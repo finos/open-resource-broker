@@ -236,9 +236,14 @@ docs-update: dev-install  ## Update and build documentation
 	@echo "Building documentation site..."
 	cd docs && mkdocs build
 
-docs-serve: dev-install  ## Generate docs and serve locally
-	@echo "Serving documentation locally..."
-	cd docs && mkdocs serve
+docs-serve: dev-install  ## Serve versioned documentation locally with live reload
+	@echo "Starting versioned documentation server at http://127.0.0.1:8000"
+	@echo "Press Ctrl+C to stop the server"
+	@if [ ! -f "$(BIN)/mike" ]; then \
+		echo "Mike not found, installing development dependencies..."; \
+		$(MAKE) dev-install; \
+	fi
+	cd $(DOCS_DIR) && ../$(BIN)/mike serve
 
 quality-gates: lint test architecture-check  ## Run all quality gates
 	@echo "All quality gates completed successfully!"
@@ -279,15 +284,6 @@ docs-build: dev-install  ## Build documentation
 	@echo "Building documentation with MkDocs..."
 	cd $(DOCS_DIR) && ../$(BIN)/mkdocs build
 	@echo "Documentation built in $(DOCS_BUILD_DIR)/"
-
-docs-serve-versioned:  ## Serve versioned documentation locally with live reload
-	@echo "Starting versioned documentation server at http://127.0.0.1:8000"
-	@echo "Press Ctrl+C to stop the server"
-	@if [ ! -f "$(BIN)/mike" ]; then \
-		echo "Mike not found, installing development dependencies..."; \
-		$(MAKE) dev-install; \
-	fi
-	cd $(DOCS_DIR) && ../$(BIN)/mike serve
 
 docs-serve-dev:  ## Serve documentation in development mode (non-versioned)
 	@echo "Starting development documentation server at http://127.0.0.1:8000"

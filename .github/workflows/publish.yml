@@ -1,5 +1,14 @@
 name: Publish to PyPI
 
+# SECURITY NOTE: This workflow requires the following repository secrets:
+# - PYPI_API_TOKEN: Production PyPI API token (scope: entire account or project)
+# - TEST_PYPI_API_TOKEN: Test PyPI API token (scope: entire account or project)
+# 
+# To set up:
+# 1. Create API tokens at https://pypi.org/manage/account/ and https://test.pypi.org/manage/account/
+# 2. Add them as repository secrets in GitHub Settings > Secrets and variables > Actions
+# 3. See docs/deployment/pypi-setup.md for detailed setup instructions
+
 on:
   release:
     types: [published]
