@@ -56,7 +56,7 @@ jobs:
         chmod +x hadolint
         sudo mv hadolint /usr/local/bin/
     
-    - name: Run comprehensive security scan
+    - name: Run security scan
       run: |
         python dev-tools/security/security_scan.py
       continue-on-error: true

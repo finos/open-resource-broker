@@ -385,7 +385,7 @@ jobs:
       with:
         path: test-results/
     
-    - name: Generate comprehensive test report
+    - name: Generate complete test report
       run: |
         python -m pytest tests/ \
           --junitxml=test-results-combined.xml \
@@ -399,11 +399,11 @@ jobs:
           -m "not slow"
       continue-on-error: true
     
-    - name: Upload comprehensive test report
+    - name: Upload complete test report
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: comprehensive-test-report
+        name: complete-test-report
         path: |
           test-results-combined.xml
           coverage-combined.xml
@@ -414,8 +414,8 @@ jobs:
       if: always()
       with:
         file: coverage-combined.xml
-        flags: comprehensive
-        name: comprehensive-tests
+        flags: complete
+        name: complete-tests
 
   notify:
     name: Notify Results
