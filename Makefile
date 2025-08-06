@@ -449,9 +449,10 @@ ci-security-hadolint: dev-install  ## Run Hadolint Dockerfile scan
 # Composite target
 ci-security: ci-security-bandit ci-security-safety  ## Run all security scans
 
-ci-imports: dev-install  ## Run import validation (matches CI import checks)
-	@echo "Running import validation..."
-	$(PYTHON) dev-tools/scripts/validate_imports.py
+ci-build-sbom: dev-install  ## Generate SBOM files (matches publish.yml workflow)
+	@echo "Generating SBOM files for CI..."
+	@echo "This matches the GitHub Actions publish.yml workflow exactly"
+	$(MAKE) sbom-generate
 
 ci-tests-unit: dev-install  ## Run unit tests only (matches ci.yml unit-tests job)
 	@echo "Running unit tests..."
