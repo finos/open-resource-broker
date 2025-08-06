@@ -1,8 +1,11 @@
 # Multi-stage Dockerfile for Open Host Factory Plugin REST API
 # Optimized for production deployment with security and performance
 
+# Build arguments for Python version
+ARG PYTHON_VERSION=3.11
+
 # Build stage
-FROM python:3.11-slim as builder
+FROM python:${PYTHON_VERSION}-slim AS builder
 
 # Set build arguments
 ARG BUILD_DATE
@@ -45,7 +48,7 @@ RUN (uv pip install --no-cache --upgrade pip==25.1.1 setuptools==80.9.0 wheel==0
      pip install --no-cache-dir -r requirements.txt)
 
 # Production stage
-FROM python:3.11-slim as production
+FROM python:${PYTHON_VERSION}-slim AS production
 
 # Install runtime system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -90,7 +93,7 @@ ENV HF_SERVER_WORKERS=1
 ENV HF_SERVER_LOG_LEVEL=info
 ENV HF_SERVER_DOCS_ENABLED=true
 
-# Authentication configuration
+# Authentication configuration (non-sensitive defaults)
 ENV HF_AUTH_ENABLED=false
 ENV HF_AUTH_STRATEGY=none
 

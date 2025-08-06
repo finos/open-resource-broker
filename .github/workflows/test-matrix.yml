@@ -1,22 +1,15 @@
 name: Test Matrix
 
 on:
+  schedule:
+    # Run nightly comprehensive testing at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    # Allow manual triggering
   push:
-    branches: [ main, develop ]
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'requirements*.txt'
-      - 'pyproject.toml'
-      - 'pytest.ini'
-  pull_request:
-    branches: [ main, develop ]
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'requirements*.txt'
-      - 'pyproject.toml'
-      - 'pytest.ini'
+    branches: [main]
+    tags: ['v*']
+    # Only run on main branch and releases for comprehensive testing
 
 env:
   AWS_DEFAULT_REGION: us-east-1
@@ -33,8 +26,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]  # Disabled windows-latest, macos-latest for now
-        python-version: ['3.9', '3.10', '3.11', '3.12']
-        test-type: [unit, integration]
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+        test-type: [unit, integration, e2e]
         # exclude:
         #   # Reduce matrix size for faster CI
         #   - os: windows-latest

@@ -94,7 +94,7 @@ repos:
         
       - id: check-architecture
         name: Check Clean Architecture
-        entry: bash -c 'source .venv/bin/activate && python scripts/check_architecture.py --warn-only'
+        entry: bash -c 'source .venv/bin/activate && python dev-tools/scripts/check_architecture.py --warn-only'
         language: system
         files: \.(py)$
         pass_filenames: false

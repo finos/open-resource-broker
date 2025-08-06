@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Professional Quality Check Tool
+Quality Check Tool
 
-A comprehensive quality checker that enforces professional standards:
+A quality checker that enforces coding standards:
 - No emojis in code or comments
 - No unprofessional language
 - No hyperbolic marketing terms

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Comprehensive CI Testing Script
+CI Testing Script
 
 This script runs the same checks that are executed in the CI pipeline,
 allowing developers to catch issues locally before pushing.
@@ -26,7 +26,7 @@ from typing import List, Tuple
 
 
 class CIChecker:
-    """Comprehensive CI testing that matches GitHub Actions workflow."""
+    """CI testing that matches GitHub Actions workflow."""
     
     def __init__(self, verbose: bool = False, fix: bool = False):
         self.verbose = verbose
@@ -303,7 +303,7 @@ class CIChecker:
     
     def run_all_checks(self, quick: bool = False) -> bool:
         """Run all CI checks."""
-        self.log("=== Comprehensive CI Testing ===")
+        self.log("=== CI Testing ===")
         self.log("Running the same checks as GitHub Actions CI pipeline...")
         self.log("")
         
@@ -357,7 +357,7 @@ class CIChecker:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run comprehensive CI checks locally")
+    parser = argparse.ArgumentParser(description="Run CI checks locally")
     parser.add_argument("--quick", action="store_true", help="Run only fast checks")
     parser.add_argument("--fix", action="store_true", help="Fix formatting issues automatically")
     parser.add_argument("--verbose", action="store_true", help="Show detailed output")

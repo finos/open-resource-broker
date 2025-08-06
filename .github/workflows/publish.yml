@@ -1,5 +1,14 @@
 name: Publish to PyPI
 
+# SECURITY NOTE: This workflow requires the following repository secrets:
+# - PYPI_API_TOKEN: Production PyPI API token (scope: entire account or project)
+# - TEST_PYPI_API_TOKEN: Test PyPI API token (scope: entire account or project)
+# 
+# To set up:
+# 1. Create API tokens at https://pypi.org/manage/account/ and https://test.pypi.org/manage/account/
+# 2. Add them as repository secrets in GitHub Settings > Secrets and variables > Actions
+# 3. See docs/deployment/pypi-setup.md for detailed setup instructions
+
 on:
   release:
     types: [published]
@@ -66,7 +75,7 @@ jobs:
     
     - name: Create deployment summary
       run: |
-        echo "## 🚀 Package Published Successfully!" >> $GITHUB_STEP_SUMMARY
+        echo "## Package Published Successfully" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         if [ "${{ github.event.inputs.environment }}" = "pypi" ] || [ "${{ github.event_name }}" = "release" ]; then
           echo "**Environment:** Production PyPI" >> $GITHUB_STEP_SUMMARY
@@ -79,3 +88,97 @@ jobs:
         echo "**Commands:**" >> $GITHUB_STEP_SUMMARY
         echo "- \`ohfp --help\`" >> $GITHUB_STEP_SUMMARY
         echo "- \`open-hostfactory-plugin --help\`" >> $GITHUB_STEP_SUMMARY
+
+  generate-sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    needs: [build, publish]
+    if: github.event_name == 'release' || github.event.inputs.environment == 'pypi'
+    
+    permissions:
+      contents: read
+      actions: write
+      security-events: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v1
+      with:
+        enable-cache: true
+        cache-dependency-glob: "requirements*.txt"
+
+    - name: Install dependencies with uv
+      run: |
+        uv pip install --system -r requirements.txt -r requirements-dev.txt
+
+    - name: Generate Python SBOM (CycloneDX)
+      run: |
+        python -m pip install cyclonedx-bom
+        cyclonedx-py -o python-sbom-cyclonedx.json
+
+    - name: Generate Python SBOM (SPDX)
+      run: |
+        # Check if cyclonedx-bom supports SPDX format
+        if cyclonedx-py --help | grep -q "spdxjson"; then
+          cyclonedx-py --format spdxjson -o python-sbom-spdx.json
+        else
+          # Fallback: create a simple SPDX-like JSON structure
+          python -c '
+import json
+import pkg_resources
+from datetime import datetime
+
+# Create basic SPDX structure
+spdx_doc = {
+    "spdxVersion": "SPDX-2.3",
+    "dataLicense": "CC0-1.0",
+    "SPDXID": "SPDXRef-DOCUMENT",
+    "name": "open-hostfactory-plugin",
+    "documentNamespace": "https://github.com/awslabs/open-hostfactory-plugin",
+    "creationInfo": {
+        "created": datetime.utcnow().isoformat() + "Z",
+        "creators": ["Tool: cyclonedx-python-fallback"]
+    },
+    "packages": []
+}
+
+# Add packages
+for dist in pkg_resources.working_set:
+    package = {
+        "SPDXID": f"SPDXRef-Package-{dist.project_name}",
+        "name": dist.project_name,
+        "version": dist.version,
+        "downloadLocation": "NOASSERTION",
+        "filesAnalyzed": False,
+        "copyrightText": "NOASSERTION"
+    }
+    spdx_doc["packages"].append(package)
+
+with open("python-sbom-spdx.json", "w") as f:
+    json.dump(spdx_doc, f, indent=2)
+'
+        fi
+
+    - name: Upload SBOM artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: sbom-reports
+        path: |
+          python-sbom-cyclonedx.json
+          python-sbom-spdx.json
+        retention-days: 90
+
+    - name: Upload SBOM to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: python-sbom-cyclonedx.json
+      continue-on-error: true
