@@ -1,6 +1,6 @@
 # Makefile for Open Host Factory Plugin
 
-.PHONY: help install dev-install test test-unit test-integration test-e2e test-all test-cov test-html test-parallel test-quick test-performance test-aws lint format security clean build docs docs-serve docs-build run version-bump
+.PHONY: help install dev-install test test-unit test-integration test-e2e test-all test-cov test-html test-parallel test-quick test-performance test-aws lint format security clean build docs docs-serve docs-build run version-bump ci-quality ci-security ci-architecture ci-imports ci-tests-unit ci-tests-integration ci-tests-matrix ci-check ci-check-quick ci-check-fix ci-check-verbose ci ci-quick workflow-ci workflow-test-matrix workflow-security architecture-check architecture-report
 
 # Python settings
 PYTHON := python3
@@ -224,37 +224,19 @@ security-report: security-full sbom-generate  ## Generate comprehensive security
 # Architecture Quality Gates
 architecture-check: dev-install  ## Run architecture compliance checks
 	@echo "Running architecture quality checks..."
-	$(PYTHON) scripts/check_file_sizes.py --warn-only
-	$(PYTHON) scripts/validate_cqrs.py --warn-only
-	$(PYTHON) scripts/check_architecture.py --warn-only
-
-file-size-report: dev-install  ## Generate file size report
-	@echo "Generating file size report..."
-	$(PYTHON) scripts/check_file_sizes.py --report
+	$(PYTHON) dev-tools/scripts/validate_cqrs.py --warn-only
+	$(PYTHON) dev-tools/scripts/check_architecture.py --warn-only
 
 architecture-report: dev-install  ## Generate detailed architecture report
 	@echo "Generating architecture dependency report..."
-	$(PYTHON) scripts/check_architecture.py --report
+	$(PYTHON) dev-tools/scripts/check_architecture.py --report
 
 # Architecture Documentation Generation
-docs-generate: dev-install  ## Auto-generate architecture documentation
-	@echo "Generating architecture documentation..."
-	$(PYTHON) scripts/generate_arch_docs.py
-	$(PYTHON) scripts/generate_dependency_graphs.py
-
-docs-metrics: dev-install  ## Generate architecture metrics report only
-	@echo "Generating architecture metrics..."
-	$(PYTHON) scripts/generate_arch_docs.py --metrics-only
-
-docs-diagrams: dev-install  ## Generate dependency diagrams only
-	@echo "Generating dependency diagrams..."
-	$(PYTHON) scripts/generate_dependency_graphs.py
-
-docs-update: docs-generate  ## Update and build documentation
+docs-update: dev-install  ## Update and build documentation
 	@echo "Building documentation site..."
 	cd docs && mkdocs build
 
-docs-serve: docs-generate  ## Generate docs and serve locally
+docs-serve: dev-install  ## Generate docs and serve locally
 	@echo "Serving documentation locally..."
 	cd docs && mkdocs serve
 
@@ -298,7 +280,7 @@ docs-build: dev-install  ## Build documentation
 	cd $(DOCS_DIR) && ../$(BIN)/mkdocs build
 	@echo "Documentation built in $(DOCS_BUILD_DIR)/"
 
-docs-serve:  ## Serve documentation locally with live reload
+docs-serve-versioned:  ## Serve versioned documentation locally with live reload
 	@echo "Starting versioned documentation server at http://127.0.0.1:8000"
 	@echo "Press Ctrl+C to stop the server"
 	@if [ ! -f "$(BIN)/mike" ]; then \
@@ -386,27 +368,76 @@ build-test: build  ## Build and test package installation
 	./dev-tools/package/test-install.sh
 
 # CI/CD targets
+ci-quality: dev-install  ## Run code quality checks (matches ci.yml lint-and-security job)
+	@echo "Running code quality checks..."
+	$(PYTHON) -m black --check src/ tests/
+	$(PYTHON) -m isort --check-only src/ tests/
+	$(PYTHON) -m flake8 src/ tests/
+	$(PYTHON) -m mypy src/
+	$(PYTHON) -m pylint src/
+
+ci-security: dev-install  ## Run security scans (matches security.yml workflow)
+	@echo "Running security scans..."
+	$(PYTHON) -m bandit -r src/
+	$(PYTHON) -m safety check
+
+ci-architecture: dev-install  ## Run architecture compliance checks (matches ci.yml architecture-compliance job)
+	@echo "Running architecture compliance checks..."
+	$(PYTHON) dev-tools/scripts/validate_cqrs.py
+	$(PYTHON) dev-tools/scripts/check_architecture.py
+
+ci-imports: dev-install  ## Run import validation (matches CI import checks)
+	@echo "Running import validation..."
+	$(PYTHON) dev-tools/scripts/validate_imports.py
+
+ci-tests-unit: dev-install  ## Run unit tests only (matches ci.yml unit-tests job)
+	@echo "Running unit tests..."
+	$(PYTHON) -m pytest tests/unit/ $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-unit.xml --junitxml=junit-unit.xml
+
+ci-tests-integration: dev-install  ## Run integration tests only (matches ci.yml integration-tests job)
+	@echo "Running integration tests..."
+	$(PYTHON) -m pytest tests/integration/ $(PYTEST_ARGS) --junitxml=junit-integration.xml
+
+ci-tests-matrix: dev-install  ## Run comprehensive test matrix (matches test-matrix.yml workflow)
+	@echo "Running comprehensive test matrix..."
+	$(PYTHON) -m pytest tests/ $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-matrix.xml --junitxml=junit-matrix.xml
+
 ci-check: dev-install  ## Run comprehensive CI checks (matches GitHub Actions exactly)
 	@echo "Running comprehensive CI checks that match GitHub Actions pipeline..."
-	$(PYTHON) dev-tools/scripts/ci_check.py
+	$(MAKE) ci-quality
+	$(MAKE) ci-architecture
+	$(MAKE) ci-tests-unit
 
 ci-check-quick: dev-install  ## Run quick CI checks (fast checks only)
 	@echo "Running quick CI checks..."
-	$(PYTHON) dev-tools/scripts/ci_check.py --quick
+	$(MAKE) ci-quality
+	$(MAKE) ci-architecture
 
 ci-check-fix: dev-install  ## Run CI checks with automatic formatting fixes
 	@echo "Running CI checks with automatic fixes..."
-	$(PYTHON) dev-tools/scripts/ci_check.py --fix
+	$(PYTHON) -m black src/ tests/
+	$(PYTHON) -m isort src/ tests/
+	$(MAKE) ci-quality
 
 ci-check-verbose: dev-install  ## Run CI checks with verbose output
 	@echo "Running CI checks with verbose output..."
 	$(PYTHON) dev-tools/scripts/ci_check.py --verbose
 
-ci: ci-check test-all  ## Run full CI pipeline (comprehensive checks + all tests)
+ci: ci-check ci-tests-integration  ## Run full CI pipeline (comprehensive checks + all tests)
 	@echo "Full CI pipeline completed successfully!"
 
 ci-quick: ci-check-quick  ## Run quick CI pipeline (fast checks only)
 	@echo "Quick CI pipeline completed successfully!"
+
+# Workflow-specific targets (match GitHub Actions workflow names)
+workflow-ci: ci-check ci-tests-unit ci-tests-integration  ## Run complete CI workflow locally
+	@echo "CI workflow completed successfully!"
+
+workflow-test-matrix: ci-tests-matrix  ## Run test matrix workflow locally
+	@echo "Test matrix workflow completed successfully!"
+
+workflow-security: ci-security  ## Run security workflow locally
+	@echo "Security workflow completed successfully!"
 
 # Cleanup targets
 clean:  ## Clean up build artifacts
