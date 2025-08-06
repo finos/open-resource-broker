@@ -117,35 +117,46 @@ jobs:
 
     - name: Generate Python SBOM (SPDX)
       run: |
-        python -m pip install spdx-tools
-        python -c "
-        import json
-        import pkg_resources
-        from spdx_tools.spdx.model import Document, CreationInfo, Package
-        from spdx_tools.spdx.writer.write_anything import write_file
-        
-        # Create SPDX document
-        doc = Document(
-            creation_info=CreationInfo(
-                spdx_version='SPDX-2.3',
-                spdx_id='SPDXRef-DOCUMENT',
-                name='open-hostfactory-plugin',
-                document_namespace='https://github.com/awslabs/open-hostfactory-plugin',
-                creators=['Tool: cyclonedx-python']
-            )
-        )
-        
-        # Add packages
-        for dist in pkg_resources.working_set:
-            pkg = Package(
-                spdx_id=f'SPDXRef-Package-{dist.project_name}',
-                name=dist.project_name,
-                version=dist.version
-            )
-            doc.packages.append(pkg)
-        
-        write_file(doc, 'python-sbom-spdx.json', validate=False)
-        "
+        # Check if cyclonedx-bom supports SPDX format
+        if cyclonedx-py --help | grep -q "spdxjson"; then
+          cyclonedx-py --format spdxjson -o python-sbom-spdx.json
+        else
+          # Fallback: create a simple SPDX-like JSON structure
+          python -c "
+import json
+import pkg_resources
+from datetime import datetime
+
+# Create basic SPDX structure
+spdx_doc = {
+    'spdxVersion': 'SPDX-2.3',
+    'dataLicense': 'CC0-1.0',
+    'SPDXID': 'SPDXRef-DOCUMENT',
+    'name': 'open-hostfactory-plugin',
+    'documentNamespace': 'https://github.com/awslabs/open-hostfactory-plugin',
+    'creationInfo': {
+        'created': datetime.utcnow().isoformat() + 'Z',
+        'creators': ['Tool: cyclonedx-python-fallback']
+    },
+    'packages': []
+}
+
+# Add packages
+for dist in pkg_resources.working_set:
+    package = {
+        'SPDXID': f'SPDXRef-Package-{dist.project_name}',
+        'name': dist.project_name,
+        'version': dist.version,
+        'downloadLocation': 'NOASSERTION',
+        'filesAnalyzed': False,
+        'copyrightText': 'NOASSERTION'
+    }
+    spdx_doc['packages'].append(package)
+
+with open('python-sbom-spdx.json', 'w') as f:
+    json.dump(spdx_doc, f, indent=2)
+"
+        fi
 
     - name: Upload SBOM artifacts
       uses: actions/upload-artifact@v4
