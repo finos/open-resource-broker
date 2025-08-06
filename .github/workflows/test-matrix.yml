@@ -55,19 +55,7 @@ jobs:
     
     - name: Run unit tests
       run: |
-        python -m pytest tests/unit/ \
-          -v \
-          --tb=short \
-          --cov=src \
-          --cov-report=term-missing \
-          --cov-report=xml:coverage-${{ matrix.os }}-${{ matrix.python-version }}-unit.xml \
-          --cov-branch \
-          --no-cov-on-fail \
-          --durations=10 \
-          --maxfail=5 \
-          -m "unit and not slow" \
-          --timeout=60 \
-          --junitxml=junit-${{ matrix.os }}-${{ matrix.python-version }}-unit.xml
+        make ci-tests-unit
       # TODO: Remove continue-on-error once unit tests are fixed and stable across all Python versions
       continue-on-error: true
     
@@ -117,19 +105,7 @@ jobs:
     
     - name: Run integration tests
       run: |
-        python -m pytest tests/integration/ \
-          -v \
-          --tb=short \
-          --cov=src \
-          --cov-report=term-missing \
-          --cov-report=xml:coverage-${{ matrix.os }}-${{ matrix.python-version }}-integration.xml \
-          --cov-branch \
-          --no-cov-on-fail \
-          --durations=10 \
-          --maxfail=3 \
-          -m "integration and not slow" \
-          --timeout=300 \
-          --junitxml=junit-${{ matrix.os }}-${{ matrix.python-version }}-integration.xml
+        make ci-tests-integration
       # TODO: Remove continue-on-error once integration tests are fixed and stable across all Python versions
       continue-on-error: true
     
@@ -179,14 +155,7 @@ jobs:
     
     - name: Run e2e tests
       run: |
-        python -m pytest tests/e2e/ \
-          -v \
-          --tb=short \
-          --durations=10 \
-          --maxfail=2 \
-          -m "e2e" \
-          --timeout=600 \
-          --junitxml=junit-${{ matrix.os }}-${{ matrix.python-version }}-e2e.xml
+        make ci-tests-e2e
       # TODO: Remove continue-on-error once e2e tests are fixed and stable across all Python versions
       continue-on-error: true
     

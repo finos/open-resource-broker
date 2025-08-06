@@ -377,6 +377,10 @@ ci-security: dev-install  ## Run security scans (matches security.yml workflow)
 	$(PYTHON) -m bandit -r src/
 	$(PYTHON) -m safety check
 
+ci-sbom: dev-install  ## Generate SBOM files (matches publish.yml workflow)
+	@echo "Generating SBOM files..."
+	$(PYTHON) dev-tools/scripts/generate_sbom.py --format both
+
 ci-security-codeql: dev-install  ## Run CodeQL analysis locally (matches security.yml codeql-analysis job)
 	@echo "CodeQL analysis requires GitHub Actions environment"
 	@echo "Run 'gh workflow run security.yml' to trigger CodeQL analysis"

@@ -72,7 +72,7 @@ jobs:
     
     - name: Run security scan
       run: |
-        python dev-tools/security/security_scan.py
+        make ci-security
       continue-on-error: true
     
     - name: Upload Bandit SARIF results
