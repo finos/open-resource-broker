@@ -427,10 +427,10 @@ jobs:
     - name: Notify success
       if: ${{ needs.lint-and-security.result == 'success' && needs.unit-tests.result == 'success' && needs.integration-tests.result == 'success' && needs.e2e-tests.result == 'success' }}
       run: |
-        echo "🎉 All CI checks passed successfully!"
+        echo "All CI checks completed successfully"
     
     - name: Notify failure
       if: ${{ needs.lint-and-security.result == 'failure' || needs.unit-tests.result == 'failure' || needs.integration-tests.result == 'failure' || needs.e2e-tests.result == 'failure' }}
       run: |
-        echo "💥 Some CI checks failed!"
+        echo "Some CI checks failed"
         exit 1

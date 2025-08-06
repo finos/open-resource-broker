@@ -66,7 +66,7 @@ jobs:
     
     - name: Create deployment summary
       run: |
-        echo "## 🚀 Package Published Successfully!" >> $GITHUB_STEP_SUMMARY
+        echo "## Package Published Successfully" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         if [ "${{ github.event.inputs.environment }}" = "pypi" ] || [ "${{ github.event_name }}" = "release" ]; then
           echo "**Environment:** Production PyPI" >> $GITHUB_STEP_SUMMARY
