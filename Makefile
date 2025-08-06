@@ -285,6 +285,21 @@ docs-build: dev-install  ## Build documentation
 	cd $(DOCS_DIR) && ../$(BIN)/mkdocs build
 	@echo "Documentation built in $(DOCS_BUILD_DIR)/"
 
+ci-docs: dev-install  ## Build documentation exactly like CI (matches docs.yml workflow)
+	@echo "Building documentation with CI settings..."
+	@echo "This matches the GitHub Actions docs.yml workflow exactly"
+	cd $(DOCS_DIR) && ../$(BIN)/mkdocs build --strict
+	@echo "Verifying build output exists..."
+	@ls -la $(DOCS_BUILD_DIR)/
+	@echo "Documentation built successfully in $(DOCS_BUILD_DIR)/"
+	@echo "To serve locally: python -m http.server 8000 --directory $(DOCS_BUILD_DIR)"
+
+ci-docs-serve: ci-docs  ## Build docs with CI settings and serve locally
+	@echo "Starting local server for CI-built documentation..."
+	@echo "Documentation available at: http://localhost:8000"
+	@echo "Press Ctrl+C to stop the server"
+	cd $(DOCS_BUILD_DIR) && python -m http.server 8000
+
 docs-serve-dev:  ## Serve documentation in development mode (non-versioned)
 	@echo "Starting development documentation server at http://127.0.0.1:8000"
 	@echo "Press Ctrl+C to stop the server"
@@ -339,9 +354,6 @@ docs-check-gitlab:  ## Check GitLab Pages deployment status
 	@echo "INFO: Staging URL:    https://aws-gfs-acceleration.gitlab.aws.dev/open-hostfactory-plugin/develop"
 	@echo "INFO: GitLab Project: https://gitlab.aws.dev/aws-gfs-acceleration/open-hostfactory-plugin"
 	@echo "INFO: CI/CD Pipelines: https://gitlab.aws.dev/aws-gfs-acceleration/open-hostfactory-plugin/-/pipelines"
-
-docs-clean:  ## Clean documentation build files
-	rm -rf $(DOCS_BUILD_DIR)
 
 # Version management targets
 version-bump-patch:  ## Bump patch version (0.1.0 -> 0.1.1)
