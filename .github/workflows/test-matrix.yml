@@ -26,7 +26,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]  # Disabled windows-latest, macos-latest for now
-        python-version: ['3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
         test-type: [unit, integration, e2e]
         # exclude:
         #   # Reduce matrix size for faster CI
