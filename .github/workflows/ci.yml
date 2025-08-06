@@ -10,7 +10,7 @@ on:
     - cron: '0 2 * * *'
 
 env:
-  PYTHON_VERSION: '3.11'
+  PYTHON_VERSION: '3.13'
   AWS_DEFAULT_REGION: us-east-1
   AWS_ACCESS_KEY_ID: testing
   AWS_SECRET_ACCESS_KEY: testing
@@ -310,7 +310,7 @@ jobs:
         name: unit-tests
 
   integration-tests:
-    name: Integration Tests
+    name: Integration Tests (Fast)
     runs-on: ubuntu-latest
     needs: [unit-tests]
     
@@ -356,7 +356,7 @@ jobs:
         name: integration-tests
 
   e2e-tests:
-    name: End-to-End Tests
+    name: End-to-End Tests (Fast)
     runs-on: ubuntu-latest
     needs: [unit-tests, integration-tests]
     
