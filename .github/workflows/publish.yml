@@ -79,3 +79,86 @@ jobs:
         echo "**Commands:**" >> $GITHUB_STEP_SUMMARY
         echo "- \`ohfp --help\`" >> $GITHUB_STEP_SUMMARY
         echo "- \`open-hostfactory-plugin --help\`" >> $GITHUB_STEP_SUMMARY
+
+  generate-sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    needs: [build, publish]
+    if: github.event_name == 'release' || github.event.inputs.environment == 'pypi'
+    
+    permissions:
+      contents: read
+      actions: write
+      security-events: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v1
+      with:
+        enable-cache: true
+        cache-dependency-glob: "requirements*.txt"
+
+    - name: Install dependencies with uv
+      run: |
+        uv pip install --system -r requirements.txt -r requirements-dev.txt
+
+    - name: Generate Python SBOM (CycloneDX)
+      run: |
+        python -m pip install cyclonedx-bom
+        cyclonedx-py -o python-sbom-cyclonedx.json
+
+    - name: Generate Python SBOM (SPDX)
+      run: |
+        python -m pip install spdx-tools
+        python -c "
+        import json
+        import pkg_resources
+        from spdx_tools.spdx.model import Document, CreationInfo, Package
+        from spdx_tools.spdx.writer.write_anything import write_file
+        
+        # Create SPDX document
+        doc = Document(
+            creation_info=CreationInfo(
+                spdx_version='SPDX-2.3',
+                spdx_id='SPDXRef-DOCUMENT',
+                name='open-hostfactory-plugin',
+                document_namespace='https://github.com/awslabs/open-hostfactory-plugin',
+                creators=['Tool: cyclonedx-python']
+            )
+        )
+        
+        # Add packages
+        for dist in pkg_resources.working_set:
+            pkg = Package(
+                spdx_id=f'SPDXRef-Package-{dist.project_name}',
+                name=dist.project_name,
+                version=dist.version
+            )
+            doc.packages.append(pkg)
+        
+        write_file(doc, 'python-sbom-spdx.json', validate=False)
+        "
+
+    - name: Upload SBOM artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: sbom-reports
+        path: |
+          python-sbom-cyclonedx.json
+          python-sbom-spdx.json
+        retention-days: 90
+
+    - name: Upload SBOM to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: python-sbom-cyclonedx.json
+      continue-on-error: true
