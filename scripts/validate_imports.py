@@ -37,16 +37,16 @@ def validate_critical_imports():
     for module_name in critical_imports:
         try:
             importlib.import_module(module_name)
-            print(f"✅ {module_name}")
+            print(f"PASS {module_name}")
         except ImportError as e:
             failed_imports.append((module_name, str(e)))
-            print(f"❌ {module_name}: {e}")
+            print(f"FAIL {module_name}: {e}")
         except Exception as e:
             failed_imports.append((module_name, f"Unexpected error: {e}"))
-            print(f"⚠️ {module_name}: Unexpected error: {e}")
+            print(f"WARN {module_name}: Unexpected error: {e}")
 
     if failed_imports:
-        print(f"\n❌ {len(failed_imports)} critical imports failed:")
+        print(f"\n{len(failed_imports)} critical imports failed:")
         for module, error in failed_imports:
             print(f"  - {module}: {error}")
         return False
