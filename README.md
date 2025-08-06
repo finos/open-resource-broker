@@ -1,10 +1,10 @@
 # Open Host Factory Plugin
 
-A professional cloud provider integration plugin for IBM Spectrum Symphony Host Factory, enabling dynamic provisioning of compute resources with a REST API interface and clean architecture implementation.
+A cloud provider integration plugin for IBM Spectrum Symphony Host Factory, enabling dynamic provisioning of compute resources with a REST API interface and structured architecture implementation.
 
 ## Overview
 
-The Open Host Factory Plugin provides seamless integration between IBM Spectrum Symphony Host Factory and cloud providers, implementing enterprise-grade patterns including Domain-Driven Design (DDD), Command Query Responsibility Segregation (CQRS), and Clean Architecture principles.
+The Open Host Factory Plugin provides integration between IBM Spectrum Symphony Host Factory and cloud providers, implementing industry-standard patterns including Domain-Driven Design (DDD), Command Query Responsibility Segregation (CQRS), and structured architecture principles.
 
 **Currently Supported Providers:**
 - **AWS** - Amazon Web Services (RunInstances, EC2Fleet, SpotFleet, Auto Scaling Groups)
