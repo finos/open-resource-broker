@@ -16,7 +16,7 @@ prometheus-client>=0.17.0,<1.0.0
 jsonschema>=2.5.1,<5.0.0
 
 # CLI and UI
-rich>=13.3.0,<14.0.0
+rich>=13.3.0,<15.0.0
 python-dotenv>=0.13.0,<2.0.0
 
 # Authentication dependencies
