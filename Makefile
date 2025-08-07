@@ -285,6 +285,15 @@ docs-build: dev-install  ## Build documentation
 	cd $(DOCS_DIR) && ../$(BIN)/mkdocs build
 	@echo "Documentation built in $(DOCS_BUILD_DIR)/"
 
+ci-docs-build: dev-install  ## Build documentation exactly like CI (matches docs.yml workflow)
+	@echo "Building documentation with CI settings..."
+	@echo "This matches the GitHub Actions docs.yml workflow exactly"
+	cd $(DOCS_DIR) && ../$(BIN)/mike deploy --update-aliases latest
+	cd $(DOCS_DIR) && ../$(BIN)/mike set-default latest
+	@echo "Verifying build output exists..."
+	@ls -la $(DOCS_BUILD_DIR)/
+	@echo "Documentation built successfully in $(DOCS_BUILD_DIR)/"
+
 docs-serve-dev:  ## Serve documentation in development mode (non-versioned)
 	@echo "Starting development documentation server at http://127.0.0.1:8000"
 	@echo "Press Ctrl+C to stop the server"
@@ -339,9 +348,6 @@ docs-check-gitlab:  ## Check GitLab Pages deployment status
 	@echo "INFO: Staging URL:    https://aws-gfs-acceleration.gitlab.aws.dev/open-hostfactory-plugin/develop"
 	@echo "INFO: GitLab Project: https://gitlab.aws.dev/aws-gfs-acceleration/open-hostfactory-plugin"
 	@echo "INFO: CI/CD Pipelines: https://gitlab.aws.dev/aws-gfs-acceleration/open-hostfactory-plugin/-/pipelines"
-
-docs-clean:  ## Clean documentation build files
-	rm -rf $(DOCS_BUILD_DIR)
 
 # Version management targets
 version-bump-patch:  ## Bump patch version (0.1.0 -> 0.1.1)
@@ -443,9 +449,10 @@ ci-security-hadolint: dev-install  ## Run Hadolint Dockerfile scan
 # Composite target
 ci-security: ci-security-bandit ci-security-safety  ## Run all security scans
 
-ci-imports: dev-install  ## Run import validation (matches CI import checks)
-	@echo "Running import validation..."
-	$(PYTHON) dev-tools/scripts/validate_imports.py
+ci-build-sbom: dev-install  ## Generate SBOM files (matches publish.yml workflow)
+	@echo "Generating SBOM files for CI..."
+	@echo "This matches the GitHub Actions publish.yml workflow exactly"
+	$(MAKE) sbom-generate
 
 ci-tests-unit: dev-install  ## Run unit tests only (matches ci.yml unit-tests job)
 	@echo "Running unit tests..."

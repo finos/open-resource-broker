@@ -122,7 +122,7 @@ jobs:
     - name: Generate SBOM files
       run: |
         python -m pip install cyclonedx-bom
-        make ci-sbom
+        make ci-build-sbom
 
     - name: Upload SBOM artifacts
       uses: actions/upload-artifact@v4
