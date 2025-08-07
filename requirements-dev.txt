@@ -64,7 +64,7 @@ bump2version>=1.0.1,<2.0.0
 
 # Monitoring and Profiling
 memory-profiler>=0.61.0,<1.0.0
-line-profiler>=4.1.1,<5.0.0
+line-profiler>=4.1.1,<6.0.0
 py-spy>=0.3.14,<1.0.0
 
 # Docker Development
