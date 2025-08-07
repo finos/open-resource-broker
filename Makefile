@@ -285,14 +285,16 @@ docs-build: dev-install  ## Build documentation
 	cd $(DOCS_DIR) && ../$(BIN)/mkdocs build
 	@echo "Documentation built in $(DOCS_BUILD_DIR)/"
 
-ci-docs-build: dev-install  ## Build documentation exactly like CI (matches docs.yml workflow)
+ci-docs-build: dev-install  ## Build documentation like CI (matches docs.yml workflow)
 	@echo "Building documentation with CI settings..."
-	@echo "This matches the GitHub Actions docs.yml workflow exactly"
+	@echo "This matches the GitHub Actions docs.yml workflow"
 	cd $(DOCS_DIR) && ../$(BIN)/mike deploy --update-aliases latest
 	cd $(DOCS_DIR) && ../$(BIN)/mike set-default latest
+	@echo "Listing deployed versions..."
+	cd $(DOCS_DIR) && ../$(BIN)/mike list
 	@echo "Verifying build output exists..."
 	@ls -la $(DOCS_BUILD_DIR)/
-	@echo "Documentation built successfully in $(DOCS_BUILD_DIR)/"
+	@echo "Documentation built successfully with versioning"
 
 docs-serve-dev:  ## Serve documentation in development mode (non-versioned)
 	@echo "Starting development documentation server at http://127.0.0.1:8000"

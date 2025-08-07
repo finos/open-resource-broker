@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -47,7 +47,12 @@ jobs:
         run: |
           uv pip install --system -r requirements-dev.txt
 
-      - name: Build documentation
+      - name: Configure git for mike
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Build documentation with mike
         working-directory: docs
         run: |
           mike deploy --update-aliases latest
