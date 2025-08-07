@@ -27,16 +27,9 @@ updates:
         update-types:
           - "minor"
           - "patch"
-    versioning-strategy: auto
     allow:
       - dependency-type: "direct"
       - dependency-type: "indirect"
-    vendor: true
-    # Security updates
-    security-updates:
-      enabled: true
-    vulnerability-alerts:
-      enabled: true
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
@@ -53,38 +46,8 @@ updates:
       prefix: "chore"
       include: "scope"
     open-pull-requests-limit: 10
-    # Security updates for actions
-    security-updates:
-      enabled: true
 
-  # Docker dependencies
-  - package-ecosystem: "docker"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "tuesday"
-      time: "10:00"
-      timezone: "Etc/UTC"
-    labels:
-      - "dependencies"
-      - "docker"
-    commit-message:
-      prefix: "chore"
-      include: "scope"
-    open-pull-requests-limit: 5
-    security-updates:
-      enabled: true
-    reviewers:
-      - "aws-samples/hostfactory-maintainers"
-    assignees:
-      - "aws-samples/hostfactory-maintainers"
-    groups:
-      actions:
-        patterns:
-          - "*"
-    versioning-strategy: increase
-
-  # Docker dependencies
+  # Docker dependencies (merged configuration)
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
@@ -107,4 +70,3 @@ updates:
       docker:
         patterns:
           - "*"
-    versioning-strategy: auto
