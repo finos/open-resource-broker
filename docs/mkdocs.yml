@@ -1,15 +1,15 @@
 site_name: Open Host Factory Plugin
 site_description: Provider-agnostic Host Factory plugin for IBM Spectrum Symphony
-site_url: https://aws-gfs-acceleration.gitlab.aws.dev/open-hostfactory-plugin
-repo_url: https://gitlab.aws.dev/aws-gfs-acceleration/open-hostfactory-plugin
+site_url: https://awslabs.github.io/open-hostfactory-plugin
+repo_url: https://github.com/awslabs/open-hostfactory-plugin
 repo_name: open-hostfactory-plugin
 
 # Proper docs structure: mkdocs.yml in docs/, markdown files in docs/docs/
 docs_dir: docs
 site_dir: site
 
-# GitLab-specific settings
-edit_uri: -/edit/main/docs/
+# GitHub-specific settings
+edit_uri: edit/main/docs/
 
 theme:
   name: material
@@ -37,6 +37,11 @@ theme:
     - content.code.annotate
     - content.code.copy
     - content.tabs.link
+
+# Mike versioning configuration
+extra:
+  version:
+    provider: mike
 
 plugins:
   - search

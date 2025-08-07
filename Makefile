@@ -1,6 +1,6 @@
 # Makefile for Open Host Factory Plugin
 
-.PHONY: help install dev-install test test-unit test-integration test-e2e test-all test-cov test-html test-parallel test-quick test-performance test-aws lint format security clean build docs docs-serve docs-build run version-bump ci-quality ci-security ci-security-codeql ci-security-container ci-architecture ci-imports ci-tests-unit ci-tests-integration ci-tests-e2e ci-tests-matrix ci-tests-performance ci-check ci-check-quick ci-check-fix ci-check-verbose ci ci-quick workflow-ci workflow-test-matrix workflow-security architecture-check architecture-report
+.PHONY: help install install-pip install-uv dev-install dev-install-pip dev-install-uv test test-unit test-integration test-e2e test-all test-cov test-html test-parallel test-quick test-performance test-aws test-report lint format security security-container security-full security-scan security-validate-sarif security-report sbom-generate clean clean-all build build-test docs docs-build docs-serve docs-deploy docs-clean docs-deploy-version docs-list-versions docs-delete-version ci-docs-build ci-docs-deploy run run-dev version-bump version-bump-patch version-bump-minor version-bump-major ci-quality ci-security ci-security-codeql ci-security-container ci-architecture ci-imports ci-tests-unit ci-tests-integration ci-tests-e2e ci-tests-matrix ci-tests-performance ci-check ci-check-quick ci-check-fix ci-check-verbose ci ci-quick workflow-ci workflow-test-matrix workflow-security architecture-check architecture-report quality-check quality-check-fix quality-check-files quality-gates quality-full generate-completions install-completions install-bash-completions install-zsh-completions uninstall-completions test-completions dev-setup install-package uninstall-package reinstall-package init-db create-config validate-config docker-build docker-run docker-compose-up docker-compose-down dev status uv-lock uv-sync uv-sync-dev uv-check uv-benchmark
 
 # Python settings
 PYTHON := python3
@@ -157,7 +157,7 @@ security: dev-install  ## Run security checks
 	@echo "Running safety (dependency vulnerability check)..."
 	$(BIN)/safety check || echo "Vulnerable dependencies found"
 
-security-container: ## Run container security scans
+security-container: dev-install ## Run container security scans
 	@echo "Running container security scans..."
 	@if ! command -v trivy >/dev/null 2>&1; then \
 		echo "Installing Trivy..."; \
@@ -232,23 +232,10 @@ architecture-report: dev-install  ## Generate detailed architecture report
 	$(PYTHON) dev-tools/scripts/check_architecture.py --report
 
 # Architecture Documentation Generation
-docs-update: dev-install  ## Update and build documentation
-	@echo "Building documentation site..."
-	cd docs && mkdocs build
-
-docs-serve: dev-install  ## Serve versioned documentation locally with live reload
-	@echo "Starting versioned documentation server at http://127.0.0.1:8000"
-	@echo "Press Ctrl+C to stop the server"
-	@if [ ! -f "$(BIN)/mike" ]; then \
-		echo "Mike not found, installing development dependencies..."; \
-		$(MAKE) dev-install; \
-	fi
-	cd $(DOCS_DIR) && ../$(BIN)/mike serve
-
 quality-gates: lint test architecture-check  ## Run all quality gates
 	@echo "All quality gates completed successfully!"
 
-quality-full: lint test architecture-check docs-generate  ## Run quality gates and generate docs
+quality-full: lint test architecture-check docs-build  ## Run quality gates and generate docs
 	@echo "Full quality check and documentation generation completed!"
 
 # Completion targets
@@ -278,35 +265,35 @@ test-completions:         ## Test completion generation
 	@$(PYTHON) src/run.py --completion zsh > /dev/null && echo "SUCCESS: Zsh completion generation works"
 
 # Documentation targets
-docs: docs-build  ## Build documentation (alias for docs-build)
+docs: docs-build  ## Build documentation (main docs entry point)
 
-docs-build: dev-install  ## Build documentation
-	@echo "Building documentation with MkDocs..."
-	cd $(DOCS_DIR) && ../$(BIN)/mkdocs build
-	@echo "Documentation built in $(DOCS_BUILD_DIR)/"
-
-ci-docs-build: dev-install  ## Build documentation like CI (matches docs.yml workflow)
-	@echo "Building documentation with CI settings..."
-	@echo "This matches the GitHub Actions docs.yml workflow"
+docs-build: dev-install  ## Build documentation locally with mike (no push)
+	@echo "Building documentation locally with mike..."
 	cd $(DOCS_DIR) && ../$(BIN)/mike deploy --update-aliases latest
-	cd $(DOCS_DIR) && ../$(BIN)/mike set-default latest
-	@echo "Listing deployed versions..."
-	cd $(DOCS_DIR) && ../$(BIN)/mike list
-	@echo "Verifying build output exists..."
-	@ls -la $(DOCS_BUILD_DIR)/
-	@echo "Documentation built successfully with versioning"
+	@echo "Documentation built with mike versioning"
 
-docs-serve-dev:  ## Serve documentation in development mode (non-versioned)
-	@echo "Starting development documentation server at http://127.0.0.1:8000"
+ci-docs-build: dev-install  ## Build documentation for CI PR testing (matches docs.yml PR builds)
+	@echo "Building documentation for CI testing..."
+	cd $(DOCS_DIR) && ../$(BIN)/mkdocs build --strict
+	@echo "Documentation built and validated for CI"
+
+docs-serve: dev-install  ## Serve versioned documentation locally with live reload
+	@echo "Starting versioned documentation server at http://127.0.0.1:8000"
 	@echo "Press Ctrl+C to stop the server"
-	@if [ ! -f "$(BIN)/mkdocs" ]; then \
-		echo "MkDocs not found, installing development dependencies..."; \
+	@if [ ! -f "$(BIN)/mike" ]; then \
+		echo "Mike not found, installing development dependencies..."; \
 		$(MAKE) dev-install; \
 	fi
-	cd $(DOCS_DIR) && ../$(BIN)/mkdocs serve
+	cd $(DOCS_DIR) && ../$(BIN)/mike serve
 
-docs-deploy: dev-install  ## Deploy documentation to GitHub Pages
-	cd $(DOCS_DIR) && ../$(BIN)/mike deploy --push --update-aliases $(VERSION) latest
+docs-deploy: dev-install  ## Deploy documentation locally (for testing deployment)
+	@echo "Deploying documentation locally with mike..."
+	@echo "WARNING: This will commit to your local gh-pages branch"
+	cd $(DOCS_DIR) && ../$(BIN)/mike deploy --update-aliases latest
+	@echo "Documentation deployed locally. Use 'git push origin gh-pages' to publish."
+
+ci-docs-deploy: dev-install  ## Deploy documentation to GitHub Pages (matches docs.yml main branch)
+	cd $(DOCS_DIR) && ../$(BIN)/mike deploy --push --update-aliases latest
 
 docs-deploy-version: dev-install  ## Deploy specific version (usage: make docs-deploy-version VERSION=1.0.0)
 	@if [ -z "$(VERSION)" ]; then \
@@ -333,23 +320,8 @@ docs-delete-version:  ## Delete a documentation version (usage: make docs-delete
 	fi
 	cd $(DOCS_DIR) && ../$(BIN)/mike delete $(VERSION)
 
-docs-deploy-gitlab:  ## Deploy documentation to GitLab Pages (production)
-	@echo "INFO: Triggering GitLab Pages production deployment..."
-	@echo "INFO: Documentation will be available at: https://aws-gfs-acceleration.gitlab.aws.dev/open-hostfactory-plugin"
-	@echo "TIP: Push to main branch to trigger deployment"
-	git push origin main
-
-docs-deploy-staging:  ## Deploy documentation to GitLab Pages (staging)
-	@echo "INFO: Triggering GitLab Pages staging deployment..."
-	@echo "INFO: Documentation will be available at: https://aws-gfs-acceleration.gitlab.aws.dev/open-hostfactory-plugin/develop"
-	@echo "TIP: Push to develop branch to trigger deployment"
-	git push origin develop
-
-docs-check-gitlab:  ## Check GitLab Pages deployment status
-	@echo "INFO: Production URL: https://aws-gfs-acceleration.gitlab.aws.dev/open-hostfactory-plugin"
-	@echo "INFO: Staging URL:    https://aws-gfs-acceleration.gitlab.aws.dev/open-hostfactory-plugin/develop"
-	@echo "INFO: GitLab Project: https://gitlab.aws.dev/aws-gfs-acceleration/open-hostfactory-plugin"
-	@echo "INFO: CI/CD Pipelines: https://gitlab.aws.dev/aws-gfs-acceleration/open-hostfactory-plugin/-/pipelines"
+docs-clean:  ## Clean documentation build files
+	rm -rf $(DOCS_BUILD_DIR)
 
 # Version management targets
 version-bump-patch:  ## Bump patch version (0.1.0 -> 0.1.1)
@@ -593,7 +565,7 @@ dev: dev-install format lint test-quick  ## Quick development workflow (format, 
 status:  ## Show project status and useful commands
 	@echo "=== Open Host Factory Plugin Status ==="
 	@echo ""
-	@echo "📁 Project Structure:"
+	@echo "Project Structure:"
 	@echo "  Source code:     $(PACKAGE)/"
 	@echo "  Tests:          $(TESTS)/"
 	@echo "  Documentation:  $(DOCS_DIR)/"
@@ -602,17 +574,15 @@ status:  ## Show project status and useful commands
 	@echo "INFO: Quick Commands:"
 	@echo "  make dev-setup     - Set up development environment"
 	@echo "  make test          - Run tests"
+	@echo "  make docs          - Build documentation"
 	@echo "  make docs-serve    - Start documentation server"
 	@echo "  make dev           - Quick development workflow"
 	@echo ""
-	@echo "📚 Documentation:"
+	@echo "Documentation:"
 	@echo "  Local docs:     make docs-serve (versioned)"
-	@echo "  Dev docs:       make docs-serve-dev (non-versioned)"
 	@echo "  Build docs:     make docs-build"
-	@echo "  GitLab Pages:   https://aws-gfs-acceleration.gitlab.aws.dev/open-hostfactory-plugin (production)"
-	@echo "  Staging Pages:  https://aws-gfs-acceleration.gitlab.aws.dev/open-hostfactory-plugin/develop"
-	@echo "  Deploy prod:    make docs-deploy-gitlab"
-	@echo "  Deploy staging: make docs-deploy-staging"
+	@echo "  GitHub Pages:   https://awslabs.github.io/open-hostfactory-plugin"
+	@echo "  Deploy docs:    make docs-deploy (local) or make ci-docs-deploy (CI)"
 	@echo "  List versions:  make docs-list-versions"
 	@echo "  Deploy version: make docs-deploy-version VERSION=1.0.0"
 	@echo ""
