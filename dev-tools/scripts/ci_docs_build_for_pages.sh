@@ -2,7 +2,7 @@
 set -e
 
 # CI Documentation Build for GitHub Pages Script
-# Builds documentation with mike but deploys locally (no push)
+# Builds documentation with mkdocs directly (no versioning)
 # Output goes to docs/site for GitHub Pages artifact upload
 
 echo "Building documentation for GitHub Pages deployment..."
@@ -12,19 +12,16 @@ cd docs
 # Clean any existing site directory
 rm -rf site
 
-# Try different mike installation methods in order of preference
-if command -v ../.venv/bin/mike >/dev/null 2>&1; then
-    echo "Using venv mike..."
-    ../.venv/bin/mike deploy --update-aliases latest
-    ../.venv/bin/mike set-default latest
-elif command -v mike >/dev/null 2>&1; then
-    echo "Using system mike..."
-    mike deploy --update-aliases latest
-    mike set-default latest
+# Use mkdocs build directly for GitHub Pages
+if command -v ../.venv/bin/mkdocs >/dev/null 2>&1; then
+    echo "Using venv mkdocs..."
+    ../.venv/bin/mkdocs build --strict
+elif command -v mkdocs >/dev/null 2>&1; then
+    echo "Using system mkdocs..."
+    mkdocs build --strict
 else
-    echo "Using Python module mike..."
-    python3 -m mike deploy --update-aliases latest
-    python3 -m mike set-default latest
+    echo "Using Python module mkdocs..."
+    python3 -m mkdocs build --strict
 fi
 
 echo "Verifying site directory exists..."
