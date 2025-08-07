@@ -2,7 +2,7 @@ name: Deploy Documentation
 
 on:
   push:
-    branches: [main, ddd_refactor]
+    branches: [main]
     paths:
       - 'docs/**'
       - 'src/**'
@@ -12,9 +12,10 @@ on:
     paths:
       - 'docs/**'
       - 'src/**'
+  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -46,11 +47,18 @@ jobs:
         run: |
           uv pip install --system -r requirements-dev.txt
 
-      - name: Build documentation
+      - name: Configure git for mike
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Build documentation with mike
         working-directory: docs
         run: |
-          mkdocs build --strict
-          ls -la site/  # Verify build output exists
+          mike deploy --update-aliases latest
+          mike set-default latest
+          mike list
+          ls -la site/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
@@ -58,7 +66,7 @@ jobs:
           path: docs/site
 
   deploy:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/ddd_refactor'
+    if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
