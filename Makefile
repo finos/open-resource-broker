@@ -274,7 +274,17 @@ docs-build: dev-install  ## Build documentation locally with mike (no push)
 
 ci-docs-build: dev-install  ## Build documentation for CI PR testing (matches docs.yml PR builds)
 	@echo "Building documentation for CI testing..."
-	cd $(DOCS_DIR) && $(PYTHON) -m mkdocs build --strict
+	@cd $(DOCS_DIR) && \
+	if command -v ../$(BIN)/mkdocs >/dev/null 2>&1; then \
+		echo "Using venv mkdocs..."; \
+		../$(BIN)/mkdocs build --strict; \
+	elif command -v mkdocs >/dev/null 2>&1; then \
+		echo "Using system mkdocs..."; \
+		mkdocs build --strict; \
+	else \
+		echo "Using Python module mkdocs..."; \
+		$(PYTHON) -m mkdocs build --strict; \
+	fi
 	@echo "Documentation built and validated for CI"
 
 docs-serve: dev-install  ## Serve versioned documentation locally with live reload
@@ -293,7 +303,17 @@ docs-deploy: dev-install  ## Deploy documentation locally (for testing deploymen
 	@echo "Documentation deployed locally. Use 'git push origin gh-pages' to publish."
 
 ci-docs-deploy: dev-install  ## Deploy documentation to GitHub Pages (matches docs.yml main branch)
-	cd $(DOCS_DIR) && $(PYTHON) -m mike deploy --push --update-aliases latest
+	@cd $(DOCS_DIR) && \
+	if command -v ../$(BIN)/mike >/dev/null 2>&1; then \
+		echo "Using venv mike..."; \
+		../$(BIN)/mike deploy --push --update-aliases latest; \
+	elif command -v mike >/dev/null 2>&1; then \
+		echo "Using system mike..."; \
+		mike deploy --push --update-aliases latest; \
+	else \
+		echo "Using Python module mike..."; \
+		$(PYTHON) -m mike deploy --push --update-aliases latest; \
+	fi
 
 docs-deploy-version: dev-install  ## Deploy specific version (usage: make docs-deploy-version VERSION=1.0.0)
 	@if [ -z "$(VERSION)" ]; then \
