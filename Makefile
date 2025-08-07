@@ -274,7 +274,7 @@ docs-build: dev-install  ## Build documentation locally with mike (no push)
 
 ci-docs-build: dev-install  ## Build documentation for CI PR testing (matches docs.yml PR builds)
 	@echo "Building documentation for CI testing..."
-	cd $(DOCS_DIR) && ../$(BIN)/mkdocs build --strict
+	cd $(DOCS_DIR) && $(PYTHON) -m mkdocs build --strict
 	@echo "Documentation built and validated for CI"
 
 docs-serve: dev-install  ## Serve versioned documentation locally with live reload
@@ -293,7 +293,7 @@ docs-deploy: dev-install  ## Deploy documentation locally (for testing deploymen
 	@echo "Documentation deployed locally. Use 'git push origin gh-pages' to publish."
 
 ci-docs-deploy: dev-install  ## Deploy documentation to GitHub Pages (matches docs.yml main branch)
-	cd $(DOCS_DIR) && ../$(BIN)/mike deploy --push --update-aliases latest
+	cd $(DOCS_DIR) && $(PYTHON) -m mike deploy --push --update-aliases latest
 
 docs-deploy-version: dev-install  ## Deploy specific version (usage: make docs-deploy-version VERSION=1.0.0)
 	@if [ -z "$(VERSION)" ]; then \
