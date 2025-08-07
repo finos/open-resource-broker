@@ -59,8 +59,9 @@ def main():
     """Main entry point."""
     print("Validating critical Python imports...")
 
-    # Add project root to Python path
-    project_root = Path(__file__).parent.parent
+    # Add project root to Python path so 'src' package can be imported
+    # Path: dev-tools/scripts/validate_imports.py -> project-root
+    project_root = Path(__file__).parent.parent.parent
     sys.path.insert(0, str(project_root))
 
     success = validate_critical_imports()
