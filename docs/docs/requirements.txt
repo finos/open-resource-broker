@@ -1,6 +1,6 @@
 # MkDocs Documentation Dependencies
 # This file contains only the dependencies needed for building documentation
-# Used by GitLab CI/CD pipeline for faster, more reliable builds
+# Used by GitHub Actions workflow for faster, more reliable builds
 
 mkdocs>=1.5.0
 mkdocs-material>=9.1.0

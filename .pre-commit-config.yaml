@@ -78,7 +78,7 @@ repos:
       # Architecture Quality Gates
       - id: check-file-sizes
         name: Check File Sizes
-        entry: bash -c 'source .venv/bin/activate && python scripts/check_file_sizes.py --warn-only'
+        entry: bash -c 'source .venv/bin/activate && python dev-tools/scripts/check_file_sizes.py --warn-only'
         language: system
         files: \.(py)$
         pass_filenames: false

@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -47,32 +47,17 @@ jobs:
         run: |
           uv pip install --system -r requirements-dev.txt
 
-      - name: Configure git for mike
+      - name: Configure Git for mike
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Build documentation with mike
-        working-directory: docs
+      - name: Build documentation
         run: |
-          mike deploy --update-aliases latest
-          mike set-default latest
-          mike list
-          ls -la site/
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs/site
-
-  deploy:
-    if: github.ref == 'refs/heads/main'
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            # Deploy with mike for main branch
+            make ci-docs-deploy
+          else
+            # Build for PRs (same as local development)
+            make ci-docs-build
+          fi

@@ -37,7 +37,7 @@ The Open Host Factory Plugin provides integration between IBM Spectrum Symphony 
 
 ```bash
 # Clone repository
-git clone https://gitlab.aws.dev/aws-gfs-acceleration/open-hostfactory-plugin.git
+git clone https://github.com/awslabs/open-hostfactory-plugin.git
 cd open-hostfactory-plugin
 
 # Configure environment
@@ -71,7 +71,7 @@ For faster dependency resolution and installation, use [uv](https://github.com/a
 pip install uv
 
 # Clone repository
-git clone https://gitlab.aws.dev/aws-gfs-acceleration/open-hostfactory-plugin.git
+git clone https://github.com/awslabs/open-hostfactory-plugin.git
 cd open-hostfactory-plugin
 
 # Fast development setup with uv
@@ -91,7 +91,7 @@ make uv-sync-dev
 
 ```bash
 # Clone repository
-git clone https://gitlab.aws.dev/aws-gfs-acceleration/open-hostfactory-plugin.git
+git clone https://github.com/awslabs/open-hostfactory-plugin.git
 cd open-hostfactory-plugin
 
 # Traditional setup with pip
@@ -321,7 +321,7 @@ providers:
 
 ```bash
 # Clone repository
-git clone https://gitlab.aws.dev/aws-gfs-acceleration/open-hostfactory-plugin.git
+git clone https://github.com/awslabs/open-hostfactory-plugin.git
 cd open-hostfactory-plugin
 
 # Create virtual environment
