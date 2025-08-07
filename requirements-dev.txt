@@ -55,7 +55,7 @@ mkdocs-section-index>=0.3.0,<1.0.0
 mike>=1.1.0,<3.0.0
 
 # Development Tools
-pre-commit>=3.3.3,<4.0.0
+pre-commit>=3.3.3,<5.0.0
 debugpy>=1.8.0,<2.0.0
 ipython>=8.12.2,<9.0.0
 ipdb>=0.13.13,<1.0.0
