@@ -24,16 +24,16 @@ LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 # Install system dependencies for building
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    git \
+    build-essential=12.9 \
+    curl=7.88.1-10+deb12u12 \
+    git=1:2.39.5-0+deb12u1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
 # Install UV for fast dependency management
-RUN pip install --no-cache-dir uv
+RUN pip install --no-cache-dir uv==0.5.11
 
 # Copy pyproject.toml and other config files first for better caching
 COPY pyproject.toml ./
@@ -52,13 +52,13 @@ FROM python:${PYTHON_VERSION}-slim AS production
 
 # Install runtime system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    ca-certificates \
+    curl=7.88.1-10+deb12u12 \
+    ca-certificates=20230311 \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
 # Create non-root user for security
-RUN groupadd -r ${PACKAGE_NAME_SHORT} && useradd -r -g ${PACKAGE_NAME_SHORT} -s /bin/false ${PACKAGE_NAME_SHORT}
+RUN groupadd -r "${PACKAGE_NAME_SHORT}" && useradd -r -g "${PACKAGE_NAME_SHORT}" -s /bin/false "${PACKAGE_NAME_SHORT}"
 
 # Set working directory
 WORKDIR /app
@@ -77,7 +77,7 @@ COPY pyproject.toml ./
 
 # Create necessary directories and set permissions
 RUN mkdir -p /app/logs /app/data /app/tmp && \
-    chown -R ${PACKAGE_NAME_SHORT}:${PACKAGE_NAME_SHORT} /app
+    chown -R "${PACKAGE_NAME_SHORT}":"${PACKAGE_NAME_SHORT}" /app
 
 # Set environment variables
 ENV PYTHONPATH=/app
@@ -117,10 +117,10 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 EXPOSE 8000
 
 # Switch to non-root user
-USER ${PACKAGE_NAME_SHORT}
+USER "${PACKAGE_NAME_SHORT}"
 
 # Create entrypoint script
-COPY --chown=${PACKAGE_NAME_SHORT}:${PACKAGE_NAME_SHORT} deployment/docker/docker-entrypoint.sh /app/
+COPY --chown="${PACKAGE_NAME_SHORT}":"${PACKAGE_NAME_SHORT}" deployment/docker/docker-entrypoint.sh /app/
 RUN chmod +x /app/docker-entrypoint.sh
 
 # Set entrypoint
@@ -128,7 +128,11 @@ ENTRYPOINT ["/app/docker-entrypoint.sh"]
 
 # Default command
 CMD ["serve"]
-FROM python:${PYTHON_VERSION}-slim AS production
+
+# ==============================================================================
+# Production Stage (Final)
+# ==============================================================================
+FROM python:${PYTHON_VERSION}-slim AS final
 
 # Install runtime system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -138,7 +142,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean
 
 # Create non-root user for security
-RUN groupadd -r ${PACKAGE_NAME_SHORT} && useradd -r -g ${PACKAGE_NAME_SHORT} -s /bin/false ${PACKAGE_NAME_SHORT}
+RUN groupadd -r "${PACKAGE_NAME_SHORT}" && useradd -r -g "${PACKAGE_NAME_SHORT}" -s /bin/false "${PACKAGE_NAME_SHORT}"
 
 # Set working directory
 WORKDIR /app
@@ -157,7 +161,7 @@ COPY pyproject.toml setup.py ./
 
 # Create necessary directories and set permissions
 RUN mkdir -p /app/logs /app/data /app/tmp && \
-    chown -R ${PACKAGE_NAME_SHORT}:${PACKAGE_NAME_SHORT} /app
+    chown -R "${PACKAGE_NAME_SHORT}":"${PACKAGE_NAME_SHORT}" /app
 
 # Set environment variables
 ENV PYTHONPATH=/app
@@ -197,10 +201,10 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 EXPOSE 8000
 
 # Switch to non-root user
-USER ${PACKAGE_NAME_SHORT}
+USER "${PACKAGE_NAME_SHORT}"
 
 # Create entrypoint script
-COPY --chown=${PACKAGE_NAME_SHORT}:${PACKAGE_NAME_SHORT} deployment/docker/docker-entrypoint.sh /app/
+COPY --chown="${PACKAGE_NAME_SHORT}":"${PACKAGE_NAME_SHORT}" deployment/docker/docker-entrypoint.sh /app/
 RUN chmod +x /app/docker-entrypoint.sh
 
 # Set entrypoint
