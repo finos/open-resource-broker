@@ -10,7 +10,6 @@ on:
     - cron: '0 2 * * *'
 
 env:
-  PYTHON_VERSION: '3.13'
   AWS_DEFAULT_REGION: us-east-1
   AWS_ACCESS_KEY_ID: testing
   AWS_SECRET_ACCESS_KEY: testing
@@ -18,10 +17,27 @@ env:
   TESTING: true
 
 jobs:
+  get-python-version:
+    name: Get Python Version from Makefile
+    runs-on: ubuntu-latest
+    outputs:
+      python-version: ${{ steps.version.outputs.python-version }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Get default Python version from Makefile
+      id: version
+      run: |
+        DEFAULT_PYTHON=$(make print-DEFAULT_PYTHON)
+        echo "python-version=$DEFAULT_PYTHON" >> $GITHUB_OUTPUT
+        echo "Using Python version: $DEFAULT_PYTHON"
+
   # Code Quality Jobs (granular with tool names)
   lint-black:
     name: Black (Code Formatting)
     runs-on: ubuntu-latest
+    needs: get-python-version
     
     steps:
     - name: Checkout code
@@ -30,7 +46,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ env.PYTHON_VERSION }}
+        python-version: ${{ needs.get-python-version.outputs.python-version }}
     
     - name: Install uv
       uses: astral-sh/setup-uv@v6
