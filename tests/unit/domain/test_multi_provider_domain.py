@@ -157,7 +157,8 @@ class TestTemplateMultiProviderFields:
 
         # Test image_id validation
         with pytest.raises(ValueError, match="image_id is required"):
-            Template(template_id="validation-test", subnet_ids=["subnet-123"], max_instances=1)
+            Template(template_id="validation-test",
+                     subnet_ids=["subnet-123"], max_instances=1)
 
         # Test subnet_ids validation
         with pytest.raises(ValueError, match="At least one subnet_id is required"):

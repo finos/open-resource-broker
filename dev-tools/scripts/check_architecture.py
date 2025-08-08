@@ -21,7 +21,7 @@ class ArchitectureValidator:
         self.violations = []
         self.layer_imports = {
             'domain': [],
-            'application': [], 
+            'application': [],
             'infrastructure': [],
             'interface': []
         }
@@ -139,7 +139,7 @@ class ArchitectureValidator:
 
         # Check each layer
         self.check_domain_layer_dependencies()
-        self.check_application_layer_dependencies() 
+        self.check_application_layer_dependencies()
         self.check_infrastructure_layer_dependencies()
         self.check_interface_layer_dependencies()
 

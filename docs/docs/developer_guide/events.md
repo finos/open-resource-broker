@@ -22,25 +22,25 @@ graph TB
         Aggregate[Aggregate Root]
         DomainEvents[Domain Events]
     end
-    
+
     subgraph "Application Layer"
         EventHandlers[Event Handlers]
         CommandHandlers[Command Handlers]
         QueryHandlers[Query Handlers]
     end
-    
+
     subgraph "Infrastructure Layer"
         EventStore[Event Store]
         EventPublisher[Event Publisher]
         EventRegistry[Event Registry]
     end
-    
+
     subgraph "External Systems"
         Notifications[Notifications]
         Audit[Audit System]
         Monitoring[Monitoring]
     end
-    
+
     Aggregate --> DomainEvents
     DomainEvents --> EventStore
     EventStore --> EventPublisher
@@ -65,7 +65,7 @@ class Request(AggregateRoot):
         self.status = RequestStatus.COMPLETED
         self.machine_ids = machine_ids
         self.completed_at = datetime.utcnow()
-        
+
         # Generate domain event
         self._add_domain_event(RequestCompletedEvent(
             request_id=self.request_id,
@@ -124,15 +124,15 @@ class TemplateConfigurationManager:
                  event_publisher: Optional[EventPublisherPort] = None):
         self.event_publisher = event_publisher
         # ... other initialization
-    
+
     async def save_template(self, template: TemplateDTO) -> None:
         """Save template with optional event publishing."""
         existing_template = await self.get_template_by_id(template.template_id)
         is_update = existing_template is not None
-        
+
         # Perform save operation
         await self._perform_save_operation(template)
-        
+
         # Publish domain event if event publisher is available
         if self.event_publisher and self.event_publisher.is_enabled():
             if is_update:
@@ -149,7 +149,7 @@ class TemplateConfigurationManager:
                     template_type=template.provider_api or 'aws',
                     timestamp=datetime.utcnow()
                 )
-            
+
             self.event_publisher.publish(event)
 ```
 
@@ -226,19 +226,19 @@ The system includes 47+ specialized event handlers organized by concern:
 ```python
 class BaseEventHandler(ABC):
     """Base class for all event handlers."""
-    
+
     def __init__(self):
         self.logger = get_logger(self.__class__.__name__)
-    
+
     @abstractmethod
     async def handle(self, event: DomainEvent) -> None:
         """Handle the domain event."""
         pass
-    
+
     def can_handle(self, event: DomainEvent) -> bool:
         """Check if this handler can process the event."""
         return True
-    
+
     async def handle_with_error_recovery(self, event: DomainEvent) -> None:
         """Handle event with error recovery."""
         try:
@@ -247,7 +247,7 @@ class BaseEventHandler(ABC):
         except Exception as e:
             self.logger.error(f"Failed to handle {event.event_type}: {str(e)}")
             await self.handle_error(event, e)
-    
+
     async def handle_error(self, event: DomainEvent, error: Exception) -> None:
         """Handle event processing errors."""
         # Default error handling - can be overridden
@@ -261,11 +261,11 @@ class BaseEventHandler(ABC):
 ```python
 class RequestAuditHandler(BaseEventHandler):
     """Handles audit logging for request events."""
-    
+
     def __init__(self, audit_service: AuditService):
         super().__init__()
         self._audit_service = audit_service
-    
+
     async def handle(self, event: DomainEvent) -> None:
         if isinstance(event, RequestCreatedEvent):
             await self._handle_request_created(event)
@@ -273,7 +273,7 @@ class RequestAuditHandler(BaseEventHandler):
             await self._handle_request_status_changed(event)
         elif isinstance(event, RequestCompletedEvent):
             await self._handle_request_completed(event)
-    
+
     async def _handle_request_created(self, event: RequestCreatedEvent) -> None:
         await self._audit_service.log_event(
             event_type="REQUEST_CREATED",
@@ -286,7 +286,7 @@ class RequestAuditHandler(BaseEventHandler):
                 "tags": event.tags or {}
             }
         )
-    
+
     async def _handle_request_status_changed(self, event: RequestStatusChangedEvent) -> None:
         await self._audit_service.log_event(
             event_type="REQUEST_STATUS_CHANGED",
@@ -305,11 +305,11 @@ class RequestAuditHandler(BaseEventHandler):
 ```python
 class MachineAuditHandler(BaseEventHandler):
     """Handles audit logging for machine events."""
-    
+
     def __init__(self, audit_service: AuditService):
         super().__init__()
         self._audit_service = audit_service
-    
+
     async def handle(self, event: DomainEvent) -> None:
         if isinstance(event, MachineCreatedEvent):
             await self._handle_machine_created(event)
@@ -317,7 +317,7 @@ class MachineAuditHandler(BaseEventHandler):
             await self._handle_machine_status_changed(event)
         elif isinstance(event, MachineTerminatedEvent):
             await self._handle_machine_terminated(event)
-    
+
     async def _handle_machine_created(self, event: MachineCreatedEvent) -> None:
         await self._audit_service.log_event(
             event_type="MACHINE_CREATED",
@@ -337,11 +337,11 @@ class MachineAuditHandler(BaseEventHandler):
 ```python
 class TemplateAuditHandler(BaseEventHandler):
     """Handles audit logging for template events."""
-    
+
     def __init__(self, audit_service: AuditService):
         super().__init__()
         self._audit_service = audit_service
-    
+
     async def handle(self, event: DomainEvent) -> None:
         if isinstance(event, TemplateCreatedEvent):
             await self._handle_template_created(event)
@@ -351,7 +351,7 @@ class TemplateAuditHandler(BaseEventHandler):
             await self._handle_template_deleted(event)
         elif isinstance(event, TemplateValidatedEvent):
             await self._handle_template_validated(event)
-    
+
     async def _handle_template_created(self, event: TemplateCreatedEvent) -> None:
         await self._audit_service.log_event(
             event_type="TEMPLATE_CREATED",
@@ -362,7 +362,7 @@ class TemplateAuditHandler(BaseEventHandler):
                 "created_at": event.timestamp.isoformat()
             }
         )
-    
+
     async def _handle_template_updated(self, event: TemplateUpdatedEvent) -> None:
         await self._audit_service.log_event(
             event_type="TEMPLATE_UPDATED",
@@ -373,7 +373,7 @@ class TemplateAuditHandler(BaseEventHandler):
                 "updated_at": event.timestamp.isoformat()
             }
         )
-    
+
     async def _handle_template_deleted(self, event: TemplateDeletedEvent) -> None:
         await self._audit_service.log_event(
             event_type="TEMPLATE_DELETED",
@@ -383,7 +383,7 @@ class TemplateAuditHandler(BaseEventHandler):
                 "deleted_at": event.timestamp.isoformat()
             }
         )
-    
+
     async def _handle_template_validated(self, event: TemplateValidatedEvent) -> None:
         await self._audit_service.log_event(
             event_type="TEMPLATE_VALIDATED",
@@ -403,17 +403,17 @@ class TemplateAuditHandler(BaseEventHandler):
 ```python
 class RequestNotificationHandler(BaseEventHandler):
     """Handles notifications for request events."""
-    
+
     def __init__(self, notification_service: NotificationService):
         super().__init__()
         self._notification_service = notification_service
-    
+
     async def handle(self, event: DomainEvent) -> None:
         if isinstance(event, RequestCompletedEvent):
             await self._handle_request_completed(event)
         elif isinstance(event, RequestStatusChangedEvent) and event.new_status == RequestStatus.FAILED:
             await self._handle_request_failed(event)
-    
+
     async def _handle_request_completed(self, event: RequestCompletedEvent) -> None:
         if self._should_notify_completion(event):
             await self._notification_service.send_notification(
@@ -427,7 +427,7 @@ class RequestNotificationHandler(BaseEventHandler):
                 },
                 severity="info"
             )
-    
+
     async def _handle_request_failed(self, event: RequestStatusChangedEvent) -> None:
         await self._notification_service.send_notification(
             title="Request Failed",
@@ -446,24 +446,24 @@ class RequestNotificationHandler(BaseEventHandler):
 ```python
 class ErrorNotificationHandler(BaseEventHandler):
     """Handles error notifications and alerting."""
-    
+
     def __init__(self, alerting_service: AlertingService):
         super().__init__()
         self._alerting_service = alerting_service
-    
+
     async def handle(self, event: DomainEvent) -> None:
         if self._is_error_event(event):
             await self._handle_error_event(event)
-    
+
     def _is_error_event(self, event: DomainEvent) -> bool:
         error_indicators = [
             'Failed', 'Error', 'Timeout', 'Exception'
         ]
         return any(indicator in event.event_type for indicator in error_indicators)
-    
+
     async def _handle_error_event(self, event: DomainEvent) -> None:
         severity = self._determine_severity(event)
-        
+
         await self._alerting_service.send_alert(
             alert_type="SYSTEM_ERROR",
             severity=severity,
@@ -480,18 +480,18 @@ class ErrorNotificationHandler(BaseEventHandler):
 ```python
 class RequestWorkflowHandler(BaseEventHandler):
     """Orchestrates multi-step request workflows."""
-    
+
     def __init__(self, command_bus: CommandBus, provider_service: ProviderService):
         super().__init__()
         self._command_bus = command_bus
         self._provider_service = provider_service
-    
+
     async def handle(self, event: DomainEvent) -> None:
         if isinstance(event, RequestCreatedEvent):
             await self._handle_request_created(event)
         elif isinstance(event, RequestStatusChangedEvent):
             await self._handle_request_status_changed(event)
-    
+
     async def _handle_request_created(self, event: RequestCreatedEvent) -> None:
         # Start provisioning workflow
         command = StartProvisioningCommand(
@@ -499,9 +499,9 @@ class RequestWorkflowHandler(BaseEventHandler):
             template_id=event.template_id,
             machine_count=event.machine_count
         )
-        
+
         await self._command_bus.dispatch(command)
-    
+
     async def _handle_request_status_changed(self, event: RequestStatusChangedEvent) -> None:
         if event.new_status == RequestStatus.COMPLETED:
             # Trigger post-completion workflows
@@ -516,27 +516,27 @@ class RequestWorkflowHandler(BaseEventHandler):
 ```python
 class MachineWorkflowHandler(BaseEventHandler):
     """Manages machine provisioning workflows."""
-    
+
     def __init__(self, machine_service: MachineService):
         super().__init__()
         self._machine_service = machine_service
-    
+
     async def handle(self, event: DomainEvent) -> None:
         if isinstance(event, MachineCreatedEvent):
             await self._handle_machine_created(event)
         elif isinstance(event, MachineStatusChangedEvent):
             await self._handle_machine_status_changed(event)
-    
+
     async def _handle_machine_created(self, event: MachineCreatedEvent) -> None:
         # Initialize machine monitoring
         await self._machine_service.start_monitoring(event.machine_id)
-        
+
         # Configure machine if needed
         await self._machine_service.configure_machine(
             machine_id=event.machine_id,
             template_id=event.template_id
         )
-    
+
     async def _handle_machine_status_changed(self, event: MachineStatusChangedEvent) -> None:
         if event.new_status == MachineStatus.RUNNING:
             # Machine is ready for use
@@ -553,18 +553,18 @@ class MachineWorkflowHandler(BaseEventHandler):
 ```python
 class MetricsCollectionHandler(BaseEventHandler):
     """Collects metrics from domain events."""
-    
+
     def __init__(self, metrics_service: MetricsService):
         super().__init__()
         self._metrics_service = metrics_service
-    
+
     async def handle(self, event: DomainEvent) -> None:
         # Collect general event metrics
         await self._metrics_service.increment_counter(
             "domain_events_total",
             tags={"event_type": event.event_type}
         )
-        
+
         # Collect specific metrics based on event type
         if isinstance(event, RequestCreatedEvent):
             await self._collect_request_metrics(event)
@@ -572,7 +572,7 @@ class MetricsCollectionHandler(BaseEventHandler):
             await self._collect_machine_metrics(event)
         elif isinstance(event, RequestCompletedEvent):
             await self._collect_completion_metrics(event)
-    
+
     async def _collect_request_metrics(self, event: RequestCreatedEvent) -> None:
         await self._metrics_service.increment_counter(
             "requests_created_total",
@@ -581,20 +581,20 @@ class MetricsCollectionHandler(BaseEventHandler):
                 "request_type": event.request_type.value
             }
         )
-        
+
         await self._metrics_service.record_histogram(
             "request_machine_count",
             value=event.machine_count,
             tags={"template_id": event.template_id}
         )
-    
+
     async def _collect_completion_metrics(self, event: RequestCompletedEvent) -> None:
         await self._metrics_service.record_histogram(
             "request_duration_seconds",
             value=event.duration_seconds,
             tags={"template_id": event.template_id}
         )
-        
+
         await self._metrics_service.increment_counter(
             "requests_completed_total",
             tags={"template_id": event.template_id}
@@ -606,21 +606,21 @@ class MetricsCollectionHandler(BaseEventHandler):
 ```python
 class PerformanceMonitoringHandler(BaseEventHandler):
     """Monitors system performance through events."""
-    
+
     def __init__(self, performance_service: PerformanceService):
         super().__init__()
         self._performance_service = performance_service
-    
+
     async def handle(self, event: DomainEvent) -> None:
         # Track event processing latency
         processing_time = datetime.utcnow() - event.occurred_at
-        
+
         await self._performance_service.record_latency(
             "event_processing_latency",
             latency_ms=processing_time.total_seconds() * 1000,
             tags={"event_type": event.event_type}
         )
-        
+
         # Detect slow operations
         if processing_time.total_seconds() > 5.0:
             await self._performance_service.record_slow_operation(
@@ -640,11 +640,11 @@ class PerformanceMonitoringHandler(BaseEventHandler):
 ```python
 class EventStore:
     """Persistent storage for domain events."""
-    
+
     def __init__(self, storage_strategy: StorageStrategy):
         self._storage = storage_strategy
         self._logger = get_logger(__name__)
-    
+
     async def append_events(self, 
                           aggregate_id: str, 
                           events: List[DomainEvent],
@@ -657,7 +657,7 @@ class EventStore:
                 raise ConcurrencyConflictError(
                     f"Expected version {expected_version}, got {current_version}"
                 )
-            
+
             # Store events with deduplication
             for event in events:
                 if not await self._event_exists(event.event_id):
@@ -665,11 +665,11 @@ class EventStore:
                     self._logger.debug(f"Stored event {event.event_id}")
                 else:
                     self._logger.debug(f"Event {event.event_id} already exists, skipping")
-            
+
         except Exception as e:
             self._logger.error(f"Failed to append events: {str(e)}")
             raise
-    
+
     async def get_events(self, 
                         aggregate_id: str, 
                         from_version: int = 0) -> List[DomainEvent]:
@@ -678,20 +678,20 @@ class EventStore:
             events = await self._storage.get_events_for_aggregate(
                 aggregate_id, from_version
             )
-            
+
             return [self._deserialize_event(event_data) for event_data in events]
-            
+
         except Exception as e:
             self._logger.error(f"Failed to get events for {aggregate_id}: {str(e)}")
             raise
-    
+
     async def get_all_events(self, 
                            from_timestamp: Optional[datetime] = None) -> List[DomainEvent]:
         """Retrieve all events from a specific timestamp."""
         try:
             events = await self._storage.get_all_events(from_timestamp)
             return [self._deserialize_event(event_data) for event_data in events]
-            
+
         except Exception as e:
             self._logger.error(f"Failed to get all events: {str(e)}")
             raise
@@ -702,12 +702,12 @@ class EventStore:
 ```python
 class EventReplayer:
     """Replays events for debugging and recovery."""
-    
+
     def __init__(self, event_store: EventStore, event_handlers: List[BaseEventHandler]):
         self._event_store = event_store
         self._event_handlers = event_handlers
         self._logger = get_logger(__name__)
-    
+
     async def replay_events(self, 
                           from_timestamp: datetime,
                           to_timestamp: Optional[datetime] = None,
@@ -715,26 +715,26 @@ class EventReplayer:
         """Replay events within a time range."""
         try:
             events = await self._event_store.get_all_events(from_timestamp)
-            
+
             # Filter events if needed
             if to_timestamp:
                 events = [e for e in events if e.occurred_at <= to_timestamp]
-            
+
             if event_types:
                 events = [e for e in events if e.event_type in event_types]
-            
+
             # Replay events in chronological order
             events.sort(key=lambda e: e.occurred_at)
-            
+
             for event in events:
                 await self._replay_event(event)
-                
+
             self._logger.info(f"Replayed {len(events)} events")
-            
+
         except Exception as e:
             self._logger.error(f"Event replay failed: {str(e)}")
             raise
-    
+
     async def _replay_event(self, event: DomainEvent) -> None:
         """Replay a single event through all handlers."""
         for handler in self._event_handlers:
@@ -752,32 +752,32 @@ class EventReplayer:
 ```python
 class EventPublisher:
     """Publishes domain events to registered handlers."""
-    
+
     def __init__(self):
         self._handlers: Dict[str, List[BaseEventHandler]] = {}
         self._logger = get_logger(__name__)
-    
+
     def register_handler(self, event_type: str, handler: BaseEventHandler) -> None:
         """Register an event handler for a specific event type."""
         if event_type not in self._handlers:
             self._handlers[event_type] = []
-        
+
         self._handlers[event_type].append(handler)
         self._logger.debug(f"Registered {handler.__class__.__name__} for {event_type}")
-    
+
     async def publish_events(self, events: List[DomainEvent]) -> None:
         """Publish a list of events to all registered handlers."""
         for event in events:
             await self._publish_event(event)
-    
+
     async def _publish_event(self, event: DomainEvent) -> None:
         """Publish a single event to all registered handlers."""
         handlers = self._handlers.get(event.event_type, [])
-        
+
         if not handlers:
             self._logger.debug(f"No handlers registered for {event.event_type}")
             return
-        
+
         # Publish to all handlers concurrently
         tasks = []
         for handler in handlers:
@@ -786,7 +786,7 @@ class EventPublisher:
                     handler.handle_with_error_recovery(event)
                 )
                 tasks.append(task)
-        
+
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
             self._logger.debug(f"Published {event.event_type} to {len(tasks)} handlers")
@@ -802,35 +802,35 @@ def register_event_handlers(event_publisher: EventPublisher,
                           notification_service: NotificationService,
                           metrics_service: MetricsService) -> None:
     """Register all event handlers with the event publisher."""
-    
+
     # Audit handlers
     request_audit_handler = RequestAuditHandler(audit_service)
     machine_audit_handler = MachineAuditHandler(audit_service)
     template_audit_handler = TemplateAuditHandler(audit_service)
-    
+
     # Notification handlers
     request_notification_handler = RequestNotificationHandler(notification_service)
     error_notification_handler = ErrorNotificationHandler(notification_service)
-    
+
     # Monitoring handlers
     metrics_handler = MetricsCollectionHandler(metrics_service)
     performance_handler = PerformanceMonitoringHandler(metrics_service)
-    
+
     # Register handlers for specific event types
     event_publisher.register_handler("RequestCreatedEvent", request_audit_handler)
     event_publisher.register_handler("RequestStatusChangedEvent", request_audit_handler)
     event_publisher.register_handler("RequestCompletedEvent", request_audit_handler)
-    
+
     event_publisher.register_handler("MachineCreatedEvent", machine_audit_handler)
     event_publisher.register_handler("MachineStatusChangedEvent", machine_audit_handler)
     event_publisher.register_handler("MachineTerminatedEvent", machine_audit_handler)
-    
+
     # Template event handlers
     event_publisher.register_handler("TemplateCreatedEvent", template_audit_handler)
     event_publisher.register_handler("TemplateUpdatedEvent", template_audit_handler)
     event_publisher.register_handler("TemplateDeletedEvent", template_audit_handler)
     event_publisher.register_handler("TemplateValidatedEvent", template_audit_handler)
-    
+
     # Register handlers for all events
     for event_type in get_all_event_types():
         event_publisher.register_handler(event_type, metrics_handler)
@@ -847,7 +847,7 @@ class TestRequestAuditHandler:
     def handler(self):
         audit_service = Mock(spec=AuditService)
         return RequestAuditHandler(audit_service)
-    
+
     async def test_handle_request_created_event(self, handler):
         # Arrange
         event = RequestCreatedEvent(
@@ -857,10 +857,10 @@ class TestRequestAuditHandler:
             request_type=RequestType.PROVISION,
             created_at=datetime.utcnow()
         )
-        
+
         # Act
         await handler.handle(event)
-        
+
         # Assert
         handler._audit_service.log_event.assert_called_once()
         call_args = handler._audit_service.log_event.call_args
@@ -877,21 +877,21 @@ async def test_event_flow_integration():
     event_store = InMemoryEventStore()
     event_publisher = EventPublisher()
     audit_service = Mock(spec=AuditService)
-    
+
     handler = RequestAuditHandler(audit_service)
     event_publisher.register_handler("RequestCreatedEvent", handler)
-    
+
     # Act - Create request (generates event)
     request = Request.create_new_request(
         template_id="template-1",
         machine_count=2
     )
-    
+
     # Extract and publish events
     events = request.get_domain_events()
     await event_store.append_events("req-123", events, 0)
     await event_publisher.publish_events(events)
-    
+
     # Assert
     audit_service.log_event.assert_called_once()
 ```

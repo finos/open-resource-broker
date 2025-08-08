@@ -4,7 +4,6 @@
 import argparse
 import subprocess
 import sys
-import threading
 import time
 from pathlib import Path
 
@@ -16,57 +15,58 @@ class Colors:
     GREEN = '\033[0;32m'
     YELLOW = '\033[1;33m'
     BLUE = '\033[0;34m'
+    GRAY = '\033[0;37m'
     NC = '\033[0m'
-
-def show_progress(stop_event):
-    """Show progress dots while command runs."""
-    while not stop_event.is_set():
-        print(".", end="", flush=True)
-        time.sleep(0.5)
 
 def run_hook(name, command, warning_only=False, debug=False):
     """Run a single pre-commit hook."""
-    print(f"Running {name}... ", end="", flush=True)
-
     if debug:
+        print(f"Running {name}...", end=" ", flush=True)
+        start_time = time.time()
         result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        duration = time.time() - start_time
         exit_code = result.returncode
         output = result.stdout + result.stderr
     else:
-        # Show progress dots
-        stop_event = threading.Event()
-        progress_thread = threading.Thread(target=show_progress, args=(stop_event,))
-        progress_thread.start()
+        print(f"Running {name}: ", end="", flush=True)
+        start_time = time.time()
 
-        result = subprocess.run(command, shell=True, capture_output=True, text=True)
-        exit_code = result.returncode
+        # Start subprocess
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
-        stop_event.set()
-        progress_thread.join()
+        # Show dots while running
+        while process.poll() is None:
+            print(".", end="", flush=True)
+            time.sleep(1)
+
+        # Get results
+        stdout, stderr = process.communicate()
+        duration = time.time() - start_time
+        exit_code = process.returncode
+        output = stdout + stderr
+
+        print(" ", end="", flush=True)  # Space after dots
 
     if exit_code == 0:
-        print(f"{Colors.GREEN}PASS{Colors.NC}")
+        print(f"{Colors.GREEN}PASS{Colors.NC} ({duration:.1f}s)")
         return True
     else:
         if warning_only:
-            print(f"{Colors.YELLOW}WARN{Colors.NC}")
-            if debug:
+            print(f"{Colors.YELLOW}WARN{Colors.NC} ({duration:.1f}s)")
+            if debug and output:
                 print(f"{Colors.YELLOW}  Output: {output}{Colors.NC}")
-            else:
-                print(f"  Command: {command} (warning only)")
             return True  # Don't fail on warnings
         else:
-            print(f"{Colors.RED}FAIL{Colors.NC}")
-            if debug:
+            print(f"{Colors.RED}FAIL{Colors.NC} ({duration:.1f}s)")
+            if debug and output:
                 print(f"{Colors.RED}  Output: {output}{Colors.NC}")
-            else:
-                print(f"  Command: {command}")
             return False
 
 def main():
     parser = argparse.ArgumentParser(description="Run pre-commit checks")
     parser.add_argument("--debug", "-d", action="store_true", help="Show debug output")
     parser.add_argument("--extended", "-e", action="store_true", help="Show extended info")
+    parser.add_argument("--required-only", "-r", action="store_true", help="Run only required checks (skip warnings)")
     args = parser.parse_args()
 
     # Check for yq
@@ -103,11 +103,16 @@ def main():
 
     failed = 0
     warned = 0
+    total_time = time.time()
 
     for i, hook in enumerate(hooks):
         name = hook["name"]
         command = hook["entry"]
         warning_only = hook.get("warning_only", False)
+
+        # Skip warning-only checks if --required-only flag is set
+        if args.required_only and warning_only:
+            continue
 
         if args.extended:
             print(f"{Colors.BLUE}Hook {i+1}/{len(hooks)}: {name}{Colors.NC}")
@@ -121,8 +126,10 @@ def main():
             else:
                 failed += 1
 
+    total_elapsed = time.time() - total_time
+
     # Summary
-    print(f"\nSummary: {len(hooks)} hooks executed")
+    print(f"\nSummary: {len(hooks)} hooks executed in {Colors.GRAY}{total_elapsed:.2f}s{Colors.NC}")
     if failed > 0:
         print(f"{Colors.RED}Failed: {failed}{Colors.NC}")
     if warned > 0:

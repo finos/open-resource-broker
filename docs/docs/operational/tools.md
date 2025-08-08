@@ -226,12 +226,12 @@ from src.infrastructure.utilities.common.collections import batch_processor
 
 class BatchProcessor:
     """Framework for batch processing operations."""
-    
+
     def __init__(self, batch_size: int = 100, parallel_workers: int = 4):
         self.batch_size = batch_size
         self.parallel_workers = parallel_workers
         self.logger = get_logger(__name__)
-    
+
     def process_in_batches(self, 
                           items: List[Any], 
                           processor: Callable[[List[Any]], None],
@@ -240,15 +240,15 @@ class BatchProcessor:
         total_items = len(items)
         processed_items = 0
         errors = []
-        
+
         for batch in self._create_batches(items):
             try:
                 processor(batch)
                 processed_items += len(batch)
-                
+
                 if progress_callback:
                     progress_callback(processed_items, total_items)
-                    
+
             except Exception as e:
                 error_info = {
                     'batch_start': processed_items,
@@ -257,14 +257,14 @@ class BatchProcessor:
                 }
                 errors.append(error_info)
                 self.logger.error(f"Batch processing error: {e}")
-        
+
         return {
             'total_items': total_items,
             'processed_items': processed_items,
             'errors': errors,
             'success_rate': processed_items / total_items if total_items > 0 else 0
         }
-    
+
     def _create_batches(self, items: List[Any]) -> Iterator[List[Any]]:
         """Create batches from items."""
         for i in range(0, len(items), self.batch_size):
@@ -274,16 +274,16 @@ class BatchProcessor:
 def batch_update_requests():
     """Example: Batch update request statuses."""
     from src.infrastructure.di.container import get_container
-    
+
     container = get_container()
     request_repo = container.get(RequestRepositoryInterface)
-    
+
     # Get all pending requests
     pending_requests = request_repo.query_entities(
         "requests", 
         filters={"status": "PENDING"}
     )
-    
+
     def update_batch(batch):
         """Update a batch of requests."""
         for request_data in batch:
@@ -291,12 +291,12 @@ def batch_update_requests():
             request_data['status'] = 'IN_PROGRESS'
             request_data['updated_at'] = datetime.utcnow().isoformat()
             request_repo.update_entity("requests", request_data['request_id'], request_data)
-    
+
     def progress_callback(processed, total):
         """Progress reporting callback."""
         percentage = (processed / total) * 100
         print(f"Progress: {processed}/{total} ({percentage:.1f}%)")
-    
+
     # Process in batches
     processor = BatchProcessor(batch_size=50)
     result = processor.process_in_batches(
@@ -304,7 +304,7 @@ def batch_update_requests():
         update_batch, 
         progress_callback
     )
-    
+
     print(f"Batch update completed: {result}")
 ```
 

@@ -12,18 +12,18 @@ jobs:
   validate-yaml:
     name: Validate Workflow YAML
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Validate workflow files
       run: |
         echo "Validating GitHub Actions workflow YAML files..."
         for file in .github/workflows/*.yml .github/workflows/*.yaml; do
           if [ -f "$file" ]; then
             echo "Validating $file..."
-            yq . "$file" > /dev/null && echo "✓ $file is valid" || (echo "✗ $file is invalid" && exit 1)
+            yq . "$file" > /dev/null && echo "VALID: $file" || (echo "INVALID: $file" && exit 1)
           fi
         done
         echo "All workflow files are valid!"

@@ -260,7 +260,7 @@ def test_template_validation_invalid_provider_api(self):
 @pytest.mark.unit
 class TestTemplateAggregate:
     """Test cases for Template aggregate."""
-    
+
     def test_template_creation(self):
         """Test basic template creation."""
         # Arrange
@@ -269,10 +269,10 @@ class TestTemplateAggregate:
             "name": "test-template",
             # ... other fields
         }
-        
+
         # Act
         template = Template(**template_data)
-        
+
         # Assert
         assert template.id == "template-001"
         assert template.name == "test-template"
@@ -290,14 +290,14 @@ def test_application_service_request_machines(
     """Test requesting machines through application service."""
     # Setup
     mock_command_bus.dispatch.return_value = {"request_id": "req-123"}
-    
+
     # Execute
     result = application_service.request_machines(
         template_id=sample_template.id,
         machine_count=2,
         requester_id="test-user"
     )
-    
+
     # Verify
     assert result["request_id"] == "req-123"
     mock_command_bus.dispatch.assert_called_once()
@@ -316,7 +316,7 @@ def test_aws_provider_provision_instances(
     """Test AWS provider instance provisioning."""
     provider = AWSProvider(config=aws_config)
     provider.initialize(aws_config)
-    
+
     # Use mocked AWS services
     result = provider.provision_instances(
         template_id="template-001",
@@ -326,7 +326,7 @@ def test_aws_provider_provision_instances(
             "security_group_ids": [mock_ec2_resources["security_group_id"]]
         }
     )
-    
+
     assert "instance_ids" in result
 ```
 

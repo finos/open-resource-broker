@@ -131,7 +131,7 @@ groups:
       severity: critical
     annotations:
       summary: "OHFP API is down"
-      
+
   - alert: OHFPHighErrorRate
     expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
     for: 2m

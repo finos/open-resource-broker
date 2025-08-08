@@ -20,11 +20,11 @@ repository:
 
 build:
   platforms: [linux/amd64, linux/arm64]  # Container platforms
-  
+
 ci:
   test_timeout: 300  # Test timeout in seconds
   coverage_threshold: 70  # Minimum coverage percentage
-  
+
 development:
   pre_commit_enabled: true
   security_scan_enabled: true

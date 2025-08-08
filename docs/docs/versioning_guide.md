@@ -213,11 +213,11 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-    
+
     - name: Install dependencies
       run: |
         pip install -r requirements-dev.txt
-    
+
     - name: Deploy documentation
       run: |
         cd docs

@@ -30,7 +30,7 @@ class Template(BaseModel):
     template_id: str
     max_number: int
     attributes: Dict[str, Any]
-    
+
     def validate_configuration(self) -> bool:
         """Business rule: validate template configuration."""
         # Core business logic here
@@ -51,7 +51,7 @@ class MachineStatus(Enum):
 # src/domain/template/ami_resolver.py
 class AMIResolver:
     """Domain service for AMI resolution logic."""
-    
+
     def resolve_ami_id(self, ami_reference: str) -> str:
         """Business logic for AMI resolution."""
 ```
@@ -61,7 +61,7 @@ class AMIResolver:
 # src/domain/template/repository.py
 class TemplateRepository(ABC):
     """Abstract repository interface."""
-    
+
     @abstractmethod
     async def get_by_id(self, template_id: str) -> Optional[Template]:
         """Get template by ID."""
@@ -88,7 +88,7 @@ The application layer orchestrates domain objects and implements use cases.
 @injectable
 class ApplicationService:
     """Main application orchestrator."""
-    
+
     def __init__(self, 
                  command_bus: CommandBus,
                  query_bus: QueryBus,
@@ -101,7 +101,7 @@ class ApplicationService:
 # src/application/commands/template_handlers.py
 class GetTemplatesHandler:
     """Handle template retrieval commands."""
-    
+
     def handle(self, command: GetTemplatesCommand) -> List[Template]:
         # Coordinate domain objects
 ```
@@ -111,7 +111,7 @@ class GetTemplatesHandler:
 # src/application/queries/handlers.py
 class TemplateQueryHandler:
     """Handle template queries."""
-    
+
     def handle(self, query: TemplateQuery) -> TemplateResponse:
         # Process queries using domain objects
 ```
@@ -146,7 +146,7 @@ The infrastructure layer implements external concerns and technical details.
 # src/infrastructure/persistence/json/template_repository.py
 class JSONTemplateRepository(TemplateRepository):
     """JSON implementation of template repository."""
-    
+
     async def get_by_id(self, template_id: str) -> Optional[Template]:
         # JSON-specific implementation
 ```
@@ -157,7 +157,7 @@ class JSONTemplateRepository(TemplateRepository):
 @injectable
 class AWSInstanceManager:
     """AWS-specific instance management."""
-    
+
     def __init__(self, aws_client: AWSClient, logger: LoggingPort):
         # Infrastructure dependencies
 ```
@@ -167,7 +167,7 @@ class AWSInstanceManager:
 # src/infrastructure/di/container.py
 class DIContainer:
     """Dependency injection container."""
-    
+
     def register_singleton(self, interface: Type, implementation: Type):
         # DI container implementation
 ```
@@ -222,7 +222,7 @@ async def get_templates():
 # src/interface/template_command_handlers.py
 class TemplateCommandHandler:
     """Handle CLI template commands."""
-    
+
     def handle_list_templates(self, args):
         # CLI-specific processing
         # Call application layer
@@ -380,7 +380,7 @@ class TemplateRepository(ABC):
     @abstractmethod
     async def get_all(self) -> List[Template]:
         pass
-    
+
     @abstractmethod
     async def get_by_id(self, template_id: str) -> Optional[Template]:
         pass
@@ -392,7 +392,7 @@ class JSONTemplateRepository(TemplateRepository):
     def __init__(self, file_path: str, logger: LoggingPort):
         self._file_path = file_path
         self._logger = logger
-    
+
     async def get_all(self) -> List[Template]:
         # JSON-specific implementation
 ```

@@ -80,7 +80,8 @@ class TestBaseEntity:
     def test_entity_with_timestamps(self):
         """Test entity with timestamp fields."""
         now = datetime.now(timezone.utc)
-        entity = MockEntity(id="test-1", name="Timestamped Entity", created_at=now, updated_at=now)
+        entity = MockEntity(id="test-1", name="Timestamped Entity",
+                            created_at=now, updated_at=now)
 
         assert entity.created_at == now
         assert entity.updated_at == now
@@ -178,7 +179,8 @@ class TestValueObjects:
     def test_resource_id_validation(self):
         """Test ResourceId validation."""
         # Valid resource IDs
-        valid_ids = ["resource-123", "res-456", "r-789", "subnet-abc123", "sg-def456", "vpc-ghi789"]
+        valid_ids = ["resource-123", "res-456", "r-789",
+            "subnet-abc123", "sg-def456", "vpc-ghi789"]
 
         for valid_id in valid_ids:
             resource_id = ResourceId(value=valid_id)

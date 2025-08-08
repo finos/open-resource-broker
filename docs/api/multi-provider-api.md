@@ -557,9 +557,9 @@ Provider Selection Result:
   Selection Reason: Load balanced across 2 AWS providers (weight: 10/15)
   Confidence: 0.9
   Selection Time: 5ms
-  
+
   Alternatives: aws-us-west-2
-  
+
   Validation Result: Valid
     - API: EC2Fleet supported
     - Instance count: 5 (within limit of 1000)

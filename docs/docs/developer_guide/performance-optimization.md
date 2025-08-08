@@ -56,7 +56,7 @@ def register_my_service_lazy(container):
             dependency1=container.get(Dependency1),
             dependency2=container.get(Dependency2)
         )
-    
+
     container.register_factory(MyService, create_my_service)
 
 # Register for on-demand loading
@@ -77,13 +77,13 @@ class MyComponent:
     def __init__(self):
         self._heavy_resource = None
         self._database = None
-    
+
     @property
     def heavy_resource(self):
         if self._heavy_resource is None:
             self._heavy_resource = create_heavy_resource()
         return self._heavy_resource
-    
+
     @property
     def database(self):
         if self._database is None:
@@ -146,28 +146,28 @@ class TestMyComponentPerformance:
         start_time = time.time()
         component = MyComponent()
         creation_time = (time.time() - start_time) * 1000
-        
+
         assert creation_time < 10, f"Creation took {creation_time:.1f}ms"
-    
+
     def test_first_access_performance(self):
         """Test first access performance."""
         component = MyComponent()
-        
+
         start_time = time.time()
         result = component.expensive_operation()
         access_time = (time.time() - start_time) * 1000
-        
+
         assert access_time < 1000, f"First access took {access_time:.1f}ms"
-    
+
     def test_cached_access_performance(self):
         """Test cached access performance."""
         component = MyComponent()
         component.expensive_operation()  # Prime cache
-        
+
         start_time = time.time()
         result = component.expensive_operation()  # Should be cached
         cached_time = (time.time() - start_time) * 1000
-        
+
         assert cached_time < 10, f"Cached access took {cached_time:.1f}ms"
 ```
 
@@ -178,13 +178,13 @@ def test_end_to_end_performance():
     """Test end-to-end command performance."""
     import subprocess
     import sys
-    
+
     start_time = time.time()
     result = subprocess.run([
         sys.executable, "src/run.py", "templates", "list"
     ], capture_output=True, text=True)
     total_time = (time.time() - start_time) * 1000
-    
+
     assert result.returncode == 0
     assert total_time < 5000, f"Command took {total_time:.1f}ms"
 ```
@@ -231,12 +231,12 @@ def profile_memory(func):
     def wrapper(*args, **kwargs):
         process = psutil.Process(os.getpid())
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
-        
+
         result = func(*args, **kwargs)
-        
+
         final_memory = process.memory_info().rss / 1024 / 1024  # MB
         memory_increase = final_memory - initial_memory
-        
+
         logger.info(f"{func.__name__} memory increase: {memory_increase:.1f}MB")
         return result
     return wrapper
@@ -273,11 +273,11 @@ logger = get_logger(__name__)
 def debug_lazy_loading():
     """Enable debug logging for lazy loading."""
     logger.debug("Starting lazy component loading...")
-    
+
     start_time = time.time()
     component = container.get(MyComponent)
     load_time = (time.time() - start_time) * 1000
-    
+
     logger.debug(f"Component loaded in {load_time:.1f}ms")
     logger.debug(f"Component type: {type(component)}")
     logger.debug(f"Component cached: {hasattr(container, '_cached_instances')}")
@@ -295,12 +295,12 @@ import time
 
 def diagnose_startup():
     start_time = time.time()
-    
+
     # Test each component
     logger.info("Creating application...")
     app = Application()
     logger.info(f"App creation: {(time.time() - start_time) * 1000:.1f}ms")
-    
+
     start_time = time.time()
     app.initialize()
     logger.info(f"App initialization: {(time.time() - start_time) * 1000:.1f}ms")
@@ -321,18 +321,18 @@ import psutil
 
 def diagnose_memory():
     process = psutil.Process(os.getpid())
-    
+
     # Before operation
     gc.collect()
     initial_memory = process.memory_info().rss / 1024 / 1024
-    
+
     # Perform operation
     result = expensive_operation()
-    
+
     # After operation
     gc.collect()
     final_memory = process.memory_info().rss / 1024 / 1024
-    
+
     logger.info(f"Memory increase: {final_memory - initial_memory:.1f}MB")
 ```
 
@@ -351,14 +351,14 @@ def diagnose_first_access():
     start_time = time.time()
     component = container.get(SlowComponent)
     load_time = (time.time() - start_time) * 1000
-    
+
     logger.info(f"Component load time: {load_time:.1f}ms")
-    
+
     # Test component initialization
     start_time = time.time()
     result = component.initialize()
     init_time = (time.time() - start_time) * 1000
-    
+
     logger.info(f"Component init time: {init_time:.1f}ms")
 ```
 
@@ -380,7 +380,7 @@ class OptimizedComponent:
     def __init__(self):
         self._expensive_resource = None
         self._database_connection = None
-    
+
     @property
     def expensive_resource(self):
         """Lazy-loaded expensive resource."""
@@ -388,7 +388,7 @@ class OptimizedComponent:
             logger.debug("Loading expensive resource...")
             self._expensive_resource = create_expensive_resource()
         return self._expensive_resource
-    
+
     @property
     def database_connection(self):
         """Lazy-loaded database connection."""
@@ -411,16 +411,16 @@ class CachedComponent:
         logger.debug(f"Computing result for {input_data}")
         # Expensive computation here
         return result
-    
+
     def __init__(self):
         self._cache = {}
         self._cache_ttl = {}
         self._ttl_seconds = 300  # 5 minutes
-    
+
     def get_with_ttl(self, key):
         """Get cached value with TTL."""
         now = time.time()
-        
+
         if key in self._cache:
             if now - self._cache_ttl[key] < self._ttl_seconds:
                 return self._cache[key]
@@ -428,12 +428,12 @@ class CachedComponent:
                 # Expired, remove from cache
                 del self._cache[key]
                 del self._cache_ttl[key]
-        
+
         # Compute new value
         value = self._compute_value(key)
         self._cache[key] = value
         self._cache_ttl[key] = now
-        
+
         return value
 ```
 
@@ -444,17 +444,17 @@ class CachedComponent:
 ```python
 def register_components_selectively(container, config):
     """Register only needed components based on configuration."""
-    
+
     # Always register core components
     register_core_services(container)
-    
+
     # Conditionally register optional components
     if config.get('features', {}).get('aws_integration', False):
         register_aws_services(container)
-    
+
     if config.get('features', {}).get('database_support', False):
         register_database_services(container)
-    
+
     if config.get('features', {}).get('monitoring', False):
         register_monitoring_services(container)
 ```
@@ -464,17 +464,17 @@ def register_components_selectively(container, config):
 ```python
 def register_services_in_batches(container, services):
     """Register services in batches to optimize startup."""
-    
+
     # Batch 1: Critical services (immediate)
     critical_services = [LoggingService, ConfigService]
     for service in critical_services:
         container.register_singleton(service)
-    
+
     # Batch 2: Core services (lazy)
     core_services = [DatabaseService, CacheService]
     for service in core_services:
         container.register_on_demand(service, lambda: service())
-    
+
     # Batch 3: Optional services (very lazy)
     optional_services = [MonitoringService, ReportingService]
     for service in optional_services:
@@ -534,15 +534,15 @@ class PerformanceMetrics:
         self.component_load_times = {}
         self.memory_usage = {}
         self.cache_hit_rates = {}
-    
+
     def record_startup_time(self, time_ms):
         self.startup_time = time_ms
         logger.info(f"Startup time: {time_ms:.1f}ms")
-    
+
     def record_component_load(self, component_name, time_ms):
         self.component_load_times[component_name] = time_ms
         logger.info(f"{component_name} load time: {time_ms:.1f}ms")
-    
+
     def record_memory_usage(self, operation, memory_mb):
         self.memory_usage[operation] = memory_mb
         logger.info(f"{operation} memory usage: {memory_mb:.1f}MB")
@@ -553,24 +553,24 @@ class PerformanceMetrics:
 ```python
 def setup_performance_monitoring():
     """Set up automated performance monitoring."""
-    
+
     # Monitor startup time
     @profile_function
     def monitored_startup():
         app = Application()
         app.initialize()
         return app
-    
+
     # Monitor component access
     original_get = container.get
     def monitored_get(service_type):
         start_time = time.time()
         result = original_get(service_type)
         load_time = (time.time() - start_time) * 1000
-        
+
         metrics.record_component_load(service_type.__name__, load_time)
         return result
-    
+
     container.get = monitored_get
 ```
 
@@ -585,28 +585,28 @@ def performance_health_check():
         'status': 'healthy',
         'checks': {}
     }
-    
+
     # Check startup time
     start_time = time.time()
     app = Application()
     startup_time = (time.time() - start_time) * 1000
-    
+
     health['checks']['startup_time'] = {
         'status': 'healthy' if startup_time < 500 else 'unhealthy',
         'value': f"{startup_time:.1f}ms",
         'threshold': '500ms'
     }
-    
+
     # Check memory usage
     process = psutil.Process(os.getpid())
     memory_mb = process.memory_info().rss / 1024 / 1024
-    
+
     health['checks']['memory_usage'] = {
         'status': 'healthy' if memory_mb < 200 else 'warning',
         'value': f"{memory_mb:.1f}MB",
         'threshold': '200MB'
     }
-    
+
     return health
 ```
 

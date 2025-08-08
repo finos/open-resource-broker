@@ -124,7 +124,7 @@ from src.domain.base.dependency_injection import injectable, singleton
 class ConfigurationService:
     def __init__(self):
         self.config = self.load_config()
-    
+
     def load_config(self):
         # Load configuration logic
         return {}
@@ -252,11 +252,11 @@ The scheduler port demonstrates registry integration for configuration-driven st
 def create_scheduler_port(container):
     from src.infrastructure.registry.scheduler_registry import get_scheduler_registry
     from src.config.manager import get_config_manager
-    
+
     config_manager = get_config_manager()
     scheduler_config = config_manager.get_scheduler_config()
     scheduler_type = scheduler_config.get('strategy', 'hostfactory')
-    
+
     registry = get_scheduler_registry()
     return registry.get_active_strategy(scheduler_type, scheduler_config)
 
@@ -309,7 +309,7 @@ Some services are registered manually in the DI container instead of using the `
 # Location: src/infrastructure/di/port_registrations.py
 def _register_template_configuration_services(container: DIContainer) -> None:
     """Register template configuration services."""
-    
+
     # Factory-based singleton registration with complex initialization
     container.register_singleton(
         TemplateConfigurationManager,
@@ -358,11 +358,11 @@ from src.infrastructure.di.container import DIContainer
 def test_service():
     # Create test container
     container = DIContainer()
-    
+
     # Register test dependencies
     mock_dependency = MockDependency()
     container.register_instance(SomeDependency, mock_dependency)
-    
+
     # Test service
     service = container.get(ServiceUnderTest)
     assert service.dependency is mock_dependency

@@ -32,7 +32,7 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Get default Python version from project config
       id: version
       run: |
@@ -45,16 +45,16 @@ jobs:
     runs-on: ubuntu-latest
     needs: get-config
     environment: ${{ github.event.inputs.environment || 'pypi' }}
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: ${{ needs.get-config.outputs.default-python-version }}
-    
+
     - name: Install uv
       uses: astral-sh/setup-uv@v6
       with:
@@ -63,19 +63,19 @@ jobs:
     - name: Install build dependencies with uv
       run: |
         uv pip install --system build twine
-    
+
     - name: Generate pyproject.toml
       run: |
         python dev-tools/scripts/generate-pyproject.py
-    
+
     - name: Build package
       run: |
         python -m build --clean
-    
+
     - name: Check package
       run: |
         python -m twine check dist/*
-    
+
     - name: Publish to Test PyPI
       if: github.event.inputs.environment == 'testpypi' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment != 'pypi')
       uses: pypa/gh-action-pypi-publish@release/v1
@@ -83,14 +83,14 @@ jobs:
         repository-url: https://test.pypi.org/legacy/
         password: ${{ secrets.TEST_PYPI_API_TOKEN }}
         verbose: true
-    
+
     - name: Publish to PyPI
       if: github.event.inputs.environment == 'pypi' || github.event_name == 'release'
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         password: ${{ secrets.PYPI_API_TOKEN }}
         verbose: true
-    
+
     - name: Create deployment summary
       run: |
         echo "## Package Published Successfully" >> $GITHUB_STEP_SUMMARY
@@ -112,7 +112,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [publish]
     if: github.event_name == 'release' || github.event.inputs.environment == 'pypi'
-    
+
     permissions:
       contents: read
       actions: write

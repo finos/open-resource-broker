@@ -21,11 +21,11 @@ The central component that replaces multiple competing template systems:
 class TemplateConfigurationManager:
     """
     Template Configuration Manager - Single Source of Truth.
-    
+
     Consolidates template operations into a coherent architecture that
     treats templates as configuration data rather than transactional entities.
     """
-    
+
     def __init__(self, 
                  config_manager: ConfigurationManager,
                  scheduler_strategy: SchedulerPort,
@@ -53,13 +53,13 @@ Repository pattern implementation for template persistence:
 @injectable
 class TemplateRepositoryImpl(TemplateRepositoryPort):
     """Template repository implementation using configuration manager."""
-    
+
     def __init__(self, 
                  config_manager: TemplateConfigurationManager,
                  logger: LoggingPort):
         self.config_manager = config_manager
         self.logger = logger
-    
+
     async def find_all(self) -> List[Template]:
         """Find all templates."""
         template_dtos = await self.config_manager.load_templates()
@@ -74,7 +74,7 @@ Performance optimization through intelligent caching:
 @injectable
 class TemplateCacheService:
     """Template caching service for performance optimization."""
-    
+
     def __init__(self, cache_ttl_seconds: int = 300):
         self._cache: Dict[str, Any] = {}
         self._cache_timestamps: Dict[str, datetime] = {}
@@ -98,21 +98,21 @@ Templates are discovered using a hierarchical priority system:
 async def discover_template_files(self, force_refresh: bool = False) -> TemplateDiscoveryResult:
     """
     Discover template files using provider-specific hierarchy.
-    
+
     Returns:
         TemplateDiscoveryResult with discovered files and metadata
     """
     discovery_result = TemplateDiscoveryResult()
-    
+
     # Get active providers from configuration
     active_providers = self._get_active_providers()
-    
+
     for provider in active_providers:
         await self._discover_provider_templates(provider, discovery_result)
-    
+
     # Discover legacy templates (no provider prefix)
     await self._discover_legacy_templates(discovery_result)
-    
+
     return discovery_result
 ```
 
@@ -141,10 +141,10 @@ Templates are loaded with intelligent caching:
 async def load_templates(self, force_refresh: bool = False) -> List[TemplateDTO]:
     """
     Load all templates from discovered files.
-    
+
     Args:
         force_refresh: Force reload even if cached
-        
+
     Returns:
         List of TemplateDTO objects
     """
@@ -153,18 +153,18 @@ async def load_templates(self, force_refresh: bool = False) -> List[TemplateDTO]
         cache_age = (datetime.now() - self._cache_timestamp).total_seconds()
         if cache_age < self._cache_ttl_seconds:
             return list(self._template_cache.values())
-    
+
     # Discover and load templates
     discovery_result = await self.discover_template_files(force_refresh)
     all_templates = {}
-    
+
     for file_metadata in discovery_result.get_sorted_files():
         file_templates = await self._load_templates_from_file(file_metadata)
-        
+
         # Merge templates, respecting priority
         for template in file_templates:
             template_id = template.template_id
-            
+
             if template_id not in all_templates:
                 all_templates[template_id] = template
             else:
@@ -172,7 +172,7 @@ async def load_templates(self, force_refresh: bool = False) -> List[TemplateDTO]
                 existing_priority = getattr(all_templates[template_id], '_source_priority', 999)
                 if file_metadata.priority < existing_priority:
                     all_templates[template_id] = template
-    
+
     return list(all_templates.values())
 ```
 
@@ -193,17 +193,17 @@ The system provides comprehensive cache management:
 async def save_template(self, template: TemplateDTO) -> None:
     """
     Save template to configuration files.
-    
+
     This method implements CRUD create/update operations by writing
     templates to the appropriate provider-specific files.
     """
     # Determine target file based on template provider
     provider = getattr(template, '_source_provider', 'aws')
     target_file = await self._determine_target_file(template, provider)
-    
+
     # Load existing templates from target file
     existing_templates = await self._load_templates_from_file_path(target_file)
-    
+
     # Update or add the template
     template_found = False
     for i, existing_template in enumerate(existing_templates):
@@ -211,13 +211,13 @@ async def save_template(self, template: TemplateDTO) -> None:
             existing_templates[i] = template.configuration
             template_found = True
             break
-    
+
     if not template_found:
         existing_templates.append(template.configuration)
-    
+
     # Write back to file
     await self._write_templates_to_file(target_file, existing_templates)
-    
+
     # Update cache
     self._template_cache[template.template_id] = template
 ```
@@ -228,7 +228,7 @@ async def save_template(self, template: TemplateDTO) -> None:
 async def delete_template(self, template_id: str) -> None:
     """
     Delete template from configuration files.
-    
+
     This method implements CRUD delete operations by removing
     templates from their source files.
     """
@@ -236,20 +236,20 @@ async def delete_template(self, template_id: str) -> None:
     template = await self.get_template_by_id(template_id)
     if not template:
         raise ValueError(f"Template {template_id} not found")
-    
+
     source_file = getattr(template, '_source_file', None)
     if not source_file:
         raise ValueError(f"Cannot determine source file for template {template_id}")
-    
+
     # Load, modify, and save
     existing_templates = await self._load_templates_from_file_path(Path(source_file))
     existing_templates = [
         t for t in existing_templates 
         if t.get('template_id') != template_id and t.get('templateId') != template_id
     ]
-    
+
     await self._write_templates_to_file(Path(source_file), existing_templates)
-    
+
     # Remove from cache
     if template_id in self._template_cache:
         del self._template_cache[template_id]
@@ -275,10 +275,10 @@ async def save_template(self, template: TemplateDTO) -> None:
         # Determine if this is create or update
         existing_template = await self.get_template_by_id(template.template_id)
         is_update = existing_template is not None
-        
+
         # Perform the save operation
         await self._perform_save_operation(template)
-        
+
         # Publish domain event if event publisher is available
         if self.event_publisher and self.event_publisher.is_enabled():
             if is_update:
@@ -295,10 +295,10 @@ async def save_template(self, template: TemplateDTO) -> None:
                     template_type=template.provider_api or 'aws',
                     timestamp=datetime.utcnow()
                 )
-            
+
             self.event_publisher.publish(event)
             self.logger.debug(f"Published {event.__class__.__name__} for template {template.template_id}")
-        
+
     except Exception as e:
         self.logger.error(f"Failed to save template {template.template_id}: {e}")
         raise
@@ -312,17 +312,17 @@ Template events can be handled by dedicated event handlers:
 @event_handler("TemplateCreatedEvent")
 class TemplateCreatedHandler(BaseEventHandler):
     """Handle template creation events."""
-    
+
     async def handle(self, event: TemplateCreatedEvent) -> None:
         # Send notifications
         await self.notification_service.notify_template_created(
             template_id=event.template_id,
             template_name=event.template_name
         )
-        
+
         # Update metrics
         self.metrics_collector.increment_counter("templates_created")
-        
+
         # Audit logging
         self.audit_logger.log_template_operation(
             operation="CREATE",
@@ -333,11 +333,11 @@ class TemplateCreatedHandler(BaseEventHandler):
 @event_handler("TemplateUpdatedEvent")
 class TemplateUpdatedHandler(BaseEventHandler):
     """Handle template update events."""
-    
+
     async def handle(self, event: TemplateUpdatedEvent) -> None:
         # Invalidate related caches
         await self.cache_service.invalidate_template_cache(event.template_id)
-        
+
         # Notify dependent systems
         await self.dependency_service.notify_template_changed(
             template_id=event.template_id,
@@ -352,13 +352,13 @@ Event publishing can be configured through the dependency injection system:
 ```python
 def register_template_services(container: DIContainer) -> None:
     """Register template services with optional event publishing."""
-    
+
     # Register event publisher (optional)
     if container.has_service(EventPublisherPort):
         event_publisher = container.get(EventPublisherPort)
     else:
         event_publisher = None
-    
+
     # Register template configuration manager with event publishing
     # Note: TemplateConfigurationManager is manually registered as singleton
     # in src/infrastructure/di/port_registrations.py instead of using @injectable
@@ -393,14 +393,14 @@ The template infrastructure integrates seamlessly with the CQRS pattern:
 class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, List[TemplateDTO]]):
     def __init__(self, config_manager: TemplateConfigurationManager):
         self.config_manager = config_manager
-    
+
     async def execute_query(self, query: ListTemplatesQuery) -> List[TemplateDTO]:
         templates = await self.config_manager.load_templates(query.force_refresh)
-        
+
         # Apply filters
         if query.provider_api:
             templates = [t for t in templates if t.provider_api == query.provider_api]
-        
+
         return templates
 ```
 
@@ -411,7 +411,7 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, List[TemplateDTO
 class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, TemplateDTO]):
     def __init__(self, config_manager: TemplateConfigurationManager):
         self.config_manager = config_manager
-    
+
     async def execute_command(self, command: CreateTemplateCommand) -> TemplateDTO:
         # Create TemplateDTO from command
         template_dto = TemplateDTO(
@@ -420,10 +420,10 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, TemplateDT
             provider_api=command.provider_api,
             configuration=command.configuration
         )
-        
+
         # Save using configuration manager
         await self.config_manager.save_template(template_dto)
-        
+
         return template_dto
 ```
 
@@ -491,13 +491,13 @@ The template system includes intelligent HostFactory attribute generation throug
 ```python
 def _create_hf_attributes(self, template_data: Dict[str, Any]) -> Dict[str, Any]:
     """Create HF-compatible attributes object with CPU/RAM specs.
-    
+
     This method handles the creation of HostFactory attributes with proper
     CPU and RAM specifications based on instance type.
     """
     # Handle both snake_case and camelCase field names
     instance_type = template_data.get('instance_type') or template_data.get('instanceType', 't2.micro')
-    
+
     # CPU/RAM mapping for common instance types
     cpu_ram_mapping = {
         "t2.micro": {"ncpus": "1", "nram": "1024"},
@@ -513,10 +513,10 @@ def _create_hf_attributes(self, template_data: Dict[str, Any]) -> Dict[str, Any]
         "r5.large": {"ncpus": "2", "nram": "16384"},
         "r5.xlarge": {"ncpus": "4", "nram": "32768"},
     }
-    
+
     # Get specs for instance type, default to t2.micro specs
     specs = cpu_ram_mapping.get(instance_type, {"ncpus": "1", "nram": "1024"})
-    
+
     # Return HF-compatible attributes format
     return {
         "type": ["String", "X86_64"],

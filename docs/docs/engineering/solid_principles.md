@@ -39,7 +39,7 @@ The ApplicationService (high-level module) depends only on abstractions:
 @injectable
 class ApplicationService:
     """High-level module - depends only on abstractions."""
-    
+
     def __init__(self,
                  provider_type: str,
                  command_bus: CommandBus,           # Abstraction
@@ -50,13 +50,13 @@ class ApplicationService:
                  error_handler: ErrorHandlingPort,  # Abstraction
                  provider_context: ProviderContext): # Abstraction
         """All dependencies are abstractions, not concrete implementations."""
-        
+
         # High-level module doesn't know about:
         # - Specific logging implementation (Python logging, structured logging, etc.)
         # - Specific configuration format (YAML, JSON, environment variables)
         # - Specific DI container implementation
         # - Specific provider implementation (AWS, Azure, etc.)
-        
+
         self._provider_type = provider_type
         self._command_bus = command_bus
         self._query_bus = query_bus
@@ -78,17 +78,17 @@ from typing import Any, Dict, Optional
 
 class LoggingPort(ABC):
     """Abstraction for logging functionality."""
-    
+
     @abstractmethod
     def info(self, message: str, extra: Optional[Dict[str, Any]] = None) -> None:
         """Log info message."""
         pass
-    
+
     @abstractmethod
     def error(self, message: str, exception: Optional[Exception] = None) -> None:
         """Log error message."""
         pass
-    
+
     @abstractmethod
     def debug(self, message: str, extra: Optional[Dict[str, Any]] = None) -> None:
         """Log debug message."""
@@ -107,21 +107,21 @@ from src.domain.ports.logging_port import LoggingPort
 
 class PythonLoggingAdapter(LoggingPort):
     """Concrete implementation using Python's logging module."""
-    
+
     def __init__(self, logger_name: str = __name__):
         self._logger = logging.getLogger(logger_name)
-    
+
     def info(self, message: str, extra: Optional[Dict[str, Any]] = None) -> None:
         """Log info message using Python logging."""
         self._logger.info(message, extra=extra)
-    
+
     def error(self, message: str, exception: Optional[Exception] = None) -> None:
         """Log error message using Python logging."""
         if exception:
             self._logger.error(f"{message}: {str(exception)}", exc_info=True)
         else:
             self._logger.error(message)
-    
+
     def debug(self, message: str, extra: Optional[Dict[str, Any]] = None) -> None:
         """Log debug message using Python logging."""
         self._logger.debug(message, extra=extra)
@@ -143,7 +143,7 @@ The provider strategy pattern demonstrates DIP:
 class ProviderContext:
     def __init__(self, strategy: ProviderStrategy):  # Abstraction
         self._strategy = strategy
-    
+
     def execute_request(self, request: MachineRequest) -> MachineResponse:
         return self._strategy.handle_request(request)
 
@@ -175,14 +175,14 @@ Each class has a single reason to change:
 # Good: Single responsibility
 class MachineRequestValidator:
     """Only responsible for validating machine requests."""
-    
+
     def validate(self, request: MachineRequest) -> ValidationResult:
         # Validation logic only
         pass
 
 class MachineRequestProcessor:
     """Only responsible for processing machine requests."""
-    
+
     def process(self, request: MachineRequest) -> MachineResponse:
         # Processing logic only
         pass

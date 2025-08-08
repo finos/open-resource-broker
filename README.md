@@ -167,11 +167,11 @@ async def use_hostfactory():
         command="ohfp", 
         args=["mcp", "serve", "--stdio"]
     )
-    
+
     async with ClientSession(server_params) as session:
         # List available tools
         tools = await session.list_tools()
-        
+
         # Request infrastructure
         result = await session.call_tool(
             "request_machines",

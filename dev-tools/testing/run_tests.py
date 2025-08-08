@@ -3,26 +3,28 @@
 import sys
 import subprocess
 import argparse
-from pathlib import Path
-from typing import List, Optional
+import logging
+from typing import List
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logger = logging.getLogger(__name__)
 
 
 def run_command(cmd: List[str], description: str) -> bool:
     """Run a command and return success status."""
-    print(f"\n{'='*60}")
-    print(f"Running: {description}")
-    print(f"Command: {' '.join(cmd)}")
-    print(f"{'='*60}")
+    logger.info(f"Running: {description}")
+    logger.debug(f"Command: {' '.join(cmd)}")
 
     try:
         result = subprocess.run(cmd, check=True, capture_output=False)
-        print(f"PASS {description}")
+        logger.info(f"PASS {description}")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"FAIL {description} (exit code: {e.returncode})")
+        logger.error(f"FAIL {description} (exit code: {e.returncode})")
         return False
     except FileNotFoundError:
-        print(f"FAIL {description} (command not found)")
+        logger.error(f"FAIL {description} (command not found)")
         return False
 
 

@@ -70,7 +70,7 @@ Before starting migration:
    ```bash
    # Test target storage
    ohfp storage test --type sqlite
-   
+
    # Compare data counts
    ohfp requests list --count
    ```

@@ -22,13 +22,18 @@ case "${1:-all}" in
         echo "Running all pre-commit checks in container..."
         docker run --rm -v "$PWD:/app" ohfp-dev-tools ./dev-tools/scripts/pre_commit_check.py
         ;;
+    required)
+        echo "Running required pre-commit checks in container..."
+        docker run --rm -v "$PWD:/app" ohfp-dev-tools ./dev-tools/scripts/pre_commit_check.py --required-only
+        ;;
     format)
         echo "Running format in container..."
         docker run --rm -v "$PWD:/app" ohfp-dev-tools make format
         ;;
     help|*)
-        echo "Usage: $0 [all|format]"
-        echo "  all    - Run all pre-commit checks in container"
-        echo "  format - Auto-format code in container (modifies files)"
+        echo "Usage: $0 [all|required|format]"
+        echo "  all      - Run all pre-commit checks in container"
+        echo "  required - Run only required pre-commit checks in container (skip warnings)"
+        echo "  format   - Auto-format code in container (modifies files)"
         ;;
 esac

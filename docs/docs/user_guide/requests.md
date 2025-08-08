@@ -354,10 +354,10 @@ if error_code in RETRYABLE_ERRORS:
 if request.status == "FAILED" and request.partial_machines:
     # Some machines were created before failure
     partial_machines = request.get_partial_machines()
-    
+
     # Option 1: Keep partial machines
     update_request_status("PARTIAL_SUCCESS")
-    
+
     # Option 2: Clean up partial machines
     cleanup_partial_machines(partial_machines)
 ```
@@ -445,13 +445,13 @@ def submit_async_request(template_id, machine_count):
             "timeout": 1800  # 30 minutes
         }
     }
-    
+
     response = api_client.call(request)
     request_id = response["result"]["requestId"]
-    
+
     # Store request ID for later checking
     store_request_id(request_id)
-    
+
     return request_id
 ```
 
@@ -462,17 +462,17 @@ def submit_async_request(template_id, machine_count):
 def submit_sync_request(template_id, machine_count, max_wait=600):
     # Submit request
     request_id = submit_async_request(template_id, machine_count)
-    
+
     # Poll for completion
     start_time = time.time()
     while time.time() - start_time < max_wait:
         status = get_request_status(request_id)
-        
+
         if status["status"] in ["COMPLETED", "FAILED", "TIMEOUT"]:
             return status
-        
+
         time.sleep(10)  # Poll every 10 seconds
-    
+
     raise TimeoutError(f"Request {request_id} did not complete within {max_wait} seconds")
 ```
 
@@ -492,7 +492,7 @@ def submit_request_with_callback(template_id, machine_count, callback_url):
             }
         }
     }
-    
+
     return api_client.call(request)
 ```
 
@@ -505,15 +505,15 @@ def submit_request_with_callback(template_id, machine_count, callback_url):
 def monitor_request(request_id, callback=None):
     while True:
         status = get_request_status(request_id)
-        
+
         if callback:
             callback(status)
-        
+
         if status["status"] in ["COMPLETED", "FAILED", "TIMEOUT", "CANCELLED"]:
             break
-        
+
         time.sleep(30)  # Check every 30 seconds
-    
+
     return status
 ```
 
@@ -560,7 +560,7 @@ Track key metrics for request performance:
 # Analyze request performance
 def analyze_request_performance(time_period="24h"):
     requests = get_requests_in_period(time_period)
-    
+
     metrics = {
         "total_requests": len(requests),
         "success_rate": calculate_success_rate(requests),
@@ -568,7 +568,7 @@ def analyze_request_performance(time_period="24h"):
         "failure_breakdown": categorize_failures(requests),
         "peak_hours": identify_peak_usage(requests)
     }
-    
+
     return metrics
 ```
 

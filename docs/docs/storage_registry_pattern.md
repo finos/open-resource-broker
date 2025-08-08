@@ -93,7 +93,7 @@ def register_redis_storage() -> None:
 # src/infrastructure/persistence/registration.py
 def register_all_storage_types() -> None:
     # ... existing registrations
-    
+
     # Add Redis registration
     try:
         from src.infrastructure.persistence.redis.registration import register_redis_storage
@@ -151,10 +151,10 @@ class RedisStrategyConfig(BaseModel):
 def _register_repository_services(container: DIContainer) -> None:
     # Ensure all storage types are registered
     register_all_storage_types()
-    
+
     # Register repository factory
     container.register_singleton(RepositoryFactory, ...)
-    
+
     # Register repositories using the factory
     container.register_singleton(RequestRepositoryInterface, 
                                 lambda c: c.get(RepositoryFactory).create_request_repository())
@@ -190,10 +190,10 @@ def _register_repository_services(container: DIContainer) -> None:
 def test_repository_creation_with_storage_registry():
     registry = get_storage_registry()
     registry.register_storage("test", create_test_strategy, create_test_config)
-    
+
     factory = RepositoryFactory(config_manager)
     repository = factory.create_request_repository()
-    
+
     assert isinstance(repository, RequestRepository)
     assert isinstance(repository.storage_strategy, TestStorageStrategy)
 ```

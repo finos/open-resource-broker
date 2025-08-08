@@ -55,7 +55,7 @@ sequenceDiagram
     DB-->>QRY: Request (with resource_ids + provider_api)
     QRY->>DB: Find machines by request_id
     DB-->>QRY: [] (empty - first time)
-    
+
     QRY->>AWS: Get handler for provider_api
     AWS-->>QRY: ASGHandler/EC2FleetHandler/etc
     QRY->>HAND: check_hosts_status(request)
@@ -63,10 +63,10 @@ sequenceDiagram
     HAND->>HAND: Extract instance_ids from ASG
     HAND->>HAND: describe_instances(instance_ids)
     HAND-->>QRY: List[instance_details]
-    
+
     QRY->>QRY: Create Machine aggregates
     QRY->>DB: save_batch(machines)
-    
+
     QRY-->>CLI: Request + Machines
     CLI-->>HF: Full status with machine details
 ```

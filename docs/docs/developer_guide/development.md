@@ -29,7 +29,7 @@ This guide covers setting up a development environment, understanding the codeba
    ```bash
    # Install runtime dependencies
    pip install -r requirements.txt
-   
+
    # Install development dependencies
    pip install -r requirements-dev.txt
    ```
@@ -38,7 +38,7 @@ This guide covers setting up a development environment, understanding the codeba
    ```bash
    # Copy example configuration
    cp config/config.example.json config/config.json
-   
+
    # Edit configuration for your environment
    vim config/config.json
    ```
@@ -47,7 +47,7 @@ This guide covers setting up a development environment, understanding the codeba
    ```bash
    # Create data directory
    mkdir -p data
-   
+
    # Initialize database (if using SQLite)
    python -m src.infrastructure.persistence.database.init_db
    ```
@@ -56,7 +56,7 @@ This guide covers setting up a development environment, understanding the codeba
    ```bash
    # Run all tests
    pytest
-   
+
    # Run with coverage
    pytest --cov=src --cov-report=html
    ```
@@ -224,7 +224,7 @@ providers/
    ```bash
    # Create test file
    touch tests/test_your_feature.py
-   
+
    # Write failing tests
    pytest tests/test_your_feature.py -v
    ```
@@ -239,10 +239,10 @@ providers/
    ```bash
    # Run specific tests
    pytest tests/test_your_feature.py -v
-   
+
    # Run all tests
    pytest
-   
+
    # Check coverage
    pytest --cov=src --cov-report=term-missing
    ```
@@ -251,7 +251,7 @@ providers/
    ```bash
    # Update relevant documentation
    vim docs/docs/user_guide/your-feature.md
-   
+
    # Build documentation
    cd docs && mkdocs serve
    ```
@@ -279,7 +279,7 @@ from typing import Any
 
 def convert_cli_args_to_hostfactory_input(self, operation: str, args: Any) -> Dict[str, Any]:
     """Convert CLI arguments to HostFactory JSON input format.
-    
+
     Uses Any type for args parameter to support different argument sources
     including argparse.Namespace, dict, or other argument containers.
     """
@@ -318,21 +318,21 @@ class RequestService:
 ```python
 class RequestService:
     """Service for managing machine requests.
-    
+
     This service provides high-level operations for creating,
     updating, and querying machine requests.
     """
-    
+
     def create_request(self, template_id: str, machine_count: int) -> str:
         """Create a new machine request.
-        
+
         Args:
             template_id: ID of the template to use
             machine_count: Number of machines to request
-            
+
         Returns:
             The ID of the created request
-            
+
         Raises:
             TemplateNotFoundError: If template doesn't exist
             ValidationError: If parameters are invalid
@@ -347,31 +347,31 @@ class RequestService:
 ```python
 class TestRequestService:
     """Test suite for RequestService."""
-    
+
     @pytest.fixture
     def service(self):
         """Create service instance for testing."""
         repository = Mock(spec=RequestRepository)
         return RequestService(repository)
-    
+
     def test_create_request_success(self, service):
         """Test successful request creation."""
         # Arrange
         template_id = "template-1"
         machine_count = 2
-        
+
         # Act
         result = service.create_request(template_id, machine_count)
-        
+
         # Assert
         assert result is not None
         service._repository.save.assert_called_once()
-    
+
     def test_create_request_invalid_template(self, service):
         """Test request creation with invalid template."""
         # Arrange
         service._repository.get_template.return_value = None
-        
+
         # Act & Assert
         with pytest.raises(TemplateNotFoundError):
             service.create_request("invalid-template", 2)
@@ -419,17 +419,17 @@ def create_request(template_id: str, machine_count: int) -> str:
         "template_id": template_id,
         "machine_count": machine_count
     })
-    
+
     try:
         # Business logic
         request_id = "req-123"
-        
+
         logger.info("Request created successfully", extra={
             "request_id": request_id
         })
-        
+
         return request_id
-        
+
     except Exception as e:
         logger.error("Failed to create request", extra={
             "template_id": template_id,
@@ -504,7 +504,7 @@ python -m memory_profiler src/bootstrap.py
 def create_request(template_id: str, machine_count: int) -> str:
     if not template_id or not template_id.strip():
         raise ValidationError("template_id is required")
-    
+
     if machine_count <= 0 or machine_count > 1000:
         raise ValidationError("machine_count must be between 1 and 1000")
 

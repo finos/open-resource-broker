@@ -26,12 +26,12 @@ async with OpenHFPluginMCPTools(provider="aws") as tools:
     # List all available tools
     available_tools = tools.list_tools()
     print(f"Available tools: {len(available_tools)}")
-    
+
     # Call a tool
     result = await tools.call_tool("list_templates", {
         "active_only": True
     })
-    
+
     if result.get("success"):
         templates = result["data"]
         print(f"Found {len(templates)} templates")
@@ -73,10 +73,10 @@ async with OpenHFPluginMCPTools() as tools:
     # Get tools by type
     query_tools = tools.get_tools_by_type("query")
     command_tools = tools.get_tools_by_type("command")
-    
+
     print(f"Query tools: {query_tools}")
     print(f"Command tools: {command_tools}")
-    
+
     # Get detailed tool information
     tool_info = tools.get_tool_info("list_templates")
     print(f"Tool schema: {tool_info.input_schema}")
@@ -197,14 +197,14 @@ async with OpenHFPluginMCPTools() as tools:
             "template_id": "invalid-template",
             "machine_count": 5
         })
-        
+
         if "error" in result:
             error = result["error"]
             print(f"Tool error: {error['message']}")
             print(f"Error type: {error['type']}")
         else:
             print(f"Success: {result['data']}")
-            
+
     except ValueError as e:
         print(f"Validation error: {e}")
     except Exception as e:
@@ -230,12 +230,12 @@ async with OpenHFPluginMCPTools() as tools:
         from ohfpsdk.mcp import OpenHFPluginMCPTools
         import asyncio
         import json
-        
+
         async def main():
             async with OpenHFPluginMCPTools() as tools:
                 # Your integration logic here
                 pass
-        
+
         asyncio.run(main())
       "]
     }
@@ -248,17 +248,17 @@ async with OpenHFPluginMCPTools() as tools:
 class HostFactoryAssistant:
     def __init__(self):
         self.mcp_tools = None
-    
+
     async def initialize(self):
         self.mcp_tools = OpenHFPluginMCPTools()
         await self.mcp_tools.initialize()
-    
+
     async def handle_request(self, tool_name: str, args: dict):
         if not self.mcp_tools:
             await self.initialize()
-        
+
         return await self.mcp_tools.call_tool(tool_name, args)
-    
+
     async def cleanup(self):
         if self.mcp_tools:
             await self.mcp_tools.cleanup()

@@ -1,64 +1,86 @@
 #!/usr/bin/env python3
-"""Clean whitespace in blank lines from files."""
+"""Clean whitespace from Python files."""
 
-import argparse
-import re
+import os
 import sys
 from pathlib import Path
+import pathspec
 
-def clean_whitespace_in_file(file_path):
-    """Clean whitespace in blank lines from a single file."""
+def clean_file(file_path: Path) -> bool:
+    """Clean whitespace from a single file."""
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
 
-        # Replace lines with only whitespace with empty lines
-        cleaned_content = re.sub(r'^[ \t]+$', '', content, flags=re.MULTILINE)
+        original_content = content
 
-        if content != cleaned_content:
+        # Remove trailing whitespace from each line
+        lines = content.splitlines()
+        cleaned_lines = [line.rstrip() for line in lines]
+
+        # Ensure file ends with single newline
+        if cleaned_lines and cleaned_lines[-1]:
+            cleaned_lines.append('')
+
+        cleaned_content = '\n'.join(cleaned_lines)
+
+        if cleaned_content != original_content:
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(cleaned_content)
             return True
+
         return False
     except Exception as e:
         print(f"Error processing {file_path}: {e}")
         return False
 
+def load_gitignore_spec(root_dir: Path) -> pathspec.PathSpec:
+    """Load .gitignore patterns."""
+    gitignore_path = root_dir / '.gitignore'
+    if gitignore_path.exists():
+        with open(gitignore_path, 'r', encoding='utf-8') as f:
+            return pathspec.PathSpec.from_lines('gitwildmatch', f)
+    return pathspec.PathSpec.from_lines('gitwildmatch', [])
+
+def find_python_files(root_dir: Path) -> list[Path]:
+    """Find all Python files in the directory, respecting .gitignore."""
+    spec = load_gitignore_spec(root_dir)
+    python_files = []
+
+    for pattern in ['**/*.py', '**/*.pyi']:
+        for file_path in root_dir.glob(pattern):
+            if file_path.is_file():
+                # Get relative path for gitignore matching
+                rel_path = file_path.relative_to(root_dir)
+                if not spec.match_file(str(rel_path)):
+                    python_files.append(file_path)
+
+    return python_files
+
 def main():
-    parser = argparse.ArgumentParser(description="Clean whitespace in blank lines from files")
-    parser.add_argument('patterns', nargs='*', default=['*.py', '*.md', '*.yml', '*.yaml', '*.json', '*.txt', '*.sh'],
-                       help='File patterns to process (default: common file types)')
-    args = parser.parse_args()
+    """Main function."""
+    # Navigate to project root from dev-tools/scripts/
+    root_dir = Path(__file__).parent.parent.parent
+    python_files = find_python_files(root_dir)
 
-    files = []
-    for pattern in args.patterns:
-        if Path(pattern).is_file():
-            files.append(Path(pattern))
-        else:
-            files.extend(Path('.').rglob(pattern))
+    if not python_files:
+        print("No Python files found.")
+        return
 
-    if not files:
-        print("No files found to process")
-        return 0
+    modified_count = 0
+    total_files = len(python_files)
 
-    print(f"Processing {len(files)} files...", end="", flush=True)
+    print(f"Processing {total_files} Python files...")
 
-    changed_files = []
-    for i, file_path in enumerate(files):
-        if i % 10 == 0:  # Progress every 10 files
-            print(".", end="", flush=True)
+    for i, file_path in enumerate(python_files, 1):
+        if clean_file(file_path):
+            modified_count += 1
 
-        if clean_whitespace_in_file(file_path):
-            changed_files.append(file_path)
+        # Simple progress without tqdm to avoid context overflow
+        if i % 50 == 0 or i == total_files:
+            print(f"Progress: {i}/{total_files} files processed")
 
-    print(f" done!")
+    print(f"Completed: {total_files} files processed, {modified_count} files modified.")
 
-    if changed_files:
-        print(f"Cleaned whitespace in {len(changed_files)} files")
-    else:
-        print("No files needed whitespace cleaning")
-
-    return 0
-
-if __name__ == '__main__':
-    sys.exit(main())
+if __name__ == "__main__":
+    main()

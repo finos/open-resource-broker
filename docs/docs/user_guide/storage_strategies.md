@@ -21,39 +21,39 @@ graph TB
         Repo[Generic Repository]
         Migration[Migration Tool]
     end
-    
+
     subgraph "Storage Strategies"
         JSON[JSON Strategy]
         SQL[SQL Strategy]
         DynamoDB[DynamoDB Strategy]
     end
-    
+
     subgraph "Storage Components"
         FileManager[File Manager]
         Serializer[JSON Serializer]
         LockManager[Lock Manager]
         TransactionManager[Transaction Manager]
     end
-    
+
     subgraph "Physical Storage"
         JSONFiles[JSON Files]
         SQLiteDB[SQLite Database]
         PostgreSQL[PostgreSQL]
         DynamoDBTables[DynamoDB Tables]
     end
-    
+
     Repo --> JSON
     Repo --> SQL
     Repo --> DynamoDB
     Migration --> JSON
     Migration --> SQL
     Migration --> DynamoDB
-    
+
     JSON --> FileManager
     JSON --> Serializer
     JSON --> LockManager
     JSON --> TransactionManager
-    
+
     JSON --> JSONFiles
     SQL --> SQLiteDB
     SQL --> PostgreSQL
@@ -437,24 +437,24 @@ All storage strategies implement the same interface:
 ```python
 class RepositoryInterface:
     """Generic repository interface for all storage strategies."""
-    
+
     def save_entity(self, collection: str, entity_data: Dict[str, Any]) -> None:
         """Save an entity to storage."""
         pass
-    
+
     def get_entity(self, collection: str, entity_id: str) -> Optional[Dict[str, Any]]:
         """Retrieve an entity by ID."""
         pass
-    
+
     def update_entity(self, collection: str, entity_id: str, 
                      entity_data: Dict[str, Any]) -> None:
         """Update an existing entity."""
         pass
-    
+
     def delete_entity(self, collection: str, entity_id: str) -> None:
         """Delete an entity."""
         pass
-    
+
     def query_entities(self, collection: str, 
                       filters: Dict[str, Any] = None,
                       order_by: str = None,
@@ -471,15 +471,15 @@ The same code works with any storage strategy:
 # Works with JSON, SQL, or DynamoDB
 def create_request(repository: RepositoryInterface, request_data: Dict[str, Any]) -> str:
     """Create a request using any storage strategy."""
-    
+
     # Validate template exists
     template = repository.get_entity("templates", request_data["template_id"])
     if not template:
         raise TemplateNotFoundError("Template not found")
-    
+
     # Save request
     repository.save_entity("requests", request_data)
-    
+
     # Create machines
     for i in range(request_data["machine_count"]):
         machine_data = {
@@ -489,7 +489,7 @@ def create_request(repository: RepositoryInterface, request_data: Dict[str, Any]
             "status": "PENDING"
         }
         repository.save_entity("machines", machine_data)
-    
+
     return request_data["request_id"]
 ```
 
@@ -540,12 +540,12 @@ for batch in migration_tool.get_migration_batches(batch_size=100):
     templates = source_repo.query_entities("templates", limit=batch_size)
     for template in templates:
         target_repo.save_entity("templates", template)
-    
+
     # Migrate requests
     requests = source_repo.query_entities("requests", limit=batch_size)
     for request in requests:
         target_repo.save_entity("requests", request)
-    
+
     # Migrate machines
     machines = source_repo.query_entities("machines", limit=batch_size)
     for machine in machines:

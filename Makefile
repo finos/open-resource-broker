@@ -1,6 +1,6 @@
 # Makefile for Open Host Factory Plugin
 
-.PHONY: help install install-pip install-uv dev-install dev-install-pip dev-install-uv test test-unit test-integration test-e2e test-all test-cov test-html test-parallel test-quick test-performance test-aws test-report lint format security security-container security-full security-scan security-validate-sarif security-report sbom-generate clean clean-all build build-test docs docs-build docs-serve docs-deploy docs-clean docs-deploy-version docs-list-versions docs-delete-version ci-docs-build ci-docs-build-for-pages ci-docs-deploy run run-dev version-show version-bump version-bump-patch version-bump-minor version-bump-major generate-pyproject ci-quality ci-security ci-security-codeql ci-security-container ci-architecture ci-imports ci-tests-unit ci-tests-integration ci-tests-e2e ci-tests-matrix ci-tests-performance ci-check ci-check-quick ci-check-fix ci-check-verbose ci ci-quick workflow-ci workflow-test-matrix workflow-security architecture-check architecture-report quality-check quality-check-fix quality-check-files quality-gates quality-full generate-completions install-completions install-bash-completions install-zsh-completions uninstall-completions test-completions dev-setup install-package uninstall-package reinstall-package init-db create-config validate-config docker-build docker-run docker-compose-up docker-compose-down dev status uv-lock uv-sync uv-sync-dev uv-check uv-benchmark file-sizes file-sizes-report validate-workflows detect-secrets clean-whitespace hadolint-check install-dev-tools dev-checks-container format-container hadolint-check-container pre-commit-check
+.PHONY: help install install-pip install-uv dev-install dev-install-pip dev-install-uv test test-unit test-integration test-e2e test-all test-cov test-html test-parallel test-quick test-performance test-aws test-report lint format security security-container security-full security-scan security-validate-sarif security-report sbom-generate clean clean-all build build-test docs docs-build docs-serve docs-deploy docs-clean docs-deploy-version docs-list-versions docs-delete-version ci-docs-build ci-docs-build-for-pages ci-docs-deploy run run-dev version-show version-bump version-bump-patch version-bump-minor version-bump-major generate-pyproject ci-quality ci-security ci-security-codeql ci-security-container ci-architecture ci-imports ci-tests-unit ci-tests-integration ci-tests-e2e ci-tests-matrix ci-tests-performance ci-check ci-check-quick ci-check-fix ci-check-verbose ci ci-quick workflow-ci workflow-test-matrix workflow-security architecture-check architecture-report quality-check quality-check-fix quality-check-files quality-gates quality-full generate-completions install-completions install-bash-completions install-zsh-completions uninstall-completions test-completions dev-setup install-package uninstall-package reinstall-package init-db create-config validate-config docker-build docker-run docker-compose-up docker-compose-down dev status uv-lock uv-sync uv-sync-dev uv-check uv-benchmark file-sizes file-sizes-report validate-workflows detect-secrets clean-whitespace hadolint-check install-dev-tools dev-checks-container dev-checks-container-required format-container hadolint-check-container pre-commit-check pre-commit-check-required
 
 # Python settings
 PYTHON := python3
@@ -216,6 +216,9 @@ hadolint-check: ## Check Dockerfile with hadolint
 dev-checks-container: ## Run all pre-commit checks in container (no local tools needed)
 	./dev-tools/scripts/run_dev_checks.sh all
 
+dev-checks-container-required: ## Run only required pre-commit checks in container (skip warnings)
+	./dev-tools/scripts/run_dev_checks.sh required
+
 format-container: ## Format code in container (no local tools needed)
 	./dev-tools/scripts/run_dev_checks.sh format
 
@@ -235,10 +238,18 @@ clean-whitespace:  ## Clean whitespace in blank lines from all files
 	@echo "Cleaning whitespace in blank lines..."
 	./dev-tools/scripts/clean_whitespace.py
 
-format: dev-install clean-whitespace  ## Format code (Black + isort + autopep8 + whitespace cleanup)
-	$(BIN)/autopep8 --in-place --max-line-length=88 --select=E501 --recursive $(PACKAGE) $(TESTS)
-	$(BIN)/black $(PACKAGE) $(TESTS)
-	$(BIN)/isort $(PACKAGE) $(TESTS)
+format: dev-install clean-whitespace  ## Format code (Black + isort + autopep8 + autoflake + whitespace cleanup)
+	@echo "Checking for files that need formatting..."
+	@if $(BIN)/black --check $(PACKAGE) $(TESTS) >/dev/null 2>&1 && \
+	   $(BIN)/isort --check-only $(PACKAGE) $(TESTS) >/dev/null 2>&1; then \
+		echo "All files already formatted correctly"; \
+	else \
+		echo "Formatting files..."; \
+		$(BIN)/autoflake --in-place --remove-all-unused-imports --remove-unused-variables --recursive $(PACKAGE) $(TESTS); \
+		$(BIN)/autopep8 --in-place --max-line-length=88 --select=E501 --recursive $(PACKAGE) $(TESTS); \
+		$(BIN)/black $(PACKAGE) $(TESTS); \
+		$(BIN)/isort $(PACKAGE) $(TESTS); \
+	fi
 
 security: dev-install  ## Run security checks
 	@echo "Running bandit (security linter)..."
@@ -506,7 +517,11 @@ detect-secrets: dev-install  ## Detect potential hardcoded secrets in source cod
 
 pre-commit-check: dev-install  ## Run all pre-commit validation checks
 	@echo "Running pre-commit validation checks..."
-	./dev-tools/scripts/pre_commit_check.sh
+	./dev-tools/scripts/pre_commit_check.py
+
+pre-commit-check-required: dev-install  ## Run only required pre-commit checks (skip warnings)
+	@echo "Running required pre-commit validation checks..."
+	./dev-tools/scripts/pre_commit_check.py --required-only
 
 # Composite target
 ci-architecture: ci-arch-cqrs ci-arch-clean ci-arch-imports ci-arch-file-sizes  ## Run all architecture checks
@@ -786,7 +801,7 @@ print-%:
 	@echo $($*)
 
 # JSON print targets for GitHub Actions (handles both single values and lists)
-print-json-PYTHON_VERSIONS:
+print-json-PYTHON_VERSIONS:  ## Print Python versions as JSON for GitHub Actions
 	@echo "$(PYTHON_VERSIONS)" | tr ' ' '\n' | jq -R . | jq -s . | jq -c .
 
 print-json-%:

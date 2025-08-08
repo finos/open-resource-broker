@@ -15,7 +15,7 @@ updates:
       prefix: "chore(deps)"
       include: "scope"
     open-pull-requests-limit: 3
-    
+
     # Group related dependencies together
     groups:
       aws-dependencies:
@@ -26,7 +26,7 @@ updates:
         update-types:
           - "minor"
           - "patch"
-      
+
       dev-tools:
         patterns:
           - "black"
@@ -38,7 +38,7 @@ updates:
         update-types:
           - "minor"
           - "patch"
-      
+
       testing-tools:
         patterns:
           - "pytest*"
@@ -47,7 +47,7 @@ updates:
         update-types:
           - "minor"
           - "patch"
-      
+
       security-updates:
         patterns:
           - "*"
@@ -55,7 +55,7 @@ updates:
           - "patch"
           - "minor"
           - "major"
-    
+
     # Ignore problematic updates
     ignore:
       # Don't update major versions automatically for critical tools

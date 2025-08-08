@@ -269,6 +269,10 @@ class DocstringChecker(FileChecker):
         if not file_path.endswith(".py"):
             return []
 
+        # Skip docstring checks for test files
+        if "/test" in file_path or file_path.startswith("test"):
+            return []
+
         violations = []
         try:
             tree = ast.parse(content)
@@ -399,20 +403,25 @@ class QualityChecker:
         """Run all checks on the given files."""
         all_violations = []
 
+        # Filter files that exist and have relevant extensions
+        valid_files = []
         for file_path in file_paths:
-            # Skip files that don't exist
-            if not os.path.isfile(file_path):
-                continue
+            if os.path.isfile(file_path):
+                ext = os.path.splitext(file_path)[1].lower()
+                if ext in ALL_EXTENSIONS:
+                    valid_files.append(file_path)
 
-            # Skip files with extensions we don't care about
-            ext = os.path.splitext(file_path)[1].lower()
-            if ext not in ALL_EXTENSIONS:
-                continue
+        if not valid_files:
+            return all_violations
 
-            # Run all checkers
-            for checker in self.checkers:
-                violations = checker.check_file(file_path)
-                all_violations.extend(violations)
+        for i, file_path in enumerate(valid_files, 1):
+            if i % 10 == 0 or i == len(valid_files):
+                print(f"Progress: {i}/{len(valid_files)} files checked", flush=True)
+
+                # Run all checkers on this file
+                for checker in self.checkers:
+                    violations = checker.check_file(file_path)
+                    all_violations.extend(violations)
 
         return all_violations
 

@@ -51,11 +51,11 @@ EOF
 # Validate environment
 validate_environment() {
     log_info "Validating environment..."
-    
+
     # Check Python version
     python_version=$(python --version 2>&1)
     log_debug "Python version: $python_version"
-    
+
     # Check required directories
     for dir in "/app/logs" "/app/data" "/app/tmp"; do
         if [[ ! -d "$dir" ]]; then
@@ -63,33 +63,33 @@ validate_environment() {
             mkdir -p "$dir"
         fi
     done
-    
+
     # Check write permissions
     if [[ ! -w "/app/logs" ]]; then
         log_error "No write permission to /app/logs"
         exit 1
     fi
-    
+
     if [[ ! -w "/app/data" ]]; then
         log_error "No write permission to /app/data"
         exit 1
     fi
-    
+
     log_info "Environment validation complete"
 }
 
 # Setup configuration
 setup_configuration() {
     log_info "Setting up configuration..."
-    
+
     # Configuration file precedence:
     # 1. /app/config/docker.json (if exists)
     # 2. /app/config/production.json (if exists)  
     # 3. /app/config/default_config.json (fallback)
     # 4. Environment variables (highest precedence)
-    
+
     config_file=""
-    
+
     if [[ -f "/app/config/docker.json" ]]; then
         config_file="/app/config/docker.json"
         log_info "Using Docker-specific configuration: $config_file"
@@ -102,12 +102,12 @@ setup_configuration() {
     else
         log_warn "No configuration file found, using environment variables only"
     fi
-    
+
     # Export configuration file path for the application
     if [[ -n "$config_file" ]]; then
         export HF_CONFIG_FILE="$config_file"
     fi
-    
+
     # Log key configuration values
     log_debug "Server enabled: ${HF_SERVER_ENABLED:-true}"
     log_debug "Server host: ${HF_SERVER_HOST:-0.0.0.0}"
@@ -115,7 +115,7 @@ setup_configuration() {
     log_debug "Auth enabled: ${HF_AUTH_ENABLED:-false}"
     log_debug "Auth strategy: ${HF_AUTH_STRATEGY:-none}"
     log_debug "Provider type: ${HF_PROVIDER_TYPE:-aws}"
-    
+
     log_info "Configuration setup complete"
 }
 
@@ -123,7 +123,7 @@ setup_configuration() {
 setup_aws_credentials() {
     if [[ "${HF_PROVIDER_TYPE:-aws}" == "aws" ]] || [[ "${HF_AUTH_STRATEGY:-none}" == "iam" ]]; then
         log_info "Setting up AWS credentials..."
-        
+
         # Check for AWS credentials
         if [[ -n "${AWS_ACCESS_KEY_ID}" ]] && [[ -n "${AWS_SECRET_ACCESS_KEY}" ]]; then
             log_info "Using AWS credentials from environment variables"
@@ -134,7 +134,7 @@ setup_aws_credentials() {
         else
             log_warn "No AWS credentials found - some features may not work"
         fi
-        
+
         # Set default region if not specified
         export AWS_DEFAULT_REGION="${HF_PROVIDER_AWS_REGION:-us-east-1}"
         log_debug "AWS region: ${AWS_DEFAULT_REGION}"
@@ -144,65 +144,65 @@ setup_aws_credentials() {
 # Wait for dependencies (if needed)
 wait_for_dependencies() {
     log_info "Checking dependencies..."
-    
+
     # If using external database, wait for it
     if [[ -n "${DATABASE_URL}" ]]; then
         log_info "Waiting for database connection..."
         # Add database connection check here if needed
     fi
-    
+
     # If using external services, wait for them
     if [[ -n "${EXTERNAL_SERVICE_URL}" ]]; then
         log_info "Waiting for external services..."
         # Add external service checks here if needed
     fi
-    
+
     log_info "Dependencies check complete"
 }
 
 # Start the application
 start_application() {
     log_info "Starting Open Host Factory Plugin REST API..."
-    
+
     # Build command arguments
     cmd_args=()
-    
+
     # Add configuration file if available
     if [[ -n "${HF_CONFIG_FILE}" ]]; then
         cmd_args+=("--config" "${HF_CONFIG_FILE}")
     fi
-    
+
     # Add logging level
     if [[ -n "${HF_LOGGING_LEVEL}" ]]; then
         cmd_args+=("--log-level" "${HF_LOGGING_LEVEL}")
     fi
-    
+
     # Add system serve command
     cmd_args+=("system" "serve")
-    
+
     # Add server-specific arguments
     if [[ -n "${HF_SERVER_HOST}" ]]; then
         cmd_args+=("--host" "${HF_SERVER_HOST}")
     fi
-    
+
     if [[ -n "${HF_SERVER_PORT}" ]]; then
         cmd_args+=("--port" "${HF_SERVER_PORT}")
     fi
-    
+
     if [[ -n "${HF_SERVER_WORKERS}" ]] && [[ "${HF_SERVER_WORKERS}" -gt 1 ]]; then
         cmd_args+=("--workers" "${HF_SERVER_WORKERS}")
     fi
-    
+
     if [[ "${HF_SERVER_RELOAD:-false}" == "true" ]]; then
         cmd_args+=("--reload")
     fi
-    
+
     if [[ -n "${HF_SERVER_LOG_LEVEL}" ]]; then
         cmd_args+=("--log-level" "${HF_SERVER_LOG_LEVEL}")
     fi
-    
+
     log_info "Executing: python src/run.py ${cmd_args[*]}"
-    
+
     # Execute the application
     exec python src/run.py "${cmd_args[@]}"
 }

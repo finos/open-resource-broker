@@ -73,7 +73,7 @@ def main():
         description="Check for large files that may violate Single Responsibility Principle"
     )
     parser.add_argument(
-        "--warn-only", 
+        "--warn-only",
         action="store_true",
         help="Only warn, don't fail the build"
     )
@@ -85,7 +85,7 @@ def main():
     )
     parser.add_argument(
         "--report",
-        action="store_true", 
+        action="store_true",
         help="Generate a full file size report"
     )
 

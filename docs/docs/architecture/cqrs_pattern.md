@@ -66,28 +66,28 @@ from src.domain.base.ports import LoggingPort
 
 class ValidateTemplateHandler:
     """Handle template validation commands."""
-    
+
     def __init__(self, 
                  template_repo: TemplateRepository,
                  logger: LoggingPort):
         self._template_repo = template_repo
         self._logger = logger
-    
+
     async def handle(self, command: ValidateTemplateCommand) -> ValidationResult:
         """Handle template validation."""
         self._logger.info(f"Validating template: {command.template_id}")
-        
+
         # Retrieve template
         template = await self._template_repo.get_by_id(command.template_id)
         if not template:
             raise TemplateNotFoundError(command.template_id)
-        
+
         # Perform validation
         validation_result = template.validate_configuration()
-        
+
         # Log result
         self._logger.info(f"Template validation result: {validation_result.is_valid}")
-        
+
         return validation_result
 ```
 
@@ -96,7 +96,7 @@ class ValidateTemplateHandler:
 # src/application/commands/request_handlers.py
 class CreateRequestHandler:
     """Handle request creation commands."""
-    
+
     def __init__(self,
                  request_repo: RequestRepository,
                  template_repo: TemplateRepository,
@@ -106,29 +106,29 @@ class CreateRequestHandler:
         self._template_repo = template_repo
         self._provider_context = provider_context
         self._logger = logger
-    
+
     async def handle(self, command: CreateRequestCommand) -> RequestId:
         """Handle request creation."""
         self._logger.info(f"Creating request for template: {command.template_id}")
-        
+
         # Validate template exists
         template = await self._template_repo.get_by_id(command.template_id)
         if not template:
             raise TemplateNotFoundError(command.template_id)
-        
+
         # Create request aggregate
         request = Request.create(
             template_id=command.template_id,
             max_number=command.max_number,
             attributes=command.attributes or {}
         )
-        
+
         # Save request
         await self._request_repo.save(request)
-        
+
         # Publish domain event
         request.publish_event(RequestCreatedEvent(request.id))
-        
+
         self._logger.info(f"Request created: {request.id}")
         return request.id
 ```
@@ -175,30 +175,30 @@ class GetRequestStatusQuery(BaseQuery):
 # src/application/queries/template_handlers.py
 class GetTemplatesHandler:
     """Handle template retrieval queries."""
-    
+
     def __init__(self,
                  template_repo: TemplateRepository,
                  logger: LoggingPort):
         self._template_repo = template_repo
         self._logger = logger
-    
+
     async def handle(self, query: GetTemplatesQuery) -> List[TemplateResponse]:
         """Handle template retrieval."""
         self._logger.info("Retrieving templates")
-        
+
         # Apply filters
         templates = await self._template_repo.get_all(
             filters=query.filters,
             limit=query.limit,
             offset=query.offset
         )
-        
+
         # Convert to response DTOs
         responses = [
             TemplateResponse.from_domain(template)
             for template in templates
         ]
-        
+
         self._logger.info(f"Retrieved {len(responses)} templates")
         return responses
 ```
@@ -208,7 +208,7 @@ class GetTemplatesHandler:
 # src/application/queries/request_handlers.py
 class GetRequestStatusHandler:
     """Handle request status queries."""
-    
+
     def __init__(self,
                  request_repo: RequestRepository,
                  machine_repo: MachineRepository,
@@ -216,21 +216,21 @@ class GetRequestStatusHandler:
         self._request_repo = request_repo
         self._machine_repo = machine_repo
         self._logger = logger
-    
+
     async def handle(self, query: GetRequestStatusQuery) -> RequestStatusResponse:
         """Handle request status retrieval."""
         self._logger.info(f"Getting status for request: {query.request_id}")
-        
+
         # Get request
         request = await self._request_repo.get_by_id(query.request_id)
         if not request:
             raise RequestNotFoundError(query.request_id)
-        
+
         # Get machines if requested
         machines = []
         if query.include_machines:
             machines = await self._machine_repo.get_by_request_id(query.request_id)
-        
+
         # Build response
         response = RequestStatusResponse(
             request_id=request.id,
@@ -238,7 +238,7 @@ class GetRequestStatusHandler:
             created_at=request.created_at,
             machines=[MachineResponse.from_domain(m) for m in machines]
         )
-        
+
         return response
 ```
 
@@ -255,26 +255,26 @@ from src.domain.base.ports import LoggingPort
 
 class CommandBus:
     """Bus for routing commands to handlers."""
-    
+
     def __init__(self, logger: LoggingPort):
         self._handlers: Dict[Type, Any] = {}
         self._logger = logger
-    
+
     def register_handler(self, command_type: Type, handler: Any):
         """Register a command handler."""
         self._handlers[command_type] = handler
         self._logger.info(f"Registered handler for {command_type.__name__}")
-    
+
     async def execute(self, command: Any) -> Any:
         """Execute a command."""
         command_type = type(command)
-        
+
         if command_type not in self._handlers:
             raise HandlerNotFoundError(f"No handler for {command_type.__name__}")
-        
+
         handler = self._handlers[command_type]
         self._logger.info(f"Executing command: {command_type.__name__}")
-        
+
         try:
             result = await handler.handle(command)
             self._logger.info(f"Command executed successfully: {command_type.__name__}")
@@ -290,26 +290,26 @@ class CommandBus:
 # src/application/base/queries.py
 class QueryBus:
     """Bus for routing queries to handlers."""
-    
+
     def __init__(self, logger: LoggingPort):
         self._handlers: Dict[Type, Any] = {}
         self._logger = logger
-    
+
     def register_handler(self, query_type: Type, handler: Any):
         """Register a query handler."""
         self._handlers[query_type] = handler
         self._logger.info(f"Registered handler for {query_type.__name__}")
-    
+
     async def execute(self, query: Any) -> Any:
         """Execute a query."""
         query_type = type(query)
-        
+
         if query_type not in self._handlers:
             raise HandlerNotFoundError(f"No handler for {query_type.__name__}")
-        
+
         handler = self._handlers[query_type]
         self._logger.info(f"Executing query: {query_type.__name__}")
-        
+
         try:
             result = await handler.handle(query)
             self._logger.info(f"Query executed successfully: {query_type.__name__}")
@@ -328,7 +328,7 @@ The ApplicationService coordinates CQRS operations.
 @injectable
 class ApplicationService:
     """Main application service using CQRS."""
-    
+
     def __init__(self,
                  command_bus: CommandBus,
                  query_bus: QueryBus,
@@ -336,21 +336,21 @@ class ApplicationService:
         self._command_bus = command_bus
         self._query_bus = query_bus
         self._logger = logger
-    
+
     async def create_request(self, template_id: str, max_number: int) -> str:
         """Create a new request using CQRS."""
         command = CreateRequestCommand(
             template_id=template_id,
             max_number=max_number
         )
-        
+
         request_id = await self._command_bus.execute(command)
         return request_id
-    
+
     async def get_templates(self, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
         """Get templates using CQRS."""
         query = GetTemplatesQuery(filters=filters)
-        
+
         templates = await self._query_bus.execute(query)
         return [template.to_dict() for template in templates]
 ```
@@ -365,10 +365,10 @@ The interface layer uses CQRS through the ApplicationService.
 # src/interface/request_command_handlers.py
 class RequestCommandHandler:
     """Handle CLI request commands using CQRS."""
-    
+
     def __init__(self, application_service: ApplicationService):
         self._app_service = application_service
-    
+
     async def handle_create_request(self, args):
         """Handle create request CLI command."""
         try:
@@ -376,9 +376,9 @@ class RequestCommandHandler:
                 template_id=args.template_id,
                 max_number=args.count
             )
-            
+
             print(f"Request created: {request_id}")
-            
+
         except Exception as e:
             print(f"Error creating request: {e}")
 ```
@@ -398,9 +398,9 @@ async def create_request(
             template_id=request.template_id,
             max_number=request.max_number
         )
-        
+
         return {"request_id": request_id}
-        
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 ```

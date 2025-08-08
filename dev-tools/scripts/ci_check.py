@@ -18,11 +18,16 @@ Options:
 
 import argparse
 import configparser
+import logging
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 from typing import List, Tuple
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logger = logging.getLogger(__name__)
 
 
 class CIChecker:
@@ -38,16 +43,16 @@ class CIChecker:
 
     def log(self, message: str):
         """Log message to both console and temp file."""
-        print(message)
+        logger.info(message)
         self.output_lines.append(message)
 
     def write_temp_file(self):
         """Write all output to temporary file."""
         if not self.temp_file:
             self.temp_file = tempfile.NamedTemporaryFile(
-                mode='w', 
-                suffix='.txt', 
-                prefix='ci_check_', 
+                mode='w',
+                suffix='.txt',
+                prefix='ci_check_',
                 delete=False
             )
 
@@ -192,23 +197,22 @@ class CIChecker:
         """Run code formatting checks (Black, isort)."""
         self.log("\n=== Code Formatting Checks ===")
 
+        checks = [
+            ("Black code formatting", [sys.executable, "-m", "black", "--check", "src/", "tests/"]),
+            ("isort import sorting", [sys.executable, "-m", "isort", "--check-only", "src/", "tests/"])
+        ]
+
+        if self.fix:
+            checks = [
+                ("Black code formatting", [sys.executable, "-m", "black", "src/", "tests/"]),
+                ("isort import sorting", [sys.executable, "-m", "isort", "src/", "tests/"])
+            ]
+
         all_passed = True
-
-        # Black formatting check
-        black_cmd = [sys.executable, "-m", "black", "--check", "src/", "tests/"]
-        if self.fix:
-            black_cmd = [sys.executable, "-m", "black", "src/", "tests/"]
-
-        if not self.run_command(black_cmd, "Black code formatting"):
-            all_passed = False
-
-        # isort import sorting check
-        isort_cmd = [sys.executable, "-m", "isort", "--check-only", "src/", "tests/"]
-        if self.fix:
-            isort_cmd = [sys.executable, "-m", "isort", "src/", "tests/"]
-
-        if not self.run_command(isort_cmd, "isort import sorting"):
-            all_passed = False
+        for i, (description, cmd) in enumerate(checks, 1):
+            logger.info(f"[{i}/{len(checks)}] {description}...")
+            if not self.run_command(cmd, description):
+                all_passed = False
 
         return all_passed
 
@@ -216,34 +220,24 @@ class CIChecker:
         """Run linting checks (flake8, mypy, pylint)."""
         self.log("\n=== Linting Checks ===")
 
+        checks = [
+            ("flake8 style guide", [sys.executable, "-m", "flake8", "src/", "tests/"], False),
+            ("mypy type checking", [sys.executable, "-m", "mypy", "src/"], True),
+            ("pylint code analysis", [sys.executable, "-m", "pylint", "src/"], True)
+        ]
+
         all_passed = True
-
-        # flake8 style guide
-        if not self.run_command(
-            [sys.executable, "-m", "flake8", "src/", "tests/"],
-            "flake8 style guide"
-        ):
-            all_passed = False
-
-        # mypy type checking (allowed to fail)
-        self.run_command(
-            [sys.executable, "-m", "mypy", "src/"],
-            "mypy type checking",
-            allow_failure=True
-        )
-
-        # pylint code analysis (allowed to fail)
-        self.run_command(
-            [sys.executable, "-m", "pylint", "src/"],
-            "pylint code analysis",
-            allow_failure=True
-        )
+        for i, (description, cmd, allow_failure) in enumerate(checks, 1):
+            logger.info(f"[{i}/{len(checks)}] {description}...")
+            if not self.run_command(cmd, description, allow_failure=allow_failure):
+                if not allow_failure:
+                    all_passed = False
 
         return all_passed
 
     def run_complexity_analysis(self) -> bool:
         """Run complexity analysis (allowed to fail)."""
-        print("\n=== Complexity Analysis ===")
+        logger.info("=== Complexity Analysis ===")
 
         # Radon complexity analysis (allowed to fail)
         self.run_command(
@@ -262,7 +256,7 @@ class CIChecker:
 
     def run_security_checks(self) -> bool:
         """Run security checks (bandit, safety)."""
-        print("\n=== Security Checks ===")
+        logger.info("=== Security Checks ===")
 
         # bandit security linter (allowed to fail)
         self.run_command(
@@ -288,7 +282,7 @@ class CIChecker:
 
     def run_tests(self, quick: bool = False) -> bool:
         """Run test suite."""
-        print("\n=== Test Suite ===")
+        logger.info("=== Test Suite ===")
 
         if quick:
             return self.run_command(

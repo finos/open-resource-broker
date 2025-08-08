@@ -98,22 +98,22 @@ The `TemplateConfigurationManager` now operates entirely with infrastructure DTO
 class TemplateConfigurationManager:
     """
     Template Configuration Manager - Single Source of Truth.
-    
+
     Architecture Improvements:
     - Uses TemplateDTO instead of direct domain Template imports
     - Follows Dependency Inversion Principle (DIP)
     - Maintains clean separation between infrastructure and domain layers
     - Provides configuration-driven template discovery and management
     """
-    
+
     async def load_templates(self, force_refresh: bool = False) -> List[TemplateDTO]:
         """Load all templates from discovered files."""
         # Implementation uses TemplateDTO throughout
-        
+
     async def get_template_by_id(self, template_id: str) -> Optional[TemplateDTO]:
         """Get a specific template by ID."""
         # Returns TemplateDTO instead of domain Template
-        
+
     async def save_template(self, template: TemplateDTO) -> None:
         """Save template to configuration files."""
         # Accepts TemplateDTO instead of domain Template
@@ -129,12 +129,12 @@ The template repository implementation now properly converts between DTOs and do
 @injectable
 class TemplateRepositoryImpl(TemplateRepositoryPort):
     """Template repository implementation using configuration manager."""
-    
+
     async def find_all(self) -> List[Template]:
         """Find all templates."""
         template_dtos = await self.config_manager.load_templates()
         return [self._dto_to_domain(dto) for dto in template_dtos]
-    
+
     async def find_by_id(self, template_id: TemplateId) -> Optional[Template]:
         """Find template by ID."""
         template_dto = await self.config_manager.get_template_by_id(template_id.value)
@@ -149,7 +149,7 @@ CQRS handlers continue to work with domain objects while the infrastructure laye
 @query_handler(ListTemplatesQuery)
 class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, List[TemplateDTO]]):
     """Handle template listing queries."""
-    
+
     async def execute_query(self, query: ListTemplatesQuery) -> List[TemplateDTO]:
         # Infrastructure layer returns DTOs
         # Application layer can convert to domain objects as needed

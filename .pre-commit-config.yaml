@@ -9,7 +9,7 @@ repos:
         files: \.(py)$
         pass_filenames: false
         description: "Auto-format Python code with black and isort"
-      
+
       - id: black
         name: Black (Code Formatting)
         entry: make ci-quality-black
@@ -17,7 +17,7 @@ repos:
         files: \.(py)$
         pass_filenames: false
         description: "Check Python code formatting with Black"
-      
+
       - id: isort
         name: isort (Import Sorting)
         entry: make ci-quality-isort
@@ -25,7 +25,7 @@ repos:
         files: \.(py)$
         pass_filenames: false
         description: "Check Python import sorting with isort"
-      
+
       - id: flake8
         name: flake8 (Style Guide)
         entry: make ci-quality-flake8
@@ -33,7 +33,52 @@ repos:
         files: \.(py)$
         pass_filenames: false
         description: "Check Python style guide compliance with flake8"
-      
+
+      - id: mypy
+        name: mypy (Type Checking)
+        entry: make ci-quality-mypy
+        language: system
+        files: \.(py)$
+        pass_filenames: false
+        description: "Check Python type annotations with mypy"
+        warning_only: true  # Allow this to fail without blocking commit
+
+      - id: pylint
+        name: pylint (Code Analysis)
+        entry: make ci-quality-pylint
+        language: system
+        files: \.(py)$
+        pass_filenames: false
+        description: "Run pylint code analysis"
+        warning_only: true  # Allow this to fail without blocking commit
+
+      - id: bandit
+        name: bandit (Security Analysis)
+        entry: make ci-security-bandit
+        language: system
+        files: \.(py)$
+        pass_filenames: false
+        description: "Run bandit security analysis"
+        warning_only: true  # Allow this to fail without blocking commit
+
+      - id: safety
+        name: safety (Dependency Security)
+        entry: make ci-security-safety
+        language: system
+        files: requirements.*\.txt$|pyproject\.toml$
+        pass_filenames: false
+        description: "Check dependencies for known security vulnerabilities"
+        warning_only: true  # Allow this to fail without blocking commit
+
+      - id: hadolint
+        name: hadolint (Dockerfile Linting)
+        entry: make hadolint-check
+        language: system
+        files: Dockerfile.*
+        pass_filenames: false
+        description: "Lint Dockerfile with hadolint"
+        warning_only: true  # Allow this to fail without blocking commit
+
       - id: quality-check
         name: Quality Check
         entry: make quality-check
@@ -41,7 +86,7 @@ repos:
         files: \.(py|md|rst|txt|yaml|yml|json|toml)$
         pass_filenames: false
         description: "Run comprehensive professional quality checks"
-      
+
       - id: validate-imports
         name: Validate Python Imports
         entry: make ci-imports
@@ -49,7 +94,7 @@ repos:
         files: \.(py)$
         pass_filenames: false
         description: "Validate that all critical imports work correctly"
-      
+
       - id: validate-cqrs
         name: Validate CQRS Patterns
         entry: make ci-arch-cqrs
@@ -58,7 +103,7 @@ repos:
         pass_filenames: false
         description: "Validate CQRS architecture patterns"
         warning_only: true  # Allow this to fail without blocking commit
-      
+
       - id: check-architecture
         name: Check Architecture Compliance
         entry: make ci-arch-clean
@@ -67,7 +112,7 @@ repos:
         pass_filenames: false
         description: "Check Clean Architecture compliance"
         warning_only: true  # Allow this to fail without blocking commit
-      
+
       - id: validate-imports-arch
         name: Validate Import Architecture
         entry: make ci-arch-imports
@@ -76,7 +121,7 @@ repos:
         pass_filenames: false
         description: "Validate import architecture compliance"
         warning_only: true  # Allow this to fail without blocking commit
-      
+
       - id: check-file-sizes-arch
         name: Check File Sizes (Architecture)
         entry: make ci-arch-file-sizes
@@ -85,7 +130,7 @@ repos:
         pass_filenames: false
         description: "Check file sizes for architecture compliance"
         warning_only: true  # Allow this to fail without blocking commit
-      
+
       - id: security-scan
         name: Security Scan
         entry: make security-scan
@@ -94,7 +139,7 @@ repos:
         pass_filenames: false
         description: "Run comprehensive security scan"
         warning_only: true  # Allow this to fail without blocking commit
-      
+
       - id: validate-workflows
         name: Validate Workflows
         entry: make validate-workflows
@@ -102,7 +147,7 @@ repos:
         files: \.github/workflows/.*\.(yml|yaml)$
         pass_filenames: false
         description: "Validate GitHub Actions workflow YAML files"
-      
+
       - id: detect-secrets
         name: Detect Hardcoded Secrets
         entry: make detect-secrets
@@ -110,7 +155,7 @@ repos:
         files: ^src/.*\.py$
         pass_filenames: false
         description: "Detect potential hardcoded secrets in source code"
-      
+
       - id: check-file-sizes
         name: Check File Sizes
         entry: make file-sizes

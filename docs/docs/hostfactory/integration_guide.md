@@ -75,7 +75,7 @@ For production environments with multiple providers:
       <Parameter name="PROVIDER_NAME">aws-us-east-1</Parameter>
     </Parameters>
   </HostProvider>
-  
+
   <HostProvider name="aws-us-west-2">
     <Script>
       <GetAvailableTemplates>/opt/hostfactory-plugin/scripts/getAvailableTemplates.sh</GetAvailableTemplates>

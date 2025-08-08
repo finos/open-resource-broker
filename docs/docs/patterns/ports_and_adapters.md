@@ -25,22 +25,22 @@ from abc import ABC, abstractmethod
 
 class LoggingPort(ABC):
     """Abstract interface for logging operations."""
-    
+
     @abstractmethod
     def info(self, message: str, **kwargs) -> None:
         """Log informational message."""
         pass
-    
+
     @abstractmethod
     def error(self, message: str, **kwargs) -> None:
         """Log error message."""
         pass
-    
+
     @abstractmethod
     def warning(self, message: str, **kwargs) -> None:
         """Log warning message."""
         pass
-    
+
     @abstractmethod
     def debug(self, message: str, **kwargs) -> None:
         """Log debug message."""
@@ -56,22 +56,22 @@ from typing import Any, Dict, Optional
 
 class ConfigurationPort(ABC):
     """Abstract interface for configuration access."""
-    
+
     @abstractmethod
     def get(self, key: str, default: Any = None) -> Any:
         """Get configuration value by key."""
         pass
-    
+
     @abstractmethod
     def get_section(self, section: str) -> Dict[str, Any]:
         """Get entire configuration section."""
         pass
-    
+
     @abstractmethod
     def has_key(self, key: str) -> bool:
         """Check if configuration key exists."""
         pass
-    
+
     @abstractmethod
     def get_provider_config(self) -> Dict[str, Any]:
         """Get provider-specific configuration."""
@@ -89,17 +89,17 @@ T = TypeVar('T')
 
 class ContainerPort(ABC):
     """Abstract interface for dependency injection container."""
-    
+
     @abstractmethod
     def get(self, interface: Type[T]) -> T:
         """Resolve dependency by interface type."""
         pass
-    
+
     @abstractmethod
     def register_singleton(self, interface: Type, implementation: Type) -> None:
         """Register singleton service."""
         pass
-    
+
     @abstractmethod
     def register_transient(self, interface: Type, implementation: Type) -> None:
         """Register transient service."""
@@ -118,7 +118,7 @@ from .aggregate import Template
 
 class TemplateRepository(ABC):
     """Abstract interface for template data access."""
-    
+
     @abstractmethod
     async def get_all(self, 
                      filters: Optional[Dict[str, Any]] = None,
@@ -126,17 +126,17 @@ class TemplateRepository(ABC):
                      offset: Optional[int] = None) -> List[Template]:
         """Retrieve all templates with optional filtering."""
         pass
-    
+
     @abstractmethod
     async def get_by_id(self, template_id: str) -> Optional[Template]:
         """Retrieve template by ID."""
         pass
-    
+
     @abstractmethod
     async def save(self, template: Template) -> None:
         """Save template."""
         pass
-    
+
     @abstractmethod
     async def delete(self, template_id: str) -> bool:
         """Delete template by ID."""
@@ -154,22 +154,22 @@ from src.domain.machine.aggregate import Machine
 
 class ProviderStrategy(ABC):
     """Abstract interface for cloud provider strategies."""
-    
+
     @abstractmethod
     async def provision_instances(self, request: Request) -> List[Machine]:
         """Provision compute instances."""
         pass
-    
+
     @abstractmethod
     async def terminate_instances(self, instance_ids: List[str]) -> bool:
         """Terminate compute instances."""
         pass
-    
+
     @abstractmethod
     async def get_instance_status(self, instance_ids: List[str]) -> Dict[str, str]:
         """Get status of compute instances."""
         pass
-    
+
     @abstractmethod
     async def validate_template(self, template_config: Dict[str, Any]) -> bool:
         """Validate template configuration."""
@@ -192,22 +192,22 @@ import logging
 
 class LoggingAdapter(LoggingPort):
     """Concrete logging implementation using Python logging."""
-    
+
     def __init__(self, name: str = __name__):
         self._logger = get_logger(name)
-    
+
     def info(self, message: str, **kwargs) -> None:
         """Log informational message."""
         self._logger.info(message, extra=kwargs)
-    
+
     def error(self, message: str, **kwargs) -> None:
         """Log error message."""
         self._logger.error(message, extra=kwargs)
-    
+
     def warning(self, message: str, **kwargs) -> None:
         """Log warning message."""
         self._logger.warning(message, extra=kwargs)
-    
+
     def debug(self, message: str, **kwargs) -> None:
         """Log debug message."""
         self._logger.debug(message, extra=kwargs)
@@ -223,22 +223,22 @@ from typing import Any, Dict
 
 class ConfigurationAdapter(ConfigurationPort):
     """Concrete configuration implementation using ConfigurationManager."""
-    
+
     def __init__(self, config_manager: ConfigurationManager):
         self._config_manager = config_manager
-    
+
     def get(self, key: str, default: Any = None) -> Any:
         """Get configuration value by key."""
         return self._config_manager.get(key, default)
-    
+
     def get_section(self, section: str) -> Dict[str, Any]:
         """Get entire configuration section."""
         return self._config_manager.get_section(section)
-    
+
     def has_key(self, key: str) -> bool:
         """Check if configuration key exists."""
         return self._config_manager.has_key(key)
-    
+
     def get_provider_config(self) -> Dict[str, Any]:
         """Get provider-specific configuration."""
         return self._config_manager.get_provider_config()
@@ -256,18 +256,18 @@ T = TypeVar('T')
 
 class ContainerAdapter(ContainerPort):
     """Concrete container implementation using DIContainer."""
-    
+
     def __init__(self, di_container: DIContainer):
         self._container = di_container
-    
+
     def get(self, interface: Type[T]) -> T:
         """Resolve dependency by interface type."""
         return self._container.get(interface)
-    
+
     def register_singleton(self, interface: Type, implementation: Type) -> None:
         """Register singleton service."""
         self._container.register_singleton(interface, implementation)
-    
+
     def register_transient(self, interface: Type, implementation: Type) -> None:
         """Register transient service."""
         self._container.register_transient(interface, implementation)
@@ -287,7 +287,7 @@ from typing import Dict, Any, List
 @injectable
 class AWSTemplateAdapter:
     """AWS-specific template operations adapter."""
-    
+
     def __init__(self, 
                  aws_client: AWSClient, 
                  logger: LoggingPort, 
@@ -295,25 +295,25 @@ class AWSTemplateAdapter:
         self._aws_client = aws_client
         self._logger = logger
         self._config = config
-    
+
     async def validate_template(self, template_config: Dict[str, Any]) -> bool:
         """Validate AWS-specific template configuration."""
         self._logger.info(f"Validating AWS template configuration")
-        
+
         # AWS-specific validation logic
         required_fields = ['image_id', 'vm_type', 'subnet_ids']
         for field in required_fields:
             if field not in template_config:
                 self._logger.error(f"Missing required field: {field}")
                 return False
-        
+
         # Validate AMI exists
         ami_id = template_config.get('image_id')
         if not await self._validate_ami_exists(ami_id):
             return False
-        
+
         return True
-    
+
     async def _validate_ami_exists(self, ami_id: str) -> bool:
         """Validate that AMI exists in AWS."""
         try:
@@ -339,27 +339,27 @@ from typing import List, Dict, Any
 @injectable
 class AWSProviderStrategy(ProviderStrategy):
     """AWS implementation of provider strategy."""
-    
+
     def __init__(self, 
                  config: AWSProviderConfig, 
                  logger: LoggingPort):
         self._config = config
         self._logger = logger
         self._aws_client = AWSClient(config, logger)
-    
+
     async def provision_instances(self, request: Request) -> List[Machine]:
         """Provision AWS compute instances."""
         self._logger.info(f"Provisioning {request.max_number} instances for template {request.template_id}")
-        
+
         # AWS-specific provisioning logic
         ec2_client = self._aws_client.get_client('ec2')
-        
+
         # Build launch parameters
         launch_params = self._build_launch_parameters(request)
-        
+
         # Launch instances
         response = ec2_client.run_instances(**launch_params)
-        
+
         # Convert to domain objects
         machines = []
         for instance in response['Instances']:
@@ -370,10 +370,10 @@ class AWSProviderStrategy(ProviderStrategy):
                 request_id=request.id
             )
             machines.append(machine)
-        
+
         self._logger.info(f"Provisioned {len(machines)} instances")
         return machines
-    
+
     def _build_launch_parameters(self, request: Request) -> Dict[str, Any]:
         """Build AWS-specific launch parameters."""
         # Implementation details for AWS parameter building
@@ -394,7 +394,7 @@ import boto3
 
 class DynamoDBTemplateRepository(TemplateRepository):
     """DynamoDB implementation of template repository."""
-    
+
     def __init__(self, 
                  table_name: str,
                  region: str,
@@ -404,57 +404,57 @@ class DynamoDBTemplateRepository(TemplateRepository):
         self._logger = logger
         self._dynamodb = boto3.resource('dynamodb', region_name=region)
         self._table = self._dynamodb.Table(table_name)
-    
+
     async def get_all(self, 
                      filters: Optional[Dict[str, Any]] = None,
                      limit: Optional[int] = None,
                      offset: Optional[int] = None) -> List[Template]:
         """Retrieve all templates from DynamoDB."""
         self._logger.info("Retrieving templates from DynamoDB")
-        
+
         try:
             # Build scan parameters
             scan_params = {}
             if limit:
                 scan_params['Limit'] = limit
-            
+
             # Apply filters if provided
             if filters:
                 scan_params.update(self._build_filter_expression(filters))
-            
+
             # Perform scan
             response = self._table.scan(**scan_params)
-            
+
             # Convert to domain objects
             templates = []
             for item in response['Items']:
                 template = self._item_to_template(item)
                 templates.append(template)
-            
+
             self._logger.info(f"Retrieved {len(templates)} templates")
             return templates
-            
+
         except Exception as e:
             self._logger.error(f"Error retrieving templates: {e}")
             raise
-    
+
     async def get_by_id(self, template_id: str) -> Optional[Template]:
         """Retrieve template by ID from DynamoDB."""
         self._logger.info(f"Retrieving template {template_id}")
-        
+
         try:
             response = self._table.get_item(Key={'template_id': template_id})
-            
+
             if 'Item' not in response:
                 return None
-            
+
             template = self._item_to_template(response['Item'])
             return template
-            
+
         except Exception as e:
             self._logger.error(f"Error retrieving template {template_id}: {e}")
             raise
-    
+
     def _item_to_template(self, item: Dict[str, Any]) -> Template:
         """Convert DynamoDB item to Template domain object."""
         return Template(
@@ -488,14 +488,14 @@ def test_application_service():
     mock_logger = Mock(spec=LoggingPort)
     mock_config = Mock(spec=ConfigurationPort)
     mock_template_repo = Mock(spec=TemplateRepository)
-    
+
     # Create service with mocked dependencies
     service = ApplicationService(
         logger=mock_logger,
         config=mock_config,
         template_repo=mock_template_repo
     )
-    
+
     # Test behavior
     # Verify interactions with mocks
 ```
@@ -508,7 +508,7 @@ def test_with_real_adapters():
     logger = LoggingAdapter("test")
     config = ConfigurationAdapter(test_config_manager)
     template_repo = InMemoryTemplateRepository()
-    
+
     # Test with real implementations
     service = ApplicationService(logger, config, template_repo)
     # Test actual behavior
@@ -534,7 +534,7 @@ The system can select adapters based on configuration:
 # src/infrastructure/di/adapter_registration.py
 def register_adapters(container: DIContainer, config: ConfigurationPort) -> None:
     """Register adapters based on configuration."""
-    
+
     # Storage adapter selection
     storage_type = config.get("storage.type", "memory")
     if storage_type == "dynamodb":
@@ -552,7 +552,7 @@ def register_adapters(container: DIContainer, config: ConfigurationPort) -> None
             TemplateRepository,
             InMemoryTemplateRepository
         )
-    
+
     # Provider adapter selection
     provider_type = config.get("provider.type", "mock")
     if provider_type == "aws":

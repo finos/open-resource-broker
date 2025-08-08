@@ -208,11 +208,13 @@ class TestRequestAggregate:
         """Test request validation for required fields."""
         # Missing template_id for new request
         with pytest.raises((ValueError, RequestValidationError)):
-            Request.create_new_request(template_id="", machine_count=1, requester_id="user-123")
+            Request.create_new_request(
+                template_id="", machine_count=1, requester_id="user-123")
 
         # Missing requester_id
         with pytest.raises((ValueError, RequestValidationError)):
-            Request.create_new_request(template_id="template-001", machine_count=1, requester_id="")
+            Request.create_new_request(
+                template_id="template-001", machine_count=1, requester_id="")
 
         # Missing machine_ids for return request
         with pytest.raises((ValueError, RequestValidationError)):
@@ -246,14 +248,16 @@ class TestRequestAggregate:
         request.start_processing()
 
         # Update progress
-        request.update_progress(completed_count=2, status_message="2 out of 5 machines provisioned")
+        request.update_progress(
+            completed_count=2, status_message="2 out of 5 machines provisioned")
 
         assert request.completed_machine_count == 2
         assert request.status_message == "2 out of 5 machines provisioned"
         assert request.get_progress_percentage() == 40.0  # 2/5 * 100
 
         # Update progress again
-        request.update_progress(completed_count=5, status_message="All machines provisioned")
+        request.update_progress(
+            completed_count=5, status_message="All machines provisioned")
 
         assert request.completed_machine_count == 5
         assert request.get_progress_percentage() == 100.0
@@ -585,6 +589,7 @@ class TestRequestExceptions:
 
     def test_request_processing_error(self):
         """Test RequestProcessingError."""
-        error = RequestProcessingError("Failed to process request", request_id="req-123")
+        error = RequestProcessingError(
+            "Failed to process request", request_id="req-123")
         assert str(error) == "Failed to process request"
         assert error.request_id == "req-123"

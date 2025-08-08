@@ -21,19 +21,19 @@ Instead of duplicating common entity behavior, the plugin uses base classes:
 # src/domain/base/entity.py
 class Entity(BaseModel):
     """Base entity with common functionality."""
-    
+
     model_config = ConfigDict(frozen=False, validate_assignment=True)
-    
+
     def __eq__(self, other) -> bool:
         """Common equality logic - not repeated in each entity."""
         if not isinstance(other, self.__class__):
             return False
         return self.get_identity() == other.get_identity()
-    
+
     def __hash__(self) -> int:
         """Common hash logic - not repeated in each entity."""
         return hash(self.get_identity())
-    
+
     @abstractmethod
     def get_identity(self) -> Any:
         """Each entity defines its identity."""
@@ -41,19 +41,19 @@ class Entity(BaseModel):
 
 class AggregateRoot(Entity):
     """Base aggregate root with event handling."""
-    
+
     def __init__(self, **data):
         super().__init__(**data)
         self._domain_events: List[DomainEvent] = []
-    
+
     def add_domain_event(self, event: DomainEvent) -> None:
         """Common event handling - not repeated in each aggregate."""
         self._domain_events.append(event)
-    
+
     def get_domain_events(self) -> List[DomainEvent]:
         """Common event retrieval - not repeated in each aggregate."""
         return self._domain_events.copy()
-    
+
     def clear_domain_events(self) -> None:
         """Common event clearing - not repeated in each aggregate."""
         self._domain_events.clear()
@@ -61,22 +61,22 @@ class AggregateRoot(Entity):
 # Domain entities inherit common behavior
 class Template(AggregateRoot):
     """Template entity - inherits common functionality."""
-    
+
     template_id: str
     max_number: int
     attributes: Dict[str, Any]
-    
+
     def get_identity(self) -> str:
         """Only defines identity - other behavior inherited."""
         return self.template_id
 
 class Request(AggregateRoot):
     """Request entity - inherits same common functionality."""
-    
+
     request_id: str
     template_id: str
     status: RequestStatus
-    
+
     def get_identity(self) -> str:
         """Only defines identity - other behavior inherited."""
         return self.request_id
@@ -90,25 +90,25 @@ Common repository operations are abstracted to avoid duplication:
 # src/domain/base/repository.py
 class Repository(ABC, Generic[T]):
     """Base repository with common operations."""
-    
+
     @abstractmethod
     async def get_by_id(self, entity_id: str) -> Optional[T]:
         pass
-    
+
     @abstractmethod
     async def save(self, entity: T) -> None:
         pass
-    
+
     @abstractmethod
     async def delete(self, entity_id: str) -> bool:
         pass
-    
+
     # Common validation logic - not repeated in each repository
     def _validate_entity_id(self, entity_id: str) -> None:
         """Common validation - used by all repositories."""
         if not entity_id or not entity_id.strip():
             raise ValueError("Entity ID cannot be empty")
-    
+
     # Common error handling - not repeated in each repository
     def _handle_not_found(self, entity_id: str, entity_type: str) -> None:
         """Common not found handling."""
@@ -134,17 +134,17 @@ Instead of duplicating similar code for different configurations, the plugin use
 # Single provider strategy implementation handles multiple configurations
 class AWSProviderStrategy:
     """Single implementation handles multiple AWS configurations."""
-    
+
     def __init__(self, config: AWSProviderConfig, logger: LoggingPort):
         self._config = config
         self._logger = logger
-    
+
     async def provision_instances(self, request: Request) -> List[Machine]:
         """Single method handles different provisioning types via configuration."""
-        
+
         # Configuration drives behavior instead of separate methods
         provisioning_type = self._config.get_provisioning_type(request.template)
-        
+
         if provisioning_type == "ec2_fleet":
             return await self._provision_with_ec2_fleet(request)
         elif provisioning_type == "spot_fleet":
@@ -162,11 +162,11 @@ provisioning:
     high_performance: ec2_fleet
     cost_optimized: spot_fleet
     scalable: auto_scaling
-  
+
   ec2_fleet:
     target_capacity_type: on-demand
     allocation_strategy: diversified
-  
+
   spot_fleet:
     target_capacity: 10
     allocation_strategy: lowestPrice
@@ -179,27 +179,27 @@ provisioning:
 # Single factory handles multiple handler types via configuration
 class AWSHandlerFactory:
     """Single factory implementation for all handler types."""
-    
+
     def __init__(self, config: ConfigurationPort):
         self._config = config
         self._handler_configs = self._load_handler_configurations()
-    
+
     def create_handler(self, handler_type: str) -> AWSHandler:
         """Single creation method handles all types via configuration."""
-        
+
         # Configuration drives handler creation instead of separate factory methods
         handler_config = self._handler_configs.get(handler_type)
         if not handler_config:
             raise ValueError(f"Unknown handler type: {handler_type}")
-        
+
         # Common creation logic with configuration-driven parameters
         return self._create_configured_handler(handler_type, handler_config)
-    
+
     def _create_configured_handler(self, handler_type: str, config: Dict[str, Any]) -> AWSHandler:
         """Common handler creation logic - not duplicated for each type."""
-        
+
         handler_class = self._get_handler_class(handler_type)
-        
+
         # Common initialization parameters from configuration
         return handler_class(
             aws_client=self._aws_client,
@@ -220,7 +220,7 @@ handlers:
     timeout:
       provision: 300
       terminate: 60
-  
+
   spot_fleet:
     class: SpotFleetHandler
     retry:
@@ -241,21 +241,21 @@ Common operations are extracted into reusable utility functions:
 # src/providers/aws/utilities/aws_operations.py
 class AWSOperations:
     """Shared AWS operations - eliminates duplication across handlers."""
-    
+
     @staticmethod
     def build_tags(base_tags: Dict[str, str], additional_tags: Dict[str, str] = None) -> List[Dict[str, str]]:
         """Common tag building logic - used by all handlers."""
         tags = base_tags.copy()
         if additional_tags:
             tags.update(additional_tags)
-        
+
         return [{"Key": k, "Value": v} for k, v in tags.items()]
-    
+
     @staticmethod
     def parse_instance_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Common response parsing - used by all handlers."""
         instances = []
-        
+
         for reservation in response.get('Reservations', []):
             for instance in reservation.get('Instances', []):
                 instances.append({
@@ -266,15 +266,15 @@ class AWSOperations:
                     'private_ip': instance.get('PrivateIpAddress'),
                     'public_ip': instance.get('PublicIpAddress')
                 })
-        
+
         return instances
-    
+
     @staticmethod
     def validate_instance_ids(instance_ids: List[str]) -> None:
         """Common validation - used by all handlers."""
         if not instance_ids:
             raise ValueError("Instance IDs list cannot be empty")
-        
+
         for instance_id in instance_ids:
             if not instance_id.startswith('i-'):
                 raise ValueError(f"Invalid instance ID format: {instance_id}")
@@ -287,13 +287,13 @@ class EC2FleetHandler(AWSHandler):
             base_tags={"RequestId": request.id, "Handler": "EC2Fleet"},
             additional_tags=request.template.attributes.get("tags", {})
         )
-        
+
         # Launch instances with common tags
         response = await self._launch_ec2_fleet(request, tags)
-        
+
         # Uses shared utility instead of duplicating parsing logic
         instances = AWSOperations.parse_instance_response(response)
-        
+
         return self._convert_to_machines(instances, request)
 
 class SpotFleetHandler(AWSHandler):
@@ -303,10 +303,10 @@ class SpotFleetHandler(AWSHandler):
             base_tags={"RequestId": request.id, "Handler": "SpotFleet"},
             additional_tags=request.template.attributes.get("tags", {})
         )
-        
+
         response = await self._launch_spot_fleet(request, tags)
         instances = AWSOperations.parse_instance_response(response)
-        
+
         return self._convert_to_machines(instances, request)
 ```
 
@@ -316,37 +316,37 @@ class SpotFleetHandler(AWSHandler):
 # src/config/utilities/config_utils.py
 class ConfigurationUtils:
     """Shared configuration utilities - eliminates duplication."""
-    
+
     @staticmethod
     def merge_configurations(base_config: Dict[str, Any], 
                            override_config: Dict[str, Any]) -> Dict[str, Any]:
         """Common configuration merging - used throughout the system."""
         merged = base_config.copy()
-        
+
         for key, value in override_config.items():
             if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
                 merged[key] = ConfigurationUtils.merge_configurations(merged[key], value)
             else:
                 merged[key] = value
-        
+
         return merged
-    
+
     @staticmethod
     def validate_required_fields(config: Dict[str, Any], 
                                 required_fields: List[str], 
                                 config_name: str) -> None:
         """Common validation - used by all configuration classes."""
         missing_fields = []
-        
+
         for field in required_fields:
             if field not in config:
                 missing_fields.append(field)
-        
+
         if missing_fields:
             raise ConfigurationError(
                 f"Missing required fields in {config_name}: {missing_fields}"
             )
-    
+
     @staticmethod
     def get_nested_value(config: Dict[str, Any], 
                         key_path: str, 
@@ -354,13 +354,13 @@ class ConfigurationUtils:
         """Common nested value retrieval - used throughout configuration system."""
         keys = key_path.split('.')
         value = config
-        
+
         for key in keys:
             if isinstance(value, dict) and key in value:
                 value = value[key]
             else:
                 return default
-        
+
         return value
 
 # Configuration classes use shared utilities
@@ -372,13 +372,13 @@ class AWSProviderConfig:
             ['region'], 
             'AWS Provider'
         )
-        
+
         # Uses shared merging for defaults
         self._config = ConfigurationUtils.merge_configurations(
             self._get_default_config(),
             config_data
         )
-    
+
     def get_handler_config(self, handler_type: str) -> Dict[str, Any]:
         # Uses shared nested value retrieval
         return ConfigurationUtils.get_nested_value(
@@ -398,7 +398,7 @@ Instead of duplicating similar patterns, the plugin uses templates and generator
 # src/application/base/handler_template.py
 class CommandHandlerTemplate:
     """Template for command handlers - eliminates duplication."""
-    
+
     def __init__(self, 
                  repository: Repository,
                  logger: LoggingPort,
@@ -406,32 +406,32 @@ class CommandHandlerTemplate:
         self._repository = repository
         self._logger = logger
         self._validator = validator
-    
+
     async def handle_command(self, 
                            command: Any,
                            entity_factory: Callable,
                            success_message: str) -> Any:
         """Template method - common command handling pattern."""
-        
+
         # Common validation pattern
         if self._validator:
             self._validator.validate(command)
-        
+
         # Common logging pattern
         self._logger.info(f"Handling command: {command.__class__.__name__}")
-        
+
         try:
             # Entity creation using factory
             entity = entity_factory(command)
-            
+
             # Common persistence pattern
             await self._repository.save(entity)
-            
+
             # Common success logging
             self._logger.info(success_message.format(entity_id=entity.get_identity()))
-            
+
             return entity.get_identity()
-            
+
         except Exception as e:
             # Common error handling pattern
             self._logger.error(f"Command handling failed: {e}")
@@ -441,7 +441,7 @@ class CommandHandlerTemplate:
 class CreateTemplateHandler:
     def __init__(self, template_repo: TemplateRepository, logger: LoggingPort):
         self._template = CommandHandlerTemplate(template_repo, logger)
-    
+
     async def handle(self, command: CreateTemplateCommand) -> str:
         # Uses template instead of duplicating command handling logic
         return await self._template.handle_command(
@@ -457,7 +457,7 @@ class CreateTemplateHandler:
 class CreateRequestHandler:
     def __init__(self, request_repo: RequestRepository, logger: LoggingPort):
         self._template = CommandHandlerTemplate(request_repo, logger)
-    
+
     async def handle(self, command: CreateRequestCommand) -> str:
         # Same template - no duplication
         return await self._template.handle_command(
@@ -480,17 +480,17 @@ Common values are defined once and reused:
 # src/domain/base/constants.py
 class SystemConstants:
     """System-wide constants - single source of truth."""
-    
+
     # Default values used throughout the system
     DEFAULT_TIMEOUT = 300
     DEFAULT_RETRY_ATTEMPTS = 3
     DEFAULT_BATCH_SIZE = 50
-    
+
     # Common field names
     TEMPLATE_ID_FIELD = "template_id"
     REQUEST_ID_FIELD = "request_id"
     MACHINE_ID_FIELD = "machine_id"
-    
+
     # Common status values
     PENDING_STATUS = "pending"
     RUNNING_STATUS = "running"
@@ -500,7 +500,7 @@ class SystemConstants:
 # src/domain/base/field_mappings.py
 class FieldMappings:
     """Common field mappings - eliminates duplication across formatters."""
-    
+
     # HostFactory standard field mappings
     HF_STANDARD_FIELDS = {
         "templateId": "template_id",
@@ -509,7 +509,7 @@ class FieldMappings:
         "machineId": "machine_id",
         "instanceType": "instance_type"
     }
-    
+
     # AWS-specific field mappings
     AWS_FIELD_MAPPINGS = {
         "InstanceId": "machine_id",
@@ -518,7 +518,7 @@ class FieldMappings:
         "LaunchTime": "created_at",
         "PrivateIpAddress": "private_ip"
     }
-    
+
     @classmethod
     def get_mapped_field(cls, source_field: str, mapping_type: str) -> str:
         """Common field mapping logic - used by all formatters."""

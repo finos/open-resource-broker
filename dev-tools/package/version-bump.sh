@@ -46,7 +46,7 @@ else
     MAJOR=${VERSION_PARTS[0]}
     MINOR=${VERSION_PARTS[1]}
     PATCH=${VERSION_PARTS[2]}
-    
+
     case $BUMP_TYPE in
         major)
             MAJOR=$((MAJOR + 1))
@@ -66,7 +66,7 @@ else
             exit 1
             ;;
     esac
-    
+
     NEW_VERSION="$MAJOR.$MINOR.$PATCH"
 fi
 
