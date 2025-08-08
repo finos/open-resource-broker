@@ -391,11 +391,11 @@ class QualityChecker:
         """Load .gitignore patterns for filtering files."""
         if not pathspec:
             return None
-        
+
         gitignore_path = Path(".gitignore")
         if not gitignore_path.exists():
             return None
-        
+
         try:
             with open(gitignore_path, 'r', encoding='utf-8') as f:
                 return pathspec.PathSpec.from_lines('gitwildmatch', f)
@@ -406,7 +406,7 @@ class QualityChecker:
         """Check if file should be ignored based on gitignore."""
         if not self.gitignore_spec:
             return False
-        
+
         # Convert to relative path for gitignore matching
         try:
             rel_path = os.path.relpath(file_path)

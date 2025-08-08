@@ -20,10 +20,13 @@ class Colors:
 
 def run_hook(name, command, warning_only=False, debug=False):
     """Run a single pre-commit hook."""
+    # Split command for shell=False security
+    cmd_args = command.split() if isinstance(command, str) else command
+
     if debug:
         print(f"Running {name}...", end=" ", flush=True)
         start_time = time.time()
-        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        result = subprocess.run(cmd_args, shell=False, capture_output=True, text=True)
         duration = time.time() - start_time
         exit_code = result.returncode
         output = result.stdout + result.stderr
@@ -32,7 +35,7 @@ def run_hook(name, command, warning_only=False, debug=False):
         start_time = time.time()
 
         # Start subprocess
-        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        process = subprocess.Popen(cmd_args, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
         # Show dots while running
         while process.poll() is None:
