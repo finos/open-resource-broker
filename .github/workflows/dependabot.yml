@@ -23,9 +23,9 @@ jobs:
     - name: Get default Python version from project config
       id: version
       run: |
-        DEFAULT_PYTHON=$(yq '.python.default_version' .project.yml)
-        echo "python-version=$DEFAULT_PYTHON" >> $GITHUB_OUTPUT
-        echo "Using Python version: $DEFAULT_PYTHON"
+        DEFAULT_PYTHON_VERSION=$(yq '.python.default_version' .project.yml)
+        echo "python-version=$DEFAULT_PYTHON_VERSION" >> $GITHUB_OUTPUT
+        echo "Using Python version: $DEFAULT_PYTHON_VERSION"
 
   update-uv-lock:
     name: Update UV Lock File

@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       python-versions: ${{ steps.config.outputs.python-versions }}
-      default-python: ${{ steps.config.outputs.default-python }}
+      default-python-version: ${{ steps.config.outputs.default-python-version }}
       container-registry: ${{ steps.config.outputs.container-registry }}
       container-image: ${{ steps.config.outputs.container-image }}
       version: ${{ steps.config.outputs.version }}
@@ -44,17 +44,17 @@ jobs:
       uses: actions/checkout@v4
     
     - name: Get default Python version from project config
-      id: default-python
+      id: default-python-version
       run: |
         # Use project config directly with yq
-        DEFAULT_PYTHON=$(yq '.python.default_version' .project.yml)
-        echo "default-python=$DEFAULT_PYTHON" >> $GITHUB_OUTPUT
-        echo "Using Python version: $DEFAULT_PYTHON"
+        DEFAULT_PYTHON_VERSION=$(yq '.python.default_version' .project.yml)
+        echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> $GITHUB_OUTPUT
+        echo "Using Python version: $DEFAULT_PYTHON_VERSION"
     
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ steps.default-python.outputs.default-python }}
+        python-version: ${{ steps.default-python-version.outputs.default-python-version }}
     
     - name: Install uv
       uses: astral-sh/setup-uv@v6
@@ -75,19 +75,19 @@ jobs:
       run: |
         # Use consistent print-* and print-json-* targets
         PYTHON_VERSIONS_JSON=$(make print-json-PYTHON_VERSIONS)
-        DEFAULT_PYTHON=$(yq '.python.default_version' .project.yml)
+        DEFAULT_PYTHON_VERSION=$(yq '.python.default_version' .project.yml)
         CONTAINER_REGISTRY=$(make print-CONTAINER_REGISTRY)
         CONTAINER_IMAGE=$(make print-CONTAINER_IMAGE)
         VERSION=$(make print-VERSION)
         
         echo "python-versions=$PYTHON_VERSIONS_JSON" >> $GITHUB_OUTPUT
-        echo "default-python=$DEFAULT_PYTHON" >> $GITHUB_OUTPUT
+        echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> $GITHUB_OUTPUT
         echo "container-registry=$CONTAINER_REGISTRY" >> $GITHUB_OUTPUT
         echo "container-image=$CONTAINER_IMAGE" >> $GITHUB_OUTPUT
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         
         echo "Found Python versions: $(make print-PYTHON_VERSIONS)"
-        echo "Default Python version: $DEFAULT_PYTHON"
+        echo "Default Python version: $DEFAULT_PYTHON_VERSION"
         echo "Container registry: $CONTAINER_REGISTRY"
         echo "Container image: $CONTAINER_IMAGE"
         echo "Version: $VERSION"
@@ -114,7 +114,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ needs.get-config.outputs.default-python }}
+        python-version: ${{ needs.get-config.outputs.default-python-version }}
     
     - name: Install uv
       uses: astral-sh/setup-uv@v6
@@ -157,7 +157,7 @@ jobs:
         ./dev-tools/scripts/container-build.sh
     
     - name: Test container image
-      if: matrix.python-version == needs.get-config.outputs.default-python
+      if: matrix.python-version == needs.get-config.outputs.default-python-version
       run: |
         # Test that the container starts and responds to health check
         IMAGE_TAG="${{ needs.get-config.outputs.container-registry }}/${{ needs.get-config.outputs.container-image }}:${{ needs.get-config.outputs.version }}-python${{ matrix.python-version }}"
@@ -203,7 +203,7 @@ jobs:
     - name: Create and push manifests
       env:
         PYTHON_VERSIONS: ${{ join(fromJSON(needs.get-config.outputs.python-versions), ' ') }}
-        DEFAULT_PYTHON: ${{ needs.get-config.outputs.default-python }}
+        DEFAULT_PYTHON_VERSION: ${{ needs.get-config.outputs.default-python-version }}
         REGISTRY: ${{ needs.get-config.outputs.container-registry }}
         IMAGE: ${{ needs.get-config.outputs.container-image }}
         VERSION: ${{ needs.get-config.outputs.version }}

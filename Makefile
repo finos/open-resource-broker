@@ -12,7 +12,7 @@ PROJECT_CONFIG := .project.yml
 
 # Python version settings (loaded from project config)
 PYTHON_VERSIONS := $(shell yq '.python.versions | join(" ")' $(PROJECT_CONFIG))
-DEFAULT_PYTHON_VERSION := $(shell yq '.python.default_version' $(PROJECT_CONFIG))
+DEFAULT_PYTHON_VERSION := $(shell yq '.python.default_python_version' $(PROJECT_CONFIG))
 
 # Generate pyproject.toml from template with project configuration
 generate-pyproject:  ## Generate pyproject.toml from template using project config
