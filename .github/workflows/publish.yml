@@ -26,7 +26,7 @@ on:
 env:
 
 jobs:
-  get-default-python-version:
+  get-config:
     name: Get Python Version from Makefile
     runs-on: ubuntu-latest
     outputs:
@@ -45,7 +45,7 @@ jobs:
   publish:
     name: Build and Publish Package
     runs-on: ubuntu-latest
-    needs: get-default-python-version
+    needs: get-config
     environment: ${{ github.event.inputs.environment || 'pypi' }}
     
     steps:
@@ -55,7 +55,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ needs.get-default-python-version.outputs.default-python-version }}
+        python-version: ${{ needs.get-config.outputs.default-python-version }}
     
     - name: Install uv
       uses: astral-sh/setup-uv@v6
@@ -127,7 +127,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ needs.get-default-python-version.outputs.default-python-version }}
+        python-version: ${{ needs.get-config.outputs.default-python-version }}
 
     - name: Install uv
       uses: astral-sh/setup-uv@v6

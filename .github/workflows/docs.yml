@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  get-python-version:
+  get-config:
     name: Get Python Version from Makefile
     runs-on: ubuntu-latest
     outputs:
@@ -41,7 +41,7 @@ jobs:
         echo "Using Python version: $DEFAULT_PYTHON_VERSION"
 
   build:
-    needs: get-python-version
+    needs: get-config
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -52,7 +52,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ needs.get-python-version.outputs.default-python-version }}
+          python-version: ${{ needs.get-config.outputs.default-python-version }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6

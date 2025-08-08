@@ -390,22 +390,13 @@ version-show:  ## Show current version from project config
 	@echo "Current version: $(VERSION)"
 
 version-bump-patch:  ## Bump patch version (1.0.0 -> 1.0.1)
-	@current_version=$(VERSION); \
-	new_version=$$(echo $$current_version | awk -F. '{$$3++; print $$1"."$$2"."$$3}'); \
-	yq -i '.project.version = "'$$new_version'"' $(PROJECT_CONFIG); \
-	echo "Version bumped from $$current_version to $$new_version"
+	@./dev-tools/package/version-bump.sh patch
 
 version-bump-minor:  ## Bump minor version (1.0.0 -> 1.1.0)
-	@current_version=$(VERSION); \
-	new_version=$$(echo $$current_version | awk -F. '{$$2++; $$3=0; print $$1"."$$2"."$$3}'); \
-	yq -i '.project.version = "'$$new_version'"' $(PROJECT_CONFIG); \
-	echo "Version bumped from $$current_version to $$new_version"
+	@./dev-tools/package/version-bump.sh minor
 
 version-bump-major:  ## Bump major version (1.0.0 -> 2.0.0)
-	@current_version=$(VERSION); \
-	new_version=$$(echo $$current_version | awk -F. '{$$1++; $$2=0; $$3=0; print $$1"."$$2"."$$3}'); \
-	yq -i '.project.version = "'$$new_version'"' $(PROJECT_CONFIG); \
-	echo "Version bumped from $$current_version to $$new_version"
+	@./dev-tools/package/version-bump.sh major
 
 version-bump:  ## Show version bump help
 	@echo "Version Management Commands:"

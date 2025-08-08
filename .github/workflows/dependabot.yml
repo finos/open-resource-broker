@@ -11,7 +11,7 @@ on:
 env:
 
 jobs:
-  get-default-python-version:
+  get-config:
     name: Get Python Version from Makefile
     runs-on: ubuntu-latest
     outputs:
@@ -31,8 +31,8 @@ jobs:
     name: Update UV Lock File
     if: github.actor == 'dependabot[bot]' && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    needs: get-default-python-version
-    needs: get-default-python-version
+    needs: get-config
+    needs: get-config
     permissions:
       contents: write
       pull-requests: write
@@ -47,7 +47,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ needs.get-default-python-version.outputs.default-python-version }}
+          python-version: ${{ needs.get-config.outputs.default-python-version }}
       
       - name: Install UV
         uses: astral-sh/setup-uv@v6
@@ -188,7 +188,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ needs.get-default-python-version.outputs.default-python-version }}
+          python-version: ${{ needs.get-config.outputs.default-python-version }}
       
       - name: Install UV
         uses: astral-sh/setup-uv@v6
