@@ -1,8 +1,9 @@
 # Multi-stage Dockerfile for Open Host Factory Plugin REST API
 # Optimized for production deployment with UV-first architecture
 
-# Build arguments for Python version
-ARG PYTHON_VERSION=3.11
+# Build arguments from Makefile (no defaults - must be provided)
+ARG PYTHON_VERSION
+ARG PACKAGE_NAME_SHORT
 
 # Build stage
 FROM python:${PYTHON_VERSION}-slim AS builder
@@ -57,7 +58,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean
 
 # Create non-root user for security
-RUN groupadd -r ohfp && useradd -r -g ohfp -s /bin/false ohfp
+RUN groupadd -r ${PACKAGE_NAME_SHORT} && useradd -r -g ${PACKAGE_NAME_SHORT} -s /bin/false ${PACKAGE_NAME_SHORT}
 
 # Set working directory
 WORKDIR /app
@@ -76,7 +77,7 @@ COPY pyproject.toml ./
 
 # Create necessary directories and set permissions
 RUN mkdir -p /app/logs /app/data /app/tmp && \
-    chown -R ohfp:ohfp /app
+    chown -R ${PACKAGE_NAME_SHORT}:${PACKAGE_NAME_SHORT} /app
 
 # Set environment variables
 ENV PYTHONPATH=/app
@@ -116,10 +117,10 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 EXPOSE 8000
 
 # Switch to non-root user
-USER ohfp
+USER ${PACKAGE_NAME_SHORT}
 
 # Create entrypoint script
-COPY --chown=ohfp:ohfp deployment/docker/docker-entrypoint.sh /app/
+COPY --chown=${PACKAGE_NAME_SHORT}:${PACKAGE_NAME_SHORT} deployment/docker/docker-entrypoint.sh /app/
 RUN chmod +x /app/docker-entrypoint.sh
 
 # Set entrypoint
@@ -137,7 +138,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean
 
 # Create non-root user for security
-RUN groupadd -r ohfp && useradd -r -g ohfp -s /bin/false ohfp
+RUN groupadd -r ${PACKAGE_NAME_SHORT} && useradd -r -g ${PACKAGE_NAME_SHORT} -s /bin/false ${PACKAGE_NAME_SHORT}
 
 # Set working directory
 WORKDIR /app
@@ -156,7 +157,7 @@ COPY pyproject.toml setup.py ./
 
 # Create necessary directories and set permissions
 RUN mkdir -p /app/logs /app/data /app/tmp && \
-    chown -R ohfp:ohfp /app
+    chown -R ${PACKAGE_NAME_SHORT}:${PACKAGE_NAME_SHORT} /app
 
 # Set environment variables
 ENV PYTHONPATH=/app
@@ -196,10 +197,10 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 EXPOSE 8000
 
 # Switch to non-root user
-USER ohfp
+USER ${PACKAGE_NAME_SHORT}
 
 # Create entrypoint script
-COPY --chown=ohfp:ohfp deployment/docker/docker-entrypoint.sh /app/
+COPY --chown=${PACKAGE_NAME_SHORT}:${PACKAGE_NAME_SHORT} deployment/docker/docker-entrypoint.sh /app/
 RUN chmod +x /app/docker-entrypoint.sh
 
 # Set entrypoint

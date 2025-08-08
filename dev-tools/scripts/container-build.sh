@@ -101,13 +101,17 @@ setup_builder() {
 build_image() {
     log_info "Building Docker image..."
     
+    # Get values from Makefile if not provided
+    local MAKEFILE_DEFAULT_PYTHON_VERSION="${PYTHON_VERSION:-$(make -s print-DEFAULT_PYTHON 2>/dev/null || echo '3.13')}"
+    local MAKEFILE_PACKAGE_SHORT="${PACKAGE_NAME_SHORT:-$(make -s print-PACKAGE_NAME_SHORT 2>/dev/null || echo 'ohfp')}"
+    
     # Prepare tags with Python version support
     local tags=()
     local version_tag="${VERSION}"
     
     # Add Python version to tag if specified
-    if [[ -n "${PYTHON_VERSION}" && "${MULTI_PYTHON}" == "true" ]]; then
-        version_tag="${VERSION}-python${PYTHON_VERSION}"
+    if [[ -n "${MAKEFILE_DEFAULT_PYTHON_VERSION}" && "${MULTI_PYTHON}" == "true" ]]; then
+        version_tag="${VERSION}-python${MAKEFILE_DEFAULT_PYTHON_VERSION}"
     fi
     
     if [[ -n "${REGISTRY}" ]]; then
