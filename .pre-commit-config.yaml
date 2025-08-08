@@ -2,6 +2,14 @@
 repos:
   - repo: local
     hooks:
+      - id: format
+        name: Auto-Format Code
+        entry: make format
+        language: system
+        files: \.(py)$
+        pass_filenames: false
+        description: "Auto-format Python code with black and isort"
+      
       - id: black
         name: Black (Code Formatting)
         entry: make ci-quality-black
