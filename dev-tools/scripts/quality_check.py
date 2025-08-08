@@ -310,19 +310,19 @@ class ImportChecker(FileChecker):
         violations = []
         try:
             import subprocess
-            
+
             # Run autoflake in check mode
             result = subprocess.run([
-                "autoflake", "--check", "--remove-all-unused-imports", 
+                "autoflake", "--check", "--remove-all-unused-imports",
                 "--remove-unused-variables", file_path
             ], capture_output=True, text=True, cwd=".")
-            
+
             # If autoflake found issues, it returns non-zero exit code
             if result.returncode != 0:
                 violations.append(UnusedImportViolation(
                     file_path, 1, "Run 'make format' to fix automatically"
                 ))
-                
+
         except (subprocess.SubprocessError, FileNotFoundError):
             # Skip if autoflake not available
             pass
