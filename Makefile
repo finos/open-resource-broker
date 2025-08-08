@@ -464,7 +464,7 @@ ci-security-bandit:  ## Run Bandit security scan
 
 ci-security-safety:  ## Run Safety dependency scan
 	@echo "Running Safety dependency scan..."
-	$(call run-tool,safety,scan)
+	$(call run-tool,safety,check)
 
 ci-security-trivy:  ## Run Trivy container scan
 	@echo "Running Trivy container scan..."
