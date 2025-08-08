@@ -99,7 +99,7 @@ jobs:
     
     strategy:
       matrix:
-        python-version: ${{ fromJSON(needs.get-config.outputs.default-python-versions) }}
+        python-version: ${{ fromJSON(needs.get-config.outputs.python-versions) }}
     
     permissions:
       contents: read

@@ -30,17 +30,24 @@ jobs:
     name: Get Python Version from Makefile
     runs-on: ubuntu-latest
     outputs:
-      python-version: ${{ steps.version.outputs.default-python-version }}
+      python-versions: ${{ steps.config.outputs.python-versions }}
+      default-python-version: ${{ steps.config.outputs.default-python-version }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Get default Python version from project config
-      id: version
+    - name: Get configuration from project config
+      id: config
       run: |
+        # Use consistent print-* and print-json-* targets
+        PYTHON_VERSIONS_JSON=$(make print-json-PYTHON_VERSIONS)
         DEFAULT_PYTHON_VERSION=$(yq '.python.default_version' .project.yml)
+        
+        echo "python-versions=$PYTHON_VERSIONS_JSON" >> $GITHUB_OUTPUT
         echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> $GITHUB_OUTPUT
-        echo "Using Python version: $DEFAULT_PYTHON_VERSION"
+        
+        echo "Found Python versions: $(make print-PYTHON_VERSIONS)"
+        echo "Default Python version: $DEFAULT_PYTHON_VERSION"
 
   # Security Scan Jobs (granular with tool names)
   security-bandit:
@@ -294,7 +301,7 @@ jobs:
     
     strategy:
       matrix:
-        default-python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+        python-version: ${{ fromJSON(needs.get-config.outputs.python-versions) }}
     
     permissions:
       contents: read
@@ -314,31 +321,31 @@ jobs:
         file: ./Dockerfile
         push: false
         load: true
-        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:security-scan-py${{ matrix.default-python-version }}
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:security-scan-py${{ matrix.python-version }}
         build-args: |
-          PYTHON_VERSION=${{ matrix.default-python-version }}
+          PYTHON_VERSION=${{ matrix.python-version }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:security-scan-py${{ matrix.default-python-version }}
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:security-scan-py${{ matrix.python-version }}
         format: 'sarif'
-        output: 'trivy-results-py${{ matrix.default-python-version }}.sarif'
+        output: 'trivy-results-py${{ matrix.python-version }}.sarif'
 
     - name: Upload Trivy scan results to GitHub Security tab
       uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
-        sarif_file: 'trivy-results-py${{ matrix.default-python-version }}.sarif'
+        sarif_file: 'trivy-results-py${{ matrix.python-version }}.sarif'
 
     - name: Run Trivy vulnerability scanner (JSON output)
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:security-scan-py${{ matrix.default-python-version }}
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:security-scan-py${{ matrix.python-version }}
         format: 'json'
-        output: 'trivy-results-py${{ matrix.default-python-version }}.json'
+        output: 'trivy-results-py${{ matrix.python-version }}.json'
 
     - name: Dockerfile security scan with Hadolint
       uses: hadolint/hadolint-action@v3.1.0
@@ -358,9 +365,9 @@ jobs:
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: container-security-reports-py${{ matrix.default-python-version }}
+        name: container-security-reports-py${{ matrix.python-version }}
         path: |
-          trivy-results-py${{ matrix.default-python-version }}.sarif
-          trivy-results-py${{ matrix.default-python-version }}.json
+          trivy-results-py${{ matrix.python-version }}.sarif
+          trivy-results-py${{ matrix.python-version }}.json
           hadolint-dockerfile.sarif
         retention-days: 30
