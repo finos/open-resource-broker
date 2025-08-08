@@ -731,6 +731,23 @@ status:  ## Show project status and useful commands
 print-%:
 	@echo $($*)
 
+# Container workflow integration targets
+print-python-versions:  ## Print Python versions as space-separated list
+	@echo "$(PYTHON_VERSIONS)"
+
+print-python-versions-json:  ## Print Python versions as JSON array
+	@echo "$(PYTHON_VERSIONS)" | tr ' ' '\n' | jq -R . | jq -s .
+
+print-default-python:  ## Print default Python version
+	@echo "$(DEFAULT_PYTHON)"
+
+print-container-info:  ## Print all container-related information
+	@echo "CONTAINER_REGISTRY=$(CONTAINER_REGISTRY)"
+	@echo "CONTAINER_IMAGE=$(CONTAINER_IMAGE)"
+	@echo "VERSION=$(VERSION)"
+	@echo "PYTHON_VERSIONS=$(PYTHON_VERSIONS)"
+	@echo "DEFAULT_PYTHON=$(DEFAULT_PYTHON)"
+
 # UV-specific targets for performance optimization
 uv-lock: ## Generate uv lock file for reproducible builds
 	@if ! command -v uv >/dev/null 2>&1; then \

@@ -30,7 +30,7 @@ on:
         type: boolean
 
 env:
-  REGISTRY: ghcr.io
+  PYTHON_VERSION: '3.11'
 
 jobs:
   get-python-versions:
@@ -39,25 +39,53 @@ jobs:
     outputs:
       python-versions: ${{ steps.versions.outputs.python-versions }}
       default-python: ${{ steps.versions.outputs.default-python }}
+      container-registry: ${{ steps.versions.outputs.container-registry }}
+      container-image: ${{ steps.versions.outputs.container-image }}
+      version: ${{ steps.versions.outputs.version }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Extract Python versions from Makefile
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        enable-cache: true
+        cache-dependency-glob: "pyproject.toml.template"
+    
+    - name: Generate pyproject.toml
+      run: |
+        python dev-tools/scripts/generate-pyproject.py
+    
+    - name: Install dependencies with uv
+      run: |
+        make ci-install
+    
+    - name: Extract configuration from Makefile
       id: versions
       run: |
-        # Extract PYTHON_VERSIONS from Makefile
-        PYTHON_VERSIONS=$(grep "^PYTHON_VERSIONS :=" Makefile | cut -d'=' -f2 | xargs)
-        DEFAULT_PYTHON=$(grep "^DEFAULT_PYTHON :=" Makefile | cut -d'=' -f2 | xargs)
-        
-        # Convert to JSON array for matrix
-        PYTHON_VERSIONS_JSON=$(echo "$PYTHON_VERSIONS" | tr ' ' '\n' | jq -R . | jq -s .)
+        # Use proper Makefile targets instead of grep
+        PYTHON_VERSIONS_JSON=$(make print-python-versions-json)
+        DEFAULT_PYTHON=$(make print-default-python)
+        CONTAINER_REGISTRY=$(make print-CONTAINER_REGISTRY)
+        CONTAINER_IMAGE=$(make print-CONTAINER_IMAGE)
+        VERSION=$(make print-VERSION)
         
         echo "python-versions=$PYTHON_VERSIONS_JSON" >> $GITHUB_OUTPUT
         echo "default-python=$DEFAULT_PYTHON" >> $GITHUB_OUTPUT
+        echo "container-registry=$CONTAINER_REGISTRY" >> $GITHUB_OUTPUT
+        echo "container-image=$CONTAINER_IMAGE" >> $GITHUB_OUTPUT
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
         
-        echo "Found Python versions: $PYTHON_VERSIONS"
+        echo "Found Python versions: $(make print-python-versions)"
         echo "Default Python version: $DEFAULT_PYTHON"
+        echo "Container registry: $CONTAINER_REGISTRY"
+        echo "Container image: $CONTAINER_IMAGE"
+        echo "Version: $VERSION"
 
   container-build:
     name: Build Container Images
@@ -78,6 +106,25 @@ jobs:
       with:
         fetch-depth: 0
     
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        enable-cache: true
+        cache-dependency-glob: "pyproject.toml.template"
+    
+    - name: Generate pyproject.toml
+      run: |
+        python dev-tools/scripts/generate-pyproject.py
+    
+    - name: Install dependencies with uv
+      run: |
+        make ci-install
+    
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
       with:
@@ -87,31 +134,15 @@ jobs:
       if: github.event_name != 'pull_request'
       uses: docker/login-action@v3
       with:
-        registry: ${{ env.REGISTRY }}
+        registry: ${{ needs.get-python-versions.outputs.container-registry }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     
-    - name: Get package metadata from Makefile
-      id: package
-      run: |
-        # Source environment and get package info
-        source .venv/bin/activate 2>/dev/null || python -m venv .venv && source .venv/bin/activate
-        pip install -e . >/dev/null 2>&1 || true
-        
-        # Get values from Makefile (fallback to defaults if not available)
-        CONTAINER_REGISTRY=$(make -s --no-print-directory -f Makefile print-CONTAINER_REGISTRY 2>/dev/null || echo "ghcr.io/awslabs")
-        CONTAINER_IMAGE=$(make -s --no-print-directory -f Makefile print-CONTAINER_IMAGE 2>/dev/null || echo "open-hostfactory-plugin")
-        VERSION=$(make -s --no-print-directory -f Makefile print-VERSION 2>/dev/null || echo "latest")
-        
-        echo "registry=$CONTAINER_REGISTRY" >> $GITHUB_OUTPUT
-        echo "image=$CONTAINER_IMAGE" >> $GITHUB_OUTPUT
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-    
     - name: Build container using dev-tools script
       env:
-        REGISTRY: ${{ steps.package.outputs.registry }}
-        IMAGE_NAME: ${{ steps.package.outputs.image }}
-        VERSION: ${{ steps.package.outputs.version }}
+        REGISTRY: ${{ needs.get-python-versions.outputs.container-registry }}
+        IMAGE_NAME: ${{ needs.get-python-versions.outputs.container-image }}
+        VERSION: ${{ needs.get-python-versions.outputs.version }}
         PYTHON_VERSION: ${{ matrix.python-version }}
         PLATFORMS: linux/amd64,linux/arm64
         PUSH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'release' || github.event.inputs.push_images == 'true') }}
@@ -124,7 +155,7 @@ jobs:
       if: matrix.python-version == needs.get-python-versions.outputs.default-python
       run: |
         # Test that the container starts and responds to health check
-        IMAGE_TAG="${{ steps.package.outputs.registry }}/${{ steps.package.outputs.image }}:${{ steps.package.outputs.version }}-python${{ matrix.python-version }}"
+        IMAGE_TAG="${{ needs.get-python-versions.outputs.container-registry }}/${{ needs.get-python-versions.outputs.container-image }}:${{ needs.get-python-versions.outputs.version }}-python${{ matrix.python-version }}"
         
         echo "Testing container image: $IMAGE_TAG"
         
@@ -157,38 +188,20 @@ jobs:
       packages: write
       
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
     - name: Log in to Container Registry
       uses: docker/login-action@v3
       with:
-        registry: ${{ env.REGISTRY }}
+        registry: ${{ needs.get-python-versions.outputs.container-registry }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Get package metadata
-      id: package
-      run: |
-        # Get values using same method as build job
-        source .venv/bin/activate 2>/dev/null || python -m venv .venv && source .venv/bin/activate
-        pip install -e . >/dev/null 2>&1 || true
-        
-        CONTAINER_REGISTRY=$(make -s --no-print-directory -f Makefile print-CONTAINER_REGISTRY 2>/dev/null || echo "ghcr.io/awslabs")
-        CONTAINER_IMAGE=$(make -s --no-print-directory -f Makefile print-CONTAINER_IMAGE 2>/dev/null || echo "open-hostfactory-plugin")
-        VERSION=$(make -s --no-print-directory -f Makefile print-VERSION 2>/dev/null || echo "latest")
-        
-        echo "registry=$CONTAINER_REGISTRY" >> $GITHUB_OUTPUT
-        echo "image=$CONTAINER_IMAGE" >> $GITHUB_OUTPUT
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
     
     - name: Create and push manifests
       env:
         PYTHON_VERSIONS: ${{ join(fromJSON(needs.get-python-versions.outputs.python-versions), ' ') }}
         DEFAULT_PYTHON: ${{ needs.get-python-versions.outputs.default-python }}
-        REGISTRY: ${{ steps.package.outputs.registry }}
-        IMAGE: ${{ steps.package.outputs.image }}
-        VERSION: ${{ steps.package.outputs.version }}
+        REGISTRY: ${{ needs.get-python-versions.outputs.container-registry }}
+        IMAGE: ${{ needs.get-python-versions.outputs.container-image }}
+        VERSION: ${{ needs.get-python-versions.outputs.version }}
       run: |
         if [ "${{ github.ref }}" = "refs/heads/main" ]; then
           # Create manifest for latest
