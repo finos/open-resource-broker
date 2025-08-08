@@ -8,8 +8,6 @@ on:
     - cron: '0 6 1 * 1'
   workflow_dispatch:
 
-env:
-
 jobs:
   get-config:
     name: Get Python Version from Makefile
@@ -31,7 +29,6 @@ jobs:
     name: Update UV Lock File
     if: github.actor == 'dependabot[bot]' && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    needs: get-config
     needs: get-config
     permissions:
       contents: write

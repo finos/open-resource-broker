@@ -54,7 +54,6 @@ jobs:
     name: Bandit (Security Scan)
     runs-on: ubuntu-latest
     needs: get-config
-    needs: get-config
     
     permissions:
       security-events: write

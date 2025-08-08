@@ -23,8 +23,6 @@ on:
         - testpypi
         - pypi
 
-env:
-
 jobs:
   get-config:
     name: Get Python Version from Makefile
