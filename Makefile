@@ -208,9 +208,7 @@ clean-whitespace: dev-install  ## Clean whitespace in blank lines from all files
 	@echo "Cleaning whitespace in blank lines..."
 	./dev-tools/scripts/clean_whitespace.sh
 
-format: dev-install  ## Format code (Black + isort + autopep8 + whitespace cleanup)
-	@echo "Cleaning up whitespace in blank lines..."
-	./dev-tools/scripts/clean_whitespace.sh "*.py"
+format: clean-whitespace dev-install  ## Format code (Black + isort + autopep8 + whitespace cleanup)
 	$(BIN)/autopep8 --in-place --max-line-length=88 --select=E501 --recursive $(PACKAGE) $(TESTS)
 	$(BIN)/black $(PACKAGE) $(TESTS)
 	$(BIN)/isort $(PACKAGE) $(TESTS)
