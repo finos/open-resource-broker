@@ -11,7 +11,7 @@ cd "$PROJECT_ROOT"
 # Ensure we're using the venv's Python explicitly
 if [ ! -f ".venv/bin/python" ]; then
     echo "ERROR: Virtual environment not found at .venv/"
-    echo "Please create it first: python3.11 -m venv .venv"
+    echo "Please create it first: python3 -m venv .venv"
     exit 1
 fi
 

@@ -32,7 +32,7 @@ BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 VCS_REF=$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')
 
 # Python version support (from Makefile environment variables)
-PYTHON_VERSION="${PYTHON_VERSION:-3.13}"  # Single Python version from Makefile
+PYTHON_VERSION="${PYTHON_VERSION:-$(make -s print-DEFAULT_PYTHON_VERSION 2>/dev/null || echo '3.13')}"  # Dynamic from Makefile with fallback
 MULTI_PYTHON="${MULTI_PYTHON:-false}"     # Flag for multi-Python builds
 
 # Build arguments

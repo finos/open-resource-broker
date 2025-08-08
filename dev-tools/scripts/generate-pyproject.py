@@ -9,6 +9,24 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
+import subprocess
+
+def _get_config_value(key: str) -> str:
+    """Get value from .project.yml using yq."""
+    try:
+        result = subprocess.run(
+            ["yq", key, ".project.yml"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"Error reading config key '{key}': {e}")
+        print("Make sure yq is installed and .project.yml exists")
+        sys.exit(1)
+
 try:
     from _package import (
         PACKAGE_NAME,
@@ -19,6 +37,11 @@ try:
         DOCS_URL,
         REPO_ISSUES_URL,
     )
+    
+    # Get Python version info from config
+    python_versions = _get_config_value('.python.versions[]')
+    min_python_version = _get_config_value('.python.min_version')
+    
 except ImportError as e:
     print(f"Error importing package configuration: {e}")
     print("Make sure yq is installed and .project.yml exists")
@@ -38,6 +61,13 @@ def generate_pyproject():
     with open(template_path, 'r', encoding='utf-8') as f:
         template_content = f.read()
     
+    # Generate Python classifiers
+    python_classifiers = []
+    for version in python_versions.split('\n'):
+        if version.strip():
+            python_classifiers.append(f'    "Programming Language :: Python :: {version.strip()}",')
+    python_classifiers_str = '\n'.join(python_classifiers)
+    
     # Replace placeholders with actual values
     replacements = {
         '{{PACKAGE_NAME}}': PACKAGE_NAME,
@@ -47,6 +77,8 @@ def generate_pyproject():
         '{{REPO_URL}}': REPO_URL,
         '{{DOCS_URL}}': DOCS_URL,
         '{{REPO_ISSUES_URL}}': REPO_ISSUES_URL,
+        '{{PYTHON_CLASSIFIERS}}': python_classifiers_str,
+        '{{MIN_PYTHON_VERSION}}': min_python_version,
     }
     
     generated_content = template_content
