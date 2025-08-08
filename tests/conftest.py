@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Generator, Optional
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
@@ -17,14 +17,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Import test environment fixtures
-from tests.fixtures.environment.mock_env_vars import (
-    complete_test_environment,
-    create_test_config_dict,
-    create_test_templates_dict,
-    mock_aws_credentials,
-    mock_hf_environment,
-    mock_hf_environment_with_fixtures,
-)
 
 # Import moto for AWS mocking
 try:
