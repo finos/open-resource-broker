@@ -14,13 +14,13 @@ from typing import List, Tuple
 def check_large_files(warn_only: bool = False, threshold: int = 600) -> None:
     """
     Check for files that are getting too large.
-    
+
     Args:
         warn_only: If True, only warn without failing
         threshold: Line count threshold for warnings
     """
     large_files = []
-    
+
     # Check Python files in src directory
     for file_path in Path("src").rglob("*.py"):
         try:
@@ -29,21 +29,21 @@ def check_large_files(warn_only: bool = False, threshold: int = 600) -> None:
                 large_files.append((file_path, line_count))
         except Exception as e:
             print(f"Warning: Could not analyze {file_path}: {e}")
-    
+
     if large_files:
         print("WARNING: Large files detected:")
         print("=" * 50)
-        
+
         # Sort by line count (largest first)
         large_files.sort(key=lambda x: x[1], reverse=True)
-        
+
         for file_path, lines in large_files:
             print(f"  {file_path}: {lines} lines")
-        
+
         print("=" * 50)
         print(f"Consider splitting files larger than {threshold} lines for better maintainability.")
         print("Large files often indicate Single Responsibility Principle violations.")
-        
+
         if not warn_only:
             print("FAILURE: Build failed due to large files.")
             sys.exit(1)
@@ -56,14 +56,14 @@ def check_large_files(warn_only: bool = False, threshold: int = 600) -> None:
 def get_file_size_report() -> List[Tuple[str, int]]:
     """Get a report of all Python file sizes."""
     file_sizes = []
-    
+
     for file_path in Path("src").rglob("*.py"):
         try:
             line_count = len(file_path.read_text(encoding='utf-8').splitlines())
             file_sizes.append((str(file_path), line_count))
         except Exception:
             continue
-    
+
     return sorted(file_sizes, key=lambda x: x[1], reverse=True)
 
 
@@ -88,9 +88,9 @@ def main():
         action="store_true", 
         help="Generate a full file size report"
     )
-    
+
     args = parser.parse_args()
-    
+
     if args.report:
         print("FILE SIZE REPORT:")
         print("=" * 50)

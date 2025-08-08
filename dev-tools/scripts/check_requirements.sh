@@ -59,21 +59,21 @@ EXIT_CODE=0
 for req_file in "${REQUIREMENTS_FILES[@]}"; do
     if [ -f "$PROJECT_ROOT/$req_file" ]; then
         log_section "Checking $req_file"
-        
+
         # Check for security vulnerabilities using safety
         log_info "Running safety check..."
         if ! safety check -r "$PROJECT_ROOT/$req_file"; then
             log_error "Security vulnerabilities found in $req_file"
             EXIT_CODE=1
         fi
-        
+
         # Check for security vulnerabilities using pip-audit
         log_info "Running pip-audit check..."
         if ! pip-audit -r "$PROJECT_ROOT/$req_file"; then
             log_error "Security vulnerabilities found in $req_file by pip-audit"
             EXIT_CODE=1
         fi
-        
+
         # Check for outdated packages
         log_info "Checking for outdated packages..."
         pip list --outdated --format=json | python -c '
@@ -82,14 +82,14 @@ pkgs = json.load(sys.stdin)
 for pkg in pkgs:
     print(f"{pkg["name"]}: {pkg["version"]} -> {pkg["latest_version"]}")
 '
-        
+
         # Validate requirements format
         log_info "Validating requirements format..."
         if ! pip check -r "$PROJECT_ROOT/$req_file"; then
             log_error "Invalid requirements format in $req_file"
             EXIT_CODE=1
         fi
-        
+
         # Check for duplicate requirements
         log_info "Checking for duplicate requirements..."
         DUPLICATES=$(sort "$PROJECT_ROOT/$req_file" | uniq -d)
@@ -98,14 +98,14 @@ for pkg in pkgs:
             echo "$DUPLICATES"
             EXIT_CODE=1
         fi
-        
+
         # Check for conflicts
         log_info "Checking for dependency conflicts..."
         if ! pip check; then
             log_error "Dependency conflicts found"
             EXIT_CODE=1
         fi
-        
+
         # Generate requirements.txt from setup.py if it exists
         if [ -f "$PROJECT_ROOT/setup.py" ]; then
             log_info "Checking setup.py dependencies..."
@@ -113,7 +113,7 @@ for pkg in pkgs:
             pip-compile "$PROJECT_ROOT/setup.py" --output-file "$TMP_REQ"
             SETUP_DEPS=$(cat "$TMP_REQ")
             FILE_DEPS=$(cat "$PROJECT_ROOT/$req_file")
-            
+
             # Compare dependencies
             if [ "$SETUP_DEPS" != "$FILE_DEPS" ]; then
                 log_warn "Dependencies in $req_file differ from setup.py"

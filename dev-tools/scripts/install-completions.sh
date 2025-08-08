@@ -81,15 +81,15 @@ esac
 # Install bash completions
 if [ "$INSTALL_BASH" = true ]; then
     print_status "Installing bash completions..."
-    
+
     # Create directory
     mkdir -p ~/.local/share/bash-completion/completions
-    
+
     # Generate and install completion
     python src/run.py --completion bash > ~/.local/share/bash-completion/completions/ohfp
-    
+
     print_success "Bash completions installed to ~/.local/share/bash-completion/completions/ohfp"
-    
+
     # Check if bash-completion is sourced
     if ! grep -q "bash-completion" ~/.bashrc 2>/dev/null; then
         print_warning "You may need to add this to your ~/.bashrc:"
@@ -104,15 +104,15 @@ fi
 # Install zsh completions
 if [ "$INSTALL_ZSH" = true ]; then
     print_status "Installing zsh completions..."
-    
+
     # Create directory
     mkdir -p ~/.local/share/zsh/site-functions
-    
+
     # Generate and install completion
     python src/run.py --completion zsh > ~/.local/share/zsh/site-functions/_ohfp
-    
+
     print_success "Zsh completions installed to ~/.local/share/zsh/site-functions/_ohfp"
-    
+
     # Check if fpath is configured
     if ! grep -q "~/.local/share/zsh/site-functions" ~/.zshrc 2>/dev/null; then
         print_warning "You may need to add this to your ~/.zshrc:"

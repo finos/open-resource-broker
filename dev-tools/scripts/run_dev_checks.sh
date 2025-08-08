@@ -16,11 +16,11 @@ make generate-pyproject
 echo "Building dev tools container..."
 docker build -t ohfp-dev-tools -f dev-tools/docker/Dockerfile.dev-tools .
 
-# Run checks using our existing pre-commit script in container
+# Run checks using our existing pre-commit Python script in container
 case "${1:-all}" in
     all)
         echo "Running all pre-commit checks in container..."
-        docker run --rm -v "$PWD:/app" ohfp-dev-tools ./dev-tools/scripts/pre_commit_check.sh
+        docker run --rm -v "$PWD:/app" ohfp-dev-tools ./dev-tools/scripts/pre_commit_check.py
         ;;
     format)
         echo "Running format in container..."

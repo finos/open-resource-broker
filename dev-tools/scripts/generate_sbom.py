@@ -24,10 +24,10 @@ def run_command(cmd: List[str], capture_output: bool = True) -> subprocess.Compl
 def generate_cyclonedx_sbom(output_file: str) -> bool:
     """Generate CycloneDX SBOM using cyclonedx-py."""
     print(f"Generating CycloneDX SBOM: {output_file}")
-    
+
     # Use correct cyclonedx-py syntax
     result = run_command(["cyclonedx-py", "environment", "-o", output_file])
-    
+
     if result.returncode == 0:
         print(f"Generated CycloneDX SBOM: {output_file}")
         return True
@@ -39,17 +39,17 @@ def generate_cyclonedx_sbom(output_file: str) -> bool:
 def generate_spdx_sbom(output_file: str) -> bool:
     """Generate SPDX SBOM, with fallback if cyclonedx-py doesn't support SPDX."""
     print(f"Generating SPDX SBOM: {output_file}")
-    
+
     # Try cyclonedx-py with SPDX format first
     help_result = run_command(["cyclonedx-py", "--help"])
-    
+
     if help_result.returncode == 0 and "spdxjson" in help_result.stdout:
         result = run_command(["cyclonedx-py", "environment", "--format", "spdxjson", "-o", output_file])
-        
+
         if result.returncode == 0:
             print(f"Generated SPDX SBOM with cyclonedx-py: {output_file}")
             return True
-    
+
     # Fallback: generate SPDX manually
     return generate_spdx_fallback(output_file)
 
@@ -63,7 +63,7 @@ def generate_spdx_fallback(output_file: str) -> bool:
         except ImportError:
             # Python < 3.8 fallback
             from importlib_metadata import distributions
-        
+
         # Create basic SPDX structure
         spdx_doc = {
             "spdxVersion": "SPDX-2.3",
@@ -77,7 +77,7 @@ def generate_spdx_fallback(output_file: str) -> bool:
             },
             "packages": []
         }
-        
+
         # Add packages from current environment
         for dist in distributions():
             package = {
@@ -89,14 +89,14 @@ def generate_spdx_fallback(output_file: str) -> bool:
                 "copyrightText": "NOASSERTION"
             }
             spdx_doc["packages"].append(package)
-        
+
         # Write SPDX file
         with open(output_file, "w") as f:
             json.dump(spdx_doc, f, indent=2)
-        
+
         print(f"Generated SPDX SBOM with fallback: {output_file}")
         return True
-        
+
     except Exception as e:
         print(f"Failed to generate SPDX SBOM: {e}", file=sys.stderr)
         return False
@@ -120,21 +120,21 @@ def main():
         default=".",
         help="Output directory for SBOM files"
     )
-    
+
     args = parser.parse_args()
-    
+
     success = True
-    
+
     if args.format in ["cyclonedx", "both"]:
         output_file = args.output if args.output and args.format == "cyclonedx" else f"{args.output_dir}/python-sbom-cyclonedx.json"
         if not generate_cyclonedx_sbom(output_file):
             success = False
-    
+
     if args.format in ["spdx", "both"]:
         output_file = args.output if args.output and args.format == "spdx" else f"{args.output_dir}/python-sbom-spdx.json"
         if not generate_spdx_sbom(output_file):
             success = False
-    
+
     sys.exit(0 if success else 1)
 
 
