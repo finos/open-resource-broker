@@ -1,5 +1,5 @@
 #!/bin/bash
-"""Pre-commit validation script - run all checks before committing."""
+"""Pre-commit validation script - simulates .pre-commit-config.yaml hooks."""
 
 set -e
 
@@ -14,7 +14,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 cd "$PROJECT_ROOT"
 
-echo "Running pre-commit checks..."
+echo "Running pre-commit checks (simulating .pre-commit-config.yaml)..."
 
 # Check if virtual environment exists
 if [ ! -f ".venv/bin/python" ]; then
@@ -27,17 +27,17 @@ fi
 source .venv/bin/activate
 
 # Function to run check and report result
-run_check() {
+run_hook() {
     local name="$1"
     local command="$2"
     
-    echo -n "Checking $name... "
+    echo -n "Running $name... "
     if eval "$command" > /dev/null 2>&1; then
         echo -e "${GREEN}PASS${NC}"
         return 0
     else
         echo -e "${RED}FAIL${NC}"
-        echo "  Run: $command"
+        echo "  Command: $command"
         return 1
     fi
 }
@@ -45,53 +45,60 @@ run_check() {
 # Track failures
 FAILED=0
 
-# 1. Workflow validation
-if ! run_check "workflow YAML syntax" "python dev-tools/scripts/validate_workflows.py"; then
+echo "Simulating pre-commit hooks from .pre-commit-config.yaml:"
+echo ""
+
+# 1. Professional Quality Check
+if ! run_hook "professional-quality-check" "python dev-tools/scripts/quality_check.py --strict"; then
     FAILED=1
 fi
 
-# 2. Python syntax
-if ! run_check "Python syntax" "python -m py_compile src/**/*.py"; then
+# 2. Validate Imports
+if ! run_hook "validate-imports" "python dev-tools/scripts/validate_imports.py"; then
     FAILED=1
 fi
 
-# 3. Import validation
-if ! run_check "import structure" "python dev-tools/scripts/validate_imports.py"; then
+# 3. Import Validation Tests
+if ! run_hook "test-import-validation" "python -m pytest tests/test_import_validation.py -v"; then
     FAILED=1
 fi
 
-# 4. CQRS validation
-if ! run_check "CQRS patterns" "python dev-tools/scripts/validate_cqrs.py"; then
+# 4. Check Deprecated Imports
+if ! run_hook "check-deprecated-imports" "! grep -r 'from.*request.*value_objects.*import.*MachineStatus' . --include='*.py'"; then
     FAILED=1
 fi
 
-# 5. Architecture compliance
-if ! run_check "architecture rules" "python dev-tools/scripts/check_architecture.py --warn-only"; then
+# 5. Comprehensive Security Scan
+if ! run_hook "comprehensive-security-scan" "python dev-tools/security/security_scan.py"; then
     FAILED=1
 fi
 
-# 6. Code formatting
-if ! run_check "code formatting (black)" "black --check src/ tests/"; then
+# 6. Bandit Security Check (Fallback)
+if ! run_hook "bandit-security-check" "python -m bandit -r src/ -f json -q"; then
     FAILED=1
 fi
 
-# 7. Import sorting
-if ! run_check "import sorting (isort)" "isort --check-only src/ tests/"; then
+# 7. Safety Dependency Check
+if ! run_hook "safety-dependency-check" "python -m safety check --short-report"; then
     FAILED=1
 fi
 
-# 8. Basic linting
-if ! run_check "basic linting (flake8)" "flake8 src/ tests/"; then
+# Additional checks not in pre-commit config but useful
+echo ""
+echo "Additional validation checks:"
+
+# 8. Workflow validation
+if ! run_hook "validate-workflows" "python dev-tools/scripts/validate_workflows.py"; then
     FAILED=1
 fi
 
-# 9. Security scan
-if ! run_check "security scan (bandit)" "bandit -r src/ -f json -o /tmp/bandit-report.json"; then
+# 9. CQRS validation
+if ! run_hook "validate-cqrs" "python dev-tools/scripts/validate_cqrs.py"; then
     FAILED=1
 fi
 
-# 10. Configuration validation
-if ! run_check "configuration files" "yq . .project.yml > /dev/null"; then
+# 10. Architecture compliance
+if ! run_hook "check-architecture" "python dev-tools/scripts/check_architecture.py --warn-only"; then
     FAILED=1
 fi
 
