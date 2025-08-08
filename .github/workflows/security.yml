@@ -177,6 +177,8 @@ jobs:
   security-trufflehog:
     name: TruffleHog (Secrets Scan)
     runs-on: ubuntu-latest
+    # Skip TruffleHog on main branch pushes where base and head are the same
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000')
     
     permissions:
       security-events: write
@@ -186,13 +188,15 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
     
     - name: Check for secrets with TruffleHog
       uses: trufflesecurity/trufflehog@main
       with:
         path: ./
-        base: main
-        head: HEAD
+        base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        head: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.after }}
         extra_args: --debug --only-verified
 
   dependency-review:

@@ -120,7 +120,7 @@ EXPOSE 8000
 USER ohfp
 
 # Create entrypoint script
-COPY --chown=ohfp:ohfp docker-entrypoint.sh /app/
+COPY --chown=ohfp:ohfp deployment/docker/docker-entrypoint.sh /app/
 RUN chmod +x /app/docker-entrypoint.sh
 
 # Set entrypoint
