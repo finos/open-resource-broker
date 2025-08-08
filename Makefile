@@ -746,14 +746,14 @@ print-%:
 
 # JSON print targets for GitHub Actions (handles both single values and lists)
 print-json-PYTHON_VERSIONS:
-	@echo "$(PYTHON_VERSIONS)" | tr ' ' '\n' | jq -R . | jq -s .
+	@echo "$(PYTHON_VERSIONS)" | tr ' ' '\n' | jq -R . | jq -s . | jq -c .
 
 print-json-%:
 	@value="$($*)"; \
 	if echo "$$value" | grep -q " "; then \
-		echo "$$value" | tr ' ' '\n' | jq -R . | jq -s .; \
+		echo "$$value" | tr ' ' '\n' | jq -R . | jq -s . | jq -c .; \
 	else \
-		echo "$$value" | jq -R .; \
+		echo "$$value" | jq -R . | jq -c .; \
 	fi
 
 # UV-specific targets for performance optimization
