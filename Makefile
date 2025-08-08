@@ -1,30 +1,34 @@
 # Makefile for Open Host Factory Plugin
 
-.PHONY: help install install-pip install-uv dev-install dev-install-pip dev-install-uv test test-unit test-integration test-e2e test-all test-cov test-html test-parallel test-quick test-performance test-aws test-report lint format security security-container security-full security-scan security-validate-sarif security-report sbom-generate clean clean-all build build-test docs docs-build docs-serve docs-deploy docs-clean docs-deploy-version docs-list-versions docs-delete-version ci-docs-build ci-docs-build-for-pages ci-docs-deploy run run-dev version-bump version-bump-patch version-bump-minor version-bump-major ci-quality ci-security ci-security-codeql ci-security-container ci-architecture ci-imports ci-tests-unit ci-tests-integration ci-tests-e2e ci-tests-matrix ci-tests-performance ci-check ci-check-quick ci-check-fix ci-check-verbose ci ci-quick workflow-ci workflow-test-matrix workflow-security architecture-check architecture-report quality-check quality-check-fix quality-check-files quality-gates quality-full generate-completions install-completions install-bash-completions install-zsh-completions uninstall-completions test-completions dev-setup install-package uninstall-package reinstall-package init-db create-config validate-config docker-build docker-run docker-compose-up docker-compose-down dev status uv-lock uv-sync uv-sync-dev uv-check uv-benchmark file-sizes file-sizes-report
+.PHONY: help install install-pip install-uv dev-install dev-install-pip dev-install-uv test test-unit test-integration test-e2e test-all test-cov test-html test-parallel test-quick test-performance test-aws test-report lint format security security-container security-full security-scan security-validate-sarif security-report sbom-generate clean clean-all build build-test docs docs-build docs-serve docs-deploy docs-clean docs-deploy-version docs-list-versions docs-delete-version ci-docs-build ci-docs-build-for-pages ci-docs-deploy run run-dev version-show version-bump version-bump-patch version-bump-minor version-bump-major generate-pyproject ci-quality ci-security ci-security-codeql ci-security-container ci-architecture ci-imports ci-tests-unit ci-tests-integration ci-tests-e2e ci-tests-matrix ci-tests-performance ci-check ci-check-quick ci-check-fix ci-check-verbose ci ci-quick workflow-ci workflow-test-matrix workflow-security architecture-check architecture-report quality-check quality-check-fix quality-check-files quality-gates quality-full generate-completions install-completions install-bash-completions install-zsh-completions uninstall-completions test-completions dev-setup install-package uninstall-package reinstall-package init-db create-config validate-config docker-build docker-run docker-compose-up docker-compose-down dev status uv-lock uv-sync uv-sync-dev uv-check uv-benchmark file-sizes file-sizes-report
 
 # Python settings
 PYTHON := python3
 VENV := .venv
 BIN := $(VENV)/bin
 
-# Python version settings (centralized for all build/test operations)
-PYTHON_VERSIONS := 3.9 3.10 3.11 3.12 3.13
-DEFAULT_PYTHON_VERSION := 3.13
+# Project configuration (single source of truth)
+PROJECT_CONFIG := .project.yml
 
-# Generate pyproject.toml from template with centralized configuration
-generate-pyproject:  ## Generate pyproject.toml from template using centralized config
-	./dev-tools/scripts/generate-pyproject.py
+# Python version settings (loaded from project config)
+PYTHON_VERSIONS := $(shell yq '.python.versions | join(" ")' $(PROJECT_CONFIG))
+DEFAULT_PYTHON_VERSION := $(shell yq '.python.default_version' $(PROJECT_CONFIG))
 
-# Get package metadata dynamically (single source of truth)
-PACKAGE_NAME := $(shell python -c "from src._package import PACKAGE_NAME; print(PACKAGE_NAME)" 2>/dev/null || echo "open-hostfactory-plugin")
-PACKAGE_NAME_SHORT := $(shell python -c "from src._package import PACKAGE_NAME_SHORT; print(PACKAGE_NAME_SHORT)" 2>/dev/null || echo "ohfp")
-REPO_ORG := $(shell python -c "from src._package import REPO_ORG; print(REPO_ORG)" 2>/dev/null || echo "awslabs")
-CONTAINER_REGISTRY := $(shell python -c "from src._package import CONTAINER_REGISTRY; print(CONTAINER_REGISTRY)" 2>/dev/null || echo "ghcr.io/awslabs")
-CONTAINER_IMAGE := $(shell python -c "from src._package import CONTAINER_IMAGE; print(CONTAINER_IMAGE)" 2>/dev/null || echo "open-hostfactory-plugin")
-DOCS_URL := $(shell python -c "from src._package import DOCS_URL; print(DOCS_URL)" 2>/dev/null || echo "https://awslabs.github.io/open-hostfactory-plugin")
+# Generate pyproject.toml from template with project configuration
+generate-pyproject:  ## Generate pyproject.toml from template using project config
+	@echo "Generating pyproject.toml from template using $(PROJECT_CONFIG)..."
+	@./dev-tools/scripts/generate-pyproject.py --config $(PROJECT_CONFIG)
 
-# Get version dynamically (single source of truth)
-VERSION := $(shell python -c "from src._version import __version__; print(__version__)" 2>/dev/null || echo "0.1.0")
+# Package information (loaded from project config)
+PACKAGE_NAME := $(shell yq '.project.name' $(PROJECT_CONFIG))
+PACKAGE_NAME_SHORT := $(shell yq '.project.short_name' $(PROJECT_CONFIG))
+VERSION := $(shell yq '.project.version' $(PROJECT_CONFIG))
+
+# Repository information (loaded from project config)
+REPO_ORG := $(shell yq '.repository.org' $(PROJECT_CONFIG))
+CONTAINER_REGISTRY := $(shell yq '.repository.registry' $(PROJECT_CONFIG))/$(REPO_ORG)
+CONTAINER_IMAGE := $(PACKAGE_NAME)
+DOCS_URL := https://$(REPO_ORG).github.io/$(PACKAGE_NAME)
 
 # Project settings
 PROJECT := $(PACKAGE_NAME)
@@ -382,17 +386,35 @@ docs-clean:  ## Clean documentation build files
 	rm -rf $(DOCS_BUILD_DIR)
 
 # Version management targets
-version-bump-patch:  ## Bump patch version (0.1.0 -> 0.1.1)
-	./dev-tools/package/version-bump.sh patch
+version-show:  ## Show current version from project config
+	@echo "Current version: $(VERSION)"
 
-version-bump-minor:  ## Bump minor version (0.1.0 -> 0.2.0)
-	./dev-tools/package/version-bump.sh minor
+version-bump-patch:  ## Bump patch version (1.0.0 -> 1.0.1)
+	@current_version=$(VERSION); \
+	new_version=$$(echo $$current_version | awk -F. '{$$3++; print $$1"."$$2"."$$3}'); \
+	yq -i '.project.version = "'$$new_version'"' $(PROJECT_CONFIG); \
+	echo "Version bumped from $$current_version to $$new_version"
 
-version-bump-major:  ## Bump major version (0.1.0 -> 1.0.0)
-	./dev-tools/package/version-bump.sh major
+version-bump-minor:  ## Bump minor version (1.0.0 -> 1.1.0)
+	@current_version=$(VERSION); \
+	new_version=$$(echo $$current_version | awk -F. '{$$2++; $$3=0; print $$1"."$$2"."$$3}'); \
+	yq -i '.project.version = "'$$new_version'"' $(PROJECT_CONFIG); \
+	echo "Version bumped from $$current_version to $$new_version"
+
+version-bump-major:  ## Bump major version (1.0.0 -> 2.0.0)
+	@current_version=$(VERSION); \
+	new_version=$$(echo $$current_version | awk -F. '{$$1++; $$2=0; $$3=0; print $$1"."$$2"."$$3}'); \
+	yq -i '.project.version = "'$$new_version'"' $(PROJECT_CONFIG); \
+	echo "Version bumped from $$current_version to $$new_version"
 
 version-bump:  ## Show version bump help
-	./dev-tools/package/version-bump.sh
+	@echo "Version Management Commands:"
+	@echo "  make version-show         - Show current version"
+	@echo "  make version-bump-patch   - Bump patch version (1.0.0 -> 1.0.1)"
+	@echo "  make version-bump-minor   - Bump minor version (1.0.0 -> 1.1.0)"
+	@echo "  make version-bump-major   - Bump major version (1.0.0 -> 2.0.0)"
+	@echo ""
+	@echo "Current version: $(VERSION)"
 
 # Build targets (using dev-tools)
 build: generate-pyproject clean dev-install  ## Build package

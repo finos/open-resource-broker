@@ -19,8 +19,7 @@ Architecture:
     between domain logic, application services, and infrastructure concerns.
 """
 
-from ._package import PACKAGE_NAME
-from ._version import __version__
+from ._package import PACKAGE_NAME, __version__
 
 __author__ = "AWS Professional Services"
 __email__ = "aws-proserve@amazon.com"

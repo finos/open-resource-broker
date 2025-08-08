@@ -3,10 +3,10 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-# Values updated to use centralized configuration
-name = "{{PACKAGE_NAME}}"           # From src._package.PACKAGE_NAME
-version = "{{VERSION}}"             # From src._version.__version__
-description = "Open Host Factory Plugin for IBM Spectrum Symphony"
+# Values from centralized .project.yml configuration
+name = "{{PACKAGE_NAME}}"
+version = "{{VERSION}}"
+description = "{{DESCRIPTION}}"
 readme = "README.md"
 license = "Apache-2.0"
 authors = [
@@ -225,7 +225,7 @@ use_parentheses = true
 ensure_newline_before_comments = true
 
 [tool.mypy]
-python_version = "{{ DEFAULT_PYTHON_VERSION }}"
+python_version = "{{ project.python.default_version }}"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

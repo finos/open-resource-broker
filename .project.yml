@@ -1,0 +1,30 @@
+# Project Configuration
+# This file centralizes all project metadata and build settings
+# Single source of truth for versions, names, and build parameters
+
+project:
+  name: open-hostfactory-plugin
+  short_name: ohfp  # CLI command name
+  version: 1.0.0
+  description: "Cloud provider integration plugin for IBM Spectrum Symphony Host Factory"
+
+python:
+  versions: [3.9, 3.10, 3.11, 3.12, 3.13]  # Supported Python versions
+  default_version: 3.13  # Default for builds and CI
+  min_version: 3.9  # Minimum required version
+
+repository:
+  org: awslabs
+  name: open-hostfactory-plugin
+  registry: ghcr.io  # Container registry
+
+build:
+  platforms: [linux/amd64, linux/arm64]  # Container platforms
+  
+ci:
+  test_timeout: 300  # Test timeout in seconds
+  coverage_threshold: 70  # Minimum coverage percentage
+  
+development:
+  pre_commit_enabled: true
+  security_scan_enabled: true

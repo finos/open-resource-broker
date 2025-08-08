@@ -81,7 +81,7 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
     parser.add_argument("-d", "--data", help="Input JSON data string (HostFactory compatibility)")
     # Get version dynamically
     try:
-        from src import __version__
+        from src._package import __version__
 
         version_string = f"%(prog)s {__version__}"
     except ImportError:

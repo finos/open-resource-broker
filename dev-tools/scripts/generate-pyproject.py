@@ -1,26 +1,27 @@
 #!/usr/bin/env python3
 """Generate pyproject.toml from template using centralized configuration."""
 
-import os
+import argparse
 import sys
 from pathlib import Path
 
-# Add project root to Python path
+# Add src to Python path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
 try:
-    from _version import __version__
     from _package import (
         PACKAGE_NAME,
         PACKAGE_NAME_SHORT,
+        __version__,
+        DESCRIPTION,
         REPO_URL,
         DOCS_URL,
-        REPO_ISSUES_URL
+        REPO_ISSUES_URL,
     )
 except ImportError as e:
-    print(f"Error importing centralized configuration: {e}")
-    print("Make sure src/_version.py and src/_package.py exist")
+    print(f"Error importing package configuration: {e}")
+    print("Make sure yq is installed and .project.yml exists")
     sys.exit(1)
 
 
@@ -42,6 +43,7 @@ def generate_pyproject():
         '{{PACKAGE_NAME}}': PACKAGE_NAME,
         '{{PACKAGE_NAME_SHORT}}': PACKAGE_NAME_SHORT,
         '{{VERSION}}': __version__,
+        '{{DESCRIPTION}}': DESCRIPTION,
         '{{REPO_URL}}': REPO_URL,
         '{{DOCS_URL}}': DOCS_URL,
         '{{REPO_ISSUES_URL}}': REPO_ISSUES_URL,
@@ -58,8 +60,11 @@ def generate_pyproject():
     print(f"Generated pyproject.toml from template")
     print(f"Package: {PACKAGE_NAME} v{__version__}")
     print(f"Repository: {REPO_URL}")
-    print(f"Entry points: {PACKAGE_NAME_SHORT}, {PACKAGE_NAME}")
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Generate pyproject.toml from template")
+    parser.add_argument("--config", help="Configuration file path (unused, for compatibility)")
+    args = parser.parse_args()
+    
     generate_pyproject()

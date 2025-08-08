@@ -43,11 +43,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Get default Python version from Makefile
+    - name: Get default Python version from project config
       id: default-python
       run: |
-        # Use consistent print-* target (no dependencies needed)
-        DEFAULT_PYTHON=$(make print-DEFAULT_PYTHON_VERSION)
+        # Use project config directly with yq
+        DEFAULT_PYTHON=$(yq '.python.default_version' .project.yml)
         echo "default-python=$DEFAULT_PYTHON" >> $GITHUB_OUTPUT
         echo "Using Python version: $DEFAULT_PYTHON"
     
@@ -75,7 +75,7 @@ jobs:
       run: |
         # Use consistent print-* and print-json-* targets
         PYTHON_VERSIONS_JSON=$(make print-json-PYTHON_VERSIONS)
-        DEFAULT_PYTHON=$(make print-DEFAULT_PYTHON_VERSION)
+        DEFAULT_PYTHON=$(yq '.python.default_version' .project.yml)
         CONTAINER_REGISTRY=$(make print-CONTAINER_REGISTRY)
         CONTAINER_IMAGE=$(make print-CONTAINER_IMAGE)
         VERSION=$(make print-VERSION)
