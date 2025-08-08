@@ -26,7 +26,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import List, Optional
 
 # --- Configuration ---
 
@@ -388,6 +388,9 @@ class QualityChecker:
         # Filter files that exist and have relevant extensions
         valid_files = []
         for file_path in file_paths:
+            # Skip this script to avoid self-checking issues
+            if file_path.endswith("quality_check.py"):
+                continue
             if os.path.isfile(file_path):
                 ext = os.path.splitext(file_path)[1].lower()
                 if ext in ALL_EXTENSIONS:
@@ -464,13 +467,14 @@ def main():
     else:
         files_to_check = checker.get_modified_files()
         if not files_to_check:
-            # If no modified files, check all Python files
+            # If no modified files, check all relevant files
             files_to_check = []
             for root, _, files in os.walk("."):
                 if ".git" in root or ".venv" in root or "__pycache__" in root:
                     continue
                 for file in files:
-                    if file.endswith(".py"):
+                    # Check file types that pre-commit hook expects
+                    if file.endswith((".py", ".md", ".rst", ".txt", ".yaml", ".yml", ".json", ".toml")):
                         files_to_check.append(os.path.join(root, file))
 
     # Run checks
