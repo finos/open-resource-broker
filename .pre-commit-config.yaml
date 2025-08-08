@@ -55,7 +55,7 @@ repos:
       
       - id: secrets-detection
         name: Detect Hardcoded Secrets
-        entry: bash -c 'grep -r -E "(password|secret|key|token)\s*=\s*[\"'\''][^\"'\'']{8,}" src/ --include="*.py" && echo "Potential hardcoded secrets found" && exit 1 || echo "No hardcoded secrets detected"'
+        entry: make detect-secrets
         language: system
         files: ^src/.*\.py$
         pass_filenames: false
