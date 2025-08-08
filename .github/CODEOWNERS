@@ -7,7 +7,7 @@
 # Specific ownership for critical files
 /.github/ @flamurg @fgogolli @kirillsc @canonicalname
 /pyproject.toml @flamurg @fgogolli @kirillsc @canonicalname
-/Makefile @flamurg @fgogolli @kirillsc @canonicalname
+/Dockerfile @flamurg @fgogolli @kirillsc @canonicalname
 /src/_version.py @flamurg @fgogolli @kirillsc @canonicalname
 /src/_package.py @flamurg @fgogolli @kirillsc @canonicalname
 
@@ -19,3 +19,8 @@
 /.github/workflows/ @flamurg @fgogolli @kirillsc @canonicalname
 /.github/dependabot.yml @flamurg @fgogolli @kirillsc @canonicalname
 /dev-tools/security/ @flamurg @fgogolli @kirillsc @canonicalname
+
+# Container and deployment
+/Dockerfile @flamurg @fgogolli @kirillsc @canonicalname
+/deployment/ @flamurg @fgogolli @kirillsc @canonicalname
+/dev-tools/scripts/container-build.sh @flamurg @fgogolli @kirillsc @canonicalname

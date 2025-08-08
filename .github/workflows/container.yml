@@ -1,0 +1,161 @@
+name: Container Build and Publish
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'Dockerfile*'
+      - 'src/**'
+      - 'pyproject.toml'
+      - 'deployment/docker/**'
+      - '.github/workflows/container.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'Dockerfile*'
+      - 'src/**'
+      - 'pyproject.toml'
+      - 'deployment/docker/**'
+      - '.github/workflows/container.yml'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      push_images:
+        description: 'Push images to registry'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: awslabs/open-hostfactory-plugin
+
+jobs:
+  container-build:
+    name: Build Container Images
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+    
+    permissions:
+      contents: read
+      packages: write
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        platforms: linux/amd64,linux/arm64
+    
+    - name: Log in to Container Registry
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch,suffix=-py${{ matrix.python-version }}
+          type=ref,event=pr,suffix=-py${{ matrix.python-version }}
+          type=semver,pattern={{version}},suffix=-py${{ matrix.python-version }}
+          type=semver,pattern={{major}}.{{minor}},suffix=-py${{ matrix.python-version }}
+          type=raw,value=latest-py${{ matrix.python-version }},enable={{is_default_branch}}
+        labels: |
+          org.opencontainers.image.title=Open Host Factory Plugin
+          org.opencontainers.image.description=Dynamic cloud resource provisioning for IBM Symphony Host Factory
+          org.opencontainers.image.vendor=AWS Labs
+          org.opencontainers.image.licenses=Apache-2.0
+          org.opencontainers.image.python.version=${{ matrix.python-version }}
+    
+    - name: Build and push container image
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'release' || github.event.inputs.push_images == 'true') }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          PYTHON_VERSION=${{ matrix.python-version }}
+          BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+          VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+          VCS_REF=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    - name: Test container image
+      if: matrix.python-version == '3.11'
+      run: |
+        # Test that the container starts and responds to health check
+        docker run --rm -d --name test-container \
+          -p 8000:8000 \
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}-py${{ matrix.python-version }}
+        
+        # Wait for container to start
+        sleep 10
+        
+        # Test health endpoint
+        curl -f http://localhost:8000/health || exit 1
+        
+        # Stop test container
+        docker stop test-container
+
+  container-manifest:
+    name: Create Multi-Architecture Manifests
+    runs-on: ubuntu-latest
+    needs: container-build
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'release')
+    
+    permissions:
+      contents: read
+      packages: write
+      
+    steps:
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Create and push manifest for latest
+      if: github.ref == 'refs/heads/main'
+      run: |
+        # Create manifest for latest (no Python version suffix)
+        docker manifest create ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-py3.9 \
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-py3.10 \
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-py3.11 \
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-py3.12 \
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main-py3.13
+        
+        docker manifest push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+    
+    - name: Create and push manifest for release
+      if: github.event_name == 'release'
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        
+        # Create manifest for version (no Python version suffix)
+        docker manifest create ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION} \
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-py3.9 \
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-py3.10 \
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-py3.11 \
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-py3.12 \
+          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}-py3.13
+        
+        docker manifest push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}
