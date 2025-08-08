@@ -54,7 +54,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ steps.default-python-version.outputs.default-python-version }}
+        default-python-version: ${{ steps.default-python-version.outputs.default-python-version }}
     
     - name: Install uv
       uses: astral-sh/setup-uv@v6
@@ -80,7 +80,7 @@ jobs:
         CONTAINER_IMAGE=$(make print-CONTAINER_IMAGE)
         VERSION=$(make print-VERSION)
         
-        echo "python-versions=$PYTHON_VERSIONS_JSON" >> $GITHUB_OUTPUT
+        echo "default-python-versions=$PYTHON_VERSIONS_JSON" >> $GITHUB_OUTPUT
         echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> $GITHUB_OUTPUT
         echo "container-registry=$CONTAINER_REGISTRY" >> $GITHUB_OUTPUT
         echo "container-image=$CONTAINER_IMAGE" >> $GITHUB_OUTPUT
@@ -99,7 +99,7 @@ jobs:
     
     strategy:
       matrix:
-        python-version: ${{ fromJSON(needs.get-config.outputs.python-versions) }}
+        default-python-version: ${{ fromJSON(needs.get-config.outputs.default-python-versions) }}
     
     permissions:
       contents: read
@@ -114,7 +114,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ needs.get-config.outputs.default-python-version }}
+        default-python-version: ${{ needs.get-config.outputs.default-python-version }}
     
     - name: Install uv
       uses: astral-sh/setup-uv@v6
@@ -148,7 +148,7 @@ jobs:
         REGISTRY: ${{ needs.get-config.outputs.container-registry }}
         IMAGE_NAME: ${{ needs.get-config.outputs.container-image }}
         VERSION: ${{ needs.get-config.outputs.version }}
-        PYTHON_VERSION: ${{ matrix.python-version }}
+        PYTHON_VERSION: ${{ matrix.default-python-version }}
         PLATFORMS: linux/amd64,linux/arm64
         PUSH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'release' || github.event.inputs.push_images == 'true') }}
         CACHE: true
@@ -157,10 +157,10 @@ jobs:
         ./dev-tools/scripts/container-build.sh
     
     - name: Test container image
-      if: matrix.python-version == needs.get-config.outputs.default-python-version
+      if: matrix.default-python-version == needs.get-config.outputs.default-python-version
       run: |
         # Test that the container starts and responds to health check
-        IMAGE_TAG="${{ needs.get-config.outputs.container-registry }}/${{ needs.get-config.outputs.container-image }}:${{ needs.get-config.outputs.version }}-python${{ matrix.python-version }}"
+        IMAGE_TAG="${{ needs.get-config.outputs.container-registry }}/${{ needs.get-config.outputs.container-image }}:${{ needs.get-config.outputs.version }}-python${{ matrix.default-python-version }}"
         
         echo "Testing container image: $IMAGE_TAG"
         
@@ -202,7 +202,7 @@ jobs:
     
     - name: Create and push manifests
       env:
-        PYTHON_VERSIONS: ${{ join(fromJSON(needs.get-config.outputs.python-versions), ' ') }}
+        PYTHON_VERSIONS: ${{ join(fromJSON(needs.get-config.outputs.default-python-versions), ' ') }}
         DEFAULT_PYTHON_VERSION: ${{ needs.get-config.outputs.default-python-version }}
         REGISTRY: ${{ needs.get-config.outputs.container-registry }}
         IMAGE: ${{ needs.get-config.outputs.container-image }}
