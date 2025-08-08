@@ -1,11 +1,10 @@
 #!/bin/bash
-"""Pre-commit validation script - reads .pre-commit-config.yaml and executes hooks dynamically."""
-
-set -e
+# Pre-commit validation script - reads .pre-commit-config.yaml and executes hooks dynamically
 
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Get to project root
@@ -21,36 +20,50 @@ if [ ! -f ".pre-commit-config.yaml" ]; then
     exit 1
 fi
 
-# Extract hook entries from config file
-HOOKS=$(yq '.repos[0].hooks[].entry' .pre-commit-config.yaml)
-NAMES=$(yq '.repos[0].hooks[].name' .pre-commit-config.yaml)
+# Check if yq is available
+if ! command -v yq >/dev/null 2>&1; then
+    echo -e "${RED}ERROR: yq not found. Install with: brew install yq${NC}"
+    exit 1
+fi
 
-# Convert to arrays
-readarray -t hook_entries <<< "$HOOKS"
-readarray -t hook_names <<< "$NAMES"
-
-# Track failures
+# Track failures and warnings
 FAILED=0
+WARNED=0
 
-# Run each hook
-for i in "${!hook_entries[@]}"; do
-    name="${hook_names[$i]}"
-    command="${hook_entries[$i]}"
+# Get hook count
+HOOK_COUNT=$(yq '.repos[0].hooks | length' .pre-commit-config.yaml)
+
+# Process each hook by index
+for ((i=0; i<HOOK_COUNT; i++)); do
+    name=$(yq ".repos[0].hooks[$i].name" .pre-commit-config.yaml)
+    command=$(yq ".repos[0].hooks[$i].entry" .pre-commit-config.yaml)
     
     echo -n "Running $name... "
+    
     if eval "$command" > /dev/null 2>&1; then
         echo -e "${GREEN}PASS${NC}"
     else
-        echo -e "${RED}FAIL${NC}"
-        echo "  Command: $command"
-        FAILED=1
+        # Check if this hook has warning_only comment
+        if yq ".repos[0].hooks[$i]" .pre-commit-config.yaml | grep -q "warning_only: true"; then
+            echo -e "${YELLOW}WARN${NC}"
+            echo "  Command: $command (warning only)"
+            WARNED=1
+        else
+            echo -e "${RED}FAIL${NC}"
+            echo "  Command: $command"
+            FAILED=1
+        fi
     fi
 done
 
 # Summary
 echo ""
 if [ $FAILED -eq 0 ]; then
-    echo -e "${GREEN}SUCCESS: All pre-commit checks passed${NC}"
+    if [ $WARNED -eq 1 ]; then
+        echo -e "${YELLOW}SUCCESS: All critical pre-commit checks passed (some warnings)${NC}"
+    else
+        echo -e "${GREEN}SUCCESS: All pre-commit checks passed${NC}"
+    fi
     echo "Ready to commit!"
     exit 0
 else
