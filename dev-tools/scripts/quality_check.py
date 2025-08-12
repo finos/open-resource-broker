@@ -487,10 +487,10 @@ class QualityChecker:
             if i % 10 == 0 or i == len(valid_files):
                 print(f"Progress: {i}/{len(valid_files)} files checked", flush=True)
 
-                # Run all checkers on this file
-                for checker in self.checkers:
-                    violations = checker.check_file(file_path)
-                    all_violations.extend(violations)
+            # Run all checkers on this file
+            for checker in self.checkers:
+                violations = checker.check_file(file_path)
+                all_violations.extend(violations)
 
         return all_violations
 

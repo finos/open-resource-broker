@@ -553,7 +553,7 @@ jobs:
         python dev-tools/scripts/generate-pyproject.py
     - name: Install build dependencies with uv
       run: |
-        uv pip install --system build wheel setuptools
+        uv pip install build wheel setuptools
         make ci-install
 
     - name: Build package

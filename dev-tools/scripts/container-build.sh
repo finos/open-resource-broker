@@ -156,7 +156,12 @@ build_image() {
     if [[ "${PUSH}" == "true" ]]; then
         push_args+=("--push")
     else
-        push_args+=("--load")
+        # --load only works with single platform builds
+        if [[ "${PLATFORMS}" == *","* ]]; then
+            log_warn "Multi-platform build detected, skipping --load (cannot load multi-platform images)"
+        else
+            push_args+=("--load")
+        fi
     fi
 
     # Build command

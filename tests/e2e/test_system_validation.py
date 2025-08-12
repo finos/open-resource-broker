@@ -34,7 +34,7 @@ class TestSystemValidation:
 
     def test_complete_integration_workflow(self):
         """Test complete integration workflow."""
-        # Create unified configuration
+        # Create integrated configuration
         provider_config_data = {
             "provider": {
                 "selection_policy": "WEIGHTED_ROUND_ROBIN",
@@ -142,7 +142,7 @@ class TestSystemValidation:
             pass
 
     def test_legacy_to_unified_migration_complete(self):
-        """Test complete legacy to unified migration workflow."""
+        """Test complete legacy to integrated migration workflow."""
         # Start with legacy configuration
         legacy_config = {
             "provider": {
@@ -179,7 +179,7 @@ class TestSystemValidation:
             # Unexpected mode, but test that it's handled gracefully
             assert "mode" in validation_result
 
-        # Simulate migration to unified format
+        # Simulate migration to integrated format
         migrated_config = {
             "provider": {
                 "active_provider": "aws-legacy",
