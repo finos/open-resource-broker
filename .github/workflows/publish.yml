@@ -62,6 +62,7 @@ jobs:
 
     - name: Install build dependencies with uv
       run: |
+        uv venv
         uv pip install build twine
 
     - name: Generate pyproject.toml
