@@ -26,9 +26,9 @@ logger = logging.getLogger(__name__)
 
 class ConfigurationManager:
     """
-    Unified configuration manager that serves as the single source of truth.
+    Centralized configuration manager that serves as the single source of truth.
 
-    This class provides a unified interface for accessing configuration with:
+    This class provides a centralized interface for accessing configuration with:
     - Type safety through dataclasses
     - Support for legacy and new configuration formats
     - Environment variable overrides

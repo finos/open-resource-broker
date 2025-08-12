@@ -1,7 +1,7 @@
 """
 AWS Template Adapter - Consolidated AWS-specific template operations.
 
-This module provides a unified adapter for AWS-specific template operations,
+This module provides a integrated adapter for AWS-specific template operations,
 consolidating validation, field extension, and reference resolution.
 Follows the Adapter/Port pattern established in the codebase.
 """
@@ -124,7 +124,7 @@ class AWSTemplateAdapter(TemplateAdapterPort):
             template: Template domain entity to extend
 
         Returns:
-            Enhanced template with AWS-specific fields
+            Template with AWS-specific fields
         """
         # Set provider API based on template configuration
         if not template.provider_api:

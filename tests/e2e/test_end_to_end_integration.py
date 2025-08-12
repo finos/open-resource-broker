@@ -9,7 +9,7 @@ with the provider strategy and the entire integration flow:
 2. Launch Template Flow - Launch template manager integration works
 3. Handler Routing - Provider strategy routes to correct handlers
 4. Domain Model Integration - AWSTemplate flows through the system
-5. Error Handling - Unified error handling works across the flow
+5. Error Handling - Integrated error handling works across the flow
 6. Performance Metrics - Metrics collection works end-to-end
 
 Test Categories:
@@ -319,7 +319,7 @@ def test_handler_routing():
                     print(f"   FAIL: {handler_class.__name__} not available for {api.value}")
                     return False
 
-                # Test handler instantiation with unified constructor
+                # Test handler instantiation with integrated constructor
                 mock_aws_client = Mock()
                 mock_logger = Mock()
                 mock_aws_ops = Mock()
@@ -447,7 +447,7 @@ def test_domain_model_flow():
 
 
 def test_error_handling_integration():
-    """Test that unified error handling works across the integration."""
+    """Test that integrated error handling works across the integration."""
     try:
         from src.providers.aws.exceptions.aws_exceptions import AWSValidationError
         from src.providers.aws.infrastructure.handlers.base_handler import AWSHandler

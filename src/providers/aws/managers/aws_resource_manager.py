@@ -1,4 +1,4 @@
-"""AWS Resource Manager implementation using unified base hierarchy."""
+"""AWS Resource Manager implementation using integrated base hierarchy."""
 
 from typing import Any, Dict, List, Optional
 
@@ -18,7 +18,7 @@ from src.providers.aws.infrastructure.dry_run_adapter import aws_dry_run_context
 
 @injectable
 class AWSResourceManagerImpl(CloudProviderResourceManager[AWSClient]):
-    """AWS implementation of unified resource manager hierarchy."""
+    """AWS implementation of integrated resource manager hierarchy."""
 
     def __init__(self, aws_client: AWSClient, config: AWSProviderConfig, logger: LoggingPort):
         """Initialize AWS resource manager."""

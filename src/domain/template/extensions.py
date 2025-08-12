@@ -49,7 +49,7 @@ class TemplateExtensionRegistry:
         """Register a provider-specific extension instance.
 
         Args:
-            provider_type: The provider type (e.g., 'aws', 'azure', 'gcp')
+            provider_type: The provider type (e.g., 'aws', 'provider1', 'provider2')
             extension_instance: The extension instance implementing TemplateExtension
         """
         if not isinstance(extension_instance, TemplateExtension):

@@ -1,4 +1,4 @@
-"""Unified command handler interface for CQRS pattern."""
+"""Command handler interface for CQRS pattern."""
 
 import asyncio
 from abc import ABC, abstractmethod
@@ -12,7 +12,7 @@ TResponse = TypeVar("TResponse", bound=BaseResponse)
 
 class CommandHandler(Generic[TCommand, TResponse], ABC):
     """
-    Unified command handler interface for CQRS pattern.
+    Command handler interface for CQRS pattern.
 
     This is the single source of truth for all command handlers in the system.
     Supports both synchronous and asynchronous command handling patterns.

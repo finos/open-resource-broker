@@ -74,7 +74,7 @@ class SpotFleetHandler(AWSHandler):
             launch_template_manager: Launch template manager for AWS-specific operations
             request_adapter: Optional request adapter for terminating instances
         """
-        # Use enhanced base class initialization - eliminates duplication
+        # Use base class initialization - eliminates duplication
         super().__init__(aws_client, logger, aws_ops, launch_template_manager, request_adapter)
 
     @handle_infrastructure_exceptions(context="spot_fleet_creation")
@@ -320,7 +320,7 @@ class SpotFleetHandler(AWSHandler):
         launch_template_id: str,
         launch_template_version: str,
     ) -> Dict[str, Any]:
-        """Create Spot Fleet configuration with enhanced options."""
+        """Create Spot Fleet configuration with additional options."""
         # Strip the full ARN for service-linked role
         fleet_role = template.fleet_role
         if fleet_role == "AWSServiceRoleForEC2SpotFleet":

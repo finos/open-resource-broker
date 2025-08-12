@@ -1,7 +1,7 @@
 """Provider Context - Strategy pattern context for managing provider strategies.
 
 This module implements the Context component of the Strategy pattern,
-providing a unified interface for executing operations across different
+providing a integrated interface for executing operations across different
 provider strategies while handling strategy selection, switching, and lifecycle.
 """
 
@@ -63,7 +63,7 @@ class ProviderContext:
     Context class for managing provider strategies.
 
     This class implements the Context component of the Strategy pattern,
-    providing a unified interface for executing operations across different
+    providing a integrated interface for executing operations across different
     provider strategies. It handles strategy selection, lifecycle management,
     metrics collection, and error handling.
 

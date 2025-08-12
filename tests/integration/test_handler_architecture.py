@@ -2,9 +2,9 @@
 """
 TestA: Handler Architecture Consolidation Test
 
-This test validates the unified handler architecture implementation:
+This test validates the integrated handler architecture implementation:
 - All handlers use consistent constructor patterns
-- All handlers inherit from unified AWSHandler base class
+- All handlers inherit from integrated AWSHandler base class
 - All handlers use AWSTemplate instead of generic Template
 - All handlers use launch template manager properly
 - All handlers follow DDD/OOP/SOLID/Clean Architecture principles
@@ -238,7 +238,7 @@ def test_method_signatures():
 
 
 def test_base_class_inheritance():
-    """Test that all handlers inherit from unified AWSHandler base class."""
+    """Test that all handlers inherit from integrated AWSHandler base class."""
     try:
         # Import handlers and base class
         from src.providers.aws.infrastructure.handlers.asg_handler import ASGHandler
@@ -290,7 +290,7 @@ def test_base_class_inheritance():
 
             print(f"   PASS: {handler_name}: Properly inherits from AWSHandler")
 
-        print("   PASS: All handlers properly inherit from unified AWSHandler")
+        print("   PASS: All handlers properly inherit from integrated AWSHandler")
         return True
 
     except Exception as e:

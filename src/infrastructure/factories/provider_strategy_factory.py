@@ -1,6 +1,6 @@
 """Provider Strategy Factory - Configuration-driven provider strategy creation.
 
-This factory creates provider strategies and contexts based on unified configuration,
+This factory creates provider strategies and contexts based on integrated configuration,
 integrating the existing provider strategy ecosystem with the CQRS architecture.
 """
 
@@ -31,7 +31,7 @@ class ProviderCreationError(Exception):
 
 
 class ProviderStrategyFactory:
-    """Factory for creating provider strategies from unified configuration."""
+    """Factory for creating provider strategies from integrated configuration."""
 
     def __init__(self, config_manager: ConfigurationPort, logger: Optional[LoggingPort] = None):
         """
@@ -48,7 +48,7 @@ class ProviderStrategyFactory:
     @handle_infrastructure_exceptions(context="provider_context_creation")
     def create_provider_context(self) -> ProviderContext:
         """
-        Create configured provider context based on unified configuration.
+        Create configured provider context based on integrated configuration.
 
         Returns:
             Configured ProviderContext instance
@@ -58,7 +58,7 @@ class ProviderStrategyFactory:
             ProviderCreationError: If provider creation fails
         """
         try:
-            # Get unified provider configuration
+            # Get integrated provider configuration
             provider_config = self._config_manager.get_provider_config()
             if not provider_config:
                 raise ConfigurationError("Provider configuration not found")
@@ -83,7 +83,7 @@ class ProviderStrategyFactory:
         Create single provider context.
 
         Args:
-            config: Unified provider configuration
+            config: Integrated provider configuration
 
         Returns:
             Configured ProviderContext for single provider
@@ -119,7 +119,7 @@ class ProviderStrategyFactory:
         Create multi-provider context.
 
         Args:
-            config: Unified provider configuration
+            config: Integrated provider configuration
 
         Returns:
             Configured ProviderContext for multiple providers
@@ -261,7 +261,7 @@ class ProviderStrategyFactory:
 
         Args:
             context: Provider context to configure
-            config: Unified provider configuration
+            config: Integrated provider configuration
         """
         try:
             # Configure health check interval
@@ -328,7 +328,7 @@ class ProviderStrategyFactory:
         }
 
         try:
-            # Get and validate unified configuration
+            # Get and validate integrated configuration
             provider_config = self._config_manager.get_provider_config()
             if not provider_config:
                 validation_result["errors"].append("Provider configuration not found")

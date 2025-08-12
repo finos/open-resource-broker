@@ -39,7 +39,7 @@ from src.providers.aws.infrastructure.launch_template.manager import (
 )
 
 
-class TestEnhancedEndToEnd:
+class TestAdditionalEndToEnd:
     """End-to-end integration test suite."""
 
     def setup_method(self):

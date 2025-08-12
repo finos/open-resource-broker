@@ -99,7 +99,7 @@ def handle_domain_exceptions(context: str):
                     # Let the infrastructure handler deal with it
                     error_msg = error_handler.handle_domain_exceptions(e)
                     if error_msg:
-                        # Re-raise with enhanced context
+                        # Re-raise with additional context
                         raise type(e)(f"{context}: {error_msg}") from e
                     raise
             else:

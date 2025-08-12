@@ -1,4 +1,4 @@
-"""Tests for unified base registry supporting both single and multi choice patterns."""
+"""Tests for integrated base registry supporting both single and multi choice patterns."""
 
 from unittest.mock import Mock
 
@@ -19,8 +19,8 @@ from src.infrastructure.registry.storage_registry import (
 )
 
 
-class TestUnifiedBaseRegistry:
-    """Test unified base registry functionality."""
+class TestIntegratedBaseRegistry:
+    """Test integrated base registry functionality."""
 
     def setup_method(self):
         """Set up test fixtures."""

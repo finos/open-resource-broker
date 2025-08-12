@@ -64,7 +64,7 @@ def get_query_bus(self):
 
 ## Implementation Components
 
-### 1. Enhanced DI Container
+### 1. Lazy-Loading DI Container
 
 **File**: `src/infrastructure/di/container.py`
 

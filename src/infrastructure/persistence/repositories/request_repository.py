@@ -31,7 +31,7 @@ class RequestSerializer:
         self.logger = get_logger(__name__)
 
     def to_dict(self, request: Request) -> Dict[str, Any]:
-        """Convert Request aggregate to dictionary with enhanced fields."""
+        """Convert Request aggregate to dictionary with additional fields."""
         try:
             return {
                 # Core request fields
@@ -41,11 +41,11 @@ class RequestSerializer:
                 "request_type": request.request_type.value,
                 "status": request.status.value,
                 "status_message": request.status_message,
-                # Enhanced provider tracking fields
+                # Provider tracking fields
                 "provider_name": request.provider_name,
                 "provider_api": request.provider_api,
                 "provider_type": request.provider_type,
-                # Enhanced resource tracking fields
+                # Resource tracking fields
                 "resource_ids": request.resource_ids,
                 # HF output fields
                 "message": request.message,
@@ -77,7 +77,7 @@ class RequestSerializer:
             raise
 
     def from_dict(self, data: Dict[str, Any]) -> Request:
-        """Convert dictionary to Request aggregate with enhanced field support."""
+        """Convert dictionary to Request aggregate with additional field support."""
         try:
             # Parse datetime fields
             created_at = datetime.fromisoformat(data["created_at"])
@@ -88,7 +88,7 @@ class RequestSerializer:
                 datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else None
             )
 
-            # Build request data with enhanced fields
+            # Build request data with additional fields
             request_data = {
                 # Core request fields
                 "request_id": RequestId(value=data["request_id"]),
@@ -97,11 +97,11 @@ class RequestSerializer:
                 "request_type": RequestType(data["request_type"]),
                 "status": RequestStatus(data["status"]),
                 "status_message": data.get("status_message", data.get("error_message")),
-                # Enhanced provider tracking fields
+                # Provider tracking fields
                 "provider_name": data.get("provider_name"),
                 "provider_api": data.get("provider_api"),
                 "provider_type": data.get("provider_type", "aws"),
-                # Enhanced resource tracking fields
+                # Resource tracking fields
                 "resource_ids": data.get("resource_ids", []),
                 # HF output fields
                 "message": data.get("message"),

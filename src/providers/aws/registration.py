@@ -174,11 +174,11 @@ def register_aws_provider(
 def _register_aws_template_store(logger: "LoggingPort" = None) -> None:
     """Register AWS template store - DISABLED: Template system consolidated.
 
-    Template functionality has been consolidated into the unified TemplateConfigurationManager.
+    Template functionality has been consolidated into the integrated TemplateConfigurationManager.
     Provider-specific template logic is now handled by the scheduler strategy pattern.
     """
     if logger:
-        logger.debug("AWS template store registration skipped - using unified template system")
+        logger.debug("AWS template store registration skipped - using integrated template system")
     # No-op: Template system has been consolidated
 
 

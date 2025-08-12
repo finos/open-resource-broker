@@ -64,7 +64,7 @@ class RequestType(str, Enum):
 
 class RequestStatus(str, Enum):
     """
-    Unified request status enumeration - Complete lifecycle coverage.
+    Consolidated request status enumeration - Complete lifecycle coverage.
 
     This represents the current state of the request in its lifecycle,
     combining both processing states and outcome states.

@@ -186,7 +186,7 @@ class TestProviderDefaultsInheritance:
                         "SpotFleet": {"handler_class": "SpotFleetHandler"},
                     }
                 },
-                "azure": {
+                "provider1": {
                     "handlers": {
                         "VMSS": {"handler_class": "VMSSHandler"},
                         "VM": {"handler_class": "VMHandler"},
@@ -201,8 +201,8 @@ class TestProviderDefaultsInheritance:
                     "config": {"region": "us-east-1"},
                 },
                 {
-                    "name": "azure-west",
-                    "type": "azure",
+                    "name": "provider1-west",
+                    "type": "provider1",
                     "enabled": True,
                     "config": {"region": "westus2"},
                 },
@@ -212,21 +212,21 @@ class TestProviderDefaultsInheritance:
         provider_config = ProviderConfig(**config_data)
 
         aws_provider = provider_config.providers[0]
-        azure_provider = provider_config.providers[1]
+        provider1_provider = provider_config.providers[1]
 
         aws_defaults = provider_config.provider_defaults.get("aws")
-        azure_defaults = provider_config.provider_defaults.get("azure")
+        provider1_defaults = provider_config.provider_defaults.get("provider1")
 
         aws_handlers = aws_provider.get_effective_handlers(aws_defaults)
-        azure_handlers = azure_provider.get_effective_handlers(azure_defaults)
+        provider1_handlers = provider1_provider.get_effective_handlers(provider1_defaults)
 
         assert len(aws_handlers) == 2
         assert "EC2Fleet" in aws_handlers
         assert "SpotFleet" in aws_handlers
 
-        assert len(azure_handlers) == 2
-        assert "VMSS" in azure_handlers
-        assert "VM" in azure_handlers
+        assert len(provider1_handlers) == 2
+        assert "VMSS" in provider1_handlers
+        assert "VM" in provider1_handlers
 
     def test_complex_regional_limitations_scenario(self):
         """Test realistic multi-region AWS scenario with various limitations."""
@@ -360,7 +360,7 @@ class TestProviderDefaultsInheritance:
         """Test behavior when provider type has no defaults defined."""
         provider = ProviderInstanceConfig(
             name="test-provider",
-            type="gcp",  # Valid type but no defaults provided
+            type="provider2",  # Valid type but no defaults provided
             enabled=True,
             config={"region": "test-region"},
         )

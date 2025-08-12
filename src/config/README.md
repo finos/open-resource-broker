@@ -1,10 +1,10 @@
-# Configuration Management - Unified Configuration System
+# Configuration Management - Centralized Configuration System
 
 The configuration package provides a comprehensive, type-safe configuration management system with support for multiple sources, validation, and legacy compatibility.
 
 ## Architecture Overview
 
-### Unified Configuration Approach
+### Centralized Configuration Approach
 The configuration system serves as the single source of truth for all application settings:
 
 - **Type Safety**: Configuration defined using dataclasses with validation
@@ -16,7 +16,7 @@ The configuration system serves as the single source of truth for all applicatio
 ### Key Components
 
 #### `manager.py` - Configuration Manager
-Central configuration management with unified access patterns.
+Central configuration management with centralized access patterns.
 
 **Key Features:**
 - Single source of truth for all configuration

@@ -1,4 +1,4 @@
-"""Configuration migration utilities for unified provider configuration."""
+"""Configuration migration utilities for consolidated provider configuration."""
 
 import logging
 from typing import Any, Dict, List, Optional
@@ -7,32 +7,32 @@ from .schemas.provider_strategy_schema import ProviderConfig
 
 
 class ConfigurationMigrator:
-    """Migrate configurations to unified provider format."""
+    """Migrate configurations to consolidated provider format."""
 
     def __init__(self, logger: Optional[logging.Logger] = None):
         """Initialize configuration migrator."""
         self._logger = logger or logging.getLogger(__name__)
 
-    def migrate_to_unified_format(self, config_data: Dict[str, Any]) -> Dict[str, Any]:
+    def migrate_to_consolidated_format(self, config_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Migrate any configuration to unified provider format.
+        Migrate any configuration to consolidated provider format.
 
         Args:
             config_data: Original configuration data
 
         Returns:
-            Configuration data in unified format
+            Configuration data in consolidated format
         """
         provider_config = config_data.get("provider", {})
 
-        # Already in unified format
+        # Already in consolidated format
         if "providers" in provider_config:
-            self._logger.debug("Configuration already in unified format")
+            self._logger.debug("Configuration already in consolidated format")
             return config_data
 
         # Legacy AWS format
         if provider_config.get("type") == "aws":
-            self._logger.info("Migrating legacy AWS configuration to unified format")
+            self._logger.info("Migrating legacy AWS configuration to consolidated format")
             return self._migrate_legacy_aws(config_data)
 
         # No provider configuration
@@ -46,18 +46,18 @@ class ConfigurationMigrator:
 
     def _migrate_legacy_aws(self, config_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Migrate legacy AWS configuration to unified format.
+        Migrate legacy AWS configuration to consolidated format.
 
         Args:
             config_data: Original configuration with legacy AWS format
 
         Returns:
-            Configuration with unified provider format
+            Configuration with consolidated provider format
         """
         aws_config = config_data["provider"].get("aws", {})
 
-        # Create unified provider configuration
-        unified_provider_config = {
+        # Create consolidated provider configuration
+        consolidated_provider_config = {
             "active_provider": "aws-default",  # Single provider mode
             "selection_policy": "FIRST_AVAILABLE",
             "health_check_interval": 300,
@@ -87,7 +87,7 @@ class ConfigurationMigrator:
 
         # Create migrated configuration
         migrated_config = config_data.copy()
-        migrated_config["provider"] = unified_provider_config
+        migrated_config["provider"] = consolidated_provider_config
 
         self._logger.info("Successfully migrated legacy AWS configuration")
         return migrated_config
@@ -185,7 +185,7 @@ class ConfigurationMigrator:
             True if migration is valid
         """
         try:
-            # Validate unified configuration can be parsed
+            # Validate consolidated configuration can be parsed
             provider_config_data = migrated_config.get("provider", {})
             provider_config = ProviderConfig(**provider_config_data)
 
@@ -248,10 +248,10 @@ class ConfigurationMigrator:
             # Analyze original configuration
             original_provider = original_config.get("provider", {})
             if original_provider.get("type") == "aws":
-                summary["migration_type"] = "legacy_aws_to_unified"
+                summary["migration_type"] = "legacy_aws_to_consolidated"
                 summary["providers_before"] = 1
                 summary["mode_before"] = "legacy"
-                summary["changes"].append("Converted legacy AWS configuration to unified format")
+                summary["changes"].append("Converted legacy AWS configuration to consolidated format")
 
             # Analyze migrated configuration
             migrated_provider = migrated_config.get("provider", {})

@@ -1,6 +1,6 @@
 # Open Host Factory Plugin
 
-Welcome to the Open Host Factory Plugin documentation! This plugin provides integration between IBM Spectrum Symphony Host Factory and cloud providers, enabling dynamic provisioning of compute resources with a modern REST API interface.
+Welcome to the Open Host Factory Plugin documentation! This plugin provides integration between IBM Spectrum Symphony Host Factory and cloud providers, enabling dynamic provisioning of compute resources with a REST API interface.
 
 ## Documentation Navigation
 
@@ -57,7 +57,7 @@ ohfp --help
 ## Features
 
 - **Multi-Cloud Support**: Currently supports AWS with extensible architecture
-- **REST API**: Modern REST API with OpenAPI documentation
+- **REST API**: REST API with OpenAPI documentation
 - **Docker Ready**: Suitable for production containerization
 - **Authentication**: Multiple authentication strategies (JWT, AWS IAM, Cognito)
 - **Monitoring**: Built-in health checks and metrics
@@ -78,7 +78,7 @@ The plugin follows Domain-Driven Design (DDD) principles with a clean architectu
 - **EC2 Instances**: Direct instance provisioning
 - **Auto Scaling Groups**: Managed scaling groups
 - **Spot Fleet**: Cost-optimized spot instances
-- **Fleet API**: Modern EC2 Fleet provisioning
+- **Fleet API**: EC2 Fleet provisioning
 
 ## Getting Started
 

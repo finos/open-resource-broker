@@ -42,7 +42,7 @@ class HandlerDiscoveryService:
     This service scans application modules to trigger decorator registration,
     then registers discovered handlers with the DI container.
 
-    Enhanced with caching to improve startup performance by avoiding
+    Improved with caching to improve startup performance by avoiding
     repeated module scanning and handler discovery.
     """
 

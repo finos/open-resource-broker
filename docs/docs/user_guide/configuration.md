@@ -1,6 +1,6 @@
 # Configuration Guide
 
-The Open Host Factory Plugin uses a unified, type-safe configuration system that supports multiple sources and validation.
+The Open Host Factory Plugin uses a centralized, type-safe configuration system that supports multiple sources and validation.
 
 ## Configuration Architecture
 

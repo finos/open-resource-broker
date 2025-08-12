@@ -150,7 +150,7 @@ class TestCLIIntegration:
             "status": "success",
             "message": "Provider configuration migration completed",
             "migration_summary": {
-                "migration_type": "legacy_aws_to_unified",
+                "migration_type": "legacy_aws_to_integrated",
                 "providers_before": 1,
                 "providers_after": 1,
             },
@@ -163,7 +163,7 @@ class TestCLIIntegration:
         result = expected_result
 
         assert result["status"] == "success"
-        assert result["migration_summary"]["migration_type"] == "legacy_aws_to_unified"
+        assert result["migration_summary"]["migration_type"] == "legacy_aws_to_integrated"
 
     def test_select_provider_strategy_cli_e2e(self):
         """Test selectProviderStrategy CLI operation end-to-end."""

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Modern CLI entry point with resource-action structure."""
+"""CLI entry point with resource-action structure."""
 import asyncio
 import os
 import sys

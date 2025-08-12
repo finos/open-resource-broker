@@ -377,7 +377,7 @@ class TestExceptionDecorators:
 
 
 class TestHTTPErrorHandling:
-    """Test HTTP error handling capabilities of the unified ExceptionHandler."""
+    """Test HTTP error handling capabilities of the integrated ExceptionHandler."""
 
     def test_exception_handler_http_formatting(self):
         """Test that ExceptionHandler handles HTTP formatting correctly."""

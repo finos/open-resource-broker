@@ -89,8 +89,8 @@ class TestMultiProviderConfiguration:
                 "active_provider": "aws-production",
                 "providers": [
                     {
-                        "name": "azure-dev",
-                        "type": "azure",
+                        "name": "provider1-dev",
+                        "type": "provider1",
                         "enabled": True,
                         "config": {
                             "subscription_id": "test-sub",
@@ -107,8 +107,8 @@ class TestMultiProviderConfiguration:
                         },
                     },
                     {
-                        "name": "gcp-staging",
-                        "type": "gcp",
+                        "name": "provider2-staging",
+                        "type": "provider2",
                         "enabled": True,
                         "config": {
                             "project_id": "test-project",
@@ -131,14 +131,14 @@ class TestMultiProviderConfiguration:
             "provider": {
                 "providers": [
                     {
-                        "name": "azure-only",
-                        "type": "azure",
+                        "name": "provider1-only",
+                        "type": "provider1",
                         "enabled": True,
                         "config": {"subscription_id": "test-sub"},
                     },
                     {
-                        "name": "gcp-only",
-                        "type": "gcp",
+                        "name": "provider2-only",
+                        "type": "provider2",
                         "enabled": True,
                         "config": {"project_id": "test-project"},
                     },
@@ -213,11 +213,11 @@ class TestMultiProviderConfiguration:
         """Test fallback when specified active provider is not AWS type."""
         config = {
             "provider": {
-                "active_provider": "azure-primary",
+                "active_provider": "provider1-primary",
                 "providers": [
                     {
-                        "name": "azure-primary",
-                        "type": "azure",
+                        "name": "provider1-primary",
+                        "type": "provider1",
                         "enabled": True,
                         "config": {"subscription_id": "test-sub"},
                     },

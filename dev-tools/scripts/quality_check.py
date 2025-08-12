@@ -450,7 +450,16 @@ class ImportChecker(FileChecker):
 
 
 class CommentChecker(FileChecker):
-    """Check for TODO/FIXME comments without tickets and commented code."""
+    """Check for TODO/FIXME comments without tickets and commented code.
+    
+    Supports noqa suppressions for commented code:
+    - Line-level: # def function():  # noqa:COMMENTED
+    - Section-level: 
+        # noqa:COMMENTED section-start
+        # def function():
+        # class MyClass:
+        # noqa:COMMENTED section-end
+    """
 
     def check_content(self, file_path: str, content: str) -> List[Violation]:
         violations = []
@@ -467,9 +476,49 @@ class CommentChecker(FileChecker):
         is_test_file = "/test" in file_path or file_path.startswith("test")
         is_markdown_file = file_path.endswith(".md")
 
+        # Track section-level suppressions and string contexts
+        commented_code_suppressed = False
+        in_multiline_string = False
+        string_delimiter = None
+        
         for line_num, line in enumerate(content.splitlines(), 1):
+            # Track multiline strings (docstrings and regular strings)
+            stripped = line.strip()
+            
+            # Check for start/end of multiline strings
+            if not in_multiline_string:
+                if stripped.startswith('"""') or stripped.startswith("'''"):
+                    string_delimiter = stripped[:3]
+                    if not (stripped.endswith(string_delimiter) and len(stripped) > 3):
+                        in_multiline_string = True
+                elif stripped.startswith('r"""') or stripped.startswith("r'''"):
+                    string_delimiter = stripped[1:4]
+                    if not (stripped.endswith(string_delimiter) and len(stripped) > 4):
+                        in_multiline_string = True
+            else:
+                if stripped.endswith(string_delimiter):
+                    in_multiline_string = False
+                    string_delimiter = None
+            
+            # Skip checks if we're inside a multiline string
+            if in_multiline_string:
+                continue
+                
+            # Check for section-level suppression controls
+            if "# noqa:COMMENTED section-start" in line:
+                commented_code_suppressed = True
+                continue
+            elif "# noqa:COMMENTED section-end" in line:
+                commented_code_suppressed = False
+                continue
+            
             # Check for commented code
             if code_pattern.search(line):
+                # Skip if suppressed by section-level or line-level noqa
+                if (commented_code_suppressed or 
+                    "noqa" in line.lower() or 
+                    "noqa:commented" in line.lower()):
+                    continue
                 violations.append(CommentedCodeViolation(file_path, line_num, line.strip()))
 
             # Check for debug statements (skip for test files and markdown files)

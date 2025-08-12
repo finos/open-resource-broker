@@ -48,19 +48,19 @@ class TestSymphonyHostFactorySchedulerStrategy:
         """Test path generation with different provider."""
         self.mock_config_manager.get_app_config.return_value = {
             "scheduler": {"config_root": "/test/config"},
-            "provider": {"active_provider": "azure-production"},
+            "provider": {"active_provider": "provider1-production"},
         }
 
         # Update the provider config mock as well
         mock_provider_config = Mock()
-        mock_provider_config.active_provider = "azure-production"
+        mock_provider_config.active_provider = "provider1-production"
         self.mock_config_manager.get_provider_config.return_value = mock_provider_config
 
         templates_path = self.strategy.get_templates_file_path()
         config_path = self.strategy.get_config_file_path()
 
-        assert templates_path == "/test/config/azureprov_templates.json"
-        assert config_path == "/test/config/azureprov_config.json"
+        assert templates_path == "/test/config/provider1prov_templates.json"
+        assert config_path == "/test/config/provider1prov_config.json"
 
     def test_parse_template_config_single_mapping_point(self):
         """Test template parsing - SINGLE FIELD MAPPING POINT."""

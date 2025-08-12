@@ -76,23 +76,23 @@ class TestProviderContextIntegration:
         aws_strategy.initialize.return_value = True
         aws_strategy.is_initialized.return_value = True
 
-        azure_strategy = Mock()
-        azure_strategy.provider_type = "azure"
-        azure_strategy.initialize.return_value = True
-        azure_strategy.is_initialized.return_value = True
+        provider1_strategy = Mock()
+        provider1_strategy.provider_type = "provider1"
+        provider1_strategy.initialize.return_value = True
+        provider1_strategy.is_initialized.return_value = True
 
         # Register both strategies
         provider_context.register_strategy(aws_strategy)
-        provider_context.register_strategy(azure_strategy)
+        provider_context.register_strategy(provider1_strategy)
 
         # Test that both are available
         assert len(provider_context.available_strategies) == 2
         assert "aws" in provider_context.available_strategies
-        assert "azure" in provider_context.available_strategies
+        assert "provider1" in provider_context.available_strategies
 
         # Test switching between strategies
-        assert provider_context.set_strategy("azure") is True
-        assert provider_context.current_strategy_type == "azure"
+        assert provider_context.set_strategy("provider1") is True
+        assert provider_context.current_strategy_type == "provider1"
 
         assert provider_context.set_strategy("aws") is True
         assert provider_context.current_strategy_type == "aws"

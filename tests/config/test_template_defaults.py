@@ -224,12 +224,12 @@ class TestTemplateDefaultsService:
         assert provider_type == "aws"
 
         # Test fallback extraction from name
-        provider_type = template_defaults_service._get_provider_type("azure-east")
-        assert provider_type == "azure"
+        provider_type = template_defaults_service._get_provider_type("provider1-east")
+        assert provider_type == "provider1"
 
         # Test simple name
-        provider_type = template_defaults_service._get_provider_type("gcp")
-        assert provider_type == "gcp"
+        provider_type = template_defaults_service._get_provider_type("provider2")
+        assert provider_type == "provider2"
 
     def test_error_handling(self, template_defaults_service, mock_config_manager, mock_logger):
         """Test error handling in defaults resolution."""

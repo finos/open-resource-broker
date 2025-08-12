@@ -23,12 +23,12 @@ class TestBootstrapIntegration:
     def test_application_initialization_with_provider_config(
         self, mock_setup_logging, mock_get_config_manager, mock_register_services
     ):
-        """Test application initialization with unified provider configuration."""
+        """Test application initialization with integrated provider configuration."""
         # Setup mocks
         mock_register_services.return_value = self.mock_container
         mock_get_config_manager.return_value = self.mock_config_manager
 
-        # Mock unified provider configuration
+        # Mock integrated provider configuration
         from src.config.schemas.provider_strategy_schema import (
             ProviderConfig,
             ProviderInstanceConfig,
@@ -84,7 +84,7 @@ class TestBootstrapIntegration:
         mock_register_services.return_value = self.mock_container
         mock_get_config_manager.return_value = self.mock_config_manager
 
-        # Mock legacy configuration (no unified config available)
+        # Mock legacy configuration (no integrated config available)
         self.mock_config_manager.get_provider_config.side_effect = AttributeError(
             "Method not available"
         )

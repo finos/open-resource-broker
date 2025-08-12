@@ -361,7 +361,7 @@ class TestMigrateProviderConfigCLIHandler:
             "status": "success",
             "message": "Provider configuration migration completed",
             "migration_summary": {
-                "migration_type": "legacy_aws_to_unified",
+                "migration_type": "legacy_aws_to_integrated",
                 "providers_before": 1,
                 "providers_after": 1,
             },
@@ -392,7 +392,7 @@ class TestMigrateProviderConfigCLIHandler:
 
         expected_result = {
             "status": "success",
-            "migration_summary": {"migration_type": "legacy_aws_to_unified"},
+            "migration_summary": {"migration_type": "legacy_aws_to_integrated"},
         }
 
         self.mock_command_bus.dispatch.return_value = expected_result

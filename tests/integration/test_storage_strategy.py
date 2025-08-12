@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 
 def test_template_repository_enhancements():
-    """Test that Template repository handles enhanced fields correctly."""
+    """Test that Template repository handles additional fields correctly."""
     print("=== Storage Strategy: Template Repository Enhancement Test ===")
 
     try:
@@ -20,16 +20,16 @@ def test_template_repository_enhancements():
             TemplateSerializer,
         )
 
-        # Create a template with enhanced fields
+        # Create a template with additional fields
         template_data = {
             "template_id": "test-template",
             "name": "Test Template",
-            "description": "Test template with enhanced fields",
+            "description": "Test template with additional fields",
             "image_id": "img-123456",
             "instance_type": "t2.micro",
             "max_instances": 5,
             "subnet_ids": ["subnet-123"],  # Required field
-            # Enhanced fields
+            # Additional fields
             "instance_types": {"t2.micro": 1, "t2.small": 2},
             "primary_instance_type": "t2.micro",
             "network_zones": ["subnet-123", "subnet-456"],
@@ -50,7 +50,7 @@ def test_template_repository_enhancements():
         serialized = serializer.to_dict(template)
 
         print("PASS: Template serialization successful")
-        print(f"   - Enhanced fields included: {len(serialized)} fields")
+        print(f"   - Additional fields included: {len(serialized)} fields")
         print(f"   - instance_types: {serialized.get('instance_types')}")
         print(f"   - network_zones: {serialized.get('network_zones')}")
         print(f"   - storage_encryption: {serialized.get('storage_encryption')}")
@@ -61,7 +61,7 @@ def test_template_repository_enhancements():
 
         print("PASS: Template deserialization successful")
         print(f"   - Template ID: {deserialized.template_id}")
-        print(f"   - Enhanced fields preserved: {len(deserialized.instance_types)} instance types")
+        print(f"   - Additional fields preserved: {len(deserialized.instance_types)} instance types")
 
         return True
 
@@ -74,7 +74,7 @@ def test_template_repository_enhancements():
 
 
 def test_request_repository_enhancements():
-    """Test that Request repository handles enhanced fields correctly."""
+    """Test that Request repository handles additional fields correctly."""
     print("\n=== Request Repository Enhancement Test ===")
 
     try:
@@ -84,7 +84,7 @@ def test_request_repository_enhancements():
             RequestSerializer,
         )
 
-        # Create a request with enhanced fields
+        # Create a request with additional fields
         request_id = RequestId.generate(RequestType.ACQUIRE)
 
         request = Request(
@@ -93,12 +93,12 @@ def test_request_repository_enhancements():
             provider_type="aws",
             template_id="test-template",
             requested_count=3,
-            # Enhanced provider tracking fields
+            # Additional provider tracking fields
             provider_name="aws-primary",
             provider_api="SpotFleet",
             resource_ids=["fleet-123", "fleet-456"],
-            # Enhanced HF fields
-            message="Test request with enhanced fields",
+            # Additional HF fields
+            message="Test request with additional fields",
             successful_count=2,
             failed_count=1,
             error_details={"error_1": "Instance launch failed"},
@@ -110,7 +110,7 @@ def test_request_repository_enhancements():
         serialized = serializer.to_dict(request)
 
         print("PASS: Request serialization successful")
-        print(f"   - Enhanced fields included: {len(serialized)} fields")
+        print(f"   - Additional fields included: {len(serialized)} fields")
         print(f"   - provider_name: {serialized.get('provider_name')}")
         print(f"   - provider_api: {serialized.get('provider_api')}")
         print(f"   - resource_ids: {serialized.get('resource_ids')}")
@@ -135,7 +135,7 @@ def test_request_repository_enhancements():
 
 
 def test_machine_repository_enhancements():
-    """Test that Machine repository handles enhanced fields correctly."""
+    """Test that Machine repository handles additional fields correctly."""
     print("\n=== Machine Repository Enhancement Test ===")
 
     try:
@@ -145,7 +145,7 @@ def test_machine_repository_enhancements():
             MachineSerializer,
         )
 
-        # Create a machine with enhanced fields
+        # Create a machine with additional fields
         machine = Machine(
             instance_id=InstanceId(value="i-123456789"),
             template_id="test-template",
@@ -153,12 +153,12 @@ def test_machine_repository_enhancements():
             provider_type="aws",
             instance_type=InstanceType(value="t2.micro"),
             image_id="ami-123456",
-            # Enhanced network fields
+            # Additional network fields
             private_ip="10.0.1.100",
             public_ip="54.123.45.67",
             subnet_id="subnet-123",
             security_group_ids=["sg-123", "sg-456"],
-            # Enhanced metadata
+            # Additional metadata
             tags=Tags.from_dict({"Name": "test-machine", "Environment": "test"}),
             metadata={"launch_reason": "automated_test"},
             provider_data={"spot_price": "0.05", "availability_zone": "us-west-2a"},
@@ -169,7 +169,7 @@ def test_machine_repository_enhancements():
         serialized = serializer.to_dict(machine)
 
         print("PASS: Machine serialization successful")
-        print(f"   - Enhanced fields included: {len(serialized)} fields")
+        print(f"   - Additional fields included: {len(serialized)} fields")
         print(f"   - instance_id: {serialized.get('instance_id')}")
         print(f"   - provider_type: {serialized.get('provider_type')}")
         print(f"   - network config: {serialized.get('private_ip')}/{serialized.get('public_ip')}")
@@ -203,9 +203,9 @@ if __name__ == "__main__":
 
     if test1_passed and test2_passed and test3_passed:
         print("\nALL STORAGE STRATEGY STORAGE STRATEGY TESTS PASSED")
-        print("PASS: Template repository enhanced field support working")
-        print("PASS: Request repository enhanced field support working")
-        print("PASS: Machine repository enhanced field support working")
+        print("PASS: Template repository additional field support working")
+        print("PASS: Request repository additional field support working")
+        print("PASS: Machine repository additional field support working")
         print("PASS: All repositories support schema versioning")
         sys.exit(0)
     else:

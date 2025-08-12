@@ -146,7 +146,7 @@ def injectable(cls: Type[T]) -> Type[T]:
     # Preserve existing functionality
     cls._injectable = True
 
-    # Enhanced metadata
+    # Additional metadata
     metadata = InjectableMetadata(
         auto_wire=True,
         singleton=getattr(cls, "_singleton", False),

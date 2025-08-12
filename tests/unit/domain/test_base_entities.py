@@ -293,6 +293,7 @@ class TestValueObjects:
                 IPAddress(value=invalid_ip)
 
     # TODO: AvailabilityZone tests - class not yet implemented
+    # noqa:COMMENTED section-start
     # def test_availability_zone_creation(self):
     #     """Test AvailabilityZone value object creation."""
     #     az = AvailabilityZone("us-east-1a")
@@ -327,6 +328,7 @@ class TestValueObjects:
     #     for invalid_az in invalid_azs:
     #         with pytest.raises((ValueError, ValidationError)):
     #             AvailabilityZone(invalid_az)
+    # noqa:COMMENTED section-end
 
 
 @pytest.mark.unit

@@ -141,7 +141,7 @@ class TestSystemValidation:
             # Interface handlers may not be available, test basic integration
             pass
 
-    def test_legacy_to_unified_migration_complete(self):
+    def test_legacy_to_integrated_migration_complete(self):
         """Test complete legacy to integrated migration workflow."""
         # Start with legacy configuration
         legacy_config = {

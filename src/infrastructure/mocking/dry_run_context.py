@@ -26,8 +26,8 @@ def dry_run_context(active: bool = True) -> Generator[None, None, None]:
 
     When active, providers should use their respective mocking strategies:
     - AWS Provider: Uses moto for boto3 calls
-    - Azure Provider: Uses Azure SDK mocks
-    - GCP Provider: Uses GCP SDK mocks
+    - Provider1: Uses Provider1 SDK mocks
+    - Provider2: Uses Provider2 SDK mocks
 
     Args:
         active: Whether to activate dry-run mode

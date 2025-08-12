@@ -1,4 +1,4 @@
-"""AWS client wrapper with enhanced functionality."""
+"""AWS client wrapper with additional functionality."""
 
 import threading
 from typing import TYPE_CHECKING, Any, Dict, Optional, TypeVar
@@ -24,7 +24,7 @@ T = TypeVar("T")
 
 @injectable
 class AWSClient:
-    """Wrapper for AWS service clients with enhanced functionality."""
+    """Wrapper for AWS service clients with additional functionality."""
 
     def __init__(self, config: ConfigurationPort, logger: LoggingPort) -> None:
         """

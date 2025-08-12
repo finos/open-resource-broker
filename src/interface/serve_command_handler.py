@@ -13,7 +13,7 @@ async def handle_serve_api(args) -> Dict[str, Any]:
     Handle serve API operations.
 
     Args:
-        args: Modern argument namespace with resource/action structure
+        args: Argument namespace with resource/action structure
 
     Returns:
         Server startup results

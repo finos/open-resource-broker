@@ -63,7 +63,7 @@ class TemplateConfigurationManager:
     Responsibilities:
     - Orchestrate template loading via scheduler strategy
     - Coordinate caching and persistence services
-    - Provide unified template access interface
+    - Provide integrated template access interface
     - Handle template validation and events
     """
 

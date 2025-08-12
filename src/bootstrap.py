@@ -129,7 +129,7 @@ class Application:
     def _log_provider_configuration(self, config_manager) -> None:
         """Log provider configuration information during initialization."""
         try:
-            # Check if unified provider configuration is available
+            # Check if consolidated provider configuration is available
             if hasattr(config_manager, "get_provider_config"):
                 provider_config = config_manager.get_provider_config()
                 if provider_config:

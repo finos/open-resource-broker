@@ -1,5 +1,5 @@
 """
-Unified CQRS-aligned base handler hierarchy.
+CQRS-aligned base handler hierarchy.
 
 This module provides the single source of truth for all handler base classes,
 eliminating the confusion of multiple base handlers across different layers.
@@ -30,7 +30,7 @@ class BaseHandler(ABC):
     """
     Root base handler with common cross-cutting concerns.
 
-    Provides unified logging, metrics, error handling, and monitoring
+    Provides centralized logging, metrics, error handling, and monitoring
     for all handlers in the system. This eliminates duplication across
     the 4 different base handlers we previously had.
     """
@@ -179,7 +179,7 @@ class BaseHandler(ABC):
 
     def handle_error(self, error: Exception, context: str) -> InfrastructureErrorResponse:
         """
-        Unified error handling for all handlers.
+        Centralized error handling for all handlers.
 
         Creates consistent error responses across all handler types.
         """

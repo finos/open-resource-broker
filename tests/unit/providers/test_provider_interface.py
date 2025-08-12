@@ -16,8 +16,8 @@ class TestProviderPort:
         [
             ("mock", MockProvider),
             # Add more providers as they're implemented
-            # ("provider1", AzureProvider),
-            # ("provider2", GCPProvider),
+            # ("provider1", Provider1Provider),
+            # ("provider2", Provider2Provider),
         ],
     )
     def test_provider_interface_compliance(self, provider_type: str, provider_class):

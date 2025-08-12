@@ -52,7 +52,6 @@ class TestCLIMigration:
         assert callable(generate_zsh_completion)
 
         # Test field mapping module
-        # from src.cli.field_mapping import get_field_value, get_template_field_mapping  # TODO: Check if this module exists
         assert callable(get_field_value)
         assert callable(get_template_field_mapping)
 
@@ -89,7 +88,6 @@ class TestCLIMigration:
 
     def test_field_mapping_utilities(self):
         """Test field mapping utilities work correctly."""
-        # from src.cli.field_mapping import get_field_value, get_template_field_mapping  # TODO: Check if this module exists
 
         # Test field value extraction
         test_data = {"templateId": "test-123", "maxNumber": 5}

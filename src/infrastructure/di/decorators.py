@@ -37,7 +37,7 @@ def injectable(cls: Type[T]) -> Type[T]:
         cls: The class to make injectable
 
     Returns:
-        The same class with enhanced constructor
+        The same class with dependency injection
     """
     # Store original constructor
     original_init = cls.__init__
@@ -57,8 +57,8 @@ def injectable(cls: Type[T]) -> Type[T]:
         return cls
 
     @wraps(original_init)
-    def enhanced_init(self, *args, **kwargs):
-        """Enhanced constructor with automatic dependency resolution."""
+    def dependency_init(self, *args, **kwargs):
+        """Constructor with automatic dependency resolution."""
         # If positional arguments are provided, use original constructor directly
         if args:
             return original_init(self, *args, **kwargs)
@@ -99,7 +99,7 @@ def injectable(cls: Type[T]) -> Type[T]:
             raise
 
     # Replace constructor
-    cls.__init__ = enhanced_init
+    cls.__init__ = dependency_init
     cls._injectable = True
     cls._original_init = original_init
 

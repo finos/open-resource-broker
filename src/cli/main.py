@@ -22,7 +22,7 @@ from src.infrastructure.logging.logger import get_logger
 
 
 def parse_args() -> tuple[argparse.Namespace, dict]:
-    """Parse command line arguments with modern resource-action structure.
+    """Parse command line arguments with resource-action structure.
 
     Returns:
         tuple: (parsed_args, resource_parsers_dict)

@@ -38,4 +38,4 @@ class Command(ABC):
     """Base interface for commands."""
 
 
-# CommandHandler is imported from the unified location
+# CommandHandler is imported from the centralized location

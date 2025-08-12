@@ -8,7 +8,7 @@ class ImageResolver(ABC):
     Generic interface for resolving image references to actual image IDs.
 
     This interface allows the domain layer to resolve image references without
-    depending on specific cloud provider implementations (AWS AMI, Azure VM Image, GCP Image, etc.).
+    depending on specific cloud provider implementations (AWS AMI, Provider1 Image, Provider2 Image, etc.).
     """
 
     @abstractmethod

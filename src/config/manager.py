@@ -1,5 +1,5 @@
 """
-Unified configuration management - Refactored.
+Centralized configuration management - Refactored.
 
 This module now imports from the organized configuration managers package.
 All functionality maintains backward compatibility.

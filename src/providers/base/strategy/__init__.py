@@ -31,12 +31,12 @@ Usage Example:
 
     # Register strategies
     context.register_strategy(aws_strategy)
-    context.register_strategy(azure_strategy)
+    context.register_strategy(provider1_strategy)
 
     # Or use advanced strategies
-    composite = CompositeProviderStrategy([aws_strategy, azure_strategy])
-    fallback = FallbackProviderStrategy(aws_strategy, [azure_strategy])
-    load_balancer = LoadBalancingProviderStrategy([aws_strategy, azure_strategy])
+    composite = CompositeProviderStrategy([aws_strategy, provider1_strategy])
+    fallback = FallbackProviderStrategy(aws_strategy, [provider1_strategy])
+    load_balancer = LoadBalancingProviderStrategy([aws_strategy, provider1_strategy])
 
     # Execute operations
     operation = ProviderOperation(

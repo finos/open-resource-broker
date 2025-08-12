@@ -10,12 +10,6 @@ from src.domain.base.exceptions import ConcurrencyError, EntityNotFoundError
 # Use lazy import for event_publisher to avoid circular imports
 from src.infrastructure.logging.logger import get_logger
 
-# Lazy import to avoid circular dependency
-# from src.infrastructure.utilities.common.serialization import process_value_objects
-
-# Lazy import to avoid circular dependency
-# from src.infrastructure.utilities.common.serialization import process_value_objects
-
 T = TypeVar("T")  # Entity type
 
 

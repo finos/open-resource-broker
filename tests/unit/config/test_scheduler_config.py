@@ -78,17 +78,17 @@ class TestAppConfigWithScheduler:
         assert app_config.get_config_file_path() == "/test/path/awsprov_config.json"
         assert app_config.get_templates_file_path() == "/test/path/awsprov_templates.json"
 
-    def test_app_config_path_generation_azure(self):
-        """Test AppConfig path generation for Azure provider."""
+    def test_app_config_path_generation_provider1(self):
+        """Test AppConfig path generation for Provider1 provider."""
         config_data = {
             "version": "2.0.0",
             "scheduler": {"type": "hostfactory", "config_root": "/test/path"},
             "provider": {
-                "active_provider": "azure-default",
+                "active_provider": "provider1-default",
                 "providers": [
                     {
-                        "name": "azure-default",
-                        "type": "azure",
+                        "name": "provider1-default",
+                        "type": "provider1",
                         "enabled": True,
                         "config": {},
                     }
@@ -97,9 +97,9 @@ class TestAppConfigWithScheduler:
         }
         app_config = AppConfig(**config_data)
 
-        # Test Azure provider paths
-        assert app_config.get_config_file_path() == "/test/path/azureprov_config.json"
-        assert app_config.get_templates_file_path() == "/test/path/azureprov_templates.json"
+        # Test Provider1 provider paths
+        assert app_config.get_config_file_path() == "/test/path/provider1prov_config.json"
+        assert app_config.get_templates_file_path() == "/test/path/provider1prov_templates.json"
 
     def test_app_config_path_generation_with_complex_provider_name(self):
         """Test AppConfig path generation with complex provider names."""

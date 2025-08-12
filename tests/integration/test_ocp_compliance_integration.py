@@ -272,7 +272,7 @@ class TestOCPComplianceIntegration:
         """Test that configuration schema no longer supports legacy mode."""
         from src.config.schemas.provider_strategy_schema import (
             ProviderMode,
-            UnifiedProviderConfig,
+            IntegratedProviderConfig,
         )
 
         # Verify LEGACY mode is not in enum
@@ -280,7 +280,7 @@ class TestOCPComplianceIntegration:
         assert ProviderMode.LEGACY not in [mode.value for mode in ProviderMode]
 
         # Verify configuration doesn't detect legacy mode
-        config = UnifiedProviderConfig(
+        config = IntegratedProviderConfig(
             providers=[
                 ProviderInstanceConfig(
                     name="aws-default",

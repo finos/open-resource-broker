@@ -109,7 +109,7 @@ Provider-specific configuration management.
 Provider-specific utility functions and helpers.
 
 **Key Utilities:**
-- **Consolidated Operations**: Unified operation patterns
+- **Consolidated Operations**: Integrated operation patterns
 - Instance management utilities
 - Cost calculation utilities
 - Resource tagging utilities
@@ -125,7 +125,7 @@ Provider-specific resilience patterns and error handling.
 
 ## Handler Implementation Pattern
 
-### Unified Operations Approach
+### Integrated Operations Approach
 All cloud service handlers use consolidated operation utilities to eliminate code duplication:
 
 ```python
@@ -137,7 +137,7 @@ class CloudOperations:
         self._logger = logger
 
     async def terminate_instances(self, instance_ids: List[str]) -> Dict[str, Any]:
-        """Unified instance termination across all handlers."""
+        """Integrated instance termination across all handlers."""
         try:
             response = await self._cloud_client.terminate_instances(
                 instance_ids=instance_ids
@@ -182,7 +182,7 @@ class FleetHandler:
             raise CloudFleetError(f"Failed to create fleet: {str(e)}") from e
 
     async def terminate_fleet_instances(self, instance_ids: List[str]) -> Dict[str, Any]:
-        """Terminate fleet instances using unified operations."""
+        """Terminate fleet instances using integrated operations."""
         return await self._cloud_ops.terminate_instances(instance_ids)
 ```
 
@@ -217,7 +217,7 @@ class AutoScalingHandler:
             raise CloudASGError(f"Failed to create auto scaling group: {str(e)}") from e
 
     async def terminate_asg_instances(self, instance_ids: List[str]) -> Dict[str, Any]:
-        """Terminate auto scaling group instances using unified operations."""
+        """Terminate auto scaling group instances using integrated operations."""
         return await self._cloud_ops.terminate_instances(instance_ids)
 ```
 

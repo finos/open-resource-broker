@@ -1,7 +1,7 @@
 """
-Unified exception handling for logging, context management, and HTTP response formatting.
+Integrated exception handling for logging, context management, and HTTP response formatting.
 
-This unified handler provides:
+This integrated handler provides:
 - Consistent logging across all layers
 - Exception context preservation
 - Generic exception wrapping

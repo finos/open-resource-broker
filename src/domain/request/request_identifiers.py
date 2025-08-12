@@ -123,7 +123,7 @@ class MachineReference(ValueObject):
         if not v or not isinstance(v, str):
             raise ValueError("Machine ID must be a non-empty string")
 
-        # Basic format validation - can be enhanced based on requirements
+        # Basic format validation - can be extended based on requirements
         if len(v) < 3:
             raise ValueError("Machine ID must be at least 3 characters long")
 

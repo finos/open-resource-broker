@@ -365,7 +365,7 @@ class OpenHFPluginMCPServer:
 
     def _get_tool_schema(self, tool_name: str) -> Dict[str, Any]:
         """Get JSON schema for tool parameters."""
-        # Basic schema - could be enhanced with actual parameter introspection
+        # Basic schema - could be improved with actual parameter introspection
         common_props = {
             "template_id": {"type": "string", "description": "Template identifier"},
             "request_id": {"type": "string", "description": "Request identifier"},

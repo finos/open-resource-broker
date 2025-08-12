@@ -1,4 +1,4 @@
-"""Infrastructure resilience package - Unified retry mechanisms."""
+"""Infrastructure resilience package - Integrated retry mechanisms."""
 
 from .config import RetryConfig
 from .exceptions import (

@@ -636,7 +636,7 @@ class TestConfigurationIntegration:
             # Validate provider
             if "provider" in config:
                 provider_type = config["provider"].get("type")
-                if provider_type not in ["aws", "azure", "gcp"]:
+                if provider_type not in ["aws", "provider1", "provider2"]:
                     errors.append(f"Invalid provider type: {provider_type}")
 
                 if provider_type == "aws" and "aws" in config["provider"]:

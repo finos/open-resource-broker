@@ -53,8 +53,8 @@ class TestProviderTemplateStrategy:
                     capabilities=["RunInstances"],
                 ),
                 ProviderInstanceConfig(
-                    name="azure-east-us",
-                    type="azure",
+                    name="provider1-east-us",
+                    type="provider1",
                     enabled=True,
                     priority=3,
                     weight=3,
@@ -348,7 +348,7 @@ class TestProviderTemplateStrategy:
 
         assert strategy._classify_file_type("templates.json") == "main"
         assert strategy._classify_file_type("awsprov_templates.json") == "legacy"
-        assert strategy._classify_file_type("azureprov_templates.json") == "provider_type"
+        assert strategy._classify_file_type("provider1prov_templates.json") == "provider_type"
         assert strategy._classify_file_type("aws-us-east-1_templates.json") == "provider_instance"
         assert strategy._classify_file_type("unknown_file.json") == "unknown"
 

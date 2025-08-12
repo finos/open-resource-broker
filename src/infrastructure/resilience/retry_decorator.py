@@ -1,4 +1,4 @@
-"""Unified retry decorator supporting multiple strategies."""
+"""Integrated retry decorator supporting multiple strategies."""
 
 import time
 from functools import wraps

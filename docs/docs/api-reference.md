@@ -4,7 +4,7 @@ This document provides a comprehensive API reference for the Open Host Factory P
 
 ## Command Line Interface (CLI)
 
-The Open Host Factory Plugin provides a modern resource-action command structure for all operations.
+The Open Host Factory Plugin provides a resource-action command structure for all operations.
 
 ### Global Options
 
