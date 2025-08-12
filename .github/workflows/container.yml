@@ -41,7 +41,7 @@ jobs:
       version: ${{ steps.config.outputs.version }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Get default Python version from project config
       id: default-python-version
@@ -106,7 +106,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         fetch-depth: 0
 

@@ -24,7 +24,7 @@ jobs:
       python-version: ${{ steps.version.outputs.default-python-version }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Get default Python version from project config
       id: version
@@ -40,7 +40,7 @@ jobs:
     needs: get-config
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         fetch-depth: 0  # Fetch full history for git diff
     
@@ -50,7 +50,7 @@ jobs:
         python-version: ${{ needs.get-config.outputs.python-version }}
     
     - name: Install UV
-      uses: astral-sh/setup-uv@v3
+      uses: astral-sh/setup-uv@v6
       with:
         version: "latest"
     
@@ -79,7 +79,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -109,7 +109,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -139,7 +139,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -169,7 +169,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -200,7 +200,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -232,7 +232,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -263,7 +263,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -294,7 +294,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -325,7 +325,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -356,7 +356,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -405,7 +405,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -454,7 +454,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -495,7 +495,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -535,7 +535,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -577,7 +577,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Python
       uses: actions/setup-python@v5
