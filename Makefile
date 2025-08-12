@@ -610,12 +610,6 @@ ci-check-quick:  ## Run quick CI checks (fast checks only)
 	$(MAKE) ci-quality
 	$(MAKE) ci-architecture
 
-ci-check-fix:  ## Run CI checks with automatic formatting fixes
-	@echo "Running CI checks with automatic fixes..."
-	$(call run-tool,black,src/ tests/)
-	$(call run-tool,isort,src/ tests/)
-	$(MAKE) ci-quality
-
 ci-check-verbose:  ## Run CI checks with verbose output
 	@echo "Running CI checks with verbose output..."
 	./dev-tools/scripts/ci_check.py --verbose
