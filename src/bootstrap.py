@@ -131,18 +131,18 @@ class Application:
         try:
             # Check if unified provider configuration is available
             if hasattr(config_manager, "get_provider_config"):
-                unified_config = config_manager.get_provider_config()
-                if unified_config:
-                    mode = unified_config.get_mode()
-                    active_providers = unified_config.get_active_providers()
+                provider_config = config_manager.get_provider_config()
+                if provider_config:
+                    mode = provider_config.get_mode()
+                    active_providers = provider_config.get_active_providers()
 
                     self.logger.info(f"Provider configuration mode: {mode.value}")
                     self.logger.info(f"Active providers: {[p.name for p in active_providers]}")
 
                     if mode.value == "multi":
-                        self.logger.info(f"Selection policy: {unified_config.selection_policy}")
+                        self.logger.info(f"Selection policy: {provider_config.selection_policy}")
                         self.logger.info(
-                            f"Health check interval: {unified_config.health_check_interval}s"
+                            f"Health check interval: {provider_config.health_check_interval}s"
                         )
                 else:
                     self.logger.info("Provider configuration not found")

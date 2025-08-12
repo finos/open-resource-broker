@@ -35,7 +35,7 @@ class TestSystemValidation:
     def test_complete_integration_workflow(self):
         """Test complete integration workflow."""
         # Create unified configuration
-        unified_config_data = {
+        provider_config_data = {
             "provider": {
                 "selection_policy": "WEIGHTED_ROUND_ROBIN",
                 "health_check_interval": 30,
@@ -80,7 +80,7 @@ class TestSystemValidation:
             "template": {"ami_resolution": {"enabled": True, "cache_enabled": True}},
         }
 
-        config_path = self.create_config_file(unified_config_data)
+        config_path = self.create_config_file(provider_config_data)
 
         # Test configuration loading
         config_manager = ConfigurationManager(config_path)

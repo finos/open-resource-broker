@@ -60,10 +60,10 @@ class ReloadProviderConfigHandler(BaseCommandHandler[ReloadProviderConfigCommand
 
             # Get updated provider information
             if hasattr(config_manager, "get_provider_config"):
-                unified_config = config_manager.get_provider_config()
-                if unified_config:
-                    provider_mode = unified_config.get_mode().value
-                    active_providers = [p.name for p in unified_config.get_active_providers()]
+                provider_config = config_manager.get_provider_config()
+                if provider_config:
+                    provider_mode = provider_config.get_mode().value
+                    active_providers = [p.name for p in provider_config.get_active_providers()]
                 else:
                     provider_mode = "strategy"
                     active_providers = []

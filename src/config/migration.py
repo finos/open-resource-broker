@@ -186,11 +186,11 @@ class ConfigurationMigrator:
         """
         try:
             # Validate unified configuration can be parsed
-            provider_config = migrated_config.get("provider", {})
-            unified_config = ProviderConfig(**provider_config)
+            provider_config_data = migrated_config.get("provider", {})
+            provider_config = ProviderConfig(**provider_config_data)
 
             # Validate at least one provider is active
-            active_providers = unified_config.get_active_providers()
+            active_providers = provider_config.get_active_providers()
             if not active_providers:
                 self._logger.error("No active providers after migration")
                 return False
@@ -256,17 +256,17 @@ class ConfigurationMigrator:
             # Analyze migrated configuration
             migrated_provider = migrated_config.get("provider", {})
             if "providers" in migrated_provider:
-                unified_config = ProviderConfig(**migrated_provider)
-                summary["providers_after"] = len(unified_config.providers)
-                summary["mode_after"] = unified_config.get_mode().value
+                provider_config = ProviderConfig(**migrated_provider)
+                summary["providers_after"] = len(provider_config.providers)
+                summary["mode_after"] = provider_config.get_mode().value
 
-                if unified_config.active_provider:
+                if provider_config.active_provider:
                     summary["changes"].append(
-                        f"Set active provider to '{unified_config.active_provider}'"
+                        f"Set active provider to '{provider_config.active_provider}'"
                     )
 
                 summary["changes"].append(
-                    f"Created {len(unified_config.providers)} provider instance(s)"
+                    f"Created {len(provider_config.providers)} provider instance(s)"
                 )
 
         except Exception as e:
