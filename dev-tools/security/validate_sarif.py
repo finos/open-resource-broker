@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(message)s')
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -182,7 +182,9 @@ def main():
         logger.info("All SARIF files are valid")
         sys.exit(0)
     else:
-        logger.error("Some SARIF files have issues. Please fix them before uploading to GitHub Security tab.")
+        logger.error(
+            "Some SARIF files have issues. Please fix them before uploading to GitHub Security tab."
+        )
         sys.exit(1)
 
 

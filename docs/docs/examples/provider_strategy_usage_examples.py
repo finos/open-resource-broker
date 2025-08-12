@@ -11,7 +11,7 @@ import logging
 import time
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 from src.providers.base.strategy import (
@@ -387,7 +387,9 @@ def example_load_balancing():
     for i in range(10):
         result = load_balancer.execute_operation(operation)
         selected_provider = result.metadata.get("selected_strategy", "unknown")
-        logger.info(f"  Operation {i+1}: {selected_provider} ({'PASS' if result.success else 'FAIL'})")
+        logger.info(
+            f"  Operation {i+1}: {selected_provider} ({'PASS' if result.success else 'FAIL'})"
+        )
 
     # Show statistics
     logger.info(f"\nMetrics Load Balancer Statistics:")
@@ -450,7 +452,9 @@ def example_fallback_resilience():
     for i in range(5):
         result = fallback_strategy.execute_operation(operation)
         current_provider = fallback_strategy.current_strategy.provider_type
-        logger.info(f"  Operation {i+1}: {current_provider} ({'PASS' if result.success else 'FAIL'})")
+        logger.info(
+            f"  Operation {i+1}: {current_provider} ({'PASS' if result.success else 'FAIL'})"
+        )
 
     # Show circuit breaker metrics
     logger.info(f"\nMetrics Circuit Breaker Metrics:")
