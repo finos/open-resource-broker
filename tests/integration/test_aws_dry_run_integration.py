@@ -230,7 +230,10 @@ class TestAWSDryRunWithMoto:
 
                 # Create instance with moto
                 response = ec2.run_instances(
-                    ImageId="ami-12345678", MinCount=1, MaxCount=1, InstanceType="t2.micro"
+                    ImageId="ami-12345678",
+                    MinCount=1,
+                    MaxCount=1,
+                    InstanceType="t2.micro",
                 )
 
                 assert "Instances" in response

@@ -64,7 +64,7 @@ def get_query_bus(self):
 
 ## Implementation Components
 
-### 1. Enhanced DI Container
+### 1. Lazy-Loading DI Container
 
 **File**: `src/infrastructure/di/container.py`
 
@@ -74,7 +74,7 @@ The DI container supports both lazy and eager loading modes:
 class DIContainer:
     def is_lazy_loading_enabled(self) -> bool:
         return self._lazy_loading_enabled
-    
+
     def register_on_demand(self, service_type, setup_function):
         """Register a service to be created on first access."""
         self._on_demand_factories[service_type] = setup_function
@@ -97,12 +97,12 @@ def _register_services_lazy(container):
     # Essential services only
     register_port_adapters(container)
     register_core_services(container)
-    
+
     # Minimal component registration
     register_minimal_storage_types()    # JSON only
     register_active_scheduler_only()    # Active scheduler only
     register_provider_services(container)  # Immediate (prevents errors)
-    
+
     # Lazy factories for non-essential services
     _register_lazy_service_factories(container)
 ```
@@ -125,14 +125,14 @@ class Application:
         self._container = None
         self._config_manager = None
         self.logger = get_logger(__name__)  # Only logger immediate
-    
+
     def _ensure_container(self):
         """Lazy container creation."""
         if self._container is None:
             self._container = get_container()
             # Set up domain container for decorators
             set_domain_container(self._container)
-    
+
     def _ensure_config_manager(self):
         """Lazy config manager creation."""
         if self._config_manager is None:
@@ -255,14 +255,14 @@ def register_json_storage():
 ### 1. Adding New Lazy Components
 
 ```python
-# Step 1: Register component factory
+# Register component factory
 def register_my_component_lazy(container):
     container.register_lazy_factory(MyComponent, create_my_component)
 
-# Step 2: Configure on-demand loading
+# Configure on-demand loading
 container.register_on_demand(MyComponent, register_my_component_lazy)
 
-# Step 3: Test performance impact
+# Test performance impact
 # - Measure startup time before/after
 # - Verify first-access performance
 # - Check memory usage impact
@@ -356,7 +356,7 @@ def test_startup_performance():
 def test_lazy_loading_functionality():
     app = Application()
     assert app._container is None  # Not created yet
-    
+
     await app.initialize()
     assert app._container is not None  # Created during init
 ```

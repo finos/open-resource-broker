@@ -1,4 +1,4 @@
-"""Enhanced API handler for retrieving available templates."""
+"""API handler for retrieving available templates."""
 
 import time
 from typing import Any, Dict, Optional
@@ -17,7 +17,7 @@ from src.monitoring.metrics import MetricsCollector
 
 @injectable
 class GetAvailableTemplatesRESTHandler(BaseAPIHandler[Dict[str, Any], Dict[str, Any]]):
-    """Enhanced API handler for retrieving available templates - CQRS-aligned implementation."""
+    """API handler for retrieving available templates - CQRS-aligned implementation."""
 
     def __init__(
         self,

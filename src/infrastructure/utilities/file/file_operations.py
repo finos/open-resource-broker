@@ -286,6 +286,7 @@ def with_temp_file(suffix: str = "", prefix: str = "", dir: str = None) -> Conte
 
     @contextlib.contextmanager
     def temp_file_context():
+        """Context manager for temporary file creation and cleanup."""
         temp_path = create_temp_file(suffix=suffix, prefix=prefix, dir=dir)
         try:
             yield temp_path

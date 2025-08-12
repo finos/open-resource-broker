@@ -74,6 +74,11 @@ class ProviderSelectionService:
         self._provider_registry = provider_registry
         self._provider_config = config_manager.get_provider_config()
 
+        if not self._provider_config:
+            self._logger.warning(
+                "No provider configuration found - provider selection may be limited"
+            )
+
     def select_provider_for_template(self, template: Template) -> ProviderSelectionResult:
         """
         Select provider type and instance for template.

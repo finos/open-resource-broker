@@ -2,20 +2,25 @@
 # These users will be automatically requested for review when PRs are opened
 
 # Default owners for everything in the repo
-* @flamurg @fgogolli @kirillsc @canonicalname
+* @fgogolli @kirillsc @canonicalname
 
 # Specific ownership for critical files
-/.github/ @flamurg @fgogolli @kirillsc @canonicalname
-/pyproject.toml @flamurg @fgogolli @kirillsc @canonicalname
-/Makefile @flamurg @fgogolli @kirillsc @canonicalname
-/src/_version.py @flamurg @fgogolli @kirillsc @canonicalname
-/src/_package.py @flamurg @fgogolli @kirillsc @canonicalname
+/.github/ @fgogolli @kirillsc @canonicalname
+/pyproject.toml @fgogolli @kirillsc @canonicalname
+/Dockerfile @fgogolli @kirillsc @canonicalname
+/src/_version.py @fgogolli @kirillsc @canonicalname
+/src/_package.py @fgogolli @kirillsc @canonicalname
 
 # Documentation
-/docs/ @flamurg @fgogolli @kirillsc @canonicalname
-/README.md @flamurg @fgogolli @kirillsc @canonicalname
+/docs/ @fgogolli @kirillsc @canonicalname
+/README.md @fgogolli @kirillsc @canonicalname
 
 # Security and CI/CD
-/.github/workflows/ @flamurg @fgogolli @kirillsc @canonicalname
-/.github/dependabot.yml @flamurg @fgogolli @kirillsc @canonicalname
-/dev-tools/security/ @flamurg @fgogolli @kirillsc @canonicalname
+/.github/workflows/ @fgogolli @kirillsc @canonicalname
+/.github/dependabot.yml @fgogolli @kirillsc @canonicalname
+/dev-tools/security/ @fgogolli @kirillsc @canonicalname
+
+# Container and deployment
+/Dockerfile @fgogolli @kirillsc @canonicalname
+/deployment/ @fgogolli @kirillsc @canonicalname
+/dev-tools/scripts/container-build.sh @fgogolli @kirillsc @canonicalname

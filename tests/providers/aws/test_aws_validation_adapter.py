@@ -40,7 +40,8 @@ class TestAWSValidationAdapter:
                 supported_fleet_types=["instant", "request", "maintain"],
             ),
             "SpotFleet": Mock(
-                default_fleet_type="request", supported_fleet_types=["request", "maintain"]
+                default_fleet_type="request",
+                supported_fleet_types=["request", "maintain"],
             ),
         }
 
@@ -181,7 +182,10 @@ class TestAWSValidationAdapter:
 
     def test_validate_template_configuration_invalid_percent_on_demand(self, validation_adapter):
         """Test validation with invalid percent_on_demand."""
-        template_config = {"provider_api": "EC2Fleet", "percent_on_demand": 150}  # Should be 0-100
+        template_config = {
+            "provider_api": "EC2Fleet",
+            "percent_on_demand": 150,
+        }  # Should be 0-100
 
         result = validation_adapter.validate_template_configuration(template_config)
 

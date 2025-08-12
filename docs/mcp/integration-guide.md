@@ -23,7 +23,7 @@ from ohfpsdk.mcp import OpenHFPluginMCPTools
 async with OpenHFPluginMCPTools(provider="aws") as mcp_tools:
     # List available tools
     tools = mcp_tools.list_tools()
-    
+
     # Call a specific tool
     result = await mcp_tools.call_tool(
         "list_templates", 
@@ -192,17 +192,17 @@ async def use_hostfactory():
         command="ohfp", 
         args=["mcp", "serve", "--stdio"]
     )
-    
+
     async with ClientSession(server_params) as session:
         # List available tools
         tools = await session.list_tools()
-        
+
         # Request infrastructure
         result = await session.call_tool(
             "request_machines",
             {"template_id": "EC2FleetInstant", "count": 3}
         )
-        
+
         print(f"Request result: {result}")
 ```
 
@@ -249,14 +249,14 @@ response = openai.ChatCompletion.create(
 function_call = response.choices[0].message.function_call
 if function_call and function_call.name == "request_machines":
     args = json.loads(function_call.arguments)
-    
+
     # Execute the MCP tool via CLI
     result = subprocess.run(
         ["ohfp", "mcp", "call", "request_machines", 
          "--args", json.dumps(args)],
         capture_output=True, text=True
     )
-    
+
     print(f"Machines requested: {result.stdout}")
 ```
 

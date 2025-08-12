@@ -1,0 +1,1 @@
+"""Persistence factory components."""

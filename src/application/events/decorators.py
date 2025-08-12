@@ -41,6 +41,7 @@ class EventHandlerRegistry:
         """
 
         def decorator(handler_class: Type["EventHandler"]):
+            """Apply event handler registration to the class."""
             cls._handlers[event_type] = handler_class
             # Add event_type as class attribute for introspection
             handler_class._event_type = event_type

@@ -52,7 +52,7 @@ class ProviderRegistry(BaseRegistry):
     Registry for provider strategy factories.
 
     Uses MULTI_CHOICE mode - multiple provider strategies simultaneously.
-    Thread-safe singleton implementation using unified BaseRegistry.
+    Thread-safe singleton implementation using BaseRegistry.
     """
 
     def __init__(self):

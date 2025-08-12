@@ -213,7 +213,9 @@ class TestContainerIntegration:
 
             # Check if container is still running
             status_result = subprocess.run(
-                ["docker", "ps", "-q", "-f", f"id={container_id}"], capture_output=True, text=True
+                ["docker", "ps", "-q", "-f", f"id={container_id}"],
+                capture_output=True,
+                text=True,
             )
 
             if not status_result.stdout.strip():
@@ -229,7 +231,10 @@ class TestContainerIntegration:
                 # If we get here, the server is working
                 assert response.status_code == 200
                 assert "healthy" in response.json().get("status", "")
-            except (requests.exceptions.RequestException, requests.exceptions.JSONDecodeError):
+            except (
+                requests.exceptions.RequestException,
+                requests.exceptions.JSONDecodeError,
+            ):
                 # Server might not be fully functional due to missing dependencies
                 # But the container started successfully
                 pass
@@ -312,7 +317,15 @@ class TestContainerIntegration:
         try:
             # Check that files are owned by ohfp user
             _ = subprocess.run(
-                ["docker", "run", "--rm", built_image, "bash", "-c", "ls -la /app/ | head -5"],
+                [
+                    "docker",
+                    "run",
+                    "--rm",
+                    built_image,
+                    "bash",
+                    "-c",
+                    "ls -la /app/ | head -5",
+                ],
                 capture_output=True,
                 text=True,
                 timeout=30,

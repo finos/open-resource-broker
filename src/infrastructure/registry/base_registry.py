@@ -1,4 +1,4 @@
-"""Unified base registry supporting both single-choice and multi-choice patterns."""
+"""Integrated base registry supporting both single-choice and multi-choice patterns."""
 
 import threading
 from abc import ABC, abstractmethod
@@ -43,7 +43,7 @@ class BaseRegistration(ABC):
 
 
 class BaseRegistry(ABC):
-    """Unified base registry supporting both single-choice and multi-choice patterns."""
+    """Integrated base registry supporting both single-choice and multi-choice patterns."""
 
     _instances: Dict[str, "BaseRegistry"] = {}
     _lock = threading.Lock()

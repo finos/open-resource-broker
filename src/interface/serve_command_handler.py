@@ -13,7 +13,7 @@ async def handle_serve_api(args) -> Dict[str, Any]:
     Handle serve API operations.
 
     Args:
-        args: Modern argument namespace with resource/action structure
+        args: Argument namespace with resource/action structure
 
     Returns:
         Server startup results
@@ -73,6 +73,7 @@ async def handle_serve_api(args) -> Dict[str, Any]:
 
         # Setup signal handlers for graceful shutdown
         def signal_handler(signum, frame):
+            """Handle shutdown signals gracefully."""
             logger.info(f"Received signal {signum}, shutting down gracefully...")
             server.should_exit = True
 

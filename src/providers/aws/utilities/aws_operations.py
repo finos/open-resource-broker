@@ -1,7 +1,7 @@
 """
 Consolidated AWS Operations Utility
 
-This module provides unified AWS operation patterns to eliminate duplication across handlers.
+This module provides integrated AWS operation patterns to eliminate duplication across handlers.
 Consolidates: instance management, operation execution, describe operations, logging, and status checking.
 """
 
@@ -18,7 +18,7 @@ from src.providers.aws.infrastructure.aws_client import AWSClient
 
 @injectable
 class AWSOperations:
-    """Unified AWS operations utility with all common patterns."""
+    """Integrated AWS operations utility with all common patterns."""
 
     def __init__(self, aws_client: AWSClient, logger: LoggingPort):
         """
@@ -48,7 +48,7 @@ class AWSOperations:
         operation_context: str = "instances",
     ) -> Dict[str, Any]:
         """
-        Unified instance termination with adapter fallback.
+        Integrated instance termination with adapter fallback.
 
         Eliminates 60+ lines of duplication across 4 handlers.
 
@@ -99,7 +99,7 @@ class AWSOperations:
         **kwargs,
     ) -> Any:
         """
-        Execute AWS operation with unified retry, logging, and exception handling.
+        Execute AWS operation with integrated retry, logging, and exception handling.
 
         Eliminates 72+ lines of exception handling duplication.
 
@@ -151,7 +151,7 @@ class AWSOperations:
         self, client_method: Callable, result_key: str, operation_name: str, **filters
     ) -> List[Dict[str, Any]]:
         """
-        Unified describe operations with pagination and retry.
+        Integrated describe operations with pagination and retry.
 
         Eliminates 8 similar pagination patterns.
 
@@ -249,7 +249,7 @@ class AWSOperations:
         **describe_params,
     ) -> str:
         """
-        Unified resource status checking.
+        Integrated resource status checking.
 
         Args:
             resource_type: Type of resource (e.g., "EC2 Fleet", "ASG")

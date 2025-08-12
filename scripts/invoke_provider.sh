@@ -27,24 +27,24 @@ export HF_LOGGING_CONSOLE_ENABLED
 if [ "$USE_LOCAL_DEV" = "true" ] || [ "$USE_LOCAL_DEV" = "1" ]; then
     # Local development mode - use src/run.py from project root
     echo "Using local development mode (src/run.py)" >&2
-    
+
     # Add project root to PYTHONPATH
     export PYTHONPATH="${PROJECT_ROOT}:${PYTHONPATH}"
-    
+
     # Check if src/run.py exists
     if [ ! -f "${PROJECT_ROOT}/src/run.py" ]; then
         echo "Error: src/run.py not found at ${PROJECT_ROOT}/src/run.py" >&2
         echo "Make sure you're running from the correct directory or install the package." >&2
         exit 1
     fi
-    
+
     # Parse arguments to separate global flags from command
     global_args=()
     command_args=()
-    
+
     # First, collect all arguments
     all_args=("$@")
-    
+
     # Separate global flags from command arguments
     i=0
     while [ $i -lt ${#all_args[@]} ]; do
@@ -73,14 +73,14 @@ if [ "$USE_LOCAL_DEV" = "true" ] || [ "$USE_LOCAL_DEV" = "1" ]; then
         esac
         i=$((i + 1))
     done
-    
+
     # Execute the Python script with global args first, then command args
     exec $PYTHON_CMD "${PROJECT_ROOT}/src/run.py" "${global_args[@]}" "${command_args[@]}"
-    
+
 else
     # Package mode - use installed command
     echo "Using installed package mode ($PACKAGE_COMMAND)" >&2
-    
+
     # Check if package command is available
     if ! command -v "$PACKAGE_COMMAND" &> /dev/null; then
         echo "Error: $PACKAGE_COMMAND command not found" >&2
@@ -88,10 +88,10 @@ else
         echo "Options:" >&2
         echo "  1. Install package: pip install $PACKAGE_NAME" >&2
         echo "  2. Use local development: USE_LOCAL_DEV=true $0 $*" >&2
-        echo "  3. Install in dev mode: ./dev-tools/package/install-dev.sh" >&2
+        echo "  3. Install in dev mode: ./dev-tools/package/install_dev.sh" >&2
         exit 1
     fi
-    
+
     # Execute the installed command with all arguments
     exec "$PACKAGE_COMMAND" "--legacy" "$@"
 fi

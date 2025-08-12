@@ -1,3 +1,5 @@
+"""SQL query builder components for database operations."""
+
 import re
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple

@@ -49,17 +49,6 @@ class ProviderConfigManager:
             logger.error(f"Failed to load provider config: {e}")
             return None
 
-    def get_unified_provider_config(self) -> "ProviderConfig":
-        """Get unified provider configuration."""
-        from src.config.schemas.provider_strategy_schema import ProviderConfig
-
-        try:
-            provider_data = self._raw_config.get("provider", {})
-            return ProviderConfig(**provider_data)
-        except Exception as e:
-            logger.error(f"Failed to load unified provider config: {e}")
-            raise ConfigurationError(f"Invalid provider configuration: {e}")
-
     def is_provider_strategy_enabled(self) -> bool:
         """Check if provider strategy mode is enabled."""
         provider_mode = self.get_provider_mode()
@@ -101,8 +90,8 @@ class ProviderConfigManager:
 
         return None
 
-    def save_unified_provider_config(self, provider_config: "ProviderConfig") -> None:
-        """Save unified provider configuration."""
+    def save_provider_config(self, provider_config: "ProviderConfig") -> None:
+        """Save provider configuration."""
         try:
             # Convert provider config to dict
             provider_dict = (

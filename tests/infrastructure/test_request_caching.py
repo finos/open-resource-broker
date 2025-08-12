@@ -40,7 +40,9 @@ class TestRequestCacheService:
     def cache_service(self, mock_uow_factory, mock_config_manager, mock_logger):
         """Create cache service instance for testing."""
         return RequestCacheService(
-            uow_factory=mock_uow_factory, config_manager=mock_config_manager, logger=mock_logger
+            uow_factory=mock_uow_factory,
+            config_manager=mock_config_manager,
+            logger=mock_logger,
         )
 
     def test_caching_enabled_by_default(self, cache_service):
@@ -54,7 +56,9 @@ class TestRequestCacheService:
         config_manager.get_app_config.return_value = {}
 
         cache_service = RequestCacheService(
-            uow_factory=mock_uow_factory, config_manager=config_manager, logger=mock_logger
+            uow_factory=mock_uow_factory,
+            config_manager=config_manager,
+            logger=mock_logger,
         )
 
         assert cache_service.is_caching_enabled() is False
@@ -67,7 +71,9 @@ class TestRequestCacheService:
         }
 
         cache_service = RequestCacheService(
-            uow_factory=mock_uow_factory, config_manager=config_manager, logger=mock_logger
+            uow_factory=mock_uow_factory,
+            config_manager=config_manager,
+            logger=mock_logger,
         )
 
         result = cache_service.get_cached_request("test-request-id")
@@ -81,7 +87,9 @@ class TestRequestCacheService:
         }
 
         cache_service = RequestCacheService(
-            uow_factory=mock_uow_factory, config_manager=config_manager, logger=mock_logger
+            uow_factory=mock_uow_factory,
+            config_manager=config_manager,
+            logger=mock_logger,
         )
 
         request_dto = RequestDTO(
@@ -128,7 +136,9 @@ class TestRequestCacheService:
         config_manager.get_app_config.side_effect = Exception("Config error")
 
         cache_service = RequestCacheService(
-            uow_factory=mock_uow_factory, config_manager=config_manager, logger=mock_logger
+            uow_factory=mock_uow_factory,
+            config_manager=config_manager,
+            logger=mock_logger,
         )
 
         # Should default to disabled
@@ -154,7 +164,9 @@ class TestRequestCacheIntegration:
         }
 
         cache_service = RequestCacheService(
-            uow_factory=mock_uow_factory, config_manager=mock_config_manager, logger=mock_logger
+            uow_factory=mock_uow_factory,
+            config_manager=mock_config_manager,
+            logger=mock_logger,
         )
 
         assert cache_service is not None

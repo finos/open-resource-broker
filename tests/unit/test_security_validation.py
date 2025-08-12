@@ -39,7 +39,9 @@ class TestInputValidationSecurity:
         for malicious_input in sql_injection_attempts:
             try:
                 request = Request.create_new_request(
-                    template_id=malicious_input, machine_count=1, requester_id="test-user"
+                    template_id=malicious_input,
+                    machine_count=1,
+                    requester_id="test-user",
                 )
 
                 # If creation succeeds, template_id should be sanitized
@@ -67,7 +69,9 @@ class TestInputValidationSecurity:
         for xss_payload in xss_payloads:
             try:
                 request = Request.create_new_request(
-                    template_id="test-template", machine_count=1, requester_id=xss_payload
+                    template_id="test-template",
+                    machine_count=1,
+                    requester_id=xss_payload,
                 )
 
                 # If creation succeeds, input should be sanitized
@@ -96,7 +100,9 @@ class TestInputValidationSecurity:
         for malicious_input in command_injection_attempts:
             try:
                 request = Request.create_new_request(
-                    template_id=malicious_input, machine_count=1, requester_id="test-user"
+                    template_id=malicious_input,
+                    machine_count=1,
+                    requester_id="test-user",
                 )
 
                 # If creation succeeds, input should be sanitized
@@ -127,7 +133,9 @@ class TestInputValidationSecurity:
         for malicious_path in path_traversal_attempts:
             try:
                 request = Request.create_new_request(
-                    template_id=malicious_path, machine_count=1, requester_id="test-user"
+                    template_id=malicious_path,
+                    machine_count=1,
+                    requester_id="test-user",
                 )
 
                 # If creation succeeds, path should be sanitized
@@ -154,7 +162,9 @@ class TestInputValidationSecurity:
         for malicious_input in ldap_injection_attempts:
             try:
                 request = Request.create_new_request(
-                    template_id="test-template", machine_count=1, requester_id=malicious_input
+                    template_id="test-template",
+                    machine_count=1,
+                    requester_id=malicious_input,
                 )
 
                 # If creation succeeds, input should be sanitized
@@ -280,7 +290,10 @@ class TestDataProtectionSecurity:
             "user_id": "test-user",
             "password": "secret123",
             "aws_access_key": "AKIAIOSFODNN7EXAMPLE",
-            "request_data": {"template_id": "template-1", "api_key": "sk-1234567890abcdef"},
+            "request_data": {
+                "template_id": "template-1",
+                "api_key": "sk-1234567890abcdef",
+            },
         }
 
         def mask_log_entry(entry):
@@ -416,7 +429,10 @@ class TestDataProtectionSecurity:
                 sanitized = re.sub(r"<[^>]*>", "", data)
                 # Remove SQL injection patterns
                 sanitized = re.sub(
-                    r";\s*(DROP|DELETE|INSERT|UPDATE|SELECT)", "", sanitized, flags=re.IGNORECASE
+                    r";\s*(DROP|DELETE|INSERT|UPDATE|SELECT)",
+                    "",
+                    sanitized,
+                    flags=re.IGNORECASE,
                 )
                 # Remove path traversal patterns
                 sanitized = re.sub(r"\.\./", "", sanitized)
@@ -603,7 +619,11 @@ class TestSecurityConfiguration:
     def test_rate_limiting_simulation(self):
         """Test rate limiting mechanisms."""
         # Simulate rate limiting
-        rate_limits = {"requests_per_minute": 60, "requests_per_hour": 1000, "burst_limit": 10}
+        rate_limits = {
+            "requests_per_minute": 60,
+            "requests_per_hour": 1000,
+            "burst_limit": 10,
+        }
 
         # Simulate request tracking
         request_history = []
@@ -668,7 +688,9 @@ class TestSecurityConfiguration:
         long_requester_id = "a" * (max_lengths["requester_id"] + 1)
         try:
             request = Request.create_new_request(
-                template_id="test-template", machine_count=1, requester_id=long_requester_id
+                template_id="test-template",
+                machine_count=1,
+                requester_id=long_requester_id,
             )
             # If creation succeeds, should be truncated or validated
             assert len(request.requester_id) <= max_lengths["requester_id"]

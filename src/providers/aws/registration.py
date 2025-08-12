@@ -174,11 +174,11 @@ def register_aws_provider(
 def _register_aws_template_store(logger: "LoggingPort" = None) -> None:
     """Register AWS template store - DISABLED: Template system consolidated.
 
-    Template functionality has been consolidated into the unified TemplateConfigurationManager.
+    Template functionality has been consolidated into the integrated TemplateConfigurationManager.
     Provider-specific template logic is now handled by the scheduler strategy pattern.
     """
     if logger:
-        logger.debug("AWS template store registration skipped - using unified template system")
+        logger.debug("AWS template store registration skipped - using integrated template system")
     # No-op: Template system has been consolidated
 
 
@@ -241,6 +241,7 @@ def register_aws_provider_with_di(provider_instance, container) -> bool:
 
         # Create provider strategy factory using DI container
         def aws_strategy_factory():
+            """Factory function to create AWS strategy with DI container."""
             return _create_aws_strategy_with_di(container, aws_config, provider_instance.name)
 
         # Register the specific provider instance (no generic type registration)
@@ -268,6 +269,7 @@ def _register_aws_components_with_di(container, aws_config, instance_name: str) 
 
     # Register AWS client for this instance with instance-specific configuration
     def aws_client_factory(container_instance):
+        """Factory function to create AWS client with instance-specific configuration."""
         logger_port = container_instance.get(LoggingPort)
 
         # Create a configuration port that provides the instance-specific AWS config
@@ -275,6 +277,7 @@ def _register_aws_components_with_di(container, aws_config, instance_name: str) 
             """Configuration port that provides instance-specific AWS configuration."""
 
             def __init__(self, aws_config):
+                """Initialize with AWS configuration."""
                 self._aws_config = aws_config
 
             def get_typed(self, config_type):
@@ -339,8 +342,6 @@ def register_aws_extensions(logger: Optional["LoggingPort"] = None) -> None:
         error_msg = f"Failed to register AWS template extensions: {e}"
         if logger:
             logger.error(error_msg)
-        else:
-            print(f"ERROR: {error_msg}")
         raise
 
 
@@ -362,22 +363,16 @@ def register_aws_template_factory(
 
             if logger:
                 logger.info("AWS template class registered with factory")
-            else:
-                print("AWS template class registered with factory")
 
         except ImportError:
             # AWS template class doesn't exist yet, that's okay
             if logger:
                 logger.debug("AWS template class not available, using core template")
-            else:
-                print("AWS template class not available, using core template")
 
     except Exception as e:
         error_msg = f"Failed to register AWS template factory: {e}"
         if logger:
             logger.error(error_msg)
-        else:
-            print(f"ERROR: {error_msg}")
         # Don't raise here - factory registration is optional
 
 
@@ -414,15 +409,11 @@ def initialize_aws_provider(
 
         if logger:
             logger.info("AWS provider initialization completed successfully")
-        else:
-            print("AWS provider initialization completed successfully")
 
     except Exception as e:
         error_msg = f"AWS provider initialization failed: {e}"
         if logger:
             logger.error(error_msg)
-        else:
-            print(f"ERROR: {error_msg}")
         raise
 
 

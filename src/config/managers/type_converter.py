@@ -169,6 +169,7 @@ class ConfigTypeConverter:
         """Update configuration with new values."""
 
         def deep_update(base_dict: Dict[str, Any], update_dict: Dict[str, Any]):
+            """Recursively update nested dictionary values."""
             for key, value in update_dict.items():
                 if (
                     key in base_dict

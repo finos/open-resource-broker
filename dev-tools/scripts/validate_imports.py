@@ -5,9 +5,14 @@ Import validation script for pre-commit hooks.
 This script validates that all critical imports work correctly and catches
 issues that might be introduced during code refactoring or module reorganization.
 """
-import sys
 import importlib
+import logging
+import sys
 from pathlib import Path
+
+# Setup logging
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 
 def validate_critical_imports():
@@ -37,27 +42,27 @@ def validate_critical_imports():
     for module_name in critical_imports:
         try:
             importlib.import_module(module_name)
-            print(f"PASS {module_name}")
+            logger.info(f"PASS {module_name}")
         except ImportError as e:
             failed_imports.append((module_name, str(e)))
-            print(f"FAIL {module_name}: {e}")
+            logger.error(f"FAIL {module_name}: {e}")
         except Exception as e:
             failed_imports.append((module_name, f"Unexpected error: {e}"))
-            print(f"WARN {module_name}: Unexpected error: {e}")
+            logger.warning(f"WARN {module_name}: Unexpected error: {e}")
 
     if failed_imports:
-        print(f"\n{len(failed_imports)} critical imports failed:")
+        logger.error(f"{len(failed_imports)} critical imports failed:")
         for module, error in failed_imports:
-            print(f"  - {module}: {error}")
+            logger.error(f"  - {module}: {error}")
         return False
     else:
-        print(f"\n✅ All {len(critical_imports)} critical imports successful!")
+        logger.info(f"All {len(critical_imports)} critical imports successful!")
         return True
 
 
 def main():
     """Main entry point."""
-    print("Validating critical Python imports...")
+    logger.info("Validating critical Python imports...")
 
     # Add project root to Python path so 'src' package can be imported
     # Path: dev-tools/scripts/validate_imports.py -> project-root
@@ -67,11 +72,11 @@ def main():
     success = validate_critical_imports()
 
     if not success:
-        print("\n💡 Tip: Run the import validation tests for more detailed analysis:")
-        print("   python -m pytest tests/test_import_validation.py -v")
+        logger.info("Tip: Run the import validation tests for more detailed analysis:")
+        logger.info("   python -m pytest tests/test_import_validation.py -v")
         sys.exit(1)
 
-    print("\n🎉 Import validation completed successfully!")
+    logger.info("Import validation completed successfully!")
 
 
 if __name__ == "__main__":

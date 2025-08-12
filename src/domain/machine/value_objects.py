@@ -1,6 +1,6 @@
 """Machine-specific value objects orchestrator.
 
-This module provides a unified interface to all machine value objects organized by category:
+This module provides an integrated interface to all machine value objects organized by category:
 - Machine status (MachineStatus)
 - Machine identifiers and core types (MachineId, MachineType)
 - Machine metadata and configuration (PriceType, MachineConfiguration, MachineEvent, HealthCheck, etc.)

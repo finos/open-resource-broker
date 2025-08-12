@@ -50,7 +50,9 @@ class TestAWSLaunchTemplateManager:
 
         # Create manager instance
         self.manager = AWSLaunchTemplateManager(
-            aws_client=self.mock_aws_client, config=self.mock_config, logger=self.mock_logger
+            aws_client=self.mock_aws_client,
+            config=self.mock_config,
+            logger=self.mock_logger,
         )
 
         # Sample AWS template
@@ -350,7 +352,10 @@ class TestAWSLaunchTemplateManager:
 
         error = ClientError(
             error_response={
-                "Error": {"Code": "InvalidParameterValue", "Message": "Invalid parameter"}
+                "Error": {
+                    "Code": "InvalidParameterValue",
+                    "Message": "Invalid parameter",
+                }
             },
             operation_name="CreateLaunchTemplate",
         )

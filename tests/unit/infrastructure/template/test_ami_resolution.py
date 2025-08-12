@@ -21,7 +21,6 @@ class TestRuntimeAMICache:
 
     def test_placeholder(self):
         """Placeholder test."""
-        pass
 
 
 @pytest.mark.unit
@@ -30,7 +29,6 @@ class TestCachingAMIResolver:
 
     def test_placeholder(self):
         """Placeholder test."""
-        pass
 
 
 @pytest.mark.unit
@@ -39,4 +37,3 @@ class TestResolvingTemplateConfigurationManager:
 
     def test_placeholder(self):
         """Placeholder test."""
-        pass

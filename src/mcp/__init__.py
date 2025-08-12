@@ -29,7 +29,6 @@ Usage:
 from .discovery import MCPToolDiscovery
 from .tools import OpenHFPluginMCPTools
 
-# Server will be added in Phase 3
 __all__ = ["OpenHFPluginMCPTools", "MCPToolDiscovery"]
 
 __version__ = "1.0.0"

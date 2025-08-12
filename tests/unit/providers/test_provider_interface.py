@@ -16,8 +16,8 @@ class TestProviderPort:
         [
             ("mock", MockProvider),
             # Add more providers as they're implemented
-            # ("provider1", AzureProvider),
-            # ("provider2", GCPProvider),
+            # ("provider1", Provider1Provider),
+            # ("provider2", Provider2Provider),
         ],
     )
     def test_provider_interface_compliance(self, provider_type: str, provider_class):
@@ -109,7 +109,10 @@ class TestProviderPort:
         provider.initialize(config)
 
         # Configure custom responses
-        custom_instances = [InstanceId(value="custom-001"), InstanceId(value="custom-002")]
+        custom_instances = [
+            InstanceId(value="custom-001"),
+            InstanceId(value="custom-002"),
+        ]
         provider.set_response("create_instances", custom_instances)
 
         custom_status = {

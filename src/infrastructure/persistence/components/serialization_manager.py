@@ -121,6 +121,7 @@ class BinarySerializer(SerializationManager):
     """Binary serialization manager using pickle."""
 
     def __init__(self):
+        """Initialize binary serializer."""
         self.logger = get_logger(__name__)
 
     def serialize(self, data: Dict[str, Any]) -> bytes:

@@ -9,7 +9,7 @@ services:
     image: ohfp-api:${VERSION:-latest}
     container_name: ohfp-api-prod
     restart: always
-    
+
     # Environment variables for production
     environment:
       # Server configuration
@@ -20,34 +20,34 @@ services:
       HF_SERVER_LOG_LEVEL: info
       HF_SERVER_DOCS_ENABLED: ${HF_SERVER_DOCS_ENABLED:-false}
       HF_SERVER_RELOAD: false
-      
+
       # Authentication configuration (production)
       HF_AUTH_ENABLED: ${HF_AUTH_ENABLED:-true}
       HF_AUTH_STRATEGY: ${HF_AUTH_STRATEGY:-bearer_token}
       HF_AUTH_BEARER_SECRET_KEY: ${HF_AUTH_BEARER_SECRET_KEY}
       HF_AUTH_BEARER_TOKEN_EXPIRY: ${HF_AUTH_BEARER_TOKEN_EXPIRY:-3600}
-      
+
       # AWS configuration
       HF_PROVIDER_TYPE: aws
       HF_PROVIDER_AWS_REGION: ${AWS_REGION:-us-east-1}
-      
+
       # AWS credentials via IAM roles (recommended)
       AWS_DEFAULT_REGION: ${AWS_REGION:-us-east-1}
-      
+
       # Logging configuration
       HF_LOGGING_LEVEL: INFO
       HF_LOGGING_CONSOLE_ENABLED: true
       HF_LOGGING_FILE_ENABLED: true
       HF_LOGGING_FILE_PATH: /app/logs/app.log
-      
+
       # Storage configuration
       HF_STORAGE_STRATEGY: ${HF_STORAGE_STRATEGY:-json}
       HF_STORAGE_BASE_PATH: /app/data
-      
+
       # Security
       HF_SERVER_REQUIRE_HTTPS: ${HF_SERVER_REQUIRE_HTTPS:-false}
       HF_SERVER_TRUSTED_HOSTS: ${HF_SERVER_TRUSTED_HOSTS:-*}
-    
+
     # Volume mounts for production
     volumes:
       # Configuration (read-only)
@@ -56,7 +56,7 @@ services:
       - ohfp-prod-data:/app/data
       # Logs
       - ohfp-prod-logs:/app/logs
-    
+
     # Health check
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -64,7 +64,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    
+
     # Resource limits for production
     deploy:
       resources:
@@ -79,14 +79,14 @@ services:
         delay: 5s
         max_attempts: 3
         window: 120s
-    
+
     # Security options
     security_opt:
       - no-new-privileges:true
     read_only: false
     tmpfs:
       - /tmp:noexec,nosuid,size=100m
-    
+
     # Logging for production
     logging:
       driver: "json-file"
@@ -94,7 +94,7 @@ services:
         max-size: "50m"
         max-file: "5"
         compress: "true"
-    
+
     # Network
     networks:
       - ohfp-prod-network
@@ -115,7 +115,7 @@ services:
       - ohfp-api
     networks:
       - ohfp-prod-network
-    
+
     # Security options
     security_opt:
       - no-new-privileges:true
@@ -123,7 +123,7 @@ services:
     tmpfs:
       - /var/cache/nginx:noexec,nosuid,size=100m
       - /var/run:noexec,nosuid,size=100m
-    
+
     # Resource limits
     deploy:
       resources:

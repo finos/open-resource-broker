@@ -190,7 +190,7 @@ python run.py requestMachines --data '{"template_id": "web", "machine_count": 2}
 python run.py getRequestStatus --request-id req-12345
 ```
 
-### **Enhanced Operations**
+### **Advanced Operations**
 The provider strategy system enhances existing operations with:
 - **Automatic provider selection** based on operation requirements
 - **Failover support** if primary provider fails

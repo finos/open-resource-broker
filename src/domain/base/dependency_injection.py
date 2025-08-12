@@ -146,7 +146,7 @@ def injectable(cls: Type[T]) -> Type[T]:
     # Preserve existing functionality
     cls._injectable = True
 
-    # Enhanced metadata
+    # Additional metadata
     metadata = InjectableMetadata(
         auto_wire=True,
         singleton=getattr(cls, "_singleton", False),
@@ -218,6 +218,7 @@ def requires(*dependencies: Type) -> Callable[[Type[T]], Type[T]]:
     """
 
     def decorator(cls: Type[T]) -> Type[T]:
+        """Apply requires decorator to the class."""
         cls._dependencies = list(dependencies)
         return cls
 
@@ -245,6 +246,7 @@ def factory(factory_func: Callable[[], T]) -> Callable[[Type[T]], Type[T]]:
     """
 
     def decorator(cls: Type[T]) -> Type[T]:
+        """Attach factory function to class."""
         cls._factory = factory_func
         return cls
 
@@ -292,6 +294,7 @@ def command_handler(command_type: Type) -> Callable[[Type[T]], Type[T]]:
     """
 
     def decorator(cls: Type[T]) -> Type[T]:
+        """Register class as command handler."""
         cls._command_type = command_type
         cls._handler_type = "command"
         cls._cqrs_handler = True
@@ -321,6 +324,7 @@ def query_handler(query_type: Type) -> Callable[[Type[T]], Type[T]]:
     """
 
     def decorator(cls: Type[T]) -> Type[T]:
+        """Register class as query handler."""
         cls._query_type = query_type
         cls._handler_type = "query"
         cls._cqrs_handler = True
@@ -350,6 +354,7 @@ def event_handler(event_type: Type) -> Callable[[Type[T]], Type[T]]:
     """
 
     def decorator(cls: Type[T]) -> Type[T]:
+        """Register class as event handler."""
         cls._event_type = event_type
         cls._handler_type = "event"
         cls._cqrs_handler = True

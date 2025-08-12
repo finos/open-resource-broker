@@ -6,9 +6,8 @@ This example demonstrates how to connect to the MCP server and perform
 common infrastructure provisioning tasks.
 """
 import asyncio
-import json
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
 
 # Note: Install mcp package: pip install mcp
 from mcp import ClientSession, StdioServerParameters
@@ -95,7 +94,7 @@ class HostFactoryMCPClient:
 
 async def example_basic_operations():
     """Example: Basic MCP operations."""
-    print("=== Basic MCP Operations Example ===")
+    logger.info("=== Basic MCP Operations Example ===")
 
     async with HostFactoryMCPClient() as client:
         # Initialize session
@@ -106,58 +105,58 @@ async def example_basic_operations():
         resources = await client.list_resources()
         prompts = await client.list_prompts()
 
-        print(f"Available tools: {[t.name for t in tools]}")
-        print(f"Available resources: {[r.uri for r in resources]}")
-        print(f"Available prompts: {[p.name for p in prompts]}")
+        logger.info(f"Available tools: {[t.name for t in tools]}")
+        logger.info(f"Available resources: {[r.uri for r in resources]}")
+        logger.info(f"Available prompts: {[p.name for p in prompts]}")
 
 
 async def example_infrastructure_provisioning():
     """Example: Infrastructure provisioning workflow."""
-    print("=== Infrastructure Provisioning Example ===")
+    logger.info("=== Infrastructure Provisioning Example ===")
 
     async with HostFactoryMCPClient() as client:
         await client.initialize()
 
-        # Step 1: List available providers
+        # List available providers
         providers = await client.call_tool("list_providers")
-        print(f"Available providers: {providers}")
+        logger.info(f"Available providers: {providers}")
 
-        # Step 2: Check provider health
+        # Check provider health
         health = await client.call_tool("check_provider_health")
-        print(f"Provider health: {health}")
+        logger.info(f"Provider health: {health}")
 
-        # Step 3: List available templates
+        # List available templates
         templates = await client.call_tool("list_templates")
-        print(f"Available templates: {templates}")
+        logger.info(f"Available templates: {templates}")
 
-        # Step 4: Request infrastructure (example)
+        # Request infrastructure (example)
         # Note: This would actually provision resources
         # request_result = await client.call_tool("request_machines", {
         #     "template_id": "EC2FleetInstant",
         #     "count": 2
         # })
-        # print(f"Request result: {request_result}")
+        # logger.info(f"Request result: {request_result}")
 
 
 async def example_resource_access():
     """Example: Resource access."""
-    print("=== Resource Access Example ===")
+    logger.info("=== Resource Access Example ===")
 
     async with HostFactoryMCPClient() as client:
         await client.initialize()
 
         # Read templates resource
         templates = await client.read_resource("templates://")
-        print(f"Templates resource: {templates}")
+        logger.info(f"Templates resource: {templates}")
 
         # Read providers resource
         providers = await client.read_resource("providers://")
-        print(f"Providers resource: {providers}")
+        logger.info(f"Providers resource: {providers}")
 
 
 async def example_ai_prompts():
     """Example: AI prompt usage."""
-    print("=== AI Prompts Example ===")
+    logger.info("=== AI Prompts Example ===")
 
     async with HostFactoryMCPClient() as client:
         await client.initialize()
@@ -166,18 +165,18 @@ async def example_ai_prompts():
         provision_prompt = await client.get_prompt(
             "provision_infrastructure", {"template_type": "ec2", "instance_count": 3}
         )
-        print(f"Provision prompt: {provision_prompt}")
+        logger.info(f"Provision prompt: {provision_prompt}")
 
         # Get troubleshooting prompt
         troubleshoot_prompt = await client.get_prompt(
             "troubleshoot_deployment", {"request_id": "req-12345"}
         )
-        print(f"Troubleshoot prompt: {troubleshoot_prompt}")
+        logger.info(f"Troubleshoot prompt: {troubleshoot_prompt}")
 
 
 async def example_error_handling():
     """Example: Error handling."""
-    print("=== Error Handling Example ===")
+    logger.info("=== Error Handling Example ===")
 
     async with HostFactoryMCPClient() as client:
         await client.initialize()
@@ -186,13 +185,13 @@ async def example_error_handling():
             # Try to call non-existent tool
             await client.call_tool("non_existent_tool")
         except Exception as e:
-            print(f"Expected error for non-existent tool: {e}")
+            logger.info(f"Expected error for non-existent tool: {e}")
 
         try:
             # Try to read non-existent resource
             await client.read_resource("invalid://")
         except Exception as e:
-            print(f"Expected error for invalid resource: {e}")
+            logger.info(f"Expected error for invalid resource: {e}")
 
 
 async def main():
@@ -208,10 +207,10 @@ async def main():
     for example in examples:
         try:
             await example()
-            print()
+            logger.info()
         except Exception as e:
             logger.error(f"Error in {example.__name__}: {e}")
-            print()
+            logger.info()
 
 
 if __name__ == "__main__":

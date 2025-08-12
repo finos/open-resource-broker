@@ -16,7 +16,7 @@ async def handle_list_scheduler_strategies(args) -> Dict[str, Any]:
     Handle list scheduler strategies operations.
 
     Args:
-        args: Modern argument namespace with resource/action structure
+        args: Argument namespace with resource/action structure
 
     Returns:
         Scheduler strategies list
@@ -43,7 +43,7 @@ async def handle_show_scheduler_config(args) -> Dict[str, Any]:
     Handle show scheduler configuration operations.
 
     Args:
-        args: Modern argument namespace with resource/action structure
+        args: Argument namespace with resource/action structure
 
     Returns:
         Scheduler configuration
@@ -68,7 +68,7 @@ async def handle_validate_scheduler_config(args) -> Dict[str, Any]:
     Handle validate scheduler configuration operations.
 
     Args:
-        args: Modern argument namespace with resource/action structure
+        args: Argument namespace with resource/action structure
 
     Returns:
         Validation results

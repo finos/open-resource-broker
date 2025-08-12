@@ -32,7 +32,7 @@ BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 VCS_REF=$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')
 
 # Python version support (from Makefile environment variables)
-PYTHON_VERSION="${PYTHON_VERSION:-3.13}"  # Single Python version from Makefile
+PYTHON_VERSION="${PYTHON_VERSION:-$(make -s print-DEFAULT_PYTHON_VERSION 2>/dev/null || echo '3.13')}"  # Dynamic from Makefile with fallback
 MULTI_PYTHON="${MULTI_PYTHON:-false}"     # Flag for multi-Python builds
 
 # Build arguments
@@ -59,57 +59,61 @@ print_build_info() {
 # Check prerequisites
 check_prerequisites() {
     log_info "Checking prerequisites..."
-    
+
     # Check Docker
     if ! command -v docker &> /dev/null; then
         log_error "Docker is not installed or not in PATH"
         exit 1
     fi
-    
+
     # Check Docker Buildx
     if ! docker buildx version &> /dev/null; then
         log_error "Docker Buildx is not available"
         exit 1
     fi
-    
+
     # Check if we're in the right directory
     if [[ ! -f "Dockerfile" ]]; then
         log_error "Dockerfile not found. Please run from project root."
         exit 1
     fi
-    
+
     log_info "Prerequisites check passed"
 }
 
 # Setup buildx builder
 setup_builder() {
     log_info "Setting up Docker Buildx builder..."
-    
+
     # Create builder if it doesn't exist
     if ! docker buildx inspect ohfp-builder &> /dev/null; then
         log_info "Creating new buildx builder: ohfp-builder"
         docker buildx create --name ohfp-builder --driver docker-container --bootstrap
     fi
-    
+
     # Use the builder
     docker buildx use ohfp-builder
-    
+
     log_info "Buildx builder ready"
 }
 
 # Build the image
 build_image() {
     log_info "Building Docker image..."
-    
+
+    # Get values from Makefile if not provided
+    local MAKEFILE_DEFAULT_PYTHON_VERSION="${PYTHON_VERSION:-$(make -s print-DEFAULT_PYTHON_VERSION 2>/dev/null || echo '3.13')}"
+    local MAKEFILE_PACKAGE_SHORT="${PACKAGE_NAME_SHORT:-$(make -s print-PACKAGE_NAME_SHORT 2>/dev/null || echo 'ohfp')}"
+
     # Prepare tags with Python version support
     local tags=()
     local version_tag="${VERSION}"
-    
+
     # Add Python version to tag if specified
-    if [[ -n "${PYTHON_VERSION}" && "${MULTI_PYTHON}" == "true" ]]; then
-        version_tag="${VERSION}-python${PYTHON_VERSION}"
+    if [[ -n "${MAKEFILE_DEFAULT_PYTHON_VERSION}" && "${MULTI_PYTHON}" == "true" ]]; then
+        version_tag="${VERSION}-python${MAKEFILE_DEFAULT_PYTHON_VERSION}"
     fi
-    
+
     if [[ -n "${REGISTRY}" ]]; then
         tags+=("-t" "${REGISTRY}/${IMAGE_NAME}:${version_tag}")
         # Only add latest tag if not multi-Python build
@@ -123,7 +127,7 @@ build_image() {
             tags+=("-t" "${IMAGE_NAME}:latest")
         fi
     fi
-    
+
     # Prepare build arguments
     local build_args=(
         "--build-arg" "BUILD_DATE=${BUILD_DATE}"
@@ -131,7 +135,7 @@ build_image() {
         "--build-arg" "VCS_REF=${VCS_REF}"
         "--build-arg" "PYTHON_VERSION=${PYTHON_VERSION}"
     )
-    
+
     # Prepare cache arguments
     local cache_args=()
     if [[ "${CACHE}" == "true" ]]; then
@@ -140,21 +144,26 @@ build_image() {
             "--cache-to" "type=gha,mode=max"
         )
     fi
-    
+
     # Prepare platform arguments
     local platform_args=()
     if [[ -n "${PLATFORMS}" ]]; then
         platform_args+=("--platform" "${PLATFORMS}")
     fi
-    
+
     # Prepare push arguments
     local push_args=()
     if [[ "${PUSH}" == "true" ]]; then
         push_args+=("--push")
     else
-        push_args+=("--load")
+        # --load only works with single platform builds
+        if [[ "${PLATFORMS}" == *","* ]]; then
+            log_warn "Multi-platform build detected, skipping --load (cannot load multi-platform images)"
+        else
+            push_args+=("--load")
+        fi
     fi
-    
+
     # Build command
     local build_cmd=(
         docker buildx build
@@ -165,10 +174,10 @@ build_image() {
         "${push_args[@]}"
         .
     )
-    
+
     log_info "Executing: ${build_cmd[*]}"
     "${build_cmd[@]}"
-    
+
     log_info "Docker image build completed"
 }
 
@@ -178,14 +187,14 @@ test_image() {
         log_info "Skipping image test (image was pushed)"
         return
     fi
-    
+
     log_info "Testing built image..."
-    
+
     local test_image="${IMAGE_NAME}:${VERSION}"
     if [[ -n "${REGISTRY}" ]]; then
         test_image="${REGISTRY}/${IMAGE_NAME}:${VERSION}"
     fi
-    
+
     # Test image can start
     log_info "Testing image startup..."
     if docker run --rm "${test_image}" version; then
@@ -194,15 +203,15 @@ test_image() {
         log_error "Image startup test failed"
         exit 1
     fi
-    
+
     # Test health check
     log_info "Testing health check..."
     local container_id
     container_id=$(docker run -d -p 8001:8000 "${test_image}")
-    
+
     # Wait for container to start
     sleep 10
-    
+
     # Check health
     if curl -f http://localhost:8001/health; then
         log_info "Health check test passed"
@@ -212,10 +221,10 @@ test_image() {
         docker stop "${container_id}"
         exit 1
     fi
-    
+
     # Cleanup
     docker stop "${container_id}"
-    
+
     log_info "Image testing completed successfully"
 }
 
@@ -286,9 +295,9 @@ main() {
     setup_builder
     build_image
     test_image
-    
+
     log_info "Build process completed successfully!"
-    
+
     if [[ -n "${REGISTRY}" ]]; then
         log_info "Image: ${REGISTRY}/${IMAGE_NAME}:${VERSION}"
     else

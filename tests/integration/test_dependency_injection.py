@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Phase 6: Dependency Injection Updates Test
+Dependency Injection Updates Test
 
 This test validates that the dependency injection updates for AWS Launch Template Manager
 and other services are working correctly.
@@ -13,10 +13,10 @@ import sys
 sys.path.insert(0, os.path.abspath("."))
 
 
-def test_phase6_dependency_injection():
-    """Test Phase 6 dependency injection updates."""
+def test_dependency_injection_updates():
+    """Test dependency injection system updates and registrations."""
 
-    print("🔧 PHASE 6: DEPENDENCY INJECTION UPDATES TEST")
+    print("DEPENDENCY INJECTION UPDATES TEST")
     print("=" * 60)
 
     results = {
@@ -27,27 +27,27 @@ def test_phase6_dependency_injection():
     }
 
     try:
-        # Test 1: AWS Launch Template Manager registration
-        print("\n1️⃣ Testing AWS Launch Template Manager Registration...")
+        # AWS Launch Template Manager registration
+        print("\n1. Testing AWS Launch Template Manager Registration...")
         results["aws_launch_template_manager_registration"] = (
             test_aws_launch_template_manager_registration()
         )
 
-        # Test 2: Repository factory machine support
-        print("\n2️⃣ Testing Repository Factory Machine Support...")
+        # Repository factory machine support
+        print("\n2. Testing Repository Factory Machine Support...")
         results["repository_factory_machine_support"] = test_repository_factory_machine_support()
 
-        # Test 3: DI container resolution
-        print("\n3️⃣ Testing DI Container Resolution...")
+        # DI container resolution
+        print("\n3. Testing DI Container Resolution...")
         results["di_container_resolution"] = test_di_container_resolution()
 
-        # Test 4: Service dependencies
-        print("\n4️⃣ Testing Service Dependencies...")
+        # Service dependencies
+        print("\n4. Testing Service Dependencies...")
         results["service_dependencies"] = test_service_dependencies()
 
         # Summary
         print("\n" + "=" * 60)
-        print("📊 PHASE 6 DEPENDENCY INJECTION TEST RESULTS")
+        print("DEPENDENCY INJECTION DEPENDENCY INJECTION TEST RESULTS")
         print("=" * 60)
 
         passed = sum(1 for result in results.values() if result)
@@ -60,7 +60,7 @@ def test_phase6_dependency_injection():
         print(f"\nOverall: {passed}/{total} tests passed")
 
         if passed == total:
-            print("🎉 ALL PHASE 6 DEPENDENCY INJECTION TESTS PASSED!")
+            print("ALL DEPENDENCY INJECTION DEPENDENCY INJECTION TESTS PASSED!")
             return True
         else:
             print("WARN:  Some dependency injection tests failed")

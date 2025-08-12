@@ -1,6 +1,6 @@
 """Request-specific value objects orchestrator.
 
-This module provides a unified interface to all request value objects organized by category:
+This module provides a centralized interface to all request value objects organized by category:
 - Request types and statuses (RequestType, RequestStatus, MachineResult)
 - Request identifiers (RequestId, MachineReference, ResourceIdentifier)
 - Request metadata and configuration (RequestTimeout, MachineCount, RequestTag, etc.)

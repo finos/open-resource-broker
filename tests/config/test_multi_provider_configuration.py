@@ -25,7 +25,10 @@ class TestMultiProviderConfiguration:
                         "name": "aws-eu-west-1",
                         "type": "aws",
                         "enabled": True,
-                        "config": {"region": "eu-west-1", "profile": "fsi-pace-amer+ms-symphony"},
+                        "config": {
+                            "region": "eu-west-1",
+                            "profile": "fsi-pace-amer+ms-symphony",
+                        },
                     },
                 ],
             }
@@ -46,19 +49,28 @@ class TestMultiProviderConfiguration:
                         "name": "aws-disabled",
                         "type": "aws",
                         "enabled": False,
-                        "config": {"region": "us-west-1", "profile": "disabled-profile"},
+                        "config": {
+                            "region": "us-west-1",
+                            "profile": "disabled-profile",
+                        },
                     },
                     {
                         "name": "aws-first-enabled",
                         "type": "aws",
                         "enabled": True,
-                        "config": {"region": "us-east-1", "profile": "first-enabled-profile"},
+                        "config": {
+                            "region": "us-east-1",
+                            "profile": "first-enabled-profile",
+                        },
                     },
                     {
                         "name": "aws-second-enabled",
                         "type": "aws",
                         "enabled": True,
-                        "config": {"region": "eu-west-1", "profile": "second-enabled-profile"},
+                        "config": {
+                            "region": "eu-west-1",
+                            "profile": "second-enabled-profile",
+                        },
                     },
                 ]
             }
@@ -77,22 +89,31 @@ class TestMultiProviderConfiguration:
                 "active_provider": "aws-production",
                 "providers": [
                     {
-                        "name": "azure-dev",
-                        "type": "azure",
+                        "name": "provider1-dev",
+                        "type": "provider1",
                         "enabled": True,
-                        "config": {"subscription_id": "test-sub", "resource_group": "test-rg"},
+                        "config": {
+                            "subscription_id": "test-sub",
+                            "resource_group": "test-rg",
+                        },
                     },
                     {
                         "name": "aws-production",
                         "type": "aws",
                         "enabled": True,
-                        "config": {"region": "us-east-1", "profile": "production-profile"},
+                        "config": {
+                            "region": "us-east-1",
+                            "profile": "production-profile",
+                        },
                     },
                     {
-                        "name": "gcp-staging",
-                        "type": "gcp",
+                        "name": "provider2-staging",
+                        "type": "provider2",
                         "enabled": True,
-                        "config": {"project_id": "test-project", "zone": "us-central1-a"},
+                        "config": {
+                            "project_id": "test-project",
+                            "zone": "us-central1-a",
+                        },
                     },
                 ],
             }
@@ -110,14 +131,14 @@ class TestMultiProviderConfiguration:
             "provider": {
                 "providers": [
                     {
-                        "name": "azure-only",
-                        "type": "azure",
+                        "name": "provider1-only",
+                        "type": "provider1",
                         "enabled": True,
                         "config": {"subscription_id": "test-sub"},
                     },
                     {
-                        "name": "gcp-only",
-                        "type": "gcp",
+                        "name": "provider2-only",
+                        "type": "provider2",
                         "enabled": True,
                         "config": {"project_id": "test-project"},
                     },
@@ -142,7 +163,10 @@ class TestMultiProviderConfiguration:
                         "name": "aws-available",
                         "type": "aws",
                         "enabled": True,
-                        "config": {"region": "us-east-1", "profile": "available-profile"},
+                        "config": {
+                            "region": "us-east-1",
+                            "profile": "available-profile",
+                        },
                     }
                 ],
             }
@@ -164,7 +188,10 @@ class TestMultiProviderConfiguration:
                         "name": "aws-disabled",
                         "type": "aws",
                         "enabled": False,
-                        "config": {"region": "us-west-1", "profile": "disabled-profile"},
+                        "config": {
+                            "region": "us-west-1",
+                            "profile": "disabled-profile",
+                        },
                     },
                     {
                         "name": "aws-enabled",
@@ -186,11 +213,11 @@ class TestMultiProviderConfiguration:
         """Test fallback when specified active provider is not AWS type."""
         config = {
             "provider": {
-                "active_provider": "azure-primary",
+                "active_provider": "provider1-primary",
                 "providers": [
                     {
-                        "name": "azure-primary",
-                        "type": "azure",
+                        "name": "provider1-primary",
+                        "type": "provider1",
                         "enabled": True,
                         "config": {"subscription_id": "test-sub"},
                     },
@@ -198,7 +225,10 @@ class TestMultiProviderConfiguration:
                         "name": "aws-secondary",
                         "type": "aws",
                         "enabled": True,
-                        "config": {"region": "us-east-1", "profile": "secondary-profile"},
+                        "config": {
+                            "region": "us-east-1",
+                            "profile": "secondary-profile",
+                        },
                     },
                 ],
             }
@@ -263,7 +293,10 @@ class TestMultiProviderConfiguration:
                         "name": "aws-third",
                         "type": "aws",
                         "enabled": True,
-                        "config": {"region": "ap-southeast-1", "profile": "third-profile"},
+                        "config": {
+                            "region": "ap-southeast-1",
+                            "profile": "third-profile",
+                        },
                     },
                     {
                         "name": "aws-first",

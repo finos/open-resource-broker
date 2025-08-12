@@ -85,7 +85,11 @@ class TestAWSProviderComprehensive:
                         assert handler is not None
 
                         # Test common handler methods
-                        common_methods = ["handle", "create_instances", "terminate_instances"]
+                        common_methods = [
+                            "handle",
+                            "create_instances",
+                            "terminate_instances",
+                        ]
                         has_handler_method = any(
                             hasattr(handler, method) for method in common_methods
                         )
@@ -203,7 +207,11 @@ class TestAWSProviderComprehensive:
                 assert strategy is not None
 
                 # Test common strategy methods
-                common_methods = ["create_machines", "terminate_machines", "get_machine_status"]
+                common_methods = [
+                    "create_machines",
+                    "terminate_machines",
+                    "get_machine_status",
+                ]
                 any(hasattr(strategy, method) for method in common_methods)
 
         except ImportError:
@@ -400,7 +408,12 @@ class TestProviderStrategyPatternsComprehensive:
 
                 if strategy:
                     # Test common strategy methods
-                    common_methods = ["execute", "create_machines", "terminate_machines", "handle"]
+                    common_methods = [
+                        "execute",
+                        "create_machines",
+                        "terminate_machines",
+                        "handle",
+                    ]
 
                     for method_name in common_methods:
                         if hasattr(strategy, method_name):
@@ -483,7 +496,10 @@ class TestAWSAuthenticationComprehensive:
 
     def test_auth_strategy_initialization(self):
         """Test auth strategy initialization."""
-        auth_strategies = [("cognito_strategy", "CognitoStrategy"), ("iam_strategy", "IAMStrategy")]
+        auth_strategies = [
+            ("cognito_strategy", "CognitoStrategy"),
+            ("iam_strategy", "IAMStrategy"),
+        ]
 
         for module_name, class_name in auth_strategies:
             try:

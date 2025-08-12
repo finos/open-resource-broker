@@ -6,13 +6,16 @@ for various scenarios including new provider creation, runtime switching, load b
 and production deployment patterns.
 """
 
-import time
 import json
-from typing import Dict, Any, List
+import logging
+import time
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 from src.providers.base.strategy import (
     ProviderStrategy,
-    ProviderContext,
     ProviderOperation,
     ProviderResult,
     ProviderCapabilities,
@@ -56,6 +59,7 @@ class Provider1Strategy(ProviderStrategy):
     """
 
     def __init__(self, config: Provider1Config, logger=None):
+        """Initialize Provider1Strategy with configuration and logger."""
         from src.infrastructure.interfaces.provider import ProviderConfig
 
         super().__init__(ProviderConfig(provider_type="provider1"))
@@ -65,6 +69,7 @@ class Provider1Strategy(ProviderStrategy):
 
     @property
     def provider_type(self) -> str:
+        """Return the provider type identifier."""
         return "provider1"
 
     def initialize(self) -> bool:
@@ -118,7 +123,7 @@ class Provider1Strategy(ProviderStrategy):
 
     def _create_instances(self, operation: ProviderOperation) -> ProviderResult:
         """Create instances using Provider1 API."""
-        template_config = operation.parameters.get("template_config", {})
+        operation.parameters.get("template_config", {})
         count = operation.parameters.get("count", 1)
 
         # Simulate Provider1 instance creation
@@ -281,8 +286,8 @@ class Provider1Strategy(ProviderStrategy):
 
 def example_runtime_switching():
     """Demonstrate runtime provider switching."""
-    print("🔄 Example: Runtime Provider Switching")
-    print("-" * 40)
+    logger.info("Runtime Example: Runtime Provider Switching")
+    logger.info("-" * 40)
 
     # Create provider context
     context = create_provider_context()
@@ -306,8 +311,8 @@ def example_runtime_switching():
     # Initialize context
     context.initialize()
 
-    print(f"Available providers: {context.available_strategies}")
-    print(f"Current provider: {context.current_strategy_type}")
+    logger.info(f"Available providers: {context.available_strategies}")
+    logger.info(f"Current provider: {context.current_strategy_type}")
 
     # Create test operation
     operation = ProviderOperation(
@@ -315,22 +320,22 @@ def example_runtime_switching():
     )
 
     # Execute with AWS
-    print(f"\n🔹 Executing with AWS:")
+    logger.info(f"\n* Executing with AWS:")
     context.set_strategy("aws")
     result = context.execute_operation(operation)
-    print(f"Result: {result.success}, Templates: {len(result.data.get('templates', []))}")
+    logger.info(f"Result: {result.success}, Templates: {len(result.data.get('templates', []))}")
 
     # Switch to Provider1
-    print(f"\n🔹 Switching to Provider1:")
+    logger.info(f"\n* Switching to Provider1:")
     context.set_strategy("provider1")
     result = context.execute_operation(operation)
-    print(f"Result: {result.success}, Templates: {len(result.data.get('templates', []))}")
+    logger.info(f"Result: {result.success}, Templates: {len(result.data.get('templates', []))}")
 
     # Show metrics
-    print(f"\n📊 Metrics:")
+    logger.info(f"\nMetrics Metrics:")
     for strategy_type in context.available_strategies:
         metrics = context.get_strategy_metrics(strategy_type)
-        print(
+        logger.info(
             f"  {strategy_type}: {metrics.total_operations} ops, {metrics.success_rate:.1f}% success"
         )
 
@@ -342,8 +347,8 @@ def example_runtime_switching():
 
 def example_load_balancing():
     """Demonstrate load balancing across multiple providers."""
-    print("\n⚖️ Example: Load Balancing")
-    print("-" * 40)
+    logger.info("\nLoad Balancing Example: Load Balancing")
+    logger.info("-" * 40)
 
     # Create multiple provider strategies
     aws_config = AWSConfig(region="us-east-1", profile="default")
@@ -372,27 +377,29 @@ def example_load_balancing():
     # Initialize
     load_balancer.initialize()
 
-    print(f"Load balancer created with algorithm: {lb_config.algorithm.value}")
-    print(f"Weights: {weights}")
+    logger.info(f"Load balancer created with algorithm: {lb_config.algorithm.value}")
+    logger.info(f"Weights: {weights}")
 
     # Execute multiple operations
     operation = ProviderOperation(operation_type=ProviderOperationType.HEALTH_CHECK, parameters={})
 
-    print(f"\n🔹 Executing 10 operations:")
+    logger.info(f"\n* Executing 10 operations:")
     for i in range(10):
         result = load_balancer.execute_operation(operation)
         selected_provider = result.metadata.get("selected_strategy", "unknown")
-        print(f"  Operation {i+1}: {selected_provider} ({'✅' if result.success else '❌'})")
+        logger.info(
+            f"  Operation {i+1}: {selected_provider} ({'PASS' if result.success else 'FAIL'})"
+        )
 
     # Show statistics
-    print(f"\n📊 Load Balancer Statistics:")
+    logger.info(f"\nMetrics Load Balancer Statistics:")
     stats = load_balancer.strategy_stats
     for strategy_type, metrics in stats.items():
-        print(f"  {strategy_type}:")
-        print(f"    Requests: {metrics['total_requests']}")
-        print(f"    Success Rate: {metrics['success_rate']:.1f}%")
-        print(f"    Avg Response Time: {metrics['average_response_time']:.1f}ms")
-        print(f"    Healthy: {'✅' if metrics['is_healthy'] else '❌'}")
+        logger.info(f"  {strategy_type}:")
+        logger.info(f"    Requests: {metrics['total_requests']}")
+        logger.info(f"    Success Rate: {metrics['success_rate']:.1f}%")
+        logger.info(f"    Avg Response Time: {metrics['average_response_time']:.1f}ms")
+        logger.info(f"    Healthy: {'PASS' if metrics['is_healthy'] else 'FAIL'}")
 
 
 # =============================================================================
@@ -402,8 +409,8 @@ def example_load_balancing():
 
 def example_fallback_resilience():
     """Demonstrate fallback and resilience patterns."""
-    print("\n🛡️ Example: Fallback and Resilience")
-    print("-" * 40)
+    logger.info("\nResilience Example: Fallback and Resilience")
+    logger.info("-" * 40)
 
     # Create primary and fallback strategies
     aws_config = AWSConfig(region="us-east-1", profile="default")
@@ -433,27 +440,29 @@ def example_fallback_resilience():
     # Initialize
     fallback_strategy.initialize()
 
-    print(f"Fallback strategy created:")
-    print(f"  Mode: {fallback_config.mode.value}")
-    print(f"  Primary: {primary_strategy.provider_type}")
-    print(f"  Fallbacks: {[s.provider_type for s in fallback_strategy.fallback_strategies]}")
+    logger.info(f"Fallback strategy created:")
+    logger.info(f"  Mode: {fallback_config.mode.value}")
+    logger.info(f"  Primary: {primary_strategy.provider_type}")
+    logger.info(f"  Fallbacks: {[s.provider_type for s in fallback_strategy.fallback_strategies]}")
 
     # Execute operations
     operation = ProviderOperation(operation_type=ProviderOperationType.HEALTH_CHECK, parameters={})
 
-    print(f"\n🔹 Executing operations with fallback:")
+    logger.info(f"\n* Executing operations with fallback:")
     for i in range(5):
         result = fallback_strategy.execute_operation(operation)
         current_provider = fallback_strategy.current_strategy.provider_type
-        print(f"  Operation {i+1}: {current_provider} ({'✅' if result.success else '❌'})")
+        logger.info(
+            f"  Operation {i+1}: {current_provider} ({'PASS' if result.success else 'FAIL'})"
+        )
 
     # Show circuit breaker metrics
-    print(f"\n📊 Circuit Breaker Metrics:")
+    logger.info(f"\nMetrics Circuit Breaker Metrics:")
     metrics = fallback_strategy.circuit_metrics
-    print(f"  State: {metrics['state']}")
-    print(f"  Total Requests: {metrics['total_requests']}")
-    print(f"  Success Rate: {metrics['failure_rate']:.1f}%")
-    print(f"  Failure Count: {metrics['failure_count']}")
+    logger.info(f"  State: {metrics['state']}")
+    logger.info(f"  Total Requests: {metrics['total_requests']}")
+    logger.info(f"  Success Rate: {metrics['failure_rate']:.1f}%")
+    logger.info(f"  Failure Count: {metrics['failure_count']}")
 
 
 # =============================================================================
@@ -463,8 +472,8 @@ def example_fallback_resilience():
 
 def example_multi_provider_composition():
     """Demonstrate multi-provider composition for complex scenarios."""
-    print("\n🔄 Example: Multi-Provider Composition")
-    print("-" * 40)
+    logger.info("\nRuntime Example: Multi-Provider Composition")
+    logger.info("-" * 40)
 
     # Create multiple strategies
     aws_config = AWSConfig(region="us-east-1", profile="default")
@@ -492,25 +501,25 @@ def example_multi_provider_composition():
     # Initialize
     composite_strategy.initialize()
 
-    print(f"Composite strategy created:")
-    print(f"  Mode: {composition_config.mode.value}")
-    print(f"  Aggregation: {composition_config.aggregation_policy.value}")
-    print(f"  Providers: {list(composite_strategy.composed_strategies.keys())}")
+    logger.info(f"Composite strategy created:")
+    logger.info(f"  Mode: {composition_config.mode.value}")
+    logger.info(f"  Aggregation: {composition_config.aggregation_policy.value}")
+    logger.info(f"  Providers: {list(composite_strategy.composed_strategies.keys())}")
 
     # Execute operation that will run on all providers
     operation = ProviderOperation(
         operation_type=ProviderOperationType.GET_AVAILABLE_TEMPLATES, parameters={}
     )
 
-    print(f"\n🔹 Executing parallel operation:")
+    logger.info(f"\n* Executing parallel operation:")
     start_time = time.time()
     result = composite_strategy.execute_operation(operation)
     end_time = time.time()
 
-    print(f"  Result: {'✅' if result.success else '❌'}")
-    print(f"  Execution time: {(end_time - start_time)*1000:.1f}ms")
-    print(f"  Strategies executed: {result.metadata.get('strategies_executed', 0)}")
-    print(f"  Successful strategies: {result.metadata.get('successful_strategies', 0)}")
+    logger.info(f"  Result: {'PASS' if result.success else 'FAIL'}")
+    logger.info(f"  Execution time: {(end_time - start_time)*1000:.1f}ms")
+    logger.info(f"  Strategies executed: {result.metadata.get('strategies_executed', 0)}")
+    logger.info(f"  Successful strategies: {result.metadata.get('successful_strategies', 0)}")
 
     # Show merged results
     if result.success and isinstance(result.data, dict):
@@ -518,7 +527,7 @@ def example_multi_provider_composition():
         for key, value in result.data.items():
             if isinstance(value, list):
                 total_templates += len(value)
-        print(f"  Total templates from all providers: {total_templates}")
+        logger.info(f"  Total templates from all providers: {total_templates}")
 
 
 # =============================================================================
@@ -528,8 +537,8 @@ def example_multi_provider_composition():
 
 def example_production_monitoring():
     """Demonstrate production monitoring and alerting setup."""
-    print("\n📊 Example: Production Monitoring")
-    print("-" * 40)
+    logger.info("\nMetrics Example: Production Monitoring")
+    logger.info("-" * 40)
 
     # Create provider context with multiple strategies
     context = create_provider_context()
@@ -549,7 +558,7 @@ def example_production_monitoring():
     # Simulate some operations to generate metrics
     operation = ProviderOperation(operation_type=ProviderOperationType.HEALTH_CHECK, parameters={})
 
-    print("🔹 Generating sample metrics...")
+    logger.info("* Generating sample metrics...")
     for i in range(10):
         # Alternate between providers
         provider = "aws" if i % 2 == 0 else "provider1"
@@ -557,25 +566,25 @@ def example_production_monitoring():
         context.execute_operation(operation)
 
     # Display monitoring dashboard
-    print(f"\n📊 Provider Monitoring Dashboard:")
-    print(f"{'Provider':<12} {'Health':<8} {'Ops':<6} {'Success':<8} {'Avg RT':<8}")
-    print("-" * 50)
+    logger.info(f"\nMetrics Provider Monitoring Dashboard:")
+    logger.info(f"{'Provider':<12} {'Health':<8} {'Ops':<6} {'Success':<8} {'Avg RT':<8}")
+    logger.info("-" * 50)
 
     for strategy_type in context.available_strategies:
         # Get health status
         health = context.check_strategy_health(strategy_type)
-        health_icon = "✅" if health.is_healthy else "❌"
+        health_icon = "PASS" if health.is_healthy else "FAIL"
 
         # Get metrics
         metrics = context.get_strategy_metrics(strategy_type)
 
-        print(
+        logger.info(
             f"{strategy_type:<12} {health_icon:<8} {metrics.total_operations:<6} "
             f"{metrics.success_rate:<7.1f}% {metrics.average_response_time_ms:<7.1f}ms"
         )
 
     # Show alerting conditions
-    print(f"\n🚨 Alerting Conditions:")
+    logger.info(f"\nAlert Alerting Conditions:")
     for strategy_type in context.available_strategies:
         health = context.check_strategy_health(strategy_type)
         metrics = context.get_strategy_metrics(strategy_type)
@@ -589,9 +598,9 @@ def example_production_monitoring():
             alerts.append("HIGH_RESPONSE_TIME")
 
         if alerts:
-            print(f"  ⚠️  {strategy_type}: {', '.join(alerts)}")
+            logger.info(f"  Warning  {strategy_type}: {', '.join(alerts)}")
         else:
-            print(f"  ✅ {strategy_type}: All metrics normal")
+            logger.info(f"  PASS {strategy_type}: All metrics normal")
 
 
 # =============================================================================
@@ -601,8 +610,8 @@ def example_production_monitoring():
 
 def example_configuration_driven_setup():
     """Demonstrate configuration-driven provider setup."""
-    print("\n⚙️ Example: Configuration-Driven Setup")
-    print("-" * 40)
+    logger.info("\nConfiguration Example: Configuration-Driven Setup")
+    logger.info("-" * 40)
 
     # Example configuration (would typically be loaded from file)
     config = {
@@ -639,8 +648,8 @@ def example_configuration_driven_setup():
         }
     }
 
-    print("📋 Configuration loaded:")
-    print(json.dumps(config["provider"], indent=2))
+    logger.info("Config Configuration loaded:")
+    logger.info(json.dumps(config["provider"], indent=2))
 
     # Create providers based on configuration
     strategies = []
@@ -652,7 +661,7 @@ def example_configuration_driven_setup():
         )
         aws_strategy = AWSProviderStrategy(aws_config)
         strategies.append(aws_strategy)
-        print(f"✅ AWS provider configured")
+        logger.info(f"PASS AWS provider configured")
 
     if config["provider"]["providers"]["provider1"]["enabled"]:
         provider1_config = Provider1Config(
@@ -662,7 +671,7 @@ def example_configuration_driven_setup():
         )
         provider1_strategy = Provider1Strategy(provider1_config)
         strategies.append(provider1_strategy)
-        print(f"✅ Provider1 configured")
+        logger.info(f"PASS Provider1 configured")
 
     # Set up load balancing if enabled
     if config["provider"]["load_balancing"]["enabled"]:
@@ -677,7 +686,7 @@ def example_configuration_driven_setup():
         )
 
         load_balancer.initialize()
-        print(f"✅ Load balancing configured with {lb_config.algorithm.value}")
+        logger.info(f"PASS Load balancing configured with {lb_config.algorithm.value}")
 
         # Test the configured system
         operation = ProviderOperation(
@@ -685,7 +694,7 @@ def example_configuration_driven_setup():
         )
 
         result = load_balancer.execute_operation(operation)
-        print(f"✅ System test: {'PASS' if result.success else 'FAIL'}")
+        logger.info(f"PASS System test: {'PASS' if result.success else 'FAIL'}")
 
 
 # =============================================================================
@@ -693,8 +702,8 @@ def example_configuration_driven_setup():
 # =============================================================================
 
 if __name__ == "__main__":
-    print("🚀 Provider Strategy Pattern - Usage Examples")
-    print("=" * 60)
+    logger.info("Provider Strategy Provider Strategy Pattern - Usage Examples")
+    logger.info("=" * 60)
 
     try:
         # Run all examples
@@ -705,17 +714,17 @@ if __name__ == "__main__":
         example_production_monitoring()
         example_configuration_driven_setup()
 
-        print("\n🎉 All examples completed successfully!")
-        print("\n📚 Key Takeaways:")
-        print("  • Easy to add new providers by implementing ProviderStrategy")
-        print("  • Runtime switching enables dynamic provider selection")
-        print("  • Load balancing optimizes performance across providers")
-        print("  • Fallback strategies ensure high availability")
-        print("  • Composition enables complex multi-provider scenarios")
-        print("  • Configuration-driven setup simplifies deployment")
+        logger.info("\nSuccess All examples completed successfully!")
+        logger.info("\nSummary Key Takeaways:")
+        logger.info("  • Easy to add new providers by implementing ProviderStrategy")
+        logger.info("  • Runtime switching enables dynamic provider selection")
+        logger.info("  • Load balancing optimizes performance across providers")
+        logger.info("  • Fallback strategies ensure high availability")
+        logger.info("  • Composition enables complex multi-provider scenarios")
+        logger.info("  • Configuration-driven setup simplifies deployment")
 
     except Exception as e:
-        print(f"\n❌ Example execution failed: {e}")
+        logger.info(f"\nFAIL Example execution failed: {e}")
         import traceback
 
         traceback.print_exc()

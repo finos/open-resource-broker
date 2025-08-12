@@ -1,73 +1,48 @@
-"""Package metadata and naming constants."""
+"""Package metadata and naming constants - centralized from .project.yml."""
 
-import os
+import logging
+import subprocess
+import sys
 from pathlib import Path
 
+# Setup logging
+logging.basicConfig(level=logging.ERROR, format="%(levelname)s: %(message)s")
+logger = logging.getLogger(__name__)
 
-def _get_repo_name():
-    """Get repository name from git remote or directory name."""
+
+def _get_config_value(key: str) -> str:
+    """Get value from .project.yml using yq."""
     try:
-        import subprocess
-
+        project_root = Path(__file__).parent.parent
         result = subprocess.run(
-            ["git", "remote", "get-url", "origin"], capture_output=True, text=True, check=True
+            ["yq", key, ".project.yml"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            check=True,
         )
-        # Extract repo name from URL
-        url = result.stdout.strip()
-        if url.endswith(".git"):
-            url = url[:-4]
-
-        # Handle SSH URLs (git@github.com:org/repo)
-        if url.startswith("git@"):
-            return url.split("/")[-1]
-        # Handle HTTPS URLs (https://github.com/org/repo)
-        else:
-            return url.split("/")[-1]
-    except (subprocess.CalledProcessError, OSError, AttributeError):
-        # Fallback to directory name
-        return Path.cwd().name
+        return result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        logger.error(f"Error reading config key '{key}': {e}")
+        logger.error("Make sure yq is installed and .project.yml exists")
+        sys.exit(1)
 
 
-def _get_repo_org():
-    """Get repository organization from git remote."""
-    try:
-        import subprocess
-
-        result = subprocess.run(
-            ["git", "remote", "get-url", "origin"], capture_output=True, text=True, check=True
-        )
-        url = result.stdout.strip()
-
-        # Handle SSH URLs (git@github.com:org/repo)
-        if url.startswith("git@github.com:"):
-            # Remove git@github.com: prefix and .git suffix
-            path = url.replace("git@github.com:", "")
-            if path.endswith(".git"):
-                path = path[:-4]
-            return path.split("/")[0]
-        # Handle HTTPS URLs (https://github.com/org/repo)
-        elif "github.com" in url:
-            if url.endswith(".git"):
-                url = url[:-4]
-            parts = url.split("/")
-            return parts[-2]  # Organization name
-    except (subprocess.CalledProcessError, OSError, AttributeError, IndexError):
-        pass
-    return "awslabs"  # Default fallback
-
-
-# Package metadata
-PACKAGE_NAME = _get_repo_name()
-PACKAGE_NAME_PYTHON = PACKAGE_NAME.replace("-", "_")
-PACKAGE_NAME_SHORT = "ohfp"  # CLI command name
+# Load all values from .project.yml (single source of truth)
+PACKAGE_NAME = _get_config_value(".project.name")
+PACKAGE_NAME_SHORT = _get_config_value(".project.short_name")
+__version__ = _get_config_value(".project.version")  # Version for imports
+VERSION = __version__  # Alias for compatibility
+DESCRIPTION = _get_config_value(".project.description")
 
 # Repository metadata
-REPO_ORG = _get_repo_org()
-REPO_NAME = PACKAGE_NAME
+REPO_ORG = _get_config_value(".repository.org")
+REPO_NAME = _get_config_value(".repository.name")
+CONTAINER_REGISTRY = _get_config_value(".repository.registry")
+
+# Derived values
+PACKAGE_NAME_PYTHON = PACKAGE_NAME.replace("-", "_")
 REPO_URL = f"https://github.com/{REPO_ORG}/{REPO_NAME}"
 REPO_ISSUES_URL = f"{REPO_URL}/issues"
 DOCS_URL = f"https://{REPO_ORG}.github.io/{REPO_NAME}"
-
-# Container registry
-CONTAINER_REGISTRY = f"ghcr.io/{REPO_ORG}"
 CONTAINER_IMAGE = PACKAGE_NAME

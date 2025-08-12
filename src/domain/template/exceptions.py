@@ -31,5 +31,6 @@ class TemplateAlreadyExistsError(TemplateException):
     """Raised when attempting to create a template that already exists."""
 
     def __init__(self, template_id: str):
+        """Initialize template already exists error with template ID."""
         message = f"Template with ID '{template_id}' already exists"
         super().__init__(message, "TEMPLATE_ALREADY_EXISTS", {"template_id": template_id})

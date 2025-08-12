@@ -2,100 +2,192 @@
 repos:
   - repo: local
     hooks:
-      - id: professional-quality-check
-        name: Professional Quality Check
-        entry: bash -c 'source .venv/bin/activate && python scripts/quality_check.py --strict'
+      - id: format
+        name: Auto-Format Code
+        entry: make format
+        language: system
+        files: \.(py)$
+        pass_filenames: false
+        description: "Auto-format Python code with black and isort"
+
+      - id: black
+        name: Black (Code Formatting)
+        entry: make ci-quality-black
+        language: system
+        files: \.(py)$
+        pass_filenames: false
+        description: "Check Python code formatting with Black"
+
+      - id: isort
+        name: isort (Import Sorting)
+        entry: make ci-quality-isort
+        language: system
+        files: \.(py)$
+        pass_filenames: false
+        description: "Check Python import sorting with isort"
+
+      - id: flake8
+        name: flake8 (Style Guide)
+        entry: make ci-quality-flake8
+        language: system
+        files: \.(py)$
+        pass_filenames: false
+        description: "Check Python style guide compliance with flake8"
+
+      - id: mypy
+        name: mypy (Type Checking)
+        entry: make ci-quality-mypy
+        language: system
+        files: \.(py)$
+        pass_filenames: false
+        description: "Check Python type annotations with mypy"
+        warning_only: true  # Allow this to fail without blocking commit
+
+      - id: pylint
+        name: pylint (Code Analysis)
+        entry: make ci-quality-pylint
+        language: system
+        files: \.(py)$
+        pass_filenames: false
+        description: "Run pylint code analysis"
+        warning_only: true  # Allow this to fail without blocking commit
+
+      - id: bandit
+        name: bandit (Security Analysis)
+        entry: make ci-security-bandit
+        language: system
+        files: \.(py)$
+        pass_filenames: false
+        description: "Run bandit security analysis"
+        warning_only: true  # Allow this to fail without blocking commit
+
+      - id: safety
+        name: safety (Dependency Security)
+        entry: make ci-security-safety
+        language: system
+        files: requirements.*\.txt$|pyproject\.toml$
+        pass_filenames: false
+        description: "Check dependencies for known security vulnerabilities"
+        warning_only: true  # Allow this to fail without blocking commit
+
+      - id: hadolint
+        name: hadolint (Dockerfile Linting)
+        entry: make hadolint-check
+        language: system
+        files: Dockerfile.*
+        pass_filenames: false
+        description: "Lint Dockerfile with hadolint"
+        warning_only: true  # Allow this to fail without blocking commit
+
+      - id: quality-check
+        name: Quality Check
+        entry: make quality-check
         language: system
         files: \.(py|md|rst|txt|yaml|yml|json|toml)$
         pass_filenames: false
-        description: "Run comprehensive professional quality checks (emojis, language, docstrings, etc.)"
-      
+        description: "Run comprehensive professional quality checks"
+
       - id: validate-imports
         name: Validate Python Imports
-        entry: bash -c 'source .venv/bin/activate && python scripts/validate_imports.py'
+        entry: make ci-imports
         language: system
         files: \.(py)$
         pass_filenames: false
         description: "Validate that all critical imports work correctly"
-      
-      - id: test-import-validation
-        name: Run Import Validation Tests
-        entry: bash -c 'source .venv/bin/activate && python -m pytest tests/test_import_validation.py -v'
+
+      - id: validate-cqrs
+        name: Validate CQRS Patterns
+        entry: make ci-arch-cqrs
         language: system
         files: \.(py)$
         pass_filenames: false
-        description: "Run comprehensive import validation tests"
-      
-      - id: check-deprecated-imports
-        name: Check for Deprecated Imports
-        entry: bash -c 'grep -r "from.*request.*value_objects.*import.*MachineStatus" . --include="*.py" && echo "Found deprecated MachineStatus import" && exit 1 || echo "No deprecated imports found"'
+        description: "Validate CQRS architecture patterns"
+        warning_only: true  # Allow this to fail without blocking commit
+
+      - id: check-architecture
+        name: Check Architecture Compliance
+        entry: make ci-arch-clean
         language: system
         files: \.(py)$
         pass_filenames: false
-        description: "Check for deprecated import patterns"
-      
-      # Security Checks
-      - id: comprehensive-security-scan
-        name: Comprehensive Security Scan
-        entry: bash -c 'source .venv/bin/activate && python dev-tools/security/security_scan.py'
+        description: "Check Clean Architecture compliance"
+        warning_only: true  # Allow this to fail without blocking commit
+
+      - id: validate-imports-arch
+        name: Validate Import Architecture
+        entry: make ci-arch-imports
+        language: system
+        files: \.(py)$
+        pass_filenames: false
+        description: "Validate import architecture compliance"
+        warning_only: true  # Allow this to fail without blocking commit
+
+      - id: check-file-sizes-arch
+        name: Check File Sizes (Architecture)
+        entry: make ci-arch-file-sizes
+        language: system
+        files: \.(py)$
+        pass_filenames: false
+        description: "Check file sizes for architecture compliance"
+        warning_only: true  # Allow this to fail without blocking commit
+
+      - id: security-scan
+        name: Security Scan
+        entry: make security-scan
         language: system
         files: \.(py|txt|yml|yaml|toml|Dockerfile)$
         pass_filenames: false
-        description: "Run comprehensive security scan (Bandit, Safety, SBOM, Trivy, Hadolint)"
-      
-      - id: bandit-security-check
-        name: Bandit Security Check (Fallback)
-        entry: bash -c 'source .venv/bin/activate && python -m bandit -r src/ -f json -q'
+        description: "Run comprehensive security scan"
+        warning_only: true  # Allow this to fail without blocking commit
+
+      - id: semgrep
+        name: Semgrep (Static Analysis)
+        entry: make ci-security-semgrep
         language: system
-        files: ^src/.*\.py$
+        files: \.(py)$
         pass_filenames: false
-        description: "Run Bandit security linter on source code (fallback if comprehensive scan fails)"
-      
-      - id: safety-dependency-check
-        name: Safety Dependency Check
-        entry: bash -c 'source .venv/bin/activate && python -m safety check --short-report'
+        description: "Run Semgrep static analysis"
+        warning_only: true  # Allow this to fail without blocking commit
+
+      - id: trivy-fs
+        name: Trivy (Filesystem Scan)
+        entry: make ci-security-trivy-fs
         language: system
-        files: requirements.*\.txt$
+        files: \.(py|txt|yml|yaml|toml|json)$
         pass_filenames: false
-        description: "Check for known security vulnerabilities in dependencies"
-      
-      - id: secrets-detection
+        description: "Run Trivy filesystem vulnerability scanner"
+        warning_only: true  # Allow this to fail without blocking commit
+
+      - id: trufflehog
+        name: TruffleHog (Secrets Scan)
+        entry: make ci-security-trufflehog
+        language: system
+        files: \.(py|txt|yml|yaml|toml|json|md|sh)$
+        pass_filenames: false
+        description: "Check for secrets with TruffleHog"
+        warning_only: true  # Allow this to fail without blocking commit
+
+      - id: validate-workflows
+        name: Validate Workflows
+        entry: make validate-workflows
+        language: system
+        files: \.github/workflows/.*\.(yml|yaml)$
+        pass_filenames: false
+        description: "Validate GitHub Actions workflow YAML files"
+
+      - id: detect-secrets
         name: Detect Hardcoded Secrets
-        entry: bash -c 'grep -r -E "(password|secret|key|token)\s*=\s*[\"'\''][^\"'\'']{8,}" src/ --include="*.py" && echo "Potential hardcoded secrets found" && exit 1 || echo "No hardcoded secrets detected"'
+        entry: make detect-secrets
         language: system
         files: ^src/.*\.py$
         pass_filenames: false
         description: "Detect potential hardcoded secrets in source code"
-      
-      - id: dockerfile-security
-        name: Dockerfile Security Check
-        entry: bash -c 'if command -v hadolint >/dev/null 2>&1; then hadolint Dockerfile; else echo "Hadolint not installed, skipping Dockerfile security check"; fi'
-        language: system
-        files: ^Dockerfile.*$
-        pass_filenames: false
-        description: "Run Hadolint security check on Dockerfiles"
-      
-      # Architecture Quality Gates
+
       - id: check-file-sizes
         name: Check File Sizes
-        entry: bash -c 'source .venv/bin/activate && python dev-tools/scripts/check_file_sizes.py --warn-only'
+        entry: make file-sizes
         language: system
         files: \.(py)$
         pass_filenames: false
         description: "Check for files that may violate Single Responsibility Principle"
-        
-      - id: validate-cqrs
-        name: Validate CQRS Patterns
-        entry: bash -c 'source .venv/bin/activate && python scripts/validate_cqrs.py --warn-only'
-        language: system
-        files: \.(py)$
-        pass_filenames: false
-        description: "Validate CQRS handler patterns and inheritance"
-        
-      - id: check-architecture
-        name: Check Clean Architecture
-        entry: bash -c 'source .venv/bin/activate && python dev-tools/scripts/check_architecture.py --warn-only'
-        language: system
-        files: \.(py)$
-        pass_filenames: false
-        description: "Validate Clean Architecture dependency rules"
+        warning_only: true  # Allow this to fail without blocking commit

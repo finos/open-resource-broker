@@ -69,7 +69,7 @@ async def _run_stdio_server(mcp_server: OpenHFPluginMCPServer):
                 response = await mcp_server.handle_message(line)
 
                 # Write response to stdout
-                print(response, flush=True)
+                print(response, flush=True)  # noqa: MCP protocol output
 
             except KeyboardInterrupt:
                 logger.info("MCP server interrupted by user")
@@ -81,7 +81,7 @@ async def _run_stdio_server(mcp_server: OpenHFPluginMCPServer):
                     "jsonrpc": "2.0",
                     "error": {"code": -32603, "message": f"Server error: {str(e)}"},
                 }
-                print(error_response, flush=True)
+                print(error_response, flush=True)  # noqa: MCP protocol output
 
     except Exception as e:
         logger.error(f"Fatal error in stdio server: {e}")

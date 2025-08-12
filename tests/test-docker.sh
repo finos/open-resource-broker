@@ -39,21 +39,21 @@ TEST_PORT="8004"
 # Cleanup function
 cleanup() {
     log_info "Cleaning up test resources..."
-    
+
     # Stop and remove container
     if docker ps -q -f name="${CONTAINER_NAME}" | grep -q .; then
         docker stop "${CONTAINER_NAME}" >/dev/null 2>&1 || true
     fi
-    
+
     if docker ps -aq -f name="${CONTAINER_NAME}" | grep -q .; then
         docker rm "${CONTAINER_NAME}" >/dev/null 2>&1 || true
     fi
-    
+
     # Remove test image
     if docker images -q "${TEST_IMAGE_NAME}" | grep -q .; then
         docker rmi "${TEST_IMAGE_NAME}" >/dev/null 2>&1 || true
     fi
-    
+
     log_info "Cleanup complete"
 }
 
@@ -63,39 +63,39 @@ trap cleanup EXIT
 # Check prerequisites
 check_prerequisites() {
     log_info "Checking prerequisites..."
-    
+
     # Check Docker
     if ! command -v docker &> /dev/null; then
         log_error "Docker is not installed or not in PATH"
         exit 1
     fi
-    
+
     # Check Docker daemon
     if ! docker info >/dev/null 2>&1; then
         log_error "Docker daemon is not running"
         exit 1
     fi
-    
+
     # Check Docker Compose
     if ! command -v docker-compose &> /dev/null; then
         log_warn "Docker Compose not available - some tests will be skipped"
     fi
-    
+
     # Check pytest
     if ! command -v pytest &> /dev/null; then
         log_error "pytest is not installed"
         exit 1
     fi
-    
+
     log_info "Prerequisites check passed"
 }
 
 # Build test image
 build_test_image() {
     log_info "Building test Docker image..."
-    
+
     cd "${PROJECT_ROOT}"
-    
+
     docker build \
         -t "${TEST_IMAGE_NAME}" \
         --build-arg BUILD_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
@@ -105,58 +105,58 @@ build_test_image() {
         log_error "Docker build failed"
         exit 1
     }
-    
+
     log_info "Test image built successfully"
 }
 
 # Test Docker build
 test_docker_build() {
     log_info "Testing Docker build process..."
-    
+
     # Test that image was created
     if ! docker images -q "${TEST_IMAGE_NAME}" | grep -q .; then
         log_error "Test image not found"
         return 1
     fi
-    
+
     # Test image labels
     local labels
     labels=$(docker inspect "${TEST_IMAGE_NAME}" --format '{{json .Config.Labels}}')
-    
+
     if ! echo "${labels}" | grep -q "org.opencontainers.image.title"; then
         log_error "Image missing required labels"
         return 1
     fi
-    
+
     log_info "Docker build tests passed"
 }
 
 # Test container startup
 test_container_startup() {
     log_info "Testing container startup..."
-    
+
     # Test version command
     local version_output
     version_output=$(docker run --rm "${TEST_IMAGE_NAME}" version 2>&1)
-    
+
     if [[ $? -ne 0 ]]; then
         log_error "Container version command failed"
         log_error "Output: ${version_output}"
         return 1
     fi
-    
+
     if ! echo "${version_output}" | grep -q "Open Host Factory Plugin REST API"; then
         log_error "Version output doesn't contain expected text"
         return 1
     fi
-    
+
     log_info "Container startup tests passed"
 }
 
 # Test environment configuration
 test_environment_configuration() {
     log_info "Testing environment configuration..."
-    
+
     # Test with various environment variables
     local env_test_output
     env_test_output=$(docker run --rm \
@@ -168,20 +168,20 @@ test_environment_configuration() {
         -e HF_PROVIDER_AWS_REGION=us-west-2 \
         -e HF_DEBUG=true \
         "${TEST_IMAGE_NAME}" version 2>&1)
-    
+
     if [[ $? -ne 0 ]]; then
         log_error "Environment configuration test failed"
         log_error "Output: ${env_test_output}"
         return 1
     fi
-    
+
     log_info "Environment configuration tests passed"
 }
 
 # Test server functionality
 test_server_functionality() {
     log_info "Testing server functionality..."
-    
+
     # Start container in background
     local container_id
     container_id=$(docker run -d \
@@ -191,68 +191,68 @@ test_server_functionality() {
         -e HF_AUTH_ENABLED=false \
         -e HF_LOGGING_LEVEL=DEBUG \
         "${TEST_IMAGE_NAME}" serve)
-    
+
     if [[ $? -ne 0 ]]; then
         log_error "Failed to start container"
         return 1
     fi
-    
+
     # Wait for container to start
     log_info "Waiting for server to start..."
     sleep 10
-    
+
     # Check if container is still running
     if ! docker ps -q -f id="${container_id}" | grep -q .; then
         log_error "Container stopped unexpectedly"
         docker logs "${container_id}"
         return 1
     fi
-    
+
     # Try to connect (may fail due to missing dependencies, but container should be running)
     local health_check_result=0
     curl -f "http://localhost:${TEST_PORT}/health" >/dev/null 2>&1 || health_check_result=$?
-    
+
     if [[ ${health_check_result} -eq 0 ]]; then
         log_info "Health check successful"
     else
         log_warn "Health check failed (expected due to missing dependencies)"
         log_info "Container is running but server may not be fully functional"
     fi
-    
+
     log_info "Server functionality tests completed"
 }
 
 # Test Docker Compose
 test_docker_compose() {
     log_info "Testing Docker Compose configuration..."
-    
+
     if ! command -v docker-compose &> /dev/null; then
         log_warn "Docker Compose not available - skipping compose tests"
         return 0
     fi
-    
+
     cd "${PROJECT_ROOT}"
-    
+
     # Test compose file validation
     if ! docker-compose -f docker-compose.yml config --quiet; then
         log_error "Development Docker Compose file is invalid"
         return 1
     fi
-    
+
     if ! docker-compose -f docker-compose.prod.yml config --quiet; then
         log_error "Production Docker Compose file is invalid"
         return 1
     fi
-    
+
     log_info "Docker Compose tests passed"
 }
 
 # Run pytest Docker tests
 run_pytest_docker_tests() {
     log_info "Running pytest Docker tests..."
-    
+
     cd "${PROJECT_ROOT}"
-    
+
     # Run Docker-specific tests
     if pytest tests/docker/ -v -m docker --tb=short; then
         log_info "Pytest Docker tests passed"
@@ -265,25 +265,25 @@ run_pytest_docker_tests() {
 # Test security features
 test_security_features() {
     log_info "Testing container security features..."
-    
+
     # Test non-root user
     local user_check
     user_check=$(docker run --rm "${TEST_IMAGE_NAME}" bash -c "whoami")
-    
+
     if [[ "${user_check}" != "ohfp" ]]; then
         log_error "Container not running as ohfp user (running as: ${user_check})"
         return 1
     fi
-    
+
     # Test file permissions
     local perm_check
     perm_check=$(docker run --rm "${TEST_IMAGE_NAME}" bash -c "ls -la /app/ | grep -E '^d.*ohfp.*ohfp'")
-    
+
     if [[ -z "${perm_check}" ]]; then
         log_error "App directory not owned by ohfp user"
         return 1
     fi
-    
+
     log_info "Security tests passed"
 }
 
@@ -293,7 +293,7 @@ main() {
     log_info "Project root: ${PROJECT_ROOT}"
     log_info "Test image: ${TEST_IMAGE_NAME}"
     log_info "Test port: ${TEST_PORT}"
-    
+
     # Run test phases
     check_prerequisites
     build_test_image
@@ -304,7 +304,7 @@ main() {
     test_docker_compose
     test_security_features
     run_pytest_docker_tests
-    
+
     log_info "All Docker tests completed successfully!"
 }
 

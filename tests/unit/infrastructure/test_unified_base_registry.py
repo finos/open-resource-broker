@@ -1,4 +1,4 @@
-"""Tests for unified base registry supporting both single and multi choice patterns."""
+"""Tests for integrated base registry supporting both single and multi choice patterns."""
 
 from unittest.mock import Mock
 
@@ -19,8 +19,8 @@ from src.infrastructure.registry.storage_registry import (
 )
 
 
-class TestUnifiedBaseRegistry:
-    """Test unified base registry functionality."""
+class TestIntegratedBaseRegistry:
+    """Test integrated base registry functionality."""
 
     def setup_method(self):
         """Set up test fixtures."""
@@ -52,10 +52,14 @@ class TestUnifiedBaseRegistry:
 
         # Verify instance registration is prevented
         with pytest.raises(
-            ValueError, match="Instance registration only supported in MULTI_CHOICE mode"
+            ValueError,
+            match="Instance registration only supported in MULTI_CHOICE mode",
         ):
             registry.register_instance(
-                "json", "json-primary", self.mock_strategy_factory, self.mock_config_factory
+                "json",
+                "json-primary",
+                self.mock_strategy_factory,
+                self.mock_config_factory,
             )
 
     def test_scheduler_registry_single_choice_mode(self):

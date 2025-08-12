@@ -1,7 +1,7 @@
 """
-Infrastructure Base Resource Manager - Unified implementation foundation.
+Infrastructure Base Resource Manager - Implementation foundation.
 
-This module provides the unified base implementation for all resource managers,
+This module provides the base implementation for all resource managers,
 eliminating the confusion between multiple ResourceManager classes and providing
 a single source of truth for infrastructure resource management patterns.
 """
@@ -27,14 +27,14 @@ T = TypeVar("T")  # For provider-specific client types
 
 class BaseResourceManager(ResourceManagerPort, ABC):
     """
-    Unified base resource manager implementation.
+    Base resource manager implementation.
 
     This class eliminates the confusion between multiple ResourceManager classes
     by providing a single, well-designed base implementation that all concrete
     resource managers should inherit from.
 
     Features:
-    - Unified logging and error handling
+    - Consistent logging and error handling
     - Performance monitoring and metrics
     - Retry logic for transient failures
     - Resource lifecycle management

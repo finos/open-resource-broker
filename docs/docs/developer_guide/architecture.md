@@ -28,7 +28,7 @@ class NewFeatureCommand(BaseCommand):
 class NewFeatureHandler:
     def __init__(self, domain_service: DomainService):
         self._domain_service = domain_service
-    
+
     def handle(self, command: NewFeatureCommand):
         # Use domain services, not infrastructure directly
         return self._domain_service.execute_business_logic(command.parameter)
@@ -55,32 +55,32 @@ graph TB
         Symphony[IBM Spectrum Symphony]
         AWS[AWS Services]
     end
-    
+
     subgraph "Interface Layer"
         CLI[Command Line Interface]
         Handlers[Command Handlers]
     end
-    
+
     subgraph "Application Layer"
         AppService[Application Service]
         CommandBus[Command Bus]
         QueryBus[Query Bus]
         EventHandlers[Event Handlers]
     end
-    
+
     subgraph "Domain Layer"
         Aggregates[Domain Aggregates]
         Events[Domain Events]
         Services[Domain Services]
     end
-    
+
     subgraph "Infrastructure Layer"
         Storage[Data Storage]
         Logging[Logging]
         Config[Configuration]
         Providers[Cloud Providers]
     end
-    
+
     Symphony --> CLI
     CLI --> Handlers
     Handlers --> AppService
@@ -199,7 +199,7 @@ sequenceDiagram
     participant A as Aggregate
     participant R as Repository
     participant P as Provider
-    
+
     S->>CLI: Execute command
     CLI->>H: Parse and validate
     H->>AS: Process request
@@ -225,7 +225,7 @@ sequenceDiagram
     participant EH as Event Handler
     participant L as Logger
     participant S as Storage
-    
+
     A->>E: Generate domain event
     E->>EH: Process event
     EH->>L: Log operation

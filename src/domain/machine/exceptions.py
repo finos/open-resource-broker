@@ -27,6 +27,7 @@ class InvalidMachineStateError(MachineException):
     """Raised when attempting an invalid state transition."""
 
     def __init__(self, current_state: str, attempted_state: str):
+        """Initialize machine state transition error with states."""
         message = f"Cannot transition from {current_state} to {attempted_state}"
         super().__init__(
             message,

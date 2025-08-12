@@ -1,7 +1,7 @@
 """
 Response DTOs for application layer.
 
-This module re-exports the domain-specific DTOs to provide a unified interface
+This module re-exports the domain-specific DTOs to provide a common interface
 for the application layer. This follows the DRY principle by avoiding duplication
 of DTO definitions.
 

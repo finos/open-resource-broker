@@ -1,10 +1,10 @@
-# Configuration Management - Unified Configuration System
+# Configuration Management - Centralized Configuration System
 
 The configuration package provides a comprehensive, type-safe configuration management system with support for multiple sources, validation, and legacy compatibility.
 
 ## Architecture Overview
 
-### Unified Configuration Approach
+### Centralized Configuration Approach
 The configuration system serves as the single source of truth for all application settings:
 
 - **Type Safety**: Configuration defined using dataclasses with validation
@@ -15,8 +15,8 @@ The configuration system serves as the single source of truth for all applicatio
 
 ### Key Components
 
-#### 📁 `manager.py` - Configuration Manager
-Central configuration management with unified access patterns.
+#### `manager.py` - Configuration Manager
+Central configuration management with centralized access patterns.
 
 **Key Features:**
 - Single source of truth for all configuration
@@ -25,7 +25,7 @@ Central configuration management with unified access patterns.
 - Configuration validation and error handling
 - Legacy configuration integration
 
-#### 📁 `loader.py` - Configuration Loader
+#### `loader.py` - Configuration Loader
 Handles loading configuration from multiple sources with precedence rules.
 
 **Key Features:**
@@ -34,7 +34,7 @@ Handles loading configuration from multiple sources with precedence rules.
 - Format detection and parsing
 - Error handling and reporting
 
-#### 📁 `validator.py` - Configuration Validator
+#### `validator.py` - Configuration Validator
 Comprehensive validation system for all configuration sections.
 
 **Key Features:**
@@ -253,7 +253,7 @@ try:
     # Validate complete configuration
     config_data = load_config_from_file("config.json")
     validated_config = validate_configuration(config_data)
-    
+
 except ValidationError as e:
     print(f"Configuration validation failed: {e}")
     for error in e.errors():
@@ -321,15 +321,15 @@ def validate_aws_config(aws_config: AWSConfig) -> None:
     # Region validation
     if not aws_config.region:
         raise ValueError("AWS region is required")
-    
+
     # Retry validation
     if aws_config.max_retries < 0:
         raise ValueError("Max retries cannot be negative")
-    
+
     # Timeout validation
     if aws_config.timeout <= 0:
         raise ValueError("Timeout must be positive")
-    
+
     # Credential validation
     if aws_config.access_key_id and not aws_config.secret_access_key:
         raise ValueError("Secret access key required when access key provided")
@@ -342,15 +342,15 @@ def validate_repository_config(repo_config: RepositoryConfig) -> None:
     if repo_config.type == "json":
         if not repo_config.json.base_path:
             raise ValueError("JSON base path is required")
-        
+
         if repo_config.json.storage_type == "single_file":
             if not repo_config.json.filenames.single_file:
                 raise ValueError("Single file name is required")
-    
+
     elif repo_config.type == "sql":
         if not repo_config.sql.connection_string:
             raise ValueError("SQL connection string is required")
-    
+
     elif repo_config.type == "dynamodb":
         if not repo_config.dynamodb.table_name:
             raise ValueError("DynamoDB table name is required")
@@ -465,7 +465,7 @@ def test_configuration_loading():
         "aws": {"region": "us-east-1"},
         "logging": {"level": "INFO"}
     }
-    
+
     config = validate_configuration(config_data)
     assert config.aws.region == "us-east-1"
     assert config.logging.level == "INFO"
@@ -473,13 +473,13 @@ def test_configuration_loading():
 def test_environment_override():
     """Test environment variable override."""
     import os
-    
+
     # Set environment variable
     os.environ["HF_AWS_REGION"] = "us-west-2"
-    
+
     config = get_config_manager()
     assert config.get_aws_config().region == "us-west-2"
-    
+
     # Cleanup
     del os.environ["HF_AWS_REGION"]
 ```
@@ -490,11 +490,11 @@ def test_environment_override():
 ```python
 class ConfigurationWatcher:
     """Watch configuration files for changes."""
-    
+
     def __init__(self, config_path: str, callback: Callable):
         self._config_path = config_path
         self._callback = callback
-    
+
     def start_watching(self):
         """Start watching for configuration changes."""
         # Implementation for file system watching
@@ -505,7 +505,7 @@ class ConfigurationWatcher:
 ```python
 class EncryptedConfigurationLoader:
     """Load encrypted configuration files."""
-    
+
     def load_encrypted_config(self, config_path: str, key: str) -> Dict[str, Any]:
         """Load and decrypt configuration."""
         # Implementation for encrypted configuration

@@ -27,6 +27,7 @@ class InvalidRequestStateError(RequestException):
     """Raised when attempting an invalid request state transition."""
 
     def __init__(self, current_state: str, attempted_state: str):
+        """Initialize request state transition error with states."""
         message = f"Cannot transition request from {current_state} to {attempted_state}"
         super().__init__(
             message,

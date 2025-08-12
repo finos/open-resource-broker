@@ -49,7 +49,9 @@ class TestProviderStrategyQueries:
     def test_get_provider_capabilities_query_creation(self):
         """Test GetProviderCapabilitiesQuery creation."""
         query = GetProviderCapabilitiesQuery(
-            provider_name="aws-primary", include_performance_metrics=False, include_limitations=True
+            provider_name="aws-primary",
+            include_performance_metrics=False,
+            include_limitations=True,
         )
 
         assert query.provider_name == "aws-primary"

@@ -57,6 +57,7 @@ def register_port_adapters(container):
     # Register template configuration manager with manual factory (handles
     # optional dependencies)
     def create_template_configuration_manager(c):
+        """Create template configuration manager with dependencies."""
         # Import here to avoid circular imports
         from src.application.services.provider_capability_service import (
             ProviderCapabilityService,

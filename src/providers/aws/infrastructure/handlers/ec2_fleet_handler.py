@@ -76,7 +76,7 @@ class EC2FleetHandler(AWSHandler):
             launch_template_manager: Launch template manager for AWS-specific operations
             request_adapter: Optional request adapter for terminating instances
         """
-        # Use enhanced base class initialization - eliminates duplication
+        # Use base class initialization - eliminates duplication
         super().__init__(aws_client, logger, aws_ops, launch_template_manager, request_adapter)
 
     @handle_infrastructure_exceptions(context="ec2_fleet_creation")
@@ -221,7 +221,7 @@ class EC2FleetHandler(AWSHandler):
         launch_template_id: str,
         launch_template_version: str,
     ) -> Dict[str, Any]:
-        """Create EC2 Fleet configuration with enhanced options."""
+        """Create EC2 Fleet configuration with additional options."""
         fleet_config = {
             "LaunchTemplateConfigs": [
                 {

@@ -16,10 +16,6 @@ try:
     from src.domain.request.aggregate import Request
     from src.domain.request.value_objects import RequestStatus, RequestType
 
-    # from src.domain.request.events import (  # TODO: Verify if this exists
-    #     RequestCreatedEvent, RequestStatusChangedEvent, RequestCompletedEvent
-    # )
-
     IMPORTS_AVAILABLE = True
 except ImportError as e:
     IMPORTS_AVAILABLE = False

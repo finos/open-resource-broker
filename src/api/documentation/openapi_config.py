@@ -21,6 +21,7 @@ def configure_openapi(app: FastAPI, server_config: ServerConfig) -> None:
     """
 
     def custom_openapi():
+        """Generate custom OpenAPI schema with comprehensive documentation."""
         if app.openapi_schema:
             return app.openapi_schema
 

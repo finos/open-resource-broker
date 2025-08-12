@@ -78,7 +78,10 @@ class TestRequestBusinessRules:
         """Test that priority must be within valid range."""
         # Valid priorities (assuming 1-10 range)
         request = Request.create_new_request(
-            template_id="test-template", machine_count=1, requester_id="test-user", priority=5
+            template_id="test-template",
+            machine_count=1,
+            requester_id="test-user",
+            priority=5,
         )
         assert request.priority == 5
 
@@ -103,14 +106,20 @@ class TestRequestBusinessRules:
         """Test that timeout must be positive if specified."""
         # Valid timeout
         request = Request.create_new_request(
-            template_id="test-template", machine_count=1, requester_id="test-user", timeout=300
+            template_id="test-template",
+            machine_count=1,
+            requester_id="test-user",
+            timeout=300,
         )
         assert request.timeout == 300
 
         # Invalid timeout
         with pytest.raises(RequestValidationError):
             Request.create_new_request(
-                template_id="test-template", machine_count=1, requester_id="test-user", timeout=-1
+                template_id="test-template",
+                machine_count=1,
+                requester_id="test-user",
+                timeout=-1,
             )
 
     def test_return_request_must_have_machine_ids(self):
@@ -125,7 +134,8 @@ class TestRequestBusinessRules:
         """Test that return request machine IDs must be valid."""
         # Valid machine IDs
         request = Request.create_return_request(
-            machine_ids=["i-1234567890abcdef0", "i-abcdef1234567890"], requester_id="test-user"
+            machine_ids=["i-1234567890abcdef0", "i-abcdef1234567890"],
+            requester_id="test-user",
         )
         assert len(request.machine_ids) == 2
 
@@ -600,7 +610,8 @@ class TestBusinessRuleEnforcement:
 
         with pytest.raises((RequestValidationError, InvalidRequestStateError)):
             request.complete_successfully(
-                machine_ids=[], completion_message="Invalid completion"  # Empty machine IDs
+                machine_ids=[],
+                completion_message="Invalid completion",  # Empty machine IDs
             )
 
     def test_validation_happens_at_aggregate_boundaries(self):

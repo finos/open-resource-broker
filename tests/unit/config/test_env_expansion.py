@@ -48,9 +48,15 @@ class TestEnvironmentVariableExpansion:
     def test_expand_nested_dict_values(self):
         """Test expansion of environment variables in nested dictionary values."""
         with patch.dict(os.environ, {"TEST_VAR": "/test/path"}):
-            config = {"scheduler": {"config_root": "$TEST_VAR/configs"}, "other": "value"}
+            config = {
+                "scheduler": {"config_root": "$TEST_VAR/configs"},
+                "other": "value",
+            }
             result = expand_env_vars(config)
-            assert result == {"scheduler": {"config_root": "/test/path/configs"}, "other": "value"}
+            assert result == {
+                "scheduler": {"config_root": "/test/path/configs"},
+                "other": "value",
+            }
 
     def test_expand_list_values(self):
         """Test expansion of environment variables in list values."""
@@ -69,7 +75,10 @@ class TestEnvironmentVariableExpansion:
         """Test the main configuration expansion function."""
         with patch.dict(os.environ, {"HF_PROVIDER_CONFDIR": "/opt/hostfactory"}):
             config = {
-                "scheduler": {"type": "hostfactory", "config_root": "$HF_PROVIDER_CONFDIR/configs"},
+                "scheduler": {
+                    "type": "hostfactory",
+                    "config_root": "$HF_PROVIDER_CONFDIR/configs",
+                },
                 "template": {"templates_file_name": "awsprov_templates.json"},
             }
             result = expand_config_env_vars(config)

@@ -14,7 +14,7 @@ This guide covers the configuration-driven provider strategy system implemented 
 
 ## Overview
 
-The configuration-driven provider strategy system enables declarative management of cloud providers through unified configuration files. The system supports three operational modes:
+The configuration-driven provider strategy system enables declarative management of cloud providers through consolidated configuration files. The system supports three operational modes:
 
 - **Single Provider Mode**: One active provider with simple configuration
 - **Multi-Provider Mode**: Multiple providers with load balancing and failover
@@ -22,9 +22,9 @@ The configuration-driven provider strategy system enables declarative management
 
 ## Configuration Formats
 
-### Unified Configuration Format (Recommended)
+### Consolidated Configuration Format (Recommended)
 
-The unified configuration format provides comprehensive provider management:
+The consolidated configuration format provides comprehensive provider management:
 
 ```json
 {
@@ -238,7 +238,7 @@ Activated when:
 
 Automatically activated when:
 - Old configuration format is detected
-- No unified provider configuration is available
+- No consolidated provider configuration is available
 - Backward compatibility is required
 
 **Characteristics:**
@@ -350,7 +350,7 @@ python run.py getProviderHealth
 python run.py listAvailableProviders
 ```
 
-### Template Operations (Enhanced)
+### Template Operations
 
 ```bash
 # Get available templates (now with provider strategy support)
@@ -371,7 +371,7 @@ python run.py requestMachines --data '{
 
 ### Migrating from Legacy Configuration
 
-#### Step 1: Backup Current Configuration
+#### Backup Current Configuration
 
 ```bash
 # Create backup of current configuration
@@ -379,17 +379,17 @@ cp config/awsprov_config.json config/awsprov_config.json.backup
 cp config/awsprov_templates.json config/awsprov_templates.json.backup
 ```
 
-#### Step 2: Run Migration Tool
+#### Run Migration Tool
 
 ```bash
-# Migrate to unified format with backup
+# Migrate to consolidated format with backup
 python run.py migrateProviderConfig --data '{
   "save_to_file": true,
   "backup_original": true
 }'
 ```
 
-#### Step 3: Validate Migrated Configuration
+#### Validate Migrated Configuration
 
 ```bash
 # Validate the migrated configuration
@@ -400,7 +400,7 @@ python run.py getProviderConfig
 python run.py getAvailableTemplates
 ```
 
-#### Step 4: Update Deployment Scripts
+#### Update Deployment Scripts
 
 Update your deployment scripts to use the new configuration format:
 
@@ -431,7 +431,7 @@ export HF_PROVIDER_HEALTH_CHECK_INTERVAL=30
 }
 ```
 
-**After (Unified):**
+**After (Consolidated):**
 ```json
 {
   "provider": {

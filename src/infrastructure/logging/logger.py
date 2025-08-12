@@ -32,7 +32,7 @@ class JsonFormatter(logging.Formatter):
         except Exception as e:
             # Can't use logger here to avoid recursion
             # Just use full path and continue
-            print(
+            print(  # noqa: logging bootstrap
                 f"Warning: Error formatting log path: {e}"
             )  # Simple console output for logging system errors
 
@@ -69,6 +69,7 @@ class ContextLogger(logging.Logger):
     """Logger that supports context information."""
 
     def __init__(self, name: str, level: int = logging.NOTSET) -> None:
+        """Initialize context logger with name and level."""
         super().__init__(name, level)
         self._context: Dict[str, Any] = {}
 

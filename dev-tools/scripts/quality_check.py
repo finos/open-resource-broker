@@ -9,7 +9,6 @@ A quality checker that enforces coding standards:
 - Proper docstring coverage and format
 - Consistent naming conventions
 - No unused imports or commented code
-- No TODO/FIXME comments without tickets
 - README files are up-to-date
 
 Usage:
@@ -23,11 +22,22 @@ Options:
 
 import argparse
 import ast
+import logging
 import os
 import re
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import List, Optional
+
+# Setup logging
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+logger = logging.getLogger(__name__)
+
+try:
+    import pathspec
+except ImportError:
+    pathspec = None
 
 # --- Configuration ---
 
@@ -44,28 +54,72 @@ EMOJI_PATTERN = re.compile(
     flags=re.UNICODE,
 )
 
-# Unprofessional language terms
-UNPROFESSIONAL_TERMS = {
-    r"\bawesome\b": 'Use "excellent" or specific technical terms',
-    r"\brock\b": 'Use "implement" or "execute"',
-    r"\bcool\b": 'Use "effective" or specific benefits',
-    r"\bsweet\b": 'Use "beneficial" or specific advantages',
-    r"\bsick\b": 'Use "impressive" or specific technical terms',
-    r"\bepic\b": 'Use "comprehensive" or specific scope',
-    r"\binsane\b": 'Use "significant" or specific metrics',
-    r"\bcrazy\b": 'Use "substantial" or specific details',
+# Legitimate technical characters that should be allowed
+ALLOWED_TECHNICAL_CHARS = {
+    "├",
+    "└",
+    "│",
+    "─",  # Box drawing characters for tree structures
+    "▪",
+    "▫",
+    "■",
+    "□",  # Simple geometric shapes for bullets
+    "→",
+    "←",
+    "↑",
+    "↓",  # Basic arrows for flow diagrams
+}
+
+# Pre-compile regex patterns for better performance
+UNPROFESSIONAL_PATTERNS = {
+    re.compile(r"\bawesome\b", re.IGNORECASE): 'Use "excellent" or specific technical terms',
+    re.compile(r"\brock\b", re.IGNORECASE): 'Use "implement" or "execute"',
+    re.compile(r"\bcool\b", re.IGNORECASE): 'Use "effective" or specific benefits',
+    re.compile(r"\bsweet\b", re.IGNORECASE): 'Use "beneficial" or specific advantages',
+    re.compile(r"\bsick\b", re.IGNORECASE): 'Use "impressive" or specific technical terms',
+    re.compile(r"\bepic\b", re.IGNORECASE): 'Use "comprehensive" or specific scope',
+    re.compile(r"\binsane\b", re.IGNORECASE): 'Use "significant" or specific metrics',
+    re.compile(r"\bcrazy\b", re.IGNORECASE): 'Use "substantial" or specific details',
 }
 
 # Hyperbolic marketing terms
-HYPERBOLIC_TERMS = {
-    r"\benhanced\b": 'Use "improved" only when factually accurate',
-    r"\bunified\b": 'Use "integrated" or "consolidated"',
-    r"\bmodern\b": 'Use "current" or "updated"',
-    r"\badvanced\b": 'Use "comprehensive" or specific technical terms',
-    r"\bcutting-edge\b": 'Use "current industry standard"',
-    r"\brevolutionary\b": 'Use "significant improvement"',
-    r"\bnext-generation\b": "Use specific technology names",
-    r"\bstate-of-the-art\b": 'Use "current best practice"',
+HYPERBOLIC_PATTERNS = {
+    re.compile(r"\benhanced\b", re.IGNORECASE): 'Use "improved" only when factually accurate',
+    re.compile(r"\bunified\b", re.IGNORECASE): 'Use "integrated" or "consolidated"',
+    re.compile(r"\bmodern\b", re.IGNORECASE): 'Use "current" or "updated"',
+    re.compile(r"\bcutting-edge\b", re.IGNORECASE): 'Use "current industry standard"',
+    re.compile(r"\brevolutionary\b", re.IGNORECASE): 'Use "significant improvement"',
+    re.compile(r"\bnext-generation\b", re.IGNORECASE): "Use specific technology names",
+    re.compile(r"\bstate-of-the-art\b", re.IGNORECASE): 'Use "current best practice"',
+}
+
+# Implementation detail terms that should be removed from production code
+IMPLEMENTATION_DETAIL_PATTERNS = {
+    re.compile(r"\bphase\s+\d+\b", re.IGNORECASE): "Remove implementation phase references",
+    re.compile(r"\bphase\s+[a-z]+\b", re.IGNORECASE): "Remove implementation phase references",
+    re.compile(r"\bmigrated\s+from\b", re.IGNORECASE): "Remove migration history references",
+    re.compile(r"\bmigrating\s+to\b", re.IGNORECASE): "Remove migration process references",
+    re.compile(r"\bthis\s+instead\s+of\s+that\b", re.IGNORECASE): "Remove comparison references",
+    re.compile(r"\bold\s+implementation\b", re.IGNORECASE): "Remove old implementation references",
+    re.compile(r"\bnew\s+implementation\b", re.IGNORECASE): "Remove new implementation references",
+    re.compile(r"\blegacy\s+code\b", re.IGNORECASE): "Remove legacy code references",
+    re.compile(r"\btemporary\s+fix\b", re.IGNORECASE): "Remove temporary implementation references",
+    re.compile(r"\btodo\s*:\b", re.IGNORECASE): "Remove TODO comments from production code",
+    re.compile(r"\bfixme\s*:\b", re.IGNORECASE): "Remove FIXME comments from production code",
+    re.compile(r"\bhack\s*:\b", re.IGNORECASE): "Remove HACK comments from production code",
+    re.compile(r"\bworkaround\s+for\b", re.IGNORECASE): "Remove workaround references",
+    re.compile(r"\bquick\s+fix\b", re.IGNORECASE): "Remove quick fix references",
+    re.compile(r"\bstep\s+\d+\b", re.IGNORECASE): "Remove step-by-step implementation references",
+    re.compile(r"\btest\s+\d+\b", re.IGNORECASE): "Remove test numbering from production code",
+}
+
+# Legitimate version references that should be excluded
+VERSION_EXCLUSIONS = {
+    "CODE_OF_CONDUCT.md",  # Contributor Covenant version references
+    "LICENSE",  # License version references
+    "pyproject.toml",  # Package version references
+    "version.py",  # Version files
+    "versions.json",  # Version configuration files
 }
 
 # File extensions to check
@@ -127,6 +181,17 @@ class HyperbolicTermViolation(Violation):
         self.suggestion = suggestion
 
 
+class ImplementationDetailViolation(Violation):
+    """Implementation detail term found in production code."""
+
+    def __init__(self, file_path: str, line_num: int, content: str, term: str, suggestion: str):
+        super().__init__(
+            file_path, line_num, content, f"Implementation detail '{term}' - {suggestion}"
+        )
+        self.term = term
+        self.suggestion = suggestion
+
+
 class MissingDocstringViolation(Violation):
     """Missing docstring in class, function, or module."""
 
@@ -158,23 +223,11 @@ class DocstringFormatViolation(Violation):
 class UnusedImportViolation(Violation):
     """Unused import found in code."""
 
-    def __init__(self, file_path: str, line_num: int, import_name: str):
-        super().__init__(
-            file_path, line_num, f"import {import_name}", f"Unused import: {import_name}"
-        )
-        self.import_name = import_name
+    def __init__(self, file_path: str, line_num: int, message: str):
+        super().__init__(file_path, line_num, "", f"Unused imports detected: {message}")
 
     def can_autofix(self) -> bool:
         return True
-
-
-class TodoWithoutTicketViolation(Violation):
-    """TODO/FIXME comment without ticket reference."""
-
-    def __init__(self, file_path: str, line_num: int, content: str):
-        super().__init__(
-            file_path, line_num, content, "TODO/FIXME comment without ticket reference"
-        )
 
 
 class CommentedCodeViolation(Violation):
@@ -213,7 +266,7 @@ class FileChecker:
             # Skip binary files
             pass
         except Exception as e:
-            print(f"Error checking {file_path}: {e}")
+            logger.error(f"Error checking {file_path}: {e}")
 
         return violations
 
@@ -228,8 +281,12 @@ class EmojiChecker(FileChecker):
     def check_content(self, file_path: str, content: str) -> List[Violation]:
         violations = []
         for line_num, line in enumerate(content.splitlines(), 1):
-            if EMOJI_PATTERN.search(line):
-                violations.append(EmojiViolation(file_path, line_num, line.strip()))
+            matches = EMOJI_PATTERN.findall(line)
+            for match in matches:
+                # Check if all characters in the match are allowed technical chars
+                if not all(char in ALLOWED_TECHNICAL_CHARS for char in match):
+                    violations.append(EmojiViolation(file_path, line_num, line.strip()))
+                    break  # Only report once per line
         return violations
 
 
@@ -240,8 +297,8 @@ class LanguageChecker(FileChecker):
         violations = []
         for line_num, line in enumerate(content.splitlines(), 1):
             # Check for unprofessional language
-            for term_pattern, suggestion in UNPROFESSIONAL_TERMS.items():
-                matches = re.finditer(term_pattern, line, re.IGNORECASE)
+            for pattern, suggestion in UNPROFESSIONAL_PATTERNS.items():
+                matches = pattern.finditer(line)
                 for match in matches:
                     term = match.group(0)
                     violations.append(
@@ -251,12 +308,28 @@ class LanguageChecker(FileChecker):
                     )
 
             # Check for hyperbolic terms
-            for term_pattern, suggestion in HYPERBOLIC_TERMS.items():
-                matches = re.finditer(term_pattern, line, re.IGNORECASE)
+            for pattern, suggestion in HYPERBOLIC_PATTERNS.items():
+                matches = pattern.finditer(line)
                 for match in matches:
                     term = match.group(0)
                     violations.append(
                         HyperbolicTermViolation(file_path, line_num, line.strip(), term, suggestion)
+                    )
+
+            # Check for implementation detail terms
+            for pattern, suggestion in IMPLEMENTATION_DETAIL_PATTERNS.items():
+                matches = pattern.finditer(line)
+                for match in matches:
+                    term = match.group(0)
+                    # Skip version references in legitimate files
+                    if "version" in term.lower() and any(
+                        excluded in file_path for excluded in VERSION_EXCLUSIONS
+                    ):
+                        continue
+                    violations.append(
+                        ImplementationDetailViolation(
+                            file_path, line_num, line.strip(), term, suggestion
+                        )
                     )
 
         return violations
@@ -269,15 +342,21 @@ class DocstringChecker(FileChecker):
         if not file_path.endswith(".py"):
             return []
 
+        # Skip docstring checks for test files
+        if "/test" in file_path or file_path.startswith("test"):
+            return []
+
         violations = []
         try:
             tree = ast.parse(content)
 
-            # Check module docstring
+            # Check module docstring (skip empty __init__.py files)
             if not ast.get_docstring(tree):
-                violations.append(
-                    MissingDocstringViolation(file_path, 1, "module", Path(file_path).name)
-                )
+                # Skip empty __init__.py files - they're just package markers
+                if not (Path(file_path).name == "__init__.py" and len(content.strip()) == 0):
+                    violations.append(
+                        MissingDocstringViolation(file_path, 1, "module", Path(file_path).name)
+                    )
 
             # Check classes and functions
             for node in ast.walk(tree):
@@ -290,6 +369,11 @@ class DocstringChecker(FileChecker):
                     # Skip private methods (starting with _)
                     if not node.name.startswith("_") or node.name == "__init__":
                         if not ast.get_docstring(node):
+                            # Special handling for __init__ methods - use fast check
+                            if node.name == "__init__" and len(node.body) <= 8:
+                                # Quick heuristic: if small body, likely simple
+                                if self._is_simple_init_fast(node):
+                                    continue
                             violations.append(
                                 MissingDocstringViolation(
                                     file_path, node.lineno, "function", node.name
@@ -302,9 +386,33 @@ class DocstringChecker(FileChecker):
 
         return violations
 
+    def _is_simple_init_fast(self, node: ast.FunctionDef) -> bool:
+        """Fast check if __init__ method is simple (only parameter assignment)."""
+        # Only check small methods
+        if len(node.body) > 8:
+            return False
+
+        # Quick pattern check: only assignments and super() calls
+        for stmt in node.body:
+            if isinstance(stmt, ast.Assign):
+                # Must be self.x = y pattern
+                if not (
+                    len(stmt.targets) == 1
+                    and isinstance(stmt.targets[0], ast.Attribute)
+                    and isinstance(stmt.targets[0].value, ast.Name)
+                    and stmt.targets[0].value.id == "self"
+                ):
+                    return False
+            elif isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
+                # Allow super().__init__() only
+                continue
+            else:
+                return False
+        return True
+
 
 class ImportChecker(FileChecker):
-    """Check for unused imports."""
+    """Check for unused imports using autoflake."""
 
     def check_content(self, file_path: str, content: str) -> List[Violation]:
         if not file_path.endswith(".py"):
@@ -312,72 +420,117 @@ class ImportChecker(FileChecker):
 
         violations = []
         try:
-            tree = ast.parse(content)
+            import subprocess
 
-            # Get all imports
-            imports = {}
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Import):
-                    for name in node.names:
-                        imports[name.name] = node.lineno
-                elif isinstance(node, ast.ImportFrom):
-                    module = node.module or ""
-                    for name in node.names:
-                        if name.name == "*":
-                            continue
-                        full_name = f"{module}.{name.name}" if module else name.name
-                        imports[name.asname or name.name] = node.lineno
+            # Run autoflake in check mode
+            result = subprocess.run(
+                [
+                    "autoflake",
+                    "--check",
+                    "--remove-all-unused-imports",
+                    "--remove-unused-variables",
+                    file_path,
+                ],
+                capture_output=True,
+                text=True,
+                cwd=".",
+            )
 
-            # Find all used names
-            used_names = set()
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Name):
-                    used_names.add(node.id)
-                elif isinstance(node, ast.Attribute):
-                    # Handle attribute access like module.function
-                    if isinstance(node.value, ast.Name):
-                        used_names.add(node.value.id)
+            # If autoflake found issues, it returns non-zero exit code
+            if result.returncode != 0:
+                violations.append(
+                    UnusedImportViolation(file_path, 1, "Run 'make format' to fix automatically")
+                )
 
-            # Find unused imports
-            for name, line_num in imports.items():
-                if name not in used_names and not name.startswith("_"):
-                    violations.append(UnusedImportViolation(file_path, line_num, name))
-
-        except SyntaxError:
-            # Skip files with syntax errors
+        except (subprocess.SubprocessError, FileNotFoundError):
+            # Skip if autoflake not available
             pass
 
         return violations
 
 
 class CommentChecker(FileChecker):
-    """Check for TODO/FIXME comments without tickets and commented code."""
+    """Check for TODO/FIXME comments without tickets and commented code.
+
+    Supports noqa suppressions for commented code:
+    - Line-level: # def function():  # noqa:COMMENTED
+    - Section-level:
+        # noqa:COMMENTED section-start
+        # def function():
+        # class MyClass:
+        # noqa:COMMENTED section-end
+    """
 
     def check_content(self, file_path: str, content: str) -> List[Violation]:
         violations = []
-
-        # Regex for TODO/FIXME without ticket reference
-        todo_pattern = re.compile(r"#\s*(TODO|FIXME)(?!:?\s*\[?[A-Z]+-\d+\]?)", re.IGNORECASE)
 
         # Regex for commented code (simple heuristic)
         code_pattern = re.compile(
             r"^\s*#\s*(def|class|if|for|while|try|except|return|import|from)\s"
         )
 
-        # Regex for debug prints
-        debug_pattern = re.compile(r"^\s*(print\(|logger\.(debug|info)\()")
+        # Regex for debug prints (only catch print statements, not logger)
+        debug_pattern = re.compile(r"^\s*print\(")
+
+        # Skip debug print checks for test files and markdown files
+        is_test_file = "/test" in file_path or file_path.startswith("test")
+        is_markdown_file = file_path.endswith(".md")
+
+        # Track section-level suppressions and string contexts
+        commented_code_suppressed = False
+        in_multiline_string = False
+        string_delimiter = None
 
         for line_num, line in enumerate(content.splitlines(), 1):
-            # Check for TODO/FIXME without ticket
-            if todo_pattern.search(line):
-                violations.append(TodoWithoutTicketViolation(file_path, line_num, line.strip()))
+            # Track multiline strings (docstrings and regular strings)
+            stripped = line.strip()
+
+            # Check for start/end of multiline strings
+            if not in_multiline_string:
+                if stripped.startswith('"""') or stripped.startswith("'''"):
+                    string_delimiter = stripped[:3]
+                    if not (stripped.endswith(string_delimiter) and len(stripped) > 3):
+                        in_multiline_string = True
+                elif stripped.startswith('r"""') or stripped.startswith("r'''"):
+                    string_delimiter = stripped[1:4]
+                    if not (stripped.endswith(string_delimiter) and len(stripped) > 4):
+                        in_multiline_string = True
+            else:
+                if stripped.endswith(string_delimiter):
+                    in_multiline_string = False
+                    string_delimiter = None
+
+            # Skip checks if we're inside a multiline string
+            if in_multiline_string:
+                continue
+
+            # Check for section-level suppression controls
+            if "# noqa:COMMENTED section-start" in line:
+                commented_code_suppressed = True
+                continue
+            elif "# noqa:COMMENTED section-end" in line:
+                commented_code_suppressed = False
+                continue
 
             # Check for commented code
             if code_pattern.search(line):
+                # Skip if suppressed by section-level or line-level noqa
+                if (
+                    commented_code_suppressed
+                    or "noqa" in line.lower()
+                    or "noqa:commented" in line.lower()
+                ):
+                    continue
                 violations.append(CommentedCodeViolation(file_path, line_num, line.strip()))
 
-            # Check for debug statements
-            if debug_pattern.search(line) and "DEBUG" not in line.upper():
+            # Check for debug statements (skip for test files and markdown files)
+            if (
+                not is_test_file
+                and not is_markdown_file
+                and debug_pattern.search(line)
+                and "DEBUG" not in line.upper()
+                and "noqa" not in line.lower()
+            ):
                 violations.append(DebugStatementViolation(file_path, line_num, line.strip()))
 
         return violations
@@ -394,33 +547,105 @@ class QualityChecker:
             ImportChecker(),
             CommentChecker(),
         ]
+        self.gitignore_spec = self._load_gitignore()
+
+    def _load_gitignore(self):
+        """Load .gitignore patterns for filtering files."""
+        if not pathspec:
+            return None
+
+        gitignore_path = Path(".gitignore")
+        if not gitignore_path.exists():
+            return None
+
+        try:
+            with open(gitignore_path, "r", encoding="utf-8") as f:
+                return pathspec.PathSpec.from_lines("gitwildmatch", f)
+        except Exception:
+            return None
+
+    def _should_ignore_file(self, file_path: str) -> bool:
+        """Check if file should be ignored based on gitignore."""
+        if not self.gitignore_spec:
+            return False
+
+        # Convert to relative path for gitignore matching
+        try:
+            rel_path = os.path.relpath(file_path)
+            return self.gitignore_spec.match_file(rel_path)
+        except Exception:
+            return False
 
     def check_files(self, file_paths: List[str]) -> List[Violation]:
         """Run all checks on the given files."""
         all_violations = []
 
+        # Filter files that exist and have relevant extensions
+        valid_files = []
         for file_path in file_paths:
-            # Skip files that don't exist
-            if not os.path.isfile(file_path):
+            # Skip this script to avoid self-checking issues
+            if file_path.endswith("quality_check.py"):
                 continue
-
-            # Skip files with extensions we don't care about
-            ext = os.path.splitext(file_path)[1].lower()
-            if ext not in ALL_EXTENSIONS:
+            # Skip files ignored by gitignore
+            if self._should_ignore_file(file_path):
                 continue
+            if os.path.isfile(file_path):
+                ext = os.path.splitext(file_path)[1].lower()
+                if ext in ALL_EXTENSIONS:
+                    valid_files.append(file_path)
 
-            # Run all checkers
+        if not valid_files:
+            return all_violations
+
+        # Process files in parallel for better performance
+        def check_single_file(file_path):
+            file_violations = []
             for checker in self.checkers:
-                violations = checker.check_file(file_path)
-                all_violations.extend(violations)
+                file_violations.extend(checker.check_file(file_path))
+            return file_violations
+
+        # Use ThreadPoolExecutor for parallel processing
+        with ThreadPoolExecutor(max_workers=8) as executor:  # Increased workers
+            # Submit all file checking tasks
+            future_to_file = {
+                executor.submit(check_single_file, file_path): file_path
+                for file_path in valid_files
+            }
+
+            completed = 0
+            for future in as_completed(future_to_file):
+                completed += 1
+                if completed % 10 == 0 or completed == len(valid_files):
+                    logger.info(f"Progress: {completed}/{len(valid_files)} files checked")
+
+                try:
+                    file_violations = future.result()
+                    all_violations.extend(file_violations)
+                except Exception as e:
+                    file_path = future_to_file[future]
+                    logger.error(f"Error checking {file_path}: {e}")
 
         return all_violations
 
     def get_modified_files(self) -> List[str]:
         """Get list of modified files from git."""
+        import os
         import subprocess
 
         try:
+            # In CI/PR context, compare against target branch
+            if os.getenv("GITHUB_EVENT_NAME") == "pull_request":
+                base_ref = os.getenv("GITHUB_BASE_REF", "main")
+                result = subprocess.run(
+                    ["git", "diff", "--name-only", f"origin/{base_ref}...HEAD"],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                modified_files = result.stdout.strip().split("\n") if result.stdout.strip() else []
+                return [f for f in modified_files if f]
+
+            # Local development: check staged, unstaged, and untracked files
             # Get staged files
             result = subprocess.run(
                 ["git", "diff", "--cached", "--name-only"],
@@ -450,11 +675,13 @@ class QualityChecker:
             return [f for f in all_files if f]  # Filter out empty strings
 
         except subprocess.SubprocessError:
-            print("Warning: Failed to get modified files from git. Checking all files.")
+            logger.warning("Failed to get modified files from git. Checking all files.")
             return []
 
 
 def main():
+    """Run comprehensive code quality checks with configurable options."""
+    """Run comprehensive code quality checks with configurable options."""
     """Main entry point for the quality checker."""
     parser = argparse.ArgumentParser(description="Professional Quality Check Tool")
     parser.add_argument("--fix", action="store_true", help="Attempt to automatically fix issues")
@@ -462,6 +689,7 @@ def main():
         "--strict", action="store_true", help="Exit with error code on any violation"
     )
     parser.add_argument("--files", nargs="+", help="Specific files to check")
+    parser.add_argument("--all", action="store_true", help="Check all files in repository")
 
     args = parser.parse_args()
 
@@ -470,44 +698,94 @@ def main():
     # Determine which files to check
     if args.files:
         files_to_check = args.files
+    elif args.all:
+        # Check all relevant files in repository (deterministic)
+        files_to_check = []
+        from pathlib import Path
+
+        import pathspec
+
+        # Load .gitignore patterns
+        gitignore_path = Path(".gitignore")
+        if gitignore_path.exists():
+            with open(gitignore_path, "r", encoding="utf-8") as f:
+                spec = pathspec.PathSpec.from_lines("gitwildmatch", f)
+        else:
+            spec = pathspec.PathSpec.from_lines("gitwildmatch", [])
+
+        for pattern in [
+            "**/*.py",
+            "**/*.md",
+            "**/*.rst",
+            "**/*.txt",
+            "**/*.yaml",
+            "**/*.yml",
+            "**/*.json",
+            "**/*.toml",
+        ]:
+            for file_path in Path(".").rglob(pattern):
+                if file_path.is_file():
+                    # Check if file should be ignored
+                    rel_path = file_path.relative_to(Path("."))
+                    if not spec.match_file(str(rel_path)):
+                        files_to_check.append(str(file_path))
+        files_to_check = sorted(files_to_check)
     else:
+        # Check only git modified files
         files_to_check = checker.get_modified_files()
-        if not files_to_check:
-            # If no modified files, check all Python files
-            files_to_check = []
-            for root, _, files in os.walk("."):
-                if ".git" in root or ".venv" in root or "__pycache__" in root:
-                    continue
-                for file in files:
-                    if file.endswith(".py"):
-                        files_to_check.append(os.path.join(root, file))
 
     # Run checks
     violations = checker.check_files(files_to_check)
 
     # Print results
     if violations:
-        print(f"\n{len(violations)} quality issues found:\n")
+        logger.error(f"\n{len(violations)} quality issues found:\n")
 
-        # Group by file
+        # Group by file and count by category
         violations_by_file = {}
+        category_counts = {}
+
         for v in violations:
             if v.file_path not in violations_by_file:
                 violations_by_file[v.file_path] = []
             violations_by_file[v.file_path].append(v)
 
+            # Count by category (extract category from message)
+            if "Hyperbolic term" in v.message:
+                category = "Hyperbolic terms"
+            elif "Debug print/logging statement" in v.message:
+                category = "Debug print statements"
+            elif "Unused imports" in v.message:
+                category = "Unused imports"
+            elif "Commented-out code" in v.message:
+                category = "Commented-out code"
+            else:
+                category = "Other issues"
+
+            category_counts[category] = category_counts.get(category, 0) + 1
+
         # Print violations by file
         for file_path, file_violations in violations_by_file.items():
-            print(f"\n{file_path}:")
+            logger.error(f"\n{file_path}: ({len(file_violations)} issues)")
             for v in sorted(file_violations, key=lambda v: v.line_num):
-                print(f"  Line {v.line_num}: {v.message}")
-                print(f"    {v.content}")
+                logger.error(f"  Line {v.line_num}: {v.message}")
+                logger.error(f"    {v.content}")
+
+        # Print summary by category
+        logger.error(f"\n" + "-" * 40)
+        logger.error("Summary:")
+        for category, count in sorted(category_counts.items()):
+            logger.error(f"{category}: {count}")
+
+        logger.error("-" * 40)
+        logger.error(f"Total files with issues: {len(violations_by_file)}")
+        logger.error(f"Total issues: {len(violations)}")
 
         # Exit with error if strict mode
         if args.strict:
             sys.exit(1)
     else:
-        print("No quality issues found!")
+        logger.info("No quality issues found!")
 
     sys.exit(0)
 

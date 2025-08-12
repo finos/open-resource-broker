@@ -1,5 +1,5 @@
 """
-Unified CQRS-aligned base handler hierarchy.
+CQRS-aligned base handler hierarchy.
 
 This module provides the single source of truth for all handler base classes,
 eliminating the confusion of multiple base handlers across different layers.
@@ -30,7 +30,7 @@ class BaseHandler(ABC):
     """
     Root base handler with common cross-cutting concerns.
 
-    Provides unified logging, metrics, error handling, and monitoring
+    Provides centralized logging, metrics, error handling, and monitoring
     for all handlers in the system. This eliminates duplication across
     the 4 different base handlers we previously had.
     """
@@ -94,6 +94,8 @@ class BaseHandler(ABC):
         """
 
         def decorator(func: Callable) -> Callable:
+            """Apply monitoring decorator to function."""
+
             @wraps(func)
             async def async_wrapper(*args, **kwargs):
                 start_time = time.time()
@@ -136,6 +138,7 @@ class BaseHandler(ABC):
 
             @wraps(func)
             def sync_wrapper(*args, **kwargs):
+                """Synchronous wrapper for async/sync function handling."""
                 if asyncio.iscoroutinefunction(func):
                     return asyncio.run(async_wrapper(*args, **kwargs))
                 else:
@@ -176,7 +179,7 @@ class BaseHandler(ABC):
 
     def handle_error(self, error: Exception, context: str) -> InfrastructureErrorResponse:
         """
-        Unified error handling for all handlers.
+        Centralized error handling for all handlers.
 
         Creates consistent error responses across all handler types.
         """
@@ -279,6 +282,7 @@ class BaseQueryHandler(BaseHandler, QueryHandler[TQuery, TResult]):
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
     ):
+        """Initialize query handler with logging and error handling."""
         super().__init__(logger, error_handler)
         self._cache: Dict[str, Any] = {}
 

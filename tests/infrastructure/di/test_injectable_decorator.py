@@ -175,7 +175,10 @@ class TestInjectableDecorator:
         error_container = Mock()
         error_container.get.side_effect = Exception("Container error")
 
-        with patch("src.infrastructure.di.container.get_container", return_value=error_container):
+        with patch(
+            "src.infrastructure.di.container.get_container",
+            return_value=error_container,
+        ):
             # Should raise exception since required dependency can't be resolved
             with pytest.raises(TypeError):  # Missing required argument
                 ServiceWithError()

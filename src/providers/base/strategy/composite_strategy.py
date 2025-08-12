@@ -1,7 +1,6 @@
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
+"""Composite strategy pattern implementation for provider operations.
 
-"""Composite Provider Strategy - Multi-provider composition and orchestration.
+Composite Provider Strategy - Multi-provider composition and orchestration.
 
 This module implements the Composite pattern for provider strategies,
 enabling complex multi-provider operations, load distribution, and
@@ -15,6 +14,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional
 
+from src.domain.base.dependency_injection import injectable
+from src.domain.base.ports import LoggingPort
 from src.infrastructure.interfaces.provider import BaseProviderConfig
 from src.providers.base.strategy.provider_strategy import (
     ProviderCapabilities,

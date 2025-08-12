@@ -34,8 +34,8 @@ class TestSystemValidation:
 
     def test_complete_integration_workflow(self):
         """Test complete integration workflow."""
-        # Create unified configuration
-        unified_config_data = {
+        # Create integrated configuration
+        provider_config_data = {
             "provider": {
                 "selection_policy": "WEIGHTED_ROUND_ROBIN",
                 "health_check_interval": 30,
@@ -80,7 +80,7 @@ class TestSystemValidation:
             "template": {"ami_resolution": {"enabled": True, "cache_enabled": True}},
         }
 
-        config_path = self.create_config_file(unified_config_data)
+        config_path = self.create_config_file(provider_config_data)
 
         # Test configuration loading
         config_manager = ConfigurationManager(config_path)
@@ -141,8 +141,8 @@ class TestSystemValidation:
             # Interface handlers may not be available, test basic integration
             pass
 
-    def test_legacy_to_unified_migration_complete(self):
-        """Test complete legacy to unified migration workflow."""
+    def test_legacy_to_integrated_migration_complete(self):
+        """Test complete legacy to integrated migration workflow."""
         # Start with legacy configuration
         legacy_config = {
             "provider": {
@@ -179,7 +179,7 @@ class TestSystemValidation:
             # Unexpected mode, but test that it's handled gracefully
             assert "mode" in validation_result
 
-        # Simulate migration to unified format
+        # Simulate migration to integrated format
         migrated_config = {
             "provider": {
                 "active_provider": "aws-legacy",
@@ -190,7 +190,11 @@ class TestSystemValidation:
                         "enabled": True,
                         "priority": 1,
                         "weight": 100,
-                        "config": {"region": "us-east-1", "profile": "default", "max_retries": 3},
+                        "config": {
+                            "region": "us-east-1",
+                            "profile": "default",
+                            "max_retries": 3,
+                        },
                     }
                 ],
             },
@@ -246,7 +250,11 @@ class TestSystemValidation:
                         "priority": 1,
                         "weight": 80,
                         "capabilities": ["compute", "storage", "networking"],
-                        "config": {"region": "us-east-1", "max_retries": 3, "timeout": 30},
+                        "config": {
+                            "region": "us-east-1",
+                            "max_retries": 3,
+                            "timeout": 30,
+                        },
                     },
                     {
                         "name": "aws-failover",
@@ -255,7 +263,11 @@ class TestSystemValidation:
                         "priority": 2,
                         "weight": 20,
                         "capabilities": ["compute", "storage"],
-                        "config": {"region": "us-west-2", "max_retries": 5, "timeout": 60},
+                        "config": {
+                            "region": "us-west-2",
+                            "max_retries": 5,
+                            "timeout": 60,
+                        },
                     },
                 ],
             }
@@ -327,7 +339,12 @@ class TestSystemValidation:
                         "enabled": True,
                         "priority": 1,
                         "weight": 60,
-                        "capabilities": ["compute", "storage", "networking", "monitoring"],
+                        "capabilities": [
+                            "compute",
+                            "storage",
+                            "networking",
+                            "monitoring",
+                        ],
                         "config": {
                             "region": "us-east-1",
                             "role_arn": "arn:aws:iam::123456789012:role/ProdRole",

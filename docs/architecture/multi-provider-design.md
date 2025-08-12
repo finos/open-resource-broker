@@ -107,27 +107,27 @@ The `TemplateRepositoryImpl` class provides a complete implementation of both `A
 ```python
 class TemplateRepositoryImpl(TemplateRepository):
     """Template repository implementation for configuration-based template management."""
-    
+
     # Abstract methods from AggregateRepository
     def save(self, aggregate: Template) -> None:
         """Save a template aggregate."""
-    
+
     def find_by_id(self, aggregate_id: str) -> Optional[Template]:
         """Find template by aggregate ID."""
-    
+
     def delete(self, aggregate_id: str) -> None:
         """Delete template by aggregate ID."""
-    
+
     # Abstract methods from TemplateRepository
     def find_by_template_id(self, template_id: str) -> Optional[Template]:
         """Find template by template ID (delegates to find_by_id)."""
-    
+
     def find_by_provider_api(self, provider_api: str) -> List[Template]:
         """Find templates by provider API type."""
-    
+
     def find_active_templates(self) -> List[Template]:
         """Find all active templates."""
-    
+
     def search_templates(self, criteria: Dict[str, Any]) -> List[Template]:
         """Search templates by criteria."""
 ```
@@ -219,7 +219,7 @@ Distributes requests across provider instances based on configured weights:
 def weighted_round_robin_selection(providers: List[ProviderInstance]) -> str:
     total_weight = sum(p.weight for p in providers)
     random_value = random.randint(1, total_weight)
-    
+
     current_weight = 0
     for provider in providers:
         current_weight += provider.weight
@@ -241,12 +241,12 @@ def priority_based_selection(providers: List[ProviderInstance]) -> str:
 ### Directory Structure
 ```
 config/
-├── templates.json                    # Main templates
-├── awsprov_templates.json           # AWS provider type templates
-├── azureprov_templates.json         # Azure provider type templates
-├── aws-us-east-1_templates.json    # AWS US East instance templates
-├── aws-us-west-2_templates.json    # AWS US West instance templates
-└── azure-east-us_templates.json    # Azure East US instance templates
+- templates.json                    # Main templates
+- awsprov_templates.json           # AWS provider type templates
+- azureprov_templates.json         # Azure provider type templates
+- aws-us-east-1_templates.json    # AWS US East instance templates
+- aws-us-west-2_templates.json    # AWS US West instance templates
+- azure-east-us_templates.json    # Azure East US instance templates
 ```
 
 ### Template Inheritance

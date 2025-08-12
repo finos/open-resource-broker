@@ -198,7 +198,7 @@ for table in "${TABLE_PREFIX}_templates" "${TABLE_PREFIX}_requests" "${TABLE_PRE
     aws dynamodb create-backup \
         --table-name "$table" \
         --backup-name "${BACKUP_PREFIX}_${table}_$DATE"
-    
+
     echo "Created backup for table: $table"
 done
 
@@ -309,22 +309,22 @@ import gzip
 
 def restore_templates_only(backup_path, target_path):
     """Restore only templates from backup."""
-    
+
     # Load backup data
     with gzip.open(backup_path, 'rt') as f:
         backup_data = json.load(f)
-    
+
     # Load current data
     with open(target_path, 'r') as f:
         current_data = json.load(f)
-    
+
     # Restore only templates
     current_data['templates'] = backup_data.get('templates', {})
-    
+
     # Save updated data
     with open(target_path, 'w') as f:
         json.dump(current_data, f, indent=2)
-    
+
     print(f"Restored {len(current_data['templates'])} templates")
 
 # Usage
@@ -519,41 +519,41 @@ class BackupMonitor:
     def __init__(self, config_path="config/backup_config.json"):
         with open(config_path) as f:
             self.config = json.load(f)
-    
+
     def check_backup_freshness(self):
         """Check if backups are recent enough."""
         issues = []
-        
+
         for backup_type, config in self.config['backup_types'].items():
             backup_dir = Path(config['directory'])
             max_age_hours = config['max_age_hours']
-            
+
             if not backup_dir.exists():
                 issues.append(f"Backup directory missing: {backup_dir}")
                 continue
-            
+
             # Find most recent backup
             backup_files = list(backup_dir.glob(config['pattern']))
             if not backup_files:
                 issues.append(f"No backup files found in {backup_dir}")
                 continue
-            
+
             latest_backup = max(backup_files, key=os.path.getmtime)
             backup_age = time.time() - os.path.getmtime(latest_backup)
             backup_age_hours = backup_age / 3600
-            
+
             if backup_age_hours > max_age_hours:
                 issues.append(
                     f"Backup too old: {latest_backup} "
                     f"({backup_age_hours:.1f}h > {max_age_hours}h)"
                 )
-        
+
         return issues
-    
+
     def verify_backup_integrity(self):
         """Verify backup file integrity."""
         issues = []
-        
+
         # Check JSON backups
         json_backups = Path("backups/json").glob("*.json*")
         for backup_file in json_backups:
@@ -567,17 +567,17 @@ class BackupMonitor:
                         json.load(f)
             except Exception as e:
                 issues.append(f"Corrupt backup: {backup_file} - {e}")
-        
+
         return issues
 
 if __name__ == "__main__":
     monitor = BackupMonitor()
-    
+
     freshness_issues = monitor.check_backup_freshness()
     integrity_issues = monitor.verify_backup_integrity()
-    
+
     all_issues = freshness_issues + integrity_issues
-    
+
     if all_issues:
         print("Backup issues detected:")
         for issue in all_issues:

@@ -206,10 +206,10 @@ open-hostfactory-plugin/
    ```bash
    # Deploy to GitLab Pages production (main branch)
    make docs-deploy-gitlab
-   
+
    # Deploy to GitLab Pages staging (develop branch)
    make docs-deploy-staging
-   
+
    # Check deployment status
    make docs-check-gitlab
    ```

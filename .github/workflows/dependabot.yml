@@ -8,48 +8,62 @@ on:
     - cron: '0 6 1 * 1'
   workflow_dispatch:
 
-env:
-  PYTHON_VERSION: '3.11'
-
 jobs:
+  get-config:
+    name: Get Python Version from Makefile
+    runs-on: ubuntu-latest
+    outputs:
+      python-version: ${{ steps.version.outputs.default-python-version }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Get default Python version from project config
+      id: version
+      run: |
+        DEFAULT_PYTHON_VERSION=$(yq '.python.default_version' .project.yml)
+        echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> $GITHUB_OUTPUT
+        echo "Using Python version: $DEFAULT_PYTHON_VERSION"
+
   update-uv-lock:
     name: Update UV Lock File
     if: github.actor == 'dependabot[bot]' && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    needs: get-config
     permissions:
       contents: write
       pull-requests: write
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      
+          python-version: ${{ needs.get-config.outputs.default-python-version }}
+
       - name: Install UV
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-      
+
       - name: Generate pyproject.toml
-        run: python dev-tools/scripts/generate-pyproject.py
-      
+        run: make generate-pyproject
+
       - name: Update UV lock file
         run: |
           echo "Updating UV lock file after Dependabot changes..."
           uv lock --upgrade-package $(echo "${{ github.event.pull_request.title }}" | grep -oP 'Bump \K[^\s]+')
-      
+
       - name: Commit updated lock file
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          
+
           if [[ -n $(git status --porcelain) ]]; then
             git add uv.lock
             git commit -m "chore: update uv.lock after dependabot changes"
@@ -67,7 +81,7 @@ jobs:
       contents: write
       pull-requests: write
       checks: read
-    
+
     steps:
       - name: Check if PR is ready for auto-merge
         id: check-automerge
@@ -79,23 +93,23 @@ jobs:
               repo: context.repo.repo,
               pull_number: context.issue.number
             });
-            
+
             const title = pr.title.toLowerCase();
             const labels = pr.labels.map(label => label.name);
-            
+
             // Auto-merge conditions
             const isPatch = title.includes('patch') || labels.includes('patch');
             const isMinor = title.includes('minor') || labels.includes('minor');
             const isDev = title.includes('dev-dependencies') || labels.includes('dependencies');
-            
+
             const shouldAutoMerge = isPatch || (isMinor && isDev);
-            
+
             console.log(`Title: ${title}`);
             console.log(`Labels: ${labels.join(', ')}`);
             console.log(`Should auto-merge: ${shouldAutoMerge}`);
-            
+
             return shouldAutoMerge;
-      
+
       - name: Wait for checks to complete
         if: steps.check-automerge.outputs.result == 'true'
         uses: actions/github-script@v7
@@ -104,44 +118,44 @@ jobs:
             const maxWaitTime = 10 * 60 * 1000; // 10 minutes
             const checkInterval = 30 * 1000; // 30 seconds
             const startTime = Date.now();
-            
+
             while (Date.now() - startTime < maxWaitTime) {
               const { data: checks } = await github.rest.checks.listForRef({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 ref: context.payload.pull_request.head.sha
               });
-              
+
               const relevantChecks = checks.check_runs.filter(check => 
                 !check.name.includes('auto-merge') && 
                 !check.name.includes('dependabot')
               );
-              
+
               const allCompleted = relevantChecks.every(check => 
                 check.status === 'completed'
               );
-              
+
               const allSuccessful = relevantChecks.every(check => 
                 check.conclusion === 'success' || check.conclusion === 'neutral'
               );
-              
+
               if (allCompleted && allSuccessful) {
                 console.log('All checks passed!');
                 return true;
               }
-              
+
               if (allCompleted && !allSuccessful) {
                 console.log('Some checks failed, not auto-merging');
                 return false;
               }
-              
+
               console.log('Waiting for checks to complete...');
               await new Promise(resolve => setTimeout(resolve, checkInterval));
             }
-            
+
             console.log('Timeout waiting for checks');
             return false;
-      
+
       - name: Auto-merge PR
         if: steps.check-automerge.outputs.result == 'true'
         uses: actions/github-script@v7
@@ -163,29 +177,29 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      
+          python-version: ${{ needs.get-config.outputs.default-python-version }}
+
       - name: Install UV
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-      
+
       - name: Generate pyproject.toml
-        run: python dev-tools/scripts/generate-pyproject.py
-      
+        run: make generate-pyproject
+
       - name: Update all dependencies
         run: |
           echo "Updating all dependencies..."
           uv lock --upgrade
-      
+
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
         with:
@@ -194,13 +208,13 @@ jobs:
           title: "chore: monthly dependency maintenance"
           body: |
             ## Monthly Dependency Maintenance
-            
+
             This PR updates all dependencies to their latest compatible versions.
-            
+
             ### Changes
             - Updated `uv.lock` with latest dependency versions
             - Automated monthly maintenance run
-            
+
             ### Review Notes
             - Check for any breaking changes in updated dependencies
             - Verify all tests pass before merging

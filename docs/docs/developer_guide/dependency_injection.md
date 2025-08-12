@@ -80,7 +80,7 @@ The `DIContainer` class implements domain contracts:
 - `register_factory(cls, factory)` - Register with factory
 - `is_registered(cls)` - Check if registered
 
-### Enhanced Methods
+### Improved Methods
 - `get_optional(dependency_type)` - Optional resolution (returns None if not found)
 - `get_all(dependency_type)` - Get all instances of a type
 - `register_instance(cls, instance)` - Register pre-created instance
@@ -124,7 +124,7 @@ from src.domain.base.dependency_injection import injectable, singleton
 class ConfigurationService:
     def __init__(self):
         self.config = self.load_config()
-    
+
     def load_config(self):
         # Load configuration logic
         return {}
@@ -252,11 +252,11 @@ The scheduler port demonstrates registry integration for configuration-driven st
 def create_scheduler_port(container):
     from src.infrastructure.registry.scheduler_registry import get_scheduler_registry
     from src.config.manager import get_config_manager
-    
+
     config_manager = get_config_manager()
     scheduler_config = config_manager.get_scheduler_config()
     scheduler_type = scheduler_config.get('strategy', 'hostfactory')
-    
+
     registry = get_scheduler_registry()
     return registry.get_active_strategy(scheduler_type, scheduler_config)
 
@@ -309,7 +309,7 @@ Some services are registered manually in the DI container instead of using the `
 # Location: src/infrastructure/di/port_registrations.py
 def _register_template_configuration_services(container: DIContainer) -> None:
     """Register template configuration services."""
-    
+
     # Factory-based singleton registration with complex initialization
     container.register_singleton(
         TemplateConfigurationManager,
@@ -320,7 +320,7 @@ def _register_template_configuration_services(container: DIContainer) -> None:
 **When to use manual registration:**
 - Configuration-driven services that need complex initialization
 - Services that require specific factory patterns
-- Legacy services being migrated from @injectable pattern
+- Services transitioning from @injectable pattern
 - Services with conditional registration based on configuration
 
 ## Migration Guide
@@ -358,11 +358,11 @@ from src.infrastructure.di.container import DIContainer
 def test_service():
     # Create test container
     container = DIContainer()
-    
+
     # Register test dependencies
     mock_dependency = MockDependency()
     container.register_instance(SomeDependency, mock_dependency)
-    
+
     # Test service
     service = container.get(ServiceUnderTest)
     assert service.dependency is mock_dependency
@@ -424,7 +424,7 @@ Use lazy loading or break the dependency cycle by introducing an interface.
 The DI architecture provides:
 
 [[]] **Clean Architecture Compliance** - Proper dependency direction  
-[[]] **Enhanced DI Features** - Singleton, CQRS, optional dependencies  
+[[]] **Improved DI Features** - Singleton, CQRS, optional dependencies  
 [[]] **Backward Compatibility** - All existing code continues to work  
 [[]] **Performance Optimized** - Minimal overhead with intelligent caching  
 [[]] **Type Safe** - Full generic type support  

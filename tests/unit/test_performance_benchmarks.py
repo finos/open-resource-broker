@@ -104,7 +104,8 @@ class TestPerformanceBenchmarks:
             # Perform operations that generate events
             request.start_processing()
             request.complete_successfully(
-                machine_ids=[f"i-{i:016x}1", f"i-{i:016x}2"], completion_message="Success"
+                machine_ids=[f"i-{i:016x}1", f"i-{i:016x}2"],
+                completion_message="Success",
             )
 
             # Get events
@@ -197,7 +198,9 @@ class TestMemoryPerformance:
             # Perform operations
             for i in range(operations_per_iteration):
                 request = Request.create_new_request(
-                    template_id=f"template-{i}", machine_count=2, requester_id=f"user-{i}"
+                    template_id=f"template-{i}",
+                    machine_count=2,
+                    requester_id=f"user-{i}",
                 )
 
                 request.start_processing()
@@ -520,7 +523,10 @@ class TestScalabilityLimits:
             total_time = end_time - start_time
             time_per_item = total_time / size
 
-            performance_results[size] = {"total_time": total_time, "time_per_item": time_per_item}
+            performance_results[size] = {
+                "total_time": total_time,
+                "time_per_item": time_per_item,
+            }
 
             # Performance should scale reasonably
             assert (
@@ -556,7 +562,9 @@ class TestScalabilityLimits:
             requests = []
             for i in range(size):
                 request = Request.create_new_request(
-                    template_id=f"template-{i}", machine_count=2, requester_id=f"user-{i}"
+                    template_id=f"template-{i}",
+                    machine_count=2,
+                    requester_id=f"user-{i}",
                 )
                 requests.append(request)
 
@@ -598,7 +606,10 @@ class TestPerformanceRegression:
         # In a real scenario, these would be compared against historical data
 
         operations = [
-            ("request_creation", lambda: Request.create_new_request("template-1", 1, "user-1")),
+            (
+                "request_creation",
+                lambda: Request.create_new_request("template-1", 1, "user-1"),
+            ),
             ("status_transition", lambda: self._test_status_transition()),
             ("event_generation", lambda: self._test_event_generation()),
         ]

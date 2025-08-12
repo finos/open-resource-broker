@@ -48,7 +48,12 @@ class TestLoggingIntegration:
         python_executable = sys.executable
 
         # Add --dry-run flag before the subcommand (global argument)
-        command_with_dry_run = [python_executable, "-m", "src.cli.main", "--dry-run"] + command
+        command_with_dry_run = [
+            python_executable,
+            "-m",
+            "src.cli.main",
+            "--dry-run",
+        ] + command
 
         return subprocess.run(
             command_with_dry_run, capture_output=True, text=True, timeout=30, env=env

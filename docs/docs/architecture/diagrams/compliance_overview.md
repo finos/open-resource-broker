@@ -12,10 +12,10 @@ pie title Architecture Compliance Overview
 
 | Metric | Score | Status |
 |--------|-------|--------|
-| File Size Compliance | 95.3% | ✅ Good |
-| Layer Separation | 95% | ✅ Excellent |
-| CQRS Implementation | 90% | ✅ Good |
-| Dependency Direction | 85% | ✅ Good |
+| File Size Compliance | 95.3% | Good |
+| Layer Separation | 95% | Excellent |
+| CQRS Implementation | 90% | Good |
+| Dependency Direction | 85% | Good |
 
 ### Recommendations
 

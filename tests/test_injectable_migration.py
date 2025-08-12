@@ -18,7 +18,10 @@ class MockConfigurationPort(ConfigurationPort):
     def __init__(self):
         """Initialize the instance."""
         self._config = {
-            "provider": {"type": "aws", "aws": {"region": "us-east-1", "profile": "default"}},
+            "provider": {
+                "type": "aws",
+                "aws": {"region": "us-east-1", "profile": "default"},
+            },
             "naming": {"prefix": "test"},
             "request": {"timeout": 30},
             "template": {"default_image_id": "ami-12345678"},
@@ -119,7 +122,9 @@ class TestInjectableMigration(unittest.TestCase):
         self.container.register_singleton(
             AWSHandlerFactory,
             lambda c: AWSHandlerFactory(
-                aws_client=c.get(AWSClient), logger=c.get(LoggingPort), config=c.get(AWSConfig)
+                aws_client=c.get(AWSClient),
+                logger=c.get(LoggingPort),
+                config=c.get(AWSConfig),
             ),
         )
 

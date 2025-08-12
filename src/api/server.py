@@ -130,7 +130,7 @@ def create_fastapi_app(server_config: ServerConfig) -> FastAPI:
     # Register API routers
     _register_routers(app)
 
-    # Configure enhanced OpenAPI documentation
+    # Configure OpenAPI documentation
     configure_openapi(app, server_config)
 
     logger.info(f"FastAPI application created with {len(app.routes)} routes")

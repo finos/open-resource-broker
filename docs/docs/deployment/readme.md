@@ -392,7 +392,7 @@ upstream ohfp_backend {
 server {
     listen 80;
     server_name api.your-domain.com;
-    
+
     location / {
         proxy_pass http://ohfp_backend;
         proxy_set_header Host $host;
@@ -400,7 +400,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
-    
+
     location /health {
         proxy_pass http://ohfp_backend;
         access_log off;

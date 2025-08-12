@@ -35,7 +35,7 @@ async def handle_show_storage_config(args) -> Dict[str, Any]:
     Handle show storage configuration operations.
 
     Args:
-        args: Modern argument namespace with resource/action structure
+        args: Argument namespace with resource/action structure
 
     Returns:
         Storage configuration
@@ -57,7 +57,7 @@ async def handle_validate_storage_config(args) -> Dict[str, Any]:
     Handle validate storage configuration operations.
 
     Args:
-        args: Modern argument namespace with resource/action structure
+        args: Argument namespace with resource/action structure
 
     Returns:
         Validation results
@@ -82,7 +82,7 @@ async def handle_test_storage(args) -> Dict[str, Any]:
     Handle test storage operations.
 
     Args:
-        args: Modern argument namespace with resource/action structure
+        args: Argument namespace with resource/action structure
 
     Returns:
         Test results
@@ -104,7 +104,7 @@ async def handle_storage_health(args) -> Dict[str, Any]:
     Handle storage health operations.
 
     Args:
-        args: Modern argument namespace with resource/action structure
+        args: Argument namespace with resource/action structure
 
     Returns:
         Health status
@@ -126,7 +126,7 @@ async def handle_storage_metrics(args) -> Dict[str, Any]:
     Handle storage metrics operations.
 
     Args:
-        args: Modern argument namespace with resource/action structure
+        args: Argument namespace with resource/action structure
 
     Returns:
         Storage metrics

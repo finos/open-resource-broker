@@ -61,10 +61,10 @@ gh workflow run publish.yml -f environment=pypi
    ```bash
    # Build package locally
    python -m build
-   
+
    # Upload to Test PyPI first
    python -m twine upload --repository testpypi dist/*
-   
+
    # Then to Production PyPI
    python -m twine upload dist/*
    ```
@@ -73,7 +73,7 @@ gh workflow run publish.yml -f environment=pypi
    ```bash
    # Test installation from Test PyPI
    pip install --index-url https://test.pypi.org/simple/ open-hostfactory-plugin
-   
+
    # Test installation from Production PyPI
    pip install open-hostfactory-plugin
    ```

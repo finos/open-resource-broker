@@ -12,7 +12,7 @@ cd "$PROJECT_ROOT"
 TEMP_VENV=$(mktemp -d)
 echo "Creating temporary virtual environment at $TEMP_VENV"
 
-python3.11 -m venv "$TEMP_VENV"
+python3 -m venv "$TEMP_VENV"
 source "$TEMP_VENV/bin/activate"
 
 # Verify Python version in test environment
@@ -66,6 +66,6 @@ rm -rf "$TEMP_VENV"
 echo "PASS Package installation test completed!"
 echo ""
 echo "🎯 Package is ready for:"
-echo "  • Local development: ./dev-tools/package/install-dev.sh"
+echo "  • Local development: ./dev-tools/package/install_dev.sh"
 echo "  • Test PyPI: ./dev-tools/package/publish.sh testpypi"
 echo "  • Production PyPI: ./dev-tools/package/publish.sh pypi"

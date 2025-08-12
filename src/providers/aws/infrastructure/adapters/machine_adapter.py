@@ -313,6 +313,7 @@ class AWSMachineAdapter:
                             )
 
                             def detach_volume(volume_id=volume_id):
+                                """Detach EBS volume from instance."""
                                 return self._aws_client.ec2_client.detach_volume(VolumeId=volume_id)
 
                             self._aws_client.execute_with_circuit_breaker(
@@ -322,6 +323,7 @@ class AWSMachineAdapter:
                             self._logger.debug(f"Deleting volume {volume_id}")
 
                             def delete_volume(vol_id=volume_id):
+                                """Delete EBS volume."""
                                 return self._aws_client.ec2_client.delete_volume(VolumeId=vol_id)
 
                             self._aws_client.execute_with_circuit_breaker(
@@ -366,6 +368,7 @@ class AWSMachineAdapter:
                             )
 
                             def detach_network_interface(attachment_id=attachment_id):
+                                """Detach network interface from instance."""
                                 return self._aws_client.ec2_client.detach_network_interface(
                                     AttachmentId=attachment_id
                                 )
@@ -379,6 +382,7 @@ class AWSMachineAdapter:
                             self._logger.debug(f"Deleting network interface {nic_id}")
 
                             def delete_network_interface(network_id=nic_id):
+                                """Delete network interface."""
                                 return self._aws_client.ec2_client.delete_network_interface(
                                     NetworkInterfaceId=network_id
                                 )

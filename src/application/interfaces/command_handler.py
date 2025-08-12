@@ -1,4 +1,4 @@
-"""Unified command handler interface for CQRS pattern."""
+"""Command handler interface for CQRS pattern."""
 
 import asyncio
 from abc import ABC, abstractmethod
@@ -12,7 +12,7 @@ TResponse = TypeVar("TResponse", bound=BaseResponse)
 
 class CommandHandler(Generic[TCommand, TResponse], ABC):
     """
-    Unified command handler interface for CQRS pattern.
+    Command handler interface for CQRS pattern.
 
     This is the single source of truth for all command handlers in the system.
     Supports both synchronous and asynchronous command handling patterns.
@@ -50,7 +50,7 @@ class CommandHandler(Generic[TCommand, TResponse], ABC):
         Provide synchronous wrapper for backward compatibility.
 
         This method provides a synchronous interface to the async handle method
-        for cases where async/await cannot be used (e.g., legacy code, tests).
+        for cases where async/await cannot be used (e.g., synchronous tests).
 
         Args:
             command: Command to handle (strongly typed)

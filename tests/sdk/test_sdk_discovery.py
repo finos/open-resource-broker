@@ -105,7 +105,8 @@ class TestSDKMethodDiscovery:
         mock_command_handlers = {MockCommand: MockHandler}
 
         with patch(
-            "src.sdk.discovery.get_registered_query_handlers", return_value=mock_query_handlers
+            "src.sdk.discovery.get_registered_query_handlers",
+            return_value=mock_query_handlers,
         ):
             with patch(
                 "src.sdk.discovery.get_registered_command_handlers",

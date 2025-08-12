@@ -115,7 +115,11 @@ class TestMultiProviderConfiguration:
 
         # Verify additional fields are preserved
         handler_dict = handler_config.model_dump()
-        assert handler_dict["supported_fleet_types"] == ["instant", "request", "maintain"]
+        assert handler_dict["supported_fleet_types"] == [
+            "instant",
+            "request",
+            "maintain",
+        ]
         assert handler_dict["supports_spot"] is True
 
     def test_multi_provider_mode_detection(self):

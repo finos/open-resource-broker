@@ -1,7 +1,5 @@
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
-
-"""Fallback Provider Strategy - Resilience and failover for provider operations.
+"""
+Fallback Provider Strategy - Resilience and failover for provider operations.
 
 This module implements fallback and resilience patterns for provider strategies,
 enabling automatic failover, circuit breaker patterns, and graceful degradation
@@ -14,6 +12,8 @@ from enum import Enum
 from threading import Lock
 from typing import Any, Dict, List, Optional
 
+from src.domain.base.dependency_injection import injectable
+from src.domain.base.ports import LoggingPort
 from src.infrastructure.interfaces.provider import BaseProviderConfig
 from src.providers.base.strategy.provider_strategy import (
     ProviderCapabilities,

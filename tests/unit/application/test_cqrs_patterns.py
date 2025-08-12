@@ -382,7 +382,9 @@ class TestCommandHandlerImplementation:
 
         # Invalid command (template doesn't exist)
         invalid_command = CreateRequestCommand(
-            template_id="non-existent-template", machine_count=2, requester_id="test-user"
+            template_id="non-existent-template",
+            machine_count=2,
+            requester_id="test-user",
         )
 
         mock_template_service.get_template_by_id.return_value = None

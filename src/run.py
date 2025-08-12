@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Modern CLI entry point with resource-action structure."""
+"""CLI entry point with resource-action structure."""
 import asyncio
 import os
 import sys
@@ -16,7 +16,7 @@ from src.cli.main import main
 
 # Import version for help text
 try:
-    from . import __version__
+    from ._package import __version__
 except ImportError:
     # Fallback for direct execution
     __version__ = "0.1.0"

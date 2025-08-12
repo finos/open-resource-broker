@@ -72,18 +72,18 @@ class TestTemplateMultiProviderFields:
         assert template.provider_type == "aws"
         assert template.provider_name == "aws-us-east-1"
 
-    def test_template_provider_type_extraction_azure(self):
-        """Test provider type extraction for Azure provider."""
+    def test_template_provider_type_extraction_provider1(self):
+        """Test provider type extraction for Provider1 provider."""
         template = Template(
-            template_id="azure-test",
-            provider_name="azure-west-us",
+            template_id="provider1-test",
+            provider_name="provider1-west-us",
             image_id="image-12345",
             subnet_ids=["subnet-123"],
             max_instances=2,
         )
 
-        assert template.provider_type == "azure"
-        assert template.provider_name == "azure-west-us"
+        assert template.provider_type == "provider1"
+        assert template.provider_name == "provider1-west-us"
 
     def test_template_provider_type_extraction_single_word(self):
         """Test provider type extraction for single-word provider name."""
@@ -157,12 +157,19 @@ class TestTemplateMultiProviderFields:
 
         # Test image_id validation
         with pytest.raises(ValueError, match="image_id is required"):
-            Template(template_id="validation-test", subnet_ids=["subnet-123"], max_instances=1)
+            Template(
+                template_id="validation-test",
+                subnet_ids=["subnet-123"],
+                max_instances=1,
+            )
 
         # Test subnet_ids validation
         with pytest.raises(ValueError, match="At least one subnet_id is required"):
             Template(
-                template_id="validation-test", image_id="ami-12345", subnet_ids=[], max_instances=1
+                template_id="validation-test",
+                image_id="ami-12345",
+                subnet_ids=[],
+                max_instances=1,
             )
 
 

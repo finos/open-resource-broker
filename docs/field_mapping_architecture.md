@@ -45,7 +45,7 @@ class SchedulerProviderFieldMappings:
 - **Provider-Specific Fields**: Only mapped when the provider is active (e.g., `vmTypesOnDemand` for AWS)
 - **Extensible**: Easy to add new schedulers and providers
 
-### 2. Enhanced Scheduler Strategy
+### 2. Improved Scheduler Strategy
 
 **Location**: `src/infrastructure/scheduler/strategies/symphony_hostfactory.py`
 
@@ -55,22 +55,22 @@ The scheduler strategy now uses the field mapping registry to perform provider-a
 def _map_template_fields(self, template: Dict[str, Any]) -> Dict[str, Any]:
     # Get active provider type
     provider_type = self._get_active_provider_type()
-    
+
     # Get field mappings for HostFactory + active provider
     field_mappings = SchedulerProviderFieldMappings.get_mappings(
         scheduler_type='hostfactory',
         provider_type=provider_type
     )
-    
+
     # Apply registry-based field mappings
     mapped = {}
     for hf_field, internal_field in field_mappings.items():
         if hf_field in template:
             mapped[internal_field] = template[hf_field]
-    
+
     # Apply field transformations
     mapped = FieldTransformationUtils.apply_field_transformations(mapped)
-    
+
     return mapped
 ```
 
@@ -97,7 +97,7 @@ class AWSTemplate(CoreTemplate):
     instance_types_priority: Optional[Dict[str, int]] = None
     percent_on_demand: Optional[int] = None
     # ... other AWS-specific fields
-    
+
     # Note: instance_type and instance_types are inherited from CoreTemplate
     # No need to redefine them here - this was causing the field access issues
 ```
@@ -113,11 +113,11 @@ All handlers now use the correct inherited field names:
 
 ```python
 # Before (causing errors)
-if aws_template.vm_type:  # ❌ Field doesn't exist!
+if aws_template.vm_type:  # Field doesn't exist!
     params['InstanceType'] = aws_template.vm_type
 
 # After (working correctly)
-if aws_template.instance_type:  # ✅ Inherited from CoreTemplate
+if aws_template.instance_type:  # Inherited from CoreTemplate
     params['InstanceType'] = aws_template.instance_type
 ```
 

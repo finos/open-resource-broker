@@ -18,7 +18,10 @@ class TestConfigDrivenProviderRegistration:
             selection_policy="FIRST_AVAILABLE",
             providers=[
                 ProviderInstanceConfig(
-                    name="aws-test", type="aws", enabled=True, config={"region": "us-east-1"}
+                    name="aws-test",
+                    type="aws",
+                    enabled=True,
+                    config={"region": "us-east-1"},
                 )
             ],
         )
@@ -117,10 +120,16 @@ class TestConfigDrivenProviderRegistration:
             selection_policy="ROUND_ROBIN",
             providers=[
                 ProviderInstanceConfig(
-                    name="aws-us-east-1", type="aws", enabled=True, config={"region": "us-east-1"}
+                    name="aws-us-east-1",
+                    type="aws",
+                    enabled=True,
+                    config={"region": "us-east-1"},
                 ),
                 ProviderInstanceConfig(
-                    name="aws-us-west-2", type="aws", enabled=True, config={"region": "us-west-2"}
+                    name="aws-us-west-2",
+                    type="aws",
+                    enabled=True,
+                    config={"region": "us-west-2"},
                 ),
             ],
         )

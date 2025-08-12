@@ -60,7 +60,7 @@ class RunInstancesHandler(AWSHandler):
         error_handler: ErrorHandlingPort = None,
     ):
         """
-        Initialize RunInstances handler with unified dependencies.
+        Initialize RunInstances handler with integrated dependencies.
 
         Args:
             aws_client: AWS client instance
@@ -70,7 +70,7 @@ class RunInstancesHandler(AWSHandler):
             request_adapter: Optional request adapter for terminating instances
             error_handler: Optional error handling port for exception management
         """
-        # Use unified base class initialization
+        # Use integrated base class initialization
         super().__init__(
             aws_client,
             logger,
@@ -211,7 +211,7 @@ class RunInstancesHandler(AWSHandler):
         # Handle networking overrides based on launch template source
         if aws_template.launch_template_id:
             # Using existing launch template - need to check what it contains
-            # For now, assume we can override (this should be enhanced to inspect the
+            # For now, assume we can override (this should be improved to inspect the
             # LT)
             if aws_template.subnet_id:
                 params["SubnetId"] = aws_template.subnet_id

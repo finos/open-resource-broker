@@ -20,7 +20,6 @@ Architecture:
 """
 
 from ._package import PACKAGE_NAME
-from ._version import __version__
 
 __author__ = "AWS Professional Services"
 __email__ = "aws-proserve@amazon.com"

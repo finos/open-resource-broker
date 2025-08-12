@@ -4,7 +4,7 @@ This document provides a comprehensive API reference for the Open Host Factory P
 
 ## Command Line Interface (CLI)
 
-The Open Host Factory Plugin provides a modern resource-action command structure for all operations.
+The Open Host Factory Plugin provides a resource-action command structure for all operations.
 
 ### Global Options
 
@@ -455,7 +455,7 @@ async with OHFPSDK(provider="aws") as sdk:
     # List available templates
     templates = await sdk.list_templates(active_only=True)
     print(f"Found {len(templates)} templates")
-    
+
     # Create machines
     if templates:
         request = await sdk.create_request(
@@ -463,7 +463,7 @@ async with OHFPSDK(provider="aws") as sdk:
             machine_count=5
         )
         print(f"Created request: {request.id}")
-        
+
         # Check status
         status = await sdk.get_request_status(request_id=request.id)
         print(f"Request status: {status}")
@@ -582,11 +582,11 @@ async def use_hostfactory():
         command="ohfp", 
         args=["mcp", "serve", "--stdio"]
     )
-    
+
     async with ClientSession(server_params) as session:
         # List available tools
         tools = await session.list_tools()
-        
+
         # Request infrastructure
         result = await session.call_tool(
             "request_machines",

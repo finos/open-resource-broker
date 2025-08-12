@@ -43,7 +43,9 @@ class TestEC2FleetHandler:
 
         # Create security group
         sg = ec2.create_security_group(
-            GroupName="test-sg", Description="Test security group", VpcId=vpc["Vpc"]["VpcId"]
+            GroupName="test-sg",
+            Description="Test security group",
+            VpcId=vpc["Vpc"]["VpcId"],
         )
 
         # Create AWS operations utility
@@ -62,7 +64,10 @@ class TestEC2FleetHandler:
                         "Version": "$Latest",
                     },
                     "Overrides": [
-                        {"InstanceType": "t2.micro", "SubnetId": subnet["Subnet"]["SubnetId"]}
+                        {
+                            "InstanceType": "t2.micro",
+                            "SubnetId": subnet["Subnet"]["SubnetId"],
+                        }
                     ],
                 }
             ],
@@ -159,7 +164,10 @@ class TestASGHandler:
 
         # Create handler
         handler = ASGHandler(
-            autoscaling_client=autoscaling, ec2_client=ec2, aws_operations=aws_ops, logger=Mock()
+            autoscaling_client=autoscaling,
+            ec2_client=ec2,
+            aws_operations=aws_ops,
+            logger=Mock(),
         )
 
         # ASG configuration
@@ -201,7 +209,10 @@ class TestASGHandler:
 
         aws_ops = AWSOperations(ec2_client=ec2, logger=Mock())
         handler = ASGHandler(
-            autoscaling_client=autoscaling, ec2_client=ec2, aws_operations=aws_ops, logger=Mock()
+            autoscaling_client=autoscaling,
+            ec2_client=ec2,
+            aws_operations=aws_ops,
+            logger=Mock(),
         )
 
         # Scale up
@@ -218,7 +229,10 @@ class TestASGHandler:
 
         aws_ops = AWSOperations(ec2_client=ec2, logger=Mock())
         handler = ASGHandler(
-            autoscaling_client=autoscaling, ec2_client=ec2, aws_operations=aws_ops, logger=Mock()
+            autoscaling_client=autoscaling,
+            ec2_client=ec2,
+            aws_operations=aws_ops,
+            logger=Mock(),
         )
 
         # Create instances to terminate
@@ -251,7 +265,9 @@ class TestSpotFleetHandler:
 
         # Create security group
         sg = ec2.create_security_group(
-            GroupName="test-sg", Description="Test security group", VpcId=vpc["Vpc"]["VpcId"]
+            GroupName="test-sg",
+            Description="Test security group",
+            VpcId=vpc["Vpc"]["VpcId"],
         )
 
         aws_ops = AWSOperations(ec2_client=ec2, logger=Mock())

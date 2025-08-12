@@ -1,4 +1,4 @@
-"""AWS provider configuration - unified single source of truth."""
+"""AWS provider configuration - single source of truth."""
 
 from typing import Optional
 

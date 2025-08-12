@@ -8,46 +8,28 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 cd "$PROJECT_ROOT"
 
-# Ensure we're using the venv's Python explicitly
-if [ ! -f ".venv/bin/python" ]; then
-    echo "ERROR: Virtual environment not found at .venv/"
-    echo "Please create it first: python3.11 -m venv .venv"
-    exit 1
-fi
-
-# Activate virtual environment
-source .venv/bin/activate
-
-# Verify Python version
-echo "INFO: Using Python: $(python --version)"
-echo "INFO: Python executable: $(which python)"
+# Use centralized tool runner
+RUN_TOOL="./dev-tools/scripts/run_tool.sh"
 
 # Clean previous builds
 echo "INFO: Cleaning previous builds..."
 rm -rf dist/ build/ *.egg-info/
 
-# Install build dependencies with hybrid approach
-if command -v uv >/dev/null 2>&1; then
-    echo "INFO: Using uv for faster build dependency installation..."
-    if ! python -c "import build" 2>/dev/null; then
-        echo "INFO: Installing build dependencies with uv..."
-        uv pip install build
+# Install build dependencies if needed
+echo "INFO: Checking build dependencies..."
+if ! $RUN_TOOL python -c "import build" 2>/dev/null; then
+    echo "INFO: Installing build dependencies..."
+    if command -v uv >/dev/null 2>&1; then
+        $RUN_TOOL uv add --dev build
+    else
+        $RUN_TOOL pip install build
     fi
-    
-    # Build package using uv (if available) or fallback to standard build
-    echo "INFO: Building package with uv optimization..."
-    python -m build --clean
-else
-    echo "INFO: Using pip (uv not available)..."
-    if ! python -c "import build" 2>/dev/null; then
-        echo "INFO: Installing build dependencies..."
-        python -m pip install build
-    fi
-    
-    # Build package using the venv's Python
-    echo "INFO: Building package..."
-    python -m build --clean
 fi
+
+# Build package
+echo "INFO: Building package..."
+BUILD_ARGS="${BUILD_ARGS:-}"
+$RUN_TOOL python -m build $BUILD_ARGS
 
 echo "SUCCESS: Package built successfully!"
 echo "INFO: Files created:"
@@ -55,12 +37,6 @@ ls -la dist/
 
 echo ""
 echo "INFO: Next steps:"
-echo "  • Test installation: ./dev-tools/package/test-install.sh"
-echo "  • Publish to test PyPI: ./dev-tools/package/publish.sh testpypi"
-echo "  • Publish to PyPI: ./dev-tools/package/publish.sh pypi"
-echo ""
-if command -v uv >/dev/null 2>&1; then
-    echo "TIP: uv was used for faster builds!"
-else
-    echo "TIP: Install uv for faster builds: pip install uv"
-fi
+echo "  • Test installation: make test-install"
+echo "  • Publish to test PyPI: make publish-test"
+echo "  • Publish to PyPI: make publish"

@@ -296,17 +296,17 @@ if __name__ == "__main__":
     try:
         app = Application()
         test_suite.test_application_creation_is_fast(app)
-        print("✅ Application creation test passed")
+        print("PASS: Application creation test passed")
 
         test_suite.test_lazy_loading_configuration()
-        print("✅ Lazy loading configuration test passed")
+        print("PASS: Lazy loading configuration test passed")
 
         asyncio.run(test_suite.test_application_initialization_works(app))
-        print("✅ Application initialization test passed")
+        print("PASS: Application initialization test passed")
 
         print("=" * 50)
-        print("🎉 Integration tests completed successfully!")
+        print("Integration tests completed successfully!")
 
     except Exception as e:
-        print(f"❌ Integration test failed: {e}")
+        print(f"FAIL: Integration test failed: {e}")
         sys.exit(1)

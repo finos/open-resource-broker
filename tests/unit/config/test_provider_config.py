@@ -55,7 +55,7 @@ class TestProviderInstanceConfig:
     def test_provider_type_validation(self):
         """Test provider type validation."""
         # Valid types
-        valid_types = ["aws", "azure", "gcp"]
+        valid_types = ["aws", "provider1", "provider2"]
         for provider_type in valid_types:
             config = ProviderInstanceConfig(name="test", type=provider_type)
             assert config.type == provider_type
@@ -131,7 +131,10 @@ class TestCircuitBreakerConfig:
     def test_custom_circuit_breaker_config(self):
         """Test custom circuit breaker configuration."""
         config = CircuitBreakerConfig(
-            enabled=False, failure_threshold=10, recovery_timeout=120, half_open_max_calls=5
+            enabled=False,
+            failure_threshold=10,
+            recovery_timeout=120,
+            half_open_max_calls=5,
         )
 
         assert config.enabled is False

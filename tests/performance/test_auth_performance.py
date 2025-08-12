@@ -30,7 +30,10 @@ class TestAuthenticationPerformance:
             auth=AuthConfig(
                 enabled=True,
                 strategy="bearer_token",
-                bearer_token={"secret_key": "performance-test-secret-key", "algorithm": "HS256"},
+                bearer_token={
+                    "secret_key": "performance-test-secret-key",
+                    "algorithm": "HS256",
+                },
             ),
         )
         app = create_fastapi_app(server_config)
@@ -132,7 +135,9 @@ class TestAuthenticationPerformance:
 
         # Create test token
         token = strategy._create_access_token(
-            user_id="perf-user", roles=["user", "admin"], permissions=["read", "write", "admin"]
+            user_id="perf-user",
+            roles=["user", "admin"],
+            permissions=["read", "write", "admin"],
         )
 
         num_validations = 1000

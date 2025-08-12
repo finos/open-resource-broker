@@ -47,6 +47,7 @@ def handle_exceptions(
     """
 
     def decorator(func: Callable) -> Callable:
+        """Apply error handling to the function."""
         if inspect.iscoroutinefunction(func):
             # Async wrapper for async functions
             @wraps(func)
@@ -74,6 +75,7 @@ def handle_exceptions(
             # Sync wrapper for sync functions
             @wraps(func)
             def sync_wrapper(*args, **kwargs):
+                """Synchronous wrapper with error handling."""
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:

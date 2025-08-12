@@ -178,7 +178,14 @@ class TestValueObjects:
     def test_resource_id_validation(self):
         """Test ResourceId validation."""
         # Valid resource IDs
-        valid_ids = ["resource-123", "res-456", "r-789", "subnet-abc123", "sg-def456", "vpc-ghi789"]
+        valid_ids = [
+            "resource-123",
+            "res-456",
+            "r-789",
+            "subnet-abc123",
+            "sg-def456",
+            "vpc-ghi789",
+        ]
 
         for valid_id in valid_ids:
             resource_id = ResourceId(value=valid_id)
@@ -286,6 +293,7 @@ class TestValueObjects:
                 IPAddress(value=invalid_ip)
 
     # TODO: AvailabilityZone tests - class not yet implemented
+    # noqa:COMMENTED section-start
     # def test_availability_zone_creation(self):
     #     """Test AvailabilityZone value object creation."""
     #     az = AvailabilityZone("us-east-1a")
@@ -320,6 +328,7 @@ class TestValueObjects:
     #     for invalid_az in invalid_azs:
     #         with pytest.raises((ValueError, ValidationError)):
     #             AvailabilityZone(invalid_az)
+    # noqa:COMMENTED section-end
 
 
 @pytest.mark.unit

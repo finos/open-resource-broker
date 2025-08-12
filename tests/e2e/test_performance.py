@@ -47,7 +47,7 @@ class TestPerformance:
                     "enabled": i < 25,  # Half enabled
                     "priority": i + 1,
                     "weight": 100 - i,
-                    "capabilities": ["compute", "storage"] if i % 2 == 0 else ["compute"],
+                    "capabilities": (["compute", "storage"] if i % 2 == 0 else ["compute"]),
                     "config": {
                         "region": f"us-east-{i % 2 + 1}",
                         "profile": f"profile-{i}",

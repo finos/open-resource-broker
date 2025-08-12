@@ -147,7 +147,9 @@ class TestLoggingFixes:
 
             # Create template configuration manager
             template_manager = TemplateConfigurationManager(
-                config_manager=config_manager, scheduler_strategy=scheduler_strategy, logger=logger
+                config_manager=config_manager,
+                scheduler_strategy=scheduler_strategy,
+                logger=logger,
             )
 
             # Mock the AMI resolution methods
@@ -210,7 +212,10 @@ class TestLoggingFixes:
 
             # Verify correct mode detection
             assert provider_info["mode"] == "multi"
-            assert provider_info["provider_names"] == ["aws-aws-primary", "aws-aws-secondary"]
+            assert provider_info["provider_names"] == [
+                "aws-aws-primary",
+                "aws-aws-secondary",
+            ]
             assert provider_info["provider_count"] == 2
 
     def test_no_duplicate_provider_context_logs(self, mock_provider_context):
@@ -257,7 +262,9 @@ class TestLoggingFixes:
             scheduler_strategy = Mock()
 
             template_manager = TemplateConfigurationManager(
-                config_manager=config_manager, scheduler_strategy=scheduler_strategy, logger=logger
+                config_manager=config_manager,
+                scheduler_strategy=scheduler_strategy,
+                logger=logger,
             )
 
             # Mock the AMI resolution methods
@@ -350,7 +357,9 @@ class TestLoggingFixes:
             logger = Mock()
 
             template_manager = TemplateConfigurationManager(
-                config_manager=config_manager, scheduler_strategy=scheduler_strategy, logger=logger
+                config_manager=config_manager,
+                scheduler_strategy=scheduler_strategy,
+                logger=logger,
             )
 
             # Mock template defaults service
@@ -468,7 +477,9 @@ class TestLoggingRegression:
         logger = Mock()
 
         template_manager = TemplateConfigurationManager(
-            config_manager=config_manager, scheduler_strategy=scheduler_strategy, logger=logger
+            config_manager=config_manager,
+            scheduler_strategy=scheduler_strategy,
+            logger=logger,
         )
 
         # Mock AMI resolution methods

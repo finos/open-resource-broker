@@ -83,8 +83,11 @@ def handle_domain_exceptions(context: str):
     """
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        """Apply domain error handling to the function."""
+
         @wraps(func)
         def wrapper(*args, **kwargs) -> T:
+            """Wrapper function that applies domain error handling."""
             # Try to get error handler through domain container port
             error_handler = get_error_handling_port()
 
@@ -96,7 +99,7 @@ def handle_domain_exceptions(context: str):
                     # Let the infrastructure handler deal with it
                     error_msg = error_handler.handle_domain_exceptions(e)
                     if error_msg:
-                        # Re-raise with enhanced context
+                        # Re-raise with additional context
                         raise type(e)(f"{context}: {error_msg}") from e
                     raise
             else:

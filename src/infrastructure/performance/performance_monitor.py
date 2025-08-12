@@ -67,10 +67,12 @@ def performance_monitor(operation_name: Optional[str] = None):
     """Monitor function performance."""
 
     def decorator(func: Callable) -> Callable:
+        """Decorator that adds performance monitoring to a function."""
         name = operation_name or f"{func.__module__}.{func.__name__}"
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            """Wrapper function that measures and records performance metrics."""
             # Try to get monitor from first argument if it has one
             monitor = None
             if args and hasattr(args[0], "_performance_monitor"):

@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 class TemplateConfigurationAdapter(TemplateConfigurationPort):
-    """Adapter implementing TemplateConfigurationPort using unified template configuration manager."""
+    """Adapter implementing TemplateConfigurationPort using centralized template configuration manager."""
 
     def __init__(self, template_manager: TemplateConfigurationManager, logger: LoggingPort):
         """

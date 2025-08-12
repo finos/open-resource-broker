@@ -323,7 +323,9 @@ def _format_validation_table(result: Dict[str, Any]) -> Dict[str, Any]:
     rows = []
 
     for check in result["checks"]:
-        status_symbol = {"PASS": "✅", "WARNING": "⚠️", "FAIL": "❌"}.get(check["status"], "❓")
+        status_symbol = {"PASS": "PASS", "WARNING": "WARN", "FAIL": "FAIL"}.get(
+            check["status"], "UNKNOWN"
+        )
 
         rows.append(
             [
@@ -333,7 +335,7 @@ def _format_validation_table(result: Dict[str, Any]) -> Dict[str, Any]:
             ]
         )
 
-    overall_status = "✅ VALID" if result["valid"] else "❌ INVALID"
+    overall_status = "VALID" if result["valid"] else "INVALID"
 
     return {
         "validation_table": {"headers": headers, "rows": rows},

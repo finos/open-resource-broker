@@ -41,7 +41,10 @@ class TestOCPComplianceIntegration:
 
         # Test strategy creation
         config = ProviderInstanceConfig(
-            name="test-instance", type="test_provider", enabled=True, config={"key": "value"}
+            name="test-instance",
+            type="test_provider",
+            enabled=True,
+            config={"key": "value"},
         )
 
         strategy = registry.create_strategy("test_provider", config)
@@ -108,7 +111,10 @@ class TestOCPComplianceIntegration:
 
         # Test strategy creation
         provider_config = ProviderInstanceConfig(
-            name="test-provider", type="test_type", enabled=True, config={"key": "value"}
+            name="test-provider",
+            type="test_type",
+            enabled=True,
+            config={"key": "value"},
         )
 
         result = factory._create_provider_strategy(provider_config)
@@ -265,8 +271,8 @@ class TestOCPComplianceIntegration:
     def test_configuration_schema_no_legacy_mode(self):
         """Test that configuration schema no longer supports legacy mode."""
         from src.config.schemas.provider_strategy_schema import (
+            IntegratedProviderConfig,
             ProviderMode,
-            UnifiedProviderConfig,
         )
 
         # Verify LEGACY mode is not in enum
@@ -274,10 +280,13 @@ class TestOCPComplianceIntegration:
         assert ProviderMode.LEGACY not in [mode.value for mode in ProviderMode]
 
         # Verify configuration doesn't detect legacy mode
-        config = UnifiedProviderConfig(
+        config = IntegratedProviderConfig(
             providers=[
                 ProviderInstanceConfig(
-                    name="aws-default", type="aws", enabled=True, config={"region": "us-east-1"}
+                    name="aws-default",
+                    type="aws",
+                    enabled=True,
+                    config={"region": "us-east-1"},
                 )
             ]
         )

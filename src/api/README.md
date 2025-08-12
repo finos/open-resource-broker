@@ -1,14 +1,14 @@
-# 🌐 API Layer - REST Interface (Future Implementation)
+# API Layer - REST Interface (Future Implementation)
 
-## 📋 OVERVIEW
+## OVERVIEW
 This API layer contains REST handlers for future HTTP/REST API implementation. Currently, the system uses the CLI interface layer (`src/interface/`) for all user interactions.
 
-## 🎯 PURPOSE
+## PURPOSE
 - **Current Status:** NOT ACTIVELY USED
 - **Future Purpose:** HTTP REST API endpoints
 - **Architecture Role:** Presentation Layer (REST interface)
 
-## 📁 STRUCTURE
+## STRUCTURE
 
 ### **REST Handlers (Future Use):**
 - `GetAvailableTemplatesRESTHandler` - GET /templates endpoint
@@ -21,25 +21,25 @@ This API layer contains REST handlers for future HTTP/REST API implementation. C
 - `BaseAPIHandler` - Base class for all REST handlers
 - `APIHandlerFactory` - Factory for creating REST handlers
 
-## 🏗️ ARCHITECTURE ALIGNMENT
+## ARCHITECTURE ALIGNMENT
 
 ### **Clean Architecture Layers:**
 ```
-┌─────────────────────────────────────┐
-│ PRESENTATION LAYER                  │
-├─────────────────────────────────────┤
-│ CLI Interface    │ REST API (Future)│
-│ (Active)         │ (Planned)        │
-├─────────────────────────────────────┤
-│ APPLICATION LAYER                   │
-│ (Shared by both interfaces)         │
-├─────────────────────────────────────┤
-│ DOMAIN LAYER                        │
-│ (Core business logic)               │
-├─────────────────────────────────────┤
-│ INFRASTRUCTURE LAYER                │
-│ (Data access, external services)    │
-└─────────────────────────────────────┘
++-------------------------------------+
+| PRESENTATION LAYER                  |
++-------------------------------------+
+| CLI Interface    | REST API (Future)|
+| (Active)         | (Planned)        |
++-------------------------------------+
+| APPLICATION LAYER                   |
+| (Shared by both interfaces)         |
++-------------------------------------+
+| DOMAIN LAYER                        |
+| (Core business logic)               |
++-------------------------------------+
+| INFRASTRUCTURE LAYER                |
+| (Data access, external services)    |
++-------------------------------------+
 ```
 
 ### **Handler Naming Convention:**
@@ -48,27 +48,27 @@ This API layer contains REST handlers for future HTTP/REST API implementation. C
 - **Query Handlers:** `*QueryHandler` (Application layer)
 - **Command Handlers:** `*CommandHandler` (Application layer)
 
-## 🚀 FUTURE IMPLEMENTATION PLAN
+## FUTURE IMPLEMENTATION PLAN
 
-### **Phase 1: Basic REST Endpoints**
+### **Core REST Endpoints**
 - Implement HTTP server (Flask/FastAPI)
 - Add request/response serialization
 - Implement authentication/authorization
 - Add OpenAPI/Swagger documentation
 
-### **Phase 2: Advanced Features**
+### **Advanced Features**
 - Rate limiting and throttling
 - Request validation and sanitization
 - Error handling and status codes
 - Monitoring and metrics collection
 
-### **Phase 3: Production Readiness**
+### **Production Readiness**
 - Load balancing support
 - Caching strategies
 - Security hardening
 - Performance optimization
 
-## 🔧 CURRENT USAGE
+## CURRENT USAGE
 
 ### **How to Use (When Implemented):**
 ```python
@@ -98,7 +98,7 @@ result = handler.handle(cli_command)
 3. **Shared Logic:** Business logic is handled by Application layer (shared with CLI)
 4. **Testing:** Handlers are tested but not integrated into main application flow
 
-## 📚 RELATED DOCUMENTATION
+## RELATED DOCUMENTATION
 - [Interface Layer (CLI)](../interface/README.md) - Current active interface
 - [Application Layer](../application/README.md) - Shared business logic
 - [Architecture Overview](../../docs/architecture.md) - System architecture
@@ -107,4 +107,4 @@ result = handler.handle(cli_command)
 
 *Status: FUTURE IMPLEMENTATION*  
 *Last Updated: 2025-07-01*  
-*Phase 1 Step 3: API Layer Documentation Complete*
+*API Layer Documentation Complete*

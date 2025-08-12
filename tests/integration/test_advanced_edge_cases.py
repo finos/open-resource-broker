@@ -56,63 +56,63 @@ def test_advanced_edge_cases():
     }
 
     try:
-        # Test 1: Multi-Provider Strategy Edge Cases
+        # Multi-Provider Strategy Edge Cases
         print("\n1. Testing Multi-Provider Strategy Edge Cases...")
         results["multi_provider_edge_cases"] = test_multi_provider_edge_cases()
 
-        # Test 2: Concurrent Request Handling
+        # Concurrent Request Handling
         print("\n2. Testing Concurrent Request Handling...")
         results["concurrent_request_handling"] = test_concurrent_request_handling()
 
-        # Test 3: Storage Strategy Stress Tests
+        # Storage Strategy Stress Tests
         print("\n3. Testing Storage Strategy Stress...")
         results["storage_strategy_stress"] = test_storage_strategy_stress()
 
-        # Test 4: Domain Model Boundary Violations
+        # Domain Model Boundary Violations
         print("\n4. Testing Domain Boundary Violations...")
         results["domain_boundary_violations"] = test_domain_boundary_violations()
 
-        # Test 5: AWS API Integration Edge Cases
+        # AWS API Integration Edge Cases
         print("\n5. Testing AWS API Integration Edge Cases...")
         results["aws_api_integration_edge_cases"] = test_aws_api_integration_edge_cases()
 
-        # Test 6: Configuration Validation Extremes
+        # Configuration Validation Extremes
         print("\n6. Testing Configuration Validation Extremes...")
         results["configuration_validation_extremes"] = test_configuration_validation_extremes()
 
-        # Test 7: Template Lifecycle Edge Cases
+        # Template Lifecycle Edge Cases
         print("\n7. Testing Template Lifecycle Edge Cases...")
         results["template_lifecycle_edge_cases"] = test_template_lifecycle_edge_cases()
 
-        # Test 8: Request Lifecycle Stress Tests
+        # Request Lifecycle Stress Tests
         print("\n8. Testing Request Lifecycle Stress...")
         results["request_lifecycle_stress"] = test_request_lifecycle_stress()
 
-        # Test 9: Machine State Management
+        # Machine State Management
         print("\n9. Testing Machine State Management...")
         results["machine_state_management"] = test_machine_state_management()
 
-        # Test 10: Error Handling and Recovery
+        # Error Handling and Recovery
         print("\n10. Testing Error Handling and Recovery...")
         results["error_handling_recovery"] = test_error_handling_recovery()
 
-        # Test 11: Security and Compliance Edge Cases
+        # Security and Compliance Edge Cases
         print("\n11. Testing Security and Compliance Edge Cases...")
         results["security_compliance_edge_cases"] = test_security_compliance_edge_cases()
 
-        # Test 12: Performance and Scalability Limits
+        # Performance and Scalability Limits
         print("\n12. Testing Performance and Scalability Limits...")
         results["performance_scalability_limits"] = test_performance_scalability_limits()
 
-        # Test 13: Integration Boundary Edge Cases
+        # Integration Boundary Edge Cases
         print("\n13. Testing Integration Boundary Edge Cases...")
         results["integration_boundary_edge_cases"] = test_integration_boundary_edge_cases()
 
-        # Test 14: Time-Based Edge Cases
+        # Time-Based Edge Cases
         print("\n14. Testing Time-Based Edge Cases...")
         results["time_based_edge_cases"] = test_time_based_edge_cases()
 
-        # Test 15: Resource Limit Edge Cases
+        # Resource Limit Edge Cases
         print("\n15. Testing Resource Limit Edge Cases...")
         results["resource_limit_edge_cases"] = test_resource_limit_edge_cases()
 
@@ -436,7 +436,10 @@ def test_storage_strategy_stress():
                             def concurrent_write(thread_id):
                                 """Simulate concurrent write operation."""
                                 try:
-                                    data = {"thread_id": thread_id, "timestamp": time.time()}
+                                    data = {
+                                        "thread_id": thread_id,
+                                        "timestamp": time.time(),
+                                    }
                                     # Simulate file locking by using thread-specific files
                                     thread_file = f"{file_path}.{thread_id}"
                                     with open(thread_file, "w") as f:

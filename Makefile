@@ -1,30 +1,39 @@
 # Makefile for Open Host Factory Plugin
 
-.PHONY: help install install-pip install-uv dev-install dev-install-pip dev-install-uv test test-unit test-integration test-e2e test-all test-cov test-html test-parallel test-quick test-performance test-aws test-report lint format security security-container security-full security-scan security-validate-sarif security-report sbom-generate clean clean-all build build-test docs docs-build docs-serve docs-deploy docs-clean docs-deploy-version docs-list-versions docs-delete-version ci-docs-build ci-docs-build-for-pages ci-docs-deploy run run-dev version-bump version-bump-patch version-bump-minor version-bump-major ci-quality ci-security ci-security-codeql ci-security-container ci-architecture ci-imports ci-tests-unit ci-tests-integration ci-tests-e2e ci-tests-matrix ci-tests-performance ci-check ci-check-quick ci-check-fix ci-check-verbose ci ci-quick workflow-ci workflow-test-matrix workflow-security architecture-check architecture-report quality-check quality-check-fix quality-check-files quality-gates quality-full generate-completions install-completions install-bash-completions install-zsh-completions uninstall-completions test-completions dev-setup install-package uninstall-package reinstall-package init-db create-config validate-config docker-build docker-run docker-compose-up docker-compose-down dev status uv-lock uv-sync uv-sync-dev uv-check uv-benchmark file-sizes file-sizes-report
+.PHONY: help install install-pip install-uv dev-install dev-install-pip dev-install-uv test test-unit test-integration test-e2e test-all test-cov test-html test-parallel test-quick test-performance test-aws test-report lint format security security-container security-full security-scan security-validate-sarif security-report sbom-generate clean clean-all build build-test docs docs-build docs-serve docs-deploy docs-clean docs-deploy-version docs-list-versions docs-delete-version ci-docs-build ci-docs-build-for-pages ci-docs-deploy run run-dev version-show version-bump version-bump-patch version-bump-minor version-bump-major generate-pyproject ci-quality ci-security ci-security-codeql ci-security-container ci-architecture ci-imports ci-tests-unit ci-tests-integration ci-tests-e2e ci-tests-matrix ci-tests-performance ci-check ci-check-quick ci-check-fix ci-check-verbose ci ci-quick workflow-ci workflow-test-matrix workflow-security architecture-check architecture-report quality-check quality-check-fix quality-check-files quality-gates quality-full generate-completions install-completions install-bash-completions install-zsh-completions uninstall-completions test-completions dev-setup install-package uninstall-package reinstall-package init-db create-config validate-config docker-build docker-run docker-compose-up docker-compose-down dev status uv-lock uv-sync uv-sync-dev uv-check uv-benchmark file-sizes file-sizes-report validate-workflows detect-secrets clean-whitespace hadolint-check install-dev-tools dev-checks-container dev-checks-container-required format-container hadolint-check-container pre-commit-check pre-commit-check-required
 
 # Python settings
 PYTHON := python3
 VENV := .venv
 BIN := $(VENV)/bin
 
-# Python version settings (centralized for all build/test operations)
-PYTHON_VERSIONS := 3.9 3.10 3.11 3.12 3.13
-DEFAULT_PYTHON := 3.13
+# Project configuration (single source of truth)
+PROJECT_CONFIG := .project.yml
 
-# Generate pyproject.toml from template with centralized configuration
-generate-pyproject:  ## Generate pyproject.toml from template using centralized config
-	./dev-tools/scripts/generate-pyproject.py
+# Configurable arguments for different environments
+TEST_ARGS ?= 
+BUILD_ARGS ?=
+DOCS_ARGS ?=
 
-# Get package metadata dynamically (single source of truth)
-PACKAGE_NAME := $(shell python -c "from src._package import PACKAGE_NAME; print(PACKAGE_NAME)" 2>/dev/null || echo "open-hostfactory-plugin")
-PACKAGE_NAME_SHORT := $(shell python -c "from src._package import PACKAGE_NAME_SHORT; print(PACKAGE_NAME_SHORT)" 2>/dev/null || echo "ohfp")
-REPO_ORG := $(shell python -c "from src._package import REPO_ORG; print(REPO_ORG)" 2>/dev/null || echo "awslabs")
-CONTAINER_REGISTRY := $(shell python -c "from src._package import CONTAINER_REGISTRY; print(CONTAINER_REGISTRY)" 2>/dev/null || echo "ghcr.io/awslabs")
-CONTAINER_IMAGE := $(shell python -c "from src._package import CONTAINER_IMAGE; print(CONTAINER_IMAGE)" 2>/dev/null || echo "open-hostfactory-plugin")
-DOCS_URL := $(shell python -c "from src._package import DOCS_URL; print(DOCS_URL)" 2>/dev/null || echo "https://awslabs.github.io/open-hostfactory-plugin")
+# Python version settings (loaded from project config)
+PYTHON_VERSIONS := $(shell yq '.python.versions | join(" ")' $(PROJECT_CONFIG))
+DEFAULT_PYTHON_VERSION := $(shell yq '.python.default_version' $(PROJECT_CONFIG))
 
-# Get version dynamically (single source of truth)
-VERSION := $(shell python -c "from src._version import __version__; print(__version__)" 2>/dev/null || echo "0.1.0")
+# Generate pyproject.toml from template with project configuration
+generate-pyproject:  ## Generate pyproject.toml from template using project config
+	@echo "Generating pyproject.toml from template using $(PROJECT_CONFIG)..."
+	@./dev-tools/scripts/generate_pyproject.py --config $(PROJECT_CONFIG)
+
+# Package information (loaded from project config)
+PACKAGE_NAME := $(shell yq '.project.name' $(PROJECT_CONFIG))
+PACKAGE_NAME_SHORT := $(shell yq '.project.short_name' $(PROJECT_CONFIG))
+VERSION := $(shell yq '.project.version' $(PROJECT_CONFIG))
+
+# Repository information (loaded from project config)
+REPO_ORG := $(shell yq '.repository.org' $(PROJECT_CONFIG))
+CONTAINER_REGISTRY := $(shell yq '.repository.registry' $(PROJECT_CONFIG))/$(REPO_ORG)
+CONTAINER_IMAGE := $(PACKAGE_NAME)
+DOCS_URL := https://$(REPO_ORG).github.io/$(PACKAGE_NAME)
 
 # Project settings
 PROJECT := $(PACKAGE_NAME)
@@ -138,13 +147,13 @@ $(VENV)/bin/activate: uv.lock
 test: test-quick  ## Run quick test suite (alias for test-quick)
 
 test-unit: dev-install  ## Run unit tests only
-	./dev-tools/testing/run_tests.py --unit
+	./dev-tools/testing/run_tests.py --unit $(TEST_ARGS)
 
 test-integration: dev-install  ## Run integration tests only
-	./dev-tools/testing/run_tests.py --integration
+	./dev-tools/testing/run_tests.py --integration $(TEST_ARGS)
 
 test-e2e: dev-install  ## Run end-to-end tests only
-	./dev-tools/testing/run_tests.py --e2e
+	./dev-tools/testing/run_tests.py --e2e $(TEST_ARGS)
 
 test-all: dev-install  ## Run all tests
 	./dev-tools/testing/run_tests.py
@@ -169,12 +178,16 @@ test-html: dev-install  ## Run tests with HTML coverage report
 	@echo "Coverage report generated in htmlcov/index.html"
 
 test-report: dev-install  ## Generate comprehensive test report
-	./dev-tools/testing/run_tests.py --coverage --html-coverage
+	./dev-tools/testing/run_tests.py --all --coverage --junit-xml=test-results-combined.xml --cov-xml=coverage-combined.xml --html-coverage --maxfail=1 --timeout=60
 
 # Code quality targets
-quality-check: dev-install  ## Run professional quality checks
+quality-check: dev-install  ## Run professional quality checks on modified files
 	@echo "Running professional quality checks..."
 	./dev-tools/scripts/quality_check.py --strict
+
+quality-check-all: dev-install  ## Run professional quality checks on all files
+	@echo "Running professional quality checks on all files..."
+	./dev-tools/scripts/quality_check.py --strict --all
 
 quality-check-fix: dev-install  ## Run quality checks with auto-fix
 	@echo "Running professional quality checks with auto-fix..."
@@ -200,12 +213,42 @@ lint: dev-install quality-check  ## Run all linting checks including quality che
 	@echo "Running pylint (code analysis)..."
 	$(BIN)/pylint $(PACKAGE)
 
-format: dev-install  ## Format code (Black + isort + autopep8 + whitespace cleanup)
-	@echo "Cleaning up whitespace in blank lines..."
-	@find $(PACKAGE) $(TESTS) -name "*.py" -exec sed -i '' 's/^[[:space:]]*$$//' {} \;
-	$(BIN)/autopep8 --in-place --max-line-length=88 --select=E501 --recursive $(PACKAGE) $(TESTS)
-	$(BIN)/black $(PACKAGE) $(TESTS)
-	$(BIN)/isort $(PACKAGE) $(TESTS)
+hadolint-check: ## Check Dockerfile with hadolint
+	@if command -v hadolint >/dev/null 2>&1; then \
+		echo "Running hadolint on Dockerfile..."; \
+		hadolint Dockerfile; \
+	else \
+		echo "hadolint not found - install with: brew install hadolint"; \
+		exit 1; \
+	fi
+
+dev-checks-container: ## Run all pre-commit checks in container (no local tools needed)
+	./dev-tools/scripts/run_dev_checks.sh all
+
+dev-checks-container-required: ## Run only required pre-commit checks in container (skip warnings)
+	./dev-tools/scripts/run_dev_checks.sh required
+
+format-container: ## Format code in container (no local tools needed)
+	./dev-tools/scripts/run_dev_checks.sh format
+
+hadolint-check-container: ## Check Dockerfile with hadolint in container (no local install needed)
+	./dev-tools/scripts/run_dev_checks.sh all
+
+install-dev-tools: ## Install development tools (hadolint, etc.)
+	@echo "Installing development tools..."
+	@if command -v brew >/dev/null 2>&1; then \
+		brew install hadolint; \
+	else \
+		echo "Homebrew not found. Please install hadolint manually."; \
+		echo "See: https://github.com/hadolint/hadolint#install"; \
+	fi
+
+clean-whitespace:  ## Clean whitespace in blank lines from all files
+	@echo "Cleaning whitespace in blank lines..."
+	./dev-tools/scripts/clean_whitespace.py
+
+format: dev-install clean-whitespace  ## Format code (Black + isort + autopep8 + autoflake + whitespace cleanup)
+	./dev-tools/scripts/format_code.py
 
 security: dev-install  ## Run security checks
 	@echo "Running bandit (security linter)..."
@@ -304,16 +347,16 @@ generate-completions:     ## Generate completion scripts (bash and zsh)
 	@echo "SUCCESS: Completion scripts generated in dev-tools/completions/"
 
 install-completions:      ## Install completions for current user
-	./dev-tools/scripts/install-completions.sh
+	./dev-tools/scripts/install_completions.sh
 
 install-bash-completions: ## Install bash completions only
-	./dev-tools/scripts/install-completions.sh bash
+	./dev-tools/scripts/install_completions.sh bash
 
 install-zsh-completions:  ## Install zsh completions only
-	./dev-tools/scripts/install-completions.sh zsh
+	./dev-tools/scripts/install_completions.sh zsh
 
 uninstall-completions:    ## Remove installed completions
-	./dev-tools/scripts/install-completions.sh --uninstall
+	./dev-tools/scripts/install_completions.sh --uninstall
 
 test-completions:         ## Test completion generation
 	@echo "Testing bash completion generation..."
@@ -382,24 +425,42 @@ docs-clean:  ## Clean documentation build files
 	rm -rf $(DOCS_BUILD_DIR)
 
 # Version management targets
-version-bump-patch:  ## Bump patch version (0.1.0 -> 0.1.1)
-	./dev-tools/package/version-bump.sh patch
+version-show:  ## Show current version from project config
+	@echo "Current version: $(VERSION)"
 
-version-bump-minor:  ## Bump minor version (0.1.0 -> 0.2.0)
-	./dev-tools/package/version-bump.sh minor
+version-bump-patch:  ## Bump patch version (1.0.0 -> 1.0.1)
+	@./dev-tools/package/version_bump.sh patch
 
-version-bump-major:  ## Bump major version (0.1.0 -> 1.0.0)
-	./dev-tools/package/version-bump.sh major
+version-bump-minor:  ## Bump minor version (1.0.0 -> 1.1.0)
+	@./dev-tools/package/version_bump.sh minor
+
+version-bump-major:  ## Bump major version (1.0.0 -> 2.0.0)
+	@./dev-tools/package/version_bump.sh major
 
 version-bump:  ## Show version bump help
-	./dev-tools/package/version-bump.sh
+	@echo "Version Management Commands:"
+	@echo "  make version-show         - Show current version"
+	@echo "  make version-bump-patch   - Bump patch version (1.0.0 -> 1.0.1)"
+	@echo "  make version-bump-minor   - Bump minor version (1.0.0 -> 1.1.0)"
+	@echo "  make version-bump-major   - Bump major version (1.0.0 -> 2.0.0)"
+	@echo ""
+	@echo "Current version: $(VERSION)"
 
 # Build targets (using dev-tools)
-build: generate-pyproject clean dev-install  ## Build package
-	./dev-tools/package/build.sh
+build: clean generate-pyproject dev-install  ## Build package
+	BUILD_ARGS="$(BUILD_ARGS)" ./dev-tools/package/build.sh
 
 build-test: build  ## Build and test package installation
-	./dev-tools/package/test-install.sh
+	./dev-tools/package/test_install.sh
+
+test-install: build  ## Test package installation
+	./dev-tools/package/test_install.sh
+
+publish: build  ## Publish to PyPI (interactive)
+	./dev-tools/package/publish.sh pypi
+
+publish-test: build  ## Publish to test PyPI
+	./dev-tools/package/publish.sh testpypi
 
 # CI/CD targets
 # Individual code quality targets (with tool names)
@@ -454,6 +515,22 @@ file-sizes: dev-install  ## Check file sizes (developer-friendly alias)
 file-sizes-report: dev-install  ## Generate detailed file size report
 	./dev-tools/scripts/check_file_sizes.py --report
 
+validate-workflows: dev-install  ## Validate GitHub Actions workflow YAML files
+	@echo "Validating workflow files..."
+	./dev-tools/scripts/validate_workflows.py
+
+detect-secrets: dev-install  ## Detect potential hardcoded secrets in source code
+	@echo "Detecting hardcoded secrets..."
+	./dev-tools/security/detect_secrets.py
+
+pre-commit-check: dev-install  ## Run all pre-commit validation checks
+	@echo "Running pre-commit validation checks..."
+	./dev-tools/scripts/pre_commit_check.py
+
+pre-commit-check-required: dev-install  ## Run only required pre-commit checks (skip warnings)
+	@echo "Running required pre-commit validation checks..."
+	./dev-tools/scripts/pre_commit_check.py --required-only
+
 # Composite target
 ci-architecture: ci-arch-cqrs ci-arch-clean ci-arch-imports ci-arch-file-sizes  ## Run all architecture checks
 
@@ -484,8 +561,32 @@ ci-security-hadolint:  ## Run Hadolint Dockerfile scan
 		echo "Hadolint not available - install with: brew install hadolint"; \
 	fi
 
+ci-security-semgrep:  ## Run Semgrep static analysis
+	@echo "Running Semgrep static analysis..."
+	@if command -v semgrep >/dev/null 2>&1; then \
+		semgrep --config=auto --sarif --output=semgrep.sarif src/ || echo "Semgrep issues found"; \
+	else \
+		echo "Semgrep not available - install with: pip install semgrep"; \
+	fi
+
+ci-security-trivy-fs:  ## Run Trivy filesystem scan
+	@echo "Running Trivy filesystem scan..."
+	@if command -v trivy >/dev/null 2>&1; then \
+		trivy fs --format sarif --output trivy-fs-results.sarif . || echo "Trivy filesystem issues found"; \
+	else \
+		echo "Trivy not available - install from https://aquasecurity.github.io/trivy/"; \
+	fi
+
+ci-security-trufflehog:  ## Run TruffleHog secrets scan
+	@echo "Running TruffleHog secrets scan..."
+	@if command -v trufflehog >/dev/null 2>&1; then \
+		trufflehog git file://. --json > trufflehog-results.json || echo "Secrets found"; \
+	else \
+		echo "TruffleHog not available - install from https://github.com/trufflesecurity/trufflehog"; \
+	fi
+
 # Composite target
-ci-security: ci-security-bandit ci-security-safety  ## Run all security scans
+ci-security: ci-security-bandit ci-security-safety ci-security-semgrep ci-security-trivy-fs ci-security-trufflehog  ## Run all security scans
 
 ci-build-sbom:  ## Generate SBOM files (matches publish.yml workflow)
 	@echo "Generating SBOM files for CI..."
@@ -522,12 +623,6 @@ ci-check-quick:  ## Run quick CI checks (fast checks only)
 	@echo "Running quick CI checks..."
 	$(MAKE) ci-quality
 	$(MAKE) ci-architecture
-
-ci-check-fix:  ## Run CI checks with automatic formatting fixes
-	@echo "Running CI checks with automatic fixes..."
-	$(call run-tool,black,src/ tests/)
-	$(call run-tool,isort,src/ tests/)
-	$(MAKE) ci-quality
 
 ci-check-verbose:  ## Run CI checks with verbose output
 	@echo "Running CI checks with verbose output..."
@@ -614,7 +709,7 @@ docker-build:  ## Build Docker image
 	REGISTRY=$(CONTAINER_REGISTRY) \
 	VERSION=$(VERSION) \
 	IMAGE_NAME=$(CONTAINER_IMAGE) \
-	./dev-tools/scripts/container-build.sh
+	./dev-tools/scripts/container_build.sh
 
 docker-run:  ## Run Docker container
 	docker run -p 8000:8000 $(PROJECT):latest
@@ -634,10 +729,10 @@ container-build-multi: dev-install  ## Build container images for all Python ver
 		IMAGE_NAME=$(CONTAINER_IMAGE) \
 		PYTHON_VERSION=$$py_ver \
 		MULTI_PYTHON=true \
-		./dev-tools/scripts/container-build.sh; \
+		./dev-tools/scripts/container_build.sh; \
 	done
-	@echo "Tagging default Python $(DEFAULT_PYTHON) as latest..."
-	@docker tag $(CONTAINER_REGISTRY)/$(CONTAINER_IMAGE):$(VERSION)-python$(DEFAULT_PYTHON) $(CONTAINER_REGISTRY)/$(CONTAINER_IMAGE):$(VERSION)
+	@echo "Tagging default Python $(DEFAULT_PYTHON_VERSION) as latest..."
+	@docker tag $(CONTAINER_REGISTRY)/$(CONTAINER_IMAGE):$(VERSION)-python$(DEFAULT_PYTHON_VERSION) $(CONTAINER_REGISTRY)/$(CONTAINER_IMAGE):$(VERSION)
 
 container-build-single: dev-install  ## Build container image for single Python version (usage: make container-build-single PYTHON_VERSION=3.11)
 	@if [ -z "$(PYTHON_VERSION)" ]; then \
@@ -648,7 +743,7 @@ container-build-single: dev-install  ## Build container image for single Python 
 	VERSION=$(VERSION) \
 	IMAGE_NAME=$(CONTAINER_IMAGE) \
 	PYTHON_VERSION=$(PYTHON_VERSION) \
-	./dev-tools/scripts/container-build.sh
+	./dev-tools/scripts/container_build.sh
 
 container-push-multi: container-build-multi  ## Push all container images to registry
 	@for py_ver in $(PYTHON_VERSIONS); do \
@@ -665,13 +760,13 @@ container-show-version:  ## Show current version and tags that would be created
 	@echo "Version: $(VERSION)"
 	@echo "Registry: $(CONTAINER_REGISTRY)"
 	@echo "Python Versions: $(PYTHON_VERSIONS)"
-	@echo "Default Python: $(DEFAULT_PYTHON)"
+	@echo "Default Python: $(DEFAULT_PYTHON_VERSION)"
 	@echo ""
 	@echo "Container tags that would be created:"
 	@for py_ver in $(PYTHON_VERSIONS); do \
 		echo "  - $(CONTAINER_REGISTRY)/$(CONTAINER_IMAGE):$(VERSION)-python$$py_ver"; \
 	done
-	@echo "  - $(CONTAINER_REGISTRY)/$(CONTAINER_IMAGE):$(VERSION) (default: Python $(DEFAULT_PYTHON))"
+	@echo "  - $(CONTAINER_REGISTRY)/$(CONTAINER_IMAGE):$(VERSION) (default: Python $(DEFAULT_PYTHON_VERSION))"
 
 # Configuration management targets
 show-package-info:  ## Show current package and version metadata
@@ -726,6 +821,22 @@ status:  ## Show project status and useful commands
 	@echo "  Show info:      make container-show-version"
 	@echo "  Build single:   make container-build-single PYTHON_VERSION=3.11"
 	@echo "  Build all:      make container-build-multi"
+
+# Print variable targets for CI integration
+print-%:
+	@echo $($*)
+
+# JSON print targets for GitHub Actions (handles both single values and lists)
+print-json-PYTHON_VERSIONS:  ## Print Python versions as JSON for GitHub Actions
+	@echo "$(PYTHON_VERSIONS)" | tr ' ' '\n' | jq -R . | jq -s . | jq -c .
+
+print-json-%:
+	@value="$($*)"; \
+	if echo "$$value" | grep -q " "; then \
+		echo "$$value" | tr ' ' '\n' | jq -R . | jq -s . | jq -c .; \
+	else \
+		echo "$$value" | jq -R . | jq -c .; \
+	fi
 
 # UV-specific targets for performance optimization
 uv-lock: ## Generate uv lock file for reproducible builds

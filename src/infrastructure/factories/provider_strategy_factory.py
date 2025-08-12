@@ -1,6 +1,6 @@
 """Provider Strategy Factory - Configuration-driven provider strategy creation.
 
-This factory creates provider strategies and contexts based on unified configuration,
+This factory creates provider strategies and contexts based on integrated configuration,
 integrating the existing provider strategy ecosystem with the CQRS architecture.
 """
 
@@ -31,7 +31,7 @@ class ProviderCreationError(Exception):
 
 
 class ProviderStrategyFactory:
-    """Factory for creating provider strategies from unified configuration."""
+    """Factory for creating provider strategies from integrated configuration."""
 
     def __init__(self, config_manager: ConfigurationPort, logger: Optional[LoggingPort] = None):
         """
@@ -48,7 +48,7 @@ class ProviderStrategyFactory:
     @handle_infrastructure_exceptions(context="provider_context_creation")
     def create_provider_context(self) -> ProviderContext:
         """
-        Create configured provider context based on unified configuration.
+        Create configured provider context based on integrated configuration.
 
         Returns:
             Configured ProviderContext instance
@@ -58,16 +58,19 @@ class ProviderStrategyFactory:
             ProviderCreationError: If provider creation fails
         """
         try:
-            # Get unified provider configuration
-            unified_config = self._config_manager.get_unified_provider_config()
-            mode = unified_config.get_mode()
+            # Get integrated provider configuration
+            provider_config = self._config_manager.get_provider_config()
+            if not provider_config:
+                raise ConfigurationError("Provider configuration not found")
+
+            mode = provider_config.get_mode()
 
             self._logger.info(f"Creating provider context in {mode.value} mode")
 
             if mode == ProviderMode.SINGLE:
-                return self._create_single_provider_context(unified_config)
+                return self._create_single_provider_context(provider_config)
             elif mode == ProviderMode.MULTI:
-                return self._create_multi_provider_context(unified_config)
+                return self._create_multi_provider_context(provider_config)
             else:
                 raise ConfigurationError("Provider", "No valid provider configuration found")
 
@@ -80,7 +83,7 @@ class ProviderStrategyFactory:
         Create single provider context.
 
         Args:
-            config: Unified provider configuration
+            config: Integrated provider configuration
 
         Returns:
             Configured ProviderContext for single provider
@@ -116,7 +119,7 @@ class ProviderStrategyFactory:
         Create multi-provider context.
 
         Args:
-            config: Unified provider configuration
+            config: Integrated provider configuration
 
         Returns:
             Configured ProviderContext for multiple providers
@@ -258,7 +261,7 @@ class ProviderStrategyFactory:
 
         Args:
             context: Provider context to configure
-            config: Unified provider configuration
+            config: Integrated provider configuration
         """
         try:
             # Configure health check interval
@@ -287,19 +290,22 @@ class ProviderStrategyFactory:
             Dictionary with provider configuration information
         """
         try:
-            unified_config = self._config_manager.get_unified_provider_config()
-            mode = unified_config.get_mode()
-            active_providers = unified_config.get_active_providers()
+            provider_config = self._config_manager.get_provider_config()
+            if not provider_config:
+                return {"mode": "error", "error": "Provider configuration not found"}
+
+            mode = provider_config.get_mode()
+            active_providers = provider_config.get_active_providers()
 
             return {
                 "mode": mode.value,
-                "selection_policy": unified_config.selection_policy,
-                "active_provider": unified_config.active_provider,
-                "total_providers": len(unified_config.providers),
+                "selection_policy": provider_config.selection_policy,
+                "active_provider": provider_config.active_provider,
+                "total_providers": len(provider_config.providers),
                 "active_providers": len(active_providers),
                 "provider_names": [p.name for p in active_providers],
-                "health_check_interval": unified_config.health_check_interval,
-                "circuit_breaker_enabled": unified_config.circuit_breaker.enabled,
+                "health_check_interval": provider_config.health_check_interval,
+                "circuit_breaker_enabled": provider_config.circuit_breaker.enabled,
             }
 
         except Exception as e:
@@ -322,10 +328,14 @@ class ProviderStrategyFactory:
         }
 
         try:
-            # Get and validate unified configuration
-            unified_config = self._config_manager.get_unified_provider_config()
-            mode = unified_config.get_mode()
-            active_providers = unified_config.get_active_providers()
+            # Get and validate integrated configuration
+            provider_config = self._config_manager.get_provider_config()
+            if not provider_config:
+                validation_result["errors"].append("Provider configuration not found")
+                return validation_result
+
+            mode = provider_config.get_mode()
+            active_providers = provider_config.get_active_providers()
 
             validation_result["mode"] = mode.value
             validation_result["provider_count"] = len(active_providers)

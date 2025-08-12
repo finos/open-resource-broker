@@ -4,11 +4,18 @@ CQRS pattern validator for maintaining architectural consistency.
 
 This script validates that CQRS handlers follow proper patterns and inheritance.
 """
-import sys
-import ast
 import argparse
+import ast
+import logging
+import sys
 from pathlib import Path
-from typing import List, Tuple, Set
+from typing import List
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 
 class CQRSValidator:
@@ -49,7 +56,7 @@ class CQRSValidator:
                     self.analyze_handler_class(node, file_path)
 
         except Exception as e:
-            print(f"Warning: Could not analyze {file_path}: {e}")
+            logger.warning(f"Could not analyze {file_path}: {e}")
 
     def analyze_handler_class(self, class_node: ast.ClassDef, file_path: Path) -> None:
         """Analyze a handler class for CQRS compliance."""
@@ -121,10 +128,10 @@ class CQRSValidator:
         self.handler_files = self.find_handler_files()
 
         if not self.handler_files:
-            print("No handler files found.")
+            logger.info("No handler files found.")
             return
 
-        print(f"Analyzing {len(self.handler_files)} handler files...")
+        logger.info(f"Analyzing {len(self.handler_files)} handler files...")
 
         for handler_file in self.handler_files:
             self.analyze_handler_file(handler_file)
@@ -135,31 +142,31 @@ class CQRSValidator:
     def report_findings(self, warn_only: bool) -> None:
         """Report validation findings."""
         if self.violations:
-            print("WARNING: CQRS pattern violations detected:")
-            print("=" * 60)
+            logger.warning(f"CQRS pattern violations detected:")
+            logger.info("=" * 60)
             for violation in self.violations:
-                print(f"  {violation}")
-            print("=" * 60)
-            print("Consider updating handlers to follow CQRS patterns:")
-            print("- Command handlers should inherit from BaseCommandHandler")
-            print("- Query handlers should inherit from BaseQueryHandler")
-            print("- Event handlers should inherit from BaseEventHandler")
-            print("- Implement required validate_* and execute_* methods")
+                logger.info(f"  {violation}")
+            logger.info("=" * 60)
+            logger.info("Consider updating handlers to follow CQRS patterns:")
+            logger.info("- Command handlers should inherit from BaseCommandHandler")
+            logger.info("- Query handlers should inherit from BaseQueryHandler")
+            logger.info("- Event handlers should inherit from BaseEventHandler")
+            logger.info("- Implement required validate_* and execute_* methods")
 
             if not warn_only:
-                print("FAILURE: Build failed due to CQRS violations.")
+                logger.error(f"Build failed due to CQRS violations.")
                 sys.exit(1)
             else:
-                print("Build continues with warnings.")
+                logger.info("Build continues with warnings.")
         else:
-            print("SUCCESS: All CQRS handlers follow proper patterns.")
+            logger.info(f"All CQRS handlers follow proper patterns.")
 
         # Summary statistics
-        print(f"\nCQRS Handler Summary:")
-        print(f"  Command Handlers: {len(self.command_handlers)}")
-        print(f"  Query Handlers: {len(self.query_handlers)}")
-        print(f"  Event Handlers: {len(self.event_handlers)}")
-        print(f"  Total Handler Files: {len(self.handler_files)}")
+        logger.info(f"\nCQRS Handler Summary:")
+        logger.info(f"  Command Handlers: {len(self.command_handlers)}")
+        logger.info(f"  Query Handlers: {len(self.query_handlers)}")
+        logger.info(f"  Event Handlers: {len(self.event_handlers)}")
+        logger.info(f"  Total Handler Files: {len(self.handler_files)}")
 
 
 def main():

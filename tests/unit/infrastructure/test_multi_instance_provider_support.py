@@ -136,10 +136,16 @@ class TestMultiInstanceProviderSupport:
             selection_policy="ROUND_ROBIN",
             providers=[
                 ProviderInstanceConfig(
-                    name="aws-us-east-1", type="aws", enabled=True, config={"region": "us-east-1"}
+                    name="aws-us-east-1",
+                    type="aws",
+                    enabled=True,
+                    config={"region": "us-east-1"},
                 ),
                 ProviderInstanceConfig(
-                    name="aws-eu-west-1", type="aws", enabled=True, config={"region": "eu-west-1"}
+                    name="aws-eu-west-1",
+                    type="aws",
+                    enabled=True,
+                    config={"region": "eu-west-1"},
                 ),
                 ProviderInstanceConfig(
                     name="aws-ap-south-1",
@@ -193,7 +199,10 @@ class TestMultiInstanceProviderSupport:
 
         # Mock provider instance config
         provider_config = ProviderInstanceConfig(
-            name="aws-us-east-1", type="aws", enabled=True, config={"region": "us-east-1"}
+            name="aws-us-east-1",
+            type="aws",
+            enabled=True,
+            config={"region": "us-east-1"},
         )
 
         # Mock registry and strategy

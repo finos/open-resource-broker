@@ -49,7 +49,7 @@ class StorageRegistry(BaseRegistry):
     Registry for storage strategy factories.
 
     Uses SINGLE_CHOICE mode - only one storage strategy at a time.
-    Thread-safe singleton implementation using unified BaseRegistry.
+    Thread-safe singleton implementation using integrated BaseRegistry.
     """
 
     def __init__(self):

@@ -90,7 +90,10 @@ class TestListSchedulerStrategiesHandler:
         with patch(
             "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
             return_value=mock_registry,
-        ), patch("src.config.manager.ConfigurationManager", side_effect=Exception("Config error")):
+        ), patch(
+            "src.config.manager.ConfigurationManager",
+            side_effect=Exception("Config error"),
+        ):
 
             response = await handler.execute_query(query)
 
@@ -115,7 +118,10 @@ class TestGetSchedulerConfigurationHandler:
         # Mock app config
         app_config = Mock()
         scheduler_config = Mock()
-        scheduler_config.model_dump.return_value = {"type": "hostfactory", "config_root": "config"}
+        scheduler_config.model_dump.return_value = {
+            "type": "hostfactory",
+            "config_root": "config",
+        }
         app_config.scheduler = scheduler_config
         config_manager.get_app_config.return_value = app_config
 

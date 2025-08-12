@@ -27,7 +27,7 @@ body:
       description: A clear and concise description of what you want to happen.
       placeholder: |
         I would like to see [...]
-        
+
         Example usage:
         ```python
         # Your code example here
@@ -116,7 +116,7 @@ body:
     attributes:
       value: |
         Thank you for your feature suggestion! We'll review it and get back to you soon.
-        
+
         Remember:
         - Features should align with the project's goals
         - Consider backward compatibility

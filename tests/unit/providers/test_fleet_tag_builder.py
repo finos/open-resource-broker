@@ -33,7 +33,10 @@ class TestFleetTagBuilder:
         assert len(tags) == 5
         assert {"Key": "Name", "Value": f"hf-{self.mock_request.request_id}"} in tags
         assert {"Key": "RequestId", "Value": str(self.mock_request.request_id)} in tags
-        assert {"Key": "TemplateId", "Value": str(self.mock_template.template_id)} in tags
+        assert {
+            "Key": "TemplateId",
+            "Value": str(self.mock_template.template_id),
+        } in tags
         assert {"Key": "CreatedBy", "Value": "HostFactory"} in tags
 
         # Check CreatedAt tag exists and has proper format

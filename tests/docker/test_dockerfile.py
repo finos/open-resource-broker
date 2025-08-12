@@ -116,7 +116,14 @@ class TestDockerfile:
         try:
             # First ensure image exists
             subprocess.run(
-                ["docker", "build", "-t", "ohfp-api:test-startup", "--quiet", str(project_root)],
+                [
+                    "docker",
+                    "build",
+                    "-t",
+                    "ohfp-api:test-startup",
+                    "--quiet",
+                    str(project_root),
+                ],
                 check=True,
                 capture_output=True,
             )
@@ -146,7 +153,14 @@ class TestDockerfile:
         try:
             # Build image
             subprocess.run(
-                ["docker", "build", "-t", "ohfp-api:test-health", "--quiet", str(project_root)],
+                [
+                    "docker",
+                    "build",
+                    "-t",
+                    "ohfp-api:test-health",
+                    "--quiet",
+                    str(project_root),
+                ],
                 check=True,
                 capture_output=True,
             )
@@ -183,7 +197,14 @@ class TestDockerfile:
 
                 # Check container health
                 _ = subprocess.run(
-                    ["docker", "exec", container_id, "curl", "-f", "http://localhost:8000/health"],
+                    [
+                        "docker",
+                        "exec",
+                        container_id,
+                        "curl",
+                        "-f",
+                        "http://localhost:8000/health",
+                    ],
                     capture_output=True,
                     text=True,
                     timeout=10,

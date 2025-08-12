@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.abspath("."))
 def test_domain_validation():
     """Test domain model validation in isolation."""
 
-    print("🔍 ISOLATED DOMAIN VALIDATION TEST")
+    print("ISOLATED DOMAIN VALIDATION TEST")
     print("=" * 50)
 
     results = {
@@ -27,45 +27,45 @@ def test_domain_validation():
     }
 
     try:
-        # Test 1: Basic AWSTemplate creation
-        print("\n1️⃣ Testing Basic AWSTemplate Creation...")
+        # Basic AWSTemplate creation
+        print("\n1. Testing Basic AWSTemplate Creation...")
         results["aws_template_basic"] = test_aws_template_basic()
 
-        # Test 2: SpotFleet AWSTemplate creation
-        print("\n2️⃣ Testing SpotFleet AWSTemplate Creation...")
+        # SpotFleet AWSTemplate creation
+        print("\n2. Testing SpotFleet AWSTemplate Creation...")
         results["aws_template_spot_fleet"] = test_aws_template_spot_fleet()
 
-        # Test 3: Request creation
-        print("\n3️⃣ Testing Request Creation...")
+        # Request creation
+        print("\n3. Testing Request Creation...")
         results["request_creation"] = test_request_creation()
 
-        # Test 4: Base handler validation
-        print("\n4️⃣ Testing Base Handler Validation...")
+        # Base handler validation
+        print("\n4. Testing Base Handler Validation...")
         results["base_handler_validation"] = test_base_handler_validation()
 
         # Summary
         print("\n" + "=" * 50)
-        print("📊 DOMAIN VALIDATION TEST RESULTS")
+        print("DOMAIN VALIDATION TEST RESULTS")
         print("=" * 50)
 
         passed = sum(1 for result in results.values() if result)
         total = len(results)
 
         for test_name, result in results.items():
-            status = "✅ PASS" if result else "❌ FAIL"
+            status = "PASS: PASS" if result else "FAIL: FAIL"
             print(f"{test_name.replace('_', ' ').title()}: {status}")
 
         print(f"\nOverall: {passed}/{total} tests passed")
 
         if passed == total:
-            print("🎉 ALL DOMAIN VALIDATION TESTS PASSED!")
+            print("ALL DOMAIN VALIDATION TESTS PASSED!")
             return True
         else:
-            print("⚠️  Some domain validation tests failed")
+            print("WARN: Some domain validation tests failed")
             return False
 
     except Exception as e:
-        print(f"❌ Test execution failed: {str(e)}")
+        print(f"FAIL: Test execution failed: {str(e)}")
         import traceback
 
         traceback.print_exc()
@@ -91,24 +91,24 @@ def test_aws_template_basic():
                 security_group_ids=["sg-12345"],
             )
 
-            print(f"   ✅ Basic template created: {template.template_id}")
-            print(f"   📋 Provider API: {template.provider_api}")
-            print(f"   📋 Instance Type: {template.instance_type}")
-            print(f"   📋 Image ID: {template.image_id}")
-            print(f"   📋 Subnet IDs: {template.subnet_ids}")
-            print(f"   📋 Security Group IDs: {template.security_group_ids}")
+            print(f"   PASS: Basic template created: {template.template_id}")
+            print(f"   Provider API: {template.provider_api}")
+            print(f"   Instance Type: {template.instance_type}")
+            print(f"   Image ID: {template.image_id}")
+            print(f"   Subnet IDs: {template.subnet_ids}")
+            print(f"   Security Group IDs: {template.security_group_ids}")
 
             return True
 
         except Exception as e:
-            print(f"   ❌ Basic template creation failed: {str(e)}")
+            print(f"   FAIL: Basic template creation failed: {str(e)}")
             import traceback
 
             traceback.print_exc()
             return False
 
     except ImportError as e:
-        print(f"   ❌ Import error: {str(e)}")
+        print(f"   FAIL: Import error: {str(e)}")
         return False
 
 
@@ -136,22 +136,22 @@ def test_aws_template_spot_fleet():
                 fleet_type=AWSFleetType.REQUEST,
             )
 
-            print(f"   ✅ SpotFleet template created: {template.template_id}")
-            print(f"   📋 Provider API: {template.provider_api}")
-            print(f"   📋 Fleet Type: {template.fleet_type}")
-            print(f"   📋 Fleet Role: {template.fleet_role}")
+            print(f"   PASS: SpotFleet template created: {template.template_id}")
+            print(f"   Provider API: {template.provider_api}")
+            print(f"   Fleet Type: {template.fleet_type}")
+            print(f"   Fleet Role: {template.fleet_role}")
 
             return True
 
         except Exception as e:
-            print(f"   ❌ SpotFleet template creation failed: {str(e)}")
+            print(f"   FAIL: SpotFleet template creation failed: {str(e)}")
             import traceback
 
             traceback.print_exc()
             return False
 
     except ImportError as e:
-        print(f"   ❌ Import error: {str(e)}")
+        print(f"   FAIL: Import error: {str(e)}")
         return False
 
 
@@ -172,23 +172,23 @@ def test_request_creation():
                 provider_type="aws",
             )
 
-            print(f"   ✅ Request created: {request.request_id}")
-            print(f"   📋 Request Type: {request.request_type}")
-            print(f"   📋 Template ID: {request.template_id}")
-            print(f"   📋 Machine Count: {request.requested_count}")
-            print(f"   📋 Provider Type: {request.provider_type}")
+            print(f"   PASS: Request created: {request.request_id}")
+            print(f"   Request Type: {request.request_type}")
+            print(f"   Template ID: {request.template_id}")
+            print(f"   Machine Count: {request.requested_count}")
+            print(f"   Provider Type: {request.provider_type}")
 
             return True
 
         except Exception as e:
-            print(f"   ❌ Request creation failed: {str(e)}")
+            print(f"   FAIL: Request creation failed: {str(e)}")
             import traceback
 
             traceback.print_exc()
             return False
 
     except ImportError as e:
-        print(f"   ❌ Import error: {str(e)}")
+        print(f"   FAIL: Import error: {str(e)}")
         return False
 
 
@@ -238,19 +238,19 @@ def test_base_handler_validation():
 
             # Call the validation method directly
             handler._validate_prerequisites(template)
-            print("   ✅ Base handler validation passed")
+            print("   PASS: Base handler validation passed")
 
             return True
 
         except Exception as e:
-            print(f"   ❌ Base handler validation failed: {str(e)}")
+            print(f"   FAIL: Base handler validation failed: {str(e)}")
 
             # Try to get more detailed error information
             if hasattr(e, "errors") and e.errors:
-                print(f"   📋 Validation errors: {e.errors}")
+                print(f"   Validation errors: {e.errors}")
 
             # Let's also check what fields the template actually has
-            print("   📋 Template fields:")
+            print("   Template fields:")
             for field_name in dir(template):
                 if not field_name.startswith("_") and not callable(getattr(template, field_name)):
                     value = getattr(template, field_name)
@@ -262,7 +262,7 @@ def test_base_handler_validation():
             return False
 
     except ImportError as e:
-        print(f"   ❌ Import error: {str(e)}")
+        print(f"   FAIL: Import error: {str(e)}")
         return False
 
 

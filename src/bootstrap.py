@@ -129,20 +129,23 @@ class Application:
     def _log_provider_configuration(self, config_manager) -> None:
         """Log provider configuration information during initialization."""
         try:
-            # Check if unified provider configuration is available
+            # Check if consolidated provider configuration is available
             if hasattr(config_manager, "get_provider_config"):
-                unified_config = config_manager.get_provider_config()
-                mode = unified_config.get_mode()
-                active_providers = unified_config.get_active_providers()
+                provider_config = config_manager.get_provider_config()
+                if provider_config:
+                    mode = provider_config.get_mode()
+                    active_providers = provider_config.get_active_providers()
 
-                self.logger.info(f"Provider configuration mode: {mode.value}")
-                self.logger.info(f"Active providers: {[p.name for p in active_providers]}")
+                    self.logger.info(f"Provider configuration mode: {mode.value}")
+                    self.logger.info(f"Active providers: {[p.name for p in active_providers]}")
 
-                if mode.value == "multi":
-                    self.logger.info(f"Selection policy: {unified_config.selection_policy}")
-                    self.logger.info(
-                        f"Health check interval: {unified_config.health_check_interval}s"
-                    )
+                    if mode.value == "multi":
+                        self.logger.info(f"Selection policy: {provider_config.selection_policy}")
+                        self.logger.info(
+                            f"Health check interval: {provider_config.health_check_interval}s"
+                        )
+                else:
+                    self.logger.info("Provider configuration not found")
 
             elif hasattr(config_manager, "is_provider_strategy_enabled"):
                 if config_manager.is_provider_strategy_enabled():
@@ -329,7 +332,7 @@ async def main() -> None:
     config_path = os.getenv("CONFIG_PATH")
 
     # Only print before app creation - no logger available yet
-    print("Starting Open Host Factory...")
+    print("Starting Open Host Factory...")  # noqa: bootstrap output
 
     try:
         async with await create_application(config_path) as app:
@@ -356,7 +359,7 @@ async def main() -> None:
 
     except Exception as e:
         # Keep print here - app creation failed, no logger available
-        print(f"Application failed: {e}")
+        print(f"Application failed: {e}")  # noqa: bootstrap error
         sys.exit(1)
 
 

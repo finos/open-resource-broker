@@ -215,7 +215,10 @@ class TestEndToEndDryRun:
 
         # Create command with dry-run enabled
         command = CreateRequestCommand(
-            template_id="test-template", machine_count=1, metadata={"test": "data"}, dry_run=True
+            template_id="test-template",
+            machine_count=1,
+            metadata={"test": "data"},
+            dry_run=True,
         )
 
         # Execute command within global dry-run context

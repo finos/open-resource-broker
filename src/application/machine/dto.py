@@ -1,3 +1,5 @@
+"""Data Transfer Objects for machine domain operations."""
+
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 

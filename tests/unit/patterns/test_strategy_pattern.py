@@ -78,7 +78,11 @@ class TestStrategyPattern:
         configs = [
             {"type": "composite", "strategies": ["aws", "mock"]},
             {"type": "fallback", "primary": "aws", "fallback": "mock"},
-            {"type": "load_balancing", "strategies": ["aws1", "aws2"], "algorithm": "round_robin"},
+            {
+                "type": "load_balancing",
+                "strategies": ["aws1", "aws2"],
+                "algorithm": "round_robin",
+            },
         ]
 
         for config in configs:
@@ -182,7 +186,9 @@ class TestStrategyPattern:
 
             # Fallback strategy succeeds
             fallback_strategy.execute.return_value = ProviderResult(
-                success=True, data={"instances": ["i-fallback"]}, metadata={"provider": "fallback"}
+                success=True,
+                data={"instances": ["i-fallback"]},
+                metadata={"provider": "fallback"},
             )
 
         # Configure fallback strategy
@@ -220,7 +226,9 @@ class TestStrategyPattern:
             for i in range(3):
                 strategy = Mock(spec=ProviderStrategy)
                 strategy.execute.return_value = ProviderResult(
-                    success=True, data={"instances": [f"i-{i}"]}, metadata={"provider": f"aws{i}"}
+                    success=True,
+                    data={"instances": [f"i-{i}"]},
+                    metadata={"provider": f"aws{i}"},
                 )
                 strategies.append(strategy)
 
@@ -314,7 +322,10 @@ class TestStrategyPattern:
 
             # Strategies should support metrics collection
             if hasattr(mock_instance, "get_metrics"):
-                mock_instance.get_metrics.return_value = {"requests": 10, "success_rate": 0.95}
+                mock_instance.get_metrics.return_value = {
+                    "requests": 10,
+                    "success_rate": 0.95,
+                }
                 metrics = mock_instance.get_metrics()
                 assert isinstance(metrics, dict)
 

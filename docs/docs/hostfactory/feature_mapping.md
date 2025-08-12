@@ -391,4 +391,4 @@ New providers can be added while maintaining HostFactory compatibility:
 }
 ```
 
-This comprehensive feature mapping ensures that all HostFactory capabilities are preserved and enhanced through the plugin's modern architecture while maintaining full backward compatibility.
+This comprehensive feature mapping ensures that all HostFactory capabilities are preserved and extended through the plugin's current architecture while maintaining full backward compatibility.

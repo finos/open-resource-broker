@@ -8,11 +8,16 @@ and SBOM generation.
 """
 import argparse
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Tuple
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 
 class SecurityScanner:
@@ -26,17 +31,17 @@ class SecurityScanner:
 
     def run_bandit(self) -> Tuple[bool, str]:
         """Run Bandit security linter with SARIF output."""
-        print("Running Bandit security analysis...")
+        logger.info("Running Bandit security analysis...")
 
         try:
             # Check if bandit-sarif-formatter is available
             try:
-                import bandit_sarif_formatter
+                pass
 
                 sarif_available = True
             except ImportError:
                 sarif_available = False
-                print("WARNING: bandit-sarif-formatter not available, falling back to JSON")
+                logger.warning(f"bandit-sarif-formatter not available, falling back to JSON")
 
             # Generate JSON output (always)
             subprocess.run(
@@ -64,7 +69,7 @@ class SecurityScanner:
                 )
 
                 self.sarif_files.append("bandit-report.sarif")
-                print("SUCCESS: Bandit SARIF report generated for GitHub Security integration")
+                logger.info(f"Bandit SARIF report generated for GitHub Security integration")
 
             return True, "Bandit scan completed"
 
@@ -73,7 +78,7 @@ class SecurityScanner:
 
     def run_safety(self) -> Tuple[bool, str]:
         """Run Safety dependency vulnerability check."""
-        print("Running Safety dependency scan...")
+        logger.info("Running Safety dependency scan...")
 
         try:
             result = subprocess.run(
@@ -93,7 +98,7 @@ class SecurityScanner:
 
     def run_trivy(self) -> Tuple[bool, str]:
         """Run Trivy container vulnerability scan."""
-        print("Running Trivy container security scan...")
+        logger.info("Running Trivy container security scan...")
 
         try:
             # Build image
@@ -141,7 +146,7 @@ class SecurityScanner:
 
     def run_hadolint(self) -> Tuple[bool, str]:
         """Run Hadolint Dockerfile security scan."""
-        print("Running Hadolint Dockerfile scan...")
+        logger.info("Running Hadolint Dockerfile scan...")
 
         try:
             subprocess.run(
@@ -159,7 +164,7 @@ class SecurityScanner:
 
     def generate_sbom(self) -> Tuple[bool, str]:
         """Generate Software Bill of Materials."""
-        print("Generating SBOM files...")
+        logger.info("Generating SBOM files...")
 
         try:
             # Python dependencies SBOM with pip-audit (only CycloneDX format is supported)
@@ -190,7 +195,7 @@ class SecurityScanner:
                     check=False,
                 )
             else:
-                print("Syft not available - skipping project SBOM generation")
+                logger.info("Syft not available - skipping project SBOM generation")
 
             return True, "SBOM generation completed"
 
@@ -199,7 +204,7 @@ class SecurityScanner:
 
     def generate_report(self) -> str:
         """Generate comprehensive security report."""
-        print("Generating security report...")
+        logger.info("Generating security report...")
 
         report = {
             "scan_timestamp": subprocess.check_output(["date", "-u"]).decode().strip(),
@@ -275,7 +280,7 @@ class SecurityScanner:
 
     def run_all_scans(self, include_container: bool = True) -> Dict[str, Tuple[bool, str]]:
         """Run all security scans."""
-        print("Starting comprehensive security scan...")
+        logger.info("Starting comprehensive security scan...")
 
         # Core security scans
         self.results["Bandit"] = self.run_bandit()
@@ -289,7 +294,7 @@ class SecurityScanner:
 
         # Generate report
         report_file = self.generate_report()
-        print(f"Security report generated: {report_file}")
+        logger.info(f"Security report generated: {report_file}")
 
         return self.results
 
@@ -308,23 +313,23 @@ def main():
     results = scanner.run_all_scans(include_container=not args.no_container)
 
     # Print summary
-    print("\n" + "=" * 60)
-    print("SECURITY SCAN SUMMARY")
-    print("=" * 60)
+    logger.info("\n" + "=" * 60)
+    logger.info("SECURITY SCAN SUMMARY")
+    logger.info("=" * 60)
 
     all_passed = True
     for scan, (success, message) in results.items():
         status = "PASS" if success else "FAIL"
-        print(f"{status}: {scan} - {message}")
+        logger.info(f"{status}: {scan} - {message}")
         if not success:
             all_passed = False
 
-    print("=" * 60)
+    logger.info("=" * 60)
     if all_passed:
-        print("All security scans completed successfully")
+        logger.info("All security scans completed successfully")
         sys.exit(0)
     else:
-        print("Some security scans encountered issues. Check the reports.")
+        logger.info("Some security scans encountered issues. Check the reports.")
         sys.exit(1)
 
 

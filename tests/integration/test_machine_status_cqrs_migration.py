@@ -53,7 +53,9 @@ class TestMachineStatusCQRSMigration:
         """Test ConvertMachineStatusCommandHandler functionality."""
         # Create command
         command = ConvertMachineStatusCommand(
-            provider_state="running", provider_type="aws", metadata={"test": "migration"}
+            provider_state="running",
+            provider_type="aws",
+            metadata={"test": "migration"},
         )
 
         # Execute handler (synchronous version)
@@ -114,7 +116,9 @@ class TestMachineStatusCQRSMigration:
         """Test ValidateProviderStateCommandHandler functionality."""
         # Create validation command
         command = ValidateProviderStateCommand(
-            provider_state="running", provider_type="aws", metadata={"validation": "test"}
+            provider_state="running",
+            provider_type="aws",
+            metadata={"validation": "test"},
         )
 
         # Execute handler

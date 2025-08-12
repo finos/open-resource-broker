@@ -25,7 +25,7 @@ class SchedulerRegistry(BaseRegistry):
     Registry for scheduler strategy factories.
 
     Uses SINGLE_CHOICE mode - only one scheduler strategy at a time.
-    Thread-safe singleton implementation using unified BaseRegistry.
+    Thread-safe singleton implementation using integrated BaseRegistry.
     """
 
     def __init__(self):

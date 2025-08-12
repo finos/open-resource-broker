@@ -77,7 +77,7 @@ def register_all_storage_types() -> None:
 
 def register_storage_type_on_demand(storage_type: str) -> bool:
     """
-    Register a specific storage type on demand (Phase 3 optimization).
+    Register a specific storage type on demand .
 
     Args:
         storage_type: Name of the storage type to register
@@ -129,7 +129,7 @@ def register_storage_type_on_demand(storage_type: str) -> bool:
 
 def register_minimal_storage_types() -> None:
     """
-    Register only essential storage types for faster startup (Phase 3 optimization).
+    Register only essential storage types for faster startup .
 
     This registers only JSON storage by default, with other types loaded on demand.
     """

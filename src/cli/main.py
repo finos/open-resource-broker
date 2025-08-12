@@ -22,7 +22,7 @@ from src.infrastructure.logging.logger import get_logger
 
 
 def parse_args() -> tuple[argparse.Namespace, dict]:
-    """Parse command line arguments with modern resource-action structure.
+    """Parse command line arguments with resource-action structure.
 
     Returns:
         tuple: (parsed_args, resource_parsers_dict)
@@ -81,7 +81,7 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
     parser.add_argument("-d", "--data", help="Input JSON data string (HostFactory compatibility)")
     # Get version dynamically
     try:
-        from src import __version__
+        from src._package import __version__
 
         version_string = f"%(prog)s {__version__}"
     except ImportError:
@@ -719,15 +719,15 @@ async def main() -> None:
 
             # For other errors, show the original error message and re-raise
             if error_output.strip():
-                print(error_output.strip(), file=sys.stderr)
+                print(error_output.strip(), file=sys.stderr)  # noqa: CLI output
             raise
 
         # Handle completion generation
         if args.completion:
             if args.completion == "bash":
-                print(generate_bash_completion())
+                print(generate_bash_completion())  # noqa: CLI output
             elif args.completion == "zsh":
-                print(generate_zsh_completion())
+                print(generate_zsh_completion())  # noqa: CLI output
             return
 
         # Configure logging - let the application's proper logging system handle
@@ -772,14 +772,14 @@ async def main() -> None:
                 with open(args.output, "w") as f:
                     f.write(formatted_output)
                 if not args.quiet:
-                    print(f"Output written to {args.output}")
+                    print(f"Output written to {args.output}")  # noqa: CLI output
             else:
-                print(formatted_output)
+                print(formatted_output)  # noqa: CLI output
 
         except DomainException as e:
             logger.error(f"Domain error: {e}")
             if not args.quiet:
-                print(f"Error: {e}")
+                print(f"Error: {e}")  # noqa: CLI error
             sys.exit(1)
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
@@ -788,14 +788,14 @@ async def main() -> None:
 
                 traceback.print_exc()
             if not args.quiet:
-                print(f"Unexpected error: {e}")
+                print(f"Unexpected error: {e}")  # noqa: CLI error
             sys.exit(1)
 
     except KeyboardInterrupt:
-        print("\nOperation cancelled by user.")
+        print("\nOperation cancelled by user.")  # noqa: CLI output
         sys.exit(130)
     except Exception as e:
-        print(f"Fatal error: {e}")
+        print(f"Fatal error: {e}")  # noqa: CLI error
         sys.exit(1)
 
 

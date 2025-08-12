@@ -86,7 +86,12 @@ class TestCommandHandlersComprehensive:
                         assert hasattr(handler, "__class__")
 
                         # Check for common handler attributes
-                        common_attrs = ["handle", "repository", "logger", "event_publisher"]
+                        common_attrs = [
+                            "handle",
+                            "repository",
+                            "logger",
+                            "event_publisher",
+                        ]
                         any(hasattr(handler, attr) for attr in common_attrs)
 
                 except Exception as e:
@@ -151,7 +156,12 @@ class TestQueryHandlersComprehensive:
     def get_query_handler_modules(self):
         """Get all query handler modules."""
         handler_modules = []
-        handler_files = ["handlers", "provider_handlers", "specialized_handlers", "system_handlers"]
+        handler_files = [
+            "handlers",
+            "provider_handlers",
+            "specialized_handlers",
+            "system_handlers",
+        ]
 
         for handler_file in handler_files:
             try:

@@ -25,20 +25,20 @@ class Machine(Aggregate):
         self._template_id = template_id
         self._status = MachineStatus.PENDING
         self._created_at = datetime.utcnow()
-    
+
     def start(self) -> None:
         """Start the machine - business rule enforcement."""
         if self._status != MachineStatus.PENDING:
             raise DomainError("Can only start pending machines")
-        
+
         self._status = MachineStatus.RUNNING
         self._add_domain_event(MachineStartedEvent(self.id))
-    
+
     def stop(self) -> None:
         """Stop the machine - business rule enforcement."""
         if self._status not in [MachineStatus.RUNNING, MachineStatus.PENDING]:
             raise DomainError("Can only stop running or pending machines")
-        
+
         self._status = MachineStatus.STOPPED
         self._add_domain_event(MachineStoppedEvent(self.id))
 ```
@@ -50,7 +50,7 @@ Immutable objects that represent concepts without identity:
 @dataclass(frozen=True)
 class MachineId:
     value: str
-    
+
     def __post_init__(self):
         if not self.value or len(self.value) < 3:
             raise ValueError("Machine ID must be at least 3 characters")
@@ -60,7 +60,7 @@ class InstanceConfiguration:
     instance_type: str
     cpu_count: int
     memory_gb: int
-    
+
     def __post_init__(self):
         if self.cpu_count <= 0 or self.memory_gb <= 0:
             raise ValueError("CPU and memory must be positive")
@@ -74,7 +74,7 @@ Events that represent something important that happened in the domain:
 class MachineStartedEvent(DomainEvent):
     machine_id: MachineId
     started_at: datetime
-    
+
     @property
     def event_type(self) -> str:
         return "MachineStarted"
@@ -83,7 +83,7 @@ class MachineStartedEvent(DomainEvent):
 class TemplateValidatedEvent(DomainEvent):
     template_id: TemplateId
     validation_result: ValidationResult
-    
+
     @property
     def event_type(self) -> str:
         return "TemplateValidated"
@@ -134,12 +134,12 @@ class MachineRepositoryPort(ABC):
     async def save(self, machine: Machine) -> None:
         """Save machine to persistence."""
         pass
-    
+
     @abstractmethod
     async def find_by_id(self, machine_id: MachineId) -> Optional[Machine]:
         """Find machine by ID."""
         pass
-    
+
     @abstractmethod
     async def find_by_status(self, status: MachineStatus) -> List[Machine]:
         """Find machines by status."""
@@ -153,7 +153,7 @@ class CloudProviderPort(ABC):
     async def provision_instance(self, config: InstanceConfiguration) -> ProvisionResult:
         """Provision cloud instance."""
         pass
-    
+
     @abstractmethod
     async def terminate_instance(self, instance_id: str) -> None:
         """Terminate cloud instance."""
@@ -167,7 +167,7 @@ class LoggingPort(ABC):
     def info(self, message: str) -> None:
         """Log info message."""
         pass
-    
+
     @abstractmethod
     def error(self, message: str, exception: Optional[Exception] = None) -> None:
         """Log error message."""
@@ -183,21 +183,21 @@ Complex business logic that doesn't belong to a single aggregate:
 class MachineAllocationService:
     def __init__(self, machine_repo: MachineRepositoryPort):
         self.machine_repo = machine_repo
-    
+
     async def can_allocate_machine(self, template: Template) -> bool:
         """Business rule: Check if machine can be allocated."""
         active_machines = await self.machine_repo.find_by_status(MachineStatus.RUNNING)
-        
+
         # Business rule: Maximum 100 active machines
         if len(active_machines) >= 100:
             return False
-        
+
         # Business rule: Check template resource requirements
         if template.requires_gpu and not self._gpu_available():
             return False
-        
+
         return True
-    
+
     def _gpu_available(self) -> bool:
         """Check if GPU resources are available."""
         # Implementation of GPU availability check
@@ -210,15 +210,15 @@ class TemplateValidationService:
     def validate_template(self, template: Template) -> ValidationResult:
         """Validate template according to business rules."""
         errors = []
-        
+
         # Business rule: Template must have valid instance type
         if not self._is_valid_instance_type(template.instance_type):
             errors.append("Invalid instance type")
-        
+
         # Business rule: Memory must be sufficient for instance type
         if template.memory_gb < self._minimum_memory_for_type(template.instance_type):
             errors.append("Insufficient memory for instance type")
-        
+
         return ValidationResult(is_valid=len(errors) == 0, errors=errors)
 ```
 
@@ -232,15 +232,15 @@ class Aggregate:
     def __init__(self, aggregate_id: Any):
         self.id = aggregate_id
         self._domain_events: List[DomainEvent] = []
-    
+
     def _add_domain_event(self, event: DomainEvent) -> None:
         """Add domain event to be published."""
         self._domain_events.append(event)
-    
+
     def get_domain_events(self) -> List[DomainEvent]:
         """Get all domain events."""
         return self._domain_events.copy()
-    
+
     def clear_domain_events(self) -> None:
         """Clear domain events after publishing."""
         self._domain_events.clear()
@@ -300,10 +300,10 @@ class ResourceNotFoundError(DomainError):
 
 ### Zero External Dependencies
 The domain layer has **NO dependencies** on other layers:
-- ❌ No infrastructure imports
-- ❌ No application imports  
-- ❌ No interface imports
-- ✅ Only standard library and domain code
+- No infrastructure imports
+- No application imports  
+- No interface imports
+- Only standard library and domain code
 
 ### Dependency Inversion
 The domain defines interfaces (ports) that other layers implement:
@@ -328,10 +328,10 @@ class EmailNotificationAdapter(NotificationPort):
 def test_machine_start():
     # Arrange
     machine = Machine(MachineId("test-123"), TemplateId("template-456"))
-    
+
     # Act
     machine.start()
-    
+
     # Assert
     assert machine.status == MachineStatus.RUNNING
     events = machine.get_domain_events()
@@ -342,7 +342,7 @@ def test_business_rule_violation():
     # Arrange
     machine = Machine(MachineId("test-123"), TemplateId("template-456"))
     machine.start()
-    
+
     # Act & Assert
     with pytest.raises(DomainError):
         machine.start()  # Cannot start already running machine
@@ -354,13 +354,13 @@ async def test_allocation_service():
     # Arrange
     mock_repo = Mock(spec=MachineRepositoryPort)
     mock_repo.find_by_status.return_value = []  # No active machines
-    
+
     service = MachineAllocationService(mock_repo)
     template = Template(TemplateId("test"), instance_type="t3.micro")
-    
+
     # Act
     can_allocate = await service.can_allocate_machine(template)
-    
+
     # Assert
     assert can_allocate is True
 ```

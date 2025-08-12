@@ -41,13 +41,13 @@ def test_template_defaults_integration():
             # instance_type is MISSING - should get defaults
         }
 
-        print("✅ Testing template with missing required fields...")
+        print("PASS: Testing template with missing required fields...")
         print(f"   - Input data: {list(minimal_template_data.keys())}")
 
         # This should NOT fail because defaults will be applied
         template = serializer.from_dict(minimal_template_data)
 
-        print("✅ Template created successfully with defaults applied")
+        print("PASS: Template created successfully with defaults applied")
         print(f"   - Template ID: {template.template_id}")
         print(f"   - Subnet IDs: {template.subnet_ids}")
         print(f"   - Security Groups: {template.security_group_ids}")
@@ -59,12 +59,12 @@ def test_template_defaults_integration():
         assert template.security_group_ids, "security_group_ids should have defaults applied"
         assert template.instance_type, "instance_type should have defaults applied"
 
-        print("✅ Configuration defaults successfully applied to missing fields")
+        print("PASS: Configuration defaults successfully applied to missing fields")
 
         return True
 
     except Exception as e:
-        print(f"❌ Configuration defaults integration test failed: {e}")
+        print(f"FAIL: Configuration defaults integration test failed: {e}")
         import traceback
 
         traceback.print_exc()
@@ -102,14 +102,14 @@ def test_template_defaults_precedence():
             "instance_type": "t3.large",  # Explicit value (different from default)
         }
 
-        print("✅ Testing template with explicit values...")
+        print("PASS: Testing template with explicit values...")
         print(f"   - Input subnet_ids: {explicit_template_data['subnet_ids']}")
         print(f"   - Input security_group_ids: {explicit_template_data['security_group_ids']}")
         print(f"   - Input instance_type: {explicit_template_data['instance_type']}")
 
         template = serializer.from_dict(explicit_template_data)
 
-        print("✅ Template created successfully with explicit values preserved")
+        print("PASS: Template created successfully with explicit values preserved")
         print(f"   - Final subnet_ids: {template.subnet_ids}")
         print(f"   - Final security_group_ids: {template.security_group_ids}")
         print(f"   - Final instance_type: {template.instance_type}")
@@ -123,12 +123,12 @@ def test_template_defaults_precedence():
         ], "Explicit security_group_ids should be preserved"
         assert template.instance_type == "t3.large", "Explicit instance_type should be preserved"
 
-        print("✅ Template values correctly override defaults (proper precedence)")
+        print("PASS: Template values correctly override defaults (proper precedence)")
 
         return True
 
     except Exception as e:
-        print(f"❌ Template defaults precedence test failed: {e}")
+        print(f"FAIL: Template defaults precedence test failed: {e}")
         import traceback
 
         traceback.print_exc()
@@ -154,7 +154,7 @@ def test_defaults_service_directly():
         # Test minimal template data
         minimal_data = {"template_id": "test-direct", "image_id": "ami-123456"}
 
-        print("✅ Testing TemplateDefaultsService directly...")
+        print("PASS: Testing TemplateDefaultsService directly...")
         print(f"   - Input data: {list(minimal_data.keys())}")
 
         # Apply defaults
@@ -162,7 +162,7 @@ def test_defaults_service_directly():
             minimal_data, provider_instance_name="aws-default"
         )
 
-        print("✅ Defaults applied successfully")
+        print("PASS: Defaults applied successfully")
         print(f"   - Output data keys: {list(enriched_data.keys())}")
         print(f"   - subnet_ids: {enriched_data.get('subnet_ids')}")
         print(f"   - security_group_ids: {enriched_data.get('security_group_ids')}")
@@ -172,12 +172,12 @@ def test_defaults_service_directly():
         # Verify some defaults were applied
         assert len(enriched_data) > len(minimal_data), "Defaults should add more fields"
 
-        print("✅ TemplateDefaultsService working correctly")
+        print("PASS: TemplateDefaultsService working correctly")
 
         return True
 
     except Exception as e:
-        print(f"❌ Direct TemplateDefaultsService test failed: {e}")
+        print(f"FAIL: Direct TemplateDefaultsService test failed: {e}")
         import traceback
 
         traceback.print_exc()
@@ -192,12 +192,12 @@ if __name__ == "__main__":
     test3_passed = test_defaults_service_directly()
 
     if test1_passed and test2_passed and test3_passed:
-        print("\n🎉 ALL CONFIGURATION DEFAULTS INTEGRATION TESTS PASSED")
-        print("✅ Configuration defaults are properly applied to missing fields")
-        print("✅ Template values correctly override defaults")
-        print("✅ TemplateDefaultsService working correctly")
-        print("✅ Repository integration with defaults service working")
+        print("\nALL CONFIGURATION DEFAULTS INTEGRATION TESTS PASSED")
+        print("PASS: Configuration defaults are properly applied to missing fields")
+        print("PASS: Template values correctly override defaults")
+        print("PASS: TemplateDefaultsService working correctly")
+        print("PASS: Repository integration with defaults service working")
         sys.exit(0)
     else:
-        print("\n❌ SOME CONFIGURATION DEFAULTS TESTS FAILED")
+        print("\nFAIL: SOME CONFIGURATION DEFAULTS TESTS FAILED")
         sys.exit(1)

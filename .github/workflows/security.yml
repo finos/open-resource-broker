@@ -22,40 +22,63 @@ on:
     - cron: '0 3 * * 0'
 
 env:
-  PYTHON_VERSION: '3.11'
   REGISTRY: ghcr.io
   IMAGE_NAME: awslabs/open-hostfactory-plugin
 
 jobs:
+  get-config:
+    name: Get Python Version from Makefile
+    runs-on: ubuntu-latest
+    outputs:
+      python-versions: ${{ steps.config.outputs.python-versions }}
+      default-python-version: ${{ steps.config.outputs.default-python-version }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Get configuration from project config
+      id: config
+      run: |
+        # Use consistent print-* and print-json-* targets
+        PYTHON_VERSIONS_JSON=$(make print-json-PYTHON_VERSIONS)
+        DEFAULT_PYTHON_VERSION=$(yq '.python.default_version' .project.yml)
+
+        echo "python-versions=$PYTHON_VERSIONS_JSON" >> $GITHUB_OUTPUT
+        echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> $GITHUB_OUTPUT
+
+        echo "Found Python versions: $(make print-PYTHON_VERSIONS)"
+        echo "Default Python version: $DEFAULT_PYTHON_VERSION"
+
   # Security Scan Jobs (granular with tool names)
   security-bandit:
     name: Bandit (Security Scan)
     runs-on: ubuntu-latest
-    
+    needs: get-config
+
     permissions:
       security-events: write
       actions: read
       contents: read
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ env.PYTHON_VERSION }}
-    
+        python-version: ${{ needs.get-config.outputs.default-python-version }}
+
     - name: Install uv
       uses: astral-sh/setup-uv@v6
       with:
         enable-cache: true
         cache-dependency-glob: "requirements*.txt"
-    
+
     - name: Install dependencies with uv
       run: |
         make ci-install
-    
+
     - name: Run Bandit security scan
       run: make ci-security-bandit
       continue-on-error: true
@@ -63,47 +86,48 @@ jobs:
   security-safety:
     name: Safety (Dependency Scan)
     runs-on: ubuntu-latest
-    
+
     permissions:
       security-events: write
       actions: read
       contents: read
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ env.PYTHON_VERSION }}
-    
+        python-version: ${{ needs.get-config.outputs.default-python-version }}
+
     - name: Install uv
       uses: astral-sh/setup-uv@v6
       with:
         enable-cache: true
         cache-dependency-glob: "requirements*.txt"
-    
+
     - name: Install dependencies with uv
       run: |
         make ci-install
-    
+
     - name: Run Safety dependency scan
       run: make ci-security-safety
       continue-on-error: true
   security-hadolint:
     name: Hadolint (Dockerfile Scan)
     runs-on: ubuntu-latest
-    
+    needs: get-config
+
     permissions:
       security-events: write
       actions: read
       contents: read
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Run Hadolint Dockerfile scan
       uses: hadolint/hadolint-action@v3.1.0
       with:
@@ -111,7 +135,7 @@ jobs:
         format: sarif
         output-file: hadolint-results.sarif
         no-fail: true
-    
+
     - name: Upload Hadolint SARIF results
       uses: github/codeql-action/upload-sarif@v3
       if: always()
@@ -121,16 +145,16 @@ jobs:
   security-semgrep:
     name: Semgrep (Static Analysis)
     runs-on: ubuntu-latest
-    
+
     permissions:
       security-events: write
       actions: read
       contents: read
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Run Semgrep security analysis
       uses: returntocorp/semgrep-action@v1
       with:
@@ -140,7 +164,7 @@ jobs:
           p/python
         generateSarif: "1"
       continue-on-error: true
-    
+
     - name: Upload Semgrep SARIF results
       uses: github/codeql-action/upload-sarif@v3
       if: always()
@@ -150,16 +174,17 @@ jobs:
   security-trivy-fs:
     name: Trivy (Filesystem Scan)
     runs-on: ubuntu-latest
-    
+    needs: get-config
+
     permissions:
       security-events: write
       actions: read
       contents: read
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Run Trivy filesystem vulnerability scanner
       uses: aquasecurity/trivy-action@master
       with:
@@ -167,7 +192,7 @@ jobs:
         scan-ref: '.'
         format: 'sarif'
         output: 'trivy-fs-results.sarif'
-    
+
     - name: Upload Trivy filesystem scan results
       uses: github/codeql-action/upload-sarif@v3
       if: always()
@@ -179,18 +204,18 @@ jobs:
     runs-on: ubuntu-latest
     # Skip TruffleHog on main branch pushes where base and head are the same
     if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000')
-    
+
     permissions:
       security-events: write
       actions: read
       contents: read
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    
+
     - name: Check for secrets with TruffleHog
       uses: trufflesecurity/trufflehog@main
       with:
@@ -203,11 +228,11 @@ jobs:
     name: Dependency Review
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Dependency Review
       uses: actions/dependency-review-action@v4
       with:
@@ -218,21 +243,21 @@ jobs:
     name: CodeQL Analysis
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule' || contains(github.event.head_commit.message, '[security]')
-    
+
     permissions:
       actions: read
       contents: read
       security-events: write
-    
+
     strategy:
       fail-fast: false
       matrix:
         language: [ 'python' ]
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
@@ -240,29 +265,29 @@ jobs:
         queries: security-extended,security-and-quality
       continue-on-error: true
       id: codeql-init-extended
-    
+
     - name: Initialize CodeQL (fallback)
       if: steps.codeql-init-extended.outcome == 'failure'
       uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
         queries: security-and-quality
-    
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ env.PYTHON_VERSION }}
-    
+        python-version: ${{ needs.get-config.outputs.default-python-version }}
+
     - name: Install uv
       uses: astral-sh/setup-uv@v6
       with:
         enable-cache: true
         cache-dependency-glob: "requirements.txt"
-    
+
     - name: Install dependencies with uv
       run: |
         make ci-install
-    
+
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
       with:
@@ -272,15 +297,15 @@ jobs:
     name: Container Security
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request' || contains(github.event.pull_request.changed_files, 'Dockerfile') || contains(github.event.pull_request.changed_files, 'docker-compose')
-    
+
     strategy:
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
-    
+        python-version: ${{ fromJSON(needs.get-config.outputs.python-versions) }}
+
     permissions:
       contents: read
       security-events: write
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4

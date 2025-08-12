@@ -194,15 +194,3 @@ def get_api_handler_factory() -> APIHandlerFactory:
         APIHandlerFactory instance
     """
     return api_handler_factory
-
-
-# This eliminates the architectural violation of Infrastructure -> Interface
-# Example handler registration (done in handler modules):
-#
-# from src.infrastructure.utilities.factories.api_handler_factory import get_api_handler_factory
-#
-# class MyAPIHandler:
-#     pass
-#
-# # Register handler
-# get_api_handler_factory().register_handler('my_handler', MyAPIHandler)

@@ -435,6 +435,7 @@ class DependencyResolutionError(Exception):
     """Raised when dependency cannot be resolved."""
 
     def __init__(self, dependency_type: Type, message: str = None):
+        """Initialize dependency resolution error."""
         self.dependency_type = dependency_type
         self.message = message or f"Cannot resolve dependency: {dependency_type}"
         super().__init__(self.message)
@@ -444,6 +445,7 @@ class CircularDependencyError(DependencyResolutionError):
     """Raised when circular dependency is detected."""
 
     def __init__(self, dependency_chain: List[Type]):
+        """Initialize circular dependency error with dependency chain."""
         self.dependency_chain = dependency_chain
         chain_str = " -> ".join(str(t) for t in dependency_chain)
         message = f"Circular dependency detected: {chain_str}"

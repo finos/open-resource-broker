@@ -420,7 +420,8 @@ class TestDIContainer:
 
         # Mock injectable decorator
         with patch(
-            "src.infrastructure.di.components.dependency_resolver.is_injectable", return_value=True
+            "src.infrastructure.di.components.dependency_resolver.is_injectable",
+            return_value=True,
         ):
             with patch(
                 "src.infrastructure.di.components.dependency_resolver.get_injectable_metadata",

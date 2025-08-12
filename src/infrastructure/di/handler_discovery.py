@@ -42,7 +42,7 @@ class HandlerDiscoveryService:
     This service scans application modules to trigger decorator registration,
     then registers discovered handlers with the DI container.
 
-    Enhanced with caching to improve startup performance by avoiding
+    Improved with caching to improve startup performance by avoiding
     repeated module scanning and handler discovery.
     """
 
@@ -109,13 +109,13 @@ class HandlerDiscoveryService:
         logger.info("Cache miss - performing full handler discovery")
         start_time = time.time()
 
-        # Step 1: Discover handlers by importing modules (existing logic)
+        # Discover handlers by importing modules (existing logic)
         self._discover_handlers(base_package)
 
-        # Step 2: Register discovered handlers with DI container (existing logic)
+        # Register discovered handlers with DI container (existing logic)
         self._register_handlers()
 
-        # Step 3: Cache the results for next time
+        # Cache the results for next time
         discovery_time = time.time() - start_time
         stats = get_handler_registry_stats()
         self._save_to_cache(base_package, stats, discovery_time)

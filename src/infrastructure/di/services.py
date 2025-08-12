@@ -24,7 +24,7 @@ from src.infrastructure.di.server_services import register_server_services
 def register_all_services(container: Optional[DIContainer] = None) -> DIContainer:
     """
     Register all services in the dependency injection container.
-    Enhanced with lazy loading support for improved startup performance.
+    Includes lazy loading support for improved startup performance.
 
     Args:
         container: Optional container instance
@@ -50,7 +50,7 @@ def _register_services_lazy(container: DIContainer) -> DIContainer:
 
     logger.info("Registering services with lazy loading enabled")
 
-    # 1. Register only essential services immediately (Phase 3 optimization)
+    # 1. Register only essential services immediately
     from src.infrastructure.di.port_registrations import register_port_adapters
 
     register_port_adapters(container)
@@ -64,7 +64,7 @@ def _register_services_lazy(container: DIContainer) -> DIContainer:
 
     register_minimal_storage_types()
 
-    # 3. Register active scheduler only (Phase 3 optimization)
+    # 3. Register active scheduler only
     from src.infrastructure.scheduler.registration import register_active_scheduler_only
 
     try:
@@ -82,7 +82,7 @@ def _register_services_lazy(container: DIContainer) -> DIContainer:
         # Fallback to default scheduler
         register_active_scheduler_only("default")
 
-    # 4. Register provider services immediately (Phase 3 fix for provider
+    # 4. Register provider services immediately (fix for provider
     # context errors)
     register_provider_services(container)
 
@@ -143,6 +143,7 @@ def _register_lazy_service_factories(container: DIContainer) -> None:
 
     # Register CQRS infrastructure as lazy - triggered by QueryBus or CommandBus access
     def setup_cqrs_lazy(c):
+        """Setup CQRS infrastructure lazily when needed."""
         from src.infrastructure.di.container import _setup_cqrs_infrastructure
 
         _setup_cqrs_infrastructure(c)
@@ -158,6 +159,7 @@ def _register_lazy_service_factories(container: DIContainer) -> None:
     # Register infrastructure services as lazy - triggered by first
     # infrastructure service access
     def register_infrastructure_lazy(c):
+        """Register infrastructure services lazily when first accessed."""
         register_infrastructure_services(c)
         # Also setup CQRS if not already done (infrastructure services may need buses)
         if not c.has(QueryBus):
@@ -169,8 +171,9 @@ def _register_lazy_service_factories(container: DIContainer) -> None:
         type("InfrastructureServices", (), {}), register_infrastructure_lazy
     )
 
-    # Register scheduler services as lazy (Phase 3 optimization)
+    # Register scheduler services as lazy
     def register_scheduler_lazy(c):
+        """Register scheduler services lazily when needed."""
         from src.infrastructure.scheduler.registration import (
             register_active_scheduler_only,
         )
@@ -198,6 +201,7 @@ def _register_lazy_service_factories(container: DIContainer) -> None:
 
     # Register server services as lazy
     def register_server_lazy(c):
+        """Register server services lazily when needed."""
         register_server_services(c)
 
     # Use a placeholder type for server services
@@ -239,6 +243,7 @@ def create_handler(handler_class, config: Optional[Dict[str, Any]] = None) -> An
                 logger.info(f"Registering legacy handler class {handler_class.__name__}")
 
                 def handler_factory(c):
+                    """Factory for legacy handler instances."""
                     # Get CQRS buses directly from container
                     from src.infrastructure.di.buses import CommandBus, QueryBus
                     from src.monitoring.metrics import MetricsCollector
@@ -258,6 +263,7 @@ def create_handler(handler_class, config: Optional[Dict[str, Any]] = None) -> An
             logger.info(f"Fallback CQRS registration for handler class {handler_class.__name__}")
 
             def handler_factory(c):
+                """Fallback factory for CQRS handler instances."""
                 # Get CQRS buses directly from container
                 from src.infrastructure.di.buses import CommandBus, QueryBus
                 from src.monitoring.metrics import MetricsCollector

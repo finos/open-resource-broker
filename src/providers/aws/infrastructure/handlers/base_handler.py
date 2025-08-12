@@ -1,7 +1,7 @@
 """
-Unified AWS Handler Base Class following Clean Architecture and CQRS patterns.
+Integrated AWS Handler Base Class following Clean Architecture and CQRS patterns.
 
-This module provides a unified base handler that combines the best features of both
+This module provides a integrated base handler that combines the best features of both
 AWSHandler and BaseAWSHandler patterns while maintaining clean architecture principles
 and proper integration with our DI/CQRS system.
 """
@@ -34,7 +34,7 @@ T = TypeVar("T")
 @injectable
 class AWSHandler(ABC):
     """
-    Unified AWS handler base class following Clean Architecture and CQRS patterns.
+    Integrated AWS handler base class following Clean Architecture and CQRS patterns.
 
     This class provides the foundation for all AWS handlers in the system,
     combining the best features of both synchronous and asynchronous patterns:
@@ -189,6 +189,7 @@ class AWSHandler(ABC):
         # Create retry decorator with appropriate strategy
         @retry(**strategy_config)
         def wrapped_operation():
+            """Wrapped operation with retry logic applied."""
             return func(*args, **kwargs)
 
         try:

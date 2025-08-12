@@ -17,7 +17,7 @@ async def handle_get_request_status(args: "argparse.Namespace") -> Dict[str, Any
     Handle get request status operations.
 
     Args:
-        args: Modern argument namespace with resource/action structure
+        args: Argument namespace with resource/action structure
 
     Returns:
         Request status information
@@ -34,7 +34,7 @@ async def handle_get_request_status(args: "argparse.Namespace") -> Dict[str, Any
         input_data = args.input_data
         request_id = input_data.get("request_id") or input_data.get("requestId")
     else:
-        # Use command line arguments (modern CLI style)
+        # Use command line arguments
         if hasattr(args, "request_ids") and args.request_ids:
             # Take the first request ID from the list
             request_id = args.request_ids[0]
@@ -59,7 +59,7 @@ async def handle_request_machines(args: "argparse.Namespace") -> Dict[str, Any]:
     Handle request machines operations.
 
     Args:
-        args: Modern argument namespace with resource/action structure
+        args: Argument namespace with resource/action structure
 
     Returns:
         Machine request results in HostFactory format
@@ -90,7 +90,7 @@ async def handle_request_machines(args: "argparse.Namespace") -> Dict[str, Any]:
             template_id = input_data.get("template_id") or input_data.get("templateId")
             machine_count = input_data.get("machine_count") or input_data.get("machineCount")
     else:
-        # Use command line arguments (modern CLI style)
+        # Use command line arguments
         template_id = getattr(args, "template_id", None)
         machine_count = getattr(args, "machine_count", None)
 
@@ -128,7 +128,7 @@ async def handle_request_machines(args: "argparse.Namespace") -> Dict[str, Any]:
         # Extract resource IDs for the message
         resource_ids = getattr(request_dto, "resource_ids", []) if request_dto else []
 
-        # Create enhanced data with resource ID information
+        # Create response data with resource ID information
         request_data = {
             "request_id": request_id,
             "resource_ids": resource_ids,
@@ -169,7 +169,7 @@ async def handle_get_return_requests(args: "argparse.Namespace") -> Dict[str, An
     Handle get return requests operations.
 
     Args:
-        args: Modern argument namespace with resource/action structure
+        args: Argument namespace with resource/action structure
 
     Returns:
         Return requests list
@@ -196,7 +196,7 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> Dict[str
     Handle request return machines operations.
 
     Args:
-        args: Modern argument namespace with resource/action structure
+        args: Argument namespace with resource/action structure
 
     Returns:
         Return request results

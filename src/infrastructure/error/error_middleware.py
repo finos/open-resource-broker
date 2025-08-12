@@ -34,6 +34,7 @@ class ErrorMiddleware:
 
         @functools.wraps(handler_func)
         def wrapped_handler(*args, **kwargs):
+            """Handler wrapper with error handling and logging."""
             try:
                 # Execute the original handler
                 return handler_func(*args, **kwargs)
@@ -57,6 +58,7 @@ class ErrorMiddleware:
 
         @functools.wraps(api_handler)
         def wrapped_api_handler(input_data: Optional[Dict[str, Any]] = None, **kwargs):
+            """API handler wrapper with error handling and validation."""
             try:
                 # Execute the original API handler
                 return api_handler(input_data, **kwargs)
@@ -86,6 +88,7 @@ class ErrorMiddleware:
 
         @functools.wraps(script_handler)
         def wrapped_script_handler(*args, **kwargs):
+            """Script handler wrapper with error handling and logging."""
             try:
                 # Execute the original script handler
                 return script_handler(*args, **kwargs)
@@ -94,7 +97,7 @@ class ErrorMiddleware:
                 error_response = self._error_handler.handle_error_for_http(e)
 
                 # Format response for script output
-                print(
+                logger.error(
                     json.dumps(
                         {
                             "error": error_response.error_code,
@@ -127,8 +130,11 @@ def with_error_handling(error_handler: Optional[ExceptionHandler] = None):
     handler = error_handler or get_exception_handler()
 
     def decorator(func: Callable) -> Callable:
+        """Apply error handling decorator to function."""
+
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            """Wrapper function that handles exceptions."""
             try:
                 return func(*args, **kwargs)
             except Exception as e:
@@ -154,8 +160,11 @@ def with_api_error_handling(error_handler: Optional[ExceptionHandler] = None):
     handler = error_handler or get_exception_handler()
 
     def decorator(func: Callable) -> Callable:
+        """Apply API error handling decorator to function."""
+
         @functools.wraps(func)
         def wrapper(input_data: Optional[Dict[str, Any]] = None, **kwargs):
+            """Wrapper function for API error handling."""
             try:
                 return func(input_data, **kwargs)
             except Exception as e:

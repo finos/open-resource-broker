@@ -81,7 +81,10 @@ def sample_machine():
 def mock_config():
     """Mock configuration."""
     return {
-        "provider": {"type": "aws", "aws": {"region": "us-east-1", "profile": "default"}},
+        "provider": {
+            "type": "aws",
+            "aws": {"region": "us-east-1", "profile": "default"},
+        },
         "logging": {"level": "INFO", "console_enabled": True},
         "storage": {"strategy": "json"},
     }

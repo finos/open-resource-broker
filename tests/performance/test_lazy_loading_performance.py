@@ -1,4 +1,4 @@
-"""Performance tests for lazy loading implementation (Phase 3).
+"""Performance tests for lazy loading implementation (Lazy Loading).
 
 This module tests the performance improvements achieved through lazy loading
 optimizations, including startup time, memory usage, and component loading.
@@ -19,13 +19,13 @@ class TestLazyLoadingPerformance:
     """Test suite for lazy loading performance optimizations."""
 
     def test_startup_time_under_500ms(self):
-        """Test that application starts in under 500ms (Phase 3 target)."""
+        """Test that application starts in under 500ms (Lazy Loading target)."""
         start_time = time.time()
         Application()
         startup_time = (time.time() - start_time) * 1000
 
         assert startup_time < 500, f"Startup took {startup_time:.1f}ms, expected <500ms"
-        print(f"✅ Startup time: {startup_time:.1f}ms (target: <500ms)")
+        print(f"PASS: Startup time: {startup_time:.1f}ms (target: <500ms)")
 
     def test_help_command_performance(self):
         """Test that help command executes quickly (lightweight command test)."""
@@ -34,13 +34,16 @@ class TestLazyLoadingPerformance:
 
         start_time = time.time()
         result = subprocess.run(
-            [sys.executable, "src/run.py", "--help"], capture_output=True, text=True, cwd="."
+            [sys.executable, "src/run.py", "--help"],
+            capture_output=True,
+            text=True,
+            cwd=".",
         )
         execution_time = (time.time() - start_time) * 1000
 
         assert result.returncode == 0, "Help command failed"
         assert execution_time < 1000, f"Help command took {execution_time:.1f}ms, expected <1000ms"
-        print(f"✅ Help command: {execution_time:.1f}ms (target: <1000ms)")
+        print(f"PASS: Help command: {execution_time:.1f}ms (target: <1000ms)")
 
     def test_memory_usage_with_lazy_loading(self):
         """Test memory usage with lazy loading enabled."""
@@ -55,7 +58,7 @@ class TestLazyLoadingPerformance:
 
         # Should not increase memory significantly during creation (lazy loading)
         assert memory_increase < 50, f"Memory increased by {memory_increase:.1f}MB during creation"
-        print(f"✅ Memory increase during creation: {memory_increase:.1f}MB (target: <50MB)")
+        print(f"PASS: Memory increase during creation: {memory_increase:.1f}MB (target: <50MB)")
 
     def test_first_command_performance(self):
         """Test first command execution performance (triggers lazy loading)."""
@@ -74,7 +77,7 @@ class TestLazyLoadingPerformance:
         assert (
             first_access_time < 1000
         ), f"First query bus access took {first_access_time:.1f}ms, expected <1000ms"
-        print(f"✅ First query bus access: {first_access_time:.1f}ms (target: <1000ms)")
+        print(f"PASS: First query bus access: {first_access_time:.1f}ms (target: <1000ms)")
 
     def test_cached_component_performance(self):
         """Test cached component access performance."""
@@ -95,7 +98,7 @@ class TestLazyLoadingPerformance:
 
         assert query_bus1 is query_bus2, "Query bus should be cached"
         assert cached_time < 10, f"Cached access took {cached_time:.1f}ms, expected <10ms"
-        print(f"✅ Cached component access: {cached_time:.1f}ms (target: <10ms)")
+        print(f"PASS: Cached component access: {cached_time:.1f}ms (target: <10ms)")
 
     def test_lazy_vs_eager_loading_comparison(self):
         """Compare lazy vs eager loading performance."""
@@ -112,8 +115,8 @@ class TestLazyLoadingPerformance:
             # For now, just verify lazy loading is working
             eager_simulation_time = lazy_time * 2  # Simulate eager being slower
 
-        print(f"✅ Lazy loading time: {lazy_time:.1f}ms")
-        print(f"✅ Estimated eager time: {eager_simulation_time:.1f}ms")
+        print(f"PASS: Lazy loading time: {lazy_time:.1f}ms")
+        print(f"PASS: Estimated eager time: {eager_simulation_time:.1f}ms")
         assert lazy_time < eager_simulation_time, "Lazy loading should be faster"
 
     def test_component_registration_performance(self):
@@ -129,7 +132,7 @@ class TestLazyLoadingPerformance:
         assert (
             registration_time < 200
         ), f"Service registration took {registration_time:.1f}ms, expected <200ms"
-        print(f"✅ Service registration: {registration_time:.1f}ms (target: <200ms)")
+        print(f"PASS: Service registration: {registration_time:.1f}ms (target: <200ms)")
 
     def test_handler_discovery_performance(self):
         """Test handler discovery performance."""
@@ -150,7 +153,7 @@ class TestLazyLoadingPerformance:
             results["total_handlers"] >= 50
         ), f"Expected ≥50 handlers, got {results['total_handlers']}"
         print(
-            f"✅ Handler discovery: {discovery_time:.1f}ms for {results['total_handlers']} handlers"
+            f"PASS: Handler discovery: {discovery_time:.1f}ms for {results['total_handlers']} handlers"
         )
 
     def test_storage_registration_performance(self):
@@ -166,7 +169,7 @@ class TestLazyLoadingPerformance:
         assert (
             registration_time < 100
         ), f"Minimal storage registration took {registration_time:.1f}ms, expected <100ms"
-        print(f"✅ Minimal storage registration: {registration_time:.1f}ms (target: <100ms)")
+        print(f"PASS: Minimal storage registration: {registration_time:.1f}ms (target: <100ms)")
 
     def test_scheduler_registration_performance(self):
         """Test scheduler registration performance."""
@@ -181,7 +184,7 @@ class TestLazyLoadingPerformance:
         assert (
             registration_time < 50
         ), f"Active scheduler registration took {registration_time:.1f}ms, expected <50ms"
-        print(f"✅ Active scheduler registration: {registration_time:.1f}ms (target: <50ms)")
+        print(f"PASS: Active scheduler registration: {registration_time:.1f}ms (target: <50ms)")
 
     @pytest.mark.integration
     def test_end_to_end_performance(self):
@@ -201,7 +204,7 @@ class TestLazyLoadingPerformance:
         assert result.returncode == 0, f"Templates command failed: {result.stderr}"
         # Allow more time for full command including AWS API calls
         assert total_time < 5000, f"End-to-end took {total_time:.1f}ms, expected <5000ms"
-        print(f"✅ End-to-end performance: {total_time:.1f}ms (target: <5000ms)")
+        print(f"PASS: End-to-end performance: {total_time:.1f}ms (target: <5000ms)")
 
     def test_concurrent_access_performance(self):
         """Test performance under concurrent access."""
@@ -225,7 +228,7 @@ class TestLazyLoadingPerformance:
         assert (
             concurrent_time < 3000
         ), f"Concurrent access took {concurrent_time:.1f}ms, expected <3000ms"
-        print(f"✅ Concurrent access (5 threads): {concurrent_time:.1f}ms (target: <3000ms)")
+        print(f"PASS: Concurrent access (5 threads): {concurrent_time:.1f}ms (target: <3000ms)")
 
 
 class TestPerformanceRegression:
@@ -245,11 +248,11 @@ class TestPerformanceRegression:
         avg_startup = sum(measurements) / len(measurements)
         max_startup = max(measurements)
 
-        # Phase 3 target: <500ms average, <1000ms max
+        # Lazy Loading target: <500ms average, <1000ms max
         assert avg_startup < 500, f"Average startup {avg_startup:.1f}ms exceeds 500ms limit"
         assert max_startup < 1000, f"Max startup {max_startup:.1f}ms exceeds 1000ms limit"
 
-        print(f"✅ Startup regression test: avg={avg_startup:.1f}ms, max={max_startup:.1f}ms")
+        print(f"PASS: Startup regression test: avg={avg_startup:.1f}ms, max={max_startup:.1f}ms")
 
     def test_memory_usage_regression(self):
         """Ensure memory usage doesn't regress significantly."""
@@ -267,14 +270,14 @@ class TestPerformanceRegression:
 
         # Should not use excessive memory per application instance
         assert memory_per_app < 30, f"Memory per app {memory_per_app:.1f}MB exceeds 30MB limit"
-        print(f"✅ Memory regression test: {memory_per_app:.1f}MB per app (target: <30MB)")
+        print(f"PASS: Memory regression test: {memory_per_app:.1f}MB per app (target: <30MB)")
 
 
 if __name__ == "__main__":
     # Run performance tests directly
     test_suite = TestLazyLoadingPerformance()
 
-    print("🚀 Running Phase 3 Lazy Loading Performance Tests...")
+    print("Running Lazy Loading Lazy Loading Performance Tests...")
     print("=" * 60)
 
     try:
@@ -286,8 +289,8 @@ if __name__ == "__main__":
         test_suite.test_scheduler_registration_performance()
 
         print("=" * 60)
-        print("🎉 All performance tests passed!")
+        print("All performance tests passed!")
 
     except Exception as e:
-        print(f"❌ Performance test failed: {e}")
+        print(f"FAIL: Performance test failed: {e}")
         raise

@@ -63,7 +63,7 @@ async def handle_list_templates(args: argparse.Namespace) -> Dict[str, Any]:
             active_only = input_data.get("active_only", True)
             include_config = input_data.get("include_config", False)
         else:
-            # Use command line arguments (modern CLI style)
+            # Use command line arguments
             provider_api = getattr(args, "provider_api", None)
             active_only = getattr(args, "active_only", True)
             include_config = getattr(args, "include_config", False)

@@ -148,21 +148,21 @@ class TestTemplateDefaultsService:
         mock_config_manager.get_template_config.return_value = sample_template_config
         mock_config_manager.get_provider_config.return_value = sample_provider_config
 
-        # Test 1: Template specifies provider_api (highest priority)
+        # Template specifies provider_api (highest priority)
         template_dict = {"provider_api": "RunInstances"}
         result = template_defaults_service.resolve_provider_api_default(
             template_dict, "aws-primary"
         )
         assert result == "RunInstances"
 
-        # Test 2: Template doesn't specify, use provider instance default
+        # Template doesn't specify, use provider instance default
         template_dict = {}
         result = template_defaults_service.resolve_provider_api_default(
             template_dict, "aws-primary"
         )
         assert result == "SpotFleet"  # From provider instance defaults
 
-        # Test 3: Provider instance has no override, use provider type default
+        # Provider instance has no override, use provider type default
         result = template_defaults_service.resolve_provider_api_default(
             template_dict, "aws-secondary"
         )
@@ -224,12 +224,12 @@ class TestTemplateDefaultsService:
         assert provider_type == "aws"
 
         # Test fallback extraction from name
-        provider_type = template_defaults_service._get_provider_type("azure-east")
-        assert provider_type == "azure"
+        provider_type = template_defaults_service._get_provider_type("provider1-east")
+        assert provider_type == "provider1"
 
         # Test simple name
-        provider_type = template_defaults_service._get_provider_type("gcp")
-        assert provider_type == "gcp"
+        provider_type = template_defaults_service._get_provider_type("provider2")
+        assert provider_type == "provider2"
 
     def test_error_handling(self, template_defaults_service, mock_config_manager, mock_logger):
         """Test error handling in defaults resolution."""

@@ -151,7 +151,7 @@ nav:
       - Provider Strategy: provider_strategy_guide.md
       - Provider Pattern: provider_strategy_pattern_guide.md
       - Storage Registry: storage_registry_pattern.md
-      - Unified Format: unified_format_system.md
+      - Format System: unified_format_system.md
       - Import Guidelines: import_guidelines.md
       - Versioning: versioning_guide.md
       - Architecture Assessment: architectural_assessment.md

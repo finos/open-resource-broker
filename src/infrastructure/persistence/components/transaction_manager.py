@@ -60,6 +60,7 @@ class MemoryTransactionManager(TransactionManager):
     """In-memory transaction manager for testing and simple operations."""
 
     def __init__(self):
+        """Initialize in-memory transaction manager."""
         super().__init__()
         self.operations: List[Callable[[], None]] = []
         self.rollback_operations: List[Callable[[], None]] = []

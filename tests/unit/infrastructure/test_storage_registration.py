@@ -81,7 +81,9 @@ class TestJSONStorageRegistration:
 
         assert result == mock_repo
         mock_strategy_class.assert_called_once_with(
-            file_path="test_data/requests.json", create_dirs=True, entity_type="requests"
+            file_path="test_data/requests.json",
+            create_dirs=True,
+            entity_type="requests",
         )
         mock_repo_class.assert_called_once_with(mock_strategy)
 

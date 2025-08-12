@@ -1,5 +1,5 @@
 """
-CQRS Integration Tests - Modern Architecture Validation.
+CQRS Integration Tests - Current Architecture Validation.
 
 This test suite validates the CQRS architecture implementation with
 command and query handlers, ensuring proper integration between
@@ -330,7 +330,10 @@ class TestCQRSArchitectureIntegration:
         from src.providers.base.strategy.provider_strategy import ProviderResult
 
         failure_result = ProviderResult(
-            success=False, data={}, metadata={}, error_message="Provider operation failed"
+            success=False,
+            data={},
+            metadata={},
+            error_message="Provider operation failed",
         )
         create_request_handler._provider_context.execute_with_strategy.return_value = failure_result
 
@@ -370,7 +373,9 @@ class TestCQRSArchitectureIntegration:
         """Test that handlers properly use Unit of Work pattern."""
         # Create command
         command = CreateRequestCommand(
-            template_id="web-server-template", machine_count=1, metadata={"test": "uow_pattern"}
+            template_id="web-server-template",
+            machine_count=1,
+            metadata={"test": "uow_pattern"},
         )
 
         # Execute command

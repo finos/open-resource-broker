@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Consolidated async function handlers for improved performance
 - Updated README with MCP server documentation
-- Enhanced error handling with professional status indicators
+- Improved error handling with professional status indicators
 - Improved logging with structured messages
 - **Architecture**: Migrated `TemplateConfigurationManager` from `@injectable` decorator to manual DI registration for better configuration control
 
@@ -64,7 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Refactored architecture for scalability
 - Improved error handling
-- Enhanced configuration system
+- Improved configuration system
 
 ### Fixed
 - Various bug fixes and stability improvements

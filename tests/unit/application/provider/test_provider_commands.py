@@ -34,11 +34,15 @@ class TestProviderStrategyCommands:
     def test_execute_provider_operation_command_creation(self):
         """Test ExecuteProviderOperationCommand creation."""
         operation = ProviderOperation(
-            operation_type=ProviderOperationType.CREATE_INSTANCES, parameters={"count": 2}
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={"count": 2},
         )
 
         command = ExecuteProviderOperationCommand(
-            operation=operation, strategy_override="aws-primary", retry_count=3, timeout_seconds=30
+            operation=operation,
+            strategy_override="aws-primary",
+            retry_count=3,
+            timeout_seconds=30,
         )
 
         assert command.operation == operation

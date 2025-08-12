@@ -26,13 +26,13 @@ class CreateMachineHandler(BaseCommandHandler[CreateMachineCommand, MachineDTO])
     async def execute_command(self, command: CreateMachineCommand) -> MachineDTO:
         # Validate command
         await self.validate_command(command)
-        
+
         # Execute business logic
         machine = await self.machine_service.create_machine(command.template_id)
-        
+
         # Publish events
         await self.publish_events([MachineCreatedEvent(machine.id)])
-        
+
         return MachineDTO.from_domain(machine)
 ```
 
@@ -56,7 +56,7 @@ class MachineCreatedHandler(BaseEventHandler[MachineCreatedEvent]):
     async def handle(self, event: MachineCreatedEvent) -> None:
         # Log machine creation
         self.logger.info(f"Machine created: {event.machine_id}")
-        
+
         # Send notifications
         await self.notification_service.notify_machine_created(event)
 ```
@@ -117,7 +117,7 @@ class MachineDTO(BaseDTO):
     status: str = Field(description="Current machine status")
     template_id: str = Field(description="Template used for machine")
     created_at: datetime = Field(description="Creation timestamp")
-    
+
     @classmethod
     def from_domain(cls, machine: Machine) -> 'MachineDTO':
         return cls(
@@ -240,7 +240,7 @@ async def test_command_integration(container):
 async def validate_command(self, command: MyCommand) -> None:
     if not command.required_field:
         raise ValidationError("Required field missing")
-    
+
     if not await self.business_rule_service.is_valid(command):
         raise BusinessRuleError("Business rule violation")
 ```
@@ -250,11 +250,11 @@ async def validate_command(self, command: MyCommand) -> None:
 async def execute_command(self, command: MyCommand) -> MyResponse:
     # Execute business logic
     result = await self.domain_service.process(command)
-    
+
     # Publish domain events
     events = [MyDomainEvent(result.id, result.data)]
     await self.publish_events(events)
-    
+
     return MyResponse.from_domain(result)
 ```
 

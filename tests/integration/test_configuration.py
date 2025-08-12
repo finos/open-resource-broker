@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Phase 5: Configuration Updates Test
+Configuration Updates Test
 
 This test validates that the configuration updates for launch template
 management are working correctly.
@@ -14,10 +14,10 @@ import sys
 sys.path.insert(0, os.path.abspath("."))
 
 
-def test_phase5_configuration():
-    """Test Phase 5 configuration updates."""
+def test_configuration_updates():
+    """Test configuration system updates and validation."""
 
-    print("🔧 PHASE 5: CONFIGURATION UPDATES TEST")
+    print("CONFIGURATION UPDATES TEST")
     print("=" * 60)
 
     results = {
@@ -28,25 +28,25 @@ def test_phase5_configuration():
     }
 
     try:
-        # Test 1: Default configuration validation
-        print("\n1️⃣ Testing Default Configuration...")
+        # Default configuration validation
+        print("\nTesting Default Configuration...")
         results["default_config_validation"] = test_default_config_validation()
 
-        # Test 2: Launch template configuration presence
-        print("\n2️⃣ Testing Launch Template Configuration...")
+        # Launch template configuration presence
+        print("\nTesting Launch Template Configuration...")
         results["launch_template_config_present"] = test_launch_template_config_present()
 
-        # Test 3: AWS provider configuration class
-        print("\n3️⃣ Testing AWS Provider Configuration Class...")
+        # AWS provider configuration class
+        print("\nTesting AWS Provider Configuration Class...")
         results["aws_provider_config_class"] = test_aws_provider_config_class()
 
-        # Test 4: Configuration loading
-        print("\n4️⃣ Testing Configuration Loading...")
+        # Configuration loading
+        print("\nTesting Configuration Loading...")
         results["configuration_loading"] = test_configuration_loading()
 
         # Summary
         print("\n" + "=" * 60)
-        print("📊 PHASE 5 CONFIGURATION TEST RESULTS")
+        print("CONFIGURATION TEST RESULTS")
         print("=" * 60)
 
         passed = sum(1 for result in results.values() if result)
@@ -59,7 +59,7 @@ def test_phase5_configuration():
         print(f"\nOverall: {passed}/{total} tests passed")
 
         if passed == total:
-            print("🎉 ALL PHASE 5 CONFIGURATION TESTS PASSED!")
+            print("ALL CONFIGURATION TESTS PASSED!")
             return True
         else:
             print("WARN:  Some configuration tests failed")
@@ -145,11 +145,11 @@ def test_launch_template_config_present():
                 return False
 
         print("   PASS: Launch template configuration found")
-        print(f"   📋 Create per request: {lt_config['create_per_request']}")
-        print(f"   📋 Naming strategy: {lt_config['naming_strategy']}")
-        print(f"   📋 Version strategy: {lt_config['version_strategy']}")
-        print(f"   📋 Reuse existing: {lt_config['reuse_existing']}")
-        print(f"   📋 Max versions: {lt_config['max_versions_per_template']}")
+        print(f"   Create per request: {lt_config['create_per_request']}")
+        print(f"   Naming strategy: {lt_config['naming_strategy']}")
+        print(f"   Version strategy: {lt_config['version_strategy']}")
+        print(f"   Reuse existing: {lt_config['reuse_existing']}")
+        print(f"   Max versions: {lt_config['max_versions_per_template']}")
 
         return True
 
@@ -206,7 +206,7 @@ def test_aws_provider_config_class():
             return False
 
         print("   PASS: AWSProviderConfig includes launch template configuration")
-        print(f"   📋 Launch template config type: {type(aws_config.launch_template).__name__}")
+        print(f"   Launch template config type: {type(aws_config.launch_template).__name__}")
 
         return True
 
@@ -249,13 +249,11 @@ def test_configuration_loading():
             return False
 
         print("   PASS: Configuration loading successful")
-        print(f"   📋 Loaded region: {aws_config.region}")
+        print(f"   Loaded region: {aws_config.region}")
         print(
-            f"   📋 Launch template create_per_request: {aws_config.launch_template.create_per_request}"
+            f"   Launch template create_per_request: {aws_config.launch_template.create_per_request}"
         )
-        print(
-            f"   📋 Launch template naming_strategy: {aws_config.launch_template.naming_strategy}"
-        )
+        print(f"   Launch template naming_strategy: {aws_config.launch_template.naming_strategy}")
 
         return True
 

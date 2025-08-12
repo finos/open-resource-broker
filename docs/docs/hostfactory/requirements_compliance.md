@@ -70,7 +70,7 @@ The plugin automatically generates accurate CPU and RAM specifications based on 
 }
 ```
 
-**Compliance Status**: [IMPLEMENTED] Fully compliant with HostFactory specification with enhanced attribute accuracy
+**Compliance Status**: [IMPLEMENTED] Fully compliant with HostFactory specification with accurate attribute mapping
 
 #### requestMachines
 
@@ -181,7 +181,7 @@ The plugin supports all required HostFactory attributes:
 The plugin provides legacy camelCase field support through the `--legacy` flag:
 
 ```bash
-# Modern format (default)
+# Current format (default)
 python src/run.py templates list
 
 # Legacy camelCase format (HostFactory compatible)

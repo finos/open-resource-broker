@@ -43,7 +43,7 @@ class ConfigurationLoader:
     - Legacy configuration files
     - Default values
 
-    It provides a unified interface for loading configuration with:
+    It provides a centralized interface for loading configuration with:
     - Type safety through dataclasses
     - Support for legacy and new configuration formats
     - Environment variable overrides
@@ -253,7 +253,7 @@ class ConfigurationLoader:
         required: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """
-        Unified method for loading any configuration file with consistent priority:
+        Centralized method for loading any configuration file with consistent priority:
         1. Explicit path (if provided and contains directory)
         2. HF_PROVIDER_*DIR + filename (if file exists)
         3. Default directory + filename
@@ -458,7 +458,7 @@ class ConfigurationLoader:
 
         # Set up config paths based on HF_PROVIDER_CONFDIR
         if confdir:
-            # Template paths are now handled by unified file resolution
+            # Template paths are now handled by centralized file resolution
             # No need to override them here since the template loading will use
             # resolve_file()
             get_config_logger().debug(

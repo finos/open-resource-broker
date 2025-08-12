@@ -31,7 +31,7 @@ async with OHFPSDK(provider="aws") as sdk:
     # List available templates
     templates = await sdk.list_templates(active_only=True)
     print(f"Found {len(templates)} templates")
-    
+
     # Create machines
     if templates:
         request = await sdk.create_request(
@@ -39,7 +39,7 @@ async with OHFPSDK(provider="aws") as sdk:
             machine_count=5
         )
         print(f"Created request: {request.id}")
-        
+
         # Check status
         status = await sdk.get_request_status(request_id=request.id)
         print(f"Request status: {status}")
@@ -105,15 +105,15 @@ async with OHFPSDK(provider="mock") as sdk:
     # List all available methods
     methods = sdk.list_available_methods()
     print(f"Available methods: {methods}")
-    
+
     # Get information about a specific method
     method_info = sdk.get_method_info("list_templates")
     print(f"Method info: {method_info}")
-    
+
     # Get methods by type
     query_methods = sdk.get_methods_by_type("query")
     command_methods = sdk.get_methods_by_type("command")
-    
+
     # Get SDK statistics
     stats = sdk.get_stats()
     print(f"SDK stats: {stats}")
@@ -127,13 +127,13 @@ async with OHFPSDK(provider="mock") as sdk:
 async with OHFPSDK(provider="aws") as sdk:
     # List all templates
     templates = await sdk.list_templates()
-    
+
     # List only active templates
     active_templates = await sdk.list_templates(active_only=True)
-    
+
     # Get specific template
     template = await sdk.get_template(template_id="my-template")
-    
+
     # Create template
     new_template = await sdk.create_template(
         template_id="new-template",
@@ -142,17 +142,17 @@ async with OHFPSDK(provider="aws") as sdk:
         image_id="ami-12345678",
         instance_type="t3.medium"
     )
-    
+
     # Update template
     updated_template = await sdk.update_template(
         template_id="my-template",
         name="Updated Template",
         instance_type="t3.large"
     )
-    
+
     # Delete template
     await sdk.delete_template(template_id="old-template")
-    
+
     # Validate template
     validation_result = await sdk.validate_template(template_id="my-template")
 ```
@@ -167,16 +167,16 @@ async with OHFPSDK(provider="aws") as sdk:
         machine_count=3,
         timeout=1800
     )
-    
+
     # Monitor request status
     status = await sdk.get_request_status(request_id=request.id)
-    
+
     # List machines
     machines = await sdk.list_machines(status="running")
-    
+
     # Get machine details
     machine = await sdk.get_machine(machine_id="i-1234567890abcdef0")
-    
+
     # Return machines when done
     return_request = await sdk.create_return_request(
         machine_ids=["i-1234567890abcdef0"]
@@ -189,10 +189,10 @@ async with OHFPSDK(provider="aws") as sdk:
 async with OHFPSDK(provider="aws") as sdk:
     # List requests
     requests = await sdk.list_requests(status="pending")
-    
+
     # Get request details
     request = await sdk.get_request(request_id="req-12345678")
-    
+
     # Cancel request
     await sdk.cancel_request(request_id="req-12345678")
 ```
@@ -203,13 +203,13 @@ async with OHFPSDK(provider="aws") as sdk:
 async with OHFPSDK(provider="aws") as sdk:
     # Check provider health
     health = await sdk.get_provider_health()
-    
+
     # List available providers
     providers = await sdk.list_providers()
-    
+
     # Get provider configuration
     config = await sdk.get_provider_config()
-    
+
     # Get provider metrics
     metrics = await sdk.get_provider_metrics()
 ```
@@ -220,10 +220,10 @@ async with OHFPSDK(provider="aws") as sdk:
 async with OHFPSDK(provider="aws") as sdk:
     # Get system status
     status = await sdk.get_system_status()
-    
+
     # Run health check
     health = await sdk.check_system_health(detailed=True)
-    
+
     # Get system metrics
     metrics = await sdk.get_system_metrics()
 ```
@@ -283,7 +283,7 @@ async with OHFPSDK(provider="aws") as sdk:
         sdk.create_request("template-us-west", 3),
         sdk.create_request("template-eu-west", 1)
     ])
-    
+
     for result in results:
         print(f"Request ID: {result.id}")
 ```
@@ -294,7 +294,7 @@ async with OHFPSDK(provider="aws") as sdk:
 async with OHFPSDK(provider="aws") as sdk:
     # Get raw response data
     raw_data = await sdk.list_templates(raw_response=True)
-    
+
     # Custom serialization format
     yaml_data = await sdk.list_templates(format="yaml")
 ```

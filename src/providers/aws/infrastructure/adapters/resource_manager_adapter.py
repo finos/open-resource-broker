@@ -1,8 +1,8 @@
 """
-AWS Resource Manager Adapter using unified base hierarchy.
+AWS Resource Manager Adapter using base hierarchy.
 
 This module provides an adapter that bridges the old CloudResourceManagerPort
-interface with the new unified resource manager hierarchy, maintaining
+interface with the new resource manager hierarchy, maintaining
 backward compatibility while using the improved architecture.
 """
 
@@ -30,7 +30,7 @@ class AWSResourceManagerAdapter(CloudResourceManagerPort):
     AWS implementation of the CloudResourceManagerPort interface.
 
     This adapter provides backward compatibility with the old CloudResourceManagerPort
-    interface while using the new unified AWSResourceManagerImpl internally.
+    interface while using the new AWSResourceManagerImpl internally.
     """
 
     def __init__(self, aws_client: AWSClient, logger: LoggingPort, config: ConfigurationPort):
@@ -46,7 +46,7 @@ class AWSResourceManagerAdapter(CloudResourceManagerPort):
         self._aws_client = aws_client
         self._config = config
 
-        # Use the new unified resource manager internally
+        # Use the new resource manager internally
         from src.providers.aws.configuration.config import AWSProviderConfig
 
         aws_config = AWSProviderConfig()  # This should be injected in real implementation
@@ -58,13 +58,13 @@ class AWSResourceManagerAdapter(CloudResourceManagerPort):
         """
         Get resource quota (legacy interface).
 
-        Adapts the old interface to the new unified resource manager.
+        Adapts the old interface to the new resource manager.
         """
         try:
             # Map legacy resource types to new enum
             resource_type_enum = self._map_legacy_resource_type(resource_type)
 
-            # Use the new unified method
+            # Use the new method
             import asyncio
 
             quota_data = asyncio.run(
@@ -83,7 +83,7 @@ class AWSResourceManagerAdapter(CloudResourceManagerPort):
         """
         List available resources (legacy interface).
 
-        Adapts the old interface to the new unified resource manager.
+        Adapts the old interface to the new resource manager.
         """
         try:
             # Map legacy resource type to new enum
@@ -91,7 +91,7 @@ class AWSResourceManagerAdapter(CloudResourceManagerPort):
             if resource_type:
                 resource_type_enum = self._map_legacy_resource_type(resource_type)
 
-            # Use the new unified method
+            # Use the new method
             import asyncio
 
             allocations = asyncio.run(
@@ -109,13 +109,13 @@ class AWSResourceManagerAdapter(CloudResourceManagerPort):
         """
         Create resource (legacy interface).
 
-        Adapts the old interface to the new unified resource manager.
+        Adapts the old interface to the new resource manager.
         """
         try:
             # Convert legacy config to new specification
             specification = self._legacy_config_to_specification(resource_config)
 
-            # Use the new unified method
+            # Use the new method
             import asyncio
 
             allocation = asyncio.run(self._resource_manager.provision_resources(specification))
@@ -130,7 +130,7 @@ class AWSResourceManagerAdapter(CloudResourceManagerPort):
         """
         Delete resource (legacy interface).
 
-        Adapts the old interface to the new unified resource manager.
+        Adapts the old interface to the new resource manager.
         """
         try:
             # Get resource allocation first
@@ -140,7 +140,7 @@ class AWSResourceManagerAdapter(CloudResourceManagerPort):
                 self._resource_manager.fetch_resource_status(ResourceId(resource_id))
             )
 
-            # Use the new unified method
+            # Use the new method
             asyncio.run(self._resource_manager.deprovision_resources(allocation))
 
             return True
@@ -153,10 +153,10 @@ class AWSResourceManagerAdapter(CloudResourceManagerPort):
         """
         Get resource status (legacy interface).
 
-        Adapts the old interface to the new unified resource manager.
+        Adapts the old interface to the new resource manager.
         """
         try:
-            # Use the new unified method
+            # Use the new method
             import asyncio
 
             allocation = asyncio.run(

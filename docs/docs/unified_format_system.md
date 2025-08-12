@@ -30,7 +30,7 @@ def convert_templates(
 ) -> Dict[str, Any]:
     """
     Template conversion method.
-    
+
     Args:
         templates: List of Template domain objects
         include_full_config: If True, include all fields. If False, include only essential fields (HF minimal)

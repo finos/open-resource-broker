@@ -6,7 +6,7 @@
 graph LR
     %% Module Dependency Map (Key Modules Only)
     %% Generated: 2025-07-12 12:07:09
-    
+
     bootstrap[bootstrap]
     application_service[service]
     bootstrap --> application_service

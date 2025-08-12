@@ -5,9 +5,9 @@ if [ $# -eq 0 ]; then
     echo "Usage: $0 <major|minor|patch|VERSION>"
     echo ""
     echo "Examples:"
-    echo "  $0 patch    # 0.1.0 -> 0.1.1"
-    echo "  $0 minor    # 0.1.0 -> 0.2.0"
-    echo "  $0 major    # 0.1.0 -> 1.0.0"
+    echo "  $0 patch    # 1.0.0 -> 1.0.1"
+    echo "  $0 minor    # 1.0.0 -> 1.1.0"
+    echo "  $0 major    # 1.0.0 -> 2.0.0"
     echo "  $0 1.2.3    # Set specific version"
     exit 1
 fi
@@ -19,8 +19,21 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 cd "$PROJECT_ROOT"
 
-# Get current version
-CURRENT_VERSION=$(grep "__version__" src/__init__.py | cut -d'"' -f2)
+# Check if yq is available
+if ! command -v yq >/dev/null 2>&1; then
+    echo "ERROR: yq is required but not installed."
+    echo "Install with: brew install yq (macOS) or apt install yq (Ubuntu)"
+    exit 1
+fi
+
+# Check if .project.yml exists
+if [ ! -f .project.yml ]; then
+    echo "ERROR: .project.yml not found in project root"
+    exit 1
+fi
+
+# Get current version from project config
+CURRENT_VERSION=$(yq '.project.version' .project.yml)
 echo "Current version: $CURRENT_VERSION"
 
 # Calculate new version
@@ -33,7 +46,7 @@ else
     MAJOR=${VERSION_PARTS[0]}
     MINOR=${VERSION_PARTS[1]}
     PATCH=${VERSION_PARTS[2]}
-    
+
     case $BUMP_TYPE in
         major)
             MAJOR=$((MAJOR + 1))
@@ -48,12 +61,12 @@ else
             PATCH=$((PATCH + 1))
             ;;
         *)
-            echo "ERROR Invalid bump type: $BUMP_TYPE"
+            echo "ERROR: Invalid bump type: $BUMP_TYPE"
             echo "Use: major, minor, patch, or specific version (e.g., 1.2.3)"
             exit 1
             ;;
     esac
-    
+
     NEW_VERSION="$MAJOR.$MINOR.$PATCH"
 fi
 
@@ -62,27 +75,25 @@ echo ""
 read -p "Update version to $NEW_VERSION? (y/N): " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "ERROR Cancelled"
+    echo "ERROR: Cancelled"
     exit 1
 fi
 
-# Update version in src/__init__.py
-echo "📝 Updating src/__init__.py..."
-sed -i.bak "s/__version__ = \"$CURRENT_VERSION\"/__version__ = \"$NEW_VERSION\"/" src/__init__.py
-rm src/__init__.py.bak
+# Update version in .project.yml (single source of truth)
+echo "Updating .project.yml..."
+yq -i ".project.version = \"$NEW_VERSION\"" .project.yml
 
-# Update version in pyproject.toml if it exists
-if [ -f pyproject.toml ]; then
-    echo "📝 Updating pyproject.toml..."
-    sed -i.bak "s/version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" pyproject.toml
-    rm pyproject.toml.bak
+# Regenerate pyproject.toml from template with new version
+if [ -f pyproject.toml.template ]; then
+    echo "Regenerating pyproject.toml from template..."
+    make generate_pyproject
 fi
 
-echo "SUCCESS Version updated to $NEW_VERSION"
+echo "Version updated to $NEW_VERSION"
 echo ""
-echo "🎯 Next steps:"
-echo "  • Review changes: git diff"
-echo "  • Commit changes: git add -A && git commit -m 'Bump version to $NEW_VERSION'"
-echo "  • Create tag: git tag v$NEW_VERSION"
-echo "  • Push changes: git push && git push --tags"
-echo "  • Build and publish: ./dev-tools/package/build.sh && ./dev-tools/package/publish.sh"
+echo "Next steps:"
+echo "  Review changes: git diff"
+echo "  Commit changes: git add -A && git commit -m 'bump: version $CURRENT_VERSION -> $NEW_VERSION'"
+echo "  Create tag: git tag v$NEW_VERSION"
+echo "  Push changes: git push && git push --tags"
+echo "  Build and publish: make build && make publish"

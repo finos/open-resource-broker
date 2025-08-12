@@ -107,7 +107,8 @@ def reset_singleton(singleton_class: Type[Any]) -> None:
     class_name = singleton_class.__name__
     if class_name == "AWSClient":
         _safe_reset_global_variable(
-            "src.infrastructure.aws.aws_client_singleton", "_aws_client_singleton_instance"
+            "src.infrastructure.aws.aws_client_singleton",
+            "_aws_client_singleton_instance",
         )
     elif class_name == "ConfigurationManager":
         _safe_reset_class_instance("src.infrastructure.config.manager", "ConfigurationManager")

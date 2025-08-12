@@ -160,7 +160,9 @@ class TestJSONRepositoryImplementation:
         requests = []
         for i in range(5):
             request = Request.create_new_request(
-                template_id=f"template-{i}", machine_count=i + 1, requester_id=f"user-{i}"
+                template_id=f"template-{i}",
+                machine_count=i + 1,
+                requester_id=f"user-{i}",
             )
             requests.append(request)
 
@@ -417,7 +419,9 @@ class TestRepositoryPerformanceOptimization:
         requests = []
         for i in range(10):
             request = Request.create_new_request(
-                template_id=f"template-{i}", machine_count=i + 1, requester_id=f"user-{i}"
+                template_id=f"template-{i}",
+                machine_count=i + 1,
+                requester_id=f"user-{i}",
             )
             requests.append(request)
 

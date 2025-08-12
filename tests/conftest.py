@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Generator, Optional
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
@@ -17,14 +17,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Import test environment fixtures
-from tests.fixtures.environment.mock_env_vars import (
-    complete_test_environment,
-    create_test_config_dict,
-    create_test_templates_dict,
-    mock_aws_credentials,
-    mock_hf_environment,
-    mock_hf_environment_with_fixtures,
-)
 
 # Import moto for AWS mocking
 try:
@@ -35,6 +27,7 @@ except ImportError:
     # Fallback if moto is not available
     def mock_aws():
         def decorator(func):
+            """No-op decorator when moto is not available."""
             return func
 
         return decorator
@@ -199,7 +192,11 @@ def test_config_dict() -> Dict[str, Any]:
             "access_key_id": "testing",
             "secret_access_key": "testing",
         },
-        "logging": {"level": "DEBUG", "file_path": "logs/test.log", "console_enabled": True},
+        "logging": {
+            "level": "DEBUG",
+            "file_path": "logs/test.log",
+            "console_enabled": True,
+        },
         "database": {"type": "sqlite", "host": "", "port": 0, "name": ":memory:"},
         "template": {
             "default_image_id": "ami-12345678",

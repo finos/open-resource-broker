@@ -129,7 +129,11 @@ class TestConfigurationManager:
         """Test environment variable override."""
         with patch.dict(
             os.environ,
-            {"AWS_REGION": "us-west-1", "LOG_LEVEL": "INFO", "DATABASE_NAME": "override.db"},
+            {
+                "AWS_REGION": "us-west-1",
+                "LOG_LEVEL": "INFO",
+                "DATABASE_NAME": "override.db",
+            },
         ):
             # Test direct environment variable access
             assert config_manager.get_env("AWS_REGION") == "us-west-1"
@@ -313,7 +317,10 @@ class TestConfigurationManager:
         manager = ConfigurationManager()
 
         # Test various nested key formats
-        config = {"level1": {"level2": {"level3": "deep_value"}}, "simple": "simple_value"}
+        config = {
+            "level1": {"level2": {"level3": "deep_value"}},
+            "simple": "simple_value",
+        }
         manager.load_from_dict(config)
 
         # Test nested access
@@ -375,7 +382,12 @@ class TestConfigurationManagerEdgeCases:
         """Test handling None values in configuration."""
         manager = ConfigurationManager()
 
-        config = {"null_value": None, "empty_string": "", "zero_value": 0, "false_value": False}
+        config = {
+            "null_value": None,
+            "empty_string": "",
+            "zero_value": 0,
+            "false_value": False,
+        }
         manager.load_from_dict(config)
 
         # None should be returned as None

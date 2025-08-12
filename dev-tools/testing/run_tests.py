@@ -1,28 +1,30 @@
 #!/usr/bin/env python3
 """Test runner script for the Open Host Factory Plugin."""
-import sys
-import subprocess
 import argparse
-from pathlib import Path
-from typing import List, Optional
+import logging
+import subprocess
+import sys
+from typing import List
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 
 def run_command(cmd: List[str], description: str) -> bool:
     """Run a command and return success status."""
-    print(f"\n{'='*60}")
-    print(f"Running: {description}")
-    print(f"Command: {' '.join(cmd)}")
-    print(f"{'='*60}")
+    logger.info(f"Running: {description}")
+    logger.debug(f"Command: {' '.join(cmd)}")
 
     try:
         result = subprocess.run(cmd, check=True, capture_output=False)
-        print(f"PASS {description}")
+        logger.info(f"PASS {description}")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"FAIL {description} (exit code: {e.returncode})")
+        logger.error(f"FAIL {description} (exit code: {e.returncode})")
         return False
     except FileNotFoundError:
-        print(f"FAIL {description} (command not found)")
+        logger.error(f"FAIL {description} (command not found)")
         return False
 
 
@@ -42,6 +44,12 @@ def main():
     parser.add_argument("--markers", type=str, help="Run tests with specific markers")
     parser.add_argument("--path", type=str, help="Run tests in specific path")
     parser.add_argument("--keyword", "-k", type=str, help="Run tests matching keyword")
+    parser.add_argument(
+        "--ci", action="store_true", help="Enable CI-specific outputs (XML reports, coverage)"
+    )
+    parser.add_argument("--junit-xml", type=str, help="Generate JUnit XML report")
+    parser.add_argument("--cov-xml", type=str, help="Generate coverage XML report")
+    parser.add_argument("--all", action="store_true", help="Run all test types")
     parser.add_argument("--maxfail", type=int, default=5, help="Stop after N failures")
     parser.add_argument("--timeout", type=int, default=300, help="Test timeout in seconds")
 
@@ -59,25 +67,25 @@ def main():
     # Add parallel execution (only if pytest-xdist is available)
     if args.parallel:
         try:
-            import xdist
+            import xdist  # noqa: F401 - Used conditionally
 
             pytest_cmd.extend(["-n", "auto"])
         except ImportError:
-            print("Warning: pytest-xdist not installed, skipping parallel execution")
+            logger.warning("pytest-xdist not installed, skipping parallel execution")
 
     # Add timeout (only if pytest-timeout is available)
     try:
-        import pytest_timeout
+        import pytest_timeout  # noqa: F401 - Used conditionally
 
         pytest_cmd.extend(["--timeout", str(args.timeout)])
     except ImportError:
-        print("Warning: pytest-timeout not installed, skipping timeout option")
+        logger.warning("pytest-timeout not installed, skipping timeout option")
 
     # Add maxfail
     pytest_cmd.extend(["--maxfail", str(args.maxfail)])
 
     # Add coverage options
-    if args.coverage or args.html_coverage:
+    if args.coverage or args.html_coverage or args.ci:
         pytest_cmd.extend(
             ["--cov=src", "--cov-report=term-missing", "--cov-branch", "--no-cov-on-fail"]
         )
@@ -85,11 +93,26 @@ def main():
         if args.html_coverage:
             pytest_cmd.extend(["--cov-report=html:htmlcov"])
 
-    # Determine test selection
+        if args.cov_xml:
+            pytest_cmd.extend([f"--cov-report=xml:{args.cov_xml}"])
+        elif args.ci:
+            pytest_cmd.extend(["--cov-report=xml:coverage.xml"])
+
+    # Add JUnit XML output for CI
+    if args.junit_xml:
+        pytest_cmd.extend([f"--junitxml={args.junit_xml}"])
+    elif args.ci:
+        pytest_cmd.extend(["--junitxml=junit.xml"])
+
+    # Use centralized tool runner
+    run_tool_script = "./dev-tools/scripts/run_tool.sh"
+    final_cmd = [run_tool_script] + pytest_cmd
     test_paths = []
     markers = []
 
-    if args.unit:
+    if args.all:
+        test_paths = ["tests/"]
+    elif args.unit:
         test_paths.append("tests/unit")
         markers.append("unit")
 
@@ -131,15 +154,19 @@ def main():
     if args.keyword:
         pytest_cmd.extend(["-k", args.keyword])
 
+    # Use centralized tool runner
+    run_tool_script = "./dev-tools/scripts/run_tool.sh"
+    final_cmd = [run_tool_script] + pytest_cmd
+
     # Run the tests
-    success = run_command(pytest_cmd, "Running Tests")
+    success = run_command(final_cmd, "Running Tests")
 
     if success:
-        print(f"\nAll tests passed!")
+        logger.info("All tests passed!")
         if args.html_coverage:
-            print(f"Coverage report generated in htmlcov/index.html")
+            logger.info("Coverage report generated in htmlcov/index.html")
     else:
-        print(f"\nSome tests failed!")
+        logger.error("Some tests failed!")
         sys.exit(1)
 
 

@@ -22,7 +22,7 @@ class MachineSerializer:
         self.logger = get_logger(__name__)
 
     def to_dict(self, machine: Machine) -> Dict[str, Any]:
-        """Convert Machine aggregate to dictionary with enhanced fields."""
+        """Convert Machine aggregate to dictionary with additional fields."""
         try:
             return {
                 # Core machine identification
@@ -64,7 +64,7 @@ class MachineSerializer:
             raise
 
     def from_dict(self, data: Dict[str, Any]) -> Machine:
-        """Convert dictionary to Machine aggregate with enhanced field support."""
+        """Convert dictionary to Machine aggregate with field support."""
         try:
             from src.domain.base.value_objects import InstanceType, Tags
             from src.domain.machine.machine_status import MachineStatus
@@ -85,7 +85,7 @@ class MachineSerializer:
                 datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None
             )
 
-            # Build machine data with enhanced fields
+            # Build machine data with additional fields
             machine_data = {
                 # Core machine identification
                 "instance_id": InstanceId(value=data["instance_id"]),

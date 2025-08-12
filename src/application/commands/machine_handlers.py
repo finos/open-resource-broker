@@ -49,7 +49,7 @@ class ValidateProviderStateResponse(BaseResponse):
 
 @command_handler(UpdateMachineStatusCommand)
 class UpdateMachineStatusHandler(BaseCommandHandler[UpdateMachineStatusCommand, None]):
-    """Handler for updating machine status using unified base handler."""
+    """Handler for updating machine status using centralized base handler."""
 
     def __init__(
         self,
@@ -305,7 +305,7 @@ class ValidateProviderStateCommandHandler(
 
 @command_handler(CleanupMachineResourcesCommand)
 class CleanupMachineResourcesHandler(BaseCommandHandler[CleanupMachineResourcesCommand, None]):
-    """Handler for cleaning up machine resources using unified base handler."""
+    """Handler for cleaning up machine resources using centralized base handler."""
 
     def __init__(
         self,
@@ -343,7 +343,7 @@ class CleanupMachineResourcesHandler(BaseCommandHandler[CleanupMachineResourcesC
 
 @command_handler(RegisterMachineCommand)
 class RegisterMachineHandler(BaseCommandHandler[RegisterMachineCommand, None]):
-    """Handler for registering machines using unified base handler."""
+    """Handler for registering machines using centralized base handler."""
 
     def __init__(
         self,
@@ -387,7 +387,7 @@ class RegisterMachineHandler(BaseCommandHandler[RegisterMachineCommand, None]):
 
 @command_handler(DeregisterMachineCommand)
 class DeregisterMachineHandler(BaseCommandHandler[DeregisterMachineCommand, None]):
-    """Handler for deregistering machines using unified base handler."""
+    """Handler for deregistering machines using centralized base handler."""
 
     def __init__(
         self,

@@ -11,7 +11,7 @@ cd "$PROJECT_ROOT"
 # Ensure we're using the venv's Python explicitly
 if [ ! -f ".venv/bin/python" ]; then
     echo "ERROR: Virtual environment not found at .venv/"
-    echo "Please create it first: python3.11 -m venv .venv"
+    echo "Please create it first: python3 -m venv .venv"
     exit 1
 fi
 
@@ -25,28 +25,28 @@ echo "INFO: Python executable: $(which python)"
 # Hybrid installation approach
 if command -v uv >/dev/null 2>&1; then
     echo "INFO: Using uv for faster development installation..."
-    
+
     # Upgrade pip and build tools first with uv
     echo "INFO: Upgrading pip and build tools with uv..."
     uv pip install --upgrade pip setuptools wheel
-    
+
     # Install in editable mode using uv
     echo "INFO: Installing package in editable mode with uv..."
     uv pip install -e ".[dev]"
-    
+
     echo "SUCCESS: Development installation completed with uv!"
     echo "TIP: uv provided faster dependency resolution and installation"
 else
     echo "INFO: Using pip (uv not available)..."
-    
+
     # Upgrade pip and build tools first
     echo "INFO: Upgrading pip and build tools..."
     python -m pip install --upgrade pip setuptools wheel
-    
+
     # Install in editable mode using the venv's Python explicitly
     echo "INFO: Installing package in editable mode..."
     python -m pip install -e ".[dev]"
-    
+
     echo "SUCCESS: Development installation completed with pip!"
     echo "TIP: Install uv for faster development setup: pip install uv"
 fi

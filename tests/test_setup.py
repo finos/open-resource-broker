@@ -33,7 +33,7 @@ def test_imports_work():
     """Test that basic imports work."""
     try:
         # Test domain imports
-        # Test application imports - using modern CQRS handlers instead of ApplicationService
+        # Test application imports - using CQRS handlers
         pass
 
         # Test infrastructure imports

@@ -53,8 +53,8 @@ class TestProviderTemplateStrategy:
                     capabilities=["RunInstances"],
                 ),
                 ProviderInstanceConfig(
-                    name="azure-east-us",
-                    type="azure",
+                    name="provider1-east-us",
+                    type="provider1",
                     enabled=True,
                     priority=3,
                     weight=3,
@@ -348,7 +348,7 @@ class TestProviderTemplateStrategy:
 
         assert strategy._classify_file_type("templates.json") == "main"
         assert strategy._classify_file_type("awsprov_templates.json") == "legacy"
-        assert strategy._classify_file_type("azureprov_templates.json") == "provider_type"
+        assert strategy._classify_file_type("provider1prov_templates.json") == "provider_type"
         assert strategy._classify_file_type("aws-us-east-1_templates.json") == "provider_instance"
         assert strategy._classify_file_type("unknown_file.json") == "unknown"
 
@@ -455,7 +455,13 @@ class TestProviderTemplateStrategy:
 
         # Try to save template without template_id
         with pytest.raises(ValueError, match="Template data must include 'template_id'"):
-            strategy.save({"image_id": "ami-123", "subnet_ids": ["subnet-123"], "max_instances": 1})
+            strategy.save(
+                {
+                    "image_id": "ami-123",
+                    "subnet_ids": ["subnet-123"],
+                    "max_instances": 1,
+                }
+            )
 
     def test_object_format_templates(self, temp_dir, mock_config_manager):
         """Test loading templates in object format."""
@@ -463,8 +469,16 @@ class TestProviderTemplateStrategy:
 
         # Create templates in object format
         template_data = {
-            "template1": {"image_id": "ami-1", "subnet_ids": ["subnet-1"], "max_instances": 1},
-            "template2": {"image_id": "ami-2", "subnet_ids": ["subnet-2"], "max_instances": 2},
+            "template1": {
+                "image_id": "ami-1",
+                "subnet_ids": ["subnet-1"],
+                "max_instances": 1,
+            },
+            "template2": {
+                "image_id": "ami-2",
+                "subnet_ids": ["subnet-2"],
+                "max_instances": 2,
+            },
         }
 
         with open(main_file, "w") as f:

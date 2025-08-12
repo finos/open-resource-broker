@@ -34,8 +34,11 @@ class ErrorHandlingAdapter(ErrorHandlingPort):
         """Retry operations on failure."""
 
         def decorator(func: Callable[..., T]) -> Callable[..., T]:
+            """Decorator that applies retry logic to a function."""
+
             @wraps(func)
             def wrapper(*args: Any, **kwargs: Any) -> Any:
+                """Wrapper function that implements retry logic."""
                 last_exception = None
                 for attempt in range(max_retries + 1):
                     try:

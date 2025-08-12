@@ -224,6 +224,7 @@ class AutoRefreshTemplateCacheService(TTLTemplateCacheService):
             self._refresh_timer.cancel()
 
         def refresh():
+            """Auto-refresh template cache using loader function."""
             if self._loader_func and self._logger:
                 self._logger.debug("Auto-refreshing template cache")
                 try:

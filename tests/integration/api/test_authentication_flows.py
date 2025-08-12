@@ -65,7 +65,9 @@ class TestAuthenticationFlows:
 
         # Create valid JWT token
         strategy = BearerTokenStrategy(
-            secret_key="test-secret-key-for-integration-test", algorithm="HS256", enabled=True
+            secret_key="test-secret-key-for-integration-test",
+            algorithm="HS256",
+            enabled=True,
         )
         token = strategy._create_access_token(
             user_id="test-user", roles=["user"], permissions=["read"]
@@ -169,7 +171,9 @@ class TestAuthenticationFlows:
         server_config = ServerConfig(
             enabled=True,
             auth=AuthConfig(
-                enabled=True, strategy="bearer_token", bearer_token={"secret_key": "test-key"}
+                enabled=True,
+                strategy="bearer_token",
+                bearer_token={"secret_key": "test-key"},
             ),
         )
 
@@ -194,7 +198,10 @@ class TestAuthenticationFlows:
         # Test CORS preflight request
         response = client.options(
             "/health",
-            headers={"Origin": "http://localhost:3000", "Access-Control-Request-Method": "GET"},
+            headers={
+                "Origin": "http://localhost:3000",
+                "Access-Control-Request-Method": "GET",
+            },
         )
 
         # Should have CORS headers

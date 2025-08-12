@@ -150,7 +150,7 @@ class TestCLIIntegration:
             "status": "success",
             "message": "Provider configuration migration completed",
             "migration_summary": {
-                "migration_type": "legacy_aws_to_unified",
+                "migration_type": "legacy_aws_to_integrated",
                 "providers_before": 1,
                 "providers_after": 1,
             },
@@ -163,7 +163,7 @@ class TestCLIIntegration:
         result = expected_result
 
         assert result["status"] == "success"
-        assert result["migration_summary"]["migration_type"] == "legacy_aws_to_unified"
+        assert result["migration_summary"]["migration_type"] == "legacy_aws_to_integrated"
 
     def test_select_provider_strategy_cli_e2e(self):
         """Test selectProviderStrategy CLI operation end-to-end."""
@@ -171,7 +171,11 @@ class TestCLIIntegration:
         expected_result = {
             "selected_strategy": "aws-primary",
             "selection_reason": "Best match for required capabilities",
-            "strategy_info": {"name": "aws-primary", "type": "aws", "health_status": "healthy"},
+            "strategy_info": {
+                "name": "aws-primary",
+                "type": "aws",
+                "health_status": "healthy",
+            },
         }
 
         # Test provider strategy selection logic directly
@@ -263,10 +267,17 @@ class TestCLIIntegration:
 
         expected_result = {
             "templates": [
-                {"template_id": "basic-template", "provider_api": "aws-primary", "available": True}
+                {
+                    "template_id": "basic-template",
+                    "provider_api": "aws-primary",
+                    "available": True,
+                }
             ],
             "total_count": 1,
-            "provider_info": {"mode": "multi", "active_providers": ["aws-primary", "aws-backup"]},
+            "provider_info": {
+                "mode": "multi",
+                "active_providers": ["aws-primary", "aws-backup"],
+            },
         }
 
         # Mock template operations functionality

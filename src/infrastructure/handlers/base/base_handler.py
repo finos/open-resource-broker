@@ -74,6 +74,7 @@ class BaseHandler:
 
         @wraps(func)
         def wrapper(*args, **kwargs):
+            """Wrapper function for logging method entry and exit."""
             method_name = func.__name__
             self.log_entry(method_name, args=args, kwargs=kwargs)
             try:
@@ -100,6 +101,7 @@ class BaseHandler:
 
         @wraps(func)
         def wrapper(*args, **kwargs):
+            """Wrapper function for metrics collection."""
             if not self.metrics:
                 return func(*args, **kwargs)
 
@@ -134,6 +136,7 @@ class BaseHandler:
 
         @wraps(func)
         def wrapper(*args, **kwargs):
+            """Wrapper function for error handling."""
             try:
                 return func(*args, **kwargs)
             except Exception as e:

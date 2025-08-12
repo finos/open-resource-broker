@@ -172,8 +172,8 @@ class TestProviderSelectionService:
             selection_policy="WEIGHTED_ROUND_ROBIN",
             providers=[
                 ProviderInstanceConfig(
-                    name="azure-primary",
-                    type="azure",
+                    name="provider1-primary",
+                    type="provider1",
                     enabled=True,
                     priority=1,
                     weight=10,
@@ -356,7 +356,7 @@ class TestProviderSelectionService:
 
     def test_validate_provider_selection_type_mismatch(self, service):
         """Test validation with provider type mismatch."""
-        is_valid = service.validate_provider_selection("azure", "aws-primary")
+        is_valid = service.validate_provider_selection("provider1", "aws-primary")
         assert not is_valid
 
     def test_provider_supports_api_aws(self, service):
@@ -416,7 +416,9 @@ class TestProviderSelectionResult:
     def test_provider_selection_result_defaults(self):
         """Test ProviderSelectionResult with default values."""
         result = ProviderSelectionResult(
-            provider_type="aws", provider_instance="aws-primary", selection_reason="Test reason"
+            provider_type="aws",
+            provider_instance="aws-primary",
+            selection_reason="Test reason",
         )
 
         assert result.confidence == 1.0

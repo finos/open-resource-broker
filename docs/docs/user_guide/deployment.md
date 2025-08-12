@@ -27,7 +27,7 @@ The plugin operates as:
 
 ## Production Deployment
 
-### Step 1: Environment Setup
+### Environment Setup
 
 #### Server Requirements
 - **OS**: Linux (RHEL/CentOS 7+, Ubuntu 18.04+)
@@ -46,7 +46,7 @@ sudo usermod -aG wheel hostfactory  # For sudo access if needed
 sudo su - hostfactory
 ```
 
-### Step 2: Application Deployment
+### Application Deployment
 
 #### Install the Application
 ```bash
@@ -80,7 +80,7 @@ sudo chown -R hostfactory:hostfactory /var/lib/hostfactory
 sudo chown -R hostfactory:hostfactory /etc/hostfactory
 ```
 
-### Step 3: Configuration
+### Configuration
 
 #### Production Configuration
 Create `/etc/hostfactory/config.json`:
@@ -158,7 +158,7 @@ Create `/etc/logrotate.d/hostfactory`:
 }
 ```
 
-### Step 4: Symphony Integration
+### Symphony Integration
 
 #### Configure Symphony Host Factory
 

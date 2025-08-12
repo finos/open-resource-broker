@@ -103,6 +103,7 @@ def query_handler(query_type: Type[TQuery]):
     """
 
     def decorator(handler_class: Type[TQueryHandler]) -> Type[TQueryHandler]:
+        """Apply query handler registration to the class."""
         # Register in application-layer registry
         _query_handler_registry[query_type] = handler_class
 
@@ -144,6 +145,7 @@ def command_handler(command_type: Type[TCommand]):
     """
 
     def decorator(handler_class: Type[TCommandHandler]) -> Type[TCommandHandler]:
+        """Apply command handler registration to the class."""
         # Register in application-layer registry
         _command_handler_registry[command_type] = handler_class
 

@@ -53,14 +53,14 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
         self.logger.info(f"Getting request details for: {query.request_id}")
 
         try:
-            # Step 1: Check cache first if enabled
+            # Check cache first if enabled
             if self._cache_service and self._cache_service.is_caching_enabled():
                 cached_result = self._cache_service.get_cached_request(query.request_id)
                 if cached_result:
                     self.logger.info(f"Cache hit for request: {query.request_id}")
                     return cached_result
 
-            # Step 2: Cache miss - get request from storage
+            # Cache miss - get request from storage
             with self.uow_factory.create_unit_of_work() as uow:
                 from src.domain.request.value_objects import RequestId
 
@@ -69,13 +69,13 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 if not request:
                     raise EntityNotFoundError("Request", query.request_id)
 
-            # Step 3: Get machines from storage
+            # Get machines from storage
             machines = await self._get_machines_from_storage(query.request_id)
             self.logger.info(
                 f"DEBUG: Found {len(machines)} machines in storage for request {query.request_id}"
             )
 
-            # Step 4: Update machine status if needed
+            # Update machine status if needed
             if not machines and request.resource_ids:
                 self.logger.info(
                     f"DEBUG: No machines in storage but have resource IDs {request.resource_ids}, checking provider"
@@ -93,7 +93,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     f"DEBUG: No machines and no resource IDs for request {query.request_id}"
                 )
 
-            # Step 5: Convert to DTO with machine data
+            # Convert to DTO with machine data
             machines_data = []
             for machine in machines:
                 machines_data.append(
@@ -135,7 +135,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 metadata=request.metadata or {},
             )
 
-            # Step 6: Cache the result if caching is enabled
+            # Cache the result if caching is enabled
             if self._cache_service and self._cache_service.is_caching_enabled():
                 self._cache_service.cache_request(request_dto)
 
@@ -371,6 +371,8 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
         """Create a simple provider context for AWS operations."""
 
         class SimpleProviderContext:
+            """Simple provider context for AWS operations."""
+
             def __init__(self, container):
                 self.container = container
 
@@ -491,8 +493,10 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
             # Return a no-op event publisher
             class NoOpEventPublisher:
+                """No-operation event publisher that discards events."""
+
                 def publish(self, event):
-                    pass
+                    """Publish event (no-op implementation)."""
 
             return NoOpEventPublisher()
 

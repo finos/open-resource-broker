@@ -1,6 +1,6 @@
 """Command handlers orchestrator for the interface layer.
 
-This module provides a unified interface to all command handlers organized by responsibility:
+This module provides a integrated interface to all command handlers organized by responsibility:
 - Template operations (handle_list_templates, handle_get_template, etc.)
 - Request operations (handle_get_request_status, handle_request_machines, etc.)
 - Storage operations (handle_list_storage_strategies, etc.)

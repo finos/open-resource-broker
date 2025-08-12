@@ -24,7 +24,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  get-config:
+    name: Get Python Version from Makefile
+    runs-on: ubuntu-latest
+    outputs:
+      python-version: ${{ steps.version.outputs.default-python-version }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Get default Python version from project config
+      id: version
+      run: |
+        DEFAULT_PYTHON_VERSION=$(yq '.python.default_version' .project.yml)
+        echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> $GITHUB_OUTPUT
+        echo "Using Python version: $DEFAULT_PYTHON_VERSION"
+
   build:
+    needs: get-config
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -35,7 +52,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ needs.get-config.outputs.default-python-version }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6

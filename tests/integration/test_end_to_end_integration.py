@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Enhanced End-to-End Integration Tests.
+End-to-End Integration Tests.
 
 Tests the complete flow from request creation through AWS provisioning
 with launch template management, provider tracking, and machine creation.
@@ -39,8 +39,8 @@ from src.providers.aws.infrastructure.launch_template.manager import (
 )
 
 
-class TestEnhancedEndToEnd:
-    """Enhanced end-to-end integration test suite."""
+class TestAdditionalEndToEnd:
+    """End-to-end integration test suite."""
 
     def setup_method(self):
         """Set up test fixtures."""
@@ -64,7 +64,9 @@ class TestEnhancedEndToEnd:
         self.mock_config.launch_template.naming_strategy = "request_based"
 
         self.launch_template_manager = AWSLaunchTemplateManager(
-            aws_client=self.mock_aws_client, config=self.mock_config, logger=self.mock_logger
+            aws_client=self.mock_aws_client,
+            config=self.mock_config,
+            logger=self.mock_logger,
         )
 
         # Create handlers

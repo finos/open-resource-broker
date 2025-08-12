@@ -135,7 +135,7 @@ def register_all_scheduler_types():
 
 def register_active_scheduler_only(scheduler_type: str = "default") -> bool:
     """
-    Register only the active scheduler type for faster startup (Phase 3 optimization).
+    Register only the active scheduler type for faster startup .
 
     Args:
         scheduler_type: Type of scheduler to register ("hostfactory", "hf", or "default")
@@ -168,7 +168,7 @@ def register_active_scheduler_only(scheduler_type: str = "default") -> bool:
 
 def register_scheduler_on_demand(scheduler_type: str) -> bool:
     """
-    Register a specific scheduler type on demand (Phase 3 optimization).
+    Register a specific scheduler type on demand .
 
     Args:
         scheduler_type: Name of the scheduler type to register

@@ -1,0 +1,36 @@
+FROM python:3.11-slim
+
+# Install system dependencies (no pinning - use latest available)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    build-essential \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install hadolint (latest version)
+RUN curl -L https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64 \
+    -o /usr/local/bin/hadolint \
+    && chmod +x /usr/local/bin/hadolint
+
+# Install yq (latest version)
+RUN curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 \
+    -o /usr/local/bin/yq \
+    && chmod +x /usr/local/bin/yq
+
+# Install UV (latest version)
+RUN pip install --no-cache-dir uv
+
+# Copy project files needed for uv sync
+COPY pyproject.toml ./
+COPY uv.lock ./
+COPY README.md ./
+COPY src/ ./src/
+
+# Install all dev and ci dependencies with uv (uses versions from uv.lock)
+RUN uv sync --group dev --group ci
+
+WORKDIR /app
+
+# Default command
+CMD ["bash"]

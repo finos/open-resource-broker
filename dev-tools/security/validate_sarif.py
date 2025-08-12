@@ -7,9 +7,14 @@ and GitHub Security tab requirements.
 """
 import argparse
 import json
+import logging
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+logger = logging.getLogger(__name__)
 
 
 class SarifValidator:
@@ -144,40 +149,40 @@ def main():
     validator = SarifValidator()
     all_valid = True
 
-    print("Validating SARIF files...")
-    print("=" * 60)
+    logger.info("Validating SARIF files...")
+    logger.info("=" * 60)
 
     for file_path in args.files:
         if not file_path.exists():
-            print(f"FAIL {file_path}: File not found")
+            logger.error(f"FAIL {file_path}: File not found")
             all_valid = False
             continue
 
         is_valid, errors, warnings = validator.validate_file(file_path)
 
         if is_valid and not warnings:
-            print(f"PASS {file_path}: Valid SARIF file")
+            logger.info(f"PASS {file_path}: Valid SARIF file")
         elif is_valid and warnings:
-            print(f"WARN {file_path}: Valid with warnings")
+            logger.warning(f"WARN {file_path}: Valid with warnings")
             for warning in warnings:
-                print(f"   WARNING: {warning}")
+                logger.warning(f"   WARNING: {warning}")
             if args.strict:
                 all_valid = False
         else:
-            print(f"FAIL {file_path}: Invalid SARIF file")
+            logger.error(f"FAIL {file_path}: Invalid SARIF file")
             for error in errors:
-                print(f"   ERROR: {error}")
+                logger.error(f"   ERROR: {error}")
             for warning in warnings:
-                print(f"   WARNING: {warning}")
+                logger.warning(f"   WARNING: {warning}")
             all_valid = False
 
-    print("=" * 60)
+    logger.info("=" * 60)
 
     if all_valid:
-        print("All SARIF files are valid")
+        logger.info("All SARIF files are valid")
         sys.exit(0)
     else:
-        print(
+        logger.error(
             "Some SARIF files have issues. Please fix them before uploading to GitHub Security tab."
         )
         sys.exit(1)

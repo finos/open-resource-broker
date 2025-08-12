@@ -412,9 +412,11 @@ def _format_table_with_headers(headers: List[str], rows: List[List[str]]) -> str
 
     # Format table
     def format_row(row, widths):
+        """Format a single table row with proper column alignment."""
         return "| " + " | ".join(str(row[i]).ljust(widths[i]) for i in range(len(row))) + " |"
 
     def format_separator(widths):
+        """Generate table separator line with proper column widths."""
         return "+" + "+".join("-" * (w + 2) for w in widths) + "+"
 
     lines = []

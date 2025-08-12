@@ -146,7 +146,9 @@ class TestFullWorkflow:
             # Request machine return
             machine_ids = ["machine-001", "machine-002"]
             result = service.request_return_machines(
-                machine_ids=machine_ids, requester_id="test-user", reason="Testing complete"
+                machine_ids=machine_ids,
+                requester_id="test-user",
+                reason="Testing complete",
             )
 
             assert result["request_id"] == "req-return-123"
@@ -271,7 +273,9 @@ class TestFullWorkflow:
             # Should propagate the error
             with pytest.raises(Exception, match="Command failed"):
                 service.request_machines(
-                    template_id="template-001", machine_count=1, requester_id="test-user"
+                    template_id="template-001",
+                    machine_count=1,
+                    requester_id="test-user",
                 )
 
     def test_dependency_injection_integration(self, test_config_file: Path, aws_mocks):
@@ -344,7 +348,7 @@ class TestEndToEndScenarios:
             service, "_query_bus"
         ) as mock_query_bus, patch.object(service, "_template_service") as mock_template_service:
 
-            # Step 1: Get available templates
+            # Get available templates
             mock_template = Template(
                 id="template-001",
                 name="test-template",
@@ -360,7 +364,7 @@ class TestEndToEndScenarios:
             assert len(templates) == 1
             assert templates[0].id == "template-001"
 
-            # Step 2: Request machines
+            # Request machines
             mock_command_bus.dispatch.return_value = {
                 "request_id": "req-12345678",
                 "status": "pending",
@@ -372,7 +376,7 @@ class TestEndToEndScenarios:
             )
             assert request_result["request_id"] == "req-12345678"
 
-            # Step 3: Monitor request progress
+            # Monitor request progress
             mock_query_bus.dispatch.return_value = {
                 "request_id": "req-12345678",
                 "status": "completed",
@@ -386,7 +390,7 @@ class TestEndToEndScenarios:
             assert status["status"] == "completed"
             assert status["progress"] == 100.0
 
-            # Step 4: Get machine details
+            # Get machine details
             mock_query_bus.dispatch.return_value = [
                 {
                     "machine_id": "machine-001",
@@ -403,7 +407,7 @@ class TestEndToEndScenarios:
             machines = service.get_machines_by_request("req-12345678")
             assert len(machines) == 2
 
-            # Step 5: Return machines
+            # Return machines
             mock_command_bus.dispatch.return_value = {
                 "request_id": "req-return-123",
                 "status": "pending",
@@ -417,9 +421,13 @@ class TestEndToEndScenarios:
             )
             assert return_result["request_id"] == "req-return-123"
 
-            # Step 6: Monitor return progress
+            # Monitor return progress
             mock_query_bus.dispatch.return_value = [
-                {"request_id": "req-return-123", "status": "completed", "machine_count": 2}
+                {
+                    "request_id": "req-return-123",
+                    "status": "completed",
+                    "machine_count": 2,
+                }
             ]
 
             return_requests = service.get_return_requests(status="completed")
@@ -442,7 +450,9 @@ class TestEndToEndScenarios:
             # First request should fail
             with pytest.raises(Exception, match="Temporary failure"):
                 service.request_machines(
-                    template_id="template-001", machine_count=1, requester_id="test-user"
+                    template_id="template-001",
+                    machine_count=1,
+                    requester_id="test-user",
                 )
 
             # Simulate recovery

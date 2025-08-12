@@ -22,7 +22,7 @@ Provider Layer → Infrastructure Layer → Application Layer → Domain Layer
 
 ## Package Structure
 
-### 📁 `base/` - Base Provider Components
+### `base/` - Base Provider Components
 Common base classes and interfaces for all cloud providers.
 
 **Key Components:**
@@ -30,7 +30,7 @@ Common base classes and interfaces for all cloud providers.
 - Common provider utilities
 - Shared provider patterns
 
-### 📁 `aws/` - Reference Implementation
+### `aws/` - Reference Implementation
 Complete reference implementation demonstrating the provider pattern.
 
 **Supported Services:**
@@ -63,7 +63,7 @@ Provider Implementation
 
 ### Key Components
 
-#### 📁 `domain/` - Provider Domain Extensions
+#### `domain/` - Provider Domain Extensions
 Provider-specific domain extensions that don't pollute the core domain.
 
 **Components:**
@@ -71,7 +71,7 @@ Provider-specific domain extensions that don't pollute the core domain.
 - Provider domain events
 - Provider business rules
 
-#### 📁 `application/` - Provider Application Services
+#### `application/` - Provider Application Services
 Provider-specific application logic and use cases.
 
 **Components:**
@@ -79,7 +79,7 @@ Provider-specific application logic and use cases.
 - Provider query handlers
 - Provider workflow orchestration
 
-#### 📁 `infrastructure/` - Provider Infrastructure
+#### `infrastructure/` - Provider Infrastructure
 Technical implementations for cloud services.
 
 **Key Features:**
@@ -88,7 +88,7 @@ Technical implementations for cloud services.
 - **Region Management**: Multi-region support
 - **Service Integration**: Cloud service API integration
 
-#### 📁 `managers/` - Provider Resource Managers
+#### `managers/` - Provider Resource Managers
 High-level managers for cloud resource operations.
 
 **Key Managers:**
@@ -96,7 +96,7 @@ High-level managers for cloud resource operations.
 - **Instance Manager**: Virtual machine instance management
 - **Service Handlers**: Specific cloud service handlers
 
-#### 📁 `configuration/` - Provider Configuration
+#### `configuration/` - Provider Configuration
 Provider-specific configuration management.
 
 **Features:**
@@ -105,16 +105,16 @@ Provider-specific configuration management.
 - Service-specific configurations
 - Cost optimization settings
 
-#### 📁 `utilities/` - Provider Utilities
+#### `utilities/` - Provider Utilities
 Provider-specific utility functions and helpers.
 
 **Key Utilities:**
-- **Consolidated Operations**: Unified operation patterns
+- **Consolidated Operations**: Integrated operation patterns
 - Instance management utilities
 - Cost calculation utilities
 - Resource tagging utilities
 
-#### 📁 `resilience/` - Provider Resilience
+#### `resilience/` - Provider Resilience
 Provider-specific resilience patterns and error handling.
 
 **Features:**
@@ -125,27 +125,27 @@ Provider-specific resilience patterns and error handling.
 
 ## Handler Implementation Pattern
 
-### Unified Operations Approach
+### Integrated Operations Approach
 All cloud service handlers use consolidated operation utilities to eliminate code duplication:
 
 ```python
 class CloudOperations:
     """Consolidated cloud operations utility eliminating duplication."""
-    
+
     def __init__(self, cloud_client, logger):
         self._cloud_client = cloud_client
         self._logger = logger
-    
+
     async def terminate_instances(self, instance_ids: List[str]) -> Dict[str, Any]:
-        """Unified instance termination across all handlers."""
+        """Integrated instance termination across all handlers."""
         try:
             response = await self._cloud_client.terminate_instances(
                 instance_ids=instance_ids
             )
-            
+
             self._logger.info(f"Terminated {len(instance_ids)} instances")
             return self._standardize_termination_response(response)
-            
+
         except Exception as e:
             self._logger.error(f"Failed to terminate instances: {str(e)}")
             raise CloudOperationError(f"Instance termination failed: {str(e)}") from e
@@ -157,12 +157,12 @@ class CloudOperations:
 ```python
 class FleetHandler:
     """Handler for fleet operations."""
-    
+
     def __init__(self, cloud_client, cloud_operations):
         self._cloud_client = cloud_client
         self._cloud_ops = cloud_operations
         self._logger = get_logger(__name__)
-    
+
     async def create_fleet(self, fleet_config: FleetConfig) -> List[str]:
         """Create fleet and return instance IDs."""
         try:
@@ -171,18 +171,18 @@ class FleetHandler:
                 target_capacity=fleet_config.target_capacity,
                 fleet_type='instant'
             )
-            
+
             instance_ids = self._extract_instance_ids(response)
             self._logger.info(f"Created fleet with {len(instance_ids)} instances")
-            
+
             return instance_ids
-            
+
         except Exception as e:
             self._logger.error(f"Fleet creation failed: {str(e)}")
             raise CloudFleetError(f"Failed to create fleet: {str(e)}") from e
-    
+
     async def terminate_fleet_instances(self, instance_ids: List[str]) -> Dict[str, Any]:
-        """Terminate fleet instances using unified operations."""
+        """Terminate fleet instances using integrated operations."""
         return await self._cloud_ops.terminate_instances(instance_ids)
 ```
 
@@ -190,13 +190,13 @@ class FleetHandler:
 ```python
 class AutoScalingHandler:
     """Handler for auto scaling operations."""
-    
+
     def __init__(self, scaling_client, compute_client, cloud_operations):
         self._scaling_client = scaling_client
         self._compute_client = compute_client
         self._cloud_ops = cloud_operations
         self._logger = get_logger(__name__)
-    
+
     async def create_auto_scaling_group(self, asg_config: ASGConfig) -> str:
         """Create auto scaling group."""
         try:
@@ -208,16 +208,16 @@ class AutoScalingHandler:
                 desired_capacity=asg_config.desired_capacity,
                 subnets=asg_config.subnet_ids
             )
-            
+
             self._logger.info(f"Created auto scaling group: {asg_config.name}")
             return asg_config.name
-            
+
         except Exception as e:
             self._logger.error(f"Auto scaling group creation failed: {str(e)}")
             raise CloudASGError(f"Failed to create auto scaling group: {str(e)}") from e
-    
+
     async def terminate_asg_instances(self, instance_ids: List[str]) -> Dict[str, Any]:
-        """Terminate auto scaling group instances using unified operations."""
+        """Terminate auto scaling group instances using integrated operations."""
         return await self._cloud_ops.terminate_instances(instance_ids)
 ```
 
@@ -235,7 +235,7 @@ class CloudProviderConfig:
     session_token: Optional[str] = None
     max_retries: int = 3
     timeout: int = 30
-    
+
     # Service-specific configurations
     compute: Optional[ComputeConfig] = None
     auto_scaling: Optional[AutoScalingConfig] = None
@@ -246,13 +246,13 @@ class CloudProviderConfig:
 ```python
 def register_cloud_provider(container: DIContainer, config: CloudProviderConfig) -> None:
     """Register cloud provider services with DI container."""
-    
+
     # Register cloud client
     container.register_singleton(
         CloudClient, 
         lambda: CloudClient(config)
     )
-    
+
     # Register cloud operations utility
     container.register_singleton(
         CloudOperations,
@@ -261,7 +261,7 @@ def register_cloud_provider(container: DIContainer, config: CloudProviderConfig)
             get_logger("cloud.operations")
         )
     )
-    
+
     # Register resource managers
     container.register_singleton(
         CloudResourceManager,
@@ -270,7 +270,7 @@ def register_cloud_provider(container: DIContainer, config: CloudProviderConfig)
             container.resolve(CloudOperations)
         )
     )
-    
+
     # Register provider
     container.register_singleton(
         ProviderInterface,
@@ -307,20 +307,20 @@ class CloudSpotFleetError(CloudProviderError):
 ```python
 class CloudErrorClassifier:
     """Classify cloud errors for appropriate handling."""
-    
+
     TRANSIENT_ERRORS = [
         'RequestLimitExceeded',
         'Throttling',
         'ServiceUnavailable',
         'InternalError'
     ]
-    
+
     PERMANENT_ERRORS = [
         'InvalidParameterValue',
         'UnauthorizedOperation',
         'InvalidResourceID'
     ]
-    
+
     def is_transient_error(self, error: Exception) -> bool:
         """Check if error is transient and should be retried."""
         if hasattr(error, 'response'):
@@ -335,7 +335,7 @@ class CloudErrorClassifier:
 ```python
 class SpotFleetHandler:
     """Handler for cost-optimized spot fleet operations."""
-    
+
     async def create_spot_fleet(self, spot_config: SpotFleetConfig) -> str:
         """Create spot fleet for cost optimization."""
         try:
@@ -349,12 +349,12 @@ class SpotFleetHandler:
                     'fleet_type': 'request'
                 }
             )
-            
+
             fleet_id = response['fleet_id']
             self._logger.info(f"Created spot fleet: {fleet_id}")
-            
+
             return fleet_id
-            
+
         except Exception as e:
             self._logger.error(f"Spot fleet creation failed: {str(e)}")
             raise CloudSpotFleetError(f"Failed to create spot fleet: {str(e)}") from e
@@ -366,22 +366,22 @@ class SpotFleetHandler:
 ```python
 class CloudRegionManager:
     """Manage cloud operations across multiple regions."""
-    
+
     def __init__(self, primary_region: str, fallback_regions: List[str]):
         self._primary_region = primary_region
         self._fallback_regions = fallback_regions
         self._region_clients: Dict[str, CloudClient] = {}
-    
+
     async def provision_with_fallback(self, 
                                     provision_request: ProvisionRequest) -> List[str]:
         """Provision resources with region fallback."""
         regions_to_try = [self._primary_region] + self._fallback_regions
-        
+
         for region in regions_to_try:
             try:
                 client = await self._get_region_client(region)
                 return await client.provision_instances(provision_request)
-                
+
             except Exception as e:
                 self._logger.warning(f"Provisioning failed in {region}: {str(e)}")
                 if region == regions_to_try[-1]:
@@ -395,16 +395,16 @@ class CloudRegionManager:
 ```python
 class MockCloudClient:
     """Mock cloud client for testing."""
-    
+
     def __init__(self):
         self._instances: Dict[str, Dict[str, Any]] = {}
         self._fleets: Dict[str, Dict[str, Any]] = {}
-    
+
     async def run_instances(self, **kwargs) -> Dict[str, Any]:
         """Mock compute instance creation operation."""
         instance_count = kwargs.get('instance_count', 1)
         instances = []
-        
+
         for i in range(instance_count):
             instance_id = f"instance-{uuid.uuid4().hex[:8]}"
             instance = {
@@ -414,7 +414,7 @@ class MockCloudClient:
             }
             instances.append(instance)
             self._instances[instance_id] = instance
-        
+
         return {'instances': instances}
 ```
 
@@ -439,16 +439,16 @@ providers/
 ```python
 class NewCloudProvider(ProviderInterface):
     """New cloud provider implementation."""
-    
+
     @property
     def provider_type(self) -> str:
         return "new_cloud"
-    
+
     async def provision_resources(self, request: ProvisionRequest) -> List[str]:
         """Provision cloud resources."""
         # Provider-specific implementation
         pass
-    
+
     async def terminate_resources(self, resource_ids: List[str]) -> Dict[str, Any]:
         """Terminate cloud resources."""
         # Provider-specific implementation

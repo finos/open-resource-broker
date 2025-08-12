@@ -115,7 +115,7 @@ class ActionEventHandler(EventHandler):
 
     async def _handle_error(self, event: DomainEvent, error: Exception, duration: float) -> None:
         """
-        Enhanced error handling for action handlers.
+        Comprehensive error handling for action handlers.
 
         This extends the base error handling to include action-specific
         error handling like rollback operations, compensation actions, etc.

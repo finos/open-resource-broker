@@ -173,7 +173,13 @@ class TestAPIHandlersComprehensive:
                 # Handlers should have dependencies
                 if len(params) > 0:
                     # Common dependency names
-                    common_deps = ["query_bus", "command_bus", "repository", "logger", "service"]
+                    common_deps = [
+                        "query_bus",
+                        "command_bus",
+                        "repository",
+                        "logger",
+                        "service",
+                    ]
                     has_common_dep = any(
                         any(dep in param for dep in common_deps) for param in params
                     )
@@ -291,7 +297,12 @@ class TestAPIModelsComprehensive:
 
                     if instance:
                         # Test serialization methods
-                        serialization_methods = ["dict", "model_dump", "json", "model_dump_json"]
+                        serialization_methods = [
+                            "dict",
+                            "model_dump",
+                            "json",
+                            "model_dump_json",
+                        ]
 
                         for method_name in serialization_methods:
                             if hasattr(instance, method_name):

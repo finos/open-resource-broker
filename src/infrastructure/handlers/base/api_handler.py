@@ -114,6 +114,7 @@ class BaseAPIHandler(BaseHandler, Generic[T, R]):
         """
 
         def wrapper(request: T) -> R:
+            """Wrapper function for logging middleware."""
             context = RequestContext()
 
             # Set correlation ID for request
@@ -202,6 +203,7 @@ class BaseAPIHandler(BaseHandler, Generic[T, R]):
         """
 
         def wrapper(request: T) -> Dict[str, Any]:
+            """Wrapper function for error handling middleware."""
             try:
                 result = func(request)
 
@@ -302,6 +304,8 @@ class BaseAPIHandler(BaseHandler, Generic[T, R]):
         """
 
         def decorator(func: Callable[[T], R]) -> Callable[[T], R]:
+            """Apply retry decorator to function."""
+
             @retry(
                 strategy="exponential",
                 max_attempts=max_attempts,
@@ -309,6 +313,7 @@ class BaseAPIHandler(BaseHandler, Generic[T, R]):
                 service=service_name,
             )
             def wrapper(request: T) -> R:
+                """Wrapper function for retry middleware."""
                 return func(request)
 
             return wrapper
@@ -330,6 +335,7 @@ class BaseAPIHandler(BaseHandler, Generic[T, R]):
         """
 
         def wrapper(request: T) -> R:
+            """Wrapper function for validation middleware."""
             # Import jsonschema directly - it's a required dependency
             from jsonschema import ValidationError as JsonSchemaValidationError
             from jsonschema import validate

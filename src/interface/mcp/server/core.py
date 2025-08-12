@@ -5,8 +5,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Dict, Optional, Union
 
-from src._package import PACKAGE_NAME
-from src._version import __version__
+from src._package import PACKAGE_NAME, __version__
 from src.infrastructure.logging.logger import get_logger
 
 
@@ -366,7 +365,7 @@ class OpenHFPluginMCPServer:
 
     def _get_tool_schema(self, tool_name: str) -> Dict[str, Any]:
         """Get JSON schema for tool parameters."""
-        # Basic schema - could be enhanced with actual parameter introspection
+        # Basic schema - could be improved with actual parameter introspection
         common_props = {
             "template_id": {"type": "string", "description": "Template identifier"},
             "request_id": {"type": "string", "description": "Request identifier"},

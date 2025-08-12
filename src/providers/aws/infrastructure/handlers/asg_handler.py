@@ -59,7 +59,7 @@ class ASGHandler(AWSHandler):
         request_adapter: RequestAdapterPort = None,
     ):
         """
-        Initialize the ASG handler with unified dependencies.
+        Initialize the ASG handler with integrated dependencies.
 
         Args:
             aws_client: AWS client instance
@@ -68,7 +68,7 @@ class ASGHandler(AWSHandler):
             launch_template_manager: Launch template manager for AWS-specific operations
             request_adapter: Optional request adapter for terminating instances
         """
-        # Use unified base class initialization
+        # Use integrated base class initialization
         super().__init__(aws_client, logger, aws_ops, launch_template_manager, request_adapter)
 
     @handle_infrastructure_exceptions(context="asg_creation")
@@ -296,7 +296,7 @@ class ASGHandler(AWSHandler):
         launch_template_id: str,
         launch_template_version: str,
     ) -> Dict[str, Any]:
-        """Create Auto Scaling Group configuration with enhanced options."""
+        """Create Auto Scaling Group configuration with improved options."""
         asg_config = {
             "AutoScalingGroupName": asg_name,
             "LaunchTemplate": {

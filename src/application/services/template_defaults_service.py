@@ -334,7 +334,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         """
         Resolve template with provider extensions using domain factory.
 
-        This is the enhanced method that integrates hierarchical defaults
+        This method integrates hierarchical defaults
         with domain extensions and creates proper domain template objects.
 
         Args:
@@ -391,7 +391,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         Get provider extension defaults with hierarchy.
 
         Args:
-            provider_type: Provider type (e.g., 'aws', 'azure')
+            provider_type: Provider type (e.g., 'aws', 'provider1')
             provider_instance_name: Provider instance name for overrides
 
         Returns:

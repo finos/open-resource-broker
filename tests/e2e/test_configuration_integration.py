@@ -112,7 +112,10 @@ class TestConfigurationIntegration:
         """Test end-to-end legacy configuration support."""
         # Create legacy configuration
         config_data = {
-            "provider": {"type": "aws", "aws": {"region": "us-east-1", "profile": "default"}},
+            "provider": {
+                "type": "aws",
+                "aws": {"region": "us-east-1", "profile": "default"},
+            },
             "logging": {"level": "INFO"},
         }
 
@@ -161,7 +164,10 @@ class TestConfigurationIntegration:
         """Test end-to-end configuration migration."""
         # Create legacy configuration
         legacy_config = {
-            "provider": {"type": "aws", "aws": {"region": "us-east-1", "profile": "default"}}
+            "provider": {
+                "type": "aws",
+                "aws": {"region": "us-east-1", "profile": "default"},
+            }
         }
 
         config_path = self.create_config_file(legacy_config)
@@ -336,7 +342,11 @@ class TestConfigurationIntegration:
                         "enabled": True,
                         "priority": 1,
                         "weight": 100,
-                        "config": {"region": "us-east-1", "timeout": 10, "max_retries": 2},
+                        "config": {
+                            "region": "us-east-1",
+                            "timeout": 10,
+                            "max_retries": 2,
+                        },
                     }
                 ],
             }

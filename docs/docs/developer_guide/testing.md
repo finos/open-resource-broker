@@ -138,11 +138,11 @@ Tests Docker build process and container structure:
 def test_dockerfile_structure(self, dockerfile_path):
     """Test Dockerfile structure and best practices."""
     content = dockerfile_path.read_text()
-    
+
     # Check for multi-stage build
     assert "FROM python:3.11-slim as builder" in content
     assert "FROM python:3.11-slim as production" in content
-    
+
     # Check for security best practices
     assert "RUN groupadd -r ohfp && useradd -r -g ohfp" in content
     assert "USER ohfp" in content
@@ -161,7 +161,7 @@ def test_container_environment_variables(self, built_image):
         "-e", "HF_AUTH_ENABLED=false",
         built_image, "version"
     ], capture_output=True, text=True, timeout=30)
-    
+
     assert result.returncode == 0
 ```
 
@@ -174,7 +174,7 @@ def test_docker_compose_dev_service_configuration(self, project_root):
     """Test development Docker Compose service configuration."""
     with open(project_root / "docker-compose.yml") as f:
         compose_config = yaml.safe_load(f)
-    
+
     assert "ohfp-api" in compose_config["services"]
     assert "build" in compose_config["services"]["ohfp-api"]
 ```
@@ -218,11 +218,11 @@ class TemplateBuilder:
             "imageId": "ami-12345678",
             "instanceType": "t3.micro"
         }
-    
+
     def with_id(self, template_id: str):
         self.template_data["templateId"] = template_id
         return self
-    
+
     def build(self) -> Template:
         return Template(**self.template_data)
 ```
@@ -241,22 +241,22 @@ jobs:
     strategy:
       matrix:
         python-version: [3.11, 3.12, 3.13]
-    
+
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-    
+
     - name: Install dependencies
       run: |
         pip install -r requirements.txt
         pip install -r requirements-dev.txt
-    
+
     - name: Run tests
       run: pytest --cov=src --cov-report=xml
-    
+
     - name: Upload coverage
       uses: codecov/codecov-action@v3
 ```
@@ -270,7 +270,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
-    
+
     - name: Run Docker tests
       run: |
         pip install pytest
@@ -294,10 +294,10 @@ def test_request_machines_creates_valid_request():
     # Arrange
     template = TemplateBuilder().with_id("test-template").build()
     machine_count = 2
-    
+
     # Act
     request = create_machine_request(template, machine_count)
-    
+
     # Assert
     assert request.template_id == "test-template"
     assert request.machine_count == 2
@@ -314,16 +314,16 @@ def test_api_performance():
     """Test API performance under load."""
     import time
     import concurrent.futures
-    
+
     def make_request():
         response = client.get("/health")
         return response.status_code == 200
-    
+
     start_time = time.time()
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         futures = [executor.submit(make_request) for _ in range(100)]
         results = [future.result() for future in futures]
-    
+
     total_time = time.time() - start_time
     assert all(results)
     assert total_time < 10  # 100 requests in under 10 seconds

@@ -142,7 +142,9 @@ class TestCleanArchitectureIntegration:
         """Test AWS extension configuration works correctly."""
         # Test AWS extension config
         aws_extension_config = AWSTemplateExtensionConfig(
-            allocation_strategy="capacityOptimized", volume_type="gp3", spot_fleet_request_expiry=30
+            allocation_strategy="capacityOptimized",
+            volume_type="gp3",
+            spot_fleet_request_expiry=30,
         )
 
         # Test conversion to template defaults
@@ -222,7 +224,10 @@ class TestCleanArchitectureIntegration:
 
     def test_effective_template_resolution(self, template_defaults_service):
         """Test effective template resolution shows complete hierarchy."""
-        template_dict = {"template_id": "hierarchy-test", "max_instances": 5}  # Template override
+        template_dict = {
+            "template_id": "hierarchy-test",
+            "max_instances": 5,
+        }  # Template override
 
         # Get effective configuration
         effective_config = template_defaults_service.get_effective_template_with_extensions(

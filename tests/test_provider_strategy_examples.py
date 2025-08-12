@@ -121,7 +121,11 @@ class MockProvider2Strategy(ProviderStrategy):
         if operation.operation_type == ProviderOperationType.CREATE_INSTANCES:
             return ProviderResult.success_result(
                 {
-                    "instance_ids": ["provider2-inst-1", "provider2-inst-2", "provider2-inst-3"],
+                    "instance_ids": [
+                        "provider2-inst-1",
+                        "provider2-inst-2",
+                        "provider2-inst-3",
+                    ],
                     "count": 3,
                 }
             )
@@ -506,7 +510,9 @@ class TestFallbackAndResilience:
         failing_primary = MockProvider1Strategy(should_fail=True)
 
         fallback_strategy = FallbackProviderStrategy(
-            primary_strategy=failing_primary, fallback_strategies=[self.fallback1], config=config
+            primary_strategy=failing_primary,
+            fallback_strategies=[self.fallback1],
+            config=config,
         )
 
         fallback_strategy.initialize()
@@ -568,7 +574,9 @@ class TestCompositeStrategies:
     def test_parallel_execution(self):
         """Test parallel execution of multiple providers."""
         config = CompositionConfig(
-            mode=CompositionMode.PARALLEL, max_concurrent_operations=5, timeout_seconds=5.0
+            mode=CompositionMode.PARALLEL,
+            max_concurrent_operations=5,
+            timeout_seconds=5.0,
         )
 
         composite = CompositeProviderStrategy(strategies=self.strategies, config=config)
@@ -730,28 +738,28 @@ if __name__ == "__main__":
     print("\n1. Testing Basic Provider Creation:")
     test_basics = TestProviderStrategyBasics()
     test_basics.test_create_new_provider_strategy()
-    print("✅ New provider strategy creation works")
+    print("PASS: New provider strategy creation works")
 
     # Example 2: Runtime switching
     print("\n2. Testing Runtime Provider Switching:")
     test_switching = TestProviderContextAndSwitching()
     test_switching.setup_method()
     test_switching.test_runtime_provider_switching()
-    print("✅ Runtime provider switching works")
+    print("PASS: Runtime provider switching works")
 
     # Example 3: Load balancing
     print("\n3. Testing Load Balancing:")
     test_lb = TestLoadBalancing()
     test_lb.setup_method()
     test_lb.test_round_robin_load_balancing()
-    print("✅ Load balancing works")
+    print("PASS: Load balancing works")
 
     # Example 4: Fallback and resilience
     print("\n4. Testing Fallback and Resilience:")
     test_fallback = TestFallbackAndResilience()
     test_fallback.setup_method()
     test_fallback.test_immediate_fallback()
-    print("✅ Fallback and resilience works")
+    print("PASS: Fallback and resilience works")
 
-    print("\n🎉 All test examples completed successfully!")
-    print("📚 See test file for detailed implementation examples")
+    print("\nAll test examples completed successfully!")
+    print("See test file for detailed implementation examples")

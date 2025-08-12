@@ -377,7 +377,7 @@ class TestExceptionDecorators:
 
 
 class TestHTTPErrorHandling:
-    """Test HTTP error handling capabilities of the unified ExceptionHandler."""
+    """Test HTTP error handling capabilities of the integrated ExceptionHandler."""
 
     def test_exception_handler_http_formatting(self):
         """Test that ExceptionHandler handles HTTP formatting correctly."""
@@ -653,7 +653,10 @@ class TestPythonBuiltinExceptionWrapping:
         json_error = json.JSONDecodeError("Error", "{}", 1)
 
         result = handler._wrap_json_decode_error(
-            json_error, context="test", custom_field="custom_value", operation_id="op_123"
+            json_error,
+            context="test",
+            custom_field="custom_value",
+            operation_id="op_123",
         )
 
         assert result.details["custom_field"] == "custom_value"

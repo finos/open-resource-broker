@@ -25,7 +25,7 @@ class TestHostFactoryLifecycle:
             # For real providers, use actual configuration
             app_service = self._create_app_service(provider_type)
 
-        # Phase 1: Get Available Templates
+        # Get Available Templates
         templates_response = app_service.get_available_templates()
 
         # Validate Host Factory format
@@ -34,7 +34,7 @@ class TestHostFactoryLifecycle:
 
         template_id = templates_response["templates"][0]["templateId"]
 
-        # Phase 2: Request Machines
+        # Request Machines
         request_response = app_service.request_machines(template_id, 3)
 
         # Validate Host Factory format
@@ -42,7 +42,7 @@ class TestHostFactoryLifecycle:
         req_id = request_response["requestId"]
         assert req_id is not None
 
-        # Phase 3: Check Request Status
+        # Check Request Status
         status_response = app_service.get_request_status(req_id)
 
         # Validate Host Factory format
@@ -57,14 +57,14 @@ class TestHostFactoryLifecycle:
         if machines:
             machine_ids = [{"name": m["name"], "machineId": m["machineId"]} for m in machines[:2]]
 
-            # Phase 4: Request Return Machines
+            # Request Return Machines
             return_response = app_service.request_return_machines(machine_ids)
 
             # Validate Host Factory format
             assert HostFactoryFormatValidator.validate_request_response(return_response)
             ret_id = return_response["requestId"]
 
-            # Phase 5: Check Return Status
+            # Check Return Status
             return_status_response = app_service.get_request_status(ret_id)
 
             # Validate Host Factory format
@@ -72,7 +72,11 @@ class TestHostFactoryLifecycle:
 
             return_info = return_status_response["requests"][0]
             assert return_info["requestId"] == ret_id
-            assert return_info["status"] in ["running", "complete", "complete_with_error"]
+            assert return_info["status"] in [
+                "running",
+                "complete",
+                "complete_with_error",
+            ]
 
     def test_workflow_with_different_scenarios(self, provider_type: str):
         """Test workflow with different provider response scenarios."""

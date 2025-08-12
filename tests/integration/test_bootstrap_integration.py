@@ -20,21 +20,21 @@ class TestBootstrapIntegration:
     @patch("src.bootstrap.register_services")
     @patch("src.bootstrap.get_config_manager")
     @patch("src.bootstrap.setup_logging")
-    def test_application_initialization_with_unified_config(
+    def test_application_initialization_with_provider_config(
         self, mock_setup_logging, mock_get_config_manager, mock_register_services
     ):
-        """Test application initialization with unified provider configuration."""
+        """Test application initialization with integrated provider configuration."""
         # Setup mocks
         mock_register_services.return_value = self.mock_container
         mock_get_config_manager.return_value = self.mock_config_manager
 
-        # Mock unified provider configuration
+        # Mock integrated provider configuration
         from src.config.schemas.provider_strategy_schema import (
+            ProviderConfig,
             ProviderInstanceConfig,
-            UnifiedProviderConfig,
         )
 
-        unified_config = UnifiedProviderConfig(
+        provider_config = ProviderConfig(
             selection_policy="ROUND_ROBIN",
             providers=[
                 ProviderInstanceConfig(name="aws-primary", type="aws", enabled=True),
@@ -42,7 +42,7 @@ class TestBootstrapIntegration:
             ],
         )
 
-        self.mock_config_manager.get_unified_provider_config.return_value = unified_config
+        self.mock_config_manager.get_provider_config.return_value = provider_config
         self.mock_config_manager.get.return_value = {"type": "aws"}
 
         # Mock AppConfig
@@ -67,7 +67,7 @@ class TestBootstrapIntegration:
         assert app._initialized is True
 
         # Verify configuration logging was attempted
-        self.mock_config_manager.get_unified_provider_config.assert_called()
+        self.mock_config_manager.get_provider_config.assert_called()
 
         # Verify application service initialization
         self.mock_application_service.initialize.assert_called_once()
@@ -84,8 +84,8 @@ class TestBootstrapIntegration:
         mock_register_services.return_value = self.mock_container
         mock_get_config_manager.return_value = self.mock_config_manager
 
-        # Mock legacy configuration (no unified config available)
-        self.mock_config_manager.get_unified_provider_config.side_effect = AttributeError(
+        # Mock legacy configuration (no integrated config available)
+        self.mock_config_manager.get_provider_config.side_effect = AttributeError(
             "Method not available"
         )
         self.mock_config_manager.is_provider_strategy_enabled.return_value = False

@@ -57,7 +57,7 @@ class RepositoryFactory:
 
 ### Adding a New Storage Type
 
-#### Step 1: Create Storage Strategy
+#### Create Storage Strategy
 ```python
 # src/infrastructure/persistence/redis/strategy.py
 class RedisStorageStrategy(BaseStorageStrategy):
@@ -66,7 +66,7 @@ class RedisStorageStrategy(BaseStorageStrategy):
     # ... implement storage methods
 ```
 
-#### Step 2: Create Registration Module
+#### Create Registration Module
 ```python
 # src/infrastructure/persistence/redis/registration.py
 def create_redis_strategy(config: Any) -> RedisStorageStrategy:
@@ -88,12 +88,12 @@ def register_redis_storage() -> None:
     )
 ```
 
-#### Step 3: Register in Central Module
+#### Register in Central Module
 ```python
 # src/infrastructure/persistence/registration.py
 def register_all_storage_types() -> None:
     # ... existing registrations
-    
+
     # Add Redis registration
     try:
         from src.infrastructure.persistence.redis.registration import register_redis_storage
@@ -103,7 +103,7 @@ def register_all_storage_types() -> None:
         failed_types.append(("redis", str(e)))
 ```
 
-#### Step 4: Update Configuration Schema
+#### Update Configuration Schema
 ```python
 # src/config/schemas/storage_schema.py
 class RedisStrategyConfig(BaseModel):
@@ -151,10 +151,10 @@ class RedisStrategyConfig(BaseModel):
 def _register_repository_services(container: DIContainer) -> None:
     # Ensure all storage types are registered
     register_all_storage_types()
-    
+
     # Register repository factory
     container.register_singleton(RepositoryFactory, ...)
-    
+
     # Register repositories using the factory
     container.register_singleton(RequestRepositoryInterface, 
                                 lambda c: c.get(RepositoryFactory).create_request_repository())
@@ -190,10 +190,10 @@ def _register_repository_services(container: DIContainer) -> None:
 def test_repository_creation_with_storage_registry():
     registry = get_storage_registry()
     registry.register_storage("test", create_test_strategy, create_test_config)
-    
+
     factory = RepositoryFactory(config_manager)
     repository = factory.create_request_repository()
-    
+
     assert isinstance(repository, RequestRepository)
     assert isinstance(repository.storage_strategy, TestStorageStrategy)
 ```
