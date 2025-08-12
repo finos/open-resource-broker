@@ -49,17 +49,6 @@ class ProviderConfigManager:
             logger.error(f"Failed to load provider config: {e}")
             return None
 
-    def get_provider_config(self) -> "ProviderConfig":
-        """Get provider configuration."""
-        from src.config.schemas.provider_strategy_schema import ProviderConfig
-
-        try:
-            provider_data = self._raw_config.get("provider", {})
-            return ProviderConfig(**provider_data)
-        except Exception as e:
-            logger.error(f"Failed to load provider config: {e}")
-            raise ConfigurationError(f"Invalid provider configuration: {e}")
-
     def is_provider_strategy_enabled(self) -> bool:
         """Check if provider strategy mode is enabled."""
         provider_mode = self.get_provider_mode()
