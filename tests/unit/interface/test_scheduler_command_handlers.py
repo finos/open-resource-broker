@@ -20,7 +20,9 @@ class TestSchedulerCommandHandlers:
         """Test list scheduler strategies handler."""
         args = Namespace(resource="scheduler", action="list")
 
-        with patch("src.interface.scheduler_command_handlers.get_container") as mock_get_container:
+        with patch(
+            "src.interface.scheduler_command_handlers.get_container"
+        ) as mock_get_container:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 
@@ -39,7 +41,9 @@ class TestSchedulerCommandHandlers:
         """Test show scheduler configuration handler."""
         args = Namespace(resource="scheduler", action="show")
 
-        with patch("src.interface.scheduler_command_handlers.get_container") as mock_get_container:
+        with patch(
+            "src.interface.scheduler_command_handlers.get_container"
+        ) as mock_get_container:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 
@@ -58,7 +62,9 @@ class TestSchedulerCommandHandlers:
         """Test validate scheduler configuration handler."""
         args = Namespace(resource="scheduler", action="validate")
 
-        with patch("src.interface.scheduler_command_handlers.get_container") as mock_get_container:
+        with patch(
+            "src.interface.scheduler_command_handlers.get_container"
+        ) as mock_get_container:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 

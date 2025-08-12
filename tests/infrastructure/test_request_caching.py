@@ -31,7 +31,9 @@ class TestRequestCacheService:
         config_manager = Mock(spec=ConfigurationManager)
         config_manager.get_app_config.return_value = {
             "performance": {
-                "caching": {"request_status_caching": {"enabled": True, "ttl_seconds": 300}}
+                "caching": {
+                    "request_status_caching": {"enabled": True, "ttl_seconds": 300}
+                }
             }
         }
         return config_manager
@@ -40,7 +42,9 @@ class TestRequestCacheService:
     def cache_service(self, mock_uow_factory, mock_config_manager, mock_logger):
         """Create cache service instance for testing."""
         return RequestCacheService(
-            uow_factory=mock_uow_factory, config_manager=mock_config_manager, logger=mock_logger
+            uow_factory=mock_uow_factory,
+            config_manager=mock_config_manager,
+            logger=mock_logger,
         )
 
     def test_caching_enabled_by_default(self, cache_service):
@@ -54,7 +58,9 @@ class TestRequestCacheService:
         config_manager.get_app_config.return_value = {}
 
         cache_service = RequestCacheService(
-            uow_factory=mock_uow_factory, config_manager=config_manager, logger=mock_logger
+            uow_factory=mock_uow_factory,
+            config_manager=config_manager,
+            logger=mock_logger,
         )
 
         assert cache_service.is_caching_enabled() is False
@@ -67,7 +73,9 @@ class TestRequestCacheService:
         }
 
         cache_service = RequestCacheService(
-            uow_factory=mock_uow_factory, config_manager=config_manager, logger=mock_logger
+            uow_factory=mock_uow_factory,
+            config_manager=config_manager,
+            logger=mock_logger,
         )
 
         result = cache_service.get_cached_request("test-request-id")
@@ -81,7 +89,9 @@ class TestRequestCacheService:
         }
 
         cache_service = RequestCacheService(
-            uow_factory=mock_uow_factory, config_manager=config_manager, logger=mock_logger
+            uow_factory=mock_uow_factory,
+            config_manager=config_manager,
+            logger=mock_logger,
         )
 
         request_dto = RequestDTO(
@@ -107,13 +117,17 @@ class TestRequestCacheService:
 
         # Create mock request with recent update time (within TTL)
         mock_request = Mock()
-        mock_request.updated_at = current_time - timedelta(seconds=200)  # 200 seconds ago
+        mock_request.updated_at = current_time - timedelta(
+            seconds=200
+        )  # 200 seconds ago
 
         # Should be valid (200 < 300 TTL)
         assert cache_service._is_cache_valid(mock_request) is True
 
         # Create mock request with old update time (outside TTL)
-        mock_request.updated_at = current_time - timedelta(seconds=400)  # 400 seconds ago
+        mock_request.updated_at = current_time - timedelta(
+            seconds=400
+        )  # 400 seconds ago
 
         # Should be invalid (400 > 300 TTL)
         assert cache_service._is_cache_valid(mock_request) is False
@@ -128,7 +142,9 @@ class TestRequestCacheService:
         config_manager.get_app_config.side_effect = Exception("Config error")
 
         cache_service = RequestCacheService(
-            uow_factory=mock_uow_factory, config_manager=config_manager, logger=mock_logger
+            uow_factory=mock_uow_factory,
+            config_manager=config_manager,
+            logger=mock_logger,
         )
 
         # Should default to disabled
@@ -149,12 +165,16 @@ class TestRequestCacheIntegration:
         mock_config_manager = Mock(spec=ConfigurationManager)
         mock_config_manager.get_app_config.return_value = {
             "performance": {
-                "caching": {"request_status_caching": {"enabled": True, "ttl_seconds": 600}}
+                "caching": {
+                    "request_status_caching": {"enabled": True, "ttl_seconds": 600}
+                }
             }
         }
 
         cache_service = RequestCacheService(
-            uow_factory=mock_uow_factory, config_manager=mock_config_manager, logger=mock_logger
+            uow_factory=mock_uow_factory,
+            config_manager=mock_config_manager,
+            logger=mock_logger,
         )
 
         assert cache_service is not None

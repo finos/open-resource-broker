@@ -74,11 +74,15 @@ def test_advanced_edge_cases():
 
         # Test 5: AWS API Integration Edge Cases
         print("\n5. Testing AWS API Integration Edge Cases...")
-        results["aws_api_integration_edge_cases"] = test_aws_api_integration_edge_cases()
+        results["aws_api_integration_edge_cases"] = (
+            test_aws_api_integration_edge_cases()
+        )
 
         # Test 6: Configuration Validation Extremes
         print("\n6. Testing Configuration Validation Extremes...")
-        results["configuration_validation_extremes"] = test_configuration_validation_extremes()
+        results["configuration_validation_extremes"] = (
+            test_configuration_validation_extremes()
+        )
 
         # Test 7: Template Lifecycle Edge Cases
         print("\n7. Testing Template Lifecycle Edge Cases...")
@@ -98,15 +102,21 @@ def test_advanced_edge_cases():
 
         # Test 11: Security and Compliance Edge Cases
         print("\n11. Testing Security and Compliance Edge Cases...")
-        results["security_compliance_edge_cases"] = test_security_compliance_edge_cases()
+        results["security_compliance_edge_cases"] = (
+            test_security_compliance_edge_cases()
+        )
 
         # Test 12: Performance and Scalability Limits
         print("\n12. Testing Performance and Scalability Limits...")
-        results["performance_scalability_limits"] = test_performance_scalability_limits()
+        results["performance_scalability_limits"] = (
+            test_performance_scalability_limits()
+        )
 
         # Test 13: Integration Boundary Edge Cases
         print("\n13. Testing Integration Boundary Edge Cases...")
-        results["integration_boundary_edge_cases"] = test_integration_boundary_edge_cases()
+        results["integration_boundary_edge_cases"] = (
+            test_integration_boundary_edge_cases()
+        )
 
         # Test 14: Time-Based Edge Cases
         print("\n14. Testing Time-Based Edge Cases...")
@@ -286,7 +296,9 @@ def test_concurrent_request_handling():
                             return f"req-{op_id}-{int(time.time() * 1000000) % 1000000}"
                         elif op_type == "machine_id_assignment":
                             # Simulate machine ID assignment
-                            return f"i-{op_id}{int(time.time() * 1000000) % 1000000:010d}"
+                            return (
+                                f"i-{op_id}{int(time.time() * 1000000) % 1000000:010d}"
+                            )
                         return f"result-{op_id}"
 
                     return simulate_operation
@@ -296,7 +308,8 @@ def test_concurrent_request_handling():
                 # Execute concurrent operations
                 with ThreadPoolExecutor(max_workers=concurrent_ops) as executor:
                     futures = [
-                        executor.submit(simulate_operation, i) for i in range(concurrent_ops)
+                        executor.submit(simulate_operation, i)
+                        for i in range(concurrent_ops)
                     ]
                     results = [future.result() for future in as_completed(futures)]
 
@@ -309,7 +322,9 @@ def test_concurrent_request_handling():
                     # Check for uniqueness
                     if len(set(results)) == len(results):
                         actual_outcome = (
-                            "unique_ids_generated" if "id" in operation_type else "no_conflicts"
+                            "unique_ids_generated"
+                            if "id" in operation_type
+                            else "no_conflicts"
                         )
                     else:
                         actual_outcome = "conflicts_detected"
@@ -324,13 +339,17 @@ def test_concurrent_request_handling():
 
                 if actual_outcome == expected:
                     print(f"       PASS: Concurrent handling correct: {expected}")
-                    print(f"       Details: {len(results)} operations completed successfully")
+                    print(
+                        f"       Details: {len(results)} operations completed successfully"
+                    )
                     passed_scenarios += 1
                 else:
                     print(
                         f"       FAIL: Concurrent handling mismatch. Expected: {expected}, Got: {actual_outcome}"
                     )
-                    print(f"       Details: {len(results)} results, {len(set(results))} unique")
+                    print(
+                        f"       Details: {len(results)} results, {len(set(results))} unique"
+                    )
 
             except Exception as e:
                 print(f"       Error testing scenario: {e}")
@@ -418,7 +437,9 @@ def test_storage_strategy_stress():
                         end_time = time.time()
                         processing_time = end_time - start_time
 
-                        if len(loaded_data) == scale and processing_time < 5.0:  # 5 second limit
+                        if (
+                            len(loaded_data) == scale and processing_time < 5.0
+                        ):  # 5 second limit
                             actual_performance = "acceptable"
                         else:
                             actual_performance = "poor_performance"
@@ -436,7 +457,10 @@ def test_storage_strategy_stress():
                             def concurrent_write(thread_id):
                                 """Simulate concurrent write operation."""
                                 try:
-                                    data = {"thread_id": thread_id, "timestamp": time.time()}
+                                    data = {
+                                        "thread_id": thread_id,
+                                        "timestamp": time.time(),
+                                    }
                                     # Simulate file locking by using thread-specific files
                                     thread_file = f"{file_path}.{thread_id}"
                                     with open(thread_file, "w") as f:
@@ -447,12 +471,19 @@ def test_storage_strategy_stress():
 
                             return concurrent_write
 
-                        concurrent_write = create_concurrent_write_func(current_storage_file)
+                        concurrent_write = create_concurrent_write_func(
+                            current_storage_file
+                        )
 
                         # Execute concurrent writes
                         with ThreadPoolExecutor(max_workers=scale) as executor:
-                            futures = [executor.submit(concurrent_write, i) for i in range(scale)]
-                            results = [future.result() for future in as_completed(futures)]
+                            futures = [
+                                executor.submit(concurrent_write, i)
+                                for i in range(scale)
+                            ]
+                            results = [
+                                future.result() for future in as_completed(futures)
+                            ]
 
                         if all(results):
                             actual_performance = "no_corruption"
@@ -463,7 +494,9 @@ def test_storage_strategy_stress():
                         # Simulate backend failure
                         try:
                             # Simulate read from non-existent file
-                            non_existent_file = os.path.join(temp_dir, "non_existent.json")
+                            non_existent_file = os.path.join(
+                                temp_dir, "non_existent.json"
+                            )
                             with open(non_existent_file, "r") as f:
                                 json.load(f)
                             actual_performance = "unexpected_success"
@@ -481,7 +514,9 @@ def test_storage_strategy_stress():
                         # Create old schema data
                         old_data = []
                         for i in range(scale):
-                            old_data.append({"id": i, "name": f"item-{i}", "version": "1.0"})
+                            old_data.append(
+                                {"id": i, "name": f"item-{i}", "version": "1.0"}
+                            )
 
                         with open(old_schema_file, "w") as f:
                             json.dump(old_data, f)

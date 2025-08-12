@@ -65,7 +65,9 @@ class TestCLIIntegration:
     @pytest.mark.asyncio
     @patch("src.infrastructure.di.services.register_all_services")
     @patch("src.config.manager.get_config_manager")
-    async def test_validate_provider_config_cli_e2e(self, mock_get_config, mock_register_services):
+    async def test_validate_provider_config_cli_e2e(
+        self, mock_get_config, mock_register_services
+    ):
         """Test validateProviderConfig CLI operation end-to-end."""
         # Setup mocks
         mock_container = Mock()
@@ -105,7 +107,9 @@ class TestCLIIntegration:
     @pytest.mark.asyncio
     @patch("src.infrastructure.di.services.register_all_services")
     @patch("src.config.manager.get_config_manager")
-    async def test_reload_provider_config_cli_e2e(self, mock_get_config, mock_register_services):
+    async def test_reload_provider_config_cli_e2e(
+        self, mock_get_config, mock_register_services
+    ):
         """Test reloadProviderConfig CLI operation end-to-end."""
         # Setup mocks
         mock_container = Mock()
@@ -171,7 +175,11 @@ class TestCLIIntegration:
         expected_result = {
             "selected_strategy": "aws-primary",
             "selection_reason": "Best match for required capabilities",
-            "strategy_info": {"name": "aws-primary", "type": "aws", "health_status": "healthy"},
+            "strategy_info": {
+                "name": "aws-primary",
+                "type": "aws",
+                "health_status": "healthy",
+            },
         }
 
         # Test provider strategy selection logic directly
@@ -263,10 +271,17 @@ class TestCLIIntegration:
 
         expected_result = {
             "templates": [
-                {"template_id": "basic-template", "provider_api": "aws-primary", "available": True}
+                {
+                    "template_id": "basic-template",
+                    "provider_api": "aws-primary",
+                    "available": True,
+                }
             ],
             "total_count": 1,
-            "provider_info": {"mode": "multi", "active_providers": ["aws-primary", "aws-backup"]},
+            "provider_info": {
+                "mode": "multi",
+                "active_providers": ["aws-primary", "aws-backup"],
+            },
         }
 
         # Mock template operations functionality

@@ -17,7 +17,9 @@ class TestAuthenticationFlows:
     def test_no_auth_flow(self):
         """Test API access with no authentication."""
         # Create server config with no auth
-        server_config = ServerConfig(enabled=True, auth=AuthConfig(enabled=False, strategy="none"))
+        server_config = ServerConfig(
+            enabled=True, auth=AuthConfig(enabled=False, strategy="none")
+        )
 
         # Create FastAPI app
         app = create_fastapi_app(server_config)
@@ -65,7 +67,9 @@ class TestAuthenticationFlows:
 
         # Create valid JWT token
         strategy = BearerTokenStrategy(
-            secret_key="test-secret-key-for-integration-test", algorithm="HS256", enabled=True
+            secret_key="test-secret-key-for-integration-test",
+            algorithm="HS256",
+            enabled=True,
         )
         token = strategy._create_access_token(
             user_id="test-user", roles=["user"], permissions=["read"]
@@ -152,7 +156,9 @@ class TestAuthenticationFlows:
 
         # Create auth middleware
         auth_strategy = NoAuthStrategy(enabled=False)
-        middleware = AuthMiddleware(app=Mock(), auth_port=auth_strategy, require_auth=False)
+        middleware = AuthMiddleware(
+            app=Mock(), auth_port=auth_strategy, require_auth=False
+        )
 
         # Test context creation
         request = MockRequest()
@@ -169,7 +175,9 @@ class TestAuthenticationFlows:
         server_config = ServerConfig(
             enabled=True,
             auth=AuthConfig(
-                enabled=True, strategy="bearer_token", bearer_token={"secret_key": "test-key"}
+                enabled=True,
+                strategy="bearer_token",
+                bearer_token={"secret_key": "test-key"},
             ),
         )
 
@@ -182,7 +190,9 @@ class TestAuthenticationFlows:
         for path in excluded_paths:
             response = client.get(path)
             # Should not return 401 (may return 404 if endpoint doesn't exist)
-            assert response.status_code != 401, f"Path {path} should be excluded from auth"
+            assert (
+                response.status_code != 401
+            ), f"Path {path} should be excluded from auth"
 
     def test_cors_headers(self):
         """Test CORS headers are properly set."""
@@ -194,7 +204,10 @@ class TestAuthenticationFlows:
         # Test CORS preflight request
         response = client.options(
             "/health",
-            headers={"Origin": "http://localhost:3000", "Access-Control-Request-Method": "GET"},
+            headers={
+                "Origin": "http://localhost:3000",
+                "Access-Control-Request-Method": "GET",
+            },
         )
 
         # Should have CORS headers

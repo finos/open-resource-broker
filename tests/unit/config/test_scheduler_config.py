@@ -42,7 +42,12 @@ class TestAppConfigWithScheduler:
             "provider": {
                 "active_provider": "aws-default",
                 "providers": [
-                    {"name": "aws-default", "type": "aws", "enabled": True, "config": {}}
+                    {
+                        "name": "aws-default",
+                        "type": "aws",
+                        "enabled": True,
+                        "config": {},
+                    }
                 ],
             },
         }
@@ -58,7 +63,12 @@ class TestAppConfigWithScheduler:
             "provider": {
                 "active_provider": "aws-default",
                 "providers": [
-                    {"name": "aws-default", "type": "aws", "enabled": True, "config": {}}
+                    {
+                        "name": "aws-default",
+                        "type": "aws",
+                        "enabled": True,
+                        "config": {},
+                    }
                 ],
             },
         }
@@ -66,7 +76,9 @@ class TestAppConfigWithScheduler:
 
         # Test AWS provider paths
         assert app_config.get_config_file_path() == "/test/path/awsprov_config.json"
-        assert app_config.get_templates_file_path() == "/test/path/awsprov_templates.json"
+        assert (
+            app_config.get_templates_file_path() == "/test/path/awsprov_templates.json"
+        )
 
     def test_app_config_path_generation_azure(self):
         """Test AppConfig path generation for Azure provider."""
@@ -76,7 +88,12 @@ class TestAppConfigWithScheduler:
             "provider": {
                 "active_provider": "azure-default",
                 "providers": [
-                    {"name": "azure-default", "type": "azure", "enabled": True, "config": {}}
+                    {
+                        "name": "azure-default",
+                        "type": "azure",
+                        "enabled": True,
+                        "config": {},
+                    }
                 ],
             },
         }
@@ -84,7 +101,10 @@ class TestAppConfigWithScheduler:
 
         # Test Azure provider paths
         assert app_config.get_config_file_path() == "/test/path/azureprov_config.json"
-        assert app_config.get_templates_file_path() == "/test/path/azureprov_templates.json"
+        assert (
+            app_config.get_templates_file_path()
+            == "/test/path/azureprov_templates.json"
+        )
 
     def test_app_config_path_generation_with_complex_provider_name(self):
         """Test AppConfig path generation with complex provider names."""
@@ -94,7 +114,12 @@ class TestAppConfigWithScheduler:
             "provider": {
                 "active_provider": "aws-production-east",
                 "providers": [
-                    {"name": "aws-production-east", "type": "aws", "enabled": True, "config": {}}
+                    {
+                        "name": "aws-production-east",
+                        "type": "aws",
+                        "enabled": True,
+                        "config": {},
+                    }
                 ],
             },
         }
@@ -102,4 +127,6 @@ class TestAppConfigWithScheduler:
 
         # Should extract 'aws' from 'aws-production-east'
         assert app_config.get_config_file_path() == "/test/path/awsprov_config.json"
-        assert app_config.get_templates_file_path() == "/test/path/awsprov_templates.json"
+        assert (
+            app_config.get_templates_file_path() == "/test/path/awsprov_templates.json"
+        )

@@ -54,7 +54,9 @@ class MockProvider1Strategy(ProviderStrategy):
         time.sleep(self.response_time_ms / 1000.0)  # Simulate response time
 
         if self.should_fail:
-            return ProviderResult.error_result("Provider1 simulated failure", "PROVIDER1_ERROR")
+            return ProviderResult.error_result(
+                "Provider1 simulated failure", "PROVIDER1_ERROR"
+            )
 
         if operation.operation_type == ProviderOperationType.CREATE_INSTANCES:
             return ProviderResult.success_result(
@@ -87,7 +89,9 @@ class MockProvider1Strategy(ProviderStrategy):
     def check_health(self) -> ProviderHealthStatus:
         if self.should_fail:
             return ProviderHealthStatus.unhealthy("Provider1 is down")
-        return ProviderHealthStatus.healthy("Provider1 is healthy", self.response_time_ms)
+        return ProviderHealthStatus.healthy(
+            "Provider1 is healthy", self.response_time_ms
+        )
 
 
 class MockProvider2Strategy(ProviderStrategy):
@@ -116,12 +120,18 @@ class MockProvider2Strategy(ProviderStrategy):
         time.sleep(self.response_time_ms / 1000.0)  # Simulate response time
 
         if self.should_fail:
-            return ProviderResult.error_result("Provider2 simulated failure", "PROVIDER2_ERROR")
+            return ProviderResult.error_result(
+                "Provider2 simulated failure", "PROVIDER2_ERROR"
+            )
 
         if operation.operation_type == ProviderOperationType.CREATE_INSTANCES:
             return ProviderResult.success_result(
                 {
-                    "instance_ids": ["provider2-inst-1", "provider2-inst-2", "provider2-inst-3"],
+                    "instance_ids": [
+                        "provider2-inst-1",
+                        "provider2-inst-2",
+                        "provider2-inst-3",
+                    ],
                     "count": 3,
                 }
             )
@@ -153,7 +163,9 @@ class MockProvider2Strategy(ProviderStrategy):
     def check_health(self) -> ProviderHealthStatus:
         if self.should_fail:
             return ProviderHealthStatus.unhealthy("Provider2 is down")
-        return ProviderHealthStatus.healthy("Provider2 is healthy", self.response_time_ms)
+        return ProviderHealthStatus.healthy(
+            "Provider2 is healthy", self.response_time_ms
+        )
 
 
 class TestProviderStrategyBasics:
@@ -170,7 +182,9 @@ class TestProviderStrategyBasics:
         # Test capabilities
         capabilities = provider1.get_capabilities()
         assert capabilities.provider_type == "provider1"
-        assert ProviderOperationType.CREATE_INSTANCES in capabilities.supported_operations
+        assert (
+            ProviderOperationType.CREATE_INSTANCES in capabilities.supported_operations
+        )
 
         # Test health check
         health = provider1.check_health()
@@ -329,7 +343,9 @@ class TestLoadBalancing:
         """Test round-robin load balancing."""
         config = LoadBalancingConfig(algorithm=LoadBalancingAlgorithm.ROUND_ROBIN)
 
-        load_balancer = LoadBalancingProviderStrategy(strategies=self.strategies, config=config)
+        load_balancer = LoadBalancingProviderStrategy(
+            strategies=self.strategies, config=config
+        )
 
         load_balancer.initialize()
 
@@ -353,9 +369,13 @@ class TestLoadBalancing:
 
     def test_least_response_time_load_balancing(self):
         """Test least response time load balancing."""
-        config = LoadBalancingConfig(algorithm=LoadBalancingAlgorithm.LEAST_RESPONSE_TIME)
+        config = LoadBalancingConfig(
+            algorithm=LoadBalancingAlgorithm.LEAST_RESPONSE_TIME
+        )
 
-        load_balancer = LoadBalancingProviderStrategy(strategies=self.strategies, config=config)
+        load_balancer = LoadBalancingProviderStrategy(
+            strategies=self.strategies, config=config
+        )
 
         load_balancer.initialize()
 
@@ -372,7 +392,9 @@ class TestLoadBalancing:
 
     def test_weighted_load_balancing(self):
         """Test weighted load balancing."""
-        config = LoadBalancingConfig(algorithm=LoadBalancingAlgorithm.WEIGHTED_ROUND_ROBIN)
+        config = LoadBalancingConfig(
+            algorithm=LoadBalancingAlgorithm.WEIGHTED_ROUND_ROBIN
+        )
 
         # Give provider1 higher weight
         weights = {"provider1": 0.8, "provider2": 0.2}
@@ -416,7 +438,9 @@ class TestLoadBalancing:
 
         # Check overall health
         health = load_balancer.check_health()
-        assert health.is_healthy  # Should be healthy if at least one provider is healthy
+        assert (
+            health.is_healthy
+        )  # Should be healthy if at least one provider is healthy
 
         # Get strategy statistics
         stats = load_balancer.strategy_stats
@@ -506,7 +530,9 @@ class TestFallbackAndResilience:
         failing_primary = MockProvider1Strategy(should_fail=True)
 
         fallback_strategy = FallbackProviderStrategy(
-            primary_strategy=failing_primary, fallback_strategies=[self.fallback1], config=config
+            primary_strategy=failing_primary,
+            fallback_strategies=[self.fallback1],
+            config=config,
         )
 
         fallback_strategy.initialize()
@@ -568,7 +594,9 @@ class TestCompositeStrategies:
     def test_parallel_execution(self):
         """Test parallel execution of multiple providers."""
         config = CompositionConfig(
-            mode=CompositionMode.PARALLEL, max_concurrent_operations=5, timeout_seconds=5.0
+            mode=CompositionMode.PARALLEL,
+            max_concurrent_operations=5,
+            timeout_seconds=5.0,
         )
 
         composite = CompositeProviderStrategy(strategies=self.strategies, config=config)
@@ -653,7 +681,9 @@ class TestIntegrationScenarios:
         unreliable_provider = MockProvider1Strategy(should_fail=True)
 
         # Create load balancer
-        lb_config = LoadBalancingConfig(algorithm=LoadBalancingAlgorithm.LEAST_RESPONSE_TIME)
+        lb_config = LoadBalancingConfig(
+            algorithm=LoadBalancingAlgorithm.LEAST_RESPONSE_TIME
+        )
 
         load_balancer = LoadBalancingProviderStrategy(
             strategies=[fast_provider, slow_provider], config=lb_config

@@ -33,7 +33,9 @@ class TestMCPToolDiscovery:
         """Test successful MCP tool discovery."""
         mock_sdk = Mock(spec=OpenHFPluginSDK)
         mock_sdk.initialized = True
-        mock_sdk.list_available_methods = Mock(return_value=["test_method", "another_method"])
+        mock_sdk.list_available_methods = Mock(
+            return_value=["test_method", "another_method"]
+        )
 
         mock_method_info = Mock(spec=MethodInfo)
         mock_method_info.description = "Test method description"
@@ -137,7 +139,9 @@ class TestMCPToolDiscovery:
         mock_method_info = Mock(spec=MethodInfo)
         mock_method_info.description = None
 
-        description = discovery._generate_description("create_request", mock_method_info)
+        description = discovery._generate_description(
+            "create_request", mock_method_info
+        )
 
         assert description == "Create Request - Execute create_request operation"
 
@@ -171,8 +175,16 @@ class TestMCPToolDiscovery:
 
         mock_method_info = Mock(spec=MethodInfo)
         mock_method_info.parameters = {
-            "param1": {"type": str, "required": True, "description": "String parameter"},
-            "param2": {"type": int, "required": False, "description": "Integer parameter"},
+            "param1": {
+                "type": str,
+                "required": True,
+                "description": "String parameter",
+            },
+            "param2": {
+                "type": int,
+                "required": False,
+                "description": "Integer parameter",
+            },
         }
 
         schema = discovery._generate_schema("test_method", mock_method_info)
@@ -258,7 +270,11 @@ class TestMCPToolDiscovery:
         """Test getting discovery statistics."""
         discovery = MCPToolDiscovery()
 
-        discovery._tool_definitions = {"tool1": Mock(), "tool2": Mock(), "tool3": Mock()}
+        discovery._tool_definitions = {
+            "tool1": Mock(),
+            "tool2": Mock(),
+            "tool3": Mock(),
+        }
 
         stats = discovery.get_stats()
 

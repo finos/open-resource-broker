@@ -55,7 +55,12 @@ class TestMCPProtocolCompliance:
         assert "capabilities" in init_response["result"]
 
         # Step 2: List available tools
-        tools_message = {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}
+        tools_message = {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/list",
+            "params": {},
+        }
 
         response = await mcp_server.handle_message(json.dumps(tools_message))
         tools_response = json.loads(response)
@@ -65,7 +70,12 @@ class TestMCPProtocolCompliance:
         assert len(tools) > 0
 
         # Step 3: List available resources
-        resources_message = {"jsonrpc": "2.0", "id": 3, "method": "resources/list", "params": {}}
+        resources_message = {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "resources/list",
+            "params": {},
+        }
 
         response = await mcp_server.handle_message(json.dumps(resources_message))
         resources_response = json.loads(response)
@@ -75,7 +85,12 @@ class TestMCPProtocolCompliance:
         assert len(resources) == 4
 
         # Step 4: Get prompts
-        prompts_message = {"jsonrpc": "2.0", "id": 4, "method": "prompts/list", "params": {}}
+        prompts_message = {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "prompts/list",
+            "params": {},
+        }
 
         response = await mcp_server.handle_message(json.dumps(prompts_message))
         prompts_response = json.loads(response)
@@ -89,7 +104,10 @@ class TestMCPProtocolCompliance:
         """Test tool execution workflow."""
         # Mock the list_providers tool to return test data
         mock_tool = AsyncMock(
-            return_value={"providers": [{"name": "aws", "status": "active"}], "count": 1}
+            return_value={
+                "providers": [{"name": "aws", "status": "active"}],
+                "count": 1,
+            }
         )
         mcp_server.tools["list_providers"] = mock_tool
 
@@ -233,7 +251,12 @@ class TestMCPProtocolCompliance:
         # Create multiple concurrent requests
         messages = []
         for i in range(5):
-            message = {"jsonrpc": "2.0", "id": i + 20, "method": "tools/list", "params": {}}
+            message = {
+                "jsonrpc": "2.0",
+                "id": i + 20,
+                "method": "tools/list",
+                "params": {},
+            }
             messages.append(json.dumps(message))
 
         # Handle all messages concurrently
@@ -271,7 +294,12 @@ class TestMCPProtocolCompliance:
     @pytest.mark.asyncio
     async def test_tool_schema_compliance(self, mcp_server):
         """Test tool schema compliance."""
-        tools_message = {"jsonrpc": "2.0", "id": 101, "method": "tools/list", "params": {}}
+        tools_message = {
+            "jsonrpc": "2.0",
+            "id": 101,
+            "method": "tools/list",
+            "params": {},
+        }
 
         response = await mcp_server.handle_message(json.dumps(tools_message))
         tools_response = json.loads(response)

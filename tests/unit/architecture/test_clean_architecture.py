@@ -60,7 +60,9 @@ class TestCleanArchitecture:
 
         return violations
 
-    def _check_file_imports(self, file_path: str, current_layer: str, layers: dict) -> List[str]:
+    def _check_file_imports(
+        self, file_path: str, current_layer: str, layers: dict
+    ) -> List[str]:
         """Check imports in a specific file for layer violations."""
         violations = []
 
@@ -90,7 +92,9 @@ class TestCleanArchitecture:
             return node.module if node.module else ""
         return ""
 
-    def _is_layer_violation(self, import_name: str, current_layer: str, layers: dict) -> bool:
+    def _is_layer_violation(
+        self, import_name: str, current_layer: str, layers: dict
+    ) -> bool:
         """Check if an import violates layer dependency rules."""
         # Define allowed dependencies for each layer
         allowed_deps = {
@@ -140,12 +144,16 @@ class TestCleanArchitecture:
                         if file.endswith(".py"):
                             file_path = os.path.join(root, file)
                             violations.extend(
-                                self._check_forbidden_imports(file_path, forbidden_imports)
+                                self._check_forbidden_imports(
+                                    file_path, forbidden_imports
+                                )
                             )
 
         return violations
 
-    def _check_forbidden_imports(self, file_path: str, forbidden: List[str]) -> List[str]:
+    def _check_forbidden_imports(
+        self, file_path: str, forbidden: List[str]
+    ) -> List[str]:
         """Check for forbidden imports in a file."""
         violations = []
 
@@ -157,7 +165,9 @@ class TestCleanArchitecture:
                 for node in ast.walk(tree):
                     if isinstance(node, (ast.Import, ast.ImportFrom)):
                         import_name = self._get_import_name(node)
-                        if any(forbidden_lib in import_name for forbidden_lib in forbidden):
+                        if any(
+                            forbidden_lib in import_name for forbidden_lib in forbidden
+                        ):
                             violations.append(f"{file_path}: {import_name}")
         except (SyntaxError, UnicodeDecodeError):
             pass
@@ -192,16 +202,26 @@ class TestCleanArchitecture:
         from src.infrastructure.ports.auth.user_port import UserPort
 
         # Interfaces should be small and focused
-        auth_methods = [method for method in dir(AuthPort) if not method.startswith("_")]
-        token_methods = [method for method in dir(TokenPort) if not method.startswith("_")]
-        user_methods = [method for method in dir(UserPort) if not method.startswith("_")]
+        auth_methods = [
+            method for method in dir(AuthPort) if not method.startswith("_")
+        ]
+        token_methods = [
+            method for method in dir(TokenPort) if not method.startswith("_")
+        ]
+        user_methods = [
+            method for method in dir(UserPort) if not method.startswith("_")
+        ]
 
         # Each interface should have a reasonable number of methods (not too many)
-        assert len(auth_methods) <= 10, f"AuthPort interface too large: {len(auth_methods)} methods"
+        assert (
+            len(auth_methods) <= 10
+        ), f"AuthPort interface too large: {len(auth_methods)} methods"
         assert (
             len(token_methods) <= 10
         ), f"TokenPort interface too large: {len(token_methods)} methods"
-        assert len(user_methods) <= 10, f"UserPort interface too large: {len(user_methods)} methods"
+        assert (
+            len(user_methods) <= 10
+        ), f"UserPort interface too large: {len(user_methods)} methods"
 
     def test_dependency_inversion(self):
         """Validate dependency inversion implementation."""
@@ -265,7 +285,9 @@ class TestCleanArchitecture:
 
         violations = []
         for file_path in domain_files:
-            violations.extend(self._check_forbidden_imports(file_path, external_frameworks))
+            violations.extend(
+                self._check_forbidden_imports(file_path, external_frameworks)
+            )
 
         assert (
             len(violations) == 0

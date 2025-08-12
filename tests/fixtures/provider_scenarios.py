@@ -15,7 +15,10 @@ class ProviderScenarios:
             {
                 "name": "all_instances_succeed",
                 "description": "All instances created and running successfully",
-                "create_instances": [InstanceId(value="test-001"), InstanceId(value="test-002")],
+                "create_instances": [
+                    InstanceId(value="test-001"),
+                    InstanceId(value="test-002"),
+                ],
                 "instance_status": {
                     InstanceId(value="test-001"): "running",
                     InstanceId(value="test-002"): "running",
@@ -26,7 +29,10 @@ class ProviderScenarios:
             {
                 "name": "instances_pending_then_running",
                 "description": "Instances start pending then become running",
-                "create_instances": [InstanceId(value="test-003"), InstanceId(value="test-004")],
+                "create_instances": [
+                    InstanceId(value="test-003"),
+                    InstanceId(value="test-004"),
+                ],
                 "status_progression": [
                     {
                         InstanceId(value="test-003"): "pending",
@@ -171,16 +177,24 @@ class ProviderScenarios:
             mock_provider.set_response("create_instances", scenario["create_instances"])
 
         if "instance_status" in scenario:
-            mock_provider.set_response("get_instance_status", scenario["instance_status"])
+            mock_provider.set_response(
+                "get_instance_status", scenario["instance_status"]
+            )
 
         if "create_error" in scenario:
-            mock_provider.set_response("create_instances", Exception(scenario["create_error"]))
+            mock_provider.set_response(
+                "create_instances", Exception(scenario["create_error"])
+            )
 
         if "termination_success" in scenario:
-            mock_provider.set_response("terminate_instances", scenario["termination_success"])
+            mock_provider.set_response(
+                "terminate_instances", scenario["termination_success"]
+            )
 
         if "validation_result" in scenario:
-            mock_provider.set_response("validate_template", scenario["validation_result"])
+            mock_provider.set_response(
+                "validate_template", scenario["validation_result"]
+            )
 
 
 # Host Factory format validators

@@ -30,10 +30,14 @@ class TestDDDCompliance:
                         if isinstance(node, ast.Import):
                             for alias in node.names:
                                 if "infrastructure" in alias.name:
-                                    infrastructure_imports.append(f"{py_file}: {alias.name}")
+                                    infrastructure_imports.append(
+                                        f"{py_file}: {alias.name}"
+                                    )
                         elif isinstance(node, ast.ImportFrom):
                             if node.module and "infrastructure" in node.module:
-                                infrastructure_imports.append(f"{py_file}: {node.module}")
+                                infrastructure_imports.append(
+                                    f"{py_file}: {node.module}"
+                                )
                 except SyntaxError:
                     # Skip files with syntax errors
                     continue
@@ -57,17 +61,23 @@ class TestDDDCompliance:
                     for node in ast.walk(tree):
                         if isinstance(node, ast.Import):
                             for alias in node.names:
-                                if "providers" in alias.name or "aws" in alias.name.lower():
+                                if (
+                                    "providers" in alias.name
+                                    or "aws" in alias.name.lower()
+                                ):
                                     provider_imports.append(f"{py_file}: {alias.name}")
                         elif isinstance(node, ast.ImportFrom):
                             if node.module and (
-                                "providers" in node.module or "aws" in node.module.lower()
+                                "providers" in node.module
+                                or "aws" in node.module.lower()
                             ):
                                 provider_imports.append(f"{py_file}: {node.module}")
                 except SyntaxError:
                     continue
 
-        assert not provider_imports, f"Domain layer has provider dependencies: {provider_imports}"
+        assert (
+            not provider_imports
+        ), f"Domain layer has provider dependencies: {provider_imports}"
 
     def test_bounded_context_isolation(self):
         """Ensure bounded contexts don't leak into each other."""
@@ -177,7 +187,8 @@ class TestSOLIDCompliance:
         methods = [
             method
             for method in dir(ApplicationService)
-            if not method.startswith("_") and callable(getattr(ApplicationService, method))
+            if not method.startswith("_")
+            and callable(getattr(ApplicationService, method))
         ]
 
         # ApplicationService should only have orchestration methods
@@ -246,7 +257,9 @@ class TestSOLIDCompliance:
         ]
 
         # Should not have too many methods (ISP violation indicator)
-        assert len(methods) < 15, f"ProviderPort has {len(methods)} methods, may violate ISP"
+        assert (
+            len(methods) < 15
+        ), f"ProviderPort has {len(methods)} methods, may violate ISP"
 
     def test_dependency_inversion_principle(self):
         """Ensure high-level modules don't depend on low-level modules."""
@@ -307,11 +320,16 @@ class TestCleanArchitectureCompliance:
 
             with open(py_file, "r") as f:
                 content = f.read()
-                if "from src.application" in content or "import src.application" in content:
+                if (
+                    "from src.application" in content
+                    or "import src.application" in content
+                ):
                     domain_imports_app = True
 
         assert app_imports_domain, "Application layer should import domain layer"
-        assert not domain_imports_app, "Domain layer should not import application layer"
+        assert (
+            not domain_imports_app
+        ), "Domain layer should not import application layer"
 
     def test_layer_isolation(self):
         """Ensure each layer can be tested in isolation."""
@@ -368,7 +386,9 @@ class TestCleanArchitectureCompliance:
                     if framework in content:
                         framework_deps.append(f"{py_file}: {framework}")
 
-        assert not framework_deps, f"Domain layer has framework dependencies: {framework_deps}"
+        assert (
+            not framework_deps
+        ), f"Domain layer has framework dependencies: {framework_deps}"
 
 
 @pytest.mark.unit
@@ -420,7 +440,9 @@ class TestDesignPatternCompliance:
             pytest.skip(f"Could not import aggregate classes: {e}")
 
         # Aggregates should inherit from AggregateRoot
-        assert issubclass(Request, AggregateRoot), "Request should inherit from AggregateRoot"
+        assert issubclass(
+            Request, AggregateRoot
+        ), "Request should inherit from AggregateRoot"
 
         # Aggregates should have domain event capabilities
         request = Request.create_new_request(

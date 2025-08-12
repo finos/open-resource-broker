@@ -38,7 +38,9 @@ class TestBoundaryValueCornerCases:
         """Test machine count at boundary values."""
         # Test minimum valid value
         request = Request.create_new_request(
-            template_id="test-template", machine_count=1, requester_id="test-user"  # Minimum valid
+            template_id="test-template",
+            machine_count=1,
+            requester_id="test-user",  # Minimum valid
         )
         assert request.machine_count == 1
 
@@ -66,11 +68,15 @@ class TestBoundaryValueCornerCases:
         """Test template ID boundary cases."""
         # Test empty string
         with pytest.raises(RequestValidationError):
-            Request.create_new_request(template_id="", machine_count=1, requester_id="test-user")
+            Request.create_new_request(
+                template_id="", machine_count=1, requester_id="test-user"
+            )
 
         # Test None
         with pytest.raises(RequestValidationError):
-            Request.create_new_request(template_id=None, machine_count=1, requester_id="test-user")
+            Request.create_new_request(
+                template_id=None, machine_count=1, requester_id="test-user"
+            )
 
         # Test very long template ID
         very_long_id = "a" * 1000
@@ -168,7 +174,9 @@ class TestConcurrencyCornerCases:
         def create_request(index):
             try:
                 request = Request.create_new_request(
-                    template_id=f"template-{index}", machine_count=1, requester_id=f"user-{index}"
+                    template_id=f"template-{index}",
+                    machine_count=1,
+                    requester_id=f"user-{index}",
                 )
                 results.append(request)
             except Exception as e:
@@ -248,7 +256,9 @@ class TestConcurrencyCornerCases:
         def save_request(index):
             try:
                 request = Request.create_new_request(
-                    template_id=f"template-{index}", machine_count=1, requester_id=f"user-{index}"
+                    template_id=f"template-{index}",
+                    machine_count=1,
+                    requester_id=f"user-{index}",
                 )
                 repository.save(request)
                 results.append(request)
@@ -353,7 +363,9 @@ class TestResourceExhaustionCornerCases:
 
         except OSError as e:
             # Should handle disk space issues gracefully
-            assert "No space left on device" in str(e) or os.path.exists(large_file_path)
+            assert "No space left on device" in str(e) or os.path.exists(
+                large_file_path
+            )
 
         finally:
             # Clean up
@@ -495,7 +507,9 @@ class TestDataCorruptionCornerCases:
         # Test various encoding issues
         encoding_issues = [
             b"\xff\xfe\x00\x00",  # Invalid UTF-8
-            "café".encode("latin1").decode("utf-8", errors="ignore"),  # Encoding mismatch
+            "café".encode("latin1").decode(
+                "utf-8", errors="ignore"
+            ),  # Encoding mismatch
             "test\x00data",  # Null bytes
             "emoji 🚀 data",  # Unicode emoji
             "mixed\udcff\udcfe",  # Surrogate characters
@@ -505,7 +519,9 @@ class TestDataCorruptionCornerCases:
             try:
                 # Should handle encoding issues gracefully
                 request = Request.create_new_request(
-                    template_id=problematic_string, machine_count=1, requester_id="test-user"
+                    template_id=problematic_string,
+                    machine_count=1,
+                    requester_id="test-user",
                 )
                 # If successful, should have valid string
                 assert isinstance(request.template_id, str)

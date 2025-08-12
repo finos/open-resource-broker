@@ -123,7 +123,9 @@ class TestDockerCompose:
         # Check security options
         assert "security_opt" in ohfp_service, "Should have security options"
         security_opts = ohfp_service["security_opt"]
-        assert "no-new-privileges:true" in security_opts, "Should prevent privilege escalation"
+        assert (
+            "no-new-privileges:true" in security_opts
+        ), "Should prevent privilege escalation"
 
     def test_docker_compose_volumes_configuration(self, project_root):
         """Test Docker Compose volumes configuration."""
@@ -140,7 +142,9 @@ class TestDockerCompose:
 
         for volume in required_volumes:
             assert volume in volumes, f"Should define {volume} volume"
-            assert volumes[volume]["driver"] == "local", f"{volume} should use local driver"
+            assert (
+                volumes[volume]["driver"] == "local"
+            ), f"{volume} should use local driver"
 
     def test_docker_compose_networks_configuration(self, project_root):
         """Test Docker Compose networks configuration."""
@@ -154,7 +158,9 @@ class TestDockerCompose:
         networks = compose_config["networks"]
 
         assert "ohfp-network" in networks, "Should define ohfp-network"
-        assert networks["ohfp-network"]["driver"] == "bridge", "Should use bridge driver"
+        assert (
+            networks["ohfp-network"]["driver"] == "bridge"
+        ), "Should use bridge driver"
 
     def test_docker_compose_optional_services(self, project_root):
         """Test Docker Compose optional services configuration."""
@@ -199,7 +205,9 @@ class TestDockerCompose:
                 timeout=30,
             )
 
-            assert result.returncode == 0, f"Development compose config invalid: {result.stderr}"
+            assert (
+                result.returncode == 0
+            ), f"Development compose config invalid: {result.stderr}"
 
             # Test production compose file
             result = subprocess.run(
@@ -215,7 +223,9 @@ class TestDockerCompose:
                 timeout=30,
             )
 
-            assert result.returncode == 0, f"Production compose config invalid: {result.stderr}"
+            assert (
+                result.returncode == 0
+            ), f"Production compose config invalid: {result.stderr}"
 
         except FileNotFoundError:
             pytest.skip("docker-compose not available")
@@ -236,7 +246,9 @@ class TestDockerCompose:
         if "nginx" in services:
             nginx_service = services["nginx"]
             assert "depends_on" in nginx_service, "Nginx should depend on ohfp-api"
-            assert "ohfp-api" in nginx_service["depends_on"], "Nginx should depend on ohfp-api"
+            assert (
+                "ohfp-api" in nginx_service["depends_on"]
+            ), "Nginx should depend on ohfp-api"
 
     def test_environment_file_compatibility(self, project_root):
         """Test that .env.example is compatible with Docker Compose."""

@@ -39,7 +39,9 @@ class TestInputValidationSecurity:
         for malicious_input in sql_injection_attempts:
             try:
                 request = Request.create_new_request(
-                    template_id=malicious_input, machine_count=1, requester_id="test-user"
+                    template_id=malicious_input,
+                    machine_count=1,
+                    requester_id="test-user",
                 )
 
                 # If creation succeeds, template_id should be sanitized
@@ -67,7 +69,9 @@ class TestInputValidationSecurity:
         for xss_payload in xss_payloads:
             try:
                 request = Request.create_new_request(
-                    template_id="test-template", machine_count=1, requester_id=xss_payload
+                    template_id="test-template",
+                    machine_count=1,
+                    requester_id=xss_payload,
                 )
 
                 # If creation succeeds, input should be sanitized
@@ -96,7 +100,9 @@ class TestInputValidationSecurity:
         for malicious_input in command_injection_attempts:
             try:
                 request = Request.create_new_request(
-                    template_id=malicious_input, machine_count=1, requester_id="test-user"
+                    template_id=malicious_input,
+                    machine_count=1,
+                    requester_id="test-user",
                 )
 
                 # If creation succeeds, input should be sanitized
@@ -127,7 +133,9 @@ class TestInputValidationSecurity:
         for malicious_path in path_traversal_attempts:
             try:
                 request = Request.create_new_request(
-                    template_id=malicious_path, machine_count=1, requester_id="test-user"
+                    template_id=malicious_path,
+                    machine_count=1,
+                    requester_id="test-user",
                 )
 
                 # If creation succeeds, path should be sanitized
@@ -154,7 +162,9 @@ class TestInputValidationSecurity:
         for malicious_input in ldap_injection_attempts:
             try:
                 request = Request.create_new_request(
-                    template_id="test-template", machine_count=1, requester_id=malicious_input
+                    template_id="test-template",
+                    machine_count=1,
+                    requester_id=malicious_input,
                 )
 
                 # If creation succeeds, input should be sanitized
@@ -263,7 +273,9 @@ class TestAuthenticationSecurity:
 
         # Verify sensitive data is masked
         assert masked_data["aws_access_key"] == "********************"
-        assert masked_data["aws_secret_key"] == "****************************************"
+        assert (
+            masked_data["aws_secret_key"] == "****************************************"
+        )
         assert masked_data["password"] == "*********************"
         assert masked_data["api_key"] == "********************"
 
@@ -280,7 +292,10 @@ class TestDataProtectionSecurity:
             "user_id": "test-user",
             "password": "secret123",
             "aws_access_key": "AKIAIOSFODNN7EXAMPLE",
-            "request_data": {"template_id": "template-1", "api_key": "sk-1234567890abcdef"},
+            "request_data": {
+                "template_id": "template-1",
+                "api_key": "sk-1234567890abcdef",
+            },
         }
 
         def mask_log_entry(entry):
@@ -373,7 +388,9 @@ class TestDataProtectionSecurity:
                 if isinstance(value, str):
                     for pii_type, pattern in pii_patterns.items():
                         if re.search(pattern, value):
-                            detected_pii.append({"type": pii_type, "path": path, "value": value})
+                            detected_pii.append(
+                                {"type": pii_type, "path": path, "value": value}
+                            )
                 elif isinstance(value, dict):
                     for key, val in value.items():
                         scan_value(val, f"{path}.{key}" if path else key)
@@ -416,7 +433,10 @@ class TestDataProtectionSecurity:
                 sanitized = re.sub(r"<[^>]*>", "", data)
                 # Remove SQL injection patterns
                 sanitized = re.sub(
-                    r";\s*(DROP|DELETE|INSERT|UPDATE|SELECT)", "", sanitized, flags=re.IGNORECASE
+                    r";\s*(DROP|DELETE|INSERT|UPDATE|SELECT)",
+                    "",
+                    sanitized,
+                    flags=re.IGNORECASE,
                 )
                 # Remove path traversal patterns
                 sanitized = re.sub(r"\.\./", "", sanitized)
@@ -468,7 +488,9 @@ class TestCryptographicSecurity:
             """Hash password using secure method."""
             # Use SHA-256 with salt (in practice, use bcrypt or similar)
             salt = secrets.token_bytes(32)
-            password_hash = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 100000)
+            password_hash = hashlib.pbkdf2_hmac(
+                "sha256", password.encode(), salt, 100000
+            )
             return base64.b64encode(salt + password_hash).decode()
 
         def verify_password(password: str, hashed: str) -> bool:
@@ -476,7 +498,9 @@ class TestCryptographicSecurity:
             decoded = base64.b64decode(hashed.encode())
             salt = decoded[:32]
             stored_hash = decoded[32:]
-            password_hash = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 100000)
+            password_hash = hashlib.pbkdf2_hmac(
+                "sha256", password.encode(), salt, 100000
+            )
             return password_hash == stored_hash
 
         for password in passwords:
@@ -603,7 +627,11 @@ class TestSecurityConfiguration:
     def test_rate_limiting_simulation(self):
         """Test rate limiting mechanisms."""
         # Simulate rate limiting
-        rate_limits = {"requests_per_minute": 60, "requests_per_hour": 1000, "burst_limit": 10}
+        rate_limits = {
+            "requests_per_minute": 60,
+            "requests_per_hour": 1000,
+            "burst_limit": 10,
+        }
 
         # Simulate request tracking
         request_history = []
@@ -632,7 +660,9 @@ class TestSecurityConfiguration:
             request_history.append({"user_id": user_id, "timestamp": current_time + i})
 
         # Should be rate limited after exceeding limit
-        assert is_rate_limited(user_id, current_time + rate_limits["requests_per_minute"])
+        assert is_rate_limited(
+            user_id, current_time + rate_limits["requests_per_minute"]
+        )
 
     def test_input_length_limits(self):
         """Test input length limits for security."""
@@ -668,7 +698,9 @@ class TestSecurityConfiguration:
         long_requester_id = "a" * (max_lengths["requester_id"] + 1)
         try:
             request = Request.create_new_request(
-                template_id="test-template", machine_count=1, requester_id=long_requester_id
+                template_id="test-template",
+                machine_count=1,
+                requester_id=long_requester_id,
             )
             # If creation succeeds, should be truncated or validated
             assert len(request.requester_id) <= max_lengths["requester_id"]

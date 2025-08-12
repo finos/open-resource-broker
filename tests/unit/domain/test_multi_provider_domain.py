@@ -112,7 +112,9 @@ class TestTemplateMultiProviderFields:
 
     def test_template_provider_name_validation_invalid(self):
         """Test provider name validation with invalid characters."""
-        with pytest.raises(ValueError, match="provider_name must contain only alphanumeric"):
+        with pytest.raises(
+            ValueError, match="provider_name must contain only alphanumeric"
+        ):
             Template(
                 template_id="invalid-name-test",
                 provider_name="aws@us-east-1",  # @ is invalid
@@ -135,7 +137,9 @@ class TestTemplateMultiProviderFields:
 
     def test_template_provider_type_validation_invalid(self):
         """Test provider type validation with invalid format."""
-        with pytest.raises(ValueError, match="provider_type must be lowercase alphanumeric"):
+        with pytest.raises(
+            ValueError, match="provider_type must be lowercase alphanumeric"
+        ):
             Template(
                 template_id="invalid-type-test",
                 provider_type="AWS-Primary",  # Uppercase and hyphen invalid
@@ -157,13 +161,19 @@ class TestTemplateMultiProviderFields:
 
         # Test image_id validation
         with pytest.raises(ValueError, match="image_id is required"):
-            Template(template_id="validation-test",
-                     subnet_ids=["subnet-123"], max_instances=1)
+            Template(
+                template_id="validation-test",
+                subnet_ids=["subnet-123"],
+                max_instances=1,
+            )
 
         # Test subnet_ids validation
         with pytest.raises(ValueError, match="At least one subnet_id is required"):
             Template(
-                template_id="validation-test", image_id="ami-12345", subnet_ids=[], max_instances=1
+                template_id="validation-test",
+                image_id="ami-12345",
+                subnet_ids=[],
+                max_instances=1,
             )
 
 
@@ -218,7 +228,9 @@ class TestRequestMultiProviderFields:
         )
 
         assert request.provider_instance == "aws-us-west-2"
-        assert request.metadata["provider_selection_reason"] == "Load balanced selection"
+        assert (
+            request.metadata["provider_selection_reason"] == "Load balanced selection"
+        )
         assert request.metadata["provider_confidence"] == 0.9
         assert request.metadata["custom_field"] == "custom_value"
 

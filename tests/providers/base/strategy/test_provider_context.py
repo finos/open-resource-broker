@@ -24,10 +24,14 @@ from src.providers.base.strategy.provider_strategy import (
 class MockProviderStrategy(ProviderStrategy):
     """Mock provider strategy for testing."""
 
-    def __init__(self, provider_type: str, supports_operations=None, health_status=None):
+    def __init__(
+        self, provider_type: str, supports_operations=None, health_status=None
+    ):
         """Initialize the instance."""
         self._provider_type = provider_type
-        self._supports_operations = supports_operations or [ProviderOperationType.CREATE_INSTANCES]
+        self._supports_operations = supports_operations or [
+            ProviderOperationType.CREATE_INSTANCES
+        ]
         self._health_status = health_status or ProviderHealthStatus.healthy()
         self._initialized = False
         self.execute_count = 0
@@ -51,7 +55,9 @@ class MockProviderStrategy(ProviderStrategy):
         """Execute an operation."""
         self.execute_count += 1
         if operation.operation_type in self._supports_operations:
-            return ProviderResult.success_result({"executed": True, "count": self.execute_count})
+            return ProviderResult.success_result(
+                {"executed": True, "count": self.execute_count}
+            )
         return ProviderResult.error_result("Operation not supported", "UNSUPPORTED")
 
     def get_capabilities(self) -> ProviderCapabilities:
@@ -135,7 +141,9 @@ class TestProviderContext:
 
     def test_register_invalid_strategy(self, provider_context):
         """Test registering invalid strategy raises error."""
-        with pytest.raises(ValueError, match="Strategy must implement ProviderStrategy interface"):
+        with pytest.raises(
+            ValueError, match="Strategy must implement ProviderStrategy interface"
+        ):
             provider_context.register_strategy("not-a-strategy")
 
     def test_unregister_strategy(self, provider_context):
@@ -178,7 +186,8 @@ class TestProviderContext:
         provider_context.register_strategy(strategy)
 
         operation = ProviderOperation(
-            operation_type=ProviderOperationType.CREATE_INSTANCES, parameters={"count": 2}
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={"count": 2},
         )
 
         result = provider_context.execute_operation(operation)
@@ -190,7 +199,8 @@ class TestProviderContext:
     def test_execute_operation_no_strategy(self, provider_context):
         """Test operation execution with no strategy."""
         operation = ProviderOperation(
-            operation_type=ProviderOperationType.CREATE_INSTANCES, parameters={"count": 2}
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={"count": 2},
         )
 
         result = provider_context.execute_operation(operation)
@@ -201,7 +211,8 @@ class TestProviderContext:
     def test_execute_operation_unsupported(self, provider_context):
         """Test operation execution with unsupported operation."""
         strategy = MockProviderStrategy(
-            "test-provider", supports_operations=[ProviderOperationType.GET_INSTANCE_STATUS]
+            "test-provider",
+            supports_operations=[ProviderOperationType.GET_INSTANCE_STATUS],
         )
         provider_context.register_strategy(strategy)
 
@@ -224,7 +235,8 @@ class TestProviderContext:
         provider_context.register_strategy(strategy2)
 
         operation = ProviderOperation(
-            operation_type=ProviderOperationType.CREATE_INSTANCES, parameters={"count": 2}
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={"count": 2},
         )
 
         result = provider_context.execute_with_strategy("provider-2", operation)
@@ -236,7 +248,8 @@ class TestProviderContext:
     def test_execute_with_nonexistent_strategy(self, provider_context):
         """Test executing with nonexistent strategy."""
         operation = ProviderOperation(
-            operation_type=ProviderOperationType.CREATE_INSTANCES, parameters={"count": 2}
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={"count": 2},
         )
 
         result = provider_context.execute_with_strategy("nonexistent", operation)
@@ -277,7 +290,8 @@ class TestProviderContext:
 
         # Execute some operations to generate metrics
         operation = ProviderOperation(
-            operation_type=ProviderOperationType.CREATE_INSTANCES, parameters={"count": 2}
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={"count": 2},
         )
         provider_context.execute_operation(operation)
         provider_context.execute_operation(operation)
@@ -311,7 +325,9 @@ class TestProviderContext:
         capabilities = provider_context.get_strategy_capabilities("test-provider")
 
         assert capabilities is not None
-        assert ProviderOperationType.CREATE_INSTANCES in capabilities.supported_operations
+        assert (
+            ProviderOperationType.CREATE_INSTANCES in capabilities.supported_operations
+        )
 
     def test_context_manager(self, provider_context):
         """Test provider context as context manager."""
@@ -348,14 +364,16 @@ class TestProviderContext:
     def test_strategy_metrics_recording(self, provider_context):
         """Test that strategy metrics are recorded correctly."""
         strategy = MockProviderStrategy(
-            "test-provider", supports_operations=[ProviderOperationType.CREATE_INSTANCES]
+            "test-provider",
+            supports_operations=[ProviderOperationType.CREATE_INSTANCES],
         )
         provider_context.register_strategy(strategy)
 
         # Execute successful operations
         start_time = time.time()
         success_operation = ProviderOperation(
-            operation_type=ProviderOperationType.CREATE_INSTANCES, parameters={"count": 2}
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={"count": 2},
         )
         provider_context.execute_operation(success_operation)
         provider_context.execute_operation(success_operation)
@@ -386,7 +404,8 @@ class TestProviderContext:
         def execute_operations():
             for _ in range(10):
                 operation = ProviderOperation(
-                    operation_type=ProviderOperationType.CREATE_INSTANCES, parameters={"count": 1}
+                    operation_type=ProviderOperationType.CREATE_INSTANCES,
+                    parameters={"count": 1},
                 )
                 result = provider_context.execute_operation(operation)
                 results.append(result.success)

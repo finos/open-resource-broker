@@ -183,7 +183,9 @@ class TestAuthenticationSecurity:
         for weak_secret in weak_secrets:
             # In production, weak secrets should be rejected or warned about
             # For now, just verify the strategy can be created
-            strategy = BearerTokenStrategy(secret_key=weak_secret, algorithm="HS256", enabled=True)
+            strategy = BearerTokenStrategy(
+                secret_key=weak_secret, algorithm="HS256", enabled=True
+            )
 
             # The strategy should work but ideally warn about weak secrets
             assert strategy.secret_key == weak_secret
@@ -231,8 +233,12 @@ class TestAuthenticationSecurity:
             # In production, should not allow all origins with credentials
             if origin == "*":
                 # If allowing all origins, credentials should not be allowed
-                credentials = response.headers.get("access-control-allow-credentials", "false")
-                assert credentials.lower() != "true", "Wildcard CORS with credentials is insecure"
+                credentials = response.headers.get(
+                    "access-control-allow-credentials", "false"
+                )
+                assert (
+                    credentials.lower() != "true"
+                ), "Wildcard CORS with credentials is insecure"
 
     def test_information_disclosure(self, auth_client):
         """Test that error messages don't disclose sensitive information."""

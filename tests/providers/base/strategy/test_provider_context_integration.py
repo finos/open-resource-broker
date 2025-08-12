@@ -66,7 +66,10 @@ class TestProviderContextIntegration:
             # Test capabilities
             capabilities = provider_context.get_strategy_capabilities("aws")
             assert capabilities is not None
-            assert ProviderOperationType.CREATE_INSTANCES in capabilities.supported_operations
+            assert (
+                ProviderOperationType.CREATE_INSTANCES
+                in capabilities.supported_operations
+            )
 
     def test_multi_provider_context_scenario(self, provider_context):
         """Test multi-provider context scenario."""
@@ -178,7 +181,8 @@ class TestProviderContextIntegration:
 
         # Test routing to specific provider
         launch_operation = ProviderOperation(
-            operation_type=ProviderOperationType.CREATE_INSTANCES, parameters={"count": 2}
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={"count": 2},
         )
 
         result = provider_context.execute_with_strategy("compute", launch_operation)
@@ -215,7 +219,9 @@ class TestProviderContextIntegration:
                 limitations={},
                 performance_metrics={},
             )
-            strategy.execute_operation.return_value = ProviderResult.success_result({"provider": i})
+            strategy.execute_operation.return_value = ProviderResult.success_result(
+                {"provider": i}
+            )
             strategies.append(strategy)
             provider_context.register_strategy(strategy)
 
@@ -223,7 +229,8 @@ class TestProviderContextIntegration:
 
         # Execute operations on different providers
         operation = ProviderOperation(
-            operation_type=ProviderOperationType.CREATE_INSTANCES, parameters={"count": 1}
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={"count": 1},
         )
 
         for i, _strategy in enumerate(strategies):
@@ -282,7 +289,8 @@ class TestProviderContextIntegration:
         def execute_operations():
             for _ in range(10):
                 operation = ProviderOperation(
-                    operation_type=ProviderOperationType.CREATE_INSTANCES, parameters={"count": 1}
+                    operation_type=ProviderOperationType.CREATE_INSTANCES,
+                    parameters={"count": 1},
                 )
                 result = provider_context.execute_operation(operation)
                 results.append(result)
@@ -326,7 +334,9 @@ class TestProviderContextIntegration:
             limitations={},
             performance_metrics={},
         )
-        primary_strategy.check_health.return_value = ProviderHealthStatus.unhealthy("Service down")
+        primary_strategy.check_health.return_value = ProviderHealthStatus.unhealthy(
+            "Service down"
+        )
 
         backup_strategy = Mock()
         backup_strategy.provider_type = "backup"
@@ -358,7 +368,8 @@ class TestProviderContextIntegration:
 
         # Execute operation on backup
         operation = ProviderOperation(
-            operation_type=ProviderOperationType.CREATE_INSTANCES, parameters={"count": 1}
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={"count": 1},
         )
 
         result = provider_context.execute_with_strategy("backup", operation)

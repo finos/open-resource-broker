@@ -55,8 +55,12 @@ class TestRepositoryPatternCompliance:
 
         # Should have standard methods
         assert hasattr(request_repo, "save"), "Repository should have save method"
-        assert hasattr(request_repo, "find_by_id"), "Repository should have find_by_id method"
-        assert hasattr(request_repo, "find_all"), "Repository should have find_all method"
+        assert hasattr(
+            request_repo, "find_by_id"
+        ), "Repository should have find_by_id method"
+        assert hasattr(
+            request_repo, "find_all"
+        ), "Repository should have find_all method"
         assert hasattr(request_repo, "delete"), "Repository should have delete method"
 
         # Should have aggregate-specific methods
@@ -72,7 +76,9 @@ class TestRepositoryPatternCompliance:
         mock_storage = Mock()
         mock_event_publisher = Mock()
 
-        request_repo = RequestRepository(storage=mock_storage, event_publisher=mock_event_publisher)
+        request_repo = RequestRepository(
+            storage=mock_storage, event_publisher=mock_event_publisher
+        )
 
         # Create request with events
         request = Request.create_new_request(
@@ -160,7 +166,9 @@ class TestJSONRepositoryImplementation:
         requests = []
         for i in range(5):
             request = Request.create_new_request(
-                template_id=f"template-{i}", machine_count=i + 1, requester_id=f"user-{i}"
+                template_id=f"template-{i}",
+                machine_count=i + 1,
+                requester_id=f"user-{i}",
             )
             requests.append(request)
 
@@ -319,7 +327,9 @@ class TestRepositoryEventPublishing:
         mock_storage = Mock()
         mock_event_publisher = Mock()
 
-        request_repo = RequestRepository(storage=mock_storage, event_publisher=mock_event_publisher)
+        request_repo = RequestRepository(
+            storage=mock_storage, event_publisher=mock_event_publisher
+        )
 
         # Create request (generates events)
         request = Request.create_new_request(
@@ -345,7 +355,9 @@ class TestRepositoryEventPublishing:
         mock_storage = Mock()
         mock_event_publisher = Mock()
 
-        request_repo = RequestRepository(storage=mock_storage, event_publisher=mock_event_publisher)
+        request_repo = RequestRepository(
+            storage=mock_storage, event_publisher=mock_event_publisher
+        )
 
         # Create request and perform multiple operations
         request = Request.create_new_request(
@@ -353,7 +365,9 @@ class TestRepositoryEventPublishing:
         )
 
         request.start_processing()
-        request.complete_successfully(machine_ids=["i-123", "i-456"], completion_message="Success")
+        request.complete_successfully(
+            machine_ids=["i-123", "i-456"], completion_message="Success"
+        )
 
         # Save request
         request_repo.save(request)
@@ -362,15 +376,21 @@ class TestRepositoryEventPublishing:
         published_events = mock_event_publisher.publish_events.call_args[0][0]
 
         for i in range(1, len(published_events)):
-            assert published_events[i - 1].occurred_at <= published_events[i].occurred_at
+            assert (
+                published_events[i - 1].occurred_at <= published_events[i].occurred_at
+            )
 
     def test_repository_handles_event_publishing_failures(self):
         """Test that repository handles event publishing failures."""
         mock_storage = Mock()
         mock_event_publisher = Mock()
-        mock_event_publisher.publish_events.side_effect = Exception("Event publishing failed")
+        mock_event_publisher.publish_events.side_effect = Exception(
+            "Event publishing failed"
+        )
 
-        request_repo = RequestRepository(storage=mock_storage, event_publisher=mock_event_publisher)
+        request_repo = RequestRepository(
+            storage=mock_storage, event_publisher=mock_event_publisher
+        )
 
         request = Request.create_new_request(
             template_id="test-template", machine_count=2, requester_id="test-user"
@@ -388,7 +408,9 @@ class TestRepositoryEventPublishing:
         mock_storage = Mock()
         mock_event_publisher = Mock()
 
-        request_repo = RequestRepository(storage=mock_storage, event_publisher=mock_event_publisher)
+        request_repo = RequestRepository(
+            storage=mock_storage, event_publisher=mock_event_publisher
+        )
 
         request = Request.create_new_request(
             template_id="test-template", machine_count=2, requester_id="test-user"
@@ -417,7 +439,9 @@ class TestRepositoryPerformanceOptimization:
         requests = []
         for i in range(10):
             request = Request.create_new_request(
-                template_id=f"template-{i}", machine_count=i + 1, requester_id=f"user-{i}"
+                template_id=f"template-{i}",
+                machine_count=i + 1,
+                requester_id=f"user-{i}",
             )
             requests.append(request)
 

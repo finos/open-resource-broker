@@ -165,7 +165,8 @@ class TestProviderContextEdgeCases:
 
         # Execute multiple operations
         operation = ProviderOperation(
-            operation_type=ProviderOperationType.CREATE_INSTANCES, parameters={"count": 1}
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={"count": 1},
         )
 
         results = []
@@ -200,7 +201,8 @@ class TestProviderContextEdgeCases:
 
         # Test operation timing
         operation = ProviderOperation(
-            operation_type=ProviderOperationType.CREATE_INSTANCES, parameters={"count": 1}
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={"count": 1},
         )
 
         start_time = time.time()
@@ -237,7 +239,9 @@ class TestProviderContextEdgeCases:
 
         def register_strategy(strategy_id):
             try:
-                strategy = FlakyProviderStrategy(f"concurrent-{strategy_id}", failure_rate=0.0)
+                strategy = FlakyProviderStrategy(
+                    f"concurrent-{strategy_id}", failure_rate=0.0
+                )
                 provider_context.register_strategy(strategy)
                 strategies_registered.append(strategy_id)
             except Exception as e:
@@ -310,7 +314,8 @@ class TestProviderContextEdgeCases:
 
         def execute_slow_operation():
             operation = ProviderOperation(
-                operation_type=ProviderOperationType.CREATE_INSTANCES, parameters={"count": 1}
+                operation_type=ProviderOperationType.CREATE_INSTANCES,
+                parameters={"count": 1},
             )
             result = provider_context.execute_operation(operation)
             operation_completed.set()
@@ -357,7 +362,8 @@ class TestProviderContextEdgeCases:
         def continuous_operations():
             for _ in range(10):
                 operation = ProviderOperation(
-                    operation_type=ProviderOperationType.CREATE_INSTANCES, parameters={"count": 1}
+                    operation_type=ProviderOperationType.CREATE_INSTANCES,
+                    parameters={"count": 1},
                 )
                 result = provider_context.execute_operation(operation)
                 operation_results.append(result.success)
@@ -396,7 +402,8 @@ class TestProviderContextEdgeCases:
 
         # Execute many operations
         operation = ProviderOperation(
-            operation_type=ProviderOperationType.CREATE_INSTANCES, parameters={"count": 1}
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={"count": 1},
         )
 
         for _ in range(1000):
@@ -424,7 +431,8 @@ class TestProviderContextEdgeCases:
 
         # Execute some operations
         operation = ProviderOperation(
-            operation_type=ProviderOperationType.CREATE_INSTANCES, parameters={"count": 1}
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={"count": 1},
         )
 
         for _ in range(5):
@@ -478,7 +486,8 @@ class TestProviderContextEdgeCases:
 
         # Test with very small response times
         operation = ProviderOperation(
-            operation_type=ProviderOperationType.CREATE_INSTANCES, parameters={"count": 1}
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={"count": 1},
         )
 
         # Mock very fast operations
@@ -520,7 +529,8 @@ class TestProviderContextEdgeCases:
 
         # Try to execute operation
         operation = ProviderOperation(
-            operation_type=ProviderOperationType.CREATE_INSTANCES, parameters={"count": 1}
+            operation_type=ProviderOperationType.CREATE_INSTANCES,
+            parameters={"count": 1},
         )
 
         result = provider_context.execute_operation(operation)

@@ -34,7 +34,9 @@ class TestCLIHandlerExecution:
 
         # Mock scheduler_strategy.format_templates_response to return formatted templates
         formatted_templates = {"templates": templates}
-        scheduler_strategy.format_templates_response = MagicMock(return_value=formatted_templates)
+        scheduler_strategy.format_templates_response = MagicMock(
+            return_value=formatted_templates
+        )
 
         # Set up container.get to return the mocked objects
         container.get.side_effect = lambda x: {
@@ -45,7 +47,9 @@ class TestCLIHandlerExecution:
         mock_get_container.return_value = container
 
         # Create args with default values
-        args = argparse.Namespace(provider_api=None, active_only=True, include_config=False)
+        args = argparse.Namespace(
+            provider_api=None, active_only=True, include_config=False
+        )
 
         # Act
         result = await handle_list_templates(args)
@@ -195,7 +199,9 @@ class TestFormatConversionConsistency:
                 {"id": "template2", "formatted": True},
             ]
         }
-        scheduler_strategy.format_templates_response = MagicMock(return_value=formatted_templates)
+        scheduler_strategy.format_templates_response = MagicMock(
+            return_value=formatted_templates
+        )
 
         # Set up container.get to return the mocked objects
         container.get.side_effect = lambda x: {
@@ -206,7 +212,9 @@ class TestFormatConversionConsistency:
         mock_get_container.return_value = container
 
         # Create args with default values
-        args = argparse.Namespace(provider_api=None, active_only=True, include_config=False)
+        args = argparse.Namespace(
+            provider_api=None, active_only=True, include_config=False
+        )
 
         # Act
         result = await handle_list_templates(args)

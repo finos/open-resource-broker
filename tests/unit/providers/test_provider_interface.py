@@ -109,7 +109,10 @@ class TestProviderPort:
         provider.initialize(config)
 
         # Configure custom responses
-        custom_instances = [InstanceId(value="custom-001"), InstanceId(value="custom-002")]
+        custom_instances = [
+            InstanceId(value="custom-001"),
+            InstanceId(value="custom-002"),
+        ]
         provider.set_response("create_instances", custom_instances)
 
         custom_status = {

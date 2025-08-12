@@ -55,8 +55,9 @@ class TestExceptionContext:
 
     def test_context_to_dict(self):
         """Test converting context to dictionary."""
-        context = ExceptionContext(operation="test_operation",
-                                   layer="domain", entity_id="test-123")
+        context = ExceptionContext(
+            operation="test_operation", layer="domain", entity_id="test-123"
+        )
 
         context_dict = context.to_dict()
 
@@ -75,7 +76,8 @@ class TestExceptionHandler:
         self.mock_logger = Mock()
         self.mock_metrics = Mock()
         self.handler = ExceptionHandler(
-            logger=self.mock_logger, metrics=self.mock_metrics)
+            logger=self.mock_logger, metrics=self.mock_metrics
+        )
 
     def test_handler_initialization(self):
         """Test exception handler initialization."""
@@ -261,7 +263,9 @@ class TestExceptionDecorators:
         self.mock_logger = Mock()
 
         # Patch the global handler to use our mock logger
-        with patch("src.infrastructure.error.exception_handler.get_logger") as mock_get_logger:
+        with patch(
+            "src.infrastructure.error.exception_handler.get_logger"
+        ) as mock_get_logger:
             mock_get_logger.return_value = self.mock_logger
             self.handler = get_exception_handler()
 
@@ -498,7 +502,8 @@ class TestPythonBuiltinExceptionWrapping:
         handler = ExceptionHandler()
 
         json_error = json.JSONDecodeError(
-            "Missing comma", '{"key": "value" "key2": "value2"}', 15)
+            "Missing comma", '{"key": "value" "key2": "value2"}', 15
+        )
 
         result = handler._wrap_json_decode_error(json_error, context="template_parsing")
 
@@ -512,10 +517,12 @@ class TestPythonBuiltinExceptionWrapping:
         handler = ExceptionHandler()
 
         json_error = json.JSONDecodeError(
-            "Unexpected token", '{"request": invalid}', 10)
+            "Unexpected token", '{"request": invalid}', 10
+        )
 
         result = handler._wrap_json_decode_error(
-            json_error, context="request_processing")
+            json_error, context="request_processing"
+        )
 
         assert isinstance(result, RequestValidationError)
         assert "Invalid JSON in request data" in str(result)
@@ -565,7 +572,8 @@ class TestPythonBuiltinExceptionWrapping:
         file_error = FileNotFoundError(2, "No such file", "/path/to/config.json")
 
         result = handler._wrap_file_not_found_error(
-            file_error, context="config_loading")
+            file_error, context="config_loading"
+        )
 
         assert isinstance(result, ConfigurationError)
         assert "Required file not found" in str(result)
@@ -580,7 +588,8 @@ class TestPythonBuiltinExceptionWrapping:
         file_error = FileNotFoundError(2, "No such file", "/templates/template.json")
 
         result = handler._wrap_file_not_found_error(
-            file_error, context="template_loading")
+            file_error, context="template_loading"
+        )
 
         assert isinstance(result, ConfigurationError)
         assert "template_loading" in result.details["context"]
@@ -660,7 +669,10 @@ class TestPythonBuiltinExceptionWrapping:
         json_error = json.JSONDecodeError("Error", "{}", 1)
 
         result = handler._wrap_json_decode_error(
-            json_error, context="test", custom_field="custom_value", operation_id="op_123"
+            json_error,
+            context="test",
+            custom_field="custom_value",
+            operation_id="op_123",
         )
 
         assert result.details["custom_field"] == "custom_value"

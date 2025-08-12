@@ -23,7 +23,9 @@ class TestStorageCommandHandlers:
         """Test list storage strategies handler."""
         args = Namespace(resource="storage", action="list")
 
-        with patch("src.interface.storage_command_handlers.get_container") as mock_get_container:
+        with patch(
+            "src.interface.storage_command_handlers.get_container"
+        ) as mock_get_container:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 
@@ -42,7 +44,9 @@ class TestStorageCommandHandlers:
         """Test show storage configuration handler."""
         args = Namespace(resource="storage", action="show")
 
-        with patch("src.interface.storage_command_handlers.get_container") as mock_get_container:
+        with patch(
+            "src.interface.storage_command_handlers.get_container"
+        ) as mock_get_container:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 
@@ -61,7 +65,9 @@ class TestStorageCommandHandlers:
         """Test validate storage configuration handler."""
         args = Namespace(resource="storage", action="validate")
 
-        with patch("src.interface.storage_command_handlers.get_container") as mock_get_container:
+        with patch(
+            "src.interface.storage_command_handlers.get_container"
+        ) as mock_get_container:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 
@@ -81,7 +87,9 @@ class TestStorageCommandHandlers:
         """Test storage connection test handler."""
         args = Namespace(resource="storage", action="test")
 
-        with patch("src.interface.storage_command_handlers.get_container") as mock_get_container:
+        with patch(
+            "src.interface.storage_command_handlers.get_container"
+        ) as mock_get_container:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 
@@ -102,7 +110,9 @@ class TestStorageCommandHandlers:
         """Test storage health check handler."""
         args = Namespace(resource="storage", action="health")
 
-        with patch("src.interface.storage_command_handlers.get_container") as mock_get_container:
+        with patch(
+            "src.interface.storage_command_handlers.get_container"
+        ) as mock_get_container:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 
@@ -123,7 +133,9 @@ class TestStorageCommandHandlers:
         """Test storage metrics handler."""
         args = Namespace(resource="storage", action="metrics")
 
-        with patch("src.interface.storage_command_handlers.get_container") as mock_get_container:
+        with patch(
+            "src.interface.storage_command_handlers.get_container"
+        ) as mock_get_container:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 

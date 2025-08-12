@@ -43,7 +43,9 @@ class TestEC2FleetHandler:
 
         # Create security group
         sg = ec2.create_security_group(
-            GroupName="test-sg", Description="Test security group", VpcId=vpc["Vpc"]["VpcId"]
+            GroupName="test-sg",
+            Description="Test security group",
+            VpcId=vpc["Vpc"]["VpcId"],
         )
 
         # Create AWS operations utility
@@ -62,7 +64,10 @@ class TestEC2FleetHandler:
                         "Version": "$Latest",
                     },
                     "Overrides": [
-                        {"InstanceType": "t2.micro", "SubnetId": subnet["Subnet"]["SubnetId"]}
+                        {
+                            "InstanceType": "t2.micro",
+                            "SubnetId": subnet["Subnet"]["SubnetId"],
+                        }
                     ],
                 }
             ],
@@ -159,7 +164,10 @@ class TestASGHandler:
 
         # Create handler
         handler = ASGHandler(
-            autoscaling_client=autoscaling, ec2_client=ec2, aws_operations=aws_ops, logger=Mock()
+            autoscaling_client=autoscaling,
+            ec2_client=ec2,
+            aws_operations=aws_ops,
+            logger=Mock(),
         )
 
         # ASG configuration
@@ -201,7 +209,10 @@ class TestASGHandler:
 
         aws_ops = AWSOperations(ec2_client=ec2, logger=Mock())
         handler = ASGHandler(
-            autoscaling_client=autoscaling, ec2_client=ec2, aws_operations=aws_ops, logger=Mock()
+            autoscaling_client=autoscaling,
+            ec2_client=ec2,
+            aws_operations=aws_ops,
+            logger=Mock(),
         )
 
         # Scale up
@@ -218,7 +229,10 @@ class TestASGHandler:
 
         aws_ops = AWSOperations(ec2_client=ec2, logger=Mock())
         handler = ASGHandler(
-            autoscaling_client=autoscaling, ec2_client=ec2, aws_operations=aws_ops, logger=Mock()
+            autoscaling_client=autoscaling,
+            ec2_client=ec2,
+            aws_operations=aws_ops,
+            logger=Mock(),
         )
 
         # Create instances to terminate
@@ -251,11 +265,15 @@ class TestSpotFleetHandler:
 
         # Create security group
         sg = ec2.create_security_group(
-            GroupName="test-sg", Description="Test security group", VpcId=vpc["Vpc"]["VpcId"]
+            GroupName="test-sg",
+            Description="Test security group",
+            VpcId=vpc["Vpc"]["VpcId"],
         )
 
         aws_ops = AWSOperations(ec2_client=ec2, logger=Mock())
-        handler = SpotFleetHandler(ec2_client=ec2, aws_operations=aws_ops, logger=Mock())
+        handler = SpotFleetHandler(
+            ec2_client=ec2, aws_operations=aws_ops, logger=Mock()
+        )
 
         # Spot fleet configuration
         spot_config = {
@@ -284,7 +302,9 @@ class TestSpotFleetHandler:
         ec2 = boto3.client("ec2", region_name="us-east-1")
         aws_ops = AWSOperations(ec2_client=ec2, logger=Mock())
 
-        handler = SpotFleetHandler(ec2_client=ec2, aws_operations=aws_ops, logger=Mock())
+        handler = SpotFleetHandler(
+            ec2_client=ec2, aws_operations=aws_ops, logger=Mock()
+        )
 
         # Should be able to get current spot prices
         if hasattr(handler, "get_spot_prices"):
@@ -302,7 +322,9 @@ class TestSpotFleetHandler:
         ec2 = boto3.client("ec2", region_name="us-east-1")
         aws_ops = AWSOperations(ec2_client=ec2, logger=Mock())
 
-        handler = SpotFleetHandler(ec2_client=ec2, aws_operations=aws_ops, logger=Mock())
+        handler = SpotFleetHandler(
+            ec2_client=ec2, aws_operations=aws_ops, logger=Mock()
+        )
 
         # Should support cost optimization strategies
         if hasattr(handler, "optimize_fleet_cost"):
@@ -327,7 +349,9 @@ class TestRunInstancesHandler:
         ec2 = boto3.client("ec2", region_name="us-east-1")
         aws_ops = AWSOperations(ec2_client=ec2, logger=Mock())
 
-        handler = RunInstancesHandler(ec2_client=ec2, aws_operations=aws_ops, logger=Mock())
+        handler = RunInstancesHandler(
+            ec2_client=ec2, aws_operations=aws_ops, logger=Mock()
+        )
 
         # Instance configuration
         instance_config = {
@@ -352,7 +376,9 @@ class TestRunInstancesHandler:
         ec2 = boto3.client("ec2", region_name="us-east-1")
         aws_ops = AWSOperations(ec2_client=ec2, logger=Mock())
 
-        handler = RunInstancesHandler(ec2_client=ec2, aws_operations=aws_ops, logger=Mock())
+        handler = RunInstancesHandler(
+            ec2_client=ec2, aws_operations=aws_ops, logger=Mock()
+        )
 
         # Configuration that might cause capacity issues
         large_config = {
@@ -377,7 +403,9 @@ class TestRunInstancesHandler:
         ec2 = boto3.client("ec2", region_name="us-east-1")
         aws_ops = AWSOperations(ec2_client=ec2, logger=Mock())
 
-        handler = RunInstancesHandler(ec2_client=ec2, aws_operations=aws_ops, logger=Mock())
+        handler = RunInstancesHandler(
+            ec2_client=ec2, aws_operations=aws_ops, logger=Mock()
+        )
 
         # Configuration with user data
         config_with_user_data = {

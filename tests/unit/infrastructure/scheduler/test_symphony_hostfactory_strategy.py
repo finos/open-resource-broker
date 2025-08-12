@@ -33,7 +33,8 @@ class TestSymphonyHostFactorySchedulerStrategy:
 
         self.mock_logger = Mock()
         self.strategy = HostFactorySchedulerStrategy(
-            self.mock_config_manager, self.mock_logger)
+            self.mock_config_manager, self.mock_logger
+        )
 
     def test_get_templates_file_path(self):
         """Test templates file path generation."""
@@ -231,4 +232,7 @@ class TestSymphonyHostFactorySchedulerStrategy:
         assert symphony_template["maxNumber"] == original_data["maxNumber"]
         assert symphony_template["subnetIds"] == original_data["subnetIds"]
         assert symphony_template["priceType"] == original_data["priceType"]
-        assert symphony_template["allocationStrategy"] == original_data["allocationStrategy"]
+        assert (
+            symphony_template["allocationStrategy"]
+            == original_data["allocationStrategy"]
+        )

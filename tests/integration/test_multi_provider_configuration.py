@@ -89,7 +89,9 @@ class TestMultiProviderConfiguration:
             selection_policy = provider_section.get("selection_policy")
             providers = provider_section.get("providers", [])
 
-            assert active_provider is None, "active_provider should be null for multi-provider mode"
+            assert (
+                active_provider is None
+            ), "active_provider should be null for multi-provider mode"
             assert selection_policy == "WEIGHTED_ROUND_ROBIN"
             assert len(providers) >= 2, "Should have multiple providers configured"
 
@@ -115,7 +117,11 @@ class TestMultiProviderConfiguration:
 
         # Verify additional fields are preserved
         handler_dict = handler_config.model_dump()
-        assert handler_dict["supported_fleet_types"] == ["instant", "request", "maintain"]
+        assert handler_dict["supported_fleet_types"] == [
+            "instant",
+            "request",
+            "maintain",
+        ]
         assert handler_dict["supports_spot"] is True
 
     def test_multi_provider_mode_detection(self):

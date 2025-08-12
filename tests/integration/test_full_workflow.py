@@ -79,7 +79,9 @@ class TestFullWorkflow:
             assert template is not None
             assert isinstance(template, Template)
 
-    def test_machine_request_workflow(self, test_config_file: Path, aws_mocks, mock_ec2_resources):
+    def test_machine_request_workflow(
+        self, test_config_file: Path, aws_mocks, mock_ec2_resources
+    ):
         """Test machine request workflow."""
         app = Application(config_path=str(test_config_file))
         app.initialize()
@@ -125,7 +127,9 @@ class TestFullWorkflow:
             assert status["status"] == "processing"
             assert status["progress"] == 50.0
 
-    def test_machine_return_workflow(self, test_config_file: Path, aws_mocks, mock_ec2_resources):
+    def test_machine_return_workflow(
+        self, test_config_file: Path, aws_mocks, mock_ec2_resources
+    ):
         """Test machine return workflow."""
         app = Application(config_path=str(test_config_file))
         app.initialize()
@@ -146,7 +150,9 @@ class TestFullWorkflow:
             # Request machine return
             machine_ids = ["machine-001", "machine-002"]
             result = service.request_return_machines(
-                machine_ids=machine_ids, requester_id="test-user", reason="Testing complete"
+                machine_ids=machine_ids,
+                requester_id="test-user",
+                reason="Testing complete",
             )
 
             assert result["request_id"] == "req-return-123"
@@ -271,7 +277,9 @@ class TestFullWorkflow:
             # Should propagate the error
             with pytest.raises(Exception, match="Command failed"):
                 service.request_machines(
-                    template_id="template-001", machine_count=1, requester_id="test-user"
+                    template_id="template-001",
+                    machine_count=1,
+                    requester_id="test-user",
                 )
 
     def test_dependency_injection_integration(self, test_config_file: Path, aws_mocks):
@@ -296,7 +304,9 @@ class TestFullWorkflow:
         query_bus = container.get_query_bus()
         assert query_bus is not None
 
-    def test_provider_integration(self, test_config_file: Path, aws_mocks, mock_ec2_resources):
+    def test_provider_integration(
+        self, test_config_file: Path, aws_mocks, mock_ec2_resources
+    ):
         """Test provider integration."""
         app = Application(config_path=str(test_config_file))
         app.initialize()
@@ -342,7 +352,9 @@ class TestEndToEndScenarios:
         # Mock all the buses for end-to-end flow
         with patch.object(service, "_command_bus") as mock_command_bus, patch.object(
             service, "_query_bus"
-        ) as mock_query_bus, patch.object(service, "_template_service") as mock_template_service:
+        ) as mock_query_bus, patch.object(
+            service, "_template_service"
+        ) as mock_template_service:
 
             # Step 1: Get available templates
             mock_template = Template(
@@ -419,7 +431,11 @@ class TestEndToEndScenarios:
 
             # Step 6: Monitor return progress
             mock_query_bus.dispatch.return_value = [
-                {"request_id": "req-return-123", "status": "completed", "machine_count": 2}
+                {
+                    "request_id": "req-return-123",
+                    "status": "completed",
+                    "machine_count": 2,
+                }
             ]
 
             return_requests = service.get_return_requests(status="completed")
@@ -442,7 +458,9 @@ class TestEndToEndScenarios:
             # First request should fail
             with pytest.raises(Exception, match="Temporary failure"):
                 service.request_machines(
-                    template_id="template-001", machine_count=1, requester_id="test-user"
+                    template_id="template-001",
+                    machine_count=1,
+                    requester_id="test-user",
                 )
 
             # Simulate recovery
@@ -588,7 +606,9 @@ class TestPerformanceIntegration:
             large_template_list.append(template)
 
         with patch.object(service, "_template_service") as mock_template_service:
-            mock_template_service.get_available_templates.return_value = large_template_list
+            mock_template_service.get_available_templates.return_value = (
+                large_template_list
+            )
 
             import time
 
@@ -634,7 +654,9 @@ class TestPerformanceIntegration:
                 end_times.append(end_time)
 
         # Run 50 concurrent operations
-        threads = [threading.Thread(target=performance_worker, args=(i,)) for i in range(50)]
+        threads = [
+            threading.Thread(target=performance_worker, args=(i,)) for i in range(50)
+        ]
 
         overall_start = time.time()
 

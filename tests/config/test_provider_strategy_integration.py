@@ -89,7 +89,10 @@ class TestProviderStrategyIntegration:
                             "timeout": 10,
                             "retry_count": 2,
                         },
-                        "config": {"region": "eu-west-1", "profile": "monitored-profile"},
+                        "config": {
+                            "region": "eu-west-1",
+                            "profile": "monitored-profile",
+                        },
                     }
                 ],
             }
@@ -118,7 +121,10 @@ class TestProviderStrategyIntegration:
                         "type": "aws",
                         "enabled": True,
                         "capabilities": ["compute", "storage", "networking"],
-                        "config": {"region": "us-west-2", "profile": "full-service-profile"},
+                        "config": {
+                            "region": "us-west-2",
+                            "profile": "full-service-profile",
+                        },
                     },
                 ]
             }
@@ -142,7 +148,10 @@ class TestProviderStrategyIntegration:
                         "enabled": True,
                         "priority": 3,
                         "weight": 50,
-                        "config": {"region": "ap-southeast-1", "profile": "low-priority-profile"},
+                        "config": {
+                            "region": "ap-southeast-1",
+                            "profile": "low-priority-profile",
+                        },
                     },
                     {
                         "name": "aws-high-priority",
@@ -150,7 +159,10 @@ class TestProviderStrategyIntegration:
                         "enabled": True,
                         "priority": 1,
                         "weight": 100,
-                        "config": {"region": "us-east-1", "profile": "high-priority-profile"},
+                        "config": {
+                            "region": "us-east-1",
+                            "profile": "high-priority-profile",
+                        },
                     },
                 ]
             }
@@ -180,7 +192,10 @@ class TestProviderStrategyIntegration:
                         "name": "aws-secondary",
                         "type": "aws",
                         "enabled": True,
-                        "config": {"region": "us-west-2", "profile": "secondary-profile"},
+                        "config": {
+                            "region": "us-west-2",
+                            "profile": "secondary-profile",
+                        },
                     },
                 ],
             }
@@ -217,7 +232,9 @@ class TestProviderStrategyIntegration:
         with pytest.raises(Exception) as exc_info:
             converter.get_typed(AWSProviderConfig)
 
-        assert "At least one authentication method must be provided" in str(exc_info.value)
+        assert "At least one authentication method must be provided" in str(
+            exc_info.value
+        )
 
     def test_provider_name_validation(self):
         """Test provider name validation requirements."""

@@ -47,8 +47,12 @@ class TestOpenHFPluginSDK:
     @pytest.mark.asyncio
     async def test_sdk_context_manager_success(self):
         """Test SDK as async context manager with successful initialization."""
-        with patch.object(OpenHFPluginSDK, "initialize", new_callable=AsyncMock) as mock_init:
-            with patch.object(OpenHFPluginSDK, "cleanup", new_callable=AsyncMock) as mock_cleanup:
+        with patch.object(
+            OpenHFPluginSDK, "initialize", new_callable=AsyncMock
+        ) as mock_init:
+            with patch.object(
+                OpenHFPluginSDK, "cleanup", new_callable=AsyncMock
+            ) as mock_cleanup:
                 mock_init.return_value = True
 
                 async with OpenHFPluginSDK(provider="mock") as sdk:
@@ -60,8 +64,12 @@ class TestOpenHFPluginSDK:
     @pytest.mark.asyncio
     async def test_sdk_context_manager_with_exception(self):
         """Test SDK context manager cleanup on exception."""
-        with patch.object(OpenHFPluginSDK, "initialize", new_callable=AsyncMock) as mock_init:
-            with patch.object(OpenHFPluginSDK, "cleanup", new_callable=AsyncMock) as mock_cleanup:
+        with patch.object(
+            OpenHFPluginSDK, "initialize", new_callable=AsyncMock
+        ) as mock_init:
+            with patch.object(
+                OpenHFPluginSDK, "cleanup", new_callable=AsyncMock
+            ) as mock_cleanup:
                 mock_init.return_value = True
 
                 with pytest.raises(ValueError):
@@ -123,7 +131,9 @@ class TestOpenHFPluginSDK:
 
             sdk = OpenHFPluginSDK(provider="mock")
 
-            with pytest.raises(ProviderError, match="Failed to initialize mock provider"):
+            with pytest.raises(
+                ProviderError, match="Failed to initialize mock provider"
+            ):
                 await sdk.initialize()
 
     @pytest.mark.asyncio
@@ -137,7 +147,9 @@ class TestOpenHFPluginSDK:
 
             sdk = OpenHFPluginSDK(provider="mock")
 
-            with pytest.raises(ConfigurationError, match="Application service not available"):
+            with pytest.raises(
+                ConfigurationError, match="Application service not available"
+            ):
                 await sdk.initialize()
 
     @pytest.mark.asyncio

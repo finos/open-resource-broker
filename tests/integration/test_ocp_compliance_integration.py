@@ -41,7 +41,10 @@ class TestOCPComplianceIntegration:
 
         # Test strategy creation
         config = ProviderInstanceConfig(
-            name="test-instance", type="test_provider", enabled=True, config={"key": "value"}
+            name="test-instance",
+            type="test_provider",
+            enabled=True,
+            config={"key": "value"},
         )
 
         strategy = registry.create_strategy("test_provider", config)
@@ -53,7 +56,9 @@ class TestOCPComplianceIntegration:
 
     @patch("src.providers.aws.registration.AWSProviderStrategy")
     @patch("src.providers.aws.registration.AWSConfig")
-    def test_aws_provider_registration_integration(self, mock_aws_config, mock_aws_strategy):
+    def test_aws_provider_registration_integration(
+        self, mock_aws_config, mock_aws_strategy
+    ):
         """Test AWS provider registration integration."""
         from src.providers.aws.registration import register_aws_provider
 
@@ -85,7 +90,9 @@ class TestOCPComplianceIntegration:
         mock_aws_strategy.assert_called_once()
         assert strategy == mock_strategy_instance
 
-    @patch("src.infrastructure.factories.provider_strategy_factory.get_provider_registry")
+    @patch(
+        "src.infrastructure.factories.provider_strategy_factory.get_provider_registry"
+    )
     def test_provider_strategy_factory_integration(self, mock_get_registry):
         """Test provider strategy factory integration with registry."""
         from src.config.manager import ConfigurationManager
@@ -108,14 +115,19 @@ class TestOCPComplianceIntegration:
 
         # Test strategy creation
         provider_config = ProviderInstanceConfig(
-            name="test-provider", type="test_type", enabled=True, config={"key": "value"}
+            name="test-provider",
+            type="test_type",
+            enabled=True,
+            config={"key": "value"},
         )
 
         result = factory._create_provider_strategy(provider_config)
 
         # Verify registry was used
         mock_get_registry.assert_called_once()
-        mock_registry.create_strategy.assert_called_once_with("test_type", provider_config)
+        mock_registry.create_strategy.assert_called_once_with(
+            "test_type", provider_config
+        )
         assert result == mock_strategy
         assert result.name == "test-provider"
 
@@ -134,7 +146,9 @@ class TestOCPComplianceIntegration:
         registry = get_provider_registry()
 
         mock_resolver = Mock()
-        mock_resolver.resolve_template_resources = Mock(return_value="resolved_template")
+        mock_resolver.resolve_template_resources = Mock(
+            return_value="resolved_template"
+        )
 
         mock_validator = Mock()
         mock_validator.validate_template_config = Mock(return_value=[])
@@ -163,7 +177,9 @@ class TestOCPComplianceIntegration:
         )
 
         with patch.object(registry, "create_resolver", return_value=mock_resolver):
-            result = resolver_service.resolve_template_resources(template, "test_provider")
+            result = resolver_service.resolve_template_resources(
+                template, "test_provider"
+            )
             assert result == "resolved_template"
 
         # Test validator service
@@ -277,7 +293,10 @@ class TestOCPComplianceIntegration:
         config = UnifiedProviderConfig(
             providers=[
                 ProviderInstanceConfig(
-                    name="aws-default", type="aws", enabled=True, config={"region": "us-east-1"}
+                    name="aws-default",
+                    type="aws",
+                    enabled=True,
+                    config={"region": "us-east-1"},
                 )
             ]
         )

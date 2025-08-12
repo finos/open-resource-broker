@@ -56,7 +56,10 @@ class TestSDKMethodDiscovery:
         class GetRequestStatusQuery:
             __name__ = "GetRequestStatusQuery"
 
-        assert discovery._query_to_method_name(GetRequestStatusQuery) == "get_request_status"
+        assert (
+            discovery._query_to_method_name(GetRequestStatusQuery)
+            == "get_request_status"
+        )
 
     def test_command_to_method_name(self):
         """Test converting command class names to method names."""
@@ -70,7 +73,8 @@ class TestSDKMethodDiscovery:
             __name__ = "UpdateMachineStatusCommand"
 
         assert (
-            discovery._command_to_method_name(UpdateMachineStatusCommand) == "update_machine_status"
+            discovery._command_to_method_name(UpdateMachineStatusCommand)
+            == "update_machine_status"
         )
 
     def test_camel_to_snake(self):
@@ -91,7 +95,9 @@ class TestSDKMethodDiscovery:
         description = discovery._generate_method_description("list_templates", "query")
         assert description == "List Templates - Query operation"
 
-        description = discovery._generate_method_description("create_request", "command")
+        description = discovery._generate_method_description(
+            "create_request", "command"
+        )
         assert description == "Create Request - Command operation"
 
     @pytest.mark.asyncio
@@ -105,7 +111,8 @@ class TestSDKMethodDiscovery:
         mock_command_handlers = {MockCommand: MockHandler}
 
         with patch(
-            "src.sdk.discovery.get_registered_query_handlers", return_value=mock_query_handlers
+            "src.sdk.discovery.get_registered_query_handlers",
+            return_value=mock_query_handlers,
         ):
             with patch(
                 "src.sdk.discovery.get_registered_command_handlers",
@@ -132,7 +139,9 @@ class TestSDKMethodDiscovery:
             "src.sdk.discovery.get_registered_query_handlers",
             side_effect=Exception("Registry error"),
         ):
-            with pytest.raises(HandlerDiscoveryError, match="Failed to discover SDK methods"):
+            with pytest.raises(
+                HandlerDiscoveryError, match="Failed to discover SDK methods"
+            ):
                 await discovery.discover_sdk_methods(mock_service)
 
     def test_get_method_info_existing(self):
@@ -250,7 +259,9 @@ class TestSDKMethodDiscovery:
         )
 
         # Create command method
-        method = discovery._create_command_method(mock_service, MockCommand, method_info)
+        method = discovery._create_command_method(
+            mock_service, MockCommand, method_info
+        )
 
         # Execute method
         result = await method(test_param="value")
@@ -263,7 +274,9 @@ class TestSDKMethodDiscovery:
         """Test command method execution failure."""
         discovery = SDKMethodDiscovery()
         mock_service = Mock()
-        mock_service.execute_command = AsyncMock(side_effect=Exception("Execution error"))
+        mock_service.execute_command = AsyncMock(
+            side_effect=Exception("Execution error")
+        )
 
         # Create method info
         method_info = MethodInfo(
@@ -277,8 +290,12 @@ class TestSDKMethodDiscovery:
         )
 
         # Create command method
-        method = discovery._create_command_method(mock_service, MockCommand, method_info)
+        method = discovery._create_command_method(
+            mock_service, MockCommand, method_info
+        )
 
         # Execute method should raise MethodExecutionError
-        with pytest.raises(MethodExecutionError, match="Failed to execute test_command"):
+        with pytest.raises(
+            MethodExecutionError, match="Failed to execute test_command"
+        ):
             await method(test_param="value")

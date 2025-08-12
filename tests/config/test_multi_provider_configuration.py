@@ -25,7 +25,10 @@ class TestMultiProviderConfiguration:
                         "name": "aws-eu-west-1",
                         "type": "aws",
                         "enabled": True,
-                        "config": {"region": "eu-west-1", "profile": "fsi-pace-amer+ms-symphony"},
+                        "config": {
+                            "region": "eu-west-1",
+                            "profile": "fsi-pace-amer+ms-symphony",
+                        },
                     },
                 ],
             }
@@ -46,19 +49,28 @@ class TestMultiProviderConfiguration:
                         "name": "aws-disabled",
                         "type": "aws",
                         "enabled": False,
-                        "config": {"region": "us-west-1", "profile": "disabled-profile"},
+                        "config": {
+                            "region": "us-west-1",
+                            "profile": "disabled-profile",
+                        },
                     },
                     {
                         "name": "aws-first-enabled",
                         "type": "aws",
                         "enabled": True,
-                        "config": {"region": "us-east-1", "profile": "first-enabled-profile"},
+                        "config": {
+                            "region": "us-east-1",
+                            "profile": "first-enabled-profile",
+                        },
                     },
                     {
                         "name": "aws-second-enabled",
                         "type": "aws",
                         "enabled": True,
-                        "config": {"region": "eu-west-1", "profile": "second-enabled-profile"},
+                        "config": {
+                            "region": "eu-west-1",
+                            "profile": "second-enabled-profile",
+                        },
                     },
                 ]
             }
@@ -80,19 +92,28 @@ class TestMultiProviderConfiguration:
                         "name": "azure-dev",
                         "type": "azure",
                         "enabled": True,
-                        "config": {"subscription_id": "test-sub", "resource_group": "test-rg"},
+                        "config": {
+                            "subscription_id": "test-sub",
+                            "resource_group": "test-rg",
+                        },
                     },
                     {
                         "name": "aws-production",
                         "type": "aws",
                         "enabled": True,
-                        "config": {"region": "us-east-1", "profile": "production-profile"},
+                        "config": {
+                            "region": "us-east-1",
+                            "profile": "production-profile",
+                        },
                     },
                     {
                         "name": "gcp-staging",
                         "type": "gcp",
                         "enabled": True,
-                        "config": {"project_id": "test-project", "zone": "us-central1-a"},
+                        "config": {
+                            "project_id": "test-project",
+                            "zone": "us-central1-a",
+                        },
                     },
                 ],
             }
@@ -130,7 +151,9 @@ class TestMultiProviderConfiguration:
         with pytest.raises(Exception) as exc_info:
             converter.get_typed(AWSProviderConfig)
 
-        assert "At least one authentication method must be provided" in str(exc_info.value)
+        assert "At least one authentication method must be provided" in str(
+            exc_info.value
+        )
 
     def test_active_provider_not_found_fallback(self):
         """Test fallback when specified active provider is not found."""
@@ -142,7 +165,10 @@ class TestMultiProviderConfiguration:
                         "name": "aws-available",
                         "type": "aws",
                         "enabled": True,
-                        "config": {"region": "us-east-1", "profile": "available-profile"},
+                        "config": {
+                            "region": "us-east-1",
+                            "profile": "available-profile",
+                        },
                     }
                 ],
             }
@@ -164,7 +190,10 @@ class TestMultiProviderConfiguration:
                         "name": "aws-disabled",
                         "type": "aws",
                         "enabled": False,
-                        "config": {"region": "us-west-1", "profile": "disabled-profile"},
+                        "config": {
+                            "region": "us-west-1",
+                            "profile": "disabled-profile",
+                        },
                     },
                     {
                         "name": "aws-enabled",
@@ -198,7 +227,10 @@ class TestMultiProviderConfiguration:
                         "name": "aws-secondary",
                         "type": "aws",
                         "enabled": True,
-                        "config": {"region": "us-east-1", "profile": "secondary-profile"},
+                        "config": {
+                            "region": "us-east-1",
+                            "profile": "secondary-profile",
+                        },
                     },
                 ],
             }
@@ -219,7 +251,9 @@ class TestMultiProviderConfiguration:
         with pytest.raises(Exception) as exc_info:
             converter.get_typed(AWSProviderConfig)
 
-        assert "At least one authentication method must be provided" in str(exc_info.value)
+        assert "At least one authentication method must be provided" in str(
+            exc_info.value
+        )
 
     def test_missing_provider_config_section(self):
         """Test handling when provider config section is missing."""
@@ -230,7 +264,9 @@ class TestMultiProviderConfiguration:
         with pytest.raises(Exception) as exc_info:
             converter.get_typed(AWSProviderConfig)
 
-        assert "At least one authentication method must be provided" in str(exc_info.value)
+        assert "At least one authentication method must be provided" in str(
+            exc_info.value
+        )
 
     def test_provider_with_missing_config(self):
         """Test handling of provider instance with missing config section."""
@@ -252,7 +288,9 @@ class TestMultiProviderConfiguration:
         with pytest.raises(Exception) as exc_info:
             converter.get_typed(AWSProviderConfig)
 
-        assert "At least one authentication method must be provided" in str(exc_info.value)
+        assert "At least one authentication method must be provided" in str(
+            exc_info.value
+        )
 
     def test_multiple_aws_providers_priority_order(self):
         """Test that provider order matters when no active provider specified."""
@@ -263,7 +301,10 @@ class TestMultiProviderConfiguration:
                         "name": "aws-third",
                         "type": "aws",
                         "enabled": True,
-                        "config": {"region": "ap-southeast-1", "profile": "third-profile"},
+                        "config": {
+                            "region": "ap-southeast-1",
+                            "profile": "third-profile",
+                        },
                     },
                     {
                         "name": "aws-first",

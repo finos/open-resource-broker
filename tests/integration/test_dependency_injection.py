@@ -35,7 +35,9 @@ def test_phase6_dependency_injection():
 
         # Test 2: Repository factory machine support
         print("\n2️⃣ Testing Repository Factory Machine Support...")
-        results["repository_factory_machine_support"] = test_repository_factory_machine_support()
+        results["repository_factory_machine_support"] = (
+            test_repository_factory_machine_support()
+        )
 
         # Test 3: DI container resolution
         print("\n3️⃣ Testing DI Container Resolution...")
@@ -139,7 +141,9 @@ def test_aws_launch_template_manager_registration():
         print(f"   FAIL: Import error: {str(e)}")
         return False
     except Exception as e:
-        print(f"   FAIL: AWS Launch Template Manager registration test failed: {str(e)}")
+        print(
+            f"   FAIL: AWS Launch Template Manager registration test failed: {str(e)}"
+        )
         return False
 
 

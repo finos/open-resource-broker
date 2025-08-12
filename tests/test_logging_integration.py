@@ -48,7 +48,12 @@ class TestLoggingIntegration:
         python_executable = sys.executable
 
         # Add --dry-run flag before the subcommand (global argument)
-        command_with_dry_run = [python_executable, "-m", "src.cli.main", "--dry-run"] + command
+        command_with_dry_run = [
+            python_executable,
+            "-m",
+            "src.cli.main",
+            "--dry-run",
+        ] + command
 
         return subprocess.run(
             command_with_dry_run, capture_output=True, text=True, timeout=30, env=env
@@ -69,11 +74,15 @@ class TestLoggingIntegration:
         health_check_errors = [
             line for line in log_lines if "Error checking health of strategy" in line
         ]
-        assert len(health_check_errors) == 0, f"Found health check errors: {health_check_errors}"
+        assert (
+            len(health_check_errors) == 0
+        ), f"Found health check errors: {health_check_errors}"
 
         # Verify no duplicate SSM parameter resolution
         ssm_resolution_lines = [
-            line for line in log_lines if "Resolved SSM parameter" in line and "to AMI" in line
+            line
+            for line in log_lines
+            if "Resolved SSM parameter" in line and "to AMI" in line
         ]
 
         # Should have exactly one SSM resolution log (no duplicates)
@@ -82,7 +91,9 @@ class TestLoggingIntegration:
         ), f"Found duplicate SSM resolution: {ssm_resolution_lines}"
 
         # Verify provider mode is correctly detected
-        provider_mode_lines = [line for line in log_lines if "Final provider mode:" in line]
+        provider_mode_lines = [
+            line for line in log_lines if "Final provider mode:" in line
+        ]
         if provider_mode_lines:
             # Should show 'single' for test config (not 'unknown')
             assert any(
@@ -93,7 +104,9 @@ class TestLoggingIntegration:
             ), f"Provider mode shows 'unknown': {provider_mode_lines}"
 
         # Verify provider names are correctly reported
-        provider_names_lines = [line for line in log_lines if "Active provider names:" in line]
+        provider_names_lines = [
+            line for line in log_lines if "Active provider names:" in line
+        ]
         if provider_names_lines:
             # Should contain the test provider instance
             provider_names_line = provider_names_lines[0]
@@ -103,7 +116,9 @@ class TestLoggingIntegration:
 
         # Verify no template preloading logs
         preload_lines = [line for line in log_lines if "Preloading templates" in line]
-        assert len(preload_lines) == 0, f"Found template preloading logs: {preload_lines}"
+        assert (
+            len(preload_lines) == 0
+        ), f"Found template preloading logs: {preload_lines}"
 
         # Verify batch resolution log is present and correct
         batch_resolution_lines = [
@@ -178,7 +193,9 @@ class TestLoggingIntegration:
 
         assert "total_count" in output_data, "Missing 'total_count' field in output"
         # With proper scheduler config, we should now have templates
-        assert output_data["total_count"] > 0, "Should have templates from test fixtures"
+        assert (
+            output_data["total_count"] > 0
+        ), "Should have templates from test fixtures"
 
         # Verify template structure
         assert len(output_data["templates"]) > 0, "Should have at least one template"
@@ -188,7 +205,9 @@ class TestLoggingIntegration:
             assert field in template, f"Missing required field '{field}' in template"
 
         # Verify AMI ID is resolved (not SSM parameter)
-        assert template["imageId"].startswith("ami-"), f"AMI ID not resolved: {template['imageId']}"
+        assert template["imageId"].startswith(
+            "ami-"
+        ), f"AMI ID not resolved: {template['imageId']}"
 
         # Verify we're getting the test template
         template_ids = [t["templateId"] for t in output_data["templates"]]
@@ -211,7 +230,9 @@ class TestLoggingIntegration:
         assert result.returncode == 0, f"Command failed with stderr: {result.stderr}"
 
         # Should complete within reasonable time (30 seconds is generous)
-        assert execution_time < 30, f"Command took too long: {execution_time:.2f} seconds"
+        assert (
+            execution_time < 30
+        ), f"Command took too long: {execution_time:.2f} seconds"
 
         # Parse log output to count log messages
         log_lines = result.stderr.strip().split("\n") if result.stderr.strip() else []

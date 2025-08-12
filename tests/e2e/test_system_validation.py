@@ -190,7 +190,11 @@ class TestSystemValidation:
                         "enabled": True,
                         "priority": 1,
                         "weight": 100,
-                        "config": {"region": "us-east-1", "profile": "default", "max_retries": 3},
+                        "config": {
+                            "region": "us-east-1",
+                            "profile": "default",
+                            "max_retries": 3,
+                        },
                     }
                 ],
             },
@@ -205,7 +209,9 @@ class TestSystemValidation:
         if migrated_provider_config and hasattr(migrated_provider_config, "get_mode"):
             assert migrated_provider_config.get_mode().value == "single"
             assert len(migrated_provider_config.get_active_providers()) == 1
-            assert migrated_provider_config.get_active_providers()[0].name == "aws-legacy"
+            assert (
+                migrated_provider_config.get_active_providers()[0].name == "aws-legacy"
+            )
         else:
             # Fallback verification through basic config access
             provider_data = migrated_config_manager.get("provider", {})
@@ -246,7 +252,11 @@ class TestSystemValidation:
                         "priority": 1,
                         "weight": 80,
                         "capabilities": ["compute", "storage", "networking"],
-                        "config": {"region": "us-east-1", "max_retries": 3, "timeout": 30},
+                        "config": {
+                            "region": "us-east-1",
+                            "max_retries": 3,
+                            "timeout": 30,
+                        },
                     },
                     {
                         "name": "aws-failover",
@@ -255,7 +265,11 @@ class TestSystemValidation:
                         "priority": 2,
                         "weight": 20,
                         "capabilities": ["compute", "storage"],
-                        "config": {"region": "us-west-2", "max_retries": 5, "timeout": 60},
+                        "config": {
+                            "region": "us-west-2",
+                            "max_retries": 5,
+                            "timeout": 60,
+                        },
                     },
                 ],
             }
@@ -327,7 +341,12 @@ class TestSystemValidation:
                         "enabled": True,
                         "priority": 1,
                         "weight": 60,
-                        "capabilities": ["compute", "storage", "networking", "monitoring"],
+                        "capabilities": [
+                            "compute",
+                            "storage",
+                            "networking",
+                            "monitoring",
+                        ],
                         "config": {
                             "region": "us-east-1",
                             "role_arn": "arn:aws:iam::123456789012:role/ProdRole",
@@ -442,7 +461,10 @@ class TestSystemValidation:
 
                 assert "monitoring" in primary_capabilities
                 assert "monitoring" not in secondary_capabilities
-                assert "compute" in primary_capabilities and "compute" in secondary_capabilities
+                assert (
+                    "compute" in primary_capabilities
+                    and "compute" in secondary_capabilities
+                )
         else:
             # Fallback verification through basic config access
             provider_data = config_manager.get("provider", {})
@@ -539,7 +561,10 @@ class TestSystemValidation:
         validation_result = factory.validate_configuration()
 
         # Should identify the configuration issue
-        assert validation_result["valid"] is False or len(validation_result["warnings"]) > 0
+        assert (
+            validation_result["valid"] is False
+            or len(validation_result["warnings"]) > 0
+        )
 
     def test_performance_under_load(self):
         """Test system performance under load."""
@@ -582,7 +607,9 @@ class TestSystemValidation:
         total_time = end_time - start_time
 
         # Performance assertions
-        assert total_time < 2.0, f"Performance test took {total_time:.3f}s, expected < 2.0s"
+        assert (
+            total_time < 2.0
+        ), f"Performance test took {total_time:.3f}s, expected < 2.0s"
         if provider_config and hasattr(provider_config, "get_active_providers"):
             assert len(provider_config.get_active_providers()) == 10
 

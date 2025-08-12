@@ -56,7 +56,9 @@ def test_template_defaults_integration():
 
         # Verify defaults were applied
         assert template.subnet_ids, "subnet_ids should have defaults applied"
-        assert template.security_group_ids, "security_group_ids should have defaults applied"
+        assert (
+            template.security_group_ids
+        ), "security_group_ids should have defaults applied"
         assert template.instance_type, "instance_type should have defaults applied"
 
         print("✅ Configuration defaults successfully applied to missing fields")
@@ -104,7 +106,9 @@ def test_template_defaults_precedence():
 
         print("✅ Testing template with explicit values...")
         print(f"   - Input subnet_ids: {explicit_template_data['subnet_ids']}")
-        print(f"   - Input security_group_ids: {explicit_template_data['security_group_ids']}")
+        print(
+            f"   - Input security_group_ids: {explicit_template_data['security_group_ids']}"
+        )
         print(f"   - Input instance_type: {explicit_template_data['instance_type']}")
 
         template = serializer.from_dict(explicit_template_data)
@@ -121,7 +125,9 @@ def test_template_defaults_precedence():
         assert template.security_group_ids == [
             "sg-explicit-456"
         ], "Explicit security_group_ids should be preserved"
-        assert template.instance_type == "t3.large", "Explicit instance_type should be preserved"
+        assert (
+            template.instance_type == "t3.large"
+        ), "Explicit instance_type should be preserved"
 
         print("✅ Template values correctly override defaults (proper precedence)")
 

@@ -133,9 +133,13 @@ class TestOpenHFPluginMCPTools:
         tools = OpenHFPluginMCPTools()
         tools._initialized = True
 
-        mock_tools_list = [{"name": "test_tool", "description": "Test tool", "inputSchema": {}}]
+        mock_tools_list = [
+            {"name": "test_tool", "description": "Test tool", "inputSchema": {}}
+        ]
 
-        with patch.object(tools.discovery, "get_tools_list", return_value=mock_tools_list):
+        with patch.object(
+            tools.discovery, "get_tools_list", return_value=mock_tools_list
+        ):
             result = tools.list_tools()
 
             assert result == mock_tools_list
@@ -259,7 +263,10 @@ class TestOpenHFPluginMCPTools:
 
         tools = OpenHFPluginMCPTools()
         tools._initialized = True
-        tools.tools = {"query_tool": mock_tool_def_query, "command_tool": mock_tool_def_command}
+        tools.tools = {
+            "query_tool": mock_tool_def_query,
+            "command_tool": mock_tool_def_command,
+        }
 
         query_tools = tools.get_tools_by_type("query")
         command_tools = tools.get_tools_by_type("command")
@@ -290,7 +297,9 @@ class TestOpenHFPluginMCPTools:
         tools.tools = {"tool1": Mock(), "tool2": Mock()}
 
         with patch.object(tools, "get_tools_by_type") as mock_get_by_type:
-            mock_get_by_type.side_effect = lambda t: ["tool1"] if t == "query" else ["tool2"]
+            mock_get_by_type.side_effect = lambda t: (
+                ["tool1"] if t == "query" else ["tool2"]
+            )
 
             stats = tools.get_stats()
 

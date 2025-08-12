@@ -177,7 +177,9 @@ class TestRequestAggregate:
         for count in invalid_counts:
             with pytest.raises((ValueError, RequestValidationError)):
                 Request.create_new_request(
-                    template_id="template-001", machine_count=count, requester_id="user-123"
+                    template_id="template-001",
+                    machine_count=count,
+                    requester_id="user-123",
                 )
 
     def test_request_validation_priority(self):
@@ -209,12 +211,14 @@ class TestRequestAggregate:
         # Missing template_id for new request
         with pytest.raises((ValueError, RequestValidationError)):
             Request.create_new_request(
-                template_id="", machine_count=1, requester_id="user-123")
+                template_id="", machine_count=1, requester_id="user-123"
+            )
 
         # Missing requester_id
         with pytest.raises((ValueError, RequestValidationError)):
             Request.create_new_request(
-                template_id="template-001", machine_count=1, requester_id="")
+                template_id="template-001", machine_count=1, requester_id=""
+            )
 
         # Missing machine_ids for return request
         with pytest.raises((ValueError, RequestValidationError)):
@@ -223,7 +227,10 @@ class TestRequestAggregate:
     def test_request_timeout_handling(self):
         """Test request timeout handling."""
         request = Request.create_new_request(
-            template_id="template-001", machine_count=2, requester_id="user-123", timeout_minutes=30
+            template_id="template-001",
+            machine_count=2,
+            requester_id="user-123",
+            timeout_minutes=30,
         )
 
         assert request.timeout_minutes == 30
@@ -249,7 +256,8 @@ class TestRequestAggregate:
 
         # Update progress
         request.update_progress(
-            completed_count=2, status_message="2 out of 5 machines provisioned")
+            completed_count=2, status_message="2 out of 5 machines provisioned"
+        )
 
         assert request.completed_machine_count == 2
         assert request.status_message == "2 out of 5 machines provisioned"
@@ -257,7 +265,8 @@ class TestRequestAggregate:
 
         # Update progress again
         request.update_progress(
-            completed_count=5, status_message="All machines provisioned")
+            completed_count=5, status_message="All machines provisioned"
+        )
 
         assert request.completed_machine_count == 5
         assert request.get_progress_percentage() == 100.0
@@ -265,7 +274,10 @@ class TestRequestAggregate:
     def test_request_retry_logic(self):
         """Test request retry logic."""
         request = Request.create_new_request(
-            template_id="template-001", machine_count=2, requester_id="user-123", max_retries=3
+            template_id="template-001",
+            machine_count=2,
+            requester_id="user-123",
+            max_retries=3,
         )
 
         assert request.max_retries == 3
@@ -590,6 +602,7 @@ class TestRequestExceptions:
     def test_request_processing_error(self):
         """Test RequestProcessingError."""
         error = RequestProcessingError(
-            "Failed to process request", request_id="req-123")
+            "Failed to process request", request_id="req-123"
+        )
         assert str(error) == "Failed to process request"
         assert error.request_id == "req-123"

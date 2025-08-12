@@ -30,8 +30,8 @@ class TestBootstrapIntegration:
 
         # Mock unified provider configuration
         from src.config.schemas.provider_strategy_schema import (
-            ProviderInstanceConfig,
             ProviderConfig,
+            ProviderInstanceConfig,
         )
 
         provider_config = ProviderConfig(
@@ -163,7 +163,9 @@ class TestBootstrapIntegration:
         }
 
         self.mock_application_service.initialize.return_value = True
-        self.mock_application_service.get_provider_info.return_value = expected_provider_info
+        self.mock_application_service.get_provider_info.return_value = (
+            expected_provider_info
+        )
         self.mock_container.get.return_value = self.mock_application_service
 
         # Execute

@@ -31,8 +31,12 @@ class TestDependencyInjectionComprehensive:
 
             # Test basic container methods
             container_methods = ["register", "resolve", "get", "bind"]
-            has_container_method = any(hasattr(container, method) for method in container_methods)
-            assert has_container_method, "Container should have registration/resolution methods"
+            has_container_method = any(
+                hasattr(container, method) for method in container_methods
+            )
+            assert (
+                has_container_method
+            ), "Container should have registration/resolution methods"
 
         except ImportError:
             pytest.skip("DI Container not available")
@@ -83,7 +87,9 @@ class TestDependencyInjectionComprehensive:
                         for res_method in resolution_methods:
                             if hasattr(container, res_method):
                                 try:
-                                    resolved = getattr(container, res_method)("test_service")
+                                    resolved = getattr(container, res_method)(
+                                        "test_service"
+                                    )
                                     assert resolved is not None
                                     break
                                 except Exception:
@@ -195,7 +201,11 @@ class TestPersistenceLayerComprehensive:
         """Get repository classes from module."""
         classes = []
         for name, obj in inspect.getmembers(module):
-            if inspect.isclass(obj) and "Repository" in name and not name.startswith("Base"):
+            if (
+                inspect.isclass(obj)
+                and "Repository" in name
+                and not name.startswith("Base")
+            ):
                 classes.append((name, obj))
         return classes
 
@@ -243,8 +253,12 @@ class TestPersistenceLayerComprehensive:
 
                         # Test common repository methods
                         common_methods = ["save", "get_by_id", "find_all", "delete"]
-                        has_repo_method = any(hasattr(repo, method) for method in common_methods)
-                        assert has_repo_method, f"{class_name} should have repository methods"
+                        has_repo_method = any(
+                            hasattr(repo, method) for method in common_methods
+                        )
+                        assert (
+                            has_repo_method
+                        ), f"{class_name} should have repository methods"
 
                 except Exception as e:
                     # Log but don't fail
@@ -315,7 +329,9 @@ class TestPersistenceLayerComprehensive:
             except ImportError:
                 continue
 
-        assert len(strategy_modules) > 0, "At least one persistence strategy should exist"
+        assert (
+            len(strategy_modules) > 0
+        ), "At least one persistence strategy should exist"
 
     def test_unit_of_work_exists(self):
         """Test that unit of work pattern exists."""
@@ -334,7 +350,9 @@ class TestPersistenceLayerComprehensive:
             except ImportError:
                 continue
 
-        assert len(uow_modules) > 0, "At least one unit of work implementation should exist"
+        assert (
+            len(uow_modules) > 0
+        ), "At least one unit of work implementation should exist"
 
 
 @pytest.mark.unit
@@ -491,7 +509,9 @@ class TestAdaptersComprehensive:
 
         for adapter_file in adapter_files:
             try:
-                module = importlib.import_module(f"src.infrastructure.adapters.{adapter_file}")
+                module = importlib.import_module(
+                    f"src.infrastructure.adapters.{adapter_file}"
+                )
                 adapter_modules.append((adapter_file, module))
             except ImportError:
                 continue
@@ -502,7 +522,11 @@ class TestAdaptersComprehensive:
         """Get adapter classes from module."""
         classes = []
         for name, obj in inspect.getmembers(module):
-            if inspect.isclass(obj) and "Adapter" in name and not name.startswith("Base"):
+            if (
+                inspect.isclass(obj)
+                and "Adapter" in name
+                and not name.startswith("Base")
+            ):
                 classes.append((name, obj))
         return classes
 
@@ -593,7 +617,11 @@ class TestFactoriesComprehensive:
         for _module_name, module in modules:
             classes = []
             for name, obj in inspect.getmembers(module):
-                if inspect.isclass(obj) and "Factory" in name and not name.startswith("Base"):
+                if (
+                    inspect.isclass(obj)
+                    and "Factory" in name
+                    and not name.startswith("Base")
+                ):
                     classes.append((name, obj))
             total_classes += len(classes)
 

@@ -88,7 +88,9 @@ class TestCriticalImports:
             pass
 
         # BaseCommandHandler should not be available from interface layer
-        with pytest.raises(ImportError, match="cannot import name 'BaseCommandHandler'"):
+        with pytest.raises(
+            ImportError, match="cannot import name 'BaseCommandHandler'"
+        ):
             pass
 
     def test_bootstrap_application(self):

@@ -15,7 +15,9 @@ class TestAPIEndpoints:
     @pytest.fixture
     def client(self):
         """Create test client with no authentication."""
-        server_config = ServerConfig(enabled=True, auth=AuthConfig(enabled=False, strategy="none"))
+        server_config = ServerConfig(
+            enabled=True, auth=AuthConfig(enabled=False, strategy="none")
+        )
         app = create_fastapi_app(server_config)
         return TestClient(app)
 
@@ -25,7 +27,9 @@ class TestAPIEndpoints:
         server_config = ServerConfig(
             enabled=True,
             auth=AuthConfig(
-                enabled=True, strategy="bearer_token", bearer_token={"secret_key": "test-secret"}
+                enabled=True,
+                strategy="bearer_token",
+                bearer_token={"secret_key": "test-secret"},
             ),
         )
         app = create_fastapi_app(server_config)

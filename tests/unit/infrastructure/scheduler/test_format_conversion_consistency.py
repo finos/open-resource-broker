@@ -19,9 +19,11 @@ class TestFormatConversionConsistency:
 
         # Create scheduler strategies
         self.default_strategy = DefaultSchedulerStrategy(
-            self.config_manager, self.logger)
+            self.config_manager, self.logger
+        )
         self.symphony_strategy = HostFactorySchedulerStrategy(
-            self.config_manager, self.logger)
+            self.config_manager, self.logger
+        )
 
         # Sample data for testing
         self.sample_templates = [
@@ -71,9 +73,11 @@ class TestFormatConversionConsistency:
         """Test that format_templates_response is consistent across strategies."""
         # Act
         default_result = self.default_strategy.format_templates_response(
-            self.sample_templates)
+            self.sample_templates
+        )
         symphony_result = self.symphony_strategy.format_templates_response(
-            self.sample_templates)
+            self.sample_templates
+        )
 
         # Assert
         assert "templates" in default_result
@@ -100,9 +104,11 @@ class TestFormatConversionConsistency:
         """Test that format_request_response is consistent across strategies."""
         # Act
         default_result = self.default_strategy.format_request_response(
-            self.sample_request)
+            self.sample_request
+        )
         symphony_result = self.symphony_strategy.format_request_response(
-            self.sample_request)
+            self.sample_request
+        )
 
         # Assert
         assert "request" in default_result
@@ -158,7 +164,8 @@ class TestFormatConversionConsistency:
         assert "machine_ids" in default_request
         assert "machine_ids" in symphony_request
         assert len(default_request["machine_ids"]) == len(
-            self.sample_return_request["machine_ids"])
+            self.sample_return_request["machine_ids"]
+        )
         assert len(symphony_request["machine_ids"]) == len(
             self.sample_return_request["machine_ids"]
         )
@@ -205,7 +212,8 @@ class TestFormatConversionInHandlers:
             ]
         }
         scheduler_strategy.format_templates_response = MagicMock(
-            return_value=formatted_templates)
+            return_value=formatted_templates
+        )
 
         # Act
         handler.handle(MagicMock())
@@ -241,7 +249,8 @@ class TestFormatConversionInHandlers:
             ]
         }
         scheduler_strategy.format_templates_response = MagicMock(
-            return_value=formatted_templates)
+            return_value=formatted_templates
+        )
 
         # Set up container.get to return the mocked objects
         container.get.side_effect = lambda x: {
@@ -253,7 +262,8 @@ class TestFormatConversionInHandlers:
 
         # Create args with default values
         args = argparse.Namespace(
-            provider_api=None, active_only=True, include_config=False)
+            provider_api=None, active_only=True, include_config=False
+        )
 
         # Act
         await handle_list_templates(args)

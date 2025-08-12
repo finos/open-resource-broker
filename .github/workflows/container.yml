@@ -79,7 +79,7 @@ jobs:
         CONTAINER_IMAGE=$(make print-CONTAINER_IMAGE)
         VERSION=$(make print-VERSION)
 
-        echo "default-python-versions=$PYTHON_VERSIONS_JSON" >> $GITHUB_OUTPUT
+        echo "python-versions=$PYTHON_VERSIONS_JSON" >> $GITHUB_OUTPUT
         echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> $GITHUB_OUTPUT
         echo "container-registry=$CONTAINER_REGISTRY" >> $GITHUB_OUTPUT
         echo "container-image=$CONTAINER_IMAGE" >> $GITHUB_OUTPUT

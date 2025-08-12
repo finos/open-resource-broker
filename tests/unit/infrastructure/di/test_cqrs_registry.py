@@ -268,11 +268,14 @@ class TestCQRSHandlerRegistry:
 
                 # Register handlers
                 self.registry.register_command_handler(
-                    f"Command_{thread_id}", command_handler)
+                    f"Command_{thread_id}", command_handler
+                )
                 self.registry.register_query_handler(
-                    f"Query_{thread_id}", query_handler)
+                    f"Query_{thread_id}", query_handler
+                )
                 self.registry.register_event_handler(
-                    f"Event_{thread_id}", event_handler)
+                    f"Event_{thread_id}", event_handler
+                )
 
                 # Verify registrations
                 if (
@@ -283,7 +286,8 @@ class TestCQRSHandlerRegistry:
                     results.append(thread_id)
                 else:
                     errors.append(
-                        f"Thread {thread_id}: Registration verification failed")
+                        f"Thread {thread_id}: Registration verification failed"
+                    )
 
             except Exception as e:
                 errors.append(f"Thread {thread_id}: {str(e)}")

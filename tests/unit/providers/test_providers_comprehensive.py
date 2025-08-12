@@ -38,7 +38,11 @@ class TestAWSProviderComprehensive:
         """Get handler classes from module."""
         classes = []
         for name, obj in inspect.getmembers(module):
-            if inspect.isclass(obj) and "Handler" in name and not name.startswith("Base"):
+            if (
+                inspect.isclass(obj)
+                and "Handler" in name
+                and not name.startswith("Base")
+            ):
                 classes.append((name, obj))
         return classes
 
@@ -85,7 +89,11 @@ class TestAWSProviderComprehensive:
                         assert handler is not None
 
                         # Test common handler methods
-                        common_methods = ["handle", "create_instances", "terminate_instances"]
+                        common_methods = [
+                            "handle",
+                            "create_instances",
+                            "terminate_instances",
+                        ]
                         has_handler_method = any(
                             hasattr(handler, method) for method in common_methods
                         )
@@ -203,7 +211,11 @@ class TestAWSProviderComprehensive:
                 assert strategy is not None
 
                 # Test common strategy methods
-                common_methods = ["create_machines", "terminate_machines", "get_machine_status"]
+                common_methods = [
+                    "create_machines",
+                    "terminate_machines",
+                    "get_machine_status",
+                ]
                 any(hasattr(strategy, method) for method in common_methods)
 
         except ImportError:
@@ -225,7 +237,9 @@ class TestAWSProviderComprehensive:
 
         for utility_file in utility_files:
             try:
-                module = importlib.import_module(f"src.providers.aws.utilities.{utility_file}")
+                module = importlib.import_module(
+                    f"src.providers.aws.utilities.{utility_file}"
+                )
                 utility_modules.append((utility_file, module))
             except ImportError:
                 continue
@@ -239,7 +253,9 @@ class TestAWSProviderComprehensive:
 
         for manager_file in manager_files:
             try:
-                module = importlib.import_module(f"src.providers.aws.managers.{manager_file}")
+                module = importlib.import_module(
+                    f"src.providers.aws.managers.{manager_file}"
+                )
                 manager_modules.append((manager_file, module))
             except ImportError:
                 continue
@@ -376,7 +392,9 @@ class TestProviderStrategyPatternsComprehensive:
 
         for module_name, class_name in strategy_modules:
             try:
-                module = importlib.import_module(f"src.providers.base.strategy.{module_name}")
+                module = importlib.import_module(
+                    f"src.providers.base.strategy.{module_name}"
+                )
                 strategy_class = getattr(module, class_name)
                 strategy_classes.append((class_name, strategy_class))
             except (ImportError, AttributeError):
@@ -400,7 +418,12 @@ class TestProviderStrategyPatternsComprehensive:
 
                 if strategy:
                     # Test common strategy methods
-                    common_methods = ["execute", "create_machines", "terminate_machines", "handle"]
+                    common_methods = [
+                        "execute",
+                        "create_machines",
+                        "terminate_machines",
+                        "handle",
+                    ]
 
                     for method_name in common_methods:
                         if hasattr(strategy, method_name):
@@ -483,11 +506,16 @@ class TestAWSAuthenticationComprehensive:
 
     def test_auth_strategy_initialization(self):
         """Test auth strategy initialization."""
-        auth_strategies = [("cognito_strategy", "CognitoStrategy"), ("iam_strategy", "IAMStrategy")]
+        auth_strategies = [
+            ("cognito_strategy", "CognitoStrategy"),
+            ("iam_strategy", "IAMStrategy"),
+        ]
 
         for module_name, class_name in auth_strategies:
             try:
-                module = importlib.import_module(f"src.providers.aws.auth.{module_name}")
+                module = importlib.import_module(
+                    f"src.providers.aws.auth.{module_name}"
+                )
                 strategy_class = getattr(module, class_name)
 
                 # Try to create strategy

@@ -8,8 +8,8 @@ if TYPE_CHECKING:
 
 from src.config.manager import ConfigurationManager
 from src.domain.base.ports.logging_port import LoggingPort
-from src.domain.exceptions import ConfigurationError
 from src.domain.base.ports.scheduler_port import SchedulerPort
+from src.domain.exceptions import ConfigurationError
 from src.domain.machine.aggregate import Machine
 from src.domain.request.aggregate import Request
 from src.domain.template.aggregate import Template
@@ -36,9 +36,9 @@ class HostFactorySchedulerStrategy(SchedulerPort):
     def get_templates_file_path(self) -> str:
         """Get the templates file path for HostFactory."""
         provider_config = self.config_manager.get_provider_config()
-        if not provider_config or not hasattr(provider_config, 'active_provider'):
+        if not provider_config or not hasattr(provider_config, "active_provider"):
             raise ConfigurationError("Provider configuration or active_provider not found")
-        
+
         active_provider = provider_config.active_provider
         provider_type = active_provider.split("-")[0]
         templates_file = f"{provider_type}prov_templates.json"
@@ -171,9 +171,9 @@ class HostFactorySchedulerStrategy(SchedulerPort):
         """Get the active provider type from configuration."""
         try:
             provider_config = self.config_manager.get_provider_config()
-            if not provider_config or not hasattr(provider_config, 'active_provider'):
+            if not provider_config or not hasattr(provider_config, "active_provider"):
                 raise ConfigurationError("Provider configuration or active_provider not found")
-            
+
             active_provider = provider_config.active_provider  # e.g., 'aws-default'
             provider_type = active_provider.split("-")[0]  # Extract 'aws' from 'aws-default'
             self._logger.debug(f"Active provider type: {provider_type}")

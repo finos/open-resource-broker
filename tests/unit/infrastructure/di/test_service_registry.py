@@ -248,7 +248,8 @@ class TestServiceRegistry:
 
                 # Retrieve and verify
                 retrieved = self.registry.get_singleton_instance(
-                    f"TestClass_{thread_id}")
+                    f"TestClass_{thread_id}"
+                )
                 if retrieved and retrieved.value == thread_id:
                     results.append(thread_id)
                 else:

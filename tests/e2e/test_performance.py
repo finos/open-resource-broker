@@ -47,7 +47,9 @@ class TestPerformance:
                     "enabled": i < 25,  # Half enabled
                     "priority": i + 1,
                     "weight": 100 - i,
-                    "capabilities": ["compute", "storage"] if i % 2 == 0 else ["compute"],
+                    "capabilities": (
+                        ["compute", "storage"] if i % 2 == 0 else ["compute"]
+                    ),
                     "config": {
                         "region": f"us-east-{i % 2 + 1}",
                         "profile": f"profile-{i}",
@@ -91,7 +93,9 @@ class TestPerformance:
             loading_time < 1.0
         ), f"Configuration loading took {loading_time:.3f}s, expected < 1.0s"
 
-        print(f"Configuration loading performance: {loading_time:.3f}s for 50 providers")
+        print(
+            f"Configuration loading performance: {loading_time:.3f}s for 50 providers"
+        )
 
     def test_provider_strategy_factory_performance(self):
         """Test provider strategy factory performance."""
@@ -123,7 +127,9 @@ class TestPerformance:
         creation_time = end_time - start_time
 
         # Performance assertion
-        assert creation_time < 0.1, f"Factory creation took {creation_time:.3f}s, expected < 0.1s"
+        assert (
+            creation_time < 0.1
+        ), f"Factory creation took {creation_time:.3f}s, expected < 0.1s"
 
         # Measure provider info retrieval time
         start_time = time.time()
@@ -161,7 +167,9 @@ class TestPerformance:
                         "enabled": True,
                         "priority": i + 1,
                         "weight": 100 - i * 2,
-                        "capabilities": ["compute", "storage", "networking"][: i % 3 + 1],
+                        "capabilities": ["compute", "storage", "networking"][
+                            : i % 3 + 1
+                        ],
                         "config": {
                             "region": f"us-{'east' if i % 2 == 0 else 'west'}-{i % 2 + 1}",
                             "max_retries": i % 5 + 1,
@@ -196,9 +204,13 @@ class TestPerformance:
             assert validation_result["provider_count"] == 20
 
         # Performance assertion
-        assert validation_time < 0.5, f"Validation took {validation_time:.3f}s, expected < 0.5s"
+        assert (
+            validation_time < 0.5
+        ), f"Validation took {validation_time:.3f}s, expected < 0.5s"
 
-        print(f"Configuration validation performance: {validation_time:.3f}s for 20 providers")
+        print(
+            f"Configuration validation performance: {validation_time:.3f}s for 20 providers"
+        )
 
     def test_concurrent_configuration_access(self):
         """Test concurrent access to configuration."""
@@ -231,7 +243,9 @@ class TestPerformance:
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             futures = [executor.submit(access_provider_info) for _ in range(50)]
-            results = [future.result() for future in concurrent.futures.as_completed(futures)]
+            results = [
+                future.result() for future in concurrent.futures.as_completed(futures)
+            ]
 
         end_time = time.time()
         concurrent_time = end_time - start_time
@@ -252,7 +266,9 @@ class TestPerformance:
             concurrent_time < 2.0
         ), f"Concurrent access took {concurrent_time:.3f}s, expected < 2.0s"
 
-        print(f"Concurrent access performance: {concurrent_time:.3f}s for 50 concurrent operations")
+        print(
+            f"Concurrent access performance: {concurrent_time:.3f}s for 50 concurrent operations"
+        )
 
     def test_memory_usage_performance(self):
         """Test memory usage characteristics."""
@@ -280,7 +296,9 @@ class TestPerformance:
                 }
             )
 
-        config_data = {"provider": {"selection_policy": "ROUND_ROBIN", "providers": providers}}
+        config_data = {
+            "provider": {"selection_policy": "ROUND_ROBIN", "providers": providers}
+        }
 
         config_path = self.create_config_file(config_data)
 
@@ -297,7 +315,9 @@ class TestPerformance:
             memory_increase < 50
         ), f"Memory usage increased by {memory_increase:.1f}MB, expected < 50MB"
 
-        print(f"Memory usage performance: {memory_increase:.1f}MB increase for 100 providers")
+        print(
+            f"Memory usage performance: {memory_increase:.1f}MB increase for 100 providers"
+        )
 
     def test_provider_caching_performance(self):
         """Test provider strategy caching performance."""
@@ -332,7 +352,9 @@ class TestPerformance:
 
         # Cached access should be significantly faster (or at least not slower)
         # Note: When operations are very fast (microseconds), the difference may not be significant
-        if first_access_time > 0.001:  # Only assert significant improvement for slower operations
+        if (
+            first_access_time > 0.001
+        ):  # Only assert significant improvement for slower operations
             assert (
                 avg_cached_time < first_access_time / 10
             ), f"Cached access ({avg_cached_time:.6f}s) not significantly faster than first access ({first_access_time:.6f}s)"
@@ -399,7 +421,9 @@ class TestPerformance:
             assert "mode" in updated_info
 
         # Performance assertion
-        assert reload_time < 0.1, f"Configuration reload took {reload_time:.3f}s, expected < 0.1s"
+        assert (
+            reload_time < 0.1
+        ), f"Configuration reload took {reload_time:.3f}s, expected < 0.1s"
 
         print(f"Configuration reload performance: {reload_time:.3f}s")
 
@@ -442,8 +466,12 @@ class TestPerformance:
         avg_time = total_time / iterations
 
         # Performance targets
-        assert avg_time < 0.001, f"Average operation time {avg_time:.6f}s, expected < 0.001s"
-        assert total_time < 1.0, f"Total benchmark time {total_time:.3f}s, expected < 1.0s"
+        assert (
+            avg_time < 0.001
+        ), f"Average operation time {avg_time:.6f}s, expected < 0.001s"
+        assert (
+            total_time < 1.0
+        ), f"Total benchmark time {total_time:.3f}s, expected < 1.0s"
 
         print(
             f"Benchmark results: {iterations} operations in {total_time:.3f}s, {avg_time:.6f}s average"
@@ -488,7 +516,9 @@ class TestPerformance:
         # Run stress test with multiple threads
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             futures = [executor.submit(stress_operations) for _ in range(5)]
-            results = [future.result() for future in concurrent.futures.as_completed(futures)]
+            results = [
+                future.result() for future in concurrent.futures.as_completed(futures)
+            ]
 
         total_operations = sum(results)
         operations_per_second = total_operations / 5.0  # 5 seconds
@@ -566,4 +596,6 @@ class TestPerformance:
             processing_time < 5.0
         ), f"Large configuration processing took {processing_time:.3f}s, expected < 5.0s"
 
-        print(f"Large configuration performance: {processing_time:.3f}s for 1000 providers")
+        print(
+            f"Large configuration performance: {processing_time:.3f}s for 1000 providers"
+        )

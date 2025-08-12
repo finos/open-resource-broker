@@ -62,7 +62,7 @@ class ProviderStrategyFactory:
             provider_config = self._config_manager.get_provider_config()
             if not provider_config:
                 raise ConfigurationError("Provider configuration not found")
-            
+
             mode = provider_config.get_mode()
 
             self._logger.info(f"Creating provider context in {mode.value} mode")
@@ -293,7 +293,7 @@ class ProviderStrategyFactory:
             provider_config = self._config_manager.get_provider_config()
             if not provider_config:
                 return {"mode": "error", "error": "Provider configuration not found"}
-            
+
             mode = provider_config.get_mode()
             active_providers = provider_config.get_active_providers()
 
@@ -333,7 +333,7 @@ class ProviderStrategyFactory:
             if not provider_config:
                 validation_result["errors"].append("Provider configuration not found")
                 return validation_result
-            
+
             mode = provider_config.get_mode()
             active_providers = provider_config.get_active_providers()
 

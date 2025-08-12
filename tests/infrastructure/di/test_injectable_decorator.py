@@ -76,7 +76,9 @@ class TestInjectableDecorator:
                 self.port = port
                 self.service = service
 
-        with patch("src.infrastructure.di.container.get_container", return_value=self.container):
+        with patch(
+            "src.infrastructure.di.container.get_container", return_value=self.container
+        ):
             # Create instance - dependencies should be auto-resolved
             instance = ServiceWithDependency()
 
@@ -90,11 +92,15 @@ class TestInjectableDecorator:
 
         @injectable
         class ServiceWithOptional:
-            def __init__(self, port: MockPort, optional_service: Optional[MockService] = None):
+            def __init__(
+                self, port: MockPort, optional_service: Optional[MockService] = None
+            ):
                 self.port = port
                 self.optional_service = optional_service
 
-        with patch("src.infrastructure.di.container.get_container", return_value=self.container):
+        with patch(
+            "src.infrastructure.di.container.get_container", return_value=self.container
+        ):
             instance = ServiceWithOptional()
 
             # Required dependency resolved
@@ -110,11 +116,15 @@ class TestInjectableDecorator:
 
         @injectable
         class ServiceWithUnavailableOptional:
-            def __init__(self, port: MockPort, unavailable: Optional[UnavailableService] = None):
+            def __init__(
+                self, port: MockPort, unavailable: Optional[UnavailableService] = None
+            ):
                 self.port = port
                 self.unavailable = unavailable
 
-        with patch("src.infrastructure.di.container.get_container", return_value=self.container):
+        with patch(
+            "src.infrastructure.di.container.get_container", return_value=self.container
+        ):
             instance = ServiceWithUnavailableOptional()
 
             # Required dependency resolved
@@ -132,7 +142,9 @@ class TestInjectableDecorator:
                 self.manual_param = manual_param
                 self.service = service
 
-        with patch("src.infrastructure.di.container.get_container", return_value=self.container):
+        with patch(
+            "src.infrastructure.di.container.get_container", return_value=self.container
+        ):
             instance = MixedService(manual_param="test_value")
 
             # Auto-resolved dependencies
@@ -156,7 +168,9 @@ class TestInjectableDecorator:
                 self.default_param = default_param
                 self.service = service
 
-        with patch("src.infrastructure.di.container.get_container", return_value=self.container):
+        with patch(
+            "src.infrastructure.di.container.get_container", return_value=self.container
+        ):
             instance = ServiceWithDefaults()
 
             assert isinstance(instance.port, MockAdapter)
@@ -175,7 +189,10 @@ class TestInjectableDecorator:
         error_container = Mock()
         error_container.get.side_effect = Exception("Container error")
 
-        with patch("src.infrastructure.di.container.get_container", return_value=error_container):
+        with patch(
+            "src.infrastructure.di.container.get_container",
+            return_value=error_container,
+        ):
             # Should raise exception since required dependency can't be resolved
             with pytest.raises(TypeError):  # Missing required argument
                 ServiceWithError()
@@ -262,7 +279,9 @@ class TestInjectableIntegration:
         mock_logger = Mock(spec=LoggingPort)
         container.register_singleton(LoggingPort, lambda c: mock_logger)
 
-        with patch("src.infrastructure.di.container.get_container", return_value=container):
+        with patch(
+            "src.infrastructure.di.container.get_container", return_value=container
+        ):
             instance = ServiceWithLogging()
             assert instance.logger == mock_logger
 
@@ -287,7 +306,9 @@ class TestInjectableIntegration:
         container.register_singleton(LoggingPort, lambda c: Mock(spec=LoggingPort))
         container.register_singleton(MockEventPublisher, lambda c: MockEventPublisher())
 
-        with patch("src.infrastructure.di.container.get_container", return_value=container):
+        with patch(
+            "src.infrastructure.di.container.get_container", return_value=container
+        ):
             # This should work without the Optional[LoggingPort] error
             bus = TestCommandBus()
             assert bus.logger is not None

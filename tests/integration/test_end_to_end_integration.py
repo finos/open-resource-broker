@@ -64,7 +64,9 @@ class TestEnhancedEndToEnd:
         self.mock_config.launch_template.naming_strategy = "request_based"
 
         self.launch_template_manager = AWSLaunchTemplateManager(
-            aws_client=self.mock_aws_client, config=self.mock_config, logger=self.mock_logger
+            aws_client=self.mock_aws_client,
+            config=self.mock_config,
+            logger=self.mock_logger,
         )
 
         # Create handlers
@@ -140,7 +142,9 @@ class TestEnhancedEndToEnd:
         self.request_repository.save(self.request)
 
         # 3. Execute provisioning through handler
-        resource_id = self.spot_fleet_handler.acquire_hosts(self.request, self.aws_template)
+        resource_id = self.spot_fleet_handler.acquire_hosts(
+            self.request, self.aws_template
+        )
 
         # 4. Update request with resource information
         self.request.add_resource_id(resource_id)
@@ -168,7 +172,9 @@ class TestEnhancedEndToEnd:
         self.mock_aws_client.ec2_client.request_spot_fleet.assert_called_once()
 
         # Verify storage calls
-        assert self.mock_storage_strategy.save.call_count >= 4  # template, request, 2 machines
+        assert (
+            self.mock_storage_strategy.save.call_count >= 4
+        )  # template, request, 2 machines
 
     def test_complete_ec2_fleet_flow(self):
         """Test complete flow with EC2 Fleet handler."""
@@ -198,7 +204,9 @@ class TestEnhancedEndToEnd:
         self.template_repository.save(self.aws_template)
 
         # 2. Execute provisioning through EC2 Fleet handler
-        resource_id = self.ec2_fleet_handler.acquire_hosts(self.request, self.aws_template)
+        resource_id = self.ec2_fleet_handler.acquire_hosts(
+            self.request, self.aws_template
+        )
 
         # 3. Update request with resource information
         self.request.add_resource_id(resource_id)
@@ -238,7 +246,9 @@ class TestEnhancedEndToEnd:
         self.spot_fleet_handler.acquire_hosts(self.request, self.aws_template)
 
         # Verify launch template was created with correct data
-        create_lt_call = self.mock_aws_client.ec2_client.create_launch_template.call_args
+        create_lt_call = (
+            self.mock_aws_client.ec2_client.create_launch_template.call_args
+        )
         lt_data = create_lt_call[1]["LaunchTemplateData"]
 
         # Verify launch template data
@@ -275,7 +285,9 @@ class TestEnhancedEndToEnd:
         }
 
         # Execute provisioning
-        resource_id = self.spot_fleet_handler.acquire_hosts(self.request, self.aws_template)
+        resource_id = self.spot_fleet_handler.acquire_hosts(
+            self.request, self.aws_template
+        )
 
         # Set provider tracking information
         self.request.provider_name = "aws-primary"
@@ -403,7 +415,9 @@ class TestEnhancedEndToEnd:
         # Verify storage calls
         assert json_storage.save.call_count == 3  # template, request, machine
 
-    def _create_sample_machines(self, resource_id: str, request: Request) -> List[Machine]:
+    def _create_sample_machines(
+        self, resource_id: str, request: Request
+    ) -> List[Machine]:
         """Create sample machine entities for testing."""
         machines = []
         for i in range(request.requested_count):

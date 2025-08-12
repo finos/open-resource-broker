@@ -92,7 +92,9 @@ class TestHealthCheckConfig:
 
     def test_custom_health_check_config(self):
         """Test custom health check configuration."""
-        config = HealthCheckConfig(enabled=False, interval=600, timeout=60, retry_count=5)
+        config = HealthCheckConfig(
+            enabled=False, interval=600, timeout=60, retry_count=5
+        )
 
         assert config.enabled is False
         assert config.interval == 600
@@ -131,7 +133,10 @@ class TestCircuitBreakerConfig:
     def test_custom_circuit_breaker_config(self):
         """Test custom circuit breaker configuration."""
         config = CircuitBreakerConfig(
-            enabled=False, failure_threshold=10, recovery_timeout=120, half_open_max_calls=5
+            enabled=False,
+            failure_threshold=10,
+            recovery_timeout=120,
+            half_open_max_calls=5,
         )
 
         assert config.enabled is False
@@ -189,7 +194,9 @@ class TestProviderConfig:
 
     def test_single_provider_mode_implicit(self):
         """Test single provider mode with one provider."""
-        config = ProviderConfig(providers=[ProviderInstanceConfig(name="aws-only", type="aws")])
+        config = ProviderConfig(
+            providers=[ProviderInstanceConfig(name="aws-only", type="aws")]
+        )
 
         assert config.get_mode() == ProviderMode.SINGLE
         assert not config.is_multi_provider_mode()
@@ -238,7 +245,9 @@ class TestProviderConfig:
 
         # Invalid policy
         with pytest.raises(ValueError, match="Selection policy must be one of"):
-            ProviderConfig(selection_policy="INVALID_POLICY", providers=[dummy_provider])
+            ProviderConfig(
+                selection_policy="INVALID_POLICY", providers=[dummy_provider]
+            )
 
     def test_provider_name_uniqueness(self):
         """Test provider name uniqueness validation."""
@@ -246,7 +255,9 @@ class TestProviderConfig:
             ProviderConfig(
                 providers=[
                     ProviderInstanceConfig(name="aws-primary", type="aws"),
-                    ProviderInstanceConfig(name="aws-primary", type="aws"),  # Duplicate name
+                    ProviderInstanceConfig(
+                        name="aws-primary", type="aws"
+                    ),  # Duplicate name
                 ]
             )
 
@@ -294,5 +305,7 @@ class TestProviderConfig:
 
     def test_empty_configuration_validation(self):
         """Test validation with empty configuration."""
-        with pytest.raises(ValueError, match="At least one provider must be configured"):
+        with pytest.raises(
+            ValueError, match="At least one provider must be configured"
+        ):
             ProviderConfig()  # No providers and no legacy config

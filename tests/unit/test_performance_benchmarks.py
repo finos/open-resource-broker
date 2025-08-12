@@ -79,7 +79,9 @@ class TestPerformanceBenchmarks:
             start_time = time.perf_counter()
 
             # Simulate template loading operation
-            loaded_templates = [t for t in templates if t.template_id.startswith("template-")]
+            loaded_templates = [
+                t for t in templates if t.template_id.startswith("template-")
+            ]
 
             end_time = time.perf_counter()
             times.append(end_time - start_time)
@@ -104,7 +106,8 @@ class TestPerformanceBenchmarks:
             # Perform operations that generate events
             request.start_processing()
             request.complete_successfully(
-                machine_ids=[f"i-{i:016x}1", f"i-{i:016x}2"], completion_message="Success"
+                machine_ids=[f"i-{i:016x}1", f"i-{i:016x}2"],
+                completion_message="Success",
             )
 
             # Get events
@@ -197,7 +200,9 @@ class TestMemoryPerformance:
             # Perform operations
             for i in range(operations_per_iteration):
                 request = Request.create_new_request(
-                    template_id=f"template-{i}", machine_count=2, requester_id=f"user-{i}"
+                    template_id=f"template-{i}",
+                    machine_count=2,
+                    requester_id=f"user-{i}",
                 )
 
                 request.start_processing()
@@ -378,9 +383,13 @@ class TestConcurrentPerformance:
         avg_time = statistics.mean(results)
         throughput = total_operations / total_time
 
-        assert avg_time < 0.05, f"Concurrent repository access too slow: {avg_time:.6f}s"
+        assert (
+            avg_time < 0.05
+        ), f"Concurrent repository access too slow: {avg_time:.6f}s"
 
-        print(f"Repository concurrent access - {total_operations} operations in {total_time:.2f}s")
+        print(
+            f"Repository concurrent access - {total_operations} operations in {total_time:.2f}s"
+        )
         print(f"Throughput: {throughput:.0f} operations/second")
 
     def test_thread_safety_performance_impact(self):
@@ -520,14 +529,19 @@ class TestScalabilityLimits:
             total_time = end_time - start_time
             time_per_item = total_time / size
 
-            performance_results[size] = {"total_time": total_time, "time_per_item": time_per_item}
+            performance_results[size] = {
+                "total_time": total_time,
+                "time_per_item": time_per_item,
+            }
 
             # Performance should scale reasonably
             assert (
                 time_per_item < 0.01
             ), f"Time per item too high for {size} items: {time_per_item:.6f}s"
 
-            print(f"Dataset size {size}: {total_time:.2f}s total, {time_per_item:.6f}s per item")
+            print(
+                f"Dataset size {size}: {total_time:.2f}s total, {time_per_item:.6f}s per item"
+            )
 
             # Clean up
             requests.clear()
@@ -556,7 +570,9 @@ class TestScalabilityLimits:
             requests = []
             for i in range(size):
                 request = Request.create_new_request(
-                    template_id=f"template-{i}", machine_count=2, requester_id=f"user-{i}"
+                    template_id=f"template-{i}",
+                    machine_count=2,
+                    requester_id=f"user-{i}",
                 )
                 requests.append(request)
 
@@ -584,7 +600,9 @@ class TestScalabilityLimits:
 
         # Memory per item should not increase dramatically with scale
         memory_scaling = memory_per_item_1000 / memory_per_item_100
-        assert memory_scaling < 2.0, f"Memory usage scales poorly: {memory_scaling:.2f}x"
+        assert (
+            memory_scaling < 2.0
+        ), f"Memory usage scales poorly: {memory_scaling:.2f}x"
 
 
 @pytest.mark.performance
@@ -598,7 +616,10 @@ class TestPerformanceRegression:
         # In a real scenario, these would be compared against historical data
 
         operations = [
-            ("request_creation", lambda: Request.create_new_request("template-1", 1, "user-1")),
+            (
+                "request_creation",
+                lambda: Request.create_new_request("template-1", 1, "user-1"),
+            ),
             ("status_transition", lambda: self._test_status_transition()),
             ("event_generation", lambda: self._test_event_generation()),
         ]

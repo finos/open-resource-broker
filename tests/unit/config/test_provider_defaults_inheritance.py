@@ -99,8 +99,14 @@ class TestProviderDefaultsInheritance:
             "provider_defaults": {
                 "aws": {
                     "handlers": {
-                        "EC2Fleet": {"handler_class": "EC2FleetHandler", "supports_spot": True},
-                        "SpotFleet": {"handler_class": "SpotFleetHandler", "supports_spot": True},
+                        "EC2Fleet": {
+                            "handler_class": "EC2FleetHandler",
+                            "supports_spot": True,
+                        },
+                        "SpotFleet": {
+                            "handler_class": "SpotFleetHandler",
+                            "supports_spot": True,
+                        },
                         "ASG": {"handler_class": "ASGHandler", "supports_spot": True},
                     }
                 }
@@ -133,8 +139,14 @@ class TestProviderDefaultsInheritance:
             "provider_defaults": {
                 "aws": {
                     "handlers": {
-                        "EC2Fleet": {"handler_class": "EC2FleetHandler", "supports_spot": True},
-                        "SpotFleet": {"handler_class": "SpotFleetHandler", "supports_spot": True},
+                        "EC2Fleet": {
+                            "handler_class": "EC2FleetHandler",
+                            "supports_spot": True,
+                        },
+                        "SpotFleet": {
+                            "handler_class": "SpotFleetHandler",
+                            "supports_spot": True,
+                        },
                     }
                 }
             },
@@ -145,7 +157,10 @@ class TestProviderDefaultsInheritance:
                     "enabled": True,
                     "config": {"region": "us-west-2"},
                     "handlers": {
-                        "CustomHandler": {"handler_class": "CustomHandler", "custom_feature": True}
+                        "CustomHandler": {
+                            "handler_class": "CustomHandler",
+                            "custom_feature": True,
+                        }
                     },
                 }
             ],
@@ -282,7 +297,10 @@ class TestProviderDefaultsInheritance:
                     "config": {"region": "us-beta-1"},
                     "handler_overrides": {
                         "ASG": None,
-                        "EC2Fleet": {"handler_class": "EC2FleetHandler", "max_instances": 50},
+                        "EC2Fleet": {
+                            "handler_class": "EC2FleetHandler",
+                            "max_instances": 50,
+                        },
                         "RunInstances": {
                             "handler_class": "RunInstancesHandler",
                             "max_instances": 10,

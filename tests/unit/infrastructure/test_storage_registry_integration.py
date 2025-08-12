@@ -79,7 +79,9 @@ class TestStorageRegistryIntegration:
         mock_repository = Mock()
         mock_factory.create_request_repository.return_value = mock_repository
 
-        with patch("src.infrastructure.persistence.registration.register_all_storage_types"), patch(
+        with patch(
+            "src.infrastructure.persistence.registration.register_all_storage_types"
+        ), patch(
             "src.infrastructure.utilities.factories.repository_factory.RepositoryFactory"
         ) as mock_factory_class:
 
@@ -98,7 +100,9 @@ class TestStorageRegistryIntegration:
                     factory_registered = True
                     break
 
-            assert factory_registered, "RepositoryFactory should be registered with DI container"
+            assert (
+                factory_registered
+            ), "RepositoryFactory should be registered with DI container"
 
     def test_unit_of_work_creation_via_registry(self):
         """Test unit of work creation via storage registry."""
@@ -127,7 +131,9 @@ class TestStorageRegistryIntegration:
             result = factory.create_unit_of_work()
 
             # Verify storage registry was used
-            mock_registry.create_unit_of_work.assert_called_once_with("json", mock_config_manager)
+            mock_registry.create_unit_of_work.assert_called_once_with(
+                "json", mock_config_manager
+            )
             assert result == mock_unit_of_work
 
     def test_storage_registration_includes_unit_of_work(self):
@@ -172,7 +178,9 @@ class TestStorageRegistryIntegration:
         )
 
         # Test unit of work creation should fail
-        with pytest.raises(UnsupportedStorageError, match="Unit of work factory not registered"):
+        with pytest.raises(
+            UnsupportedStorageError, match="Unit of work factory not registered"
+        ):
             registry.create_unit_of_work("test_storage", Mock())
 
     def test_end_to_end_repository_creation(self):

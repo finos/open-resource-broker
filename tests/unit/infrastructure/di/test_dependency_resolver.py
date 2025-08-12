@@ -219,7 +219,8 @@ class TestDependencyResolver:
                 self.value = "injectable"
 
         with patch(
-            "src.infrastructure.di.components.dependency_resolver.is_injectable", return_value=True
+            "src.infrastructure.di.components.dependency_resolver.is_injectable",
+            return_value=True,
         ):
             with patch(
                 "src.infrastructure.di.components.dependency_resolver.get_injectable_metadata",
@@ -470,8 +471,9 @@ class TestDependencyResolverEdgeCases:
             self.resolver.resolve(DependentClass)
 
         # The error should mention the failing class
-        assert "FailingClass" in str(
-            exc_info.value) or "Intentional failure" in str(exc_info.value)
+        assert "FailingClass" in str(exc_info.value) or "Intentional failure" in str(
+            exc_info.value
+        )
 
 
 class TestDependencyResolverIntegration:

@@ -32,7 +32,9 @@ class TestLazyLoadingIntegration:
         """Test that application creation is fast (lazy loading)."""
         # Application should be created quickly without heavy initialization
         assert app._container is None, "Container should not be created during __init__"
-        assert app._config_manager is None, "Config manager should not be created during __init__"
+        assert (
+            app._config_manager is None
+        ), "Config manager should not be created during __init__"
         assert app.logger is not None, "Logger should be available immediately"
 
     async def test_application_initialization_works(self, app):
@@ -113,7 +115,9 @@ class TestLazyLoadingIntegration:
     def test_lazy_loading_configuration(self):
         """Test that lazy loading can be configured."""
         container = get_container()
-        assert container.is_lazy_loading_enabled(), "Lazy loading should be enabled by default"
+        assert (
+            container.is_lazy_loading_enabled()
+        ), "Lazy loading should be enabled by default"
 
     async def test_multiple_app_instances(self):
         """Test that multiple application instances work correctly."""
@@ -161,7 +165,9 @@ class TestLazyLoadingErrorHandling:
         app = Application()
 
         # Mock a failure in initialization
-        with patch.object(app, "_ensure_config_manager", side_effect=Exception("Config error")):
+        with patch.object(
+            app, "_ensure_config_manager", side_effect=Exception("Config error")
+        ):
             result = asyncio.run(app.initialize())
             assert result is False, "Initialization should fail gracefully"
 
@@ -171,7 +177,9 @@ class TestLazyLoadingErrorHandling:
         await app.initialize()
 
         # Mock a failure in lazy component creation
-        with patch.object(app._container, "get", side_effect=Exception("Component error")):
+        with patch.object(
+            app._container, "get", side_effect=Exception("Component error")
+        ):
             with pytest.raises(Exception, match="Component error"):
                 app.get_query_bus()
 
@@ -244,7 +252,9 @@ class TestLazyLoadingPerformanceIntegration:
         creation_time = (time.time() - start_time) * 1000
 
         # Creation should be very fast (lazy loading)
-        assert creation_time < 100, f"App creation took {creation_time:.1f}ms, expected <100ms"
+        assert (
+            creation_time < 100
+        ), f"App creation took {creation_time:.1f}ms, expected <100ms"
 
     async def test_first_access_performance_integration(self):
         """Test first access performance in integration context."""

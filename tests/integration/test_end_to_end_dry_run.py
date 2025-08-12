@@ -28,7 +28,9 @@ class TestEndToEndDryRun:
 
         # Create AWS provider strategy
         self.aws_config = AWSProviderConfig(region="us-east-1", profile="default")
-        self.aws_strategy = AWSProviderStrategy(config=self.aws_config, logger=self.mock_logger)
+        self.aws_strategy = AWSProviderStrategy(
+            config=self.aws_config, logger=self.mock_logger
+        )
 
         # Mock strategy initialization
         with patch.object(self.aws_strategy, "initialize", return_value=True):
@@ -91,7 +93,9 @@ class TestEndToEndDryRun:
         )
 
     @patch("src.providers.aws.infrastructure.dry_run_adapter.aws_dry_run_context")
-    def test_dry_run_command_propagates_to_provider_strategy(self, mock_dry_run_context):
+    def test_dry_run_command_propagates_to_provider_strategy(
+        self, mock_dry_run_context
+    ):
         """Test that dry-run context from command propagates to provider strategy."""
         # Mock template query response
         from src.domain.template.aggregate import Template
@@ -111,7 +115,9 @@ class TestEndToEndDryRun:
         self.mock_query_bus.dispatch.return_value = mock_template_dto
 
         # Mock instance manager response
-        self.mock_instance_manager.create_instances.return_value = ["i-1234567890abcdef0"]
+        self.mock_instance_manager.create_instances.return_value = [
+            "i-1234567890abcdef0"
+        ]
 
         # Mock dry-run context manager
         mock_context_manager = MagicMock()
@@ -204,7 +210,9 @@ class TestEndToEndDryRun:
         self.mock_query_bus.dispatch.return_value = mock_template_dto
 
         # Mock instance manager response
-        self.mock_instance_manager.create_instances.return_value = ["i-1234567890abcdef0"]
+        self.mock_instance_manager.create_instances.return_value = [
+            "i-1234567890abcdef0"
+        ]
 
         # Mock dry-run context manager
         mock_context_manager = MagicMock()
@@ -215,7 +223,10 @@ class TestEndToEndDryRun:
 
         # Create command with dry-run enabled
         command = CreateRequestCommand(
-            template_id="test-template", machine_count=1, metadata={"test": "data"}, dry_run=True
+            template_id="test-template",
+            machine_count=1,
+            metadata={"test": "data"},
+            dry_run=True,
         )
 
         # Execute command within global dry-run context
@@ -258,7 +269,9 @@ class TestEndToEndDryRun:
         )
 
         # Mock instance manager response for strategy path
-        self.mock_instance_manager.create_instances.return_value = ["i-1234567890abcdef0"]
+        self.mock_instance_manager.create_instances.return_value = [
+            "i-1234567890abcdef0"
+        ]
 
         # Execute provisioning
         resource_id = self.provisioning_adapter.provision_resources(request, template)
