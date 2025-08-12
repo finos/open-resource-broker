@@ -14,10 +14,10 @@ import sys
 sys.path.insert(0, os.path.abspath("."))
 
 
-def test_phase5_configuration():
-    """Test Phase 5 configuration updates."""
+def test_configuration_updates():
+    """Test configuration system updates and validation."""
 
-    print("PHASE 5: CONFIGURATION UPDATES TEST")
+    print("CONFIGURATION UPDATES TEST")
     print("=" * 60)
 
     results = {
@@ -28,25 +28,25 @@ def test_phase5_configuration():
     }
 
     try:
-        # Test 1: Default configuration validation
-        print("\n1. Testing Default Configuration...")
+        # Default configuration validation
+        print("\nTesting Default Configuration...")
         results["default_config_validation"] = test_default_config_validation()
 
-        # Test 2: Launch template configuration presence
-        print("\n2. Testing Launch Template Configuration...")
+        # Launch template configuration presence
+        print("\nTesting Launch Template Configuration...")
         results["launch_template_config_present"] = test_launch_template_config_present()
 
-        # Test 3: AWS provider configuration class
-        print("\n3. Testing AWS Provider Configuration Class...")
+        # AWS provider configuration class
+        print("\nTesting AWS Provider Configuration Class...")
         results["aws_provider_config_class"] = test_aws_provider_config_class()
 
-        # Test 4: Configuration loading
-        print("\n4. Testing Configuration Loading...")
+        # Configuration loading
+        print("\nTesting Configuration Loading...")
         results["configuration_loading"] = test_configuration_loading()
 
         # Summary
         print("\n" + "=" * 60)
-        print("PHASE 5 CONFIGURATION TEST RESULTS")
+        print("CONFIGURATION TEST RESULTS")
         print("=" * 60)
 
         passed = sum(1 for result in results.values() if result)
@@ -59,7 +59,7 @@ def test_phase5_configuration():
         print(f"\nOverall: {passed}/{total} tests passed")
 
         if passed == total:
-            print("ALL PHASE 5 CONFIGURATION TESTS PASSED!")
+            print("ALL CONFIGURATION TESTS PASSED!")
             return True
         else:
             print("WARN:  Some configuration tests failed")

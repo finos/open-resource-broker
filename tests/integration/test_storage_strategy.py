@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test for Phase 3: Storage Strategy Enhancement
+Test for Storage Strategy: Storage Strategy Enhancement
 Tests that all repository enhancements work correctly with the new domain fields.
 """
 
@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 def test_template_repository_enhancements():
     """Test that Template repository handles enhanced fields correctly."""
-    print("=== Phase 3: Template Repository Enhancement Test ===")
+    print("=== Storage Strategy: Template Repository Enhancement Test ===")
 
     try:
         from src.domain.template.aggregate import Template
@@ -195,14 +195,14 @@ def test_machine_repository_enhancements():
 
 
 if __name__ == "__main__":
-    print("Running Phase 3 Storage Strategy Enhancement Tests...")
+    print("Running Storage Strategy Storage Strategy Enhancement Tests...")
 
     test1_passed = test_template_repository_enhancements()
     test2_passed = test_request_repository_enhancements()
     test3_passed = test_machine_repository_enhancements()
 
     if test1_passed and test2_passed and test3_passed:
-        print("\nALL PHASE 3 STORAGE STRATEGY TESTS PASSED")
+        print("\nALL STORAGE STRATEGY STORAGE STRATEGY TESTS PASSED")
         print("PASS: Template repository enhanced field support working")
         print("PASS: Request repository enhanced field support working")
         print("PASS: Machine repository enhanced field support working")

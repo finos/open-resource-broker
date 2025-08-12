@@ -13,10 +13,10 @@ import sys
 sys.path.insert(0, os.path.abspath("."))
 
 
-def test_phase6_dependency_injection():
-    """Test Phase 6 dependency injection updates."""
+def test_dependency_injection_updates():
+    """Test dependency injection system updates and registrations."""
 
-    print("PHASE 6: DEPENDENCY INJECTION UPDATES TEST")
+    print("DEPENDENCY INJECTION UPDATES TEST")
     print("=" * 60)
 
     results = {
@@ -47,7 +47,7 @@ def test_phase6_dependency_injection():
 
         # Summary
         print("\n" + "=" * 60)
-        print("PHASE 6 DEPENDENCY INJECTION TEST RESULTS")
+        print("DEPENDENCY INJECTION DEPENDENCY INJECTION TEST RESULTS")
         print("=" * 60)
 
         passed = sum(1 for result in results.values() if result)
@@ -60,7 +60,7 @@ def test_phase6_dependency_injection():
         print(f"\nOverall: {passed}/{total} tests passed")
 
         if passed == total:
-            print("ALL PHASE 6 DEPENDENCY INJECTION TESTS PASSED!")
+            print("ALL DEPENDENCY INJECTION DEPENDENCY INJECTION TESTS PASSED!")
             return True
         else:
             print("WARN:  Some dependency injection tests failed")

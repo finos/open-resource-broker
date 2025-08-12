@@ -1,4 +1,4 @@
-"""Performance tests for lazy loading implementation (Phase 3).
+"""Performance tests for lazy loading implementation (Lazy Loading).
 
 This module tests the performance improvements achieved through lazy loading
 optimizations, including startup time, memory usage, and component loading.
@@ -19,7 +19,7 @@ class TestLazyLoadingPerformance:
     """Test suite for lazy loading performance optimizations."""
 
     def test_startup_time_under_500ms(self):
-        """Test that application starts in under 500ms (Phase 3 target)."""
+        """Test that application starts in under 500ms (Lazy Loading target)."""
         start_time = time.time()
         Application()
         startup_time = (time.time() - start_time) * 1000
@@ -248,7 +248,7 @@ class TestPerformanceRegression:
         avg_startup = sum(measurements) / len(measurements)
         max_startup = max(measurements)
 
-        # Phase 3 target: <500ms average, <1000ms max
+        # Lazy Loading target: <500ms average, <1000ms max
         assert avg_startup < 500, f"Average startup {avg_startup:.1f}ms exceeds 500ms limit"
         assert max_startup < 1000, f"Max startup {max_startup:.1f}ms exceeds 1000ms limit"
 
@@ -277,7 +277,7 @@ if __name__ == "__main__":
     # Run performance tests directly
     test_suite = TestLazyLoadingPerformance()
 
-    print("Running Phase 3 Lazy Loading Performance Tests...")
+    print("Running Lazy Loading Lazy Loading Performance Tests...")
     print("=" * 60)
 
     try:

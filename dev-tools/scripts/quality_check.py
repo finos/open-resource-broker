@@ -105,7 +105,15 @@ IMPLEMENTATION_DETAIL_TERMS = {
     r"\bquick\s+fix\b": 'Remove quick fix references',
     r"\bstep\s+\d+\b": 'Remove step-by-step implementation references',
     r"\btest\s+\d+\b": 'Remove test numbering from production code',
-    r"\bversion\s+\d+\b": 'Remove version references unless in version files',
+}
+
+# Legitimate version references that should be excluded
+VERSION_EXCLUSIONS = {
+    'CODE_OF_CONDUCT.md',  # Contributor Covenant version references
+    'LICENSE',             # License version references
+    'pyproject.toml',      # Package version references
+    'version.py',          # Version files
+    'versions.json',       # Version configuration files
 }
 
 # File extensions to check
@@ -305,6 +313,9 @@ class LanguageChecker(FileChecker):
                 matches = re.finditer(term_pattern, line, re.IGNORECASE)
                 for match in matches:
                     term = match.group(0)
+                    # Skip version references in legitimate files
+                    if 'version' in term.lower() and any(excluded in file_path for excluded in VERSION_EXCLUSIONS):
+                        continue
                     violations.append(
                         ImplementationDetailViolation(file_path, line_num, line.strip(), term, suggestion)
                     )
