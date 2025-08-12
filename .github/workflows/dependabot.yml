@@ -52,7 +52,7 @@ jobs:
           enable-cache: true
 
       - name: Generate pyproject.toml
-        run: python dev-tools/scripts/generate_pyproject.py
+        run: make generate-pyproject
 
       - name: Update UV lock file
         run: |
@@ -193,7 +193,7 @@ jobs:
           enable-cache: true
 
       - name: Generate pyproject.toml
-        run: python dev-tools/scripts/generate_pyproject.py
+        run: make generate-pyproject
 
       - name: Update all dependencies
         run: |

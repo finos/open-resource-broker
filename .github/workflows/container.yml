@@ -64,7 +64,7 @@ jobs:
 
     - name: Generate pyproject.toml
       run: |
-        python dev-tools/scripts/generate_pyproject.py
+        make generate-pyproject
 
     - name: Install dependencies with uv
       run: |
@@ -123,7 +123,7 @@ jobs:
 
     - name: Generate pyproject.toml
       run: |
-        python dev-tools/scripts/generate_pyproject.py
+        make generate-pyproject
 
     - name: Install dependencies with uv
       run: |
@@ -152,8 +152,7 @@ jobs:
         PUSH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'release' || github.event.inputs.push_images == 'true') }}
         CACHE: true
       run: |
-        chmod +x dev-tools/scripts/container_build.sh
-        ./dev-tools/scripts/container_build.sh
+        make docker-build
 
     - name: Test container image
       if: matrix.default-python-version == needs.get-config.outputs.default-python-version
