@@ -278,7 +278,7 @@ class FallbackProviderStrategy(ProviderStrategy):
 
         return self._initialized
 
-    def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
+    async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
         """
         Execute operation with fallback logic.
 
@@ -301,13 +301,13 @@ class FallbackProviderStrategy(ProviderStrategy):
 
             # Execute based on fallback mode
             if self._config.mode == FallbackMode.CIRCUIT_BREAKER:
-                result = self._execute_with_circuit_breaker(operation)
+                result = await self._execute_with_circuit_breaker(operation)
             elif self._config.mode == FallbackMode.RETRY_THEN_FALLBACK:
-                result = self._execute_with_retry_fallback(operation)
+                result = await self._execute_with_retry_fallback(operation)
             elif self._config.mode == FallbackMode.HEALTH_BASED:
-                result = self._execute_health_based(operation)
+                result = await self._execute_health_based(operation)
             else:  # IMMEDIATE
-                result = self._execute_immediate_fallback(operation)
+                result = await self._execute_immediate_fallback(operation)
 
             # Add execution metadata
             total_time_ms = (time.time() - start_time) * 1000
@@ -331,7 +331,7 @@ class FallbackProviderStrategy(ProviderStrategy):
                 {"total_execution_time_ms": total_time_ms},
             )
 
-    def _execute_with_circuit_breaker(self, operation: ProviderOperation) -> ProviderResult:
+    async def _execute_with_circuit_breaker(self, operation: ProviderOperation) -> ProviderResult:
         """Execute operation using circuit breaker pattern."""
         with self._lock:
             current_time = time.time()
@@ -348,11 +348,11 @@ class FallbackProviderStrategy(ProviderStrategy):
                     self._self._logger.info("Circuit breaker moving to half-open state")
                 else:
                     # Circuit is open, use fallback immediately
-                    return self._execute_fallback_chain(operation)
+                    return await self._execute_fallback_chain(operation)
 
             # Try primary strategy
             try:
-                result = self._primary_strategy.execute_operation(operation)
+                result = await self._primary_strategy.execute_operation(operation)
 
                 if result.success:
                     # Success - record and potentially close circuit
@@ -374,7 +374,7 @@ class FallbackProviderStrategy(ProviderStrategy):
                         )
 
                     # Try fallback
-                    return self._execute_fallback_chain(operation)
+                    return await self._execute_fallback_chain(operation)
 
             except Exception as e:
                 # Exception - record failure and try fallback
@@ -383,16 +383,16 @@ class FallbackProviderStrategy(ProviderStrategy):
                     self._circuit_state.state = CircuitState.OPEN
                     self._self._logger.warning(f"Circuit breaker opened after exception: {e}")
 
-                return self._execute_fallback_chain(operation)
+                return await self._execute_fallback_chain(operation)
 
-    def _execute_with_retry_fallback(self, operation: ProviderOperation) -> ProviderResult:
+    async def _execute_with_retry_fallback(self, operation: ProviderOperation) -> ProviderResult:
         """Execute operation with retry then fallback."""
         last_error = None
 
         # Try primary strategy with retries
         for attempt in range(self._config.max_retries + 1):
             try:
-                result = self._primary_strategy.execute_operation(operation)
+                result = await self._primary_strategy.execute_operation(operation)
 
                 if result.success:
                     self._current_strategy = self._primary_strategy
@@ -417,43 +417,43 @@ class FallbackProviderStrategy(ProviderStrategy):
         self._self._logger.warning(
             f"Primary strategy failed after {self._config.max_retries} retries: {last_error}"
         )
-        return self._execute_fallback_chain(operation)
+        return await self._execute_fallback_chain(operation)
 
-    def _execute_health_based(self, operation: ProviderOperation) -> ProviderResult:
+    async def _execute_health_based(self, operation: ProviderOperation) -> ProviderResult:
         """Execute operation based on health status."""
         # Check primary health
         if self._primary_healthy:
             try:
-                result = self._primary_strategy.execute_operation(operation)
+                result = await self._primary_strategy.execute_operation(operation)
                 if result.success:
                     self._current_strategy = self._primary_strategy
                     return result
                 else:
                     # Mark as potentially unhealthy and try fallback
                     self._primary_healthy = False
-                    return self._execute_fallback_chain(operation)
+                    return await self._execute_fallback_chain(operation)
             except Exception as e:
                 self._primary_healthy = False
                 self._self._logger.warning(f"Primary strategy failed, marking unhealthy: {e}")
-                return self._execute_fallback_chain(operation)
+                return await self._execute_fallback_chain(operation)
         else:
             # Primary is unhealthy, use fallback directly
-            return self._execute_fallback_chain(operation)
+            return await self._execute_fallback_chain(operation)
 
-    def _execute_immediate_fallback(self, operation: ProviderOperation) -> ProviderResult:
+    async def _execute_immediate_fallback(self, operation: ProviderOperation) -> ProviderResult:
         """Execute operation with immediate fallback on any failure."""
         try:
-            result = self._primary_strategy.execute_operation(operation)
+            result = await self._primary_strategy.execute_operation(operation)
             if result.success:
                 self._current_strategy = self._primary_strategy
                 return result
             else:
-                return self._execute_fallback_chain(operation)
+                return await self._execute_fallback_chain(operation)
         except Exception as e:
             self._self._logger.debug(f"Primary strategy failed, trying fallback: {e}")
-            return self._execute_fallback_chain(operation)
+            return await self._execute_fallback_chain(operation)
 
-    def _execute_fallback_chain(self, operation: ProviderOperation) -> ProviderResult:
+    async def _execute_fallback_chain(self, operation: ProviderOperation) -> ProviderResult:
         """Execute operation through the fallback chain."""
         last_error = None
 
@@ -462,7 +462,7 @@ class FallbackProviderStrategy(ProviderStrategy):
                 self._self._logger.debug(
                     f"Trying fallback strategy {i+1}: {fallback_strategy.provider_type}"
                 )
-                result = fallback_strategy.execute_operation(operation)
+                result = await fallback_strategy.execute_operation(operation)
 
                 if result.success:
                     self._current_strategy = fallback_strategy

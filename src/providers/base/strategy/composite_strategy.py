@@ -282,7 +282,7 @@ class CompositeProviderStrategy(ProviderStrategy):
 
         return self._initialized
 
-    def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
+    async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
         """
         Execute operation using the configured composition mode.
 
@@ -313,9 +313,9 @@ class CompositeProviderStrategy(ProviderStrategy):
             if self._config.mode == CompositionMode.PARALLEL:
                 execution_results = self._execute_parallel(capable_strategies, operation)
             elif self._config.mode == CompositionMode.SEQUENTIAL:
-                execution_results = self._execute_sequential(capable_strategies, operation)
+                execution_results = await self._execute_sequential(capable_strategies, operation)
             elif self._config.mode == CompositionMode.LOAD_BALANCED:
-                execution_results = self._execute_load_balanced(capable_strategies, operation)
+                execution_results = await self._execute_load_balanced(capable_strategies, operation)
             else:
                 execution_results = self._execute_parallel(capable_strategies, operation)
 
@@ -368,7 +368,7 @@ class CompositeProviderStrategy(ProviderStrategy):
 
         for strategy_type, strategy in strategies.items():
             future = self._executor.submit(
-                self._execute_single_strategy, strategy_type, strategy, operation
+                self._execute_single_strategy_sync, strategy_type, strategy, operation
             )
             futures[future] = strategy_type
 
@@ -393,14 +393,14 @@ class CompositeProviderStrategy(ProviderStrategy):
 
         return results
 
-    def _execute_sequential(
+    async def _execute_sequential(
         self, strategies: Dict[str, ProviderStrategy], operation: ProviderOperation
     ) -> List[StrategyExecutionResult]:
         """Execute operation on strategies sequentially."""
         results = []
 
         for strategy_type, strategy in strategies.items():
-            result = self._execute_single_strategy(strategy_type, strategy, operation)
+            result = await self._execute_single_strategy(strategy_type, strategy, operation)
             results.append(result)
 
             # Stop on first success if configured
@@ -412,7 +412,7 @@ class CompositeProviderStrategy(ProviderStrategy):
 
         return results
 
-    def _execute_load_balanced(
+    async def _execute_load_balanced(
         self, strategies: Dict[str, ProviderStrategy], operation: ProviderOperation
     ) -> List[StrategyExecutionResult]:
         """Execute operation using load balancing."""
@@ -422,7 +422,7 @@ class CompositeProviderStrategy(ProviderStrategy):
         selected_strategy_type = self._select_strategy_by_weight(strategies)
         selected_strategy = strategies[selected_strategy_type]
 
-        result = self._execute_single_strategy(selected_strategy_type, selected_strategy, operation)
+        result = await self._execute_single_strategy(selected_strategy_type, selected_strategy, operation)
         return [result]
 
     def _select_strategy_by_weight(self, strategies: Dict[str, ProviderStrategy]) -> str:
@@ -449,7 +449,14 @@ class CompositeProviderStrategy(ProviderStrategy):
 
         return next(iter(strategies.keys()))
 
-    def _execute_single_strategy(
+    def _execute_single_strategy_sync(
+        self, strategy_type: str, strategy: ProviderStrategy, operation: ProviderOperation
+    ) -> StrategyExecutionResult:
+        """Sync wrapper for parallel execution."""
+        import asyncio
+        return asyncio.run(self._execute_single_strategy(strategy_type, strategy, operation))
+
+    async def _execute_single_strategy(
         self,
         strategy_type: str,
         strategy: ProviderStrategy,
@@ -459,7 +466,7 @@ class CompositeProviderStrategy(ProviderStrategy):
         start_time = time.time()
 
         try:
-            result = strategy.execute_operation(operation)
+            result = await strategy.execute_operation(operation)
             execution_time_ms = (time.time() - start_time) * 1000
 
             return StrategyExecutionResult(

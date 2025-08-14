@@ -21,7 +21,7 @@ class ResourceProvisioningPort(ABC):
     """
 
     @abstractmethod
-    def provision_resources(self, request: Request, template: Template) -> str:
+    async def provision_resources(self, request: Request, template: Template) -> str:
         """
         Provision resources based on the request and template.
 

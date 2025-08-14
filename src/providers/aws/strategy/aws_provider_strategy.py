@@ -183,7 +183,7 @@ class AWSProviderStrategy(ProviderStrategy):
             self._logger.error(f"Failed to initialize AWS provider strategy: {e}")
             return False
 
-    def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
+    async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
         """
         Execute a provider operation using AWS services.
 
@@ -212,9 +212,9 @@ class AWSProviderStrategy(ProviderStrategy):
             # Execute operation within appropriate context
             if is_dry_run:
                 with aws_dry_run_context():
-                    result = self._execute_operation_internal(operation)
+                    result = await self._execute_operation_internal(operation)
             else:
-                result = self._execute_operation_internal(operation)
+                result = await self._execute_operation_internal(operation)
 
             # Add execution metadata
             execution_time_ms = int((time.time() - start_time) * 1000)
@@ -247,7 +247,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 },
             )
 
-    def _execute_operation_internal(self, operation: ProviderOperation) -> ProviderResult:
+    async def _execute_operation_internal(self, operation: ProviderOperation) -> ProviderResult:
         """
         Execute operations - separated for dry-run context wrapping.
 
@@ -265,7 +265,7 @@ class AWSProviderStrategy(ProviderStrategy):
         elif operation.operation_type == ProviderOperationType.GET_INSTANCE_STATUS:
             return self._handle_get_instance_status(operation)
         elif operation.operation_type == ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES:
-            return self._handle_describe_resource_instances(operation)
+            return await self._handle_describe_resource_instances(operation)
         elif operation.operation_type == ProviderOperationType.VALIDATE_TEMPLATE:
             return self._handle_validate_template(operation)
         elif operation.operation_type == ProviderOperationType.GET_AVAILABLE_TEMPLATES:
@@ -502,7 +502,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 f"Failed to get available templates: {str(e)}", "GET_TEMPLATES_ERROR"
             )
 
-    def _handle_describe_resource_instances(self, operation: ProviderOperation) -> ProviderResult:
+    async def _handle_describe_resource_instances(self, operation: ProviderOperation) -> ProviderResult:
         """Handle resource-to-instance discovery operation using appropriate handlers."""
         try:
             resource_ids = operation.parameters.get("resource_ids", [])
@@ -546,7 +546,7 @@ class AWSProviderStrategy(ProviderStrategy):
 
             # Use the handler's check_hosts_status method for resource-to-instance
             # discovery
-            instance_details = handler.check_hosts_status(request)
+            instance_details = await handler.check_hosts_status(request)
 
             if not instance_details:
                 self._logger.info(f"No instances found for resources: {resource_ids}")

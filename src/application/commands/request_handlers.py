@@ -359,7 +359,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
             self.logger.debug(f"Available strategies: {available_strategies}")
             self.logger.debug(f"Attempting to use strategy: {strategy_identifier}")
 
-            result = self._provider_context.execute_with_strategy(strategy_identifier, operation)
+            result = await self._provider_context.execute_with_strategy(strategy_identifier, operation)
 
             # Process result using existing pattern
             if result.success:

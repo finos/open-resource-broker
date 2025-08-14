@@ -199,7 +199,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             )
             self.logger.info(f"Operation parameters: {operation.parameters}")
 
-            result = provider_context.execute_with_strategy(strategy_identifier, operation)
+            result = await provider_context.execute_with_strategy(strategy_identifier, operation)
 
             self.logger.info(
                 f"Provider strategy result: success={result.success}, data_keys={list(result.data.keys()) if result.data else 'None'}"
@@ -288,7 +288,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             # Use the correct strategy identifier format:
             # provider_type-provider_type-instance
             strategy_identifier = f"{request.provider_type}-{request.provider_type}-{request.provider_instance or 'default'}"
-            result = provider_context.execute_with_strategy(strategy_identifier, operation)
+            result = await provider_context.execute_with_strategy(strategy_identifier, operation)
 
             if not result.success:
                 self.logger.warning(f"Failed to check resource status: {result.error_message}")

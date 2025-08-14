@@ -158,7 +158,7 @@ class ConvertMachineStatusCommandHandler(
         )
 
         # Execute operation (this would be extended to support status conversion)
-        result = self._provider_context.execute_operation(operation)
+        result = await self._provider_context.execute_operation(operation)
 
         if result.success:
             # Extract status from result (implementation depends on provider strategy)

@@ -44,7 +44,7 @@ Usage Example:
         parameters={'count': 5, 'template_id': 'web-server'}
     )
 
-    result = context.execute_operation(operation)
+    result = await context.execute_operation(operation)
 """
 
 # Advanced strategy patterns

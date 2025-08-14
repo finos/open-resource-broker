@@ -225,7 +225,7 @@ class ProviderContext:
             self._logger.info(f"Set active strategy to: {strategy_type}")
             return True
 
-    def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
+    async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
         """
         Execute an operation using the current strategy.
 
@@ -267,7 +267,7 @@ class ProviderContext:
                 )
 
             # Execute the operation
-            result = self._current_strategy.execute_operation(operation)
+            result = await self._current_strategy.execute_operation(operation)
 
             # Record metrics
             response_time_ms = (time.time() - start_time) * 1000
@@ -296,7 +296,7 @@ class ProviderContext:
                 f"Operation execution failed: {str(e)}", "EXECUTION_ERROR"
             )
 
-    def execute_with_strategy(
+    async def execute_with_strategy(
         self, strategy_type: str, operation: ProviderOperation
     ) -> ProviderResult:
         """
@@ -347,7 +347,7 @@ class ProviderContext:
                 )
 
             # Execute the operation
-            result = strategy.execute_operation(operation)
+            result = await strategy.execute_operation(operation)
 
             # Record metrics
             response_time_ms = (time.time() - start_time) * 1000

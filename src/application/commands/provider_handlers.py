@@ -140,7 +140,7 @@ class ExecuteProviderOperationHandler(
                 )
             else:
                 # Use context's strategy selection
-                result = self._provider_context.execute_operation(operation)
+                result = await self._provider_context.execute_operation(operation)
 
             execution_time = (time.time() - start_time) * 1000  # Convert to milliseconds
 
