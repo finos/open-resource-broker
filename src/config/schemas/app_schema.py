@@ -62,11 +62,8 @@ class AppConfig(BaseModel):
     def get_config_file_path(self) -> str:
         """Build full config file path using scheduler + provider type."""
         config_root = self.scheduler.get_config_root()
-        # Get provider type from active providers
-        active_providers = self.provider.get_active_providers()
-        if not active_providers:
-            raise ValueError("No active providers found")
-        provider_type = active_providers[0].type
+        # Get provider type using proper selection logic
+        provider_type = self._get_selected_provider_type()
         # Generate provider-specific config file name
         config_file = f"{provider_type}prov_config.json"
         return os.path.join(config_root, config_file)
@@ -74,14 +71,32 @@ class AppConfig(BaseModel):
     def get_templates_file_path(self) -> str:
         """Build full templates file path using scheduler + provider type."""
         config_root = self.scheduler.get_config_root()
-        # Get provider type from active providers
-        active_providers = self.provider.get_active_providers()
-        if not active_providers:
-            raise ValueError("No active providers found")
-        provider_type = active_providers[0].type
+        # Get provider type using proper selection logic
+        provider_type = self._get_selected_provider_type()
         # Generate provider-specific templates file name
         templates_file = f"{provider_type}prov_templates.json"
         return os.path.join(config_root, templates_file)
+    
+    def _get_selected_provider_type(self) -> str:
+        """Get provider type using proper selection logic."""
+        try:
+            # Use provider selection service for proper provider selection
+            from src.application.services.provider_selection_service import ProviderSelectionService
+            from src.config.manager import ConfigurationManager
+            from src.infrastructure.adapters.logging_adapter import LoggingAdapter
+            
+            config_manager = ConfigurationManager()
+            logger = LoggingAdapter("app_schema")
+            selection_service = ProviderSelectionService(config_manager, logger)
+            
+            selection_result = selection_service.select_active_provider()
+            return selection_result.provider_type
+        except Exception:
+            # Fallback to first active provider for backward compatibility
+            active_providers = self.provider.get_active_providers()
+            if active_providers:
+                return active_providers[0].type
+            return "aws"  # Ultimate fallback
 
     @field_validator("environment")
     @classmethod

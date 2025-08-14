@@ -115,6 +115,47 @@ class ProviderSelectionService:
         # Strategy 4: Fallback to default
         return self._select_default_provider(template)
 
+    def select_active_provider(self) -> ProviderSelectionResult:
+        """
+        Select active provider based on selection policy (non-template specific).
+        
+        This method implements general provider selection for scenarios where
+        no template context is available (e.g., configuration loading, file paths).
+        
+        Returns:
+            ProviderSelectionResult with selected provider and reasoning
+            
+        Raises:
+            ValueError: If no suitable provider can be found
+        """
+        self._logger.debug("Selecting active provider using selection policy")
+        
+        # Get active providers based on selection policy
+        active_providers = self._provider_config.get_active_providers()
+        if not active_providers:
+            raise ValueError("No active providers found in configuration")
+        
+        # Apply selection policy for multi-provider scenarios
+        if len(active_providers) == 1:
+            selected = active_providers[0]
+            reason = "single_active_provider"
+        else:
+            # Use load balancing strategy for multiple providers
+            selected = self._apply_load_balancing_strategy(
+                active_providers, self._provider_config.selection_policy
+            )
+            reason = f"load_balanced_{self._provider_config.selection_policy.lower()}"
+        
+        self._logger.info(f"Selected active provider: {selected.name} ({reason})")
+        
+        return ProviderSelectionResult(
+            provider_type=selected.type,
+            provider_instance=selected.name,
+            selection_reason=reason,
+            confidence=1.0,
+            alternatives=[p.name for p in active_providers if p.name != selected.name]
+        )
+
     def _select_explicit_provider(self, template: Template) -> ProviderSelectionResult:
         """Select explicitly specified provider instance."""
         provider_name = template.provider_name

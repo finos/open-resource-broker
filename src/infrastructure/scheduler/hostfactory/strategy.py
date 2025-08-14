@@ -32,23 +32,26 @@ class HostFactorySchedulerStrategy(SchedulerPort):
         self.config_manager = config_manager
         self._logger = logger
         self.template_defaults_service = template_defaults_service
+        
+        # Initialize provider selection service for proper provider selection
+        from src.application.services.provider_selection_service import ProviderSelectionService
+        self._provider_selection_service = ProviderSelectionService(
+            config_manager, logger
+        )
 
     def get_templates_file_path(self) -> str:
         """Get the templates file path for HostFactory."""
-        provider_config = self.config_manager.get_provider_config()
-        if not provider_config:
-            raise ConfigurationError("Provider configuration not found")
-
-        # Get active providers using the canonical method
-        active_providers = provider_config.get_active_providers()
-        if not active_providers:
-            raise ConfigurationError("No active providers found in configuration")
-
-        # Use the first active provider's type
-        provider_type = active_providers[0].type
-        templates_file = f"{provider_type}prov_templates.json"
-
-        return self.config_manager.resolve_file("template", templates_file)
+        try:
+            # Use provider selection service for proper provider selection
+            selection_result = self._provider_selection_service.select_active_provider()
+            provider_type = selection_result.provider_type
+            templates_file = f"{provider_type}prov_templates.json"
+            
+            return self.config_manager.resolve_file("template", templates_file)
+        except Exception as e:
+            self._logger.error(f"Failed to determine templates file path: {e}")
+            # Fallback to aws for backward compatibility
+            return self.config_manager.resolve_file("template", "awsprov_templates.json")
 
     def get_template_paths(self) -> List[str]:
         """Get template file paths."""
@@ -175,15 +178,9 @@ class HostFactorySchedulerStrategy(SchedulerPort):
     def _get_active_provider_type(self) -> str:
         """Get the active provider type from configuration."""
         try:
-            provider_config = self.config_manager.get_provider_config()
-            if not provider_config:
-                raise ConfigurationError("Provider configuration not found")
-
-            active_providers = provider_config.get_active_providers()
-            if not active_providers:
-                raise ConfigurationError("No active providers found")
-
-            provider_type = active_providers[0].type
+            # Use provider selection service for proper provider selection
+            selection_result = self._provider_selection_service.select_active_provider()
+            provider_type = selection_result.provider_type
             self._logger.debug(f"Active provider type: {provider_type}")
             return provider_type
         except Exception as e:

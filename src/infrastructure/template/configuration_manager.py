@@ -208,15 +208,25 @@ class TemplateConfigurationManager:
         if "provider_name" in template_dict:
             return template_dict["provider_name"]
 
-        # 2. Use active provider from configuration
+        # 2. Use active provider from configuration with proper selection logic
         try:
-            provider_config = self.config_manager.get_provider_config()
-            if provider_config:
-                active_providers = provider_config.get_active_providers()
-                if active_providers:
-                    return active_providers[0].name
+            from src.application.services.provider_selection_service import ProviderSelectionService
+            
+            selection_service = ProviderSelectionService(self.config_manager, self.logger)
+            selection_result = selection_service.select_active_provider()
+            return selection_result.provider_instance
         except Exception as e:
-            self.logger.debug(f"Could not determine provider instance: {e}")
+            self.logger.debug(f"Could not determine provider instance via selection service: {e}")
+            
+            # Fallback: try direct provider config access
+            try:
+                provider_config = self.config_manager.get_provider_config()
+                if provider_config:
+                    active_providers = provider_config.get_active_providers()
+                    if active_providers:
+                        return active_providers[0].name
+            except Exception as e2:
+                self.logger.debug(f"Could not determine provider instance via direct access: {e2}")
 
         # 3. Fallback to default
         return "aws"
