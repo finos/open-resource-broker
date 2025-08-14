@@ -265,7 +265,7 @@ class CircuitBreakerStrategy(RetryStrategy):
 
         elif (
             current_state == CircuitState.HALF_OPEN
-        ):  # noqa: SIM102 (false positive - proper if-elif structure)
+        ):  # noqa: SIM102 (false positive - if-elif structure)
             # Check if we should timeout back to open
             if (
                 circuit_state["half_open_start_time"]

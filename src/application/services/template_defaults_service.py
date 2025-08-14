@@ -292,7 +292,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         }
 
         try:
-            # Check if defaults are properly configured
+            # Check if defaults are correctly configured
             effective_defaults = self.get_effective_template_defaults(provider_instance_name)
 
             # Validate essential fields have defaults

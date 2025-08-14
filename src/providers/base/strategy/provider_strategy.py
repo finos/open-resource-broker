@@ -242,7 +242,7 @@ class ProviderStrategy(ABC):
         Clean up resources used by the strategy.
 
         This method should be called when the strategy is no longer needed
-        to ensure proper resource cleanup (connections, handles, etc.).
+        to ensure resource cleanup (connections, handles, etc.).
         Default implementation does nothing - override if cleanup is needed.
         """
 

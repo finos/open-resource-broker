@@ -45,7 +45,7 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[Dict[str, Any], RequestStatusRe
             metrics: Optional metrics collector
             max_retries: Maximum number of retries for failed requests
         """
-        # Initialize with proper dependencies
+        # Initialize with required dependencies
         super().__init__(logger, error_handler)
         self._query_bus = query_bus
         self._command_bus = command_bus

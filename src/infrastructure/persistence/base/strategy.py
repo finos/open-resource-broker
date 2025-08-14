@@ -20,7 +20,7 @@ class StorageStrategy(StoragePort[T], ABC, Generic[T]):
         Clean up resources used by the storage strategy.
 
         This method should be called when the storage strategy is no longer needed
-        to ensure proper resource cleanup (connections, file handles, etc.).
+        to ensure resource cleanup (connections, file handles, etc.).
 
         Raises:
             PersistenceError: If there's an error cleaning up resources

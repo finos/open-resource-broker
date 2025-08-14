@@ -70,13 +70,13 @@ def create_dynamodb_config(data: Dict[str, Any]) -> Any:
 
 def create_dynamodb_unit_of_work(config: Any) -> Any:
     """
-    Create DynamoDB unit of work with proper configuration extraction.
+    Create DynamoDB unit of work with correct configuration extraction.
 
     Args:
         config: Configuration object (ConfigurationManager or dict)
 
     Returns:
-        DynamoDBUnitOfWork instance with properly configured AWS client
+        DynamoDBUnitOfWork instance with correctly configured AWS client
     """
     import boto3
 

@@ -354,7 +354,7 @@ class ProviderStrategyFactory:
                     )
             elif (
                 mode == ProviderMode.MULTI
-            ):  # noqa: SIM102 (false positive - proper if-elif structure)
+            ):  # noqa: SIM102 (false positive - if-elif structure)
                 if len(active_providers) < 2:
                     validation_result["errors"].append(
                         "Multi-provider mode requires at least 2 active providers"

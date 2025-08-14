@@ -33,6 +33,6 @@ Usage:
     >>> python run.py requestMachines --data '{"template_id": "basic", "machine_count": 2}'
 
 Note:
-    This plugin requires proper configuration of cloud provider credentials
+    This plugin requires correct configuration of cloud provider credentials
     and Symphony Host Factory environment variables.
 """

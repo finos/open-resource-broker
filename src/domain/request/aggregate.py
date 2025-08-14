@@ -313,7 +313,7 @@ class Request(AggregateRoot):
         metadata: Optional[Dict[str, Any]] = None,
     ) -> "Request":
         """
-        Create a new request with proper domain event generation.
+        Create a new request with domain event generation.
 
         Args:
             request_type: Type of request (CREATE, TERMINATE, etc.)

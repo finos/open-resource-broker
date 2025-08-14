@@ -2,7 +2,7 @@
 Event Bus - CQRS-aligned event dispatching system.
 
 This EventBus follows the same architectural patterns as CommandBus and QueryBus,
-providing consistent event handling with proper dependency injection, error handling,
+providing consistent event handling with dependency injection, error handling,
 and middleware support.
 """
 

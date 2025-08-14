@@ -44,7 +44,7 @@ class RequestReturnMachinesRESTHandler(
             error_handler: Error handling port for exception management
             metrics: Optional metrics collector
         """
-        # Initialize with proper dependencies
+        # Initialize with required dependencies
         super().__init__(logger, error_handler)
         self._query_bus = query_bus
         self._command_bus = command_bus

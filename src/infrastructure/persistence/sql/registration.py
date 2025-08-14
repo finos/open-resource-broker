@@ -84,13 +84,13 @@ def _build_connection_string(sql_config: Any) -> str:
 
 def create_sql_unit_of_work(config: Any) -> Any:
     """
-    Create SQL unit of work with proper configuration extraction.
+    Create SQL unit of work with correct configuration extraction.
 
     Args:
         config: Configuration object (ConfigurationManager or dict)
 
     Returns:
-        SQLUnitOfWork instance with properly configured engine
+        SQLUnitOfWork instance with correctly configured engine
     """
     from sqlalchemy import create_engine
 

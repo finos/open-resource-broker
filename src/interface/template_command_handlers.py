@@ -1,7 +1,7 @@
 """Template command handlers for CLI interface.
 
 This module provides the interface layer handlers for template operations,
-using proper CQRS buses for architectural consistency.
+using CQRS buses for architectural consistency.
 
 Updated to use CommandBus and QueryBus instead of direct handler calls,
 following the same pattern as other entities in the system.

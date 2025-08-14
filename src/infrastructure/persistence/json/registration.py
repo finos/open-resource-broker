@@ -60,13 +60,13 @@ def create_json_config(data: Dict[str, Any]) -> Any:
 
 def create_json_unit_of_work(config: Any) -> Any:
     """
-    Create JSON unit of work with proper configuration extraction.
+    Create JSON unit of work with correct configuration extraction.
 
     Args:
         config: Configuration object (ConfigurationManager or dict)
 
     Returns:
-        JSONUnitOfWork instance with properly extracted configuration
+        JSONUnitOfWork instance with correctly extracted configuration
     """
     from src.config.manager import ConfigurationManager
     from src.config.schemas.storage_schema import StorageConfig

@@ -189,7 +189,7 @@ class TemplateSerializer:
 
             self.logger.debug(f"Converted template_data keys: {list(template_data.keys())}")
 
-            # Create template using model_validate to handle all fields properly
+            # Create template using model_validate to handle all fields correctly
             template = Template.model_validate(template_data)
 
             return template

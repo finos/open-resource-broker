@@ -108,7 +108,7 @@ class ConfigurationLoader:
     @classmethod
     def load(cls, config_path: Optional[str] = None) -> Dict[str, Any]:
         """
-        Load configuration from multiple sources with proper precedence.
+        Load configuration from multiple sources with correct precedence.
 
         Precedence order (highest to lowest):
         1. Environment variables (highest precedence)
@@ -130,7 +130,7 @@ class ConfigurationLoader:
         # Start with default configuration (lowest precedence)
         config = cls._load_default_config()
 
-        # Load main config.json with proper precedence (HF_PROVIDER_CONFDIR first,
+        # Load main config.json with correct precedence (HF_PROVIDER_CONFDIR first,
         # then config/)
         main_config = cls._load_config_file("conf", "config.json", required=False)
         if main_config:

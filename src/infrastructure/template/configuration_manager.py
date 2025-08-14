@@ -636,7 +636,7 @@ def create_template_configuration_manager(
     Create TemplateConfigurationManager.
 
     This function provides a clean way to create the manager with
-    proper dependency injection.
+    dependency injection.
     """
     return TemplateConfigurationManager(
         config_manager=config_manager,

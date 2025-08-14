@@ -1,8 +1,8 @@
-"""Pure domain decorators using proper DI and ports pattern.
+"""Pure domain decorators using DI and ports pattern.
 
 This module provides domain-layer decorators that maintain clean architecture
 by using domain ports for dependency injection, avoiding direct infrastructure
-dependencies and maintaining proper dependency direction.
+dependencies and maintaining correct dependency direction.
 """
 
 from functools import wraps
@@ -92,7 +92,7 @@ def handle_domain_exceptions(context: str):
             error_handler = get_error_handling_port()
 
             if error_handler:
-                # Use proper infrastructure error handling through domain ports
+                # Use infrastructure error handling through domain ports
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:

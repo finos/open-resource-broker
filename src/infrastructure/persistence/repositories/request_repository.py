@@ -123,7 +123,7 @@ class RequestSerializer:
                 "version": data.get("version", 0),
             }
 
-            # Create request using model_validate to handle all fields properly
+            # Create request using model_validate to handle all fields correctly
             request = Request.model_validate(request_data)
 
             return request

@@ -7,7 +7,7 @@ while maintaining full compatibility with the existing CQRS architecture.
 Key Features:
 - Automatic handler discovery from existing CQRS handlers
 - Zero code duplication - reuses all existing DTOs and domain objects
-- Clean Architecture compliance with proper layer separation
+- Clean Architecture compliance with layer separation
 - Dependency injection integration
 - Async/await support throughout
 

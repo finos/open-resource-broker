@@ -86,6 +86,7 @@ UNPROFESSIONAL_PATTERNS = {
 HYPERBOLIC_PATTERNS = {
     re.compile(r"\benhanced\b", re.IGNORECASE): 'Use "improved" only when factually accurate',
     re.compile(r"\bunified\b", re.IGNORECASE): 'Use "integrated" or "consolidated"',
+    re.compile(r"\bproper\b(?!\s*(?:ty|ties))", re.IGNORECASE): 'Use specific terms: "correct", "appropriate", "compliant", "structured", "domain-driven"',
     re.compile(r"\bmodern\b", re.IGNORECASE): 'Use "current" or "updated"',
     re.compile(r"\bcutting-edge\b", re.IGNORECASE): 'Use "current industry standard"',
     re.compile(r"\brevolutionary\b", re.IGNORECASE): 'Use "significant improvement"',

@@ -2,7 +2,7 @@
 Base Event Handler - Template Method Pattern for event processing.
 
 This follows the same architectural patterns as CommandHandler and QueryHandler
-in the CQRS system, providing consistent event handling with proper separation
+in the CQRS system, providing consistent event handling with clear separation
 of concerns and DRY compliance.
 """
 

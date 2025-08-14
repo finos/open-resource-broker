@@ -51,7 +51,7 @@ def _register_fastapi_services(container: DIContainer, server_config: ServerConf
 
 
 def _register_api_handlers(container: DIContainer) -> None:
-    """Register API handlers with proper dependency injection."""
+    """Register API handlers with dependency injection."""
     try:
         # Register template handler with constructor injection
         from src.api.handlers.get_available_templates_handler import (

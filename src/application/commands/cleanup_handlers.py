@@ -1,4 +1,4 @@
-"""Domain cleanup command handlers following proper CQRS pattern."""
+"""Domain cleanup command handlers following CQRS pattern."""
 
 from __future__ import annotations
 

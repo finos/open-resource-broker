@@ -49,7 +49,7 @@ class BaseHandler(ABC):
         self, operation: Callable[[], Any], context: str = ""
     ) -> Any:
         """
-        Execute operation with proper error handling using ErrorHandlingPort.
+        Execute operation with structured error handling using ErrorHandlingPort.
 
         This method provides consistent error handling across all handlers
         using the injected ErrorHandlingPort, maintaining Clean Architecture

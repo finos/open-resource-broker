@@ -47,7 +47,7 @@ class GetReturnRequestsRESTHandler(BaseAPIHandler[Dict[str, Any], ReturnRequestR
             metrics: Optional metrics collector
             cache_duration: Cache duration in seconds
         """
-        # Initialize with proper dependencies
+        # Initialize with required dependencies
         super().__init__(logger, error_handler)
         self._query_bus = query_bus
         self._command_bus = command_bus

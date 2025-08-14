@@ -67,7 +67,7 @@ def handle_exceptions(
                     # Handle exception
                     handled_exception = exception_handler.handle(e, exc_context)
 
-                    # Re-raise with proper context chain
+                    # Re-raise with context chain
                     raise handled_exception from e
 
             return async_wrapper
@@ -91,7 +91,7 @@ def handle_exceptions(
                     # Handle exception
                     handled_exception = exception_handler.handle(e, exc_context)
 
-                    # Re-raise with proper context chain
+                    # Re-raise with context chain
                     raise handled_exception from e
 
             return sync_wrapper
@@ -148,7 +148,7 @@ def handle_infrastructure_exceptions(
     Specialized decorator for infrastructure layer exception handling.
 
     This decorator is optimized for infrastructure operations and
-    ensures proper wrapping of technical exceptions.
+    ensures structured wrapping of technical exceptions.
 
     Args:
         context: Infrastructure operation context
@@ -201,7 +201,7 @@ def handle_interface_exceptions(
     Specialized decorator for interface layer exception handling.
 
     This decorator is optimized for interface operations (API, CLI, etc.)
-    and ensures proper error responses.
+    and ensures structured error responses.
 
     Args:
         context: Interface operation context
@@ -302,7 +302,7 @@ def handle_rest_exceptions(
     Specialized decorator for REST API exception handling.
 
     This decorator is optimized for REST endpoint operations and
-    ensures proper HTTP status code mapping and response formatting.
+    ensures HTTP status code mapping and response formatting.
 
     Args:
         endpoint: REST endpoint path (e.g., "/api/v1/templates")

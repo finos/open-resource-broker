@@ -40,7 +40,7 @@ class LifecycleManager:
 
     This class provides centralized management of component initialization
     and cleanup. Components implementing the Lifecycle interface can be
-    registered with the manager, which will ensure they are properly
+    registered with the manager, which will ensure they are correctly
     initialized during application startup and cleaned up during shutdown.
 
     The manager maintains a list of registered components and initializes

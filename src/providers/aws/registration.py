@@ -336,7 +336,7 @@ def register_aws_extensions(logger: Optional["LoggingPort"] = None) -> None:
 
         if logger:
             logger.debug("AWS template extensions registered successfully")
-        # Remove print statement - should use proper logging
+        # Remove print statement - should use structured logging
 
     except Exception as e:
         error_msg = f"Failed to register AWS template extensions: {e}"
@@ -418,7 +418,7 @@ def initialize_aws_provider(
 
 
 def is_aws_provider_registered() -> bool:
-    """Check if AWS provider is properly registered.
+    """Check if AWS provider is correctly registered.
 
     Returns:
         True if AWS extensions are registered

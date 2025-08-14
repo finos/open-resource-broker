@@ -3,7 +3,7 @@ Integrated AWS Handler Base Class following Clean Architecture and CQRS patterns
 
 This module provides a integrated base handler that combines the best features of both
 AWSHandler and BaseAWSHandler patterns while maintaining clean architecture principles
-and proper integration with our DI/CQRS system.
+and clean integration with our DI/CQRS system.
 """
 
 from abc import ABC, abstractmethod
@@ -39,7 +39,7 @@ class AWSHandler(ABC):
     This class provides the foundation for all AWS handlers in the system,
     combining the best features of both synchronous and asynchronous patterns:
 
-    - Clean Architecture compliance with proper dependency injection
+    - Clean Architecture compliance with dependency injection
     - CQRS-aligned error handling and logging
     - Professional retry logic with circuit breaker support
     - Performance monitoring and metrics collection

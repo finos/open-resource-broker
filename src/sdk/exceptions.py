@@ -2,7 +2,7 @@
 SDK-specific exceptions following existing error handling patterns.
 
 Follows the same patterns as domain and infrastructure exceptions
-for consistency and proper error handling throughout the system.
+for consistency and structured error handling throughout the system.
 """
 
 from typing import Any, Dict, Optional

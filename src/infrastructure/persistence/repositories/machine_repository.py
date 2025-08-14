@@ -118,7 +118,7 @@ class MachineSerializer:
                 "updated_at": updated_at,
             }
 
-            # Create machine using model_validate to handle all fields properly
+            # Create machine using model_validate to handle all fields correctly
             machine = Machine.model_validate(machine_data)
 
             return machine

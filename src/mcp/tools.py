@@ -17,7 +17,7 @@ class OpenHFPluginMCPTools:
     MCP tools for direct AI assistant integration.
 
     Provides all SDK methods as MCP tools with automatic discovery
-    and proper error handling for AI assistant consumption.
+    and structured error handling for AI assistant consumption.
     """
 
     def __init__(self, sdk: Optional[OpenHFPluginSDK] = None, **sdk_kwargs):

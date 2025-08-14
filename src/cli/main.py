@@ -730,7 +730,7 @@ async def main() -> None:
                 print(generate_zsh_completion())  # noqa: CLI output
             return
 
-        # Configure logging - let the application's proper logging system handle
+        # Configure logging - let the application's structured logging system handle
         # everything
         getattr(logging, args.log_level.upper())
 

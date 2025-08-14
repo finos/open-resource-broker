@@ -162,7 +162,7 @@ class HandlerDiscoveryService:
         for query_type, handler_class in query_handlers.items():
             try:
                 # Register handler class for DI container to create instances with
-                # proper dependency injection
+                # dependency injection
                 self.container.register_singleton(handler_class)
                 logger.debug(
                     f"Registered query handler: { handler_class.__name__} for { query_type.__name__}"
@@ -175,7 +175,7 @@ class HandlerDiscoveryService:
         for command_type, handler_class in command_handlers.items():
             try:
                 # Register handler class for DI container to create instances with
-                # proper dependency injection
+                # dependency injection
                 self.container.register_singleton(handler_class)
                 logger.debug(
                     f"Registered command handler: { handler_class.__name__} for { command_type.__name__}"
