@@ -13,6 +13,9 @@ from src.config.schemas.provider_strategy_schema import ProviderInstanceConfig
 from src.domain.base.dependency_injection import injectable
 from src.domain.base.ports import LoggingPort
 from src.domain.template.aggregate import Template
+
+# Global cache for provider selection results
+_GLOBAL_PROVIDER_CACHE: Optional["ProviderSelectionResult"] = None
 from src.infrastructure.registry.provider_registry import ProviderRegistry
 
 
@@ -124,7 +127,7 @@ class ProviderSelectionService:
         
         This method implements general provider selection for scenarios where
         no template context is available (e.g., configuration loading, file paths).
-        Results are cached to avoid multiple selections.
+        Results are cached globally to avoid multiple selections across service instances.
         
         Returns:
             ProviderSelectionResult with selected provider and reasoning
@@ -132,7 +135,13 @@ class ProviderSelectionService:
         Raises:
             ValueError: If no suitable provider can be found
         """
-        # Return cached result if available
+        global _GLOBAL_PROVIDER_CACHE
+        
+        # Return global cached result if available
+        if _GLOBAL_PROVIDER_CACHE is not None:
+            return _GLOBAL_PROVIDER_CACHE
+            
+        # Return instance cached result if available
         if self._active_provider_cache is not None:
             return self._active_provider_cache
             
@@ -162,7 +171,8 @@ class ProviderSelectionService:
             alternatives=[p.name for p in active_providers if p.name != selected.name]
         )
         
-        # Cache the result
+        # Cache the result both globally and locally
+        _GLOBAL_PROVIDER_CACHE = result
         self._active_provider_cache = result
         
         self._logger.info(f"Selected active provider: {selected.name} ({reason})")

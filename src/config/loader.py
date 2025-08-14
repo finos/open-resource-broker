@@ -134,7 +134,19 @@ class ConfigurationLoader:
         # then config/)
         main_config = cls._load_config_file("conf", "config.json", required=False)
         if main_config:
-            cls._merge_config(config, main_config)
+            # Handle schema differences: main config may have 'providers' at root level
+            # while default config has 'provider.providers'
+            if 'providers' in main_config and 'provider' not in main_config:
+                # Normalize main config to match default config structure
+                normalized_main_config = main_config.copy()
+                normalized_main_config['provider'] = {
+                    'providers': main_config['providers']
+                }
+                # Remove the root-level 'providers' to avoid duplication
+                del normalized_main_config['providers']
+                cls._merge_config(config, normalized_main_config)
+            else:
+                cls._merge_config(config, main_config)
             get_config_logger().info("Loaded main configuration")
 
         # Load explicit configuration file if provided (higher precedence)
@@ -554,6 +566,8 @@ class ConfigurationLoader:
     def _merge_config(cls, base: Dict[str, Any], update: Dict[str, Any]) -> None:
         """
         Merge update configuration into base configuration.
+        
+        Arrays are replaced entirely, not merged element by element.
 
         Args:
             base: Base configuration to update
@@ -561,8 +575,10 @@ class ConfigurationLoader:
         """
         for key, value in update.items():
             if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+                # Deep merge for dictionaries
                 cls._merge_config(base[key], value)
             else:
+                # Replace for all other types (including arrays)
                 base[key] = value
 
     @classmethod
