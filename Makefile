@@ -572,7 +572,7 @@ ci-security-semgrep:  ## Run Semgrep static analysis
 ci-security-trivy-fs:  ## Run Trivy filesystem scan
 	@echo "Running Trivy filesystem scan..."
 	@if command -v trivy >/dev/null 2>&1; then \
-		trivy fs --format sarif --output trivy-fs-results.sarif . || echo "Trivy filesystem issues found"; \
+		trivy fs --skip-dirs .venv --format sarif --output trivy-fs-results.sarif . || echo "Trivy filesystem issues found"; \
 	else \
 		echo "Trivy not available - install from https://aquasecurity.github.io/trivy/"; \
 	fi

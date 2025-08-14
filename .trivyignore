@@ -1,0 +1,18 @@
+# Trivy ignore file for security scanning exceptions
+
+# Moto testing library certificates - these are test certificates for AWS mocking
+# Not actual private keys used in production
+**/.venv/lib/python*/site-packages/moto/moto_proxy/ca.key
+**/.venv/lib/python*/site-packages/moto/moto_proxy/cert.key
+.venv/lib/python*/site-packages/moto/moto_proxy/ca.key
+.venv/lib/python*/site-packages/moto/moto_proxy/cert.key
+
+# Development and test dependencies should not be scanned in production
+.venv/**
+__pycache__/**
+*.pyc
+.pytest_cache/**
+.coverage
+htmlcov/**
+.tox/**
+.mypy_cache/**

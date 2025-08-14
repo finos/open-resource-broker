@@ -21,6 +21,7 @@ async def handle_serve_api(args) -> Dict[str, Any]:
     logger = get_logger(__name__)
 
     # Extract parameters from args
+    # nosec B104: Intentional binding for server deployment
     host = getattr(args, "host", "0.0.0.0")
     port = getattr(args, "port", 8000)
     workers = getattr(args, "workers", 1)

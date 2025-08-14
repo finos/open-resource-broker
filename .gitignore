@@ -202,3 +202,9 @@ Thumbs.db
 local_settings.py
 instance/
 .webassets-cache
+
+# Security scan results
+bandit-results*.json
+trivy-*.sarif
+semgrep-results.json
+safety-results.json
