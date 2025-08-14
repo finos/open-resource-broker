@@ -23,7 +23,6 @@ from .provider_strategy_schema import (
     CircuitBreakerConfig as StrategyCircuitBreakerConfig,
 )
 from .provider_strategy_schema import (
-    ExtendedProviderConfig,
     HealthCheckConfig,
     ProviderConfig,
     ProviderInstanceConfig,
@@ -51,7 +50,6 @@ __all__ = [
     "ProviderMode",
     "HealthCheckConfig",
     "StrategyCircuitBreakerConfig",
-    "ExtendedProviderConfig",
     # Template configuration
     "TemplateConfig",
     # Storage configurations

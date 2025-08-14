@@ -6,6 +6,7 @@ This module provides registration functions for different scheduler strategies:
 - Strategy factory functions with dependency injection
 - Registry management for scheduler types
 """
+
 from typing import TYPE_CHECKING, Any, Dict
 
 from src.domain.base.ports.configuration_port import ConfigurationPort
