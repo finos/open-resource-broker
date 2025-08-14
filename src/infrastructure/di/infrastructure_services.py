@@ -47,9 +47,6 @@ def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
     try:
         from src.config.manager import ConfigurationManager
         from src.domain.template.extensions import TemplateExtensionRegistry
-        from src.providers.aws.configuration.template_extension import (
-            AWSTemplateExtensionConfig,
-        )
 
         config_manager = container.get(ConfigurationManager)
         logger = get_logger(__name__)
@@ -69,12 +66,14 @@ def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
                 and "aws" in provider_config.provider_defaults
             ):
                 aws_defaults = provider_config.provider_defaults["aws"]
-                if hasattr(aws_defaults, "extensions") and aws_defaults.extensions:
-                    # Create AWS extension config from provider defaults
-                    aws_extension_config = AWSTemplateExtensionConfig(**aws_defaults.extensions)
+                if hasattr(aws_defaults, "extensions"):
+                    # Create AWS extension config from provider defaults using registry
+                    aws_extension_config = TemplateExtensionRegistry.create_extension_config(
+                        "aws", aws_defaults.extensions or {}
+                    )
 
                     # Check if AMI resolution is enabled
-                    if aws_extension_config.ami_resolution.enabled:
+                    if aws_extension_config and aws_extension_config.ami_resolution.enabled:
                         container.register_singleton(CachingAMIResolver)
                         # Register interface to resolve to concrete implementation
                         from src.domain.base.ports.template_resolver_port import (
@@ -92,16 +91,17 @@ def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
             # Fallback: check if any AWS provider instances have AMI resolution enabled
             if hasattr(provider_config, "providers"):
                 for provider in provider_config.providers:
-                    if (
-                        provider.type == "aws"
-                        and hasattr(provider, "extensions")
-                        and provider.extensions
-                    ):
+                    if provider.type == "aws" and hasattr(provider, "extensions"):
                         try:
-                            instance_extension_config = AWSTemplateExtensionConfig(
-                                **provider.extensions
+                            instance_extension_config = (
+                                TemplateExtensionRegistry.create_extension_config(
+                                    "aws", provider.extensions or {}
+                                )
                             )
-                            if instance_extension_config.ami_resolution.enabled:
+                            if (
+                                instance_extension_config
+                                and instance_extension_config.ami_resolution.enabled
+                            ):
                                 container.register_singleton(CachingAMIResolver)
                                 # Register interface to resolve to concrete
                                 # implementation
@@ -123,8 +123,8 @@ def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
                             )
 
             # Default: register with default AWS extension config
-            default_aws_config = AWSTemplateExtensionConfig()
-            if default_aws_config.ami_resolution.enabled:
+            default_aws_config = TemplateExtensionRegistry.create_extension_config("aws", {})
+            if default_aws_config and default_aws_config.ami_resolution.enabled:
                 container.register_singleton(CachingAMIResolver)
                 # Register interface to resolve to concrete implementation
                 from src.domain.base.ports.template_resolver_port import (
