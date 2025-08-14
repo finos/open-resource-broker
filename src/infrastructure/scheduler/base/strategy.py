@@ -4,8 +4,8 @@ This module provides the base abstract class for all scheduler strategies,
 ensuring consistent interface implementation across different scheduler types.
 """
 
-from abc import ABC, abstractmethod
-from typing import Any, Dict, List
+from abc import ABC
+from typing import Any
 
 from src.domain.base.ports.scheduler_port import SchedulerPort
 
@@ -15,6 +15,8 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
 
     This abstract base class defines the common interface and behavior
     that all scheduler strategy implementations must provide.
+
+    Inherits from SchedulerPort which defines all the required abstract methods.
     """
 
     def __init__(self, config_manager: Any, logger: Any):
@@ -26,23 +28,3 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
         """
         self.config_manager = config_manager
         self.logger = logger
-
-    @abstractmethod
-    def get_templates(self) -> List[Dict[str, Any]]:
-        """Get available templates from the scheduler.
-
-        Returns:
-            List of template dictionaries
-        """
-
-    @abstractmethod
-    def format_output(self, data: Any, output_format: str = "json") -> str:
-        """Format output data for the scheduler.
-
-        Args:
-            data: Data to format
-            output_format: Desired output format
-
-        Returns:
-            Formatted output string
-        """
