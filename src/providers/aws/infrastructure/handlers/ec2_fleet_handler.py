@@ -35,10 +35,10 @@ from src.application.dto.queries import GetTemplateQuery
 from src.domain.base.dependency_injection import injectable
 from src.domain.base.ports import LoggingPort
 from src.domain.request.aggregate import Request
+from src.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from src.infrastructure.di.buses import QueryBus
 from src.infrastructure.di.container import get_container
 from src.infrastructure.error.decorators import handle_infrastructure_exceptions
-from src.infrastructure.ports.request_adapter_port import RequestAdapterPort
 from src.infrastructure.resilience import CircuitBreakerOpenError
 from src.providers.aws.domain.template.aggregate import AWSTemplate
 from src.providers.aws.domain.template.value_objects import AWSFleetType

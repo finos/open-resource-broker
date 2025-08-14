@@ -12,7 +12,9 @@ from src.domain.base.exceptions import EntityNotFoundError
 from src.domain.base.ports import LoggingPort
 from src.domain.request.aggregate import Request
 from src.domain.template.aggregate import Template
-from src.infrastructure.ports.resource_provisioning_port import ResourceProvisioningPort
+from src.infrastructure.adapters.ports.resource_provisioning_port import (
+    ResourceProvisioningPort,
+)
 from src.infrastructure.template.configuration_manager import (
     TemplateConfigurationManager,
 )

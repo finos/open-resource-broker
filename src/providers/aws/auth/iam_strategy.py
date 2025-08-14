@@ -7,7 +7,12 @@ from botocore.exceptions import ClientError, NoCredentialsError
 
 from src.domain.base.dependency_injection import injectable
 from src.domain.base.ports import LoggingPort
-from src.infrastructure.ports.auth import AuthContext, AuthPort, AuthResult, AuthStatus
+from src.infrastructure.adapters.ports.auth import (
+    AuthContext,
+    AuthPort,
+    AuthResult,
+    AuthStatus,
+)
 
 
 @injectable

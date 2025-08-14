@@ -23,11 +23,11 @@ from src.domain.base.ports import (
     ErrorHandlingPort,
     EventPublisherPort,
     LoggingPort,
+    ProviderPort,
 )
 from src.domain.machine.repository import MachineRepository
 from src.domain.request.repository import RequestRepository
 from src.infrastructure.di.buses import QueryBus
-from src.providers.base.strategy import ProviderContext
 
 
 @command_handler(CreateRequestCommand)
@@ -44,7 +44,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
         query_bus: QueryBus,  # QueryBus is required for template lookup
         provider_selection_service: ProviderSelectionService,
         provider_capability_service: ProviderCapabilityService,
-        provider_context: ProviderContext,
+        provider_port: ProviderPort,
     ):
         """Initialize the instance."""
         super().__init__(logger, event_publisher, error_handler)

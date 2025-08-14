@@ -4,6 +4,7 @@ from src.domain.base.ports import (
     ConfigurationPort,
     EventPublisherPort,
     LoggingPort,
+    ProviderPort,
     SchedulerPort,
     StoragePort,
 )
@@ -25,6 +26,9 @@ def register_core_services(container: DIContainer) -> None:
 
     # Register storage strategy
     container.register_factory(StoragePort, lambda c: _create_storage_strategy(c))
+
+    # Register provider strategy
+    container.register_factory(ProviderPort, lambda c: _create_provider_strategy(c))
 
     # Register event publisher
     from src.infrastructure.events.publisher import ConfigurableEventPublisher
@@ -64,3 +68,14 @@ def _create_storage_strategy(container: DIContainer) -> StoragePort:
     config = container.get(ConfigurationPort)
     storage_type = config.get_storage_strategy()
     return factory.create_strategy(storage_type, config)
+
+
+def _create_provider_strategy(container: DIContainer) -> ProviderPort:
+    """Create provider strategy using adapter pattern."""
+    from src.infrastructure.adapters.provider_context_adapter import (
+        ProviderContextAdapter,
+    )
+    from src.providers.base.strategy.provider_context import ProviderContext
+
+    provider_context = container.get(ProviderContext)
+    return ProviderContextAdapter(provider_context)

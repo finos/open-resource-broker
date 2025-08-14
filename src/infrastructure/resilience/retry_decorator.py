@@ -9,10 +9,10 @@ from src.infrastructure.resilience.exceptions import (
     InvalidRetryStrategyError,
     MaxRetriesExceededError,
 )
-from src.infrastructure.resilience.strategies.circuit_breaker import (
+from src.infrastructure.resilience.strategy.circuit_breaker import (
     CircuitBreakerStrategy,
 )
-from src.infrastructure.resilience.strategies.exponential import (
+from src.infrastructure.resilience.strategy.exponential import (
     ExponentialBackoffStrategy,
 )
 

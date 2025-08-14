@@ -7,7 +7,7 @@ from typing import Any, Dict
 
 from src.infrastructure.logging.logger import get_logger
 from src.infrastructure.resilience.exceptions import CircuitBreakerOpenError
-from src.infrastructure.resilience.strategies.base import RetryStrategy
+from src.infrastructure.resilience.strategy.base import RetryStrategy
 
 logger = get_logger(__name__)
 

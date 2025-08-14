@@ -16,7 +16,7 @@ from src.domain.base.resource_manager import (
     ResourceSpecification,
     ResourceType,
 )
-from src.infrastructure.ports.cloud_resource_manager_port import (
+from src.infrastructure.adapters.ports.cloud_resource_manager_port import (
     CloudResourceManagerPort,
 )
 from src.providers.aws.exceptions.aws_exceptions import InfrastructureError

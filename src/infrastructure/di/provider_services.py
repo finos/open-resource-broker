@@ -567,11 +567,13 @@ def _register_aws_services(container: DIContainer) -> None:
             raise
 
         try:
-            from src.infrastructure.ports.cloud_resource_manager_port import (
+            from src.infrastructure.adapters.ports.cloud_resource_manager_port import (
                 CloudResourceManagerPort,
             )
-            from src.infrastructure.ports.request_adapter_port import RequestAdapterPort
-            from src.infrastructure.ports.resource_provisioning_port import (
+            from src.infrastructure.adapters.ports.request_adapter_port import (
+                RequestAdapterPort,
+            )
+            from src.infrastructure.adapters.ports.resource_provisioning_port import (
                 ResourceProvisioningPort,
             )
         except Exception as e:

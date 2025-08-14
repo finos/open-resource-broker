@@ -3,8 +3,8 @@
 import threading
 from typing import Callable, Dict
 
+from src.infrastructure.adapters.ports.auth import AuthPort
 from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.ports.auth import AuthPort
 
 
 class AuthRegistry:
@@ -110,11 +110,11 @@ def _register_default_strategies() -> None:
     registry = _auth_registry
 
     # Register no-auth strategy
-    from .strategies.no_auth_strategy import NoAuthStrategy
+    from .strategy.no_auth_strategy import NoAuthStrategy
 
     registry.register_strategy("none", NoAuthStrategy)
 
     # Register bearer token strategy
-    from .strategies.bearer_token_strategy import BearerTokenStrategy
+    from .strategy.bearer_token_strategy import BearerTokenStrategy
 
     registry.register_strategy("bearer_token", BearerTokenStrategy)
