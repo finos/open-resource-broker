@@ -53,8 +53,7 @@ def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
 
         # Check if AWS extensions are registered
         if not TemplateExtensionRegistry.has_extension("aws"):
-            logger.debug(
-                "AWS extensions not registered, skipping AMI resolver registration")
+            logger.debug("AWS extensions not registered, skipping AMI resolver registration")
             return
 
         # Try to get AWS provider configuration
@@ -124,8 +123,7 @@ def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
                             )
 
             # Default: register with default AWS extension config
-            default_aws_config = TemplateExtensionRegistry.create_extension_config("aws", {
-                                                                                   })
+            default_aws_config = TemplateExtensionRegistry.create_extension_config("aws", {})
             if default_aws_config and default_aws_config.ami_resolution.enabled:
                 container.register_singleton(CachingAMIResolver)
                 # Register interface to resolve to concrete implementation
@@ -136,8 +134,7 @@ def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
                 container.register_singleton(
                     TemplateResolverPort, lambda c: c.get(CachingAMIResolver)
                 )
-                logger.info(
-                    "AMI resolver registered with default AWS extension configuration")
+                logger.info("AMI resolver registered with default AWS extension configuration")
             else:
                 logger.debug("AMI resolution disabled in default AWS configuration")
 
@@ -150,8 +147,7 @@ def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
                 TemplateResolverPort,
             )
 
-            container.register_singleton(
-                TemplateResolverPort, lambda c: c.get(CachingAMIResolver))
+            container.register_singleton(TemplateResolverPort, lambda c: c.get(CachingAMIResolver))
             logger.info("AMI resolver registered with fallback configuration")
 
     except Exception as e:

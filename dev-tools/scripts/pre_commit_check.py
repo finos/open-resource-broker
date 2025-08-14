@@ -78,8 +78,7 @@ def main():
     """Run pre-commit checks with configurable options."""
     parser = argparse.ArgumentParser(description="Run pre-commit checks")
     parser.add_argument("--debug", "-d", action="store_true", help="Show debug output")
-    parser.add_argument("--extended", "-e", action="store_true",
-                        help="Show extended info")
+    parser.add_argument("--extended", "-e", action="store_true", help="Show extended info")
     parser.add_argument(
         "--required-only",
         "-r",
@@ -100,8 +99,7 @@ def main():
         elif subprocess.run(["which", "brew"], capture_output=True).returncode == 0:
             logger.info(f"{Colors.BLUE}  macOS: brew install yq{Colors.NC}")
         else:
-            logger.info(
-                f"{Colors.BLUE}  See: https://github.com/mikefarah/yq#install{Colors.NC}")
+            logger.info(f"{Colors.BLUE}  See: https://github.com/mikefarah/yq#install{Colors.NC}")
         return 1
 
     # Load pre-commit config

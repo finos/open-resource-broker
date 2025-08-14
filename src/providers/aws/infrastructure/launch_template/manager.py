@@ -131,8 +131,7 @@ class AWSLaunchTemplateManager:
             )
 
             version = str(response["LaunchTemplateVersion"]["VersionNumber"])
-            self._logger.info(
-                f"Using version {version} of launch template {template_id}")
+            self._logger.info(f"Using version {version} of launch template {template_id}")
 
             return LaunchTemplateResult(
                 template_id=template_id,
@@ -192,8 +191,7 @@ class AWSLaunchTemplateManager:
 
             template_name = response["LaunchTemplates"][0]["LaunchTemplateName"]
 
-            self._logger.info(
-                f"Using existing launch template {template_id} version {version}")
+            self._logger.info(f"Using existing launch template {template_id} version {version}")
 
             return LaunchTemplateResult(
                 template_id=template_id,
@@ -230,8 +228,7 @@ class AWSLaunchTemplateManager:
         Returns:
             LaunchTemplateResult with new template details
         """
-        self._logger.info(
-            f"Launch template {template_name} does not exist. Creating new template.")
+        self._logger.info(f"Launch template {template_name} does not exist. Creating new template.")
 
         response = self.aws_client.ec2_client.create_launch_template(
             LaunchTemplateName=template_name,
@@ -247,8 +244,7 @@ class AWSLaunchTemplateManager:
         )
 
         launch_template = response["LaunchTemplate"]
-        self._logger.info(
-            f"Created launch template {launch_template['LaunchTemplateId']}")
+        self._logger.info(f"Created launch template {launch_template['LaunchTemplateId']}")
 
         return LaunchTemplateResult(
             template_id=launch_template["LaunchTemplateId"],
@@ -279,8 +275,7 @@ class AWSLaunchTemplateManager:
             raise AWSValidationError(error_msg)
 
         # Log the image_id being used
-        self._logger.info(
-            f"Creating launch template with resolved image_id: {image_id}")
+        self._logger.info(f"Creating launch template with resolved image_id: {image_id}")
 
         # Get instance name using the helper function
         get_instance_name(request.request_id)
@@ -317,8 +312,7 @@ class AWSLaunchTemplateManager:
             launch_template_data["UserData"] = aws_template.user_data
 
         if aws_template.instance_profile:
-            launch_template_data["IamInstanceProfile"] = {
-                "Name": aws_template.instance_profile}
+            launch_template_data["IamInstanceProfile"] = {"Name": aws_template.instance_profile}
 
         # Add EBS optimization if specified (check if attribute exists)
         if hasattr(aws_template, "ebs_optimized") and aws_template.ebs_optimized is not None:
@@ -329,8 +323,7 @@ class AWSLaunchTemplateManager:
             hasattr(aws_template, "monitoring_enabled")
             and aws_template.monitoring_enabled is not None
         ):
-            launch_template_data["Monitoring"] = {
-                "Enabled": aws_template.monitoring_enabled}
+            launch_template_data["Monitoring"] = {"Enabled": aws_template.monitoring_enabled}
 
         return launch_template_data
 
@@ -359,8 +352,7 @@ class AWSLaunchTemplateManager:
 
         # Add template tags if any
         if aws_template.tags:
-            template_tags = [{"Key": k, "Value": str(v)}
-                                                     for k, v in aws_template.tags.items()]
+            template_tags = [{"Key": k, "Value": str(v)} for k, v in aws_template.tags.items()]
             tags.extend(template_tags)
 
         return tags

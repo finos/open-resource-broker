@@ -88,8 +88,7 @@ class DynamoDBClientManager(ResourceManager):
         try:
             # Create session
             if self.profile:
-                session = boto3.Session(profile_name=self.profile,
-                                        region_name=self.region)
+                session = boto3.Session(profile_name=self.profile, region_name=self.region)
             else:
                 session = boto3.Session(region_name=self.region)
 
@@ -335,11 +334,9 @@ class DynamoDBClientManager(ResourceManager):
         elif error_code == "ValidationException":
             self.logger.error(f"{operation} failed: Validation error - {error_message}")
         elif error_code == "ConditionalCheckFailedException":
-            self.logger.error(
-                f"{operation} failed: Conditional check failed - {error_message}")
+            self.logger.error(f"{operation} failed: Conditional check failed - {error_message}")
         elif error_code == "ProvisionedThroughputExceededException":
-            self.logger.error(
-                f"{operation} failed: Throughput exceeded - {error_message}")
+            self.logger.error(f"{operation} failed: Throughput exceeded - {error_message}")
         else:
             self.logger.error(f"{operation} failed: {error_code} - {error_message}")
 

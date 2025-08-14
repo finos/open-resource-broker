@@ -97,8 +97,7 @@ class AWSAMIResolver(ImageResolver):
         except ImportError:
             raise ValueError("boto3 is required for SSM parameter resolution")
         except Exception as e:
-            raise ValueError(
-                f"Unexpected error resolving SSM parameter {ssm_path}: {e}")
+            raise ValueError(f"Unexpected error resolving SSM parameter {ssm_path}: {e}")
 
     def _is_custom_alias(self, reference: str) -> bool:
         """

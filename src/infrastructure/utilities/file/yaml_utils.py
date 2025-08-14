@@ -51,7 +51,6 @@ def write_yaml_file(file_path: str, data: Dict[str, Any], encoding: str = "utf-8
         with open(file_path, "w", encoding=encoding) as f:
             yaml.safe_dump(data, f, default_flow_style=False, allow_unicode=True)
     except yaml.YAMLError as e:
-        raise yaml.YAMLError(
-            f"Failed to serialize data to YAML for {file_path}: {str(e)}")
+        raise yaml.YAMLError(f"Failed to serialize data to YAML for {file_path}: {str(e)}")
     except OSError as e:
         raise OSError(f"Failed to write YAML file {file_path}: {str(e)}")

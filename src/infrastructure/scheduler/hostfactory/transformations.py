@@ -77,14 +77,12 @@ class HostFactoryTransformations:
         # Transform tags
         if "tags" in mapped_data:
             original_value = mapped_data["tags"]
-            mapped_data["tags"] = HostFactoryTransformations.transform_instance_tags(
-                original_value)
+            mapped_data["tags"] = HostFactoryTransformations.transform_instance_tags(original_value)
             logger.debug(
                 f"HostFactory: Transformed tags: {original_value} -> {mapped_data['tags']}"
             )
 
         # Ensure instance type consistency
-        mapped_data = HostFactoryTransformations.ensure_instance_type_consistency(
-            mapped_data)
+        mapped_data = HostFactoryTransformations.ensure_instance_type_consistency(mapped_data)
 
         return mapped_data

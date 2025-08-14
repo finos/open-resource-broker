@@ -160,8 +160,7 @@ class TerminationError(AWSError):
         resource_ids: list[str],
         details: Optional[Dict[str, Any]] = None,
     ) -> None:
-        super().__init__(message, details={
-              "resource_ids": resource_ids, **(details or {})})
+        super().__init__(message, details={"resource_ids": resource_ids, **(details or {})})
         self.resource_ids = resource_ids
 
 

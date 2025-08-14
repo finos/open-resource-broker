@@ -41,13 +41,11 @@ class SecurityScanner:
                 sarif_available = True
             except ImportError:
                 sarif_available = False
-                logger.warning(
-                    f"bandit-sarif-formatter not available, falling back to JSON")
+                logger.warning(f"bandit-sarif-formatter not available, falling back to JSON")
 
             # Generate JSON output (always)
             subprocess.run(
-                ["python", "-m", "bandit", "-r", "src/",
-                    "-f", "json", "-o", "bandit-report.json"],
+                ["python", "-m", "bandit", "-r", "src/", "-f", "json", "-o", "bandit-report.json"],
                 cwd=self.project_root,
                 check=False,
             )
@@ -71,8 +69,7 @@ class SecurityScanner:
                 )
 
                 self.sarif_files.append("bandit-report.sarif")
-                logger.info(
-                    f"Bandit SARIF report generated for GitHub Security integration")
+                logger.info(f"Bandit SARIF report generated for GitHub Security integration")
 
             return True, "Bandit scan completed"
 
@@ -305,8 +302,7 @@ class SecurityScanner:
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description="Comprehensive security scanner")
-    parser.add_argument("--no-container", action="store_true",
-                        help="Skip container security scans")
+    parser.add_argument("--no-container", action="store_true", help="Skip container security scans")
     parser.add_argument(
         "--project-root", type=Path, default=Path.cwd(), help="Project root directory"
     )

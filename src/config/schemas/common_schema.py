@@ -22,8 +22,7 @@ class ResourceConfig(BaseModel):
     """Resource configuration."""
 
     default_prefix: str = Field("", description="Default prefix for all resources")
-    prefixes: ResourcePrefixConfig = Field(
-        default_factory=lambda: ResourcePrefixConfig())
+    prefixes: ResourcePrefixConfig = Field(default_factory=lambda: ResourcePrefixConfig())
 
     @model_validator(mode="after")
     def set_default_prefix(self) -> "ResourceConfig":
@@ -94,13 +93,11 @@ class LimitsConfig(BaseModel):
 
     tag_key_length: int = Field(128, description="Maximum length of tag keys")
     tag_value_length: int = Field(256, description="Maximum length of tag values")
-    max_tags_per_resource: int = Field(
-        50, description="Maximum number of tags per resource")
+    max_tags_per_resource: int = Field(50, description="Maximum number of tags per resource")
     max_instance_types_per_fleet: int = Field(
         20, description="Maximum number of instance types per fleet"
     )
-    max_subnets_per_fleet: int = Field(
-        16, description="Maximum number of subnets per fleet")
+    max_subnets_per_fleet: int = Field(16, description="Maximum number of subnets per fleet")
     max_security_groups_per_instance: int = Field(
         5, description="Maximum number of security groups per instance"
     )
@@ -184,8 +181,7 @@ class NamingConfig(BaseModel):
 class RequestConfig(BaseModel):
     """Request configuration."""
 
-    max_machines_per_request: int = Field(
-        100, description="Maximum number of machines per request")
+    max_machines_per_request: int = Field(100, description="Maximum number of machines per request")
 
     @field_validator("max_machines_per_request")
     @classmethod
@@ -199,11 +195,9 @@ class RequestConfig(BaseModel):
 class DatabaseConfig(BaseModel):
     """Database configuration."""
 
-    connection_timeout: int = Field(
-        30, description="Database connection timeout in seconds")
+    connection_timeout: int = Field(30, description="Database connection timeout in seconds")
     query_timeout: int = Field(60, description="Database query timeout in seconds")
-    max_connections: int = Field(
-        10, description="Maximum number of database connections")
+    max_connections: int = Field(10, description="Maximum number of database connections")
 
     @field_validator("connection_timeout", "query_timeout")
     @classmethod
@@ -226,8 +220,7 @@ class EventsConfig(BaseModel):
     """Events configuration."""
 
     enabled: bool = Field(True, description="Whether events are enabled")
-    max_events_per_request: int = Field(
-        1000, description="Maximum number of events per request")
+    max_events_per_request: int = Field(1000, description="Maximum number of events per request")
     event_retention_days: int = Field(30, description="Number of days to retain events")
 
     @field_validator("max_events_per_request")

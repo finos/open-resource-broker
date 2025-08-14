@@ -223,8 +223,7 @@ class TestContainerIntegration:
                 logs_result = subprocess.run(
                     ["docker", "logs", container_id], capture_output=True, text=True
                 )
-                pytest.fail(
-                    f"Container stopped unexpectedly. Logs: {logs_result.stdout}")
+                pytest.fail(f"Container stopped unexpectedly. Logs: {logs_result.stdout}")
 
             # Try to connect to health endpoint (may fail due to missing dependencies)
             try:

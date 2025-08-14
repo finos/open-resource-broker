@@ -18,8 +18,7 @@ def register_provider_services(container: DIContainer) -> None:
     """Register provider-specific services."""
 
     # Register provider strategy factory
-    container.register_factory(ProviderStrategyFactory,
-                               create_provider_strategy_factory)
+    container.register_factory(ProviderStrategyFactory, create_provider_strategy_factory)
 
     # Register ProviderContext with configuration-driven factory
     container.register_factory(ProviderContext, create_configured_provider_context)
@@ -73,8 +72,7 @@ def _register_providers() -> None:
         provider_config = config_manager.get_provider_config()
 
         if not provider_config:
-            logger.warning(
-                "No provider configuration found - no providers will be registered")
+            logger.warning("No provider configuration found - no providers will be registered")
             return
 
         # Validate configuration
@@ -91,8 +89,7 @@ def _register_providers() -> None:
             logger.warning("No active providers found in configuration")
             return
 
-        logger.debug(
-            f"Found {len(active_providers)} active provider(s) in configuration")
+        logger.debug(f"Found {len(active_providers)} active provider(s) in configuration")
 
         # Register each active provider
         registered_count = 0
@@ -101,8 +98,7 @@ def _register_providers() -> None:
             if provider_instance.enabled:
                 if _register_provider_instance(provider_instance):
                     registered_count += 1
-                    registered_names.append(
-                        f"{provider_instance.name}({provider_instance.type})")
+                    registered_names.append(f"{provider_instance.name}({provider_instance.type})")
             else:
                 logger.debug(
                     f"Provider instance '{ provider_instance.name}' is disabled - skipping"
@@ -156,8 +152,7 @@ def _register_providers_with_di_context(container: DIContainer) -> None:
         provider_config = config_manager.get_provider_config()
 
         if not provider_config:
-            logger.warning(
-                "No provider configuration found - no providers will be registered")
+            logger.warning("No provider configuration found - no providers will be registered")
             return
 
         # Validate configuration
@@ -174,8 +169,7 @@ def _register_providers_with_di_context(container: DIContainer) -> None:
             logger.warning("No active providers found in configuration")
             return
 
-        logger.info(
-            f"Found {len(active_providers)} active provider(s) in configuration")
+        logger.info(f"Found {len(active_providers)} active provider(s) in configuration")
 
         # Register each active provider with DI context
         registered_count = 0
@@ -184,8 +178,7 @@ def _register_providers_with_di_context(container: DIContainer) -> None:
                 if _register_provider_instance_with_di(provider_instance, container):
                     registered_count += 1
             else:
-                logger.info(
-                    f"Provider instance '{ provider_instance.name}' is disabled - skipping")
+                logger.info(f"Provider instance '{ provider_instance.name}' is disabled - skipping")
 
         logger.info(f"Successfully registered {registered_count} provider instance(s)")
         _providers_registered = True
@@ -209,8 +202,7 @@ def _register_provider_instance_with_di(provider_instance, container: DIContaine
             return False
 
     except Exception as e:
-        logger.error(
-            f"Failed to register provider instance '{provider_instance.name}': {str(e)}")
+        logger.error(f"Failed to register provider instance '{provider_instance.name}': {str(e)}")
         return False
 
 
@@ -223,8 +215,7 @@ def _register_aws_provider_with_di(provider_instance, container: DIContainer) ->
 
         return register_aws_provider_with_di(provider_instance, container)
     except Exception as e:
-        logger.error(
-            f"Failed to register AWS provider '{provider_instance.name}': {str(e)}")
+        logger.error(f"Failed to register AWS provider '{provider_instance.name}': {str(e)}")
         return False
 
 
@@ -235,8 +226,7 @@ def _validate_provider_config(provider_config) -> bool:
     try:
         # Check if providers list exists
         if not hasattr(provider_config, "providers") or not provider_config.providers:
-            logger.error(
-                "Provider configuration must have at least one provider instance")
+            logger.error("Provider configuration must have at least one provider instance")
             return False
 
         # Validate each provider instance
@@ -246,8 +236,7 @@ def _validate_provider_config(provider_config) -> bool:
                 return False
 
             if not hasattr(provider_instance, "type") or not provider_instance.type:
-                logger.error(
-                    f"Provider instance '{provider_instance.name}' must have a type")
+                logger.error(f"Provider instance '{provider_instance.name}' must have a type")
                 return False
 
             # Check for supported provider types
@@ -283,8 +272,7 @@ def _register_provider_instance(provider_instance) -> bool:
             registry = get_provider_registry()
 
             # Register AWS provider instance with unique name
-            register_aws_provider(
-                registry=registry, instance_name=provider_instance.name)
+            register_aws_provider(registry=registry, instance_name=provider_instance.name)
             logger.debug(
                 f"AWS provider instance '{ provider_instance.name}' registered successfully"
             )
@@ -296,12 +284,10 @@ def _register_provider_instance(provider_instance) -> bool:
             return False
 
     except ImportError as e:
-        logger.warning(
-            f"Provider type '{provider_instance.type}' not available: {str(e)}")
+        logger.warning(f"Provider type '{provider_instance.type}' not available: {str(e)}")
         return False
     except Exception as e:
-        logger.error(
-            f"Failed to register provider instance '{provider_instance.name}': {str(e)}")
+        logger.error(f"Failed to register provider instance '{provider_instance.name}': {str(e)}")
         return False
 
 
@@ -326,8 +312,7 @@ def create_configured_provider_context(container: DIContainer) -> ProviderContex
 
     except Exception as e:
         logger = container.get(LoggingPort)
-        logger.error(
-            f"Failed to create configured provider context, using fallback: {e}")
+        logger.error(f"Failed to create configured provider context, using fallback: {e}")
         # Create minimal provider context as fallback
         return ProviderContext(logger)
 
@@ -348,8 +333,7 @@ def _create_lazy_provider_context(
         # Get provider configuration
         provider_config = config_manager.get_provider_config()
         if not provider_config or not provider_config.providers:
-            logger.warning(
-                "No provider configuration found - creating empty provider context")
+            logger.warning("No provider configuration found - creating empty provider context")
             return provider_context
 
         # Register each active provider immediately
@@ -470,8 +454,7 @@ def _register_provider_specific_services(container: DIContainer) -> None:
 
             register_aws_services_with_di(container)
         else:
-            logger.debug(
-                "AWS provider not available, skipping AWS service registration")
+            logger.debug("AWS provider not available, skipping AWS service registration")
     except ImportError:
         logger.debug("AWS provider not available, skipping AWS service registration")
     except Exception as e:
@@ -632,8 +615,7 @@ def _register_aws_services(container: DIContainer) -> None:
             CloudResourceManagerPort, lambda c: c.get(AWSResourceManagerAdapter)
         )
 
-        container.register_factory(
-            RequestAdapterPort, lambda c: c.get(AWSRequestAdapter))
+        container.register_factory(RequestAdapterPort, lambda c: c.get(AWSRequestAdapter))
 
         logger.info("AWS services registered successfully")
     except ImportError as e:
@@ -662,8 +644,7 @@ def _create_aws_client(container: DIContainer):
                 )
                 return current_strategy.aws_client
 
-        logger.debug(
-            "No selected AWS provider strategy found, creating fallback AWS client")
+        logger.debug("No selected AWS provider strategy found, creating fallback AWS client")
 
     except Exception as e:
         logger.debug(f"Could not get AWS client from provider context: {e}")

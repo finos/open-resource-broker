@@ -102,16 +102,14 @@ class TestTemplateDefaultsService:
         }
 
         # Resolve defaults for aws-primary provider
-        result = template_defaults_service.resolve_template_defaults(
-            template_dict, "aws-primary")
+        result = template_defaults_service.resolve_template_defaults(template_dict, "aws-primary")
 
         # Verify hierarchical resolution
         assert result["template_id"] == "test-template"
         assert result["image_id"] == "ami-specific"  # Template value (highest priority)
         assert result["provider_api"] == "SpotFleet"  # Provider instance default
         assert result["instance_type"] == "t3.medium"  # Provider instance default
-        assert result["security_group_ids"] == [
-            "sg-aws-default"]  # Provider type default
+        assert result["security_group_ids"] == ["sg-aws-default"]  # Provider type default
         assert result["price_type"] == "ondemand"  # Global default
 
     def test_resolve_template_defaults_no_provider_instance(
@@ -129,8 +127,7 @@ class TestTemplateDefaultsService:
         template_dict = {"template_id": "test-template"}
 
         # Resolve defaults without provider instance
-        result = template_defaults_service.resolve_template_defaults(
-            template_dict, None)
+        result = template_defaults_service.resolve_template_defaults(template_dict, None)
 
         # Should only have global defaults
         assert result["template_id"] == "test-template"
@@ -184,16 +181,14 @@ class TestTemplateDefaultsService:
         mock_config_manager.get_provider_config.return_value = sample_provider_config
 
         # Get effective defaults for aws-primary
-        result = template_defaults_service.get_effective_template_defaults(
-            "aws-primary")
+        result = template_defaults_service.get_effective_template_defaults("aws-primary")
 
         # Should have merged defaults with proper precedence
         assert result["price_type"] == "ondemand"  # Global default
         assert result["image_id"] == "ami-aws-default"  # Provider type default
         assert result["provider_api"] == "SpotFleet"  # Provider instance override
         assert result["instance_type"] == "t3.medium"  # Provider instance override
-        assert result["security_group_ids"] == [
-            "sg-aws-default"]  # Provider type default
+        assert result["security_group_ids"] == ["sg-aws-default"]  # Provider type default
 
     def test_validate_template_defaults(
         self,
@@ -244,8 +239,7 @@ class TestTemplateDefaultsService:
         template_dict = {"template_id": "test"}
 
         # Should handle errors gracefully
-        result = template_defaults_service.resolve_template_defaults(
-            template_dict, "aws-primary")
+        result = template_defaults_service.resolve_template_defaults(template_dict, "aws-primary")
 
         # Should return original template dict
         assert result["template_id"] == "test"
@@ -271,8 +265,7 @@ class TestTemplateDefaultsService:
             "instance_type": "t3.large",  # Non-None should override
         }
 
-        result = template_defaults_service.resolve_template_defaults(
-            template_dict, "aws-primary")
+        result = template_defaults_service.resolve_template_defaults(template_dict, "aws-primary")
 
         # None value should be replaced by default
         assert result["image_id"] == "ami-aws-default"  # From provider type defaults

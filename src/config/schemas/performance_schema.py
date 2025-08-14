@@ -14,10 +14,8 @@ class BatchSizesConfig(BaseModel):
         25, description="Batch size for terminate_instances operations"
     )
     create_tags: int = Field(20, description="Batch size for create_tags operations")
-    describe_instances: int = Field(
-        25, description="Batch size for describe_instances operations")
-    run_instances: int = Field(
-        10, description="Batch size for run_instances operations")
+    describe_instances: int = Field(25, description="Batch size for describe_instances operations")
+    run_instances: int = Field(10, description="Batch size for run_instances operations")
 
     @field_validator("terminate_instances", "create_tags", "describe_instances", "run_instances")
     @classmethod
@@ -34,17 +32,13 @@ class AdaptiveBatchSizingConfig(BaseModel):
     initial_batch_size: int = Field(10, description="Initial batch size for operations")
     min_batch_size: int = Field(5, description="Minimum batch size")
     max_batch_size: int = Field(50, description="Maximum batch size")
-    increase_factor: float = Field(
-        1.5, description="Factor to increase batch size on success")
-    decrease_factor: float = Field(
-        0.5, description="Factor to decrease batch size on failure")
+    increase_factor: float = Field(1.5, description="Factor to increase batch size on success")
+    decrease_factor: float = Field(0.5, description="Factor to decrease batch size on failure")
     success_threshold: int = Field(
         3, description="Number of successful batches before increasing size"
     )
-    failure_threshold: int = Field(
-        1, description="Number of failed batches before decreasing size")
-    history_size: int = Field(
-        10, description="Size of history to maintain for each operation")
+    failure_threshold: int = Field(1, description="Number of failed batches before decreasing size")
+    history_size: int = Field(10, description="Size of history to maintain for each operation")
 
     @field_validator("min_batch_size", "max_batch_size", "initial_batch_size")
     @classmethod
@@ -82,15 +76,13 @@ class AdaptiveBatchSizingConfig(BaseModel):
     def validate_batch_size_relationships(self) -> "AdaptiveBatchSizingConfig":
         """Validate relationships between batch sizes."""
         if self.min_batch_size > self.max_batch_size:
-            raise ValueError(
-                "Minimum batch size cannot be greater than maximum batch size")
+            raise ValueError("Minimum batch size cannot be greater than maximum batch size")
 
         if (
             self.initial_batch_size < self.min_batch_size
             or self.initial_batch_size > self.max_batch_size
         ):
-            raise ValueError(
-                "Initial batch size must be between minimum and maximum batch sizes")
+            raise ValueError("Initial batch size must be between minimum and maximum batch sizes")
 
         return self
 
@@ -115,8 +107,7 @@ class HandlerDiscoveryCacheConfig(BaseModel):
     """Handler discovery caching configuration."""
 
     enabled: bool = Field(True, description="Enable handler discovery caching")
-    file: str = Field("handler_discovery.json",
-                      description="Handler discovery cache filename")
+    file: str = Field("handler_discovery.json", description="Handler discovery cache filename")
 
 
 class RequestStatusCacheConfig(BaseModel):
@@ -151,11 +142,9 @@ class CachingConfig(BaseModel):
 class PerformanceConfig(BaseModel):
     """Performance optimization configuration."""
 
-    enable_batching: bool = Field(
-        True, description="Whether to enable batching of API calls")
+    enable_batching: bool = Field(True, description="Whether to enable batching of API calls")
     batch_sizes: BatchSizesConfig = Field(default_factory=lambda: BatchSizesConfig())
-    enable_parallel: bool = Field(
-        True, description="Whether to enable parallel processing")
+    enable_parallel: bool = Field(True, description="Whether to enable parallel processing")
     max_workers: int = Field(
         10, description="Maximum number of worker threads for parallel processing"
     )

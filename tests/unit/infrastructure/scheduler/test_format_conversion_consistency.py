@@ -18,10 +18,8 @@ class TestFormatConversionConsistency:
         self.logger = MagicMock()
 
         # Create scheduler strategies
-        self.default_strategy = DefaultSchedulerStrategy(
-            self.config_manager, self.logger)
-        self.symphony_strategy = HostFactorySchedulerStrategy(
-            self.config_manager, self.logger)
+        self.default_strategy = DefaultSchedulerStrategy(self.config_manager, self.logger)
+        self.symphony_strategy = HostFactorySchedulerStrategy(self.config_manager, self.logger)
 
         # Sample data for testing
         self.sample_templates = [
@@ -70,10 +68,8 @@ class TestFormatConversionConsistency:
     def test_format_templates_response_consistency(self):
         """Test that format_templates_response is consistent across strategies."""
         # Act
-        default_result = self.default_strategy.format_templates_response(
-            self.sample_templates)
-        symphony_result = self.symphony_strategy.format_templates_response(
-            self.sample_templates)
+        default_result = self.default_strategy.format_templates_response(self.sample_templates)
+        symphony_result = self.symphony_strategy.format_templates_response(self.sample_templates)
 
         # Assert
         assert "templates" in default_result
@@ -99,10 +95,8 @@ class TestFormatConversionConsistency:
     def test_format_request_response_consistency(self):
         """Test that format_request_response is consistent across strategies."""
         # Act
-        default_result = self.default_strategy.format_request_response(
-            self.sample_request)
-        symphony_result = self.symphony_strategy.format_request_response(
-            self.sample_request)
+        default_result = self.default_strategy.format_request_response(self.sample_request)
+        symphony_result = self.symphony_strategy.format_request_response(self.sample_request)
 
         # Assert
         assert "request" in default_result
@@ -157,8 +151,7 @@ class TestFormatConversionConsistency:
         # Check that machine_ids are included and formatted consistently
         assert "machine_ids" in default_request
         assert "machine_ids" in symphony_request
-        assert len(default_request["machine_ids"]) == len(
-            self.sample_return_request["machine_ids"])
+        assert len(default_request["machine_ids"]) == len(self.sample_return_request["machine_ids"])
         assert len(symphony_request["machine_ids"]) == len(
             self.sample_return_request["machine_ids"]
         )
@@ -204,8 +197,7 @@ class TestFormatConversionInHandlers:
                 {"id": "template2", "formatted": True},
             ]
         }
-        scheduler_strategy.format_templates_response = MagicMock(
-            return_value=formatted_templates)
+        scheduler_strategy.format_templates_response = MagicMock(return_value=formatted_templates)
 
         # Act
         handler.handle(MagicMock())
@@ -240,8 +232,7 @@ class TestFormatConversionInHandlers:
                 {"id": "template2", "formatted": True},
             ]
         }
-        scheduler_strategy.format_templates_response = MagicMock(
-            return_value=formatted_templates)
+        scheduler_strategy.format_templates_response = MagicMock(return_value=formatted_templates)
 
         # Set up container.get to return the mocked objects
         container.get.side_effect = lambda x: {
@@ -252,8 +243,7 @@ class TestFormatConversionInHandlers:
         mock_get_container.return_value = container
 
         # Create args with default values
-        args = argparse.Namespace(
-            provider_api=None, active_only=True, include_config=False)
+        args = argparse.Namespace(provider_api=None, active_only=True, include_config=False)
 
         # Act
         await handle_list_templates(args)

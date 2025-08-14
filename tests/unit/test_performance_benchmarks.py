@@ -79,8 +79,7 @@ class TestPerformanceBenchmarks:
             start_time = time.perf_counter()
 
             # Simulate template loading operation
-            loaded_templates = [
-                t for t in templates if t.template_id.startswith("template-")]
+            loaded_templates = [t for t in templates if t.template_id.startswith("template-")]
 
             end_time = time.perf_counter()
             times.append(end_time - start_time)
@@ -384,8 +383,7 @@ class TestConcurrentPerformance:
 
         assert avg_time < 0.05, f"Concurrent repository access too slow: {avg_time:.6f}s"
 
-        print(
-            f"Repository concurrent access - {total_operations} operations in {total_time:.2f}s")
+        print(f"Repository concurrent access - {total_operations} operations in {total_time:.2f}s")
         print(f"Throughput: {throughput:.0f} operations/second")
 
     def test_thread_safety_performance_impact(self):
@@ -535,8 +533,7 @@ class TestScalabilityLimits:
                 time_per_item < 0.01
             ), f"Time per item too high for {size} items: {time_per_item:.6f}s"
 
-            print(
-                f"Dataset size {size}: {total_time:.2f}s total, {time_per_item:.6f}s per item")
+            print(f"Dataset size {size}: {total_time:.2f}s total, {time_per_item:.6f}s per item")
 
             # Clean up
             requests.clear()

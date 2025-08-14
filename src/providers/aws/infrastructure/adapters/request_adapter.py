@@ -169,8 +169,7 @@ class AWSRequestAdapter(RequestAdapterPort):
             Dictionary with status information
         """
         try:
-            response = self._aws_client.ec2_client.describe_fleets(
-                FleetIds=[request.resource_id])
+            response = self._aws_client.ec2_client.describe_fleets(FleetIds=[request.resource_id])
 
             if not response["Fleets"]:
                 return {
@@ -321,8 +320,7 @@ class AWSRequestAdapter(RequestAdapterPort):
 
             instance_ids = request.resource_id.split(",")
 
-            response = self._aws_client.ec2_client.describe_instances(
-                InstanceIds=instance_ids)
+            response = self._aws_client.ec2_client.describe_instances(InstanceIds=instance_ids)
 
             instances = []
             for reservation in response["Reservations"]:
@@ -367,8 +365,7 @@ class AWSRequestAdapter(RequestAdapterPort):
 
             instance_ids = request.resource_id.split(",")
 
-            response = self._aws_client.ec2_client.describe_instances(
-                InstanceIds=instance_ids)
+            response = self._aws_client.ec2_client.describe_instances(InstanceIds=instance_ids)
 
             instances = []
             for reservation in response["Reservations"]:
@@ -382,8 +379,7 @@ class AWSRequestAdapter(RequestAdapterPort):
                     )
 
             # Check if all instances are terminated
-            all_terminated = all(instance["state"] ==
-                                 "terminated" for instance in instances)
+            all_terminated = all(instance["state"] == "terminated" for instance in instances)
 
             return {
                 "status": "complete" if all_terminated else "in_progress",
@@ -408,8 +404,7 @@ class AWSRequestAdapter(RequestAdapterPort):
             Dictionary with termination results
         """
         try:
-            response = self._aws_client.ec2_client.terminate_instances(
-                InstanceIds=instance_ids)
+            response = self._aws_client.ec2_client.terminate_instances(InstanceIds=instance_ids)
 
             return {
                 "status": "success",

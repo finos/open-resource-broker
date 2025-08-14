@@ -58,8 +58,7 @@ class TestLazyLoadingPerformance:
 
         # Should not increase memory significantly during creation (lazy loading)
         assert memory_increase < 50, f"Memory increased by {memory_increase:.1f}MB during creation"
-        print(
-            f"PASS: Memory increase during creation: {memory_increase:.1f}MB (target: <50MB)")
+        print(f"PASS: Memory increase during creation: {memory_increase:.1f}MB (target: <50MB)")
 
     def test_first_command_performance(self):
         """Test first command execution performance (triggers lazy loading)."""
@@ -78,8 +77,7 @@ class TestLazyLoadingPerformance:
         assert (
             first_access_time < 1000
         ), f"First query bus access took {first_access_time:.1f}ms, expected <1000ms"
-        print(
-            f"PASS: First query bus access: {first_access_time:.1f}ms (target: <1000ms)")
+        print(f"PASS: First query bus access: {first_access_time:.1f}ms (target: <1000ms)")
 
     def test_cached_component_performance(self):
         """Test cached component access performance."""
@@ -171,8 +169,7 @@ class TestLazyLoadingPerformance:
         assert (
             registration_time < 100
         ), f"Minimal storage registration took {registration_time:.1f}ms, expected <100ms"
-        print(
-            f"PASS: Minimal storage registration: {registration_time:.1f}ms (target: <100ms)")
+        print(f"PASS: Minimal storage registration: {registration_time:.1f}ms (target: <100ms)")
 
     def test_scheduler_registration_performance(self):
         """Test scheduler registration performance."""
@@ -187,8 +184,7 @@ class TestLazyLoadingPerformance:
         assert (
             registration_time < 50
         ), f"Active scheduler registration took {registration_time:.1f}ms, expected <50ms"
-        print(
-            f"PASS: Active scheduler registration: {registration_time:.1f}ms (target: <50ms)")
+        print(f"PASS: Active scheduler registration: {registration_time:.1f}ms (target: <50ms)")
 
     @pytest.mark.integration
     def test_end_to_end_performance(self):
@@ -224,8 +220,7 @@ class TestLazyLoadingPerformance:
         start_time = time.time()
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             futures = [executor.submit(create_and_access_app) for _ in range(5)]
-            results = [future.result()
-                                     for future in concurrent.futures.as_completed(futures)]
+            results = [future.result() for future in concurrent.futures.as_completed(futures)]
 
         concurrent_time = (time.time() - start_time) * 1000
 
@@ -233,8 +228,7 @@ class TestLazyLoadingPerformance:
         assert (
             concurrent_time < 3000
         ), f"Concurrent access took {concurrent_time:.1f}ms, expected <3000ms"
-        print(
-            f"PASS: Concurrent access (5 threads): {concurrent_time:.1f}ms (target: <3000ms)")
+        print(f"PASS: Concurrent access (5 threads): {concurrent_time:.1f}ms (target: <3000ms)")
 
 
 class TestPerformanceRegression:
@@ -258,8 +252,7 @@ class TestPerformanceRegression:
         assert avg_startup < 500, f"Average startup {avg_startup:.1f}ms exceeds 500ms limit"
         assert max_startup < 1000, f"Max startup {max_startup:.1f}ms exceeds 1000ms limit"
 
-        print(
-            f"PASS: Startup regression test: avg={avg_startup:.1f}ms, max={max_startup:.1f}ms")
+        print(f"PASS: Startup regression test: avg={avg_startup:.1f}ms, max={max_startup:.1f}ms")
 
     def test_memory_usage_regression(self):
         """Ensure memory usage doesn't regress significantly."""
@@ -277,8 +270,7 @@ class TestPerformanceRegression:
 
         # Should not use excessive memory per application instance
         assert memory_per_app < 30, f"Memory per app {memory_per_app:.1f}MB exceeds 30MB limit"
-        print(
-            f"PASS: Memory regression test: {memory_per_app:.1f}MB per app (target: <30MB)")
+        print(f"PASS: Memory regression test: {memory_per_app:.1f}MB per app (target: <30MB)")
 
 
 if __name__ == "__main__":

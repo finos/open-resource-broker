@@ -232,8 +232,7 @@ class TestProviderStrategyIntegration:
         with pytest.raises(Exception) as exc_info:
             converter.get_typed(AWSProviderConfig)
 
-        assert "At least one authentication method must be provided" in str(
-            exc_info.value)
+        assert "At least one authentication method must be provided" in str(exc_info.value)
 
     def test_provider_name_validation(self):
         """Test provider name validation requirements."""

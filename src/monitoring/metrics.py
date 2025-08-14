@@ -213,8 +213,7 @@ class MetricsCollector:
                     prom_file = self.metrics_dir / "metrics.prom"
                     with prom_file.open("w") as f:
                         for name, metric in metrics.items():
-                            labels = ",".join(f'{k}="{v}"' for k,
-                                              v in metric["labels"].items())
+                            labels = ",".join(f'{k}="{v}"' for k, v in metric["labels"].items())
                             f.write(f'{name}{{{labels}}} {metric["value"]}\n')
 
                     time.sleep(self.config.get("METRICS_INTERVAL", 60))

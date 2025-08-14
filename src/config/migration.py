@@ -32,8 +32,7 @@ class ConfigurationMigrator:
 
         # Legacy AWS format
         if provider_config.get("type") == "aws":
-            self._logger.info(
-                "Migrating legacy AWS configuration to consolidated format")
+            self._logger.info("Migrating legacy AWS configuration to consolidated format")
             return self._migrate_legacy_aws(config_data)
 
         # No provider configuration
@@ -42,8 +41,7 @@ class ConfigurationMigrator:
             return config_data
 
         # Unknown format
-        self._logger.warning(
-            f"Unknown provider configuration format: {provider_config}")
+        self._logger.warning(f"Unknown provider configuration format: {provider_config}")
         return config_data
 
     def _migrate_legacy_aws(self, config_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -199,8 +197,7 @@ class ConfigurationMigrator:
 
             # Validate AWS configuration is preserved (if applicable)
             if original_config.get("provider", {}).get("type") == "aws":
-                aws_provider = next(
-                    (p for p in active_providers if p.type == "aws"), None)
+                aws_provider = next((p for p in active_providers if p.type == "aws"), None)
                 if not aws_provider:
                     self._logger.error("AWS provider not found after migration")
                     return False

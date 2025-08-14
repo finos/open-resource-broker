@@ -165,8 +165,7 @@ class OpenHFPluginMCPServer:
             return json.dumps(response.__dict__, default=str)
 
         except json.JSONDecodeError:
-            error_response = MCPMessage(
-                error={"code": -32700, "message": "Parse error"})
+            error_response = MCPMessage(error={"code": -32700, "message": "Parse error"})
             return json.dumps(error_response.__dict__)
         except Exception as e:
             self.logger.error(f"Error handling MCP message: {e}")

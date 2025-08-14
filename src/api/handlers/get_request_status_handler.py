@@ -138,8 +138,7 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[Dict[str, Any], RequestStatusRe
                 validated_data = context.metadata.get("validated_data")
                 if not validated_data:
                     # Fallback validation if not done in validate_api_request
-                    validated_data = self.validator.validate(
-                        RequestStatusModel, input_data)
+                    validated_data = self.validator.validate(RequestStatusModel, input_data)
 
                 request_ids = validated_data.request_ids
                 requests = []
@@ -272,13 +271,11 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[Dict[str, Any], RequestStatusRe
             try:
                 if long:
                     # Get full request details with machines using CQRS query
-                    query = GetRequestStatusQuery(
-                        request_id=request_id, include_machines=True)
+                    query = GetRequestStatusQuery(request_id=request_id, include_machines=True)
                     return await self._query_bus.execute(query)
                 else:
                     # Get basic request status using CQRS query
-                    query = GetRequestStatusQuery(
-                        request_id=request_id, include_machines=False)
+                    query = GetRequestStatusQuery(request_id=request_id, include_machines=False)
                     return await self._query_bus.execute(query)
             except RequestNotFoundError:
                 # Don't retry if request not found
@@ -296,8 +293,7 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[Dict[str, Any], RequestStatusRe
         if last_error:
             raise last_error
         else:
-            raise Exception(
-                f"Failed to get request status after {self._max_retries} attempts")
+            raise Exception(f"Failed to get request status after {self._max_retries} attempts")
 
 
 if TYPE_CHECKING:

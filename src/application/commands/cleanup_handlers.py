@@ -43,8 +43,7 @@ class CleanupOldRequestsHandler(BaseCommandHandler[CleanupOldRequestsCommand, Di
 
     async def execute_command(self, command: CleanupOldRequestsCommand) -> Dict[str, Any]:
         """Handle cleanup old requests command."""
-        self.logger.info(
-            f"Cleaning up requests older than {command.older_than_days} days")
+        self.logger.info(f"Cleaning up requests older than {command.older_than_days} days")
         cutoff_date = datetime.utcnow() - timedelta(days=command.older_than_days)
 
         try:
@@ -55,8 +54,7 @@ class CleanupOldRequestsHandler(BaseCommandHandler[CleanupOldRequestsCommand, Di
                 )
 
                 if command.dry_run:
-                    self.logger.info(
-                        f"DRY RUN: Would cleanup {len(old_requests)} requests")
+                    self.logger.info(f"DRY RUN: Would cleanup {len(old_requests)} requests")
                     return {
                         "dry_run": True,
                         "requests_found": len(old_requests),
@@ -72,8 +70,7 @@ class CleanupOldRequestsHandler(BaseCommandHandler[CleanupOldRequestsCommand, Di
                         self.logger.debug(f"Cleaned up request: {request.request_id}")
                     except Exception as e:
                         # Per-item exception handling - appropriate to keep
-                        self.logger.error(
-                            f"Failed to cleanup request {request.request_id}: {e}")
+                        self.logger.error(f"Failed to cleanup request {request.request_id}: {e}")
 
                 uow.commit()
 
@@ -89,8 +86,7 @@ class CleanupOldRequestsHandler(BaseCommandHandler[CleanupOldRequestsCommand, Di
                 )
                 self.event_publisher.publish(cleanup_event)
 
-                self.logger.info(
-                    f"Successfully cleaned up {cleaned_count} old requests")
+                self.logger.info(f"Successfully cleaned up {cleaned_count} old requests")
                 return {
                     "success": True,
                     "requests_cleaned": cleaned_count,
@@ -128,8 +124,7 @@ class CleanupAllResourcesHandler(BaseCommandHandler[CleanupAllResourcesCommand, 
 
     async def execute_command(self, command: CleanupAllResourcesCommand) -> Dict[str, Any]:
         """Handle cleanup all resources command."""
-        self.logger.info(
-            f"Cleaning up all resources older than {command.older_than_days} days")
+        self.logger.info(f"Cleaning up all resources older than {command.older_than_days} days")
         cutoff_date = datetime.utcnow() - timedelta(days=command.older_than_days)
 
         try:
@@ -141,8 +136,7 @@ class CleanupAllResourcesHandler(BaseCommandHandler[CleanupAllResourcesCommand, 
 
                 old_machines = uow.machines.find_old_machines(
                     cutoff_date=cutoff_date,
-                    statuses=(["terminated", "failed"]
-                              if not command.include_pending else None),
+                    statuses=(["terminated", "failed"] if not command.include_pending else None),
                 )
 
                 if command.dry_run:
@@ -167,8 +161,7 @@ class CleanupAllResourcesHandler(BaseCommandHandler[CleanupAllResourcesCommand, 
                         requests_cleaned += 1
                     except Exception as e:
                         # Per-item exception handling - appropriate to keep
-                        self.logger.error(
-                            f"Failed to cleanup request {request.request_id}: {e}")
+                        self.logger.error(f"Failed to cleanup request {request.request_id}: {e}")
 
                 # Cleanup machines
                 for machine in old_machines:
@@ -177,8 +170,7 @@ class CleanupAllResourcesHandler(BaseCommandHandler[CleanupAllResourcesCommand, 
                         machines_cleaned += 1
                     except Exception as e:
                         # Per-item exception handling - appropriate to keep
-                        self.logger.error(
-                            f"Failed to cleanup machine {machine.machine_id}: {e}")
+                        self.logger.error(f"Failed to cleanup machine {machine.machine_id}: {e}")
 
                 uow.commit()
 

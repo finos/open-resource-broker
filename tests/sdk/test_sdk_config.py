@@ -170,8 +170,7 @@ class TestSDKConfig:
 
     def test_validate_success(self):
         """Test successful configuration validation."""
-        config = SDKConfig(provider="mock", timeout=300,
-                           retry_attempts=3, log_level="INFO")
+        config = SDKConfig(provider="mock", timeout=300, retry_attempts=3, log_level="INFO")
 
         # Should not raise exception
         config.validate()

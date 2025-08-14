@@ -320,8 +320,7 @@ class AWSTemplateAdapter(TemplateAdapterPort):
                         f"SSM parameter {ami_id_or_alias} does not contain a valid AMI ID: {resolved_ami}"
                     )
             except Exception as e:
-                self._logger.error(
-                    f"Failed to resolve SSM parameter {ami_id_or_alias}: {e}")
+                self._logger.error(f"Failed to resolve SSM parameter {ami_id_or_alias}: {e}")
                 raise AWSValidationError(
                     f"Failed to resolve AMI ID from SSM parameter: {ami_id_or_alias}"
                 )

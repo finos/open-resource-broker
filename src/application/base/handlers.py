@@ -109,8 +109,7 @@ class BaseHandler(ABC):
                     duration = time.time() - start_time
 
                     if self.logger:
-                        self.logger.info(
-                            f"Completed operation: {operation_id} in {duration:.3f}s")
+                        self.logger.info(f"Completed operation: {operation_id} in {duration:.3f}s")
 
                     self._metrics[operation_id] = {
                         "duration": duration,
@@ -325,8 +324,7 @@ class BaseQueryHandler(BaseHandler, QueryHandler[TQuery, TResult]):
         except Exception as e:
             duration = time.time() - start_time
             if self.logger:
-                self.logger.error(
-                    f"Failed query: {operation_id} in {duration:.3f}s - {str(e)}")
+                self.logger.error(f"Failed query: {operation_id} in {duration:.3f}s - {str(e)}")
             raise
 
     def get_cache_key(self, query: TQuery) -> Optional[str]:

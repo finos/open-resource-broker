@@ -69,8 +69,7 @@ class TestIntegratedBaseRegistry:
         assert registry.mode == RegistryMode.SINGLE_CHOICE
 
         # Register scheduler type
-        registry.register("hostfactory", self.mock_strategy_factory,
-                          self.mock_config_factory)
+        registry.register("hostfactory", self.mock_strategy_factory, self.mock_config_factory)
 
         # Verify registration
         assert registry.is_registered("hostfactory")
@@ -121,8 +120,7 @@ class TestIntegratedBaseRegistry:
         registry = get_storage_registry()
 
         # Test backward compatibility methods
-        registry.register_storage(
-            "json", self.mock_strategy_factory, self.mock_config_factory)
+        registry.register_storage("json", self.mock_strategy_factory, self.mock_config_factory)
 
         assert registry.is_storage_registered("json")
         assert "json" in registry.get_registered_storage_types()
@@ -140,8 +138,7 @@ class TestIntegratedBaseRegistry:
         registry = get_provider_registry()
 
         # Test backward compatibility methods
-        registry.register_provider(
-            "aws", self.mock_strategy_factory, self.mock_config_factory)
+        registry.register_provider("aws", self.mock_strategy_factory, self.mock_config_factory)
 
         assert registry.is_provider_registered("aws")
         assert "aws" in registry.get_registered_providers()

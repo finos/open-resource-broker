@@ -88,8 +88,7 @@ class GetAvailableTemplatesRESTHandler(BaseAPIHandler[Dict[str, Any], Dict[str, 
             templates = await self._query_bus.execute(query)
 
             # Use scheduler strategy for format conversion - SINGLE MAPPING POINT
-            formatted_response = self._scheduler_strategy.format_templates_response(
-                templates)
+            formatted_response = self._scheduler_strategy.format_templates_response(templates)
 
             # Add correlation ID and other metadata
             if isinstance(formatted_response, dict):
@@ -104,8 +103,7 @@ class GetAvailableTemplatesRESTHandler(BaseAPIHandler[Dict[str, Any], Dict[str, 
 
             # Record metrics if available
             if self._metrics:
-                self._metrics.record_api_success(
-                    "get_available_templates", len(templates))
+                self._metrics.record_api_success("get_available_templates", len(templates))
 
             return formatted_response
 

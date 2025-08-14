@@ -48,8 +48,7 @@ class TestFleetTagBuilder:
     def test_build_fleet_tags(self):
         """Test building fleet-specific tags."""
         fleet_name = "test-fleet"
-        tags = FleetTagBuilder.build_fleet_tags(
-            self.mock_request, self.mock_template, fleet_name)
+        tags = FleetTagBuilder.build_fleet_tags(self.mock_request, self.mock_template, fleet_name)
 
         assert len(tags) == 5
         # Fleet tags should have fleet-specific name
@@ -58,8 +57,7 @@ class TestFleetTagBuilder:
 
     def test_build_instance_tags(self):
         """Test building instance-specific tags."""
-        tags = FleetTagBuilder.build_instance_tags(
-            self.mock_request, self.mock_template)
+        tags = FleetTagBuilder.build_instance_tags(self.mock_request, self.mock_template)
 
         assert len(tags) == 5
         # Instance tags should have standard name format
@@ -104,11 +102,9 @@ class TestFleetTagBuilder:
         assert fleet_name_tag["Value"] == f"hf-fleet-{self.mock_request.request_id}"
 
         # Check instance tag specification
-        instance_spec = next(
-            spec for spec in tag_specs if spec["ResourceType"] == "instance")
+        instance_spec = next(spec for spec in tag_specs if spec["ResourceType"] == "instance")
         assert instance_spec is not None
-        instance_name_tag = next(
-            tag for tag in instance_spec["Tags"] if tag["Key"] == "Name")
+        instance_name_tag = next(tag for tag in instance_spec["Tags"] if tag["Key"] == "Name")
         assert instance_name_tag["Value"] == f"hf-{self.mock_request.request_id}"
 
         # Both should have template tags
@@ -142,12 +138,9 @@ class TestFleetTagBuilder:
 
     def test_tag_consistency_across_methods(self):
         """Test that common tags are consistent across different methods."""
-        common_tags = FleetTagBuilder.build_common_tags(
-            self.mock_request, self.mock_template)
-        fleet_tags = FleetTagBuilder.build_fleet_tags(
-            self.mock_request, self.mock_template, "test")
-        instance_tags = FleetTagBuilder.build_instance_tags(
-            self.mock_request, self.mock_template)
+        common_tags = FleetTagBuilder.build_common_tags(self.mock_request, self.mock_template)
+        fleet_tags = FleetTagBuilder.build_fleet_tags(self.mock_request, self.mock_template, "test")
+        instance_tags = FleetTagBuilder.build_instance_tags(self.mock_request, self.mock_template)
 
         # Extract non-Name tags for comparison (Name varies by resource type)
         def extract_non_name_tags(tags):

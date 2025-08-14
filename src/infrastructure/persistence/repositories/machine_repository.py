@@ -71,8 +71,7 @@ class MachineSerializer:
 
             # Parse datetime fields
             launch_time = (
-                datetime.fromisoformat(data["launch_time"]) if data.get(
-                    "launch_time") else None
+                datetime.fromisoformat(data["launch_time"]) if data.get("launch_time") else None
             )
             termination_time = (
                 datetime.fromisoformat(data["termination_time"])
@@ -80,12 +79,10 @@ class MachineSerializer:
                 else None
             )
             created_at = (
-                datetime.fromisoformat(data["created_at"]) if data.get(
-                    "created_at") else None
+                datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None
             )
             updated_at = (
-                datetime.fromisoformat(data["updated_at"]) if data.get(
-                    "updated_at") else None
+                datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None
             )
 
             # Build machine data with additional fields
@@ -188,8 +185,7 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
                 return self.serializer.from_dict(data_list[0])
             return None
         except Exception as e:
-            self.logger.error(
-                f"Failed to find machine by instance_id {instance_id}: {e}")
+            self.logger.error(f"Failed to find machine by instance_id {instance_id}: {e}")
             raise
 
     @handle_infrastructure_exceptions(context="machine_repository_find_by_template_id")
@@ -200,8 +196,7 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
             data_list = self.storage_strategy.find_by_criteria(criteria)
             return [self.serializer.from_dict(data) for data in data_list]
         except Exception as e:
-            self.logger.error(
-                f"Failed to find machines by template_id {template_id}: {e}")
+            self.logger.error(f"Failed to find machines by template_id {template_id}: {e}")
             raise
 
     @handle_infrastructure_exceptions(context="machine_repository_find_by_status")
@@ -227,8 +222,7 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
 
             return [self.serializer.from_dict(data) for data in machine_data_list]
         except Exception as e:
-            self.logger.error(
-                f"Failed to find machines by request_id {request_id}: {e}")
+            self.logger.error(f"Failed to find machines by request_id {request_id}: {e}")
             raise
 
     @handle_infrastructure_exceptions(context="machine_repository_find_active_machines")

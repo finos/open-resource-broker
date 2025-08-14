@@ -131,8 +131,7 @@ class CompositeProviderStrategy(ProviderStrategy):
         self._strategies = {strategy.provider_type: strategy for strategy in strategies}
         self._config = config or CompositionConfig()
         self._logger = logger
-        self._executor = ThreadPoolExecutor(
-            max_workers=self._config.max_concurrent_operations)
+        self._executor = ThreadPoolExecutor(max_workers=self._config.max_concurrent_operations)
         self._strategy_weights: Dict[str, float] = {}
 
         # Initialize equal weights for load balancing
@@ -167,8 +166,7 @@ class CompositeProviderStrategy(ProviderStrategy):
         strategy_type = strategy.provider_type
 
         if strategy_type in self._strategies:
-            self._self._logger.warning(
-                f"Strategy {strategy_type} already exists, replacing")
+            self._self._logger.warning(f"Strategy {strategy_type} already exists, replacing")
 
         self._strategies[strategy_type] = strategy
 
@@ -201,8 +199,7 @@ class CompositeProviderStrategy(ProviderStrategy):
         try:
             strategy.cleanup()
         except Exception as e:
-            self._self._logger.warning(
-                f"Error cleaning up strategy {strategy_type}: {e}")
+            self._self._logger.warning(f"Error cleaning up strategy {strategy_type}: {e}")
 
         # Remove from composition
         del self._strategies[strategy_type]
@@ -260,19 +257,15 @@ class CompositeProviderStrategy(ProviderStrategy):
                 if not strategy.is_initialized:
                     if strategy.initialize():
                         success_count += 1
-                        self._self._logger.info(
-                            f"Initialized strategy: {strategy_type}")
+                        self._self._logger.info(f"Initialized strategy: {strategy_type}")
                     else:
-                        self._self._logger.error(
-                            f"Failed to initialize strategy: {strategy_type}")
+                        self._self._logger.error(f"Failed to initialize strategy: {strategy_type}")
                 else:
                     success_count += 1
-                    self._self._logger.debug(
-                        f"Strategy already initialized: {strategy_type}")
+                    self._self._logger.debug(f"Strategy already initialized: {strategy_type}")
 
             except Exception as e:
-                self._self._logger.error(
-                    f"Error initializing strategy {strategy_type}: {e}")
+                self._self._logger.error(f"Error initializing strategy {strategy_type}: {e}")
 
         # Check if we have enough successful initializations
         min_required = max(1, self._config.min_success_count)
@@ -318,17 +311,13 @@ class CompositeProviderStrategy(ProviderStrategy):
 
             # Execute based on composition mode
             if self._config.mode == CompositionMode.PARALLEL:
-                execution_results = self._execute_parallel(
-                    capable_strategies, operation)
+                execution_results = self._execute_parallel(capable_strategies, operation)
             elif self._config.mode == CompositionMode.SEQUENTIAL:
-                execution_results = self._execute_sequential(
-                    capable_strategies, operation)
+                execution_results = self._execute_sequential(capable_strategies, operation)
             elif self._config.mode == CompositionMode.LOAD_BALANCED:
-                execution_results = self._execute_load_balanced(
-                    capable_strategies, operation)
+                execution_results = self._execute_load_balanced(capable_strategies, operation)
             else:
-                execution_results = self._execute_parallel(
-                    capable_strategies, operation)
+                execution_results = self._execute_parallel(capable_strategies, operation)
 
             # Aggregate results
             final_result = self._aggregate_results(execution_results, operation)
@@ -348,8 +337,7 @@ class CompositeProviderStrategy(ProviderStrategy):
 
         except Exception as e:
             total_time_ms = (time.time() - start_time) * 1000
-            self._self._logger.error(
-                f"Composite operation {operation.operation_type} failed: {e}")
+            self._self._logger.error(f"Composite operation {operation.operation_type} failed: {e}")
             return ProviderResult.error_result(
                 f"Composite operation failed: {str(e)}",
                 "COMPOSITE_EXECUTION_ERROR",
@@ -368,8 +356,7 @@ class CompositeProviderStrategy(ProviderStrategy):
                 if capabilities.supports_operation(operation.operation_type):
                     capable[strategy_type] = strategy
             except Exception as e:
-                self._self._logger.warning(
-                    f"Error checking capabilities for {strategy_type}: {e}")
+                self._self._logger.warning(f"Error checking capabilities for {strategy_type}: {e}")
 
         return capable
 
@@ -435,15 +422,13 @@ class CompositeProviderStrategy(ProviderStrategy):
         selected_strategy_type = self._select_strategy_by_weight(strategies)
         selected_strategy = strategies[selected_strategy_type]
 
-        result = self._execute_single_strategy(
-            selected_strategy_type, selected_strategy, operation)
+        result = self._execute_single_strategy(selected_strategy_type, selected_strategy, operation)
         return [result]
 
     def _select_strategy_by_weight(self, strategies: Dict[str, ProviderStrategy]) -> str:
         """Select a strategy based on configured weights."""
         # Filter weights for available strategies
-        available_weights = {k: v for k,
-            v in self._strategy_weights.items() if k in strategies}
+        available_weights = {k: v for k, v in self._strategy_weights.items() if k in strategies}
 
         if not available_weights:
             return next(iter(strategies.keys()))
@@ -506,8 +491,7 @@ class CompositeProviderStrategy(ProviderStrategy):
         failed_results = [r for r in execution_results if not r.success]
 
         # Check failure threshold
-        failure_rate = len(failed_results) / \
-                           len(execution_results) if execution_results else 1.0
+        failure_rate = len(failed_results) / len(execution_results) if execution_results else 1.0
         if failure_rate > self._config.failure_threshold:
             return ProviderResult.error_result(
                 f"Too many strategies failed: {len(failed_results)}/{len(execution_results)} (threshold: {self._config.failure_threshold})",
@@ -608,8 +592,7 @@ class CompositeProviderStrategy(ProviderStrategy):
                 combined_limitations.update(capabilities.limitations)
                 performance_metrics[strategy_type] = capabilities.performance_metrics
             except Exception as e:
-                self._self._logger.warning(
-                    f"Error getting capabilities from {strategy_type}: {e}")
+                self._self._logger.warning(f"Error getting capabilities from {strategy_type}: {e}")
 
         return ProviderCapabilities(
             provider_type=self.provider_type,
@@ -677,8 +660,7 @@ class CompositeProviderStrategy(ProviderStrategy):
                     strategy.cleanup()
                     self._self._logger.debug(f"Cleaned up strategy: {strategy_type}")
                 except Exception as e:
-                    self._self._logger.warning(
-                        f"Error cleaning up strategy {strategy_type}: {e}")
+                    self._self._logger.warning(f"Error cleaning up strategy {strategy_type}: {e}")
 
             self._strategies.clear()
             self._strategy_weights.clear()

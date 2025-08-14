@@ -41,8 +41,7 @@ class SchedulerRegistry(BaseRegistry):
     ):
         """Register scheduler strategy factory - implements abstract method."""
         try:
-            self.register_type(scheduler_type, strategy_factory,
-                               config_factory, **kwargs)
+            self.register_type(scheduler_type, strategy_factory, config_factory, **kwargs)
         except ValueError as e:
             raise ConfigurationError(str(e)) from e
 

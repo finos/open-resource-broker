@@ -18,8 +18,7 @@ class TestAuthenticationPerformance:
     @pytest.fixture
     def no_auth_client(self):
         """Client with no authentication."""
-        server_config = ServerConfig(
-            enabled=True, auth=AuthConfig(enabled=False, strategy="none"))
+        server_config = ServerConfig(enabled=True, auth=AuthConfig(enabled=False, strategy="none"))
         app = create_fastapi_app(server_config)
         return TestClient(app)
 

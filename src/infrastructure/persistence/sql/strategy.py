@@ -89,8 +89,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
                     )
                 else:
                     # Insert new entity
-                    serialized_data = self.serializer.serialize_for_insert(
-                        entity_id, data)
+                    serialized_data = self.serializer.serialize_for_insert(entity_id, data)
                     query, params = self.query_builder.build_insert(serialized_data)
 
                 with self.connection_manager.get_session() as session:
@@ -117,8 +116,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
         """
         with self.lock_manager.read_lock():
             try:
-                query, param_name = self.query_builder.build_select_by_id(
-                    self._get_id_column())
+                query, param_name = self.query_builder.build_select_by_id(self._get_id_column())
                 params = {param_name: entity_id}
 
                 with self.connection_manager.get_session() as session:
@@ -127,8 +125,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
 
                 if row:
                     # Convert row to dictionary
-                    row_dict = dict(row._mapping) if hasattr(
-                        row, "_mapping") else dict(row)
+                    row_dict = dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
                     entity_data = self.serializer.deserialize_from_row(row_dict)
                     self.logger.debug(f"Found entity: {entity_id}")
                     return entity_data
@@ -159,8 +156,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 id_column = self._get_id_column()
 
                 for row in rows:
-                    row_dict = dict(row._mapping) if hasattr(
-                        row, "_mapping") else dict(row)
+                    row_dict = dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
                     entity_data = self.serializer.deserialize_from_row(row_dict)
                     entity_id = entity_data.get(id_column)
                     if entity_id:
@@ -182,8 +178,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
         """
         with self.lock_manager.write_lock():
             try:
-                query, param_name = self.query_builder.build_delete(
-                    self._get_id_column())
+                query, param_name = self.query_builder.build_delete(self._get_id_column())
                 params = {param_name: entity_id}
 
                 with self.connection_manager.get_session() as session:
@@ -191,8 +186,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
                     session.commit()
 
                     if result.rowcount == 0:
-                        self.logger.warning(
-                            f"Entity not found for deletion: {entity_id}")
+                        self.logger.warning(f"Entity not found for deletion: {entity_id}")
                     else:
                         self.logger.debug(f"Deleted entity: {entity_id}")
 
@@ -238,8 +232,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
         with self.lock_manager.read_lock():
             try:
                 prepared_criteria = self.serializer.prepare_criteria(criteria)
-                query, params = self.query_builder.build_select_by_criteria(
-                    prepared_criteria)
+                query, params = self.query_builder.build_select_by_criteria(prepared_criteria)
 
                 with self.connection_manager.get_session() as session:
                     result = session.execute(text(query), params)
@@ -247,8 +240,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
 
                 entities = []
                 for row in rows:
-                    row_dict = dict(row._mapping) if hasattr(
-                        row, "_mapping") else dict(row)
+                    row_dict = dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
                     entity_data = self.serializer.deserialize_from_row(row_dict)
                     entities.append(entity_data)
 
@@ -291,8 +283,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
         """
         with self.lock_manager.write_lock():
             try:
-                query, param_name = self.query_builder.build_delete(
-                    self._get_id_column())
+                query, param_name = self.query_builder.build_delete(self._get_id_column())
 
                 with self.connection_manager.get_session() as session:
                     for entity_id in entity_ids:

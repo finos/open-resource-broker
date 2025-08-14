@@ -120,8 +120,7 @@ class BearerTokenStrategy(AuthPort):
         """
         try:
             # Validate refresh token
-            payload = jwt.decode(refresh_token, self.secret_key,
-                                 algorithms=[self.algorithm])
+            payload = jwt.decode(refresh_token, self.secret_key, algorithms=[self.algorithm])
 
             # Check if it's actually a refresh token
             token_type = payload.get("type")

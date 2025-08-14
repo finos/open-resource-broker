@@ -65,8 +65,7 @@ class TestFieldMappingIntegration:
         single_subnet = HostFactoryTransformations.transform_subnet_id("subnet-123")
         assert single_subnet == ["subnet-123"]
 
-        list_subnets = HostFactoryTransformations.transform_subnet_id(
-            ["subnet-123", "subnet-456"])
+        list_subnets = HostFactoryTransformations.transform_subnet_id(["subnet-123", "subnet-456"])
         assert list_subnets == ["subnet-123", "subnet-456"]
 
         # Test instance tags transformation
@@ -77,8 +76,7 @@ class TestFieldMappingIntegration:
 
         # Test instance type consistency
         mapped_data = {"instance_types": {"t2.micro": 1, "t2.small": 2}}
-        result = HostFactoryTransformations.ensure_instance_type_consistency(
-            mapped_data)
+        result = HostFactoryTransformations.ensure_instance_type_consistency(mapped_data)
         assert result["instance_type"] == "t2.micro"  # First from instance_types
 
     def test_scheduler_field_mapping_ondemand(self):
@@ -217,8 +215,7 @@ class TestFieldMappingIntegration:
         assert is_aws_specific is True
 
         # Test generic field detection
-        is_generic = HostFactoryFieldMappings.is_provider_specific_field(
-            "aws", "vmType")
+        is_generic = HostFactoryFieldMappings.is_provider_specific_field("aws", "vmType")
         assert is_generic is False  # vmType is in generic mappings
 
     def test_supported_schedulers_and_providers(self):

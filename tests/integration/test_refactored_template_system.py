@@ -339,8 +339,7 @@ class TestRefactoredTemplateSystem:
         """Test that services can be injected into configuration manager."""
         # Create custom services
         custom_cache = NoOpTemplateCacheService(mock_logger)
-        custom_persistence = TemplatePersistenceService(
-            mock_scheduler_strategy, mock_logger)
+        custom_persistence = TemplatePersistenceService(mock_scheduler_strategy, mock_logger)
 
         # Inject into configuration manager
         config_manager = TemplateConfigurationManager(
@@ -361,8 +360,7 @@ class TestRefactoredTemplateSystem:
     ):
         """Test error handling and resilience in the refactored system."""
         # Configure scheduler strategy to raise exception
-        mock_scheduler_strategy.get_template_paths.side_effect = Exception(
-            "Template path error")
+        mock_scheduler_strategy.get_template_paths.side_effect = Exception("Template path error")
 
         config_manager = TemplateConfigurationManager(
             config_manager=mock_config_manager,

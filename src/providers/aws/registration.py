@@ -178,8 +178,7 @@ def _register_aws_template_store(logger: "LoggingPort" = None) -> None:
     Provider-specific template logic is now handled by the scheduler strategy pattern.
     """
     if logger:
-        logger.debug(
-            "AWS template store registration skipped - using integrated template system")
+        logger.debug("AWS template store registration skipped - using integrated template system")
     # No-op: Template system has been consolidated
 
 
@@ -253,8 +252,7 @@ def register_aws_provider_with_di(provider_instance, container) -> bool:
             config_factory=lambda: aws_config,
         )
 
-        logger.debug(
-            f"Successfully registered AWS provider instance: {provider_instance.name}")
+        logger.debug(f"Successfully registered AWS provider instance: {provider_instance.name}")
         return True
 
     except Exception as e:
@@ -300,8 +298,7 @@ def _register_aws_components_with_di(container, aws_config, instance_name: str) 
         aws_client = AWSClient(config=config_port, logger=logger_port)
 
         # Log the client creation for this specific instance
-        logger_port.info(
-            f"AWS client initialized for {instance_name}: region={aws_config.region}")
+        logger_port.info(f"AWS client initialized for {instance_name}: region={aws_config.region}")
 
         return aws_client
 
@@ -448,8 +445,7 @@ def register_aws_services_with_di(container) -> None:
         # Register AMI resolver if not already registered
         if not container.is_registered(CachingAMIResolver):
             container.register_singleton(CachingAMIResolver)
-            container.register_singleton(
-                TemplateResolverPort, lambda c: c.get(CachingAMIResolver))
+            container.register_singleton(TemplateResolverPort, lambda c: c.get(CachingAMIResolver))
             logger.debug("AWS AMI resolver registered with DI container")
 
         # Register AWS Launch Template Manager if not already registered

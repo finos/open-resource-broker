@@ -120,15 +120,13 @@ class CIChecker:
                             self.log(
                                 f"FAIL: Python version {python_version} is too old (need 3.9+)"
                             )
-                            self.failed_checks.append(
-                                f"Python version {python_version} too old")
+                            self.failed_checks.append(f"Python version {python_version} too old")
                             return False
                     else:
                         raise ValueError("Invalid version format")
                 except (ValueError, IndexError):
                     self.log(f"FAIL: Invalid Python version format: {python_version}")
-                    self.failed_checks.append(
-                        f"Invalid Python version format: {python_version}")
+                    self.failed_checks.append(f"Invalid Python version format: {python_version}")
                     return False
 
             # Check for per-module flag issues
@@ -143,8 +141,7 @@ class CIChecker:
                     }
                     for key in section.keys():
                         if key not in allowed_flags:
-                            self.log(
-                                f"FAIL: Invalid per-module flag in {section_name}: {key}")
+                            self.log(f"FAIL: Invalid per-module flag in {section_name}: {key}")
                             self.failed_checks.append(
                                 f"Invalid per-module flag: {section_name}.{key}"
                             )
@@ -202,8 +199,7 @@ class CIChecker:
         self.log("\n=== Code Formatting Checks ===")
 
         checks = [
-            ("Black code formatting", [sys.executable,
-             "-m", "black", "--check", "src/", "tests/"]),
+            ("Black code formatting", [sys.executable, "-m", "black", "--check", "src/", "tests/"]),
             (
                 "isort import sorting",
                 [sys.executable, "-m", "isort", "--check-only", "src/", "tests/"],
@@ -212,10 +208,8 @@ class CIChecker:
 
         if self.fix:
             checks = [
-                ("Black code formatting", [
-                 sys.executable, "-m", "black", "src/", "tests/"]),
-                ("isort import sorting", [
-                 sys.executable, "-m", "isort", "src/", "tests/"]),
+                ("Black code formatting", [sys.executable, "-m", "black", "src/", "tests/"]),
+                ("isort import sorting", [sys.executable, "-m", "isort", "src/", "tests/"]),
             ]
 
         all_passed = True
@@ -231,8 +225,7 @@ class CIChecker:
         self.log("\n=== Linting Checks ===")
 
         checks = [
-            ("flake8 style guide", [sys.executable,
-             "-m", "flake8", "src/", "tests/"], False),
+            ("flake8 style guide", [sys.executable, "-m", "flake8", "src/", "tests/"], False),
             ("mypy type checking", [sys.executable, "-m", "mypy", "src/"], True),
             ("pylint code analysis", [sys.executable, "-m", "pylint", "src/"], True),
         ]
@@ -374,11 +367,9 @@ def main():
     """Run CI checks locally with various options."""
     parser = argparse.ArgumentParser(description="Run CI checks locally")
     parser.add_argument("--quick", action="store_true", help="Run only fast checks")
-    parser.add_argument("--fix", action="store_true",
-                        help="Fix formatting issues automatically")
+    parser.add_argument("--fix", action="store_true", help="Fix formatting issues automatically")
     parser.add_argument("--verbose", action="store_true", help="Show detailed output")
-    parser.add_argument(
-        "--output-file", help="Write output to specific file instead of temp file")
+    parser.add_argument("--output-file", help="Write output to specific file instead of temp file")
 
     args = parser.parse_args()
 

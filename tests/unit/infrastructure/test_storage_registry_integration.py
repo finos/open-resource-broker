@@ -127,8 +127,7 @@ class TestStorageRegistryIntegration:
             result = factory.create_unit_of_work()
 
             # Verify storage registry was used
-            mock_registry.create_unit_of_work.assert_called_once_with(
-                "json", mock_config_manager)
+            mock_registry.create_unit_of_work.assert_called_once_with("json", mock_config_manager)
             assert result == mock_unit_of_work
 
     def test_storage_registration_includes_unit_of_work(self):

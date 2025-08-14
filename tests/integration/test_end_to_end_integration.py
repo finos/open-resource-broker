@@ -142,8 +142,7 @@ class TestAdditionalEndToEnd:
         self.request_repository.save(self.request)
 
         # 3. Execute provisioning through handler
-        resource_id = self.spot_fleet_handler.acquire_hosts(
-            self.request, self.aws_template)
+        resource_id = self.spot_fleet_handler.acquire_hosts(self.request, self.aws_template)
 
         # 4. Update request with resource information
         self.request.add_resource_id(resource_id)
@@ -201,8 +200,7 @@ class TestAdditionalEndToEnd:
         self.template_repository.save(self.aws_template)
 
         # 2. Execute provisioning through EC2 Fleet handler
-        resource_id = self.ec2_fleet_handler.acquire_hosts(
-            self.request, self.aws_template)
+        resource_id = self.ec2_fleet_handler.acquire_hosts(self.request, self.aws_template)
 
         # 3. Update request with resource information
         self.request.add_resource_id(resource_id)
@@ -279,8 +277,7 @@ class TestAdditionalEndToEnd:
         }
 
         # Execute provisioning
-        resource_id = self.spot_fleet_handler.acquire_hosts(
-            self.request, self.aws_template)
+        resource_id = self.spot_fleet_handler.acquire_hosts(self.request, self.aws_template)
 
         # Set provider tracking information
         self.request.provider_name = "aws-primary"

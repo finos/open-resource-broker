@@ -31,8 +31,7 @@ class TestDependencyInjectionComprehensive:
 
             # Test basic container methods
             container_methods = ["register", "resolve", "get", "bind"]
-            has_container_method = any(hasattr(container, method)
-                                       for method in container_methods)
+            has_container_method = any(hasattr(container, method) for method in container_methods)
             assert has_container_method, "Container should have registration/resolution methods"
 
         except ImportError:
@@ -84,8 +83,7 @@ class TestDependencyInjectionComprehensive:
                         for res_method in resolution_methods:
                             if hasattr(container, res_method):
                                 try:
-                                    resolved = getattr(
-                                        container, res_method)("test_service")
+                                    resolved = getattr(container, res_method)("test_service")
                                     assert resolved is not None
                                     break
                                 except Exception:
@@ -245,8 +243,7 @@ class TestPersistenceLayerComprehensive:
 
                         # Test common repository methods
                         common_methods = ["save", "get_by_id", "find_all", "delete"]
-                        has_repo_method = any(hasattr(repo, method)
-                                              for method in common_methods)
+                        has_repo_method = any(hasattr(repo, method) for method in common_methods)
                         assert has_repo_method, f"{class_name} should have repository methods"
 
                 except Exception as e:
@@ -494,8 +491,7 @@ class TestAdaptersComprehensive:
 
         for adapter_file in adapter_files:
             try:
-                module = importlib.import_module(
-                    f"src.infrastructure.adapters.{adapter_file}")
+                module = importlib.import_module(f"src.infrastructure.adapters.{adapter_file}")
                 adapter_modules.append((adapter_file, module))
             except ImportError:
                 continue

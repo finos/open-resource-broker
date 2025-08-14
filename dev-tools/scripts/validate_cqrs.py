@@ -105,8 +105,7 @@ class CQRSValidator:
         self, class_node: ast.ClassDef, class_name: str, file_path: Path
     ) -> None:
         """Check if handler has required methods."""
-        method_names = [node.name for node in class_node.body if isinstance(
-            node, ast.FunctionDef)]
+        method_names = [node.name for node in class_node.body if isinstance(node, ast.FunctionDef)]
 
         if "CommandHandler" in class_name:
             required_methods = ["validate_command", "execute_command"]
@@ -175,8 +174,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Validate CQRS pattern compliance in handler classes"
     )
-    parser.add_argument("--warn-only", action="store_true",
-                        help="Only warn, don't fail the build")
+    parser.add_argument("--warn-only", action="store_true", help="Only warn, don't fail the build")
 
     args = parser.parse_args()
 

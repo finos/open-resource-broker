@@ -71,8 +71,7 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
             is_valid = api in supported_apis
 
             if not is_valid:
-                self._logger.debug(
-                    f"AWS API validation failed: {api} not in {supported_apis}")
+                self._logger.debug(f"AWS API validation failed: {api} not in {supported_apis}")
 
             return is_valid
 
@@ -141,8 +140,7 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
                 return "request"
 
         except Exception as e:
-            self._logger.error(
-                f"Error getting default fleet type for AWS API {api}: {e}")
+            self._logger.error(f"Error getting default fleet type for AWS API {api}: {e}")
             return "request"  # Safe fallback
 
     def get_valid_fleet_types_for_api(self, api: str) -> List[str]:
@@ -196,8 +194,7 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
                 return ["request"]
 
         except Exception as e:
-            self._logger.error(
-                f"Error getting valid fleet types for AWS API {api}: {e}")
+            self._logger.error(f"Error getting valid fleet types for AWS API {api}: {e}")
             return ["request"]  # Safe fallback
 
     def validate_fleet_type_for_api(self, fleet_type: str, api: str) -> bool:
@@ -223,8 +220,7 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
             return is_valid
 
         except Exception as e:
-            self._logger.error(
-                f"Error validating fleet type {fleet_type} for AWS API {api}: {e}")
+            self._logger.error(f"Error validating fleet type {fleet_type} for AWS API {api}: {e}")
             return False
 
     def validate_template_configuration(self, template_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -259,8 +255,7 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
                             )
 
             # Validate AWS-specific fields
-            self._validate_aws_specific_fields(
-                template_config, errors, warnings, validated_fields)
+            self._validate_aws_specific_fields(template_config, errors, warnings, validated_fields)
 
         except Exception as e:
             self._logger.error(f"Error during AWS template validation: {e}")

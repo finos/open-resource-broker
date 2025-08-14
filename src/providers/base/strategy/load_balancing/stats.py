@@ -59,8 +59,7 @@ class StrategyStats:
         # Update response time statistics
         self.response_times.append(response_time_ms)
         if self.response_times:
-            self.average_response_time = sum(
-                self.response_times) / len(self.response_times)
+            self.average_response_time = sum(self.response_times) / len(self.response_times)
 
     def reset_stats(self):
         """Reset all statistics."""

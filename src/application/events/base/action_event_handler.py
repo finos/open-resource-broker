@@ -146,8 +146,7 @@ class ActionEventHandler(EventHandler):
         if self.logger:
             event_type = getattr(event, "event_type", "unknown")
             aggregate_id = getattr(event, "aggregate_id", "unknown")
-            self.logger.error(
-                f"Action failed for {event_type} ({aggregate_id}): {str(error)}")
+            self.logger.error(f"Action failed for {event_type} ({aggregate_id}): {str(error)}")
 
     def extract_action_data(self, event: DomainEvent) -> Dict[str, Any]:
         """

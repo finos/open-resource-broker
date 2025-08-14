@@ -27,8 +27,7 @@ console_handler.setFormatter(formatter)
 # File handler with rotation
 from logging.handlers import RotatingFileHandler
 
-file_handler = RotatingFileHandler(
-    "hfmock.log", maxBytes=10 * 1024 * 1024, backupCount=5)  # 10MB
+file_handler = RotatingFileHandler("hfmock.log", maxBytes=10 * 1024 * 1024, backupCount=5)  # 10MB
 file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(formatter)
 
@@ -150,15 +149,12 @@ class HostFactoryMock:
         self.get_available_templates_script = os.path.join(
             hf_scripts_location, "getAvailableTemplates.sh"
         )
-        self.request_machines_script = os.path.join(
-            hf_scripts_location, "requestMachines.sh")
-        self.get_request_status_script = os.path.join(
-            hf_scripts_location, "getRequestStatus.sh")
+        self.request_machines_script = os.path.join(hf_scripts_location, "requestMachines.sh")
+        self.get_request_status_script = os.path.join(hf_scripts_location, "getRequestStatus.sh")
         self.request_return_machines_script = os.path.join(
             hf_scripts_location, "requestReturnMachines.sh"
         )
-        self.get_return_requests_script = os.path.join(
-            hf_scripts_location, "getReturnRequests.sh")
+        self.get_return_requests_script = os.path.join(hf_scripts_location, "getReturnRequests.sh")
 
     def get_available_templates(self) -> Dict[str, Any]:
         """Get available templates."""
@@ -216,8 +212,7 @@ class HostFactoryMock:
 
     def request_machines(self, template_name: str, machine_count: int) -> Dict[str, Any]:
         """Request machines using specified template."""
-        request = {"template": {"templateId": template_name,
-            "machineCount": machine_count}}
+        request = {"template": {"templateId": template_name, "machineCount": machine_count}}
         log.debug(f"input_request: {json.dumps(request, indent=4)}")
 
         request_file_name = write_request_json_to_a_tmp_file(request)

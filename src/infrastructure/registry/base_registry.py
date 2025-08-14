@@ -142,8 +142,7 @@ class BaseRegistry(ABC):
             ValueError: If not in multi-choice mode or instance already registered
         """
         if self.mode != RegistryMode.MULTI_CHOICE:
-            raise ValueError(
-                "Instance registration only supported in MULTI_CHOICE mode")
+            raise ValueError("Instance registration only supported in MULTI_CHOICE mode")
 
         with self._registry_lock:
             if instance_name in self._instance_registrations:
@@ -153,8 +152,7 @@ class BaseRegistry(ABC):
                 type_name, strategy_factory, config_factory, **additional_factories
             )
             self._instance_registrations[instance_name] = registration
-            self.logger.info(
-                f"Registered instance: {instance_name} (type: {type_name})")
+            self.logger.info(f"Registered instance: {instance_name} (type: {type_name})")
 
     def create_strategy_by_type(self, type_name: str, config: Any) -> Any:
         """Create strategy by type name."""
@@ -164,8 +162,7 @@ class BaseRegistry(ABC):
     def create_strategy_by_instance(self, instance_name: str, config: Any) -> Any:
         """Create strategy by instance name (multi-choice mode only)."""
         if self.mode != RegistryMode.MULTI_CHOICE:
-            raise ValueError(
-                "Instance-based creation only supported in MULTI_CHOICE mode")
+            raise ValueError("Instance-based creation only supported in MULTI_CHOICE mode")
 
         registration = self._get_instance_registration(instance_name)
         return self._create_strategy_from_registration(registration, config, instance_name)
@@ -220,8 +217,7 @@ class BaseRegistry(ABC):
             self.logger.debug(f"Created {factory_name} for type: {type_name}")
             return component
         except Exception as e:
-            self.logger.warning(
-                f"Failed to create {factory_name} for type '{type_name}': {str(e)}")
+            self.logger.warning(f"Failed to create {factory_name} for type '{type_name}': {str(e)}")
             return None
 
     def clear_registrations(self) -> None:

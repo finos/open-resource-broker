@@ -70,8 +70,7 @@ class TestJSONStorageRegistration:
         mock_config = Mock()
         mock_config.json_strategy.base_path = "test_data"
         mock_config.json_strategy.storage_type = "split_files"
-        mock_config.json_strategy.filenames = {
-            "split_files": {"requests": "requests.json"}}
+        mock_config.json_strategy.filenames = {"split_files": {"requests": "requests.json"}}
 
         mock_strategy = Mock()
         mock_strategy_class.return_value = mock_strategy

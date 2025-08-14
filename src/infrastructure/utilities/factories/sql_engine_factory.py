@@ -77,8 +77,7 @@ class SQLEngineFactory:
                     Path(db_dir).mkdir(parents=True, exist_ok=True)
 
             connection_string = f"sqlite:///{db_path}"
-            logger.debug(
-                f"Creating SQLite engine with connection string: {connection_string}")
+            logger.debug(f"Creating SQLite engine with connection string: {connection_string}")
 
             # SQLite-specific settings
             engine_kwargs["connect_args"] = {
@@ -95,8 +94,7 @@ class SQLEngineFactory:
 
             # Build connection string
             connection_string = f"postgresql://{username}:{password}@{host}:{port}/{database}"
-            logger.debug(
-                f"Creating PostgreSQL engine with connection to {host}:{port}/{database}")
+            logger.debug(f"Creating PostgreSQL engine with connection to {host}:{port}/{database}")
 
             # Add pooling configuration
             engine_kwargs.update(
@@ -118,8 +116,7 @@ class SQLEngineFactory:
 
             # Build connection string
             connection_string = f"mysql+pymysql://{username}:{password}@{host}:{port}/{database}"
-            logger.debug(
-                f"Creating MySQL engine with connection to {host}:{port}/{database}")
+            logger.debug(f"Creating MySQL engine with connection to {host}:{port}/{database}")
 
             # Add pooling configuration
             engine_kwargs.update(
@@ -142,8 +139,7 @@ class SQLEngineFactory:
 
             # Build connection string
             connection_string = f"mysql+pymysql://{username}:{password}@{host}:{port}/{database}"
-            logger.debug(
-                f"Creating Aurora engine with connection to {host}:{port}/{database}")
+            logger.debug(f"Creating Aurora engine with connection to {host}:{port}/{database}")
 
             # Add pooling configuration
             engine_kwargs.update(

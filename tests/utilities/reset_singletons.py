@@ -84,10 +84,8 @@ def reset_all_singletons() -> None:
     _safe_reset_global_variable(
         "src.infrastructure.aws.aws_client_singleton", "_aws_client_singleton_instance"
     )
-    _safe_reset_class_instance(
-        "src.infrastructure.config.manager", "ConfigurationManager")
-    _safe_reset_class_instance(
-        "src.infrastructure.logging.logger_singleton", "LoggerSingleton")
+    _safe_reset_class_instance("src.infrastructure.config.manager", "ConfigurationManager")
+    _safe_reset_class_instance("src.infrastructure.logging.logger_singleton", "LoggerSingleton")
 
 
 def reset_singleton(singleton_class: Type[Any]) -> None:
@@ -113,8 +111,6 @@ def reset_singleton(singleton_class: Type[Any]) -> None:
             "_aws_client_singleton_instance",
         )
     elif class_name == "ConfigurationManager":
-        _safe_reset_class_instance(
-            "src.infrastructure.config.manager", "ConfigurationManager")
+        _safe_reset_class_instance("src.infrastructure.config.manager", "ConfigurationManager")
     elif class_name == "LoggerSingleton":
-        _safe_reset_class_instance(
-            "src.infrastructure.logging.logger_singleton", "LoggerSingleton")
+        _safe_reset_class_instance("src.infrastructure.logging.logger_singleton", "LoggerSingleton")

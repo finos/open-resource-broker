@@ -93,8 +93,7 @@ class GetStorageHealthHandler(BaseQueryHandler[GetStorageHealthQuery, StorageHea
             strategy_name=query.strategy_name or "current",
             healthy=True,
             status="operational",
-            details=({} if not query.detailed else {
-                     "connections": "active", "latency": "low"}),
+            details=({} if not query.detailed else {"connections": "active", "latency": "low"}),
         )
 
 
@@ -120,6 +119,5 @@ class GetStorageMetricsHandler(BaseQueryHandler[GetStorageMetricsQuery, StorageM
             operations_count=0,
             average_latency=0.0,
             error_rate=0.0,
-            details=({} if not query.include_operations else {
-                     "read_ops": 0, "write_ops": 0}),
+            details=({} if not query.include_operations else {"read_ops": 0, "write_ops": 0}),
         )

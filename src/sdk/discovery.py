@@ -84,8 +84,7 @@ class SDKMethodDiscovery:
             return methods
 
         except Exception as e:
-            raise HandlerDiscoveryError(
-                f"Failed to discover SDK methods: {str(e)}") from e
+            raise HandlerDiscoveryError(f"Failed to discover SDK methods: {str(e)}") from e
 
     async def discover_sdk_methods(self, service) -> Dict[str, Callable]:
         """
@@ -189,8 +188,7 @@ class SDKMethodDiscovery:
             # Fallback to basic method info
             return MethodInfo(
                 name=method_name,
-                description=self._generate_method_description(
-                    method_name, operation_type),
+                description=self._generate_method_description(method_name, operation_type),
                 parameters={},
                 required_params=[],
                 return_type=None,

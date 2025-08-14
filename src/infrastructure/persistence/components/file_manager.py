@@ -118,8 +118,7 @@ class FileManager:
 
         try:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = self.file_path.with_suffix(
-                f".backup_{timestamp}{self.file_path.suffix}")
+            backup_path = self.file_path.with_suffix(f".backup_{timestamp}{self.file_path.suffix}")
 
             shutil.copy2(self.file_path, backup_path)
             self.logger.debug(f"Created backup: {backup_path}")
@@ -149,8 +148,7 @@ class FileManager:
                     backup_file.unlink()
                     self.logger.debug(f"Removed old backup: {backup_file}")
                 except Exception as e:
-                    self.logger.warning(
-                        f"Failed to remove old backup {backup_file}: {e}")
+                    self.logger.warning(f"Failed to remove old backup {backup_file}: {e}")
 
         except Exception as e:
             self.logger.error(f"Failed to cleanup old backups: {e}")

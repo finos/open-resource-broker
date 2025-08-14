@@ -390,8 +390,7 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Provid
                                 "avg_response_time": 0.0,
                             }
             except Exception as provider_error:
-                self.logger.warning(
-                    f"Could not get provider-specific metrics: {provider_error}")
+                self.logger.warning(f"Could not get provider-specific metrics: {provider_error}")
                 metrics["providers"]["default"] = {
                     "status": "unknown",
                     "type": "unknown",

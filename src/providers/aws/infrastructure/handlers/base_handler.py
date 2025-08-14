@@ -103,8 +103,7 @@ class AWSHandler(ABC):
         if request_adapter:
             self._logger.debug("Successfully initialized request adapter")
         else:
-            self._logger.debug(
-                "No request adapter provided, will use EC2 client directly")
+            self._logger.debug("No request adapter provided, will use EC2 client directly")
 
     @abstractmethod
     def acquire_hosts(self, request: Request, aws_template: AWSTemplate) -> str:
@@ -344,8 +343,7 @@ class AWSHandler(ABC):
         """
         try:
             # Use AWS client's EC2 client for describe_instances
-            response = self.aws_client.ec2_client.describe_instances(
-                InstanceIds=instance_ids)
+            response = self.aws_client.ec2_client.describe_instances(InstanceIds=instance_ids)
 
             instances = []
             for reservation in response.get("Reservations", []):

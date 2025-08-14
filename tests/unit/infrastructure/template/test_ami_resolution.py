@@ -12,8 +12,7 @@ and updated to work with the new architecture.
 import pytest
 
 # Skip all tests in this file since AMI resolution is disabled
-pytestmark = pytest.mark.skip(
-    "AMI resolution functionality is disabled - moved to backup/")
+pytestmark = pytest.mark.skip("AMI resolution functionality is disabled - moved to backup/")
 
 
 @pytest.mark.unit

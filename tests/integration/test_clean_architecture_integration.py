@@ -98,8 +98,7 @@ class TestCleanArchitectureIntegration:
 
         # Verify registration
         assert TemplateExtensionRegistry.has_extension("aws")
-        assert TemplateExtensionRegistry.get_extension_class(
-            "aws") == AWSTemplateExtensionConfig
+        assert TemplateExtensionRegistry.get_extension_class("aws") == AWSTemplateExtensionConfig
 
         # Test extension defaults
         extension_defaults = TemplateExtensionRegistry.get_extension_defaults("aws")
@@ -176,8 +175,7 @@ class TestCleanArchitectureIntegration:
     def test_provider_extension_hierarchy(self, template_defaults_service):
         """Test provider extension hierarchy (type -> instance)."""
         # Get extension defaults for AWS provider
-        extension_defaults = template_defaults_service._get_extension_defaults(
-            "aws", "aws-primary")
+        extension_defaults = template_defaults_service._get_extension_defaults("aws", "aws-primary")
 
         # Should include both type and instance extension defaults
         assert isinstance(extension_defaults, dict)
@@ -216,8 +214,7 @@ class TestCleanArchitectureIntegration:
     def test_configuration_validation(self, template_defaults_service):
         """Test configuration validation with extensions."""
         # Test validation for AWS provider
-        validation_result = template_defaults_service.validate_template_defaults(
-            "aws-primary")
+        validation_result = template_defaults_service.validate_template_defaults("aws-primary")
 
         assert isinstance(validation_result, dict)
         assert "is_valid" in validation_result

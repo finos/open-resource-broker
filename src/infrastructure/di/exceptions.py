@@ -103,8 +103,7 @@ class CircularDependencyError(DependencyResolutionError):
         self.dependency_chain = dependency_chain
 
         # Format the dependency chain for the error message
-        chain_str = " -> ".join([getattr(t, "__name__", str(t))
-                                for t in dependency_chain])
+        chain_str = " -> ".join([getattr(t, "__name__", str(t)) for t in dependency_chain])
         message = f"Circular dependency detected: {chain_str}"
 
         # Use the last dependency in the chain as the dependency_type

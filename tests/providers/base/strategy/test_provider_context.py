@@ -27,8 +27,7 @@ class MockProviderStrategy(ProviderStrategy):
     def __init__(self, provider_type: str, supports_operations=None, health_status=None):
         """Initialize the instance."""
         self._provider_type = provider_type
-        self._supports_operations = supports_operations or [
-            ProviderOperationType.CREATE_INSTANCES]
+        self._supports_operations = supports_operations or [ProviderOperationType.CREATE_INSTANCES]
         self._health_status = health_status or ProviderHealthStatus.healthy()
         self._initialized = False
         self.execute_count = 0

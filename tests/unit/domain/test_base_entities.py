@@ -80,8 +80,7 @@ class TestBaseEntity:
     def test_entity_with_timestamps(self):
         """Test entity with timestamp fields."""
         now = datetime.now(timezone.utc)
-        entity = MockEntity(id="test-1", name="Timestamped Entity",
-                            created_at=now, updated_at=now)
+        entity = MockEntity(id="test-1", name="Timestamped Entity", created_at=now, updated_at=now)
 
         assert entity.created_at == now
         assert entity.updated_at == now

@@ -37,8 +37,7 @@ def create_fastapi_app(server_config: ServerConfig) -> FastAPI:
 
     # Add trusted host middleware if configured
     if server_config.trusted_hosts and server_config.trusted_hosts != ["*"]:
-        app.add_middleware(TrustedHostMiddleware,
-                           allowed_hosts=server_config.trusted_hosts)
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=server_config.trusted_hosts)
 
     # Add CORS middleware
     if server_config.cors.enabled:
@@ -59,8 +58,7 @@ def create_fastapi_app(server_config: ServerConfig) -> FastAPI:
     if server_config.auth.enabled:
         auth_strategy = _create_auth_strategy(server_config.auth)
         if auth_strategy:
-            app.add_middleware(
-                AuthMiddleware, auth_port=auth_strategy, require_auth=True)
+            app.add_middleware(AuthMiddleware, auth_port=auth_strategy, require_auth=True)
             logger.info(
                 f"Authentication middleware enabled with strategy: {auth_strategy.get_strategy_name()}"
             )

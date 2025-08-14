@@ -48,8 +48,7 @@ class TemplateJSONStorageStrategy(JSONStorageStrategy):
             self.logger.debug(f"Templates file: {self.file_path}")
             self.logger.debug(f"Legacy templates file: {self.legacy_file_path}")
         elif self.legacy_file_path and os.path.exists(self.legacy_file_path):
-            self.logger.info(
-                f"Found only legacy templates file: {self.legacy_file_path}")
+            self.logger.info(f"Found only legacy templates file: {self.legacy_file_path}")
         elif os.path.exists(self.file_path):
             self.logger.info(f"Found only templates.json: {self.file_path}")
         else:
@@ -148,8 +147,7 @@ class TemplateJSONRepository(StrategyBasedRepository, TemplateRepository):
         # Get template file paths from configuration
         app_config = config_manager.get_app_config()
         templates_file_path = app_config.templates_file_path
-        legacy_templates_file_path = getattr(
-            app_config, "legacy_templates_file_path", None)
+        legacy_templates_file_path = getattr(app_config, "legacy_templates_file_path", None)
 
         # Choose strategy based on configuration
         if use_provider_strategy:
@@ -306,8 +304,7 @@ class TemplateJSONRepository(StrategyBasedRepository, TemplateRepository):
 
         max_instances = data.get("max_instances", 1)
         if max_instances <= 0:
-            raise ValueError(
-                f"Template '{template_id}' max_instances must be greater than 0")
+            raise ValueError(f"Template '{template_id}' max_instances must be greater than 0")
 
         # Create Template aggregate with all fields
         return Template(

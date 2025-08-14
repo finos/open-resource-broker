@@ -80,8 +80,7 @@ class LifecycleManager:
 
         # Check if component type is already registered
         if component_type in self._component_types:
-            self._logger.debug(
-                f"Component type {component_type.__name__} already registered")
+            self._logger.debug(f"Component type {component_type.__name__} already registered")
             return
 
         self._components.append(component)
@@ -101,16 +100,14 @@ class LifecycleManager:
         for component in self._components:
             try:
                 component.initialize()
-                self._logger.debug(
-                    f"Initialized component: {component.__class__.__name__}")
+                self._logger.debug(f"Initialized component: {component.__class__.__name__}")
             except Exception as e:
                 self._logger.error(
                     f"Error initializing component { component.__class__.__name__}: { str(e)}"
                 )
                 import traceback
 
-                self._logger.error(
-                    f"Initialization error details: {traceback.format_exc()}")
+                self._logger.error(f"Initialization error details: {traceback.format_exc()}")
 
     def shutdown_all(self) -> None:
         """
@@ -123,8 +120,7 @@ class LifecycleManager:
         for component in reversed(self._components):
             try:
                 component.shutdown()
-                self._logger.debug(
-                    f"Shut down component: {component.__class__.__name__}")
+                self._logger.debug(f"Shut down component: {component.__class__.__name__}")
             except Exception as e:
                 self._logger.error(
                     f"Error shutting down component { component.__class__.__name__}: { str(e)}"

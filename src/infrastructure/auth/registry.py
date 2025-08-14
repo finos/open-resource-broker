@@ -28,8 +28,7 @@ class AuthRegistry:
         """
         with self._lock:
             if strategy_name in self._strategies:
-                self.logger.warning(
-                    f"Overriding existing auth strategy: {strategy_name}")
+                self.logger.warning(f"Overriding existing auth strategy: {strategy_name}")
 
             self._strategies[strategy_name] = strategy_factory
             self.logger.info(f"Registered auth strategy: {strategy_name}")

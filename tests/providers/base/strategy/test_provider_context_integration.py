@@ -216,8 +216,7 @@ class TestProviderContextIntegration:
                 limitations={},
                 performance_metrics={},
             )
-            strategy.execute_operation.return_value = ProviderResult.success_result({
-                                                                                    "provider": i})
+            strategy.execute_operation.return_value = ProviderResult.success_result({"provider": i})
             strategies.append(strategy)
             provider_context.register_strategy(strategy)
 
@@ -330,8 +329,7 @@ class TestProviderContextIntegration:
             limitations={},
             performance_metrics={},
         )
-        primary_strategy.check_health.return_value = ProviderHealthStatus.unhealthy(
-            "Service down")
+        primary_strategy.check_health.return_value = ProviderHealthStatus.unhealthy("Service down")
 
         backup_strategy = Mock()
         backup_strategy.provider_type = "backup"

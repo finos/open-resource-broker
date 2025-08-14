@@ -26,8 +26,7 @@ class TestCommandHandlersComprehensive:
 
         for handler_file in handler_files:
             try:
-                module = importlib.import_module(
-                    f"src.application.commands.{handler_file}")
+                module = importlib.import_module(f"src.application.commands.{handler_file}")
                 handler_modules.append((handler_file, module))
             except ImportError:
                 continue
@@ -131,8 +130,7 @@ class TestCommandHandlersComprehensive:
                                 try:
                                     # Mock dependencies
                                     if hasattr(handler, "repository"):
-                                        handler.repository.save = AsyncMock(
-                                            return_value=Mock())
+                                        handler.repository.save = AsyncMock(return_value=Mock())
                                         handler.repository.get_by_id = AsyncMock(
                                             return_value=Mock()
                                         )
@@ -147,8 +145,7 @@ class TestCommandHandlersComprehensive:
 
                 except Exception as e:
                     # Log but don't fail
-                    print(
-                        f"Could not test command handler methods for {class_name}: {e}")
+                    print(f"Could not test command handler methods for {class_name}: {e}")
 
 
 @pytest.mark.unit
@@ -168,8 +165,7 @@ class TestQueryHandlersComprehensive:
 
         for handler_file in handler_files:
             try:
-                module = importlib.import_module(
-                    f"src.application.queries.{handler_file}")
+                module = importlib.import_module(f"src.application.queries.{handler_file}")
                 handler_modules.append((handler_file, module))
             except ImportError:
                 continue
@@ -232,8 +228,7 @@ class TestQueryHandlersComprehensive:
                                 try:
                                     # Mock dependencies
                                     if hasattr(handler, "repository"):
-                                        handler.repository.find_all = AsyncMock(
-                                            return_value=[])
+                                        handler.repository.find_all = AsyncMock(return_value=[])
                                         handler.repository.get_by_id = AsyncMock(
                                             return_value=Mock()
                                         )
@@ -362,8 +357,7 @@ class TestApplicationDTOsComprehensive:
                             instance = dto_class(id="test", name="test")
                         except Exception:
                             try:
-                                instance = dto_class(
-                                    template_id="test", machine_count=1)
+                                instance = dto_class(template_id="test", machine_count=1)
                             except Exception:
                                 continue
 
@@ -440,8 +434,7 @@ class TestApplicationEventsComprehensive:
 
         # Check base events
         try:
-            module = importlib.import_module(
-                "src.application.events.base.event_handler")
+            module = importlib.import_module("src.application.events.base.event_handler")
             event_modules.append(("base.event_handler", module))
         except ImportError:
             pass
@@ -457,8 +450,7 @@ class TestApplicationEventsComprehensive:
 
         for handler_file in handler_files:
             try:
-                module = importlib.import_module(
-                    f"src.application.events.handlers.{handler_file}")
+                module = importlib.import_module(f"src.application.events.handlers.{handler_file}")
                 event_modules.append((f"handlers.{handler_file}", module))
             except ImportError:
                 continue

@@ -82,5 +82,4 @@ class TestSchedulerStrategyRegistration:
 
         # Assert
         mock_create_default_strategy.assert_called_once_with(container)
-        container.register_singleton.assert_called_once_with(
-            SchedulerPort, lambda c: mock_strategy)
+        container.register_singleton.assert_called_once_with(SchedulerPort, lambda c: mock_strategy)

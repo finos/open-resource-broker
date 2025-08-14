@@ -159,7 +159,7 @@ class ProviderSelectionService:
             provider_instance=selected.name,
             selection_reason=reason,
             confidence=1.0,
-            alternatives=[p.name for p in active_providers if p.name != selected.name]
+            alternatives=[p.name for p in active_providers if p.name != selected.name],
         )
 
         # Cache the result
@@ -176,8 +176,7 @@ class ProviderSelectionService:
         # Validate provider instance exists and is enabled
         provider_instance = self._get_provider_instance_config(provider_name)
         if not provider_instance:
-            raise ValueError(
-                f"Provider instance '{provider_name}' not found in configuration")
+            raise ValueError(f"Provider instance '{provider_name}' not found in configuration")
 
         if not provider_instance.enabled:
             raise ValueError(f"Provider instance '{provider_name}' is disabled")
@@ -198,8 +197,7 @@ class ProviderSelectionService:
         # Get all enabled instances of the provider type
         instances = self._get_enabled_instances_by_type(provider_type)
         if not instances:
-            raise ValueError(
-                f"No enabled instances found for provider type '{provider_type}'")
+            raise ValueError(f"No enabled instances found for provider type '{provider_type}'")
 
         # Apply load balancing strategy
         selected_instance = self._apply_load_balancing_strategy(instances)
@@ -213,8 +211,7 @@ class ProviderSelectionService:
             provider_instance=selected_instance.name,
             selection_reason=f"Load balanced across { len(instances)} {provider_type} instances",
             confidence=0.9,
-            alternatives=[inst.name for inst in instances if inst.name !=
-                selected_instance.name],
+            alternatives=[inst.name for inst in instances if inst.name != selected_instance.name],
         )
 
     def _select_by_api_capability(self, template: Template) -> ProviderSelectionResult:
@@ -246,16 +243,14 @@ class ProviderSelectionService:
     def _select_default_provider(self, template: Template) -> ProviderSelectionResult:
         """Select default provider from configuration."""
         # Get default from configuration
-        default_provider_type = getattr(
-            self._provider_config, "default_provider_type", None)
+        default_provider_type = getattr(self._provider_config, "default_provider_type", None)
         default_provider_instance = getattr(
             self._provider_config, "default_provider_instance", None
         )
 
         # If no defaults in config, use first enabled provider
         if not default_provider_instance:
-            enabled_instances = [
-                p for p in self._provider_config.providers if p.enabled]
+            enabled_instances = [p for p in self._provider_config.providers if p.enabled]
             if not enabled_instances:
                 raise ValueError("No enabled providers found in configuration")
 
@@ -391,8 +386,7 @@ class ProviderSelectionService:
 
         for provider in self._provider_config.providers:
             # Get effective handlers as capabilities
-            provider_defaults = self._provider_config.provider_defaults.get(
-                provider.type)
+            provider_defaults = self._provider_config.provider_defaults.get(provider.type)
             effective_handlers = provider.get_effective_handlers(provider_defaults)
             capabilities = list(effective_handlers.keys())
 

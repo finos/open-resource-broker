@@ -56,8 +56,7 @@ class RepositoryFactory:
 
         try:
             # Get storage strategy from registry
-            storage_strategy = self.storage_registry.create_strategy(
-                storage_type, config)
+            storage_strategy = self.storage_registry.create_strategy(storage_type, config)
 
             # Create repository with strategy injection
             return MachineRepository(storage_strategy)
@@ -77,8 +76,7 @@ class RepositoryFactory:
 
         try:
             # Get storage strategy from registry
-            storage_strategy = self.storage_registry.create_strategy(
-                storage_type, config)
+            storage_strategy = self.storage_registry.create_strategy(storage_type, config)
 
             # Create repository with strategy injection
             return RequestRepository(storage_strategy)
@@ -98,8 +96,7 @@ class RepositoryFactory:
 
         try:
             # Get storage strategy from registry
-            storage_strategy = self.storage_registry.create_strategy(
-                storage_type, config)
+            storage_strategy = self.storage_registry.create_strategy(storage_type, config)
 
             # Create repository with strategy injection
             return TemplateRepository(storage_strategy)

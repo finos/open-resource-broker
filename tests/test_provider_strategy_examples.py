@@ -333,8 +333,7 @@ class TestLoadBalancing:
         """Test round-robin load balancing."""
         config = LoadBalancingConfig(algorithm=LoadBalancingAlgorithm.ROUND_ROBIN)
 
-        load_balancer = LoadBalancingProviderStrategy(
-            strategies=self.strategies, config=config)
+        load_balancer = LoadBalancingProviderStrategy(strategies=self.strategies, config=config)
 
         load_balancer.initialize()
 
@@ -358,11 +357,9 @@ class TestLoadBalancing:
 
     def test_least_response_time_load_balancing(self):
         """Test least response time load balancing."""
-        config = LoadBalancingConfig(
-            algorithm=LoadBalancingAlgorithm.LEAST_RESPONSE_TIME)
+        config = LoadBalancingConfig(algorithm=LoadBalancingAlgorithm.LEAST_RESPONSE_TIME)
 
-        load_balancer = LoadBalancingProviderStrategy(
-            strategies=self.strategies, config=config)
+        load_balancer = LoadBalancingProviderStrategy(strategies=self.strategies, config=config)
 
         load_balancer.initialize()
 
@@ -379,8 +376,7 @@ class TestLoadBalancing:
 
     def test_weighted_load_balancing(self):
         """Test weighted load balancing."""
-        config = LoadBalancingConfig(
-            algorithm=LoadBalancingAlgorithm.WEIGHTED_ROUND_ROBIN)
+        config = LoadBalancingConfig(algorithm=LoadBalancingAlgorithm.WEIGHTED_ROUND_ROBIN)
 
         # Give provider1 higher weight
         weights = {"provider1": 0.8, "provider2": 0.2}
@@ -665,8 +661,7 @@ class TestIntegrationScenarios:
         unreliable_provider = MockProvider1Strategy(should_fail=True)
 
         # Create load balancer
-        lb_config = LoadBalancingConfig(
-            algorithm=LoadBalancingAlgorithm.LEAST_RESPONSE_TIME)
+        lb_config = LoadBalancingConfig(algorithm=LoadBalancingAlgorithm.LEAST_RESPONSE_TIME)
 
         load_balancer = LoadBalancingProviderStrategy(
             strategies=[fast_provider, slow_provider], config=lb_config

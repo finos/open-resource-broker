@@ -51,8 +51,7 @@ def check_large_files(warn_only: bool = False, threshold: int = 600) -> None:
         logger.info(
             f"Consider splitting files larger than {threshold} lines for better maintainability."
         )
-        logger.info(
-            "Large files often indicate Single Responsibility Principle violations.")
+        logger.info("Large files often indicate Single Responsibility Principle violations.")
 
         if not warn_only:
             logger.error("Build failed due to large files.")
@@ -82,16 +81,14 @@ def main():
     parser = argparse.ArgumentParser(
         description="Check for large files that may violate Single Responsibility Principle"
     )
-    parser.add_argument("--warn-only", action="store_true",
-                        help="Only warn, don't fail the build")
+    parser.add_argument("--warn-only", action="store_true", help="Only warn, don't fail the build")
     parser.add_argument(
         "--threshold",
         type=int,
         default=600,
         help="Line count threshold for warnings (default: 600)",
     )
-    parser.add_argument("--report", action="store_true",
-                        help="Generate a full file size report")
+    parser.add_argument("--report", action="store_true", help="Generate a full file size report")
 
     args = parser.parse_args()
 

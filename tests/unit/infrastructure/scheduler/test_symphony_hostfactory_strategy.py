@@ -32,8 +32,7 @@ class TestSymphonyHostFactorySchedulerStrategy:
         self.mock_config_manager.resolve_file.side_effect = mock_resolve_file
 
         self.mock_logger = Mock()
-        self.strategy = HostFactorySchedulerStrategy(
-            self.mock_config_manager, self.mock_logger)
+        self.strategy = HostFactorySchedulerStrategy(self.mock_config_manager, self.mock_logger)
 
     def test_get_templates_file_path(self):
         """Test templates file path generation."""

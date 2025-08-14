@@ -54,8 +54,7 @@ class AWSInstanceManager:
                 security_groups = template_config.get("security_group_ids")
                 if security_groups:
                     params["SecurityGroupIds"] = (
-                        security_groups if isinstance(security_groups, list) else [
-                                                      security_groups]
+                        security_groups if isinstance(security_groups, list) else [security_groups]
                     )
 
                 # Add key name if specified
@@ -67,13 +66,11 @@ class AWSInstanceManager:
                 response = ec2_client.run_instances(**params)
 
                 # Extract instance IDs
-                instance_ids = [instance["InstanceId"]
-                    for instance in response["Instances"]]
+                instance_ids = [instance["InstanceId"] for instance in response["Instances"]]
 
                 # Add tags if specified
                 if template_config.get("tags") and instance_ids:
-                    tags = [{"Key": k, "Value": v}
-                        for k, v in template_config["tags"].items()]
+                    tags = [{"Key": k, "Value": v} for k, v in template_config["tags"].items()]
                     ec2_client.create_tags(Resources=instance_ids, Tags=tags)
 
                 return instance_ids

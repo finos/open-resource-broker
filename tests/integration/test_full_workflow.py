@@ -644,8 +644,7 @@ class TestPerformanceIntegration:
                 end_times.append(end_time)
 
         # Run 50 concurrent operations
-        threads = [threading.Thread(target=performance_worker, args=(i,))
-                                    for i in range(50)]
+        threads = [threading.Thread(target=performance_worker, args=(i,)) for i in range(50)]
 
         overall_start = time.time()
 

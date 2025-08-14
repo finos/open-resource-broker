@@ -142,8 +142,7 @@ class HealthCheck:
                     health_file = self.health_dir / "health.json"
                     with health_file.open("w") as f:
                         json.dump(
-                            {name: status.to_dict()
-                                                  for name, status in results.items()},
+                            {name: status.to_dict() for name, status in results.items()},
                             f,
                             indent=2,
                         )
@@ -300,8 +299,7 @@ class HealthCheck:
             # Check EC2 service
             response = self.aws_client.ec2_client.describe_instances(MaxResults=5)
 
-            instance_count = sum(len(r["Instances"])
-                                 for r in response.get("Reservations", []))
+            instance_count = sum(len(r["Instances"]) for r in response.get("Reservations", []))
 
             return HealthStatus(
                 name="ec2",
@@ -421,8 +419,7 @@ class HealthCheck:
 
             # List tables
             tables = self.aws_client.session.client("dynamodb").list_tables()
-            project_tables = [t for t in tables["TableNames"]
-                if t.startswith(table_prefix)]
+            project_tables = [t for t in tables["TableNames"] if t.startswith(table_prefix)]
 
             return HealthStatus(
                 name="database",
@@ -446,8 +443,7 @@ class HealthCheck:
         """Check overall application health."""
         try:
             # Run all other checks
-            results = {name: self.run_check(name)
-                                            for name in self.checks if name != "application"}
+            results = {name: self.run_check(name) for name in self.checks if name != "application"}
 
             # Count status types
             status_counts = {"healthy": 0, "degraded": 0, "unhealthy": 0, "unknown": 0}
