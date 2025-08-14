@@ -38,7 +38,8 @@ def generate_cyclonedx_sbom(output_file: str) -> bool:
         logger.info(f"Generated CycloneDX SBOM: {output_file}")
         return True
     else:
-        logger.info(f"Failed to generate CycloneDX SBOM: {result.stderr}", file=sys.stderr)
+        logger.info(
+            f"Failed to generate CycloneDX SBOM: {result.stderr}", file=sys.stderr)
         return False
 
 
@@ -120,7 +121,8 @@ def main():
         help="SBOM format to generate",
     )
     parser.add_argument("--output", help="Output file path (for single format only)")
-    parser.add_argument("--output-dir", default=".", help="Output directory for SBOM files")
+    parser.add_argument("--output-dir", default=".",
+                        help="Output directory for SBOM files")
 
     args = parser.parse_args()
 

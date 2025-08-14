@@ -104,7 +104,8 @@ def test_template_defaults_precedence():
 
         print("PASS: Testing template with explicit values...")
         print(f"   - Input subnet_ids: {explicit_template_data['subnet_ids']}")
-        print(f"   - Input security_group_ids: {explicit_template_data['security_group_ids']}")
+        print(
+            f"   - Input security_group_ids: {explicit_template_data['security_group_ids']}")
         print(f"   - Input instance_type: {explicit_template_data['instance_type']}")
 
         template = serializer.from_dict(explicit_template_data)

@@ -121,7 +121,8 @@ class TestOCPComplianceIntegration:
 
         # Verify registry was used
         mock_get_registry.assert_called_once()
-        mock_registry.create_strategy.assert_called_once_with("test_type", provider_config)
+        mock_registry.create_strategy.assert_called_once_with(
+            "test_type", provider_config)
         assert result == mock_strategy
         assert result.name == "test-provider"
 
@@ -140,7 +141,8 @@ class TestOCPComplianceIntegration:
         registry = get_provider_registry()
 
         mock_resolver = Mock()
-        mock_resolver.resolve_template_resources = Mock(return_value="resolved_template")
+        mock_resolver.resolve_template_resources = Mock(
+            return_value="resolved_template")
 
         mock_validator = Mock()
         mock_validator.validate_template_config = Mock(return_value=[])
@@ -169,7 +171,8 @@ class TestOCPComplianceIntegration:
         )
 
         with patch.object(registry, "create_resolver", return_value=mock_resolver):
-            result = resolver_service.resolve_template_resources(template, "test_provider")
+            result = resolver_service.resolve_template_resources(
+                template, "test_provider")
             assert result == "resolved_template"
 
         # Test validator service

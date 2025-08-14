@@ -91,7 +91,8 @@ class TestPerformance:
             loading_time < 1.0
         ), f"Configuration loading took {loading_time:.3f}s, expected < 1.0s"
 
-        print(f"Configuration loading performance: {loading_time:.3f}s for 50 providers")
+        print(
+            f"Configuration loading performance: {loading_time:.3f}s for 50 providers")
 
     def test_provider_strategy_factory_performance(self):
         """Test provider strategy factory performance."""
@@ -198,7 +199,8 @@ class TestPerformance:
         # Performance assertion
         assert validation_time < 0.5, f"Validation took {validation_time:.3f}s, expected < 0.5s"
 
-        print(f"Configuration validation performance: {validation_time:.3f}s for 20 providers")
+        print(
+            f"Configuration validation performance: {validation_time:.3f}s for 20 providers")
 
     def test_concurrent_configuration_access(self):
         """Test concurrent access to configuration."""
@@ -231,7 +233,8 @@ class TestPerformance:
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             futures = [executor.submit(access_provider_info) for _ in range(50)]
-            results = [future.result() for future in concurrent.futures.as_completed(futures)]
+            results = [future.result()
+                                     for future in concurrent.futures.as_completed(futures)]
 
         end_time = time.time()
         concurrent_time = end_time - start_time
@@ -252,7 +255,8 @@ class TestPerformance:
             concurrent_time < 2.0
         ), f"Concurrent access took {concurrent_time:.3f}s, expected < 2.0s"
 
-        print(f"Concurrent access performance: {concurrent_time:.3f}s for 50 concurrent operations")
+        print(
+            f"Concurrent access performance: {concurrent_time:.3f}s for 50 concurrent operations")
 
     def test_memory_usage_performance(self):
         """Test memory usage characteristics."""
@@ -280,7 +284,8 @@ class TestPerformance:
                 }
             )
 
-        config_data = {"provider": {"selection_policy": "ROUND_ROBIN", "providers": providers}}
+        config_data = {"provider": {
+            "selection_policy": "ROUND_ROBIN", "providers": providers}}
 
         config_path = self.create_config_file(config_data)
 
@@ -297,7 +302,8 @@ class TestPerformance:
             memory_increase < 50
         ), f"Memory usage increased by {memory_increase:.1f}MB, expected < 50MB"
 
-        print(f"Memory usage performance: {memory_increase:.1f}MB increase for 100 providers")
+        print(
+            f"Memory usage performance: {memory_increase:.1f}MB increase for 100 providers")
 
     def test_provider_caching_performance(self):
         """Test provider strategy caching performance."""
@@ -488,7 +494,8 @@ class TestPerformance:
         # Run stress test with multiple threads
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             futures = [executor.submit(stress_operations) for _ in range(5)]
-            results = [future.result() for future in concurrent.futures.as_completed(futures)]
+            results = [future.result()
+                                     for future in concurrent.futures.as_completed(futures)]
 
         total_operations = sum(results)
         operations_per_second = total_operations / 5.0  # 5 seconds
@@ -566,4 +573,5 @@ class TestPerformance:
             processing_time < 5.0
         ), f"Large configuration processing took {processing_time:.3f}s, expected < 5.0s"
 
-        print(f"Large configuration performance: {processing_time:.3f}s for 1000 providers")
+        print(
+            f"Large configuration performance: {processing_time:.3f}s for 1000 providers")

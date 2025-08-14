@@ -23,7 +23,8 @@ class HostFactoryMCPClient:
     def __init__(self):
         """Initialize the MCP client."""
         self.session = None
-        self.server_params = StdioServerParameters(command="ohfp", args=["mcp", "serve", "--stdio"])
+        self.server_params = StdioServerParameters(
+            command="ohfp", args=["mcp", "serve", "--stdio"])
 
     async def __aenter__(self):
         """Async context manager entry."""

@@ -82,10 +82,12 @@ class RequestSerializer:
             # Parse datetime fields
             created_at = datetime.fromisoformat(data["created_at"])
             started_at = (
-                datetime.fromisoformat(data["started_at"]) if data.get("started_at") else None
+                datetime.fromisoformat(data["started_at"]) if data.get(
+                    "started_at") else None
             )
             completed_at = (
-                datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else None
+                datetime.fromisoformat(data["completed_at"]) if data.get(
+                    "completed_at") else None
             )
 
             # Build request data with additional fields
@@ -290,7 +292,8 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
             data_list = self.storage_strategy.find_by_criteria(criteria)
             return [self.serializer.from_dict(data) for data in data_list]
         except Exception as e:
-            self.logger.error(f"Failed to find requests by template_id {template_id}: {e}")
+            self.logger.error(
+                f"Failed to find requests by template_id {template_id}: {e}")
             raise
 
     @handle_infrastructure_exceptions(context="request_repository_find_by_type")

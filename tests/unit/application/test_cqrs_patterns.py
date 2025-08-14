@@ -87,7 +87,8 @@ class TestCommandQuerySeparation:
 
         # Commands should not have "get" methods
         get_methods = [method for method in command_methods if method.startswith("get")]
-        assert len(get_methods) == 0, f"Commands should not have get methods: {get_methods}"
+        assert len(
+            get_methods) == 0, f"Commands should not have get methods: {get_methods}"
 
     def test_queries_do_not_modify_state(self):
         """Test that queries do not modify system state."""
@@ -186,7 +187,8 @@ class TestCommandBusImplementation:
             template_id="test-template", machine_count=2, requester_id="test-user"
         )
 
-        update_command = UpdateRequestStatusCommand(request_id="test-request", status="PROCESSING")
+        update_command = UpdateRequestStatusCommand(
+            request_id="test-request", status="PROCESSING")
 
         command_bus.dispatch(create_command)
         command_bus.dispatch(update_command)
@@ -324,7 +326,8 @@ class TestQueryBusImplementation:
         query_bus.register_handler(GetMachinesByRequestQuery, handler)
 
         # Parameterized query
-        query = GetMachinesByRequestQuery(request_id="test-request", status="RUNNING", limit=10)
+        query = GetMachinesByRequestQuery(
+            request_id="test-request", status="RUNNING", limit=10)
 
         query_bus.dispatch(query)
 

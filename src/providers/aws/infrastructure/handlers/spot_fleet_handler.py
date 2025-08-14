@@ -85,7 +85,8 @@ class SpotFleetHandler(AWSHandler):
         """
         try:
             fleet_id = self.aws_ops.execute_with_standard_error_handling(
-                operation=lambda: self._create_spot_fleet_internal(request, aws_template),
+                operation=lambda: self._create_spot_fleet_internal(
+                    request, aws_template),
                 operation_name="create Spot Fleet",
                 context="SpotFleet",
             )
@@ -230,7 +231,8 @@ class SpotFleetHandler(AWSHandler):
         ):
             # Validate that instance_types is also specified
             if not hasattr(aws_template, "instance_types") or not aws_template.instance_types:
-                errors.append("instance_types must be specified when using instance_types_ondemand")
+                errors.append(
+                    "instance_types must be specified when using instance_types_ondemand")
 
             # Validate that instance_types_ondemand has valid instance types
             for instance_type, weight in aws_template.instance_types_ondemand.items():
@@ -291,7 +293,8 @@ class SpotFleetHandler(AWSHandler):
             identity = self.aws_client.sts_client.get_caller_identity()
 
             # Check permissions - create IAM client directly from session
-            iam_client = self.aws_client.session.client("iam", config=self.aws_client.boto_config)
+            iam_client = self.aws_client.session.client(
+                "iam", config=self.aws_client.boto_config)
             response = iam_client.simulate_principal_policy(
                 PolicySourceArn=identity["Arn"],
                 ActionNames=[
@@ -516,7 +519,8 @@ class SpotFleetHandler(AWSHandler):
                 ]
 
         # Log the final configuration
-        self._logger.debug(f"Spot Fleet configuration: {json.dumps(fleet_config, indent=2)}")
+        self._logger.debug(
+            f"Spot Fleet configuration: {json.dumps(fleet_config, indent=2)}")
 
         return fleet_config
 
@@ -548,7 +552,8 @@ class SpotFleetHandler(AWSHandler):
                 instance_types = [aws_template.instance_type]
 
             if not instance_types:
-                self._logger.warning("No instance types found for spot price monitoring")
+                self._logger.warning(
+                    "No instance types found for spot price monitoring")
                 return {}
 
             price_history = self._retry_with_backoff(
@@ -574,7 +579,8 @@ class SpotFleetHandler(AWSHandler):
         """Check the status of instances in the spot fleet."""
         try:
             if not request.resource_id:
-                raise AWSInfrastructureError("No Spot Fleet Request ID found in request")
+                raise AWSInfrastructureError(
+                    "No Spot Fleet Request ID found in request")
 
             # Get fleet information with pagination and retry
             fleet_list = self._retry_with_backoff(
@@ -586,7 +592,8 @@ class SpotFleetHandler(AWSHandler):
             )
 
             if not fleet_list:
-                raise AWSEntityNotFoundError(f"Spot Fleet Request {request.resource_id} not found")
+                raise AWSEntityNotFoundError(
+                    f"Spot Fleet Request {request.resource_id} not found")
 
             fleet = fleet_list[0]
 
@@ -609,7 +616,8 @@ class SpotFleetHandler(AWSHandler):
             instance_ids = [instance["InstanceId"] for instance in active_instances]
 
             if not instance_ids:
-                self._logger.info(f"No active instances found in Spot Fleet {request.resource_id}")
+                self._logger.info(
+                    f"No active instances found in Spot Fleet {request.resource_id}")
                 return []
 
             # Get detailed instance information
@@ -632,7 +640,8 @@ class SpotFleetHandler(AWSHandler):
         """
         try:
             if not request.resource_id:
-                raise AWSInfrastructureError("No Spot Fleet Request ID found in request")
+                raise AWSInfrastructureError(
+                    "No Spot Fleet Request ID found in request")
 
             # Get fleet configuration with pagination and retry
             fleet_list = self._retry_with_backoff(
@@ -644,7 +653,8 @@ class SpotFleetHandler(AWSHandler):
             )
 
             if not fleet_list:
-                raise AWSEntityNotFoundError(f"Spot Fleet {request.resource_id} not found")
+                raise AWSEntityNotFoundError(
+                    f"Spot Fleet {request.resource_id} not found")
 
             fleet = fleet_list[0]
             fleet_type = fleet["SpotFleetRequestConfig"].get("Type", "maintain")
@@ -683,7 +693,8 @@ class SpotFleetHandler(AWSHandler):
                     SpotFleetRequestIds=[request.resource_id],
                     TerminateInstances=True,
                 )
-                self._logger.info(f"Cancelled entire Spot Fleet request: {request.resource_id}")
+                self._logger.info(
+                    f"Cancelled entire Spot Fleet request: {request.resource_id}")
 
         except ClientError as e:
             error = self._convert_client_error(e)

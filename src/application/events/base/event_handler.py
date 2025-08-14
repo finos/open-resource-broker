@@ -191,7 +191,8 @@ class EventHandler(ABC):
             error: The exception that occurred
         """
         if self.logger:
-            self.logger.error(f"Event sent to dead letter queue: {event.event_type} - {str(error)}")
+            self.logger.error(
+                f"Event sent to dead letter queue: {event.event_type} - {str(error)}")
         # Future: Implement actual dead letter queue integration
 
     def extract_fields(self, event: DomainEvent, field_mapping: Dict[str, Any]) -> Dict[str, Any]:

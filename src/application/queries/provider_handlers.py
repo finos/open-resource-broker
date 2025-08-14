@@ -75,7 +75,8 @@ class GetProviderHealthHandler(BaseQueryHandler[GetProviderHealthQuery, Provider
                 detailed_health = strategy.get_health_status()
                 health_info.update(detailed_health)
 
-            self.logger.info(f"Provider {query.provider_name} health: {health_info['health']}")
+            self.logger.info(
+                f"Provider {query.provider_name} health: {health_info['health']}")
             return health_info
 
         except Exception as e:
@@ -132,7 +133,8 @@ class ListAvailableProvidersHandler(
                     }
                     available_providers.append(provider_info)
                 except Exception as e:
-                    self.logger.warning(f"Could not get info for provider {strategy_name}: {e}")
+                    self.logger.warning(
+                        f"Could not get info for provider {strategy_name}: {e}")
                     available_providers.append(
                         {
                             "name": strategy_name,
@@ -200,7 +202,8 @@ class GetProviderCapabilitiesHandler(
                 detailed_capabilities = strategy.get_capabilities()
                 capabilities.update(detailed_capabilities)
 
-            self.logger.info(f"Retrieved capabilities for provider: {query.provider_name}")
+            self.logger.info(
+                f"Retrieved capabilities for provider: {query.provider_name}")
             return capabilities
 
         except Exception as e:
@@ -314,7 +317,8 @@ class GetProviderStrategyConfigHandler(
                 detailed_config = strategy.get_configuration()
                 config.update(detailed_config)
 
-            self.logger.info(f"Retrieved strategy config for provider: {query.provider_name}")
+            self.logger.info(
+                f"Retrieved strategy config for provider: {query.provider_name}")
             return config
 
         except Exception as e:

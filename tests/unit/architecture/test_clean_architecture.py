@@ -140,7 +140,8 @@ class TestCleanArchitecture:
                         if file.endswith(".py"):
                             file_path = os.path.join(root, file)
                             violations.extend(
-                                self._check_forbidden_imports(file_path, forbidden_imports)
+                                self._check_forbidden_imports(
+                                    file_path, forbidden_imports)
                             )
 
         return violations
@@ -192,16 +193,21 @@ class TestCleanArchitecture:
         from src.infrastructure.ports.auth.user_port import UserPort
 
         # Interfaces should be small and focused
-        auth_methods = [method for method in dir(AuthPort) if not method.startswith("_")]
-        token_methods = [method for method in dir(TokenPort) if not method.startswith("_")]
-        user_methods = [method for method in dir(UserPort) if not method.startswith("_")]
+        auth_methods = [method for method in dir(
+            AuthPort) if not method.startswith("_")]
+        token_methods = [method for method in dir(
+            TokenPort) if not method.startswith("_")]
+        user_methods = [method for method in dir(
+            UserPort) if not method.startswith("_")]
 
         # Each interface should have a reasonable number of methods (not too many)
-        assert len(auth_methods) <= 10, f"AuthPort interface too large: {len(auth_methods)} methods"
+        assert len(
+            auth_methods) <= 10, f"AuthPort interface too large: {len(auth_methods)} methods"
         assert (
             len(token_methods) <= 10
         ), f"TokenPort interface too large: {len(token_methods)} methods"
-        assert len(user_methods) <= 10, f"UserPort interface too large: {len(user_methods)} methods"
+        assert len(
+            user_methods) <= 10, f"UserPort interface too large: {len(user_methods)} methods"
 
     def test_dependency_inversion(self):
         """Validate dependency inversion implementation."""
@@ -265,7 +271,8 @@ class TestCleanArchitecture:
 
         violations = []
         for file_path in domain_files:
-            violations.extend(self._check_forbidden_imports(file_path, external_frameworks))
+            violations.extend(self._check_forbidden_imports(
+                file_path, external_frameworks))
 
         assert (
             len(violations) == 0

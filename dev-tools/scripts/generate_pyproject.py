@@ -68,7 +68,8 @@ def generate_pyproject():
     python_classifiers = []
     for version in python_versions.split("\n"):
         if version.strip():
-            python_classifiers.append(f'    "Programming Language :: Python :: {version.strip()}",')
+            python_classifiers.append(
+                f'    "Programming Language :: Python :: {version.strip()}",')
     python_classifiers_str = "\n".join(python_classifiers)
 
     # Replace placeholders with actual values
@@ -98,8 +99,10 @@ def generate_pyproject():
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate pyproject.toml from template")
-    parser.add_argument("--config", help="Configuration file path (unused, for compatibility)")
+    parser = argparse.ArgumentParser(
+        description="Generate pyproject.toml from template")
+    parser.add_argument(
+        "--config", help="Configuration file path (unused, for compatibility)")
     args = parser.parse_args()
 
     generate_pyproject()

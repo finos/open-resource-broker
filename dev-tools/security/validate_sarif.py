@@ -97,17 +97,20 @@ class SarifValidator:
         # Validate message
         message = result.get("message", {})
         if not isinstance(message, dict):
-            self.errors.append(f"Run {run_index}, Result {result_index}: Message must be an object")
+            self.errors.append(
+                f"Run {run_index}, Result {result_index}: Message must be an object")
             return False
 
         if "text" not in message:
-            self.errors.append(f"Run {run_index}, Result {result_index}: Message missing text")
+            self.errors.append(
+                f"Run {run_index}, Result {result_index}: Message missing text")
             return False
 
         # Check locations (optional but recommended)
         locations = result.get("locations", [])
         if not locations:
-            self.warnings.append(f"Run {run_index}, Result {result_index}: No locations specified")
+            self.warnings.append(
+                f"Run {run_index}, Result {result_index}: No locations specified")
 
         return True
 
@@ -142,7 +145,8 @@ def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description="Validate SARIF files")
     parser.add_argument("files", nargs="+", type=Path, help="SARIF files to validate")
-    parser.add_argument("--strict", action="store_true", help="Treat warnings as errors")
+    parser.add_argument("--strict", action="store_true",
+                        help="Treat warnings as errors")
 
     args = parser.parse_args()
 

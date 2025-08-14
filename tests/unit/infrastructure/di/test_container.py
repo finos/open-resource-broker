@@ -569,7 +569,8 @@ class TestDIContainerIntegration:
 
         # Register different types
         self.container.register_singleton(SingletonService)
-        self.container.register_factory(FactoryService, lambda: FactoryService("factory_value"))
+        self.container.register_factory(
+            FactoryService, lambda: FactoryService("factory_value"))
         pre_instance = InstanceService("pre_created")
         self.container.register_instance(InstanceService, pre_instance)
 

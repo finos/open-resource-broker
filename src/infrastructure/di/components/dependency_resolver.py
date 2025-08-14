@@ -58,7 +58,8 @@ class DependencyResolver:
 
         # Check for circular dependencies
         if cls in dependency_chain:
-            chain_str = " -> ".join([c.__name__ for c in dependency_chain]) + f" -> {cls.__name__}"
+            chain_str = " -> ".join([c.__name__ for c in dependency_chain]
+                                    ) + f" -> {cls.__name__}"
             raise CircularDependencyError(f"Circular dependency detected: {chain_str}")
 
         # Add current class to dependency chain
@@ -86,7 +87,8 @@ class DependencyResolver:
             if isinstance(e, (DependencyResolutionError, CircularDependencyError)):
                 raise
             else:
-                raise DependencyResolutionError(cls, f"Failed to resolve {cls.__name__}: {str(e)}")
+                raise DependencyResolutionError(
+                    cls, f"Failed to resolve {cls.__name__}: {str(e)}")
 
     def _create_instance(self, cls: Type[T], dependency_chain: Set[Type]) -> T:
         """Create an instance of the specified type."""
@@ -142,7 +144,8 @@ class DependencyResolver:
                 self._auto_register_injectable_class(cls)
 
             # Get constructor parameters
-            constructor_params = self._resolve_constructor_parameters(cls, dependency_chain)
+            constructor_params = self._resolve_constructor_parameters(
+                cls, dependency_chain)
 
             # Create instance
             instance = cls(**constructor_params)
@@ -154,7 +157,8 @@ class DependencyResolver:
             if isinstance(e, (DependencyResolutionError, CircularDependencyError)):
                 raise
             else:
-                raise InstantiationError(cls, f"Failed to instantiate {cls.__name__}: {str(e)}")
+                raise InstantiationError(
+                    cls, f"Failed to instantiate {cls.__name__}: {str(e)}")
 
     def _auto_register_injectable_class(self, cls: Type) -> None:
         """Auto-register an injectable class."""
@@ -178,7 +182,8 @@ class DependencyResolver:
                 self._service_registry.register_injectable_class(cls)
                 logger.debug(f"Auto-registered legacy injectable class: {cls.__name__}")
         except Exception as e:
-            logger.warning(f"Failed to auto-register injectable class {cls.__name__}: {e}")
+            logger.warning(
+                f"Failed to auto-register injectable class {cls.__name__}: {e}")
 
     def _resolve_constructor_parameters(
         self, cls: Type, dependency_chain: Set[Type]
@@ -234,11 +239,13 @@ class DependencyResolver:
                 # Resolve dependency
                 if param.default == inspect.Parameter.empty:
                     # Required parameter
-                    parameters[param_name] = self.resolve(param_type, cls, dependency_chain)
+                    parameters[param_name] = self.resolve(
+                        param_type, cls, dependency_chain)
                 else:
                     # Optional parameter - try to resolve, use default if not available
                     with suppress(DependencyResolutionError, UnregisteredDependencyError):
-                        parameters[param_name] = self.resolve(param_type, cls, dependency_chain)
+                        parameters[param_name] = self.resolve(
+                            param_type, cls, dependency_chain)
 
             return parameters
 
@@ -291,11 +298,13 @@ class DependencyResolver:
                 # Resolve dependency
                 if param.default == inspect.Parameter.empty:
                     # Required parameter
-                    parameters[param_name] = self.resolve(param_type, None, dependency_chain)
+                    parameters[param_name] = self.resolve(
+                        param_type, None, dependency_chain)
                 else:
                     # Optional parameter
                     with suppress(DependencyResolutionError, UnregisteredDependencyError):
-                        parameters[param_name] = self.resolve(param_type, None, dependency_chain)
+                        parameters[param_name] = self.resolve(
+                            param_type, None, dependency_chain)
 
             return parameters
 

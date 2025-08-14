@@ -68,11 +68,13 @@ class TestBoundaryValueCornerCases:
         """Test template ID boundary cases."""
         # Test empty string
         with pytest.raises(RequestValidationError):
-            Request.create_new_request(template_id="", machine_count=1, requester_id="test-user")
+            Request.create_new_request(
+                template_id="", machine_count=1, requester_id="test-user")
 
         # Test None
         with pytest.raises(RequestValidationError):
-            Request.create_new_request(template_id=None, machine_count=1, requester_id="test-user")
+            Request.create_new_request(
+                template_id=None, machine_count=1, requester_id="test-user")
 
         # Test very long template ID
         very_long_id = "a" * 1000
@@ -359,7 +361,8 @@ class TestResourceExhaustionCornerCases:
 
         except OSError as e:
             # Should handle disk space issues gracefully
-            assert "No space left on device" in str(e) or os.path.exists(large_file_path)
+            assert "No space left on device" in str(
+                e) or os.path.exists(large_file_path)
 
         finally:
             # Clean up
@@ -501,7 +504,8 @@ class TestDataCorruptionCornerCases:
         # Test various encoding issues
         encoding_issues = [
             b"\xff\xfe\x00\x00",  # Invalid UTF-8
-            "café".encode("latin1").decode("utf-8", errors="ignore"),  # Encoding mismatch
+            "café".encode("latin1").decode(
+                "utf-8", errors="ignore"),  # Encoding mismatch
             "test\x00data",  # Null bytes
             "emoji rocket data",  # Unicode emoji
             "mixed\udcff\udcfe",  # Surrogate characters

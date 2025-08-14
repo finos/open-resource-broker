@@ -63,7 +63,8 @@ class ReloadProviderConfigHandler(BaseCommandHandler[ReloadProviderConfigCommand
                 provider_config = config_manager.get_provider_config()
                 if provider_config:
                     provider_mode = provider_config.get_mode().value
-                    active_providers = [p.name for p in provider_config.get_active_providers()]
+                    active_providers = [
+                        p.name for p in provider_config.get_active_providers()]
                 else:
                     provider_mode = "strategy"
                     active_providers = []

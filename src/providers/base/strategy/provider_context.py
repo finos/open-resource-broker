@@ -52,7 +52,8 @@ class StrategyMetrics:
             self.average_response_time_ms = response_time_ms
         else:
             self.average_response_time_ms = (
-                self.average_response_time_ms * (self.total_operations - 1) + response_time_ms
+                self.average_response_time_ms * \
+                    (self.total_operations - 1) + response_time_ms
             ) / self.total_operations
 
         self.last_used_time = time.time()
@@ -140,7 +141,8 @@ class ProviderContext:
 
         with self._lock:
             if strategy_type in self._strategies:
-                self._logger.debug(f"Strategy {strategy_type} already registered, replacing")
+                self._logger.debug(
+                    f"Strategy {strategy_type} already registered, replacing")
 
             self._strategies[strategy_type] = strategy
             self._strategy_metrics[strategy_type] = StrategyMetrics()
@@ -215,10 +217,12 @@ class ProviderContext:
             if not strategy.is_initialized:
                 try:
                     if not strategy.initialize():
-                        self._logger.error(f"Failed to initialize strategy {strategy_type}")
+                        self._logger.error(
+                            f"Failed to initialize strategy {strategy_type}")
                         return False
                 except Exception as e:
-                    self._logger.error(f"Error initializing strategy {strategy_type}: {e}")
+                    self._logger.error(
+                        f"Error initializing strategy {strategy_type}: {e}")
                     return False
 
             self._current_strategy = strategy
@@ -434,7 +438,8 @@ class ProviderContext:
             return health_status
 
         except Exception as e:
-            self._logger.error(f"Error checking health of strategy {strategy_type}: {e}")
+            self._logger.error(
+                f"Error checking health of strategy {strategy_type}: {e}")
             return ProviderHealthStatus.unhealthy(
                 f"Health check failed: {str(e)}", {"exception": str(e)}
             )
@@ -476,7 +481,8 @@ class ProviderContext:
         # For lazy loading, don't trigger loading during initialize()
         # Only set up the lazy loading mechanism
         if hasattr(self, "_lazy_provider_loader") and self._lazy_provider_loader:
-            self._logger.info("Lazy loading configured - providers will load on first operation")
+            self._logger.info(
+                "Lazy loading configured - providers will load on first operation")
             self._initialized = True  # Mark as "ready for lazy loading"
             return True
 
@@ -501,9 +507,11 @@ class ProviderContext:
                         success_count += 1
                         self._logger.debug(f"Initialized strategy: {strategy_type}")
                     else:
-                        self._logger.error(f"Failed to initialize strategy: {strategy_type}")
+                        self._logger.error(
+                            f"Failed to initialize strategy: {strategy_type}")
                 except Exception as e:
-                    self._logger.error(f"Error initializing strategy {strategy_type}: {e}")
+                    self._logger.error(
+                        f"Error initializing strategy {strategy_type}: {e}")
 
             # Consider initialization successful if at least one strategy works
             self._initialized = success_count > 0
@@ -538,7 +546,8 @@ class ProviderContext:
                     strategy.cleanup()
                     self._logger.debug(f"Cleaned up strategy: {strategy_type}")
                 except Exception as e:
-                    self._logger.warning(f"Error cleaning up strategy {strategy_type}: {e}")
+                    self._logger.warning(
+                        f"Error cleaning up strategy {strategy_type}: {e}")
 
             self._strategies.clear()
             self._strategy_metrics.clear()

@@ -139,7 +139,8 @@ class AWSProviderAdapter:
     ) -> ProviderResourceIdentifier:
         """Create an AWS resource identifier."""
         if not self._resource_validator.validate_resource_identifier(identifier, resource_type):
-            self._logger.warning(f"Invalid AWS {resource_type} identifier: {identifier}")
+            self._logger.warning(
+                f"Invalid AWS {resource_type} identifier: {identifier}")
             raise ValueError(f"Invalid AWS {resource_type} identifier: {identifier}")
 
         return ProviderResourceIdentifier(

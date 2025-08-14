@@ -186,7 +186,8 @@ class SQLQueryBuilder(QueryManager):
         self._validate_identifier(id_column)
 
         # Filter data to only include known columns (excluding ID)
-        filtered_data = {k: v for k, v in data.items() if k in self.columns and k != id_column}
+        filtered_data = {k: v for k, v in data.items(
+        ) if k in self.columns and k != id_column}
 
         if not filtered_data:
             raise ValueError("No valid columns found in data for update")

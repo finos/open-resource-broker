@@ -227,5 +227,6 @@ class AWSTemplate(CoreTemplate):
             ),
             price_type=self.price_type,
             subnet_ids=[AWSSubnetId(value=sid) for sid in self.subnet_ids],
-            security_group_ids=[AWSSecurityGroupId(value=sgid) for sgid in self.security_group_ids],
+            security_group_ids=[AWSSecurityGroupId(
+                value=sgid) for sgid in self.security_group_ids],
         )

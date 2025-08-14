@@ -136,8 +136,10 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             )
             return resource_id
         else:
-            self._logger.error(f"Provider strategy operation failed: {result.error_message}")
-            raise InfrastructureError(f"Failed to provision resources: {result.error_message}")
+            self._logger.error(
+                f"Provider strategy operation failed: {result.error_message}")
+            raise InfrastructureError(
+                f"Failed to provision resources: {result.error_message}")
 
     def _provision_via_handlers(self, request: Request, template: Template) -> str:
         """
@@ -156,10 +158,12 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         try:
             # Acquire hosts using the handler
             resource_id = handler.acquire_hosts(request, template)
-            self._logger.info(f"Successfully provisioned resources with ID {resource_id}")
+            self._logger.info(
+                f"Successfully provisioned resources with ID {resource_id}")
             return resource_id
         except AWSValidationError as e:
-            self._logger.error(f"Validation error during resource provisioning: {str(e)}")
+            self._logger.error(
+                f"Validation error during resource provisioning: {str(e)}")
             raise
         except QuotaExceededError as e:
             self._logger.error(f"Quota exceeded during resource provisioning: {str(e)}")
@@ -182,11 +186,13 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             AWSEntityNotFoundError: If the resource is not found
             InfrastructureError: For other infrastructure errors
         """
-        self._logger.info(f"Checking status of resources for request {request.request_id}")
+        self._logger.info(
+            f"Checking status of resources for request {request.request_id}")
 
         if not request.resource_id:
             self._logger.error(f"No resource ID found in request {request.request_id}")
-            raise AWSEntityNotFoundError(f"No resource ID found in request {request.request_id}")
+            raise AWSEntityNotFoundError(
+                f"No resource ID found in request {request.request_id}")
 
         # Get the template to determine the handler type
         if not self._template_config_manager:
@@ -239,7 +245,8 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
 
         if not request.resource_id:
             self._logger.error(f"No resource ID found in request {request.request_id}")
-            raise AWSEntityNotFoundError(f"No resource ID found in request {request.request_id}")
+            raise AWSEntityNotFoundError(
+                f"No resource ID found in request {request.request_id}")
 
         # Get the template to determine the handler type
         if not self._template_config_manager:
@@ -266,7 +273,8 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         try:
             # Release hosts using the handler
             handler.release_hosts(request)
-            self._logger.info(f"Successfully released resources for request {request.request_id}")
+            self._logger.info(
+                f"Successfully released resources for request {request.request_id}")
         except AWSEntityNotFoundError as e:
             self._logger.error(f"Resource not found during release: {str(e)}")
             raise
@@ -311,7 +319,8 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
                 }
             elif resource_id.startswith("fleet-"):
                 # EC2 Fleet
-                response = self.aws_client.ec2_client.describe_fleets(FleetIds=[resource_id])
+                response = self.aws_client.ec2_client.describe_fleets(FleetIds=[
+                                                                      resource_id])
                 if not response["Fleets"]:
                     raise AWSEntityNotFoundError(f"Fleet {resource_id} not found")
 

@@ -40,7 +40,8 @@ def configure_openapi(app: FastAPI, server_config: ServerConfig) -> None:
             )
 
             # Add global security requirement
-            security_scheme_name = _get_security_scheme_name(server_config.auth.strategy)
+            security_scheme_name = _get_security_scheme_name(
+                server_config.auth.strategy)
             if security_scheme_name:
                 openapi_schema["security"] = [{security_scheme_name: []}]
 

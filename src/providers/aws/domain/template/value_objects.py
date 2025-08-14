@@ -38,7 +38,8 @@ class ResourceId(ResourceId):
 
         # Fall back to class pattern if not in config
         if not pattern:
-            raise ValueError(f"Pattern for {cls.resource_type} not found in AWS configuration")
+            raise ValueError(
+                f"Pattern for {cls.resource_type} not found in AWS configuration")
 
         if not re.match(pattern, v):
             raise ValueError(f"Invalid AWS {cls.resource_type} ID format: {v}")
@@ -377,7 +378,8 @@ class AWSConfiguration(ValueObject):
 
         # Set default allocation strategy if not provided
         if not self.allocation_strategy:
-            object.__setattr__(self, "allocation_strategy", AllocationStrategy.LOWEST_PRICE)
+            object.__setattr__(self, "allocation_strategy",
+                               AllocationStrategy.LOWEST_PRICE)
 
         # Set default price type if not provided
         if not self.price_type:

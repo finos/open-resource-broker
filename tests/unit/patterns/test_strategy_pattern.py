@@ -144,8 +144,10 @@ class TestStrategyPattern:
         aws_strategy = Mock(spec=ProviderStrategy)
         mock_strategy = Mock(spec=ProviderStrategy)
 
-        aws_strategy.execute.return_value = ProviderResult(success=True, data={"provider": "aws"})
-        mock_strategy.execute.return_value = ProviderResult(success=True, data={"provider": "mock"})
+        aws_strategy.execute.return_value = ProviderResult(
+            success=True, data={"provider": "aws"})
+        mock_strategy.execute.return_value = ProviderResult(
+            success=True, data={"provider": "mock"})
 
         # Test strategy switching
         if hasattr(context, "set_strategy"):
@@ -182,7 +184,8 @@ class TestStrategyPattern:
             fallback_strategy = Mock(spec=ProviderStrategy)
 
             # Primary strategy fails
-            primary_strategy.execute.side_effect = Exception("Primary provider unavailable")
+            primary_strategy.execute.side_effect = Exception(
+                "Primary provider unavailable")
 
             # Fallback strategy succeeds
             fallback_strategy.execute.return_value = ProviderResult(
@@ -288,7 +291,8 @@ class TestStrategyPattern:
             MockComposite()
 
             # Mock a failing operation
-            operation = ProviderOperation(operation_type="invalid_operation", parameters={})
+            operation = ProviderOperation(
+                operation_type="invalid_operation", parameters={})
 
             # Mock error result
             mock_instance.execute.return_value = ProviderResult(
@@ -346,7 +350,8 @@ class TestStrategyPattern:
             strategy = MockLoadBalancer()
 
         # Strategies should be stateless or thread-safe
-        operation = ProviderOperation(operation_type="create_instances", parameters={"count": 1})
+        operation = ProviderOperation(
+            operation_type="create_instances", parameters={"count": 1})
 
         # Execute concurrently (simulated)
         results = []
@@ -376,7 +381,8 @@ class TestStrategyPattern:
         # Test weighted selection
         if hasattr(selector, "select_weighted"):
             selected = selector.select_weighted(providers)
-            assert selected in [p["name"] for p in providers if p["health"] == "healthy"]
+            assert selected in [p["name"]
+                for p in providers if p["health"] == "healthy"]
 
         # Test round-robin selection
         if hasattr(selector, "select_round_robin"):
@@ -409,7 +415,8 @@ class TestStrategyPattern:
 
             except Exception:
                 # Factory might require additional configuration
-                pytest.skip(f"Strategy {strategy_type} requires additional configuration")
+                pytest.skip(
+                    f"Strategy {strategy_type} requires additional configuration")
 
     def test_strategy_chain_of_responsibility(self):
         """Test strategy chain of responsibility pattern."""
@@ -435,7 +442,8 @@ class TestStrategyPattern:
             if hasattr(mock_instance, "chain_strategies"):
                 mock_instance.chain_strategies(strategies)
 
-            operation = ProviderOperation(operation_type="multi_step_operation", parameters={})
+            operation = ProviderOperation(
+                operation_type="multi_step_operation", parameters={})
 
             result = composite.execute(operation)
 

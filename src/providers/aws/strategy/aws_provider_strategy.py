@@ -168,7 +168,8 @@ class AWSProviderStrategy(ProviderStrategy):
             True if initialization successful, False otherwise
         """
         try:
-            self._logger.info(f"AWS provider strategy ready for region: {self._aws_config.region}")
+            self._logger.info(
+                f"AWS provider strategy ready for region: {self._aws_config.region}")
 
             # Don't create AWS client here - let it be lazy
             # Don't create managers here - they depend on AWS client
@@ -176,7 +177,8 @@ class AWSProviderStrategy(ProviderStrategy):
             # Don't perform health check here - it would trigger AWS client creation
 
             self._initialized = True
-            self._logger.debug("AWS provider strategy initialized successfully (lazy mode)")
+            self._logger.debug(
+                "AWS provider strategy initialized successfully (lazy mode)")
             return True
 
         except Exception as e:
@@ -399,7 +401,8 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             try:
-                response = aws_client.ec2_client.terminate_instances(InstanceIds=instance_ids)
+                response = aws_client.ec2_client.terminate_instances(
+                    InstanceIds=instance_ids)
                 terminating_count = len(response.get("TerminatingInstances", []))
                 success = terminating_count == len(instance_ids)
 
@@ -437,7 +440,8 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             try:
-                response = aws_client.ec2_client.describe_instances(InstanceIds=instance_ids)
+                response = aws_client.ec2_client.describe_instances(
+                    InstanceIds=instance_ids)
 
                 # Convert AWS instances to domain Machine entities
                 machines = []
@@ -776,14 +780,17 @@ class AWSProviderStrategy(ProviderStrategy):
                 templates = []
                 for template_path in template_paths:
                     try:
-                        template_data = scheduler_strategy.load_templates_from_path(template_path)
+                        template_data = scheduler_strategy.load_templates_from_path(
+                            template_path)
                         templates.extend(template_data)
                     except Exception as e:
-                        self._logger.warning(f"Failed to load templates from {template_path}: {e}")
+                        self._logger.warning(
+                            f"Failed to load templates from {template_path}: {e}")
 
                 return templates
             else:
-                self._logger.warning("No scheduler strategy available, using fallback templates")
+                self._logger.warning(
+                    "No scheduler strategy available, using fallback templates")
                 # Fallback to basic templates if no scheduler strategy
                 return self._get_fallback_templates()
 

@@ -50,7 +50,8 @@ class MachineDTO(BaseDTO):
         Returns:
             MachineDTO instance
         """
-        status = machine.status.value if hasattr(machine.status, "value") else str(machine.status)
+        status = machine.status.value if hasattr(
+            machine.status, "value") else str(machine.status)
 
         # Common fields for both short and long formats
         common_fields = {

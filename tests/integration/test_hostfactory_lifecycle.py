@@ -20,7 +20,8 @@ class TestHostFactoryLifecycle:
         # Setup provider
         if provider_type == "mock":
             provider = create_mock_provider()
-            app_service = self._create_app_service_with_provider(provider_type, provider)
+            app_service = self._create_app_service_with_provider(
+                provider_type, provider)
         else:
             # For real providers, use actual configuration
             app_service = self._create_app_service(provider_type)
@@ -29,7 +30,8 @@ class TestHostFactoryLifecycle:
         templates_response = app_service.get_available_templates()
 
         # Validate Host Factory format
-        assert HostFactoryFormatValidator.validate_templates_response(templates_response)
+        assert HostFactoryFormatValidator.validate_templates_response(
+            templates_response)
         assert len(templates_response["templates"]) > 0
 
         template_id = templates_response["templates"][0]["templateId"]
@@ -55,7 +57,8 @@ class TestHostFactoryLifecycle:
         # Get machine information
         machines = request_info.get("machines", [])
         if machines:
-            machine_ids = [{"name": m["name"], "machineId": m["machineId"]} for m in machines[:2]]
+            machine_ids = [{"name": m["name"], "machineId": m["machineId"]}
+                for m in machines[:2]]
 
             # Request Return Machines
             return_response = app_service.request_return_machines(machine_ids)
@@ -68,7 +71,8 @@ class TestHostFactoryLifecycle:
             return_status_response = app_service.get_request_status(ret_id)
 
             # Validate Host Factory format
-            assert HostFactoryFormatValidator.validate_status_response(return_status_response)
+            assert HostFactoryFormatValidator.validate_status_response(
+                return_status_response)
 
             return_info = return_status_response["requests"][0]
             assert return_info["requestId"] == ret_id
@@ -88,7 +92,8 @@ class TestHostFactoryLifecycle:
         for scenario in scenarios:
             provider = create_mock_provider()
             ProviderScenarios.configure_mock_provider(provider, scenario)
-            app_service = self._create_app_service_with_provider(provider_type, provider)
+            app_service = self._create_app_service_with_provider(
+                provider_type, provider)
 
             # Execute workflow
             templates = app_service.get_available_templates()
@@ -120,7 +125,8 @@ class TestHostFactoryLifecycle:
         for scenario in scenarios:
             provider = create_mock_provider()
             ProviderScenarios.configure_mock_provider(provider, scenario)
-            app_service = self._create_app_service_with_provider(provider_type, provider)
+            app_service = self._create_app_service_with_provider(
+                provider_type, provider)
 
             # Execute workflow
             templates = app_service.get_available_templates()

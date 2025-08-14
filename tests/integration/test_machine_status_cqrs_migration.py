@@ -31,7 +31,8 @@ class TestMachineStatusCQRSMigration:
         """Create mock provider context."""
         context = Mock()
         context.set_strategy.return_value = True
-        context.execute_operation.return_value = Mock(success=True, data={"status": "running"})
+        context.execute_operation.return_value = Mock(
+            success=True, data={"status": "running"})
         return context
 
     @pytest.fixture
@@ -77,7 +78,8 @@ class TestMachineStatusCQRSMigration:
 
         handler = ConvertMachineStatusCommandHandler(mock_provider_context)
 
-        command = ConvertMachineStatusCommand(provider_state="running", provider_type="aws")
+        command = ConvertMachineStatusCommand(
+            provider_state="running", provider_type="aws")
 
         # Execute handler
         import asyncio
@@ -136,7 +138,8 @@ class TestMachineStatusCQRSMigration:
         self, convert_handler, batch_convert_handler, validate_handler
     ):
         """Test that handlers correctly identify their commands."""
-        convert_command = ConvertMachineStatusCommand(provider_state="running", provider_type="aws")
+        convert_command = ConvertMachineStatusCommand(
+            provider_state="running", provider_type="aws")
         batch_command = ConvertBatchMachineStatusCommand(provider_states=[])
         validate_command = ValidateProviderStateCommand(
             provider_state="running", provider_type="aws"
@@ -183,7 +186,8 @@ class TestMachineStatusCQRSMigration:
 
         handler = ConvertMachineStatusCommandHandler(mock_provider_context)
 
-        command = ConvertMachineStatusCommand(provider_state="running", provider_type="invalid")
+        command = ConvertMachineStatusCommand(
+            provider_state="running", provider_type="invalid")
 
         # Should not raise exception, should handle gracefully
         import asyncio
@@ -215,7 +219,8 @@ class TestMachineStatusCQRSMigration:
         end_time = time.time()
         total_time = end_time - start_time
 
-        print(f"CQRS handlers performance: {total_time:.3f}s for {len(commands)} conversions")
+        print(
+            f"CQRS handlers performance: {total_time:.3f}s for {len(commands)} conversions")
 
         # Should complete within reasonable time
         assert total_time < 1.0, f"Performance regression: {total_time:.3f}s"

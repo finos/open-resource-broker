@@ -30,7 +30,8 @@ def main():
         logger.error(f".github/workflows directory not found")
         sys.exit(1)
 
-    workflow_files = list(workflows_dir.glob("*.yml")) + list(workflows_dir.glob("*.yaml"))
+    workflow_files = list(workflows_dir.glob("*.yml")) + \
+                          list(workflows_dir.glob("*.yaml"))
 
     if not workflow_files:
         logger.error(f"No workflow files found")

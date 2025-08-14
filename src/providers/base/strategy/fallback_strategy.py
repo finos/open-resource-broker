@@ -261,7 +261,8 @@ class FallbackProviderStrategy(ProviderStrategy):
                         f"Fallback strategy {i+1} already initialized: {strategy.provider_type}"
                     )
             except Exception as e:
-                self._self._logger.error(f"Error initializing fallback strategy {i+1}: {e}")
+                self._self._logger.error(
+                    f"Error initializing fallback strategy {i+1}: {e}")
 
         # Consider initialization successful if at least one strategy works
         self._initialized = success_count > 0
@@ -324,7 +325,8 @@ class FallbackProviderStrategy(ProviderStrategy):
 
         except Exception as e:
             total_time_ms = (time.time() - start_time) * 1000
-            self._self._logger.error(f"Fallback operation {operation.operation_type} failed: {e}")
+            self._self._logger.error(
+                f"Fallback operation {operation.operation_type} failed: {e}")
             return ProviderResult.error_result(
                 f"Fallback operation failed: {str(e)}",
                 "FALLBACK_EXECUTION_ERROR",
@@ -381,7 +383,8 @@ class FallbackProviderStrategy(ProviderStrategy):
                 self._circuit_state.record_failure()
                 if self._circuit_state.failure_count >= self._config.circuit_breaker_threshold:
                     self._circuit_state.state = CircuitState.OPEN
-                    self._self._logger.warning(f"Circuit breaker opened after exception: {e}")
+                    self._self._logger.warning(
+                        f"Circuit breaker opened after exception: {e}")
 
                 return self._execute_fallback_chain(operation)
 
@@ -434,7 +437,8 @@ class FallbackProviderStrategy(ProviderStrategy):
                     return self._execute_fallback_chain(operation)
             except Exception as e:
                 self._primary_healthy = False
-                self._self._logger.warning(f"Primary strategy failed, marking unhealthy: {e}")
+                self._self._logger.warning(
+                    f"Primary strategy failed, marking unhealthy: {e}")
                 return self._execute_fallback_chain(operation)
         else:
             # Primary is unhealthy, use fallback directly
@@ -472,7 +476,8 @@ class FallbackProviderStrategy(ProviderStrategy):
                     return result
                 else:
                     last_error = result.error_message
-                    self._self._logger.debug(f"Fallback strategy {i+1} failed: {last_error}")
+                    self._self._logger.debug(
+                        f"Fallback strategy {i+1} failed: {last_error}")
 
             except Exception as e:
                 last_error = str(e)
@@ -527,7 +532,8 @@ class FallbackProviderStrategy(ProviderStrategy):
                 self._last_health_check = current_time
 
                 if not self._primary_healthy:
-                    self._self._logger.debug(f"Primary strategy unhealthy: {health.status_message}")
+                    self._self._logger.debug(
+                        f"Primary strategy unhealthy: {health.status_message}")
 
             except Exception as e:
                 self._primary_healthy = False
@@ -567,7 +573,8 @@ class FallbackProviderStrategy(ProviderStrategy):
                     }
                 )
             except Exception as e:
-                self._self._logger.warning(f"Error getting fallback {i+1} capabilities: {e}")
+                self._self._logger.warning(
+                    f"Error getting fallback {i+1} capabilities: {e}")
 
         # Add fallback-specific features
         combined_features.update(
@@ -670,7 +677,8 @@ class FallbackProviderStrategy(ProviderStrategy):
                         f"Cleaned up fallback strategy {i+1}: {strategy.provider_type}"
                     )
                 except Exception as e:
-                    self._self._logger.warning(f"Error cleaning up fallback strategy {i+1}: {e}")
+                    self._self._logger.warning(
+                        f"Error cleaning up fallback strategy {i+1}: {e}")
 
             self._initialized = False
 

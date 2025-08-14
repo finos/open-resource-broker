@@ -271,7 +271,8 @@ class SQLSerializer(DataConverter):
                 serialized = self.serialize_for_insert(entity_id, data)
                 serialized_list.append(serialized)
 
-            self.logger.debug(f"Serialized {len(entities)} entities for batch operation")
+            self.logger.debug(
+                f"Serialized {len(entities)} entities for batch operation")
             return serialized_list
 
         except Exception as e:

@@ -37,7 +37,8 @@ def get_instance_by_id(instance_id: str, aws_client: Any = None) -> Dict[str, An
 
         # Check if instance exists
         if not response["Reservations"] or not response["Reservations"][0]["Instances"]:
-            raise InfrastructureError("AWS.EC2", f"EC2 instance {instance_id} not found")
+            raise InfrastructureError(
+                "AWS.EC2", f"EC2 instance {instance_id} not found")
 
         return response["Reservations"][0]["Instances"][0]
 
@@ -174,7 +175,8 @@ def create_instance(
             },
         )
 
-        raise InfrastructureError("AWS.EC2", f"Unexpected error creating EC2 instance: {str(e)}")
+        raise InfrastructureError(
+            "AWS.EC2", f"Unexpected error creating EC2 instance: {str(e)}")
 
 
 def terminate_instance(instance_id: str, aws_client: Any = None) -> Dict[str, Any]:
@@ -200,7 +202,8 @@ def terminate_instance(instance_id: str, aws_client: Any = None) -> Dict[str, An
         # Terminate instance with retry built-in
         response = _terminate_instance(ec2_client, instance_id)
 
-        logger.info(f"Terminated EC2 instance {instance_id}", extra={"instance_id": instance_id})
+        logger.info(f"Terminated EC2 instance {instance_id}", extra={
+                    "instance_id": instance_id})
 
         return response
 

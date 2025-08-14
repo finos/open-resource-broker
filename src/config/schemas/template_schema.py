@@ -17,7 +17,8 @@ class TemplateConfig(BaseModel):
     max_number: int = Field(10, description="Maximum number of instances per request")
 
     # Template file paths
-    templates_file_path: str = Field("config/templates.json", description="Path to templates file")
+    templates_file_path: str = Field(
+        "config/templates.json", description="Path to templates file")
     legacy_templates_file_path: str = Field(
         "config/awsprov_templates.json", description="Path to legacy templates file"
     )
@@ -35,7 +36,8 @@ class TemplateConfig(BaseModel):
     default_provider_type: Optional[str] = Field(
         None, description="Default provider type (aws, provider1, provider2)"
     )
-    default_provider_name: Optional[str] = Field(None, description="Default provider instance name")
+    default_provider_name: Optional[str] = Field(
+        None, description="Default provider instance name")
     default_provider_api: str = Field("EC2Fleet", description="Default provider API")
 
     # Generic pricing configuration

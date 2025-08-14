@@ -35,7 +35,8 @@ class TestDomainEventGeneration:
         events = request.get_domain_events()
         assert len(events) >= 1, "Request creation should generate at least one event"
 
-        created_event = next((e for e in events if isinstance(e, RequestCreatedEvent)), None)
+        created_event = next(
+            (e for e in events if isinstance(e, RequestCreatedEvent)), None)
         assert created_event is not None, "Should generate RequestCreatedEvent"
         assert created_event.request_id == str(request.id.value)
         assert created_event.template_id == "test-template"
@@ -55,7 +56,8 @@ class TestDomainEventGeneration:
         request.start_processing()
 
         events = request.get_domain_events()
-        status_event = next((e for e in events if isinstance(e, RequestStatusChangedEvent)), None)
+        status_event = next((e for e in events if isinstance(
+            e, RequestStatusChangedEvent)), None)
         assert status_event is not None, "Status change should generate event"
         assert status_event.old_status == RequestStatus.PENDING.value
         assert status_event.new_status == RequestStatus.PROCESSING.value
@@ -76,7 +78,8 @@ class TestDomainEventGeneration:
         )
 
         events = request.get_domain_events()
-        completed_event = next((e for e in events if isinstance(e, RequestCompletedEvent)), None)
+        completed_event = next(
+            (e for e in events if isinstance(e, RequestCompletedEvent)), None)
         assert completed_event is not None, "Completion should generate event"
         assert completed_event.machine_ids == machine_ids
         assert completed_event.success is True
@@ -95,7 +98,8 @@ class TestDomainEventGeneration:
         request.fail_with_error(error_message)
 
         events = request.get_domain_events()
-        completed_event = next((e for e in events if isinstance(e, RequestCompletedEvent)), None)
+        completed_event = next(
+            (e for e in events if isinstance(e, RequestCompletedEvent)), None)
         assert completed_event is not None, "Failure should generate completion event"
         assert completed_event.success is False
         assert completed_event.error_message == error_message
@@ -108,7 +112,8 @@ class TestDomainEventGeneration:
         )
 
         events = request.get_domain_events()
-        created_event = next((e for e in events if isinstance(e, RequestCreatedEvent)), None)
+        created_event = next(
+            (e for e in events if isinstance(e, RequestCreatedEvent)), None)
         assert created_event is not None, "Return request should generate created event"
         assert created_event.request_type == RequestType.RETURN.value
         assert created_event.machine_ids == machine_ids
@@ -272,7 +277,8 @@ class TestEventAggregateInteraction:
 
         # Perform multiple operations
         request.start_processing()
-        request.complete_successfully(machine_ids=["i-123", "i-456"], completion_message="Success")
+        request.complete_successfully(
+            machine_ids=["i-123", "i-456"], completion_message="Success")
 
         events = request.get_domain_events()
         # Should have: Created, StatusChanged, Completed events
@@ -291,7 +297,8 @@ class TestEventAggregateInteraction:
         )
 
         request.start_processing()
-        request.complete_successfully(machine_ids=["i-123", "i-456"], completion_message="Success")
+        request.complete_successfully(
+            machine_ids=["i-123", "i-456"], completion_message="Success")
 
         events = request.get_domain_events()
 
@@ -317,7 +324,8 @@ class TestEventBusinessLogic:
         )
 
         events = request.get_domain_events()
-        created_event = next((e for e in events if isinstance(e, RequestCreatedEvent)), None)
+        created_event = next(
+            (e for e in events if isinstance(e, RequestCreatedEvent)), None)
 
         assert created_event is not None
         assert created_event.template_id == "test-template"
@@ -341,7 +349,8 @@ class TestEventBusinessLogic:
         new_status = request.status
 
         events = request.get_domain_events()
-        status_event = next((e for e in events if isinstance(e, RequestStatusChangedEvent)), None)
+        status_event = next((e for e in events if isinstance(
+            e, RequestStatusChangedEvent)), None)
 
         assert status_event is not None
         assert status_event.old_status == old_status.value
@@ -364,7 +373,8 @@ class TestEventBusinessLogic:
         )
 
         events = request.get_domain_events()
-        completed_event = next((e for e in events if isinstance(e, RequestCompletedEvent)), None)
+        completed_event = next(
+            (e for e in events if isinstance(e, RequestCompletedEvent)), None)
 
         assert completed_event is not None
         assert completed_event.success is True
@@ -385,7 +395,8 @@ class TestEventSystemIntegration:
 
         # Perform complete lifecycle
         request.start_processing()
-        request.complete_successfully(machine_ids=["i-123", "i-456"], completion_message="Success")
+        request.complete_successfully(
+            machine_ids=["i-123", "i-456"], completion_message="Success")
 
         events = request.get_domain_events()
 
@@ -424,8 +435,10 @@ class TestEventSystemIntegration:
 
         # Events should contain all necessary data for replay
         for event in events:
-            assert hasattr(event, "request_id"), "Events should have request_id for replay"
-            assert hasattr(event, "occurred_at"), "Events should have timestamp for replay"
+            assert hasattr(
+                event, "request_id"), "Events should have request_id for replay"
+            assert hasattr(
+                event, "occurred_at"), "Events should have timestamp for replay"
             assert hasattr(event, "event_id"), "Events should have unique ID for replay"
 
     def test_event_deduplication_support(self):

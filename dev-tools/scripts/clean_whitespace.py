@@ -88,7 +88,8 @@ def main():
         if i % 50 == 0 or i == total_files:
             logger.info(f"Progress: {i}/{total_files} files processed")
 
-    logger.info(f"Completed: {total_files} files processed, {modified_count} files modified.")
+    logger.info(
+        f"Completed: {total_files} files processed, {modified_count} files modified.")
 
 
 if __name__ == "__main__":

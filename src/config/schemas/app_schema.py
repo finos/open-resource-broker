@@ -35,13 +35,15 @@ class AppConfig(BaseModel):
     resource: ResourceConfig = Field(default_factory=lambda: ResourceConfig())
     request: RequestConfig = Field(default_factory=lambda: RequestConfig())
     database: DatabaseConfig = Field(default_factory=lambda: DatabaseConfig())
-    circuit_breaker: CircuitBreakerConfig = Field(default_factory=lambda: CircuitBreakerConfig())
+    circuit_breaker: CircuitBreakerConfig = Field(
+        default_factory=lambda: CircuitBreakerConfig())
     performance: PerformanceConfig = Field(default_factory=lambda: PerformanceConfig())
     server: ServerConfig = Field(default_factory=lambda: ServerConfig())
     environment: str = Field("development", description="Environment")
     debug: bool = Field(False, description="Debug mode")
     request_timeout: int = Field(300, description="Request timeout in seconds")
-    max_machines_per_request: int = Field(100, description="Maximum number of machines per request")
+    max_machines_per_request: int = Field(
+        100, description="Maximum number of machines per request")
 
     @model_validator(mode="after")
     def ensure_template_config(self) -> "AppConfig":
@@ -76,17 +78,17 @@ class AppConfig(BaseModel):
         # Generate provider-specific templates file name
         templates_file = f"{provider_type}prov_templates.json"
         return os.path.join(config_root, templates_file)
-    
+
     def _get_selected_provider_type(self) -> str:
         """Get provider type using proper selection logic."""
         try:
             # Use provider selection service for proper provider selection
             from src.application.services.provider_selection_service import ProviderSelectionService
             from src.infrastructure.di.container import get_container
-            
+
             container = get_container()
             selection_service = container.get(ProviderSelectionService)
-            
+
             selection_result = selection_service.select_active_provider()
             return selection_result.provider_type
         except Exception:

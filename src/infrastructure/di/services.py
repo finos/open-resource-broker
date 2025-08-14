@@ -236,11 +236,13 @@ def create_handler(handler_class, config: Optional[Dict[str, Any]] = None) -> An
             from src.infrastructure.di.decorators import is_injectable
 
             if is_injectable(handler_class):
-                logger.info(f"Registering injectable handler class {handler_class.__name__}")
+                logger.info(
+                    f"Registering injectable handler class {handler_class.__name__}")
                 container.register_singleton(handler_class)
             else:
                 # Legacy handler registration
-                logger.info(f"Registering legacy handler class {handler_class.__name__}")
+                logger.info(
+                    f"Registering legacy handler class {handler_class.__name__}")
 
                 def handler_factory(c):
                     """Factory for legacy handler instances."""
@@ -260,7 +262,8 @@ def create_handler(handler_class, config: Optional[Dict[str, Any]] = None) -> An
                 container.register_factory(handler_class, handler_factory)
         except ImportError:
             # Fallback to CQRS registration if decorator module not available
-            logger.info(f"Fallback CQRS registration for handler class {handler_class.__name__}")
+            logger.info(
+                f"Fallback CQRS registration for handler class {handler_class.__name__}")
 
             def handler_factory(c):
                 """Fallback factory for CQRS handler instances."""

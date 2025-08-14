@@ -101,7 +101,8 @@ async def list_templates(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to list templates: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to list templates: {str(e)}")
 
 
 @router.get("/{template_id}", summary="Get Template", description="Get template by ID")
@@ -138,7 +139,8 @@ async def get_template(
                 },
             )
         else:
-            raise HTTPException(status_code=404, detail=f"Template {template_id} not found")
+            raise HTTPException(
+                status_code=404, detail=f"Template {template_id} not found")
 
     except HTTPException:
         raise
@@ -198,7 +200,8 @@ async def create_template(template_data: TemplateCreateRequest) -> JSONResponse:
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create template: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create template: {str(e)}")
 
 
 @router.put(
@@ -252,7 +255,8 @@ async def update_template(template_id: str, template_data: TemplateUpdateRequest
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update template: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update template: {str(e)}")
 
 
 @router.delete("/{template_id}", summary="Delete Template", description="Delete a template")
@@ -292,7 +296,8 @@ async def delete_template(template_id: str) -> JSONResponse:
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete template: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete template: {str(e)}")
 
 
 @router.post(
@@ -319,7 +324,8 @@ async def validate_template(template_data: Dict[str, Any] = TEMPLATE_DATA_BODY) 
         validation_result = query_bus.execute(query)
 
         # Check if validation result has errors
-        is_valid = not validation_result.errors if hasattr(validation_result, "errors") else True
+        is_valid = not validation_result.errors if hasattr(
+            validation_result, "errors") else True
 
         return JSONResponse(
             status_code=200,
@@ -327,10 +333,12 @@ async def validate_template(template_data: Dict[str, Any] = TEMPLATE_DATA_BODY) 
                 "valid": is_valid,
                 "template_id": template_data.get("template_id", "validation-template"),
                 "validation_errors": (
-                    validation_result.errors if hasattr(validation_result, "errors") else []
+                    validation_result.errors if hasattr(
+                        validation_result, "errors") else []
                 ),
                 "validation_warnings": (
-                    validation_result.warnings if hasattr(validation_result, "warnings") else []
+                    validation_result.warnings if hasattr(
+                        validation_result, "warnings") else []
                 ),
                 "timestamp": None,
             },
@@ -339,7 +347,8 @@ async def validate_template(template_data: Dict[str, Any] = TEMPLATE_DATA_BODY) 
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to validate template: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to validate template: {str(e)}")
 
 
 @router.post("/refresh", summary="Refresh Templates", description="Refresh template cache")
@@ -357,7 +366,8 @@ async def refresh_templates() -> JSONResponse:
 
         # Force refresh by listing templates - this will trigger cache refresh in
         # the query handler
-        query = ListTemplatesQuery(provider_api=None, active_only=True, include_configuration=False)
+        query = ListTemplatesQuery(
+            provider_api=None, active_only=True, include_configuration=False)
 
         templates = query_bus.execute(query)
         template_count = len(templates) if templates else 0
@@ -375,4 +385,5 @@ async def refresh_templates() -> JSONResponse:
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to refresh templates: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to refresh templates: {str(e)}")

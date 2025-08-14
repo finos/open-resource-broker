@@ -168,7 +168,8 @@ class HandlerDiscoveryService:
                     f"Registered query handler: { handler_class.__name__} for { query_type.__name__}"
                 )
             except Exception as e:
-                logger.error(f"Failed to register query handler {handler_class.__name__}: {e}")
+                logger.error(
+                    f"Failed to register query handler {handler_class.__name__}: {e}")
 
         # Register command handlers
         command_handlers = get_registered_command_handlers()
@@ -181,10 +182,12 @@ class HandlerDiscoveryService:
                     f"Registered command handler: { handler_class.__name__} for { command_type.__name__}"
                 )
             except Exception as e:
-                logger.error(f"Failed to register command handler {handler_class.__name__}: {e}")
+                logger.error(
+                    f"Failed to register command handler {handler_class.__name__}: {e}")
 
         total_registered = len(query_handlers) + len(command_handlers)
-        logger.info(f"Handler registration complete. Registered {total_registered} handlers")
+        logger.info(
+            f"Handler registration complete. Registered {total_registered} handlers")
 
     def _try_load_from_cache(self, base_package: str) -> Optional[Dict[str, Any]]:
         """Try to load handler discovery results from cache if valid."""
@@ -271,7 +274,8 @@ class HandlerDiscoveryService:
 
                     # Register with DI container
                     self.container.register_singleton(handler_class)
-                    logger.debug(f"Registered cached query handler: {handler_class.__name__}")
+                    logger.debug(
+                        f"Registered cached query handler: {handler_class.__name__}")
 
                 except Exception as e:
                     logger.warning(
@@ -292,7 +296,8 @@ class HandlerDiscoveryService:
 
                     # Register with DI container
                     self.container.register_singleton(handler_class)
-                    logger.debug(f"Registered cached command handler: {handler_class.__name__}")
+                    logger.debug(
+                        f"Registered cached command handler: {handler_class.__name__}")
 
                 except Exception as e:
                     logger.warning(

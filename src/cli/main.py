@@ -60,7 +60,8 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
         help="Output format",
     )
     parser.add_argument("--output", help="Output file (default: stdout)")
-    parser.add_argument("--quiet", action="store_true", help="Suppress non-essential output")
+    parser.add_argument("--quiet", action="store_true",
+                        help="Suppress non-essential output")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument(
         "--dry-run",
@@ -77,8 +78,10 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
     )
 
     # HostFactory compatibility flags
-    parser.add_argument("-f", "--file", help="Input JSON file path (HostFactory compatibility)")
-    parser.add_argument("-d", "--data", help="Input JSON data string (HostFactory compatibility)")
+    parser.add_argument(
+        "-f", "--file", help="Input JSON file path (HostFactory compatibility)")
+    parser.add_argument(
+        "-d", "--data", help="Input JSON data string (HostFactory compatibility)")
     # Get version dynamically
     try:
         from src._package import __version__
@@ -101,7 +104,8 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
     # This allows both 'templates list' and 'getAvailableTemplates' to work
 
     # Templates resource
-    templates_parser = subparsers.add_parser("templates", help="Manage compute templates")
+    templates_parser = subparsers.add_parser(
+        "templates", help="Manage compute templates")
     resource_parsers["templates"] = templates_parser
     templates_subparsers = templates_parser.add_subparsers(
         dest="action", help="Template actions", required=True
@@ -118,21 +122,25 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
     )
 
     # Templates show
-    templates_show = templates_subparsers.add_parser("show", help="Show template details")
+    templates_show = templates_subparsers.add_parser(
+        "show", help="Show template details")
     templates_show.add_argument("template_id", help="Template ID to show")
     templates_show.add_argument(
         "--format", choices=["json", "yaml", "table", "list"], help="Output format"
     )
 
     # Templates create
-    templates_create = templates_subparsers.add_parser("create", help="Create new template")
-    templates_create.add_argument("--file", required=True, help="Template configuration file")
+    templates_create = templates_subparsers.add_parser(
+        "create", help="Create new template")
+    templates_create.add_argument("--file", required=True,
+                                  help="Template configuration file")
     templates_create.add_argument(
         "--validate-only", action="store_true", help="Only validate, do not create"
     )
 
     # Templates update
-    templates_update = templates_subparsers.add_parser("update", help="Update existing template")
+    templates_update = templates_subparsers.add_parser(
+        "update", help="Update existing template")
     templates_update.add_argument("template_id", help="Template ID to update")
     templates_update.add_argument(
         "--file", required=True, help="Updated template configuration file"
@@ -146,12 +154,16 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
     )
 
     # Templates validate
-    templates_validate = templates_subparsers.add_parser("validate", help="Validate template")
-    templates_validate.add_argument("--file", required=True, help="Template file to validate")
+    templates_validate = templates_subparsers.add_parser(
+        "validate", help="Validate template")
+    templates_validate.add_argument(
+        "--file", required=True, help="Template file to validate")
 
     # Templates refresh
-    templates_refresh = templates_subparsers.add_parser("refresh", help="Refresh template cache")
-    templates_refresh.add_argument("--force", action="store_true", help="Force complete refresh")
+    templates_refresh = templates_subparsers.add_parser(
+        "refresh", help="Refresh template cache")
+    templates_refresh.add_argument(
+        "--force", action="store_true", help="Force complete refresh")
 
     # Machines resource
     machines_parser = subparsers.add_parser("machines", help="Manage compute instances")
@@ -176,7 +188,8 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
     )
 
     # Machines request (create machines)
-    machines_request = machines_subparsers.add_parser("request", help="Request new machines")
+    machines_request = machines_subparsers.add_parser(
+        "request", help="Request new machines")
     machines_request.add_argument(
         "template_id",
         nargs="?",
@@ -203,11 +216,13 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
     )
 
     # Machines status
-    machines_status = machines_subparsers.add_parser("status", help="Check machine status")
+    machines_status = machines_subparsers.add_parser(
+        "status", help="Check machine status")
     machines_status.add_argument("machine_ids", nargs="+", help="Machine IDs to check")
 
     # Requests resource
-    requests_parser = subparsers.add_parser("requests", help="Manage provisioning requests")
+    requests_parser = subparsers.add_parser(
+        "requests", help="Manage provisioning requests")
     resource_parsers["requests"] = requests_parser
     requests_subparsers = requests_parser.add_subparsers(
         dest="action", help="Request actions", required=True
@@ -235,10 +250,12 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
     # Requests cancel
     requests_cancel = requests_subparsers.add_parser("cancel", help="Cancel request")
     requests_cancel.add_argument("request_id", help="Request ID to cancel")
-    requests_cancel.add_argument("--force", action="store_true", help="Force cancellation")
+    requests_cancel.add_argument(
+        "--force", action="store_true", help="Force cancellation")
 
     # Requests status
-    requests_status = requests_subparsers.add_parser("status", help="Check request status")
+    requests_status = requests_subparsers.add_parser(
+        "status", help="Check request status")
     requests_status.add_argument("request_ids", nargs="+", help="Request IDs to check")
 
     # System resource
@@ -289,7 +306,8 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
     config_get.add_argument("key", help="Configuration key")
 
     # Config validate
-    config_validate = config_subparsers.add_parser("validate", help="Validate configuration")
+    config_validate = config_subparsers.add_parser(
+        "validate", help="Validate configuration")
     config_validate.add_argument("--file", help="Configuration file to validate")
 
     # Providers resource
@@ -300,7 +318,8 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
     )
 
     # Providers list
-    providers_list = providers_subparsers.add_parser("list", help="List available providers")
+    providers_list = providers_subparsers.add_parser(
+        "list", help="List available providers")
     providers_list.add_argument(
         "--format", choices=["json", "yaml", "table", "list"], help="Output format"
     )
@@ -309,36 +328,42 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
     )
 
     # Providers show
-    providers_show = providers_subparsers.add_parser("show", help="Show provider details")
+    providers_show = providers_subparsers.add_parser(
+        "show", help="Show provider details")
     providers_show.add_argument(
         "--format", choices=["json", "yaml", "table", "list"], help="Output format"
     )
     providers_show.add_argument("--provider", help="Show specific provider details")
 
     # Providers health
-    providers_health = providers_subparsers.add_parser("health", help="Check provider health")
+    providers_health = providers_subparsers.add_parser(
+        "health", help="Check provider health")
     providers_health.add_argument(
         "--format", choices=["json", "yaml", "table", "list"], help="Output format"
     )
     providers_health.add_argument("--provider", help="Check specific provider health")
 
     # Providers select
-    providers_select = providers_subparsers.add_parser("select", help="Select provider strategy")
+    providers_select = providers_subparsers.add_parser(
+        "select", help="Select provider strategy")
     providers_select.add_argument("provider", help="Provider name to select")
     providers_select.add_argument("--strategy", help="Specific strategy to select")
 
     # Providers exec
-    providers_exec = providers_subparsers.add_parser("exec", help="Execute provider operation")
+    providers_exec = providers_subparsers.add_parser(
+        "exec", help="Execute provider operation")
     providers_exec.add_argument("operation", help="Operation to execute")
     providers_exec.add_argument("--provider", help="Provider to execute operation on")
     providers_exec.add_argument("--params", help="Operation parameters (JSON format)")
 
     # Providers metrics
-    providers_metrics = providers_subparsers.add_parser("metrics", help="Show provider metrics")
+    providers_metrics = providers_subparsers.add_parser(
+        "metrics", help="Show provider metrics")
     providers_metrics.add_argument(
         "--format", choices=["json", "yaml", "table", "list"], help="Output format"
     )
-    providers_metrics.add_argument("--provider", help="Show metrics for specific provider")
+    providers_metrics.add_argument(
+        "--provider", help="Show metrics for specific provider")
 
     # Storage resource
     storage_parser = subparsers.add_parser("storage", help="Storage management")
@@ -348,31 +373,38 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
     )
 
     # Storage list
-    storage_list = storage_subparsers.add_parser("list", help="List available storage strategies")
+    storage_list = storage_subparsers.add_parser(
+        "list", help="List available storage strategies")
     storage_list.add_argument(
         "--format", choices=["json", "yaml", "table", "list"], help="Output format"
     )
 
     # Storage show
-    storage_show = storage_subparsers.add_parser("show", help="Show current storage configuration")
+    storage_show = storage_subparsers.add_parser(
+        "show", help="Show current storage configuration")
     storage_show.add_argument(
         "--format", choices=["json", "yaml", "table", "list"], help="Output format"
     )
-    storage_show.add_argument("--strategy", help="Show specific storage strategy details")
+    storage_show.add_argument(
+        "--strategy", help="Show specific storage strategy details")
 
     # Storage validate
     storage_validate = storage_subparsers.add_parser(
         "validate", help="Validate storage configuration"
     )
-    storage_validate.add_argument("--strategy", help="Validate specific storage strategy")
+    storage_validate.add_argument(
+        "--strategy", help="Validate specific storage strategy")
 
     # Storage test
-    storage_test = storage_subparsers.add_parser("test", help="Test storage connectivity")
+    storage_test = storage_subparsers.add_parser(
+        "test", help="Test storage connectivity")
     storage_test.add_argument("--strategy", help="Test specific storage strategy")
-    storage_test.add_argument("--timeout", type=int, default=30, help="Test timeout in seconds")
+    storage_test.add_argument("--timeout", type=int, default=30,
+                              help="Test timeout in seconds")
 
     # Storage health
-    storage_health = storage_subparsers.add_parser("health", help="Check storage health")
+    storage_health = storage_subparsers.add_parser(
+        "health", help="Check storage health")
     storage_health.add_argument(
         "--format", choices=["json", "yaml", "table", "list"], help="Output format"
     )
@@ -387,7 +419,8 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
     storage_metrics.add_argument(
         "--format", choices=["json", "yaml", "table", "list"], help="Output format"
     )
-    storage_metrics.add_argument("--strategy", help="Show metrics for specific storage strategy")
+    storage_metrics.add_argument(
+        "--strategy", help="Show metrics for specific storage strategy")
 
     # Scheduler resource
     scheduler_parser = subparsers.add_parser("scheduler", help="Scheduler management")
@@ -403,14 +436,17 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
     scheduler_list.add_argument(
         "--format", choices=["json", "yaml", "table", "list"], help="Output format"
     )
-    scheduler_list.add_argument("--long", action="store_true", help="Show detailed information")
+    scheduler_list.add_argument("--long", action="store_true",
+                                help="Show detailed information")
 
     # Scheduler show
-    scheduler_show = scheduler_subparsers.add_parser("show", help="Show scheduler configuration")
+    scheduler_show = scheduler_subparsers.add_parser(
+        "show", help="Show scheduler configuration")
     scheduler_show.add_argument(
         "--format", choices=["json", "yaml", "table", "list"], help="Output format"
     )
-    scheduler_show.add_argument("--scheduler", help="Show specific scheduler strategy details")
+    scheduler_show.add_argument(
+        "--scheduler", help="Show specific scheduler strategy details")
 
     # Scheduler validate
     scheduler_validate = scheduler_subparsers.add_parser(
@@ -419,12 +455,15 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
     scheduler_validate.add_argument(
         "--format", choices=["json", "yaml", "table", "list"], help="Output format"
     )
-    scheduler_validate.add_argument("--scheduler", help="Validate specific scheduler strategy")
+    scheduler_validate.add_argument(
+        "--scheduler", help="Validate specific scheduler strategy")
 
     # MCP resource
-    mcp_parser = subparsers.add_parser("mcp", help="MCP (Model Context Protocol) operations")
+    mcp_parser = subparsers.add_parser(
+        "mcp", help="MCP (Model Context Protocol) operations")
     resource_parsers["mcp"] = mcp_parser
-    mcp_subparsers = mcp_parser.add_subparsers(dest="action", help="MCP actions", required=True)
+    mcp_subparsers = mcp_parser.add_subparsers(
+        dest="action", help="MCP actions", required=True)
 
     # MCP tools
     mcp_tools = mcp_subparsers.add_parser("tools", help="MCP tools management")
@@ -455,7 +494,8 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
     )
 
     # MCP tools info
-    mcp_tools_info = mcp_tools_sub.add_parser("info", help="Get information about MCP tool")
+    mcp_tools_info = mcp_tools_sub.add_parser(
+        "info", help="Get information about MCP tool")
     mcp_tools_info.add_argument("tool_name", help="Name of tool to get info for")
     mcp_tools_info.add_argument(
         "--format",
@@ -465,7 +505,8 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
     )
 
     # MCP validate
-    mcp_validate = mcp_subparsers.add_parser("validate", help="Validate MCP configuration")
+    mcp_validate = mcp_subparsers.add_parser(
+        "validate", help="Validate MCP configuration")
     mcp_validate.add_argument("--config", help="MCP configuration file to validate")
     mcp_validate.add_argument(
         "--format",
@@ -476,8 +517,10 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
 
     # MCP serve
     mcp_serve = mcp_subparsers.add_parser("serve", help="Start MCP server")
-    mcp_serve.add_argument("--port", type=int, default=3000, help="Server port (default: 3000)")
-    mcp_serve.add_argument("--host", default="localhost", help="Server host (default: localhost)")
+    mcp_serve.add_argument("--port", type=int, default=3000,
+                           help="Server port (default: 3000)")
+    mcp_serve.add_argument("--host", default="localhost",
+                           help="Server host (default: localhost)")
     mcp_serve.add_argument(
         "--stdio",
         action="store_true",
@@ -651,7 +694,8 @@ async def execute_command(args, app) -> Dict[str, Any]:
         handler_func = COMMAND_HANDLERS[handler_key]
 
         if handler_func is None:
-            raise NotImplementedError(f"Command not yet implemented: {args.resource} {args.action}")
+            raise NotImplementedError(
+                f"Command not yet implemented: {args.resource} {args.action}")
 
         # All handlers are async functions with decorators
         result = await handler_func(args)

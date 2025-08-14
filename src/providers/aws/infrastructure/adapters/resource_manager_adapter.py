@@ -50,7 +50,8 @@ class AWSResourceManagerAdapter(CloudResourceManagerPort):
         from src.providers.aws.configuration.config import AWSProviderConfig
 
         aws_config = AWSProviderConfig()  # This should be injected in real implementation
-        self._resource_manager = AWSResourceManagerImpl(self._aws_client, aws_config, self._logger)
+        self._resource_manager = AWSResourceManagerImpl(
+            self._aws_client, aws_config, self._logger)
 
     def get_resource_quota(
         self, resource_type: str, region: Optional[str] = None
@@ -118,7 +119,8 @@ class AWSResourceManagerAdapter(CloudResourceManagerPort):
             # Use the new method
             import asyncio
 
-            allocation = asyncio.run(self._resource_manager.provision_resources(specification))
+            allocation = asyncio.run(
+                self._resource_manager.provision_resources(specification))
 
             return str(allocation.resource_id)
 

@@ -8,7 +8,8 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 class JsonStrategyConfig(BaseModel):
     """JSON storage strategy configuration."""
 
-    storage_type: str = Field("single_file", description="Storage type (single_file, split_files)")
+    storage_type: str = Field(
+        "single_file", description="Storage type (single_file, split_files)")
     base_path: str = Field("data", description="Base path for JSON files")
     filenames: Dict[str, Any] = Field(
         default_factory=lambda: {
@@ -38,7 +39,8 @@ class JsonStrategyConfig(BaseModel):
 class SqlStrategyConfig(BaseModel):
     """SQL storage strategy configuration."""
 
-    type: str = Field("sqlite", description="SQL database type (sqlite, postgresql, mysql, aurora)")
+    type: str = Field(
+        "sqlite", description="SQL database type (sqlite, postgresql, mysql, aurora)")
     host: str = Field("", description="Database host")
     port: int = Field(0, description="Database port")
     name: str = Field("database.db", description="Database name")
@@ -47,7 +49,8 @@ class SqlStrategyConfig(BaseModel):
     pool_size: int = Field(5, description="Connection pool size")
     max_overflow: int = Field(10, description="Maximum connection overflow")
     timeout: int = Field(30, description="Connection timeout in seconds")
-    ssl_ca: Optional[str] = Field(None, description="SSL CA certificate path (for Aurora)")
+    ssl_ca: Optional[str] = Field(
+        None, description="SSL CA certificate path (for Aurora)")
     ssl_verify: bool = Field(True, description="Verify SSL certificate (for Aurora)")
     cluster_endpoint: Optional[str] = Field(None, description="Aurora cluster endpoint")
 
@@ -80,7 +83,8 @@ class SqlStrategyConfig(BaseModel):
                 raise ValueError(f"Database name is required for {db_type}")
         elif db_type == "aurora":
             if not self.cluster_endpoint and not host:
-                raise ValueError("Either cluster_endpoint or host is required for Aurora")
+                raise ValueError(
+                    "Either cluster_endpoint or host is required for Aurora")
             if not port:
                 raise ValueError("Port is required for Aurora")
             if not name:
@@ -155,7 +159,8 @@ class StorageConfig(BaseModel):
     default_storage_path: str = Field(
         "data", description="Default path for local storage strategies"
     )
-    json_strategy: JsonStrategyConfig = Field(default_factory=lambda: JsonStrategyConfig())
+    json_strategy: JsonStrategyConfig = Field(
+        default_factory=lambda: JsonStrategyConfig())
     sql_strategy: SqlStrategyConfig = Field(default_factory=lambda: SqlStrategyConfig())
     dynamodb_strategy: DynamodbStrategyConfig = Field(
         default_factory=lambda: DynamodbStrategyConfig()

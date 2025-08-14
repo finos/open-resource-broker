@@ -99,7 +99,8 @@ class TemplatePersistenceService:
                         configuration=template.configuration,
                     )
                 self.event_publisher.publish(event)
-                self.logger.debug(f"Published domain event for template {template.template_id}")
+                self.logger.debug(
+                    f"Published domain event for template {template.template_id}")
 
             self.logger.info(f"Saved template {template.template_id} to {target_file}")
 
@@ -123,7 +124,8 @@ class TemplatePersistenceService:
                 # Use first template path as default
                 template_paths = self.scheduler_strategy.get_template_paths()
                 if not template_paths:
-                    raise ValueError("No template paths available from scheduler strategy")
+                    raise ValueError(
+                        "No template paths available from scheduler strategy")
                 target_file = Path(template_paths[0])
 
             # Load existing templates from source file
@@ -152,7 +154,8 @@ class TemplatePersistenceService:
                     deletion_time=datetime.now(),
                 )
                 self.event_publisher.publish(event)
-                self.logger.debug(f"Published deletion event for template {template_id}")
+                self.logger.debug(
+                    f"Published deletion event for template {template_id}")
 
             self.logger.info(f"Deleted template {template_id} from {target_file}")
 

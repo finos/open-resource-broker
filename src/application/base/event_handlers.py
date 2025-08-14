@@ -82,7 +82,8 @@ class BaseEventHandler(Generic[TEvent], EventHandler[TEvent], ABC):
             self._record_success_metrics(event_type, duration)
 
             if self.logger:
-                self.logger.info(f"Event processed successfully: {event_type} ({duration:.3f}s)")
+                self.logger.info(
+                    f"Event processed successfully: {event_type} ({duration:.3f}s)")
 
         except Exception as e:
             # Record failure metrics

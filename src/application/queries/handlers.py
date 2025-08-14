@@ -83,9 +83,11 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 # No machines in storage but we have resource IDs - check provider and
                 # create machines
                 machines = await self._check_provider_and_create_machines(request)
-                self.logger.info(f"DEBUG: Provider check returned {len(machines)} machines")
+                self.logger.info(
+                    f"DEBUG: Provider check returned {len(machines)} machines")
             elif machines:
-                self.logger.info(f"DEBUG: Have {len(machines)} machines, updating status from AWS")
+                self.logger.info(
+                    f"DEBUG: Have {len(machines)} machines, updating status from AWS")
                 # We have machines - update their status from AWS
                 machines = await self._update_machine_status_from_aws(machines)
             else:
@@ -199,7 +201,8 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             )
             self.logger.info(f"Operation parameters: {operation.parameters}")
 
-            result = provider_context.execute_with_strategy(strategy_identifier, operation)
+            result = provider_context.execute_with_strategy(
+                strategy_identifier, operation)
 
             self.logger.info(
                 f"Provider strategy result: success={result.success}, data_keys={list(result.data.keys()) if result.data else 'None'}"
@@ -288,10 +291,12 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             # Use the correct strategy identifier format:
             # provider_type-provider_type-instance
             strategy_identifier = f"{request.provider_type}-{request.provider_type}-{request.provider_instance or 'default'}"
-            result = provider_context.execute_with_strategy(strategy_identifier, operation)
+            result = provider_context.execute_with_strategy(
+                strategy_identifier, operation)
 
             if not result.success:
-                self.logger.warning(f"Failed to check resource status: {result.error_message}")
+                self.logger.warning(
+                    f"Failed to check resource status: {result.error_message}")
                 return machines
 
             # Extract domain machine entities from result (provider strategy already
@@ -770,7 +775,8 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, List[Template]])
                         domain_templates.append(domain_template)
 
                     except Exception as e:
-                        self.logger.warning(f"Skipping invalid template {dto.template_id}: {e}")
+                        self.logger.warning(
+                            f"Skipping invalid template {dto.template_id}: {e}")
                         continue
 
             self.logger.info(f"Found {len(domain_templates)} templates")
@@ -807,7 +813,8 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
             template_port = self.container.get(TemplateConfigurationPort)
 
             # Validate template configuration
-            validation_errors = template_port.validate_template_config(query.configuration)
+            validation_errors = template_port.validate_template_config(
+                query.configuration)
 
             # Log validation results
             if validation_errors:
@@ -825,7 +832,8 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
             }
 
         except Exception as e:
-            self.logger.error(f"Template validation failed for {query.template_id}: {e}")
+            self.logger.error(
+                f"Template validation failed for {query.template_id}: {e}")
             return {
                 "template_id": query.template_id,
                 "is_valid": False,
@@ -918,7 +926,8 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, List[MachineDTO]])
                         machine_id=str(machine.machine_id),
                         provider_id=machine.provider_id,
                         template_id=machine.template_id,
-                        request_id=(str(machine.request_id) if machine.request_id else None),
+                        request_id=(str(machine.request_id)
+                                    if machine.request_id else None),
                         status=machine.status.value,
                         instance_type=machine.instance_type,
                         created_at=machine.created_at,

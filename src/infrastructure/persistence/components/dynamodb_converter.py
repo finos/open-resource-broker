@@ -33,7 +33,8 @@ class DynamoDBConverter(DataConverter):
     def to_storage_format(self, domain_data: Dict[str, Any]) -> Any:
         """Convert domain data to DynamoDB format (implements DataConverter interface)."""
         # Extract entity_id from domain_data if present
-        entity_id = domain_data.get(self.partition_key, domain_data.get("id", "unknown"))
+        entity_id = domain_data.get(
+            self.partition_key, domain_data.get("id", "unknown"))
         return self.to_dynamodb_item(entity_id, domain_data)
 
     def from_storage_format(self, storage_data: Any) -> Dict[str, Any]:
@@ -60,7 +61,8 @@ class DynamoDBConverter(DataConverter):
 
             # Add sort key if specified
             if self.sort_key and self.sort_key in data:
-                item[self.sort_key] = self._convert_to_dynamodb_type(data[self.sort_key])
+                item[self.sort_key] = self._convert_to_dynamodb_type(
+                    data[self.sort_key])
 
             # Convert all other fields
             for key, value in data.items():
@@ -268,7 +270,8 @@ class DynamoDBConverter(DataConverter):
                 elif "$contains" in value:
                     filter_expressions.append(Attr(key).contains(value["$contains"]))
                 elif "$begins_with" in value:
-                    filter_expressions.append(Attr(key).begins_with(value["$begins_with"]))
+                    filter_expressions.append(
+                        Attr(key).begins_with(value["$begins_with"]))
                 else:
                     # Default equality
                     filter_expressions.append(Attr(key).eq(value))

@@ -69,7 +69,8 @@ def _register_api_handlers(container: DIContainer) -> None:
                     command_bus=c.get(CommandBus),
                     scheduler_strategy=c.get(SchedulerPort),
                     metrics=(
-                        c.get(MetricsCollector) if c.is_registered(MetricsCollector) else None
+                        c.get(MetricsCollector) if c.is_registered(
+                            MetricsCollector) else None
                     ),
                 ),
             )
@@ -90,10 +91,12 @@ def _register_api_handlers(container: DIContainer) -> None:
                     scheduler_strategy=c.get(SchedulerPort),
                     logger=c.get(LoggingPort),
                     error_handler=(
-                        c.get(ErrorHandlingPort) if c.is_registered(ErrorHandlingPort) else None
+                        c.get(ErrorHandlingPort) if c.is_registered(
+                            ErrorHandlingPort) else None
                     ),
                     metrics=(
-                        c.get(MetricsCollector) if c.is_registered(MetricsCollector) else None
+                        c.get(MetricsCollector) if c.is_registered(
+                            MetricsCollector) else None
                     ),
                 ),
             )
@@ -117,10 +120,12 @@ def _register_api_handlers(container: DIContainer) -> None:
                     scheduler_strategy=c.get(SchedulerPort),
                     logger=c.get(LoggingPort),
                     error_handler=(
-                        c.get(ErrorHandlingPort) if c.is_registered(ErrorHandlingPort) else None
+                        c.get(ErrorHandlingPort) if c.is_registered(
+                            ErrorHandlingPort) else None
                     ),
                     metrics=(
-                        c.get(MetricsCollector) if c.is_registered(MetricsCollector) else None
+                        c.get(MetricsCollector) if c.is_registered(
+                            MetricsCollector) else None
                     ),
                 ),
             )
@@ -143,10 +148,12 @@ def _register_api_handlers(container: DIContainer) -> None:
                     scheduler_strategy=c.get(SchedulerPort),
                     logger=c.get(LoggingPort),
                     error_handler=(
-                        c.get(ErrorHandlingPort) if c.is_registered(ErrorHandlingPort) else None
+                        c.get(ErrorHandlingPort) if c.is_registered(
+                            ErrorHandlingPort) else None
                     ),
                     metrics=(
-                        c.get(MetricsCollector) if c.is_registered(MetricsCollector) else None
+                        c.get(MetricsCollector) if c.is_registered(
+                            MetricsCollector) else None
                     ),
                 ),
             )
@@ -169,10 +176,12 @@ def _register_api_handlers(container: DIContainer) -> None:
                     scheduler_strategy=c.get(SchedulerPort),
                     logger=c.get(LoggingPort),
                     error_handler=(
-                        c.get(ErrorHandlingPort) if c.is_registered(ErrorHandlingPort) else None
+                        c.get(ErrorHandlingPort) if c.is_registered(
+                            ErrorHandlingPort) else None
                     ),
                     metrics=(
-                        c.get(MetricsCollector) if c.is_registered(MetricsCollector) else None
+                        c.get(MetricsCollector) if c.is_registered(
+                            MetricsCollector) else None
                     ),
                 ),
             )

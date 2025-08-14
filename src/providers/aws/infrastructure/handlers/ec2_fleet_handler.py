@@ -194,7 +194,8 @@ class EC2FleetHandler(AWSHandler):
                 )
 
             request.metadata["instance_ids"] = instance_ids
-            self._logger.debug(f"Stored instance IDs in request metadata: {instance_ids}")
+            self._logger.debug(
+                f"Stored instance IDs in request metadata: {instance_ids}")
 
         return fleet_id
 
@@ -276,7 +277,8 @@ class EC2FleetHandler(AWSHandler):
             if template.max_spot_price is not None:
                 if "SpotOptions" not in fleet_config:
                     fleet_config["SpotOptions"] = {}
-                fleet_config["SpotOptions"]["MaxTotalPrice"] = str(template.max_spot_price)
+                fleet_config["SpotOptions"]["MaxTotalPrice"] = str(
+                    template.max_spot_price)
         elif price_type == "heterogeneous":
             # For heterogeneous fleets, we need to specify both on-demand and spot
             # capacities
@@ -307,7 +309,8 @@ class EC2FleetHandler(AWSHandler):
             if template.max_spot_price is not None:
                 if "SpotOptions" not in fleet_config:
                     fleet_config["SpotOptions"] = {}
-                fleet_config["SpotOptions"]["MaxTotalPrice"] = str(template.max_spot_price)
+                fleet_config["SpotOptions"]["MaxTotalPrice"] = str(
+                    template.max_spot_price)
 
         # Add overrides with weighted capacity if multiple instance types are specified
         if template.instance_types:
@@ -328,7 +331,8 @@ class EC2FleetHandler(AWSHandler):
                     on_demand_overrides.append(override)
 
                 # Add on-demand overrides to the existing overrides
-                fleet_config["LaunchTemplateConfigs"][0]["Overrides"].extend(on_demand_overrides)
+                fleet_config["LaunchTemplateConfigs"][0]["Overrides"].extend(
+                    on_demand_overrides)
 
         # Add subnet configuration
         if template.subnet_ids:
@@ -401,10 +405,12 @@ class EC2FleetHandler(AWSHandler):
             query = GetTemplateQuery(template_id=str(request.template_id))
             template = query_bus.execute(query)
             if not template:
-                raise AWSEntityNotFoundError(f"Template {request.template_id} not found")
+                raise AWSEntityNotFoundError(
+                    f"Template {request.template_id} not found")
 
             # Ensure fleet_type is not None
-            fleet_type_value = template.metadata.get("aws", {}).get("fleet_type", "instant")
+            fleet_type_value = template.metadata.get(
+                "aws", {}).get("fleet_type", "instant")
             if not fleet_type_value:
                 raise AWSValidationError("Fleet type is required")
 
@@ -451,7 +457,8 @@ class EC2FleetHandler(AWSHandler):
                 instance_ids = [instance["InstanceId"] for instance in active_instances]
 
             if not instance_ids:
-                self._logger.info(f"No active instances found in fleet {request.resource_id}")
+                self._logger.info(
+                    f"No active instances found in fleet {request.resource_id}")
                 return []
 
             # Get detailed instance information
@@ -487,7 +494,8 @@ class EC2FleetHandler(AWSHandler):
             )
 
             if not fleet_list:
-                raise AWSEntityNotFoundError(f"EC2 Fleet {request.resource_id} not found")
+                raise AWSEntityNotFoundError(
+                    f"EC2 Fleet {request.resource_id} not found")
 
             fleet = fleet_list[0]
             fleet_type = fleet.get("Type", "maintain")
@@ -507,7 +515,8 @@ class EC2FleetHandler(AWSHandler):
                         self.aws_client.ec2_client.modify_fleet,
                         operation_type="critical",
                         FleetId=request.resource_id,
-                        TargetCapacitySpecification={"TotalTargetCapacity": new_capacity},
+                        TargetCapacitySpecification={
+                            "TotalTargetCapacity": new_capacity},
                     )
                     self._logger.info(
                         f"Reduced maintain fleet {request.resource_id} capacity to {new_capacity}"

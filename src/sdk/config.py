@@ -98,7 +98,8 @@ class SDKConfig:
 
                         data = yaml.safe_load(f)
                     except ImportError:
-                        raise ConfigurationError("YAML support requires PyYAML: pip install PyYAML")
+                        raise ConfigurationError(
+                            "YAML support requires PyYAML: pip install PyYAML")
                 else:
                     data = json.load(f)
 
@@ -107,7 +108,8 @@ class SDKConfig:
             return config
 
         except Exception as e:
-            raise ConfigurationError(f"Failed to load configuration from {path}: {str(e)}") from e
+            raise ConfigurationError(
+                f"Failed to load configuration from {path}: {str(e)}") from e
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert configuration to dictionary."""

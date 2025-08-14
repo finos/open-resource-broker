@@ -67,7 +67,8 @@ class TestAWSValidationAdapter:
         """Test validation of invalid provider API."""
         assert validation_adapter.validate_provider_api("InvalidAPI") is False
         assert validation_adapter.validate_provider_api("") is False
-        assert validation_adapter.validate_provider_api("ec2fleet") is False  # Case sensitive
+        assert validation_adapter.validate_provider_api(
+            "ec2fleet") is False  # Case sensitive
 
     def test_get_supported_provider_apis(self, validation_adapter):
         """Test getting supported provider APIs."""
@@ -81,8 +82,10 @@ class TestAWSValidationAdapter:
 
     def test_get_default_fleet_type_for_api(self, validation_adapter):
         """Test getting default fleet type for API."""
-        assert validation_adapter.get_default_fleet_type_for_api("EC2Fleet") == "instant"
-        assert validation_adapter.get_default_fleet_type_for_api("SpotFleet") == "request"
+        assert validation_adapter.get_default_fleet_type_for_api(
+            "EC2Fleet") == "instant"
+        assert validation_adapter.get_default_fleet_type_for_api(
+            "SpotFleet") == "request"
 
     def test_get_default_fleet_type_for_unsupported_api(self, validation_adapter):
         """Test getting default fleet type for unsupported API raises error."""
@@ -103,15 +106,21 @@ class TestAWSValidationAdapter:
 
     def test_validate_fleet_type_for_api_valid(self, validation_adapter):
         """Test validation of valid fleet type for API."""
-        assert validation_adapter.validate_fleet_type_for_api("instant", "EC2Fleet") is True
-        assert validation_adapter.validate_fleet_type_for_api("request", "EC2Fleet") is True
-        assert validation_adapter.validate_fleet_type_for_api("request", "SpotFleet") is True
-        assert validation_adapter.validate_fleet_type_for_api("maintain", "SpotFleet") is True
+        assert validation_adapter.validate_fleet_type_for_api(
+            "instant", "EC2Fleet") is True
+        assert validation_adapter.validate_fleet_type_for_api(
+            "request", "EC2Fleet") is True
+        assert validation_adapter.validate_fleet_type_for_api(
+            "request", "SpotFleet") is True
+        assert validation_adapter.validate_fleet_type_for_api(
+            "maintain", "SpotFleet") is True
 
     def test_validate_fleet_type_for_api_invalid(self, validation_adapter):
         """Test validation of invalid fleet type for API."""
-        assert validation_adapter.validate_fleet_type_for_api("instant", "SpotFleet") is False
-        assert validation_adapter.validate_fleet_type_for_api("invalid", "EC2Fleet") is False
+        assert validation_adapter.validate_fleet_type_for_api(
+            "instant", "SpotFleet") is False
+        assert validation_adapter.validate_fleet_type_for_api(
+            "invalid", "EC2Fleet") is False
 
     def test_validate_template_configuration_valid(self, validation_adapter):
         """Test validation of valid template configuration."""
@@ -178,7 +187,8 @@ class TestAWSValidationAdapter:
         result = validation_adapter.validate_template_configuration(template_config)
 
         assert result["valid"] is False
-        assert any("Invalid AWS subnet ID format" in error for error in result["errors"])
+        assert any(
+            "Invalid AWS subnet ID format" in error for error in result["errors"])
 
     def test_validate_template_configuration_invalid_percent_on_demand(self, validation_adapter):
         """Test validation with invalid percent_on_demand."""

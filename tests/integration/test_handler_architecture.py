@@ -206,7 +206,8 @@ def test_method_signatures():
 
                 # Check parameter count
                 if len(params) != len(expected_params):
-                    print(f"   FAIL: {handler_name}.{method_name}: Wrong parameter count")
+                    print(
+                        f"   FAIL: {handler_name}.{method_name}: Wrong parameter count")
                     print(f"      Expected: {len(expected_params)} params")
                     print(f"      Actual: {len(params)} params")
                     return False
@@ -267,8 +268,10 @@ def test_base_class_inheritance():
 
             # Check direct inheritance
             if AWSHandler not in handler_class.__bases__:
-                print(f"   FAIL: {handler_name}: Does not directly inherit from AWSHandler")
-                print(f"      Base classes: {[base.__name__ for base in handler_class.__bases__]}")
+                print(
+                    f"   FAIL: {handler_name}: Does not directly inherit from AWSHandler")
+                print(
+                    f"      Base classes: {[base.__name__ for base in handler_class.__bases__]}")
                 return False
 
             # Check MRO (Method Resolution Order)
@@ -285,7 +288,8 @@ def test_base_class_inheritance():
             ]
             for method_name in base_methods:
                 if not hasattr(handler_class, method_name):
-                    print(f"   FAIL: {handler_name}: Missing inherited method '{method_name}'")
+                    print(
+                        f"   FAIL: {handler_name}: Missing inherited method '{method_name}'")
                     return False
 
             print(f"   PASS: {handler_name}: Properly inherits from AWSHandler")
@@ -348,10 +352,12 @@ def test_launch_template_integration():
                     return False
 
                 if handler.launch_template_manager != mock_launch_template_manager:
-                    print(f"   FAIL: {handler_name}: launch_template_manager not properly assigned")
+                    print(
+                        f"   FAIL: {handler_name}: launch_template_manager not properly assigned")
                     return False
 
-                print(f"   PASS: {handler_name}: Launch template manager properly integrated")
+                print(
+                    f"   PASS: {handler_name}: Launch template manager properly integrated")
 
             except Exception as e:
                 print(
@@ -383,7 +389,8 @@ def test_error_handling_consistency():
 
         for method_name in error_methods:
             if not hasattr(AWSHandler, method_name):
-                print(f"   FAIL: AWSHandler: Missing error handling method '{method_name}'")
+                print(
+                    f"   FAIL: AWSHandler: Missing error handling method '{method_name}'")
                 return False
 
         # Check that handlers inherit error handling

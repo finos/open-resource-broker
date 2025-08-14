@@ -303,7 +303,8 @@ class TestConfigurationIntegration:
             provider_data = config_manager.get("provider", {})
             # Note: Environment variable override would need to be implemented in the config manager
             # For now, test that configuration is accessible
-            assert provider_data.get("selection_policy") == "FIRST_AVAILABLE"  # Original value
+            assert provider_data.get(
+                "selection_policy") == "FIRST_AVAILABLE"  # Original value
             assert provider_data.get("health_check_interval") == 30  # Original value
 
     def test_error_handling_e2e(self):
@@ -422,14 +423,16 @@ class TestConfigurationIntegration:
             "image_id": "ami-specific",  # Should override defaults
         }
 
-        result = defaults_service.resolve_template_defaults(template_dict, "aws-primary")
+        result = defaults_service.resolve_template_defaults(
+            template_dict, "aws-primary")
 
         # Verify hierarchical resolution worked
         assert result["template_id"] == "test-template"
         assert result["image_id"] == "ami-specific"  # Template value (highest priority)
 
         # Test provider_api resolution specifically
-        provider_api = defaults_service.resolve_provider_api_default(template_dict, "aws-primary")
+        provider_api = defaults_service.resolve_provider_api_default(
+            template_dict, "aws-primary")
 
         # Should use provider instance default over provider type default
         assert provider_api in [
@@ -438,7 +441,8 @@ class TestConfigurationIntegration:
         ]  # Either is valid depending on implementation
 
         # Test effective defaults
-        effective_defaults = defaults_service.get_effective_template_defaults("aws-primary")
+        effective_defaults = defaults_service.get_effective_template_defaults(
+            "aws-primary")
         assert "provider_api" in effective_defaults
         assert "image_id" in effective_defaults
         assert "instance_type" in effective_defaults

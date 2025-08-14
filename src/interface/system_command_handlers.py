@@ -49,8 +49,10 @@ async def handle_list_providers(args) -> Dict[str, Any]:
         providers_info = []
         for provider_instance in active_providers:
             # Get effective handlers using inheritance
-            provider_defaults = provider_config.provider_defaults.get(provider_instance.type)
-            effective_handlers = provider_instance.get_effective_handlers(provider_defaults)
+            provider_defaults = provider_config.provider_defaults.get(
+                provider_instance.type)
+            effective_handlers = provider_instance.get_effective_handlers(
+                provider_defaults)
             handler_names = list(effective_handlers.keys())
 
             providers_info.append(

@@ -239,7 +239,8 @@ class TestProviderContextEdgeCases:
 
         def register_strategy(strategy_id):
             try:
-                strategy = FlakyProviderStrategy(f"concurrent-{strategy_id}", failure_rate=0.0)
+                strategy = FlakyProviderStrategy(
+                    f"concurrent-{strategy_id}", failure_rate=0.0)
                 provider_context.register_strategy(strategy)
                 strategies_registered.append(strategy_id)
             except Exception as e:

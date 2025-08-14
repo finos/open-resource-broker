@@ -68,7 +68,8 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, TemplateCo
             template_port = self._container.get(TemplateConfigurationPort)
 
             # Validate template configuration
-            validation_errors = template_port.validate_template_config(command.configuration)
+            validation_errors = template_port.validate_template_config(
+                command.configuration)
             if validation_errors:
                 self.logger.warning(
                     f"Template validation failed for { command.template_id}: {validation_errors}"
@@ -96,13 +97,15 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, TemplateCo
                 # Check if template already exists
                 existing_template = uow.templates.get_by_id(command.template_id)
                 if existing_template:
-                    raise BusinessRuleError(f"Template {command.template_id} already exists")
+                    raise BusinessRuleError(
+                        f"Template {command.template_id} already exists")
 
                 # Add new template
                 uow.templates.add(template)
                 uow.commit()
 
-                self.logger.info(f"Template created successfully: {command.template_id}")
+                self.logger.info(
+                    f"Template created successfully: {command.template_id}")
 
             return TemplateCommandResponse(template_id=command.template_id)
 
@@ -164,7 +167,8 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, TemplateCo
             # Validate updated configuration if provided
             validation_errors = []
             if command.configuration:
-                validation_errors = template_port.validate_template_config(command.configuration)
+                validation_errors = template_port.validate_template_config(
+                    command.configuration)
                 if validation_errors:
                     self.logger.warning(
                         f"Template update validation failed for { command.template_id}: {validation_errors}"
@@ -201,7 +205,8 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, TemplateCo
                 uow.templates.update(template)
                 uow.commit()
 
-                self.logger.info(f"Template updated successfully: {command.template_id}")
+                self.logger.info(
+                    f"Template updated successfully: {command.template_id}")
 
             return TemplateCommandResponse(template_id=command.template_id)
 
@@ -267,7 +272,8 @@ class DeleteTemplateHandler(BaseCommandHandler[DeleteTemplateCommand, TemplateCo
                 uow.templates.remove(template)
                 uow.commit()
 
-                self.logger.info(f"Template deleted successfully: {command.template_id}")
+                self.logger.info(
+                    f"Template deleted successfully: {command.template_id}")
 
             return TemplateCommandResponse(template_id=command.template_id)
 
@@ -327,7 +333,8 @@ class ValidateTemplateHandler(BaseCommandHandler[ValidateTemplateCommand, Templa
             template_port = self._container.get(TemplateConfigurationPort)
 
             # Validate template configuration
-            validation_errors = template_port.validate_template_config(command.configuration)
+            validation_errors = template_port.validate_template_config(
+                command.configuration)
 
             # Log validation results
             if validation_errors:
@@ -335,7 +342,8 @@ class ValidateTemplateHandler(BaseCommandHandler[ValidateTemplateCommand, Templa
                     f"Template validation failed for { command.template_id}: {validation_errors}"
                 )
             else:
-                self.logger.info(f"Template validation passed for {command.template_id}")
+                self.logger.info(
+                    f"Template validation passed for {command.template_id}")
 
             # Publish validation event (could be useful for monitoring/auditing)
             # This would be handled by the domain event system
@@ -345,7 +353,8 @@ class ValidateTemplateHandler(BaseCommandHandler[ValidateTemplateCommand, Templa
             )
 
         except Exception as e:
-            self.logger.error(f"Template validation failed for {command.template_id}: {e}")
+            self.logger.error(
+                f"Template validation failed for {command.template_id}: {e}")
             return TemplateCommandResponse(
                 template_id=command.template_id,
                 validation_errors=[f"Validation error: {str(e)}"],

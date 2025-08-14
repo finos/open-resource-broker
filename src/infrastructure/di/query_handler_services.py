@@ -85,10 +85,12 @@ def register_query_handlers_with_bus(container: DIContainer) -> None:
 
             query_bus.register(GetTemplateQuery, container.get(GetTemplateHandler))
             query_bus.register(ListTemplatesQuery, container.get(ListTemplatesHandler))
-            query_bus.register(ValidateTemplateQuery, container.get(ValidateTemplateHandler))
+            query_bus.register(ValidateTemplateQuery,
+                               container.get(ValidateTemplateHandler))
 
         except ImportError as e:
-            logger.debug(f"Template query handlers not available for bus registration: {e}")
+            logger.debug(
+                f"Template query handlers not available for bus registration: {e}")
 
         # Register request query handlers
         try:
@@ -106,12 +108,16 @@ def register_query_handlers_with_bus(container: DIContainer) -> None:
             )
 
             query_bus.register(GetRequestQuery, container.get(GetRequestHandler))
-            query_bus.register(GetRequestStatusQuery, container.get(GetRequestStatusQueryHandler))
-            query_bus.register(ListActiveRequestsQuery, container.get(ListActiveRequestsHandler))
-            query_bus.register(ListReturnRequestsQuery, container.get(ListReturnRequestsHandler))
+            query_bus.register(GetRequestStatusQuery,
+                               container.get(GetRequestStatusQueryHandler))
+            query_bus.register(ListActiveRequestsQuery,
+                               container.get(ListActiveRequestsHandler))
+            query_bus.register(ListReturnRequestsQuery,
+                               container.get(ListReturnRequestsHandler))
 
         except ImportError as e:
-            logger.debug(f"Request query handlers not available for bus registration: {e}")
+            logger.debug(
+                f"Request query handlers not available for bus registration: {e}")
 
         # Register machine query handlers
         try:
@@ -125,7 +131,8 @@ def register_query_handlers_with_bus(container: DIContainer) -> None:
             query_bus.register(ListMachinesQuery, container.get(ListMachinesHandler))
 
         except ImportError as e:
-            logger.debug(f"Machine query handlers not available for bus registration: {e}")
+            logger.debug(
+                f"Machine query handlers not available for bus registration: {e}")
 
         # Register system query handlers
         try:
@@ -142,16 +149,20 @@ def register_query_handlers_with_bus(container: DIContainer) -> None:
                 ValidateProviderConfigHandler,
             )
 
-            query_bus.register(GetProviderConfigQuery, container.get(GetProviderConfigHandler))
+            query_bus.register(GetProviderConfigQuery,
+                               container.get(GetProviderConfigHandler))
             query_bus.register(
                 ValidateProviderConfigQuery,
                 container.get(ValidateProviderConfigHandler),
             )
-            query_bus.register(GetSystemStatusQuery, container.get(GetSystemStatusHandler))
-            query_bus.register(GetProviderMetricsQuery, container.get(GetProviderMetricsHandler))
+            query_bus.register(GetSystemStatusQuery,
+                               container.get(GetSystemStatusHandler))
+            query_bus.register(GetProviderMetricsQuery,
+                               container.get(GetProviderMetricsHandler))
 
         except ImportError as e:
-            logger.debug(f"System query handlers not available for bus registration: {e}")
+            logger.debug(
+                f"System query handlers not available for bus registration: {e}")
 
         # Register specialized query handlers
         try:
@@ -169,11 +180,14 @@ def register_query_handlers_with_bus(container: DIContainer) -> None:
             query_bus.register(
                 GetActiveMachineCountQuery, container.get(GetActiveMachineCountHandler)
             )
-            query_bus.register(GetRequestSummaryQuery, container.get(GetRequestSummaryHandler))
-            query_bus.register(GetMachineHealthQuery, container.get(GetMachineHealthHandler))
+            query_bus.register(GetRequestSummaryQuery,
+                               container.get(GetRequestSummaryHandler))
+            query_bus.register(GetMachineHealthQuery,
+                               container.get(GetMachineHealthHandler))
 
         except ImportError as e:
-            logger.debug(f"Specialized query handlers not available for bus registration: {e}")
+            logger.debug(
+                f"Specialized query handlers not available for bus registration: {e}")
 
         logger.info("Query handlers registered with query bus successfully")
 

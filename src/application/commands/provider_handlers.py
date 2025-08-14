@@ -56,7 +56,8 @@ class SelectProviderStrategyHandler(
 
     async def execute_command(self, command: SelectProviderStrategyCommand) -> Dict[str, Any]:
         """Handle provider strategy selection command."""
-        self.logger.info(f"Selecting provider strategy for operation: {command.operation_type}")
+        self.logger.info(
+            f"Selecting provider strategy for operation: {command.operation_type}")
 
         try:
             # Use existing provider context to select strategy
@@ -88,7 +89,8 @@ class SelectProviderStrategyHandler(
             )
             self.event_publisher.publish(event)
 
-            self.logger.info(f"Selected strategy: {selection_result.selected_strategy.name}")
+            self.logger.info(
+                f"Selected strategy: {selection_result.selected_strategy.name}")
 
             return {
                 "selected_strategy": selection_result.selected_strategy.name,
@@ -142,7 +144,8 @@ class ExecuteProviderOperationHandler(
                 # Use context's strategy selection
                 result = self._provider_context.execute_operation(operation)
 
-            execution_time = (time.time() - start_time) * 1000  # Convert to milliseconds
+            execution_time = (time.time() - start_time) * \
+                              1000  # Convert to milliseconds
 
             # Publish operation execution event
             event = ProviderOperationExecutedEvent(
@@ -155,7 +158,8 @@ class ExecuteProviderOperationHandler(
             self.event_publisher.publish(event)
 
             if result.success:
-                self.logger.info(f"Operation completed successfully in {execution_time:.2f}ms")
+                self.logger.info(
+                    f"Operation completed successfully in {execution_time:.2f}ms")
             else:
                 self.logger.error(f"Operation failed: {result.error_message}")
 
@@ -233,7 +237,8 @@ class RegisterProviderStrategyHandler(
                 config=command.strategy_config,
             )
 
-            strategy = registry.create_strategy(command.provider_type.lower(), provider_config)
+            strategy = registry.create_strategy(
+                command.provider_type.lower(), provider_config)
 
             # Register strategy with context
             self._provider_context.register_strategy(strategy, command.strategy_name)
@@ -247,7 +252,8 @@ class RegisterProviderStrategyHandler(
             )
             self.event_publisher.publish(event)
 
-            self.logger.info(f"Successfully registered strategy: {command.strategy_name}")
+            self.logger.info(
+                f"Successfully registered strategy: {command.strategy_name}")
 
             return {
                 "strategy_name": command.strategy_name,
@@ -289,7 +295,8 @@ class UpdateProviderHealthHandler(BaseCommandHandler[UpdateProviderHealthCommand
 
         try:
             # Get current health status for comparison
-            old_status = self._provider_context.check_strategy_health(command.provider_name)
+            old_status = self._provider_context.check_strategy_health(
+                command.provider_name)
 
             # Update health status in context
             self._provider_context.update_provider_health(
@@ -307,7 +314,8 @@ class UpdateProviderHealthHandler(BaseCommandHandler[UpdateProviderHealthCommand
                 self.event_publisher.publish(event)
 
                 status_change = "healthy" if command.health_status.is_healthy else "unhealthy"
-                self.logger.info(f"Provider {command.provider_name} is now {status_change}")
+                self.logger.info(
+                    f"Provider {command.provider_name} is now {status_change}")
 
             return {
                 "provider_name": command.provider_name,

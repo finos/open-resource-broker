@@ -30,11 +30,14 @@ def run_command(cmd: List[str], description: str) -> bool:
 
 def main():
     """Main test runner function."""
-    parser = argparse.ArgumentParser(description="Run tests for Open Host Factory Plugin")
+    parser = argparse.ArgumentParser(
+        description="Run tests for Open Host Factory Plugin")
     parser.add_argument("--unit", action="store_true", help="Run unit tests only")
-    parser.add_argument("--integration", action="store_true", help="Run integration tests only")
+    parser.add_argument("--integration", action="store_true",
+                        help="Run integration tests only")
     parser.add_argument("--e2e", action="store_true", help="Run end-to-end tests only")
-    parser.add_argument("--coverage", action="store_true", help="Run tests with coverage")
+    parser.add_argument("--coverage", action="store_true",
+                        help="Run tests with coverage")
     parser.add_argument(
         "--html-coverage", action="store_true", help="Generate HTML coverage report"
     )
@@ -51,7 +54,8 @@ def main():
     parser.add_argument("--cov-xml", type=str, help="Generate coverage XML report")
     parser.add_argument("--all", action="store_true", help="Run all test types")
     parser.add_argument("--maxfail", type=int, default=5, help="Stop after N failures")
-    parser.add_argument("--timeout", type=int, default=300, help="Test timeout in seconds")
+    parser.add_argument("--timeout", type=int, default=300,
+                        help="Test timeout in seconds")
 
     args = parser.parse_args()
 

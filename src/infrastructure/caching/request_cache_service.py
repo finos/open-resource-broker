@@ -33,7 +33,8 @@ class RequestCacheService:
             request_caching = caching_config.get("request_status_caching", {})
             return request_caching.get("enabled", False)
         except Exception as e:
-            self.logger.warning(f"Failed to get caching config, defaulting to disabled: {e}")
+            self.logger.warning(
+                f"Failed to get caching config, defaulting to disabled: {e}")
             return False
 
     def _get_cache_ttl(self) -> int:
@@ -44,7 +45,8 @@ class RequestCacheService:
             request_caching = caching_config.get("request_status_caching", {})
             return request_caching.get("ttl_seconds", 300)  # Default 5 minutes
         except Exception as e:
-            self.logger.warning(f"Failed to get cache TTL, defaulting to 300 seconds: {e}")
+            self.logger.warning(
+                f"Failed to get cache TTL, defaulting to 300 seconds: {e}")
             return 300
 
     def get_cached_request(self, request_id: str) -> Optional[RequestDTO]:
@@ -125,7 +127,8 @@ class RequestCacheService:
                     self.logger.debug(f"Cached request {request_dto.request_id}")
 
         except Exception as e:
-            self.logger.warning(f"Failed to cache request {request_dto.request_id}: {e}")
+            self.logger.warning(
+                f"Failed to cache request {request_dto.request_id}: {e}")
 
     def _is_cache_valid(self, request) -> bool:
         """Check if cached request is within TTL."""
@@ -152,7 +155,8 @@ class RequestCacheService:
                     self.logger.debug(f"Invalidated cache for request {request_id}")
 
         except Exception as e:
-            self.logger.warning(f"Failed to invalidate cache for request {request_id}: {e}")
+            self.logger.warning(
+                f"Failed to invalidate cache for request {request_id}: {e}")
 
     def is_caching_enabled(self) -> bool:
         """Check if caching is enabled."""

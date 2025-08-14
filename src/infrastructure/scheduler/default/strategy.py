@@ -72,7 +72,8 @@ class DefaultSchedulerStrategy(SchedulerPort):
             return Template(**raw_data)
         except Exception as e:
             # Provide helpful error message for debugging
-            raise ValueError(f"Failed to create Template from data: {e}. Data: {raw_data}")
+            raise ValueError(
+                f"Failed to create Template from data: {e}. Data: {raw_data}")
 
     def parse_request_data(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
         """

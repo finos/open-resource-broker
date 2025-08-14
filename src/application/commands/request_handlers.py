@@ -65,7 +65,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
 
     async def execute_command(self, command: CreateRequestCommand) -> str:
         """Handle machine request creation command."""
-        self.logger.info(f"Creating machine request for template: {command.template_id}")
+        self.logger.info(
+            f"Creating machine request for template: {command.template_id}")
 
         # CRITICAL VALIDATION: Ensure providers are available
         if not self._provider_context.available_strategies:
@@ -111,7 +112,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                 self.logger.error(error_msg)
                 raise ValueError(error_msg)
 
-            self.logger.info(f"Template validation passed: {validation_result.supported_features}")
+            self.logger.info(
+                f"Template validation passed: {validation_result.supported_features}")
 
             # Create request aggregate with selected provider
             from src.domain.request.aggregate import Request
@@ -167,7 +169,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                         request.metadata["handler_used"] = provisioning_result.get(
                             "provider_data", {}
                         ).get("handler_used", "RunInstancesHandler")
-                        self.logger.info(f"Stored provider API: {request.metadata['provider_api']}")
+                        self.logger.info(
+                            f"Stored provider API: {request.metadata['provider_api']}")
 
                         # Ensure resource_ids is actually a list
                         if isinstance(resource_ids, list):
@@ -223,7 +226,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                         # Handle provisioning failure
                         from src.domain.request.value_objects import RequestStatus
 
-                        error_message = provisioning_result.get("error_message", "Unknown error")
+                        error_message = provisioning_result.get(
+                            "error_message", "Unknown error")
                         request = request.update_status(
                             RequestStatus.FAILED,
                             f"Provisioning failed: {error_message}",
@@ -276,7 +280,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                     self.event_publisher.publish(event)
 
                 # CRITICAL FIX: Raise exception instead of returning success
-                raise ValueError(f"Machine provisioning failed: {str(provisioning_error)}")
+                raise ValueError(
+                    f"Machine provisioning failed: {str(provisioning_error)}")
             else:
                 self.logger.error(f"Failed to create request: {provisioning_error}")
                 raise
@@ -315,7 +320,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
             request_id=str(request.request_id),
             template_id=template_id,
             provider_type="aws",
-            instance_type=InstanceType(value=instance_data.get("instance_type", "t2.micro")),
+            instance_type=InstanceType(
+                value=instance_data.get("instance_type", "t2.micro")),
             image_id=instance_data.get("image_id", "unknown"),
             status=MachineStatus.PENDING,
             private_ip=instance_data.get("private_ip"),
@@ -359,7 +365,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
             self.logger.debug(f"Available strategies: {available_strategies}")
             self.logger.debug(f"Attempting to use strategy: {strategy_identifier}")
 
-            result = self._provider_context.execute_with_strategy(strategy_identifier, operation)
+            result = self._provider_context.execute_with_strategy(
+                strategy_identifier, operation)
 
             # Process result using existing pattern
             if result.success:
@@ -457,7 +464,8 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             if command.machine_ids:
                 # Try to get template from first machine
                 try:
-                    machine = self._machine_repository.find_by_id(command.machine_ids[0])
+                    machine = self._machine_repository.find_by_id(
+                        command.machine_ids[0])
                     if machine and machine.template_id:
                         template_id = f"return-{machine.template_id}"
                 except Exception as e:
@@ -516,7 +524,8 @@ class UpdateRequestStatusHandler(BaseCommandHandler[UpdateRequestStatusCommand, 
 
     async def execute_command(self, command: UpdateRequestStatusCommand) -> None:
         """Handle request status update command."""
-        self.logger.info(f"Updating request status: {command.request_id} -> {command.status}")
+        self.logger.info(
+            f"Updating request status: {command.request_id} -> {command.status}")
 
         try:
             # Get request
@@ -537,10 +546,12 @@ class UpdateRequestStatusHandler(BaseCommandHandler[UpdateRequestStatusCommand, 
             for event in events:
                 self.event_publisher.publish(event)
 
-            self.logger.info(f"Request status updated: {command.request_id} -> {command.status}")
+            self.logger.info(
+                f"Request status updated: {command.request_id} -> {command.status}")
 
         except EntityNotFoundError:
-            self.logger.error(f"Request not found for status update: {command.request_id}")
+            self.logger.error(
+                f"Request not found for status update: {command.request_id}")
             raise
         except Exception as e:
             self.logger.error(f"Failed to update request status: {e}")
@@ -589,7 +600,8 @@ class CancelRequestHandler(BaseCommandHandler[CancelRequestCommand, None]):
             self.logger.info(f"Request canceled: {command.request_id}")
 
         except EntityNotFoundError:
-            self.logger.error(f"Request not found for cancellation: {command.request_id}")
+            self.logger.error(
+                f"Request not found for cancellation: {command.request_id}")
             raise
         except Exception as e:
             self.logger.error(f"Failed to cancel request: {e}")

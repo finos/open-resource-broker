@@ -49,7 +49,8 @@ class TestCQRSCompliance:
         assert hasattr(query, "template_id")
 
         # Verify command and query are different types
-        assert not isinstance(command, type(query)) and not isinstance(query, type(command))
+        assert not isinstance(command, type(
+            query)) and not isinstance(query, type(command))
 
     def test_command_handler_interface(self):
         """Test that command handlers implement proper interface."""

@@ -188,7 +188,8 @@ class ASGHandler(AWSHandler):
                 DesiredCapacity=new_capacity,
                 MinSize=min(new_capacity, asg["MinSize"]),
             )
-            self._logger.info(f"Reduced ASG {request.resource_id} capacity to {new_capacity}")
+            self._logger.info(
+                f"Reduced ASG {request.resource_id} capacity to {new_capacity}")
 
             # Detach instances from ASG
             self._retry_with_backoff(
@@ -274,7 +275,8 @@ class ASGHandler(AWSHandler):
         if hasattr(aws_template, "lifecycle_hooks") and aws_template.lifecycle_hooks:
             for hook in aws_template.lifecycle_hooks:
                 if not hook.get("role_arn"):
-                    errors.append(f"IAM role ARN required for lifecycle hook {hook.get('name')}")
+                    errors.append(
+                        f"IAM role ARN required for lifecycle hook {hook.get('name')}")
 
         if hasattr(aws_template, "target_group_arns") and aws_template.target_group_arns:
             try:
@@ -341,7 +343,8 @@ class ASGHandler(AWSHandler):
         # Add template tags
         if hasattr(aws_template, "tags") and aws_template.tags:
             for key, value in aws_template.tags.items():
-                asg_config["Tags"].append({"Key": key, "Value": value, "PropagateAtLaunch": True})
+                asg_config["Tags"].append(
+                    {"Key": key, "Value": value, "PropagateAtLaunch": True})
 
         # Add target group ARNs if specified
         if hasattr(aws_template, "target_group_arns") and aws_template.target_group_arns:
@@ -398,9 +401,11 @@ class ASGHandler(AWSHandler):
                     NotificationMetadata=hook.get("metadata"),
                     HeartbeatTimeout=hook.get("timeout", 3600),
                 )
-                self._logger.info(f"Set lifecycle hook {hook['name']} for ASG: {asg_name}")
+                self._logger.info(
+                    f"Set lifecycle hook {hook['name']} for ASG: {asg_name}")
             except Exception as e:
-                self._logger.warning(f"Failed to set lifecycle hook {hook['name']}: {str(e)}")
+                self._logger.warning(
+                    f"Failed to set lifecycle hook {hook['name']}: {str(e)}")
 
     def _wait_for_instances_termination(self, asg_name: str, timeout: int = 300) -> None:
         """Wait for all instances in the ASG to terminate."""
@@ -409,7 +414,8 @@ class ASGHandler(AWSHandler):
         start_time = time.time()
         while True:
             if time.time() - start_time > timeout:
-                raise TimeoutError(f"Timeout waiting for instances to terminate in ASG {asg_name}")
+                raise TimeoutError(
+                    f"Timeout waiting for instances to terminate in ASG {asg_name}")
 
             response = self._retry_with_backoff(
                 self.aws_client.autoscaling_client.describe_auto_scaling_groups,
@@ -423,7 +429,8 @@ class ASGHandler(AWSHandler):
             if not asg["Instances"]:
                 return
 
-            self._logger.info(f"Waiting for {len(asg['Instances'])} instances to terminate...")
+            self._logger.info(
+                f"Waiting for {len(asg['Instances'])} instances to terminate...")
             time.sleep(10)
 
     def _count_healthy_instances(self, asg: Dict[str, Any]) -> int:

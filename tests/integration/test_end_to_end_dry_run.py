@@ -28,7 +28,8 @@ class TestEndToEndDryRun:
 
         # Create AWS provider strategy
         self.aws_config = AWSProviderConfig(region="us-east-1", profile="default")
-        self.aws_strategy = AWSProviderStrategy(config=self.aws_config, logger=self.mock_logger)
+        self.aws_strategy = AWSProviderStrategy(
+            config=self.aws_config, logger=self.mock_logger)
 
         # Mock strategy initialization
         with patch.object(self.aws_strategy, "initialize", return_value=True):
@@ -111,7 +112,8 @@ class TestEndToEndDryRun:
         self.mock_query_bus.dispatch.return_value = mock_template_dto
 
         # Mock instance manager response
-        self.mock_instance_manager.create_instances.return_value = ["i-1234567890abcdef0"]
+        self.mock_instance_manager.create_instances.return_value = [
+            "i-1234567890abcdef0"]
 
         # Mock dry-run context manager
         mock_context_manager = MagicMock()
@@ -204,7 +206,8 @@ class TestEndToEndDryRun:
         self.mock_query_bus.dispatch.return_value = mock_template_dto
 
         # Mock instance manager response
-        self.mock_instance_manager.create_instances.return_value = ["i-1234567890abcdef0"]
+        self.mock_instance_manager.create_instances.return_value = [
+            "i-1234567890abcdef0"]
 
         # Mock dry-run context manager
         mock_context_manager = MagicMock()
@@ -261,7 +264,8 @@ class TestEndToEndDryRun:
         )
 
         # Mock instance manager response for strategy path
-        self.mock_instance_manager.create_instances.return_value = ["i-1234567890abcdef0"]
+        self.mock_instance_manager.create_instances.return_value = [
+            "i-1234567890abcdef0"]
 
         # Execute provisioning
         resource_id = self.provisioning_adapter.provision_resources(request, template)

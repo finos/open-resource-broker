@@ -13,7 +13,8 @@ from unittest.mock import Mock
 import pytest
 
 # Add project root to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../..")))
+sys.path.insert(0, os.path.abspath(os.path.join(
+    os.path.dirname(__file__), "../../../../..")))
 
 from src.domain.request.aggregate import Request
 from src.providers.aws.configuration.config import (
@@ -66,7 +67,8 @@ class TestAWSLaunchTemplateManager:
         )
 
         # Sample request
-        self.request = Request(request_id="req-123", template_id="test-template", requested_count=2)
+        self.request = Request(request_id="req-123",
+                               template_id="test-template", requested_count=2)
 
     def test_manager_initialization(self):
         """Test that manager initializes correctly."""
@@ -90,7 +92,8 @@ class TestAWSLaunchTemplateManager:
         self.mock_aws_client.ec2_client.create_launch_template.return_value = mock_response
 
         # Execute
-        result = self.manager.create_or_update_launch_template(self.aws_template, self.request)
+        result = self.manager.create_or_update_launch_template(
+            self.aws_template, self.request)
 
         # Verify
         assert isinstance(result, LaunchTemplateResult)
@@ -125,7 +128,8 @@ class TestAWSLaunchTemplateManager:
         )
 
         # Execute
-        result = self.manager.create_or_update_launch_template(self.aws_template, self.request)
+        result = self.manager.create_or_update_launch_template(
+            self.aws_template, self.request)
 
         # Verify
         assert result.template_id == "lt-existing"
@@ -139,7 +143,8 @@ class TestAWSLaunchTemplateManager:
     def test_create_launch_template_data_basic_fields(self):
         """Test launch template data creation with basic fields."""
         # Execute
-        data = self.manager._create_launch_template_data(self.aws_template, self.request)
+        data = self.manager._create_launch_template_data(
+            self.aws_template, self.request)
 
         # Verify basic structure
         assert "ImageId" in data
@@ -159,7 +164,8 @@ class TestAWSLaunchTemplateManager:
         self.aws_template.public_ip_assignment = True
 
         # Execute
-        data = self.manager._create_launch_template_data(self.aws_template, self.request)
+        data = self.manager._create_launch_template_data(
+            self.aws_template, self.request)
 
         # Verify network interfaces
         assert "NetworkInterfaces" in data
@@ -181,7 +187,8 @@ class TestAWSLaunchTemplateManager:
         self.aws_template.storage_encryption = True
 
         # Execute
-        data = self.manager._create_launch_template_data(self.aws_template, self.request)
+        data = self.manager._create_launch_template_data(
+            self.aws_template, self.request)
 
         # Verify block device mappings
         assert "BlockDeviceMappings" in data
@@ -204,7 +211,8 @@ class TestAWSLaunchTemplateManager:
         self.aws_template.user_data = user_data_script
 
         # Execute
-        data = self.manager._create_launch_template_data(self.aws_template, self.request)
+        data = self.manager._create_launch_template_data(
+            self.aws_template, self.request)
 
         # Verify user data (should be base64 encoded)
         assert "UserData" in data
@@ -219,7 +227,8 @@ class TestAWSLaunchTemplateManager:
         self.aws_template.instance_profile = "test-instance-profile"
 
         # Execute
-        data = self.manager._create_launch_template_data(self.aws_template, self.request)
+        data = self.manager._create_launch_template_data(
+            self.aws_template, self.request)
 
         # Verify IAM instance profile
         assert "IamInstanceProfile" in data
@@ -231,7 +240,8 @@ class TestAWSLaunchTemplateManager:
         self.aws_template.monitoring_enabled = True
 
         # Execute
-        data = self.manager._create_launch_template_data(self.aws_template, self.request)
+        data = self.manager._create_launch_template_data(
+            self.aws_template, self.request)
 
         # Verify monitoring
         assert "Monitoring" in data
@@ -363,7 +373,8 @@ class TestAWSLaunchTemplateManager:
 
         # Execute and verify exception is raised
         with pytest.raises(Exception) as exc_info:
-            self.manager.create_or_update_launch_template(self.aws_template, self.request)
+            self.manager.create_or_update_launch_template(
+                self.aws_template, self.request)
 
         # Verify error was logged
         self.mock_logger.error.assert_called()

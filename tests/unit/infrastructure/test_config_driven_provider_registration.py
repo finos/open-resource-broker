@@ -159,7 +159,8 @@ class TestConfigDrivenProviderRegistration:
         """Test provider configuration validation with valid config."""
         provider_config = ProviderConfig(
             selection_policy="FIRST_AVAILABLE",
-            providers=[ProviderInstanceConfig(name="aws-test", type="aws", enabled=True)],
+            providers=[ProviderInstanceConfig(
+                name="aws-test", type="aws", enabled=True)],
         )
 
         with patch("src.infrastructure.di.provider_services.get_logger"):

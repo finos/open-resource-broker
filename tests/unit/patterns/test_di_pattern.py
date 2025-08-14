@@ -225,7 +225,8 @@ class TestDIPattern:
         def create_complex_service():
             return ComplexService({"setting": "value"})
 
-        container.register_factory(ComplexService, create_complex_service, DIScope.SINGLETON)
+        container.register_factory(
+            ComplexService, create_complex_service, DIScope.SINGLETON)
 
         # Resolve using factory
         service = container.resolve(ComplexService)

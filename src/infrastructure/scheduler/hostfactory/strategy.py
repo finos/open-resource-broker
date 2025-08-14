@@ -7,7 +7,6 @@ if TYPE_CHECKING:
     pass
 
 from src.config.manager import ConfigurationManager
-from src.domain.base.exceptions import ConfigurationError
 from src.domain.base.ports.logging_port import LoggingPort
 from src.domain.base.ports.scheduler_port import SchedulerPort
 from src.domain.machine.aggregate import Machine
@@ -32,11 +31,11 @@ class HostFactorySchedulerStrategy(SchedulerPort):
         self.config_manager = config_manager
         self._logger = logger
         self.template_defaults_service = template_defaults_service
-        
+
         # Initialize provider selection service for proper provider selection
         from src.application.services.provider_selection_service import ProviderSelectionService
         from src.infrastructure.di.container import get_container
-        
+
         container = get_container()
         self._provider_selection_service = container.get(ProviderSelectionService)
 
@@ -47,7 +46,7 @@ class HostFactorySchedulerStrategy(SchedulerPort):
             selection_result = self._provider_selection_service.select_active_provider()
             provider_type = selection_result.provider_type
             templates_file = f"{provider_type}prov_templates.json"
-            
+
             return self.config_manager.resolve_file("template", templates_file)
         except Exception as e:
             self._logger.error(f"Failed to determine templates file path: {e}")
@@ -185,7 +184,8 @@ class HostFactorySchedulerStrategy(SchedulerPort):
             self._logger.debug(f"Active provider type: {provider_type}")
             return provider_type
         except Exception as e:
-            self._logger.warning(f"Failed to get active provider type, defaulting to 'aws': {e}")
+            self._logger.warning(
+                f"Failed to get active provider type, defaulting to 'aws': {e}")
             return "aws"  # Default fallback
 
     def convert_cli_args_to_hostfactory_input(self, operation: str, args: Any) -> Dict[str, Any]:
@@ -298,8 +298,10 @@ class HostFactorySchedulerStrategy(SchedulerPort):
                 }
             elif isinstance(data, dict):
                 # Handle dict format (fallback)
-                machines = self._format_machines_for_hostfactory(data.get("machines", []))
-                status = self._map_domain_status_to_hostfactory(data.get("status", "unknown"))
+                machines = self._format_machines_for_hostfactory(
+                    data.get("machines", []))
+                status = self._map_domain_status_to_hostfactory(
+                    data.get("status", "unknown"))
                 message = self._generate_status_message(
                     data.get("status", "unknown"), len(machines)
                 )

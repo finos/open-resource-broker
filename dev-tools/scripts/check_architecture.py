@@ -183,7 +183,8 @@ class ArchitectureValidator:
         # Summary statistics
         logger.info("Architecture Analysis Summary:")
         for layer, imports in self.layer_imports.items():
-            logger.info(f"  {layer.capitalize()} layer: {len(imports)} imports analyzed")
+            logger.info(
+                f"  {layer.capitalize()} layer: {len(imports)} imports analyzed")
 
     def generate_dependency_report(self) -> Dict[str, List[str]]:
         """Generate a detailed dependency report."""
@@ -201,9 +202,12 @@ class ArchitectureValidator:
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(description="Validate Clean Architecture dependency rules")
-    parser.add_argument("--warn-only", action="store_true", help="Only warn, don't fail the build")
-    parser.add_argument("--report", action="store_true", help="Generate detailed dependency report")
+    parser = argparse.ArgumentParser(
+        description="Validate Clean Architecture dependency rules")
+    parser.add_argument("--warn-only", action="store_true",
+                        help="Only warn, don't fail the build")
+    parser.add_argument("--report", action="store_true",
+                        help="Generate detailed dependency report")
 
     args = parser.parse_args()
 

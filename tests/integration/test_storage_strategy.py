@@ -123,7 +123,8 @@ def test_request_repository_enhancements():
 
         print("PASS: Request deserialization successful")
         print(f"   - Request ID: {deserialized.request_id}")
-        print(f"   - Provider tracking: {deserialized.provider_name}/{deserialized.provider_api}")
+        print(
+            f"   - Provider tracking: {deserialized.provider_name}/{deserialized.provider_api}")
         print(f"   - Resource IDs: {len(deserialized.resource_ids)} resources")
 
         return True
@@ -174,7 +175,8 @@ def test_machine_repository_enhancements():
         print(f"   - Additional fields included: {len(serialized)} fields")
         print(f"   - instance_id: {serialized.get('instance_id')}")
         print(f"   - provider_type: {serialized.get('provider_type')}")
-        print(f"   - network config: {serialized.get('private_ip')}/{serialized.get('public_ip')}")
+        print(
+            f"   - network config: {serialized.get('private_ip')}/{serialized.get('public_ip')}")
         print(f"   - schema_version: {serialized.get('schema_version')}")
 
         # Test deserialization

@@ -60,7 +60,8 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
         # Initialize table
         self._initialize_table()
 
-        self._self._logger.debug(f"Initialized DynamoDB storage strategy for table {table_name}")
+        self._self._logger.debug(
+            f"Initialized DynamoDB storage strategy for table {table_name}")
 
     def _initialize_table(self) -> None:
         """Initialize DynamoDB table if it doesn't exist."""
@@ -70,21 +71,24 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
                 # Partition key
                 key_schema = [{"AttributeName": "id", "KeyType": "HASH"}]
 
-                attribute_definitions = [{"AttributeName": "id", "AttributeType": "S"}]  # String
+                attribute_definitions = [
+                    {"AttributeName": "id", "AttributeType": "S"}]  # String
 
                 success = self.client_manager.create_table(
                     self.table_name, key_schema, attribute_definitions
                 )
 
                 if success:
-                    self._self._logger.info(f"Created DynamoDB table: {self.table_name}")
+                    self._self._logger.info(
+                        f"Created DynamoDB table: {self.table_name}")
                 else:
                     self._self._logger.warning(
                         f"Failed to create DynamoDB table: {self.table_name}"
                     )
 
         except Exception as e:
-            self._self._logger.error(f"Failed to initialize table {self.table_name}: {e}")
+            self._self._logger.error(
+                f"Failed to initialize table {self.table_name}: {e}")
             raise
 
     def save(self, entity_id: str, data: Dict[str, Any]) -> None:
@@ -195,7 +199,8 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
                 if success:
                     self._self._logger.debug(f"Deleted entity: {entity_id}")
                 else:
-                    self._self._logger.warning(f"Entity not found for deletion: {entity_id}")
+                    self._self._logger.warning(
+                        f"Entity not found for deletion: {entity_id}")
 
             except ClientError as e:
                 self.client_manager.handle_client_error(e, "Delete")
@@ -226,7 +231,8 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
             return exists
 
         except Exception as e:
-            self._self._logger.error(f"Failed to check existence of entity {entity_id}: {e}")
+            self._self._logger.error(
+                f"Failed to check existence of entity {entity_id}: {e}")
             return False
 
     def find_by_criteria(self, criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -254,7 +260,8 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
                 # Convert items to domain data
                 entities = self.converter.from_dynamodb_items(items)
 
-                self._self._logger.debug(f"Found {len(entities)} entities matching criteria")
+                self._self._logger.debug(
+                    f"Found {len(entities)} entities matching criteria")
                 return entities
 
             except ClientError as e:
@@ -330,7 +337,8 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
     def cleanup(self) -> None:
         """Clean up resources."""
         # DynamoDB doesn't require explicit cleanup like file handles or connections
-        self._self._logger.debug(f"Cleaned up DynamoDB storage strategy for {self.table_name}")
+        self._self._logger.debug(
+            f"Cleaned up DynamoDB storage strategy for {self.table_name}")
 
     def get_table_name(self) -> str:
         """Get table name."""

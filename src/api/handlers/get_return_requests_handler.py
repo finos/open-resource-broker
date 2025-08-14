@@ -134,14 +134,16 @@ class GetReturnRequestsRESTHandler(BaseAPIHandler[Dict[str, Any], ReturnRequestR
 
             # Apply filters if provided
             if input_data and "filters" in input_data:
-                return_requests = self._apply_filters(return_requests, input_data["filters"])
+                return_requests = self._apply_filters(
+                    return_requests, input_data["filters"])
 
             # Format response
             formatted_requests = []
             for req in return_requests:
                 request_data = {
                     "machine": (
-                        req.machines[0].name if hasattr(req, "machines") and req.machines else None
+                        req.machines[0].name if hasattr(
+                            req, "machines") and req.machines else None
                     ),
                     "gracePeriod": await self._calculate_grace_period(req),
                     "status": (req.status.value if hasattr(req.status, "value") else req.status),
@@ -157,13 +159,15 @@ class GetReturnRequestsRESTHandler(BaseAPIHandler[Dict[str, Any], ReturnRequestR
                     request_data.update(
                         {
                             "machines": (
-                                [m.to_dict() if hasattr(m, "to_dict") else m for m in req.machines]
+                                [m.to_dict() if hasattr(m, "to_dict")
+                                           else m for m in req.machines]
                                 if hasattr(req, "machines")
                                 else []
                             ),
                             "metadata": (req.metadata if hasattr(req, "metadata") else {}),
                             "events": (
-                                [e.to_dict() if hasattr(e, "to_dict") else e for e in req.events]
+                                [e.to_dict() if hasattr(e, "to_dict")
+                                           else e for e in req.events]
                                 if hasattr(req, "events")
                                 else []
                             ),

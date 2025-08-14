@@ -324,13 +324,15 @@ def test_concurrent_request_handling():
 
                 if actual_outcome == expected:
                     print(f"       PASS: Concurrent handling correct: {expected}")
-                    print(f"       Details: {len(results)} operations completed successfully")
+                    print(
+                        f"       Details: {len(results)} operations completed successfully")
                     passed_scenarios += 1
                 else:
                     print(
                         f"       FAIL: Concurrent handling mismatch. Expected: {expected}, Got: {actual_outcome}"
                     )
-                    print(f"       Details: {len(results)} results, {len(set(results))} unique")
+                    print(
+                        f"       Details: {len(results)} results, {len(set(results))} unique")
 
             except Exception as e:
                 print(f"       Error testing scenario: {e}")
@@ -450,12 +452,15 @@ def test_storage_strategy_stress():
 
                             return concurrent_write
 
-                        concurrent_write = create_concurrent_write_func(current_storage_file)
+                        concurrent_write = create_concurrent_write_func(
+                            current_storage_file)
 
                         # Execute concurrent writes
                         with ThreadPoolExecutor(max_workers=scale) as executor:
-                            futures = [executor.submit(concurrent_write, i) for i in range(scale)]
-                            results = [future.result() for future in as_completed(futures)]
+                            futures = [executor.submit(concurrent_write, i)
+                                                       for i in range(scale)]
+                            results = [future.result()
+                                                     for future in as_completed(futures)]
 
                         if all(results):
                             actual_performance = "no_corruption"
@@ -466,7 +471,8 @@ def test_storage_strategy_stress():
                         # Simulate backend failure
                         try:
                             # Simulate read from non-existent file
-                            non_existent_file = os.path.join(temp_dir, "non_existent.json")
+                            non_existent_file = os.path.join(
+                                temp_dir, "non_existent.json")
                             with open(non_existent_file, "r") as f:
                                 json.load(f)
                             actual_performance = "unexpected_success"
@@ -484,7 +490,8 @@ def test_storage_strategy_stress():
                         # Create old schema data
                         old_data = []
                         for i in range(scale):
-                            old_data.append({"id": i, "name": f"item-{i}", "version": "1.0"})
+                            old_data.append(
+                                {"id": i, "name": f"item-{i}", "version": "1.0"})
 
                         with open(old_schema_file, "w") as f:
                             json.dump(old_data, f)

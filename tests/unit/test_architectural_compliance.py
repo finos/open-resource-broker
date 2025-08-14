@@ -30,10 +30,12 @@ class TestDDDCompliance:
                         if isinstance(node, ast.Import):
                             for alias in node.names:
                                 if "infrastructure" in alias.name:
-                                    infrastructure_imports.append(f"{py_file}: {alias.name}")
+                                    infrastructure_imports.append(
+                                        f"{py_file}: {alias.name}")
                         elif isinstance(node, ast.ImportFrom):
                             if node.module and "infrastructure" in node.module:
-                                infrastructure_imports.append(f"{py_file}: {node.module}")
+                                infrastructure_imports.append(
+                                    f"{py_file}: {node.module}")
                 except SyntaxError:
                     # Skip files with syntax errors
                     continue
@@ -246,7 +248,8 @@ class TestSOLIDCompliance:
         ]
 
         # Should not have too many methods (ISP violation indicator)
-        assert len(methods) < 15, f"ProviderPort has {len(methods)} methods, may violate ISP"
+        assert len(
+            methods) < 15, f"ProviderPort has {len(methods)} methods, may violate ISP"
 
     def test_dependency_inversion_principle(self):
         """Ensure high-level modules don't depend on low-level modules."""
@@ -420,7 +423,8 @@ class TestDesignPatternCompliance:
             pytest.skip(f"Could not import aggregate classes: {e}")
 
         # Aggregates should inherit from AggregateRoot
-        assert issubclass(Request, AggregateRoot), "Request should inherit from AggregateRoot"
+        assert issubclass(
+            Request, AggregateRoot), "Request should inherit from AggregateRoot"
 
         # Aggregates should have domain event capabilities
         request = Request.create_new_request(

@@ -12,7 +12,8 @@ class HandlerCapabilityConfig(BaseModel):
 
     ec2_fleet: bool = Field(True, description="Enable EC2 Fleet handler")
     spot_fleet: bool = Field(True, description="Enable Spot Fleet handler")
-    auto_scaling_group: bool = Field(True, description="Enable Auto Scaling Group handler")
+    auto_scaling_group: bool = Field(
+        True, description="Enable Auto Scaling Group handler")
     run_instances: bool = Field(True, description="Enable Run Instances handler")
 
 
@@ -25,25 +26,34 @@ class HandlerDefaultsConfig(BaseModel):
 class LaunchTemplateConfiguration(BaseModel):
     """Launch template configuration."""
 
-    create_per_request: bool = Field(True, description="Create launch template per request")
-    naming_strategy: str = Field("request_based", description="Launch template naming strategy")
-    version_strategy: str = Field("incremental", description="Launch template version strategy")
+    create_per_request: bool = Field(
+        True, description="Create launch template per request")
+    naming_strategy: str = Field(
+        "request_based", description="Launch template naming strategy")
+    version_strategy: str = Field(
+        "incremental", description="Launch template version strategy")
     reuse_existing: bool = Field(True, description="Reuse existing launch templates")
-    cleanup_old_versions: bool = Field(False, description="Cleanup old launch template versions")
-    max_versions_per_template: int = Field(10, description="Maximum versions per launch template")
+    cleanup_old_versions: bool = Field(
+        False, description="Cleanup old launch template versions")
+    max_versions_per_template: int = Field(
+        10, description="Maximum versions per launch template")
 
 
 class HandlersConfig(BaseModel):
     """Handlers configuration."""
 
-    capabilities: HandlerCapabilityConfig = Field(default_factory=lambda: HandlerCapabilityConfig())
-    defaults: HandlerDefaultsConfig = Field(default_factory=lambda: HandlerDefaultsConfig())
+    capabilities: HandlerCapabilityConfig = Field(
+        default_factory=lambda: HandlerCapabilityConfig())
+    defaults: HandlerDefaultsConfig = Field(
+        default_factory=lambda: HandlerDefaultsConfig())
 
     # Legacy fields for backward compatibility
     ec2_fleet: bool = Field(True, description="Enable EC2 Fleet handler (legacy)")
     spot_fleet: bool = Field(True, description="Enable Spot Fleet handler (legacy)")
-    auto_scaling_group: bool = Field(True, description="Enable Auto Scaling Group handler (legacy)")
-    run_instances: bool = Field(True, description="Enable Run Instances handler (legacy)")
+    auto_scaling_group: bool = Field(
+        True, description="Enable Auto Scaling Group handler (legacy)")
+    run_instances: bool = Field(
+        True, description="Enable Run Instances handler (legacy)")
 
     @model_validator(mode="after")
     def sync_legacy_fields(self) -> "HandlersConfig":
@@ -58,7 +68,8 @@ class HandlersConfig(BaseModel):
 
             object.__setattr__(self.capabilities, "ec2_fleet", self.ec2_fleet)
             object.__setattr__(self.capabilities, "spot_fleet", self.spot_fleet)
-            object.__setattr__(self.capabilities, "auto_scaling_group", self.auto_scaling_group)
+            object.__setattr__(self.capabilities, "auto_scaling_group",
+                               self.auto_scaling_group)
             object.__setattr__(self.capabilities, "run_instances", self.run_instances)
 
         return self
@@ -86,7 +97,8 @@ class AWSProviderConfig(BaseProviderConfig):
     # AWS Settings
     region: str = Field("us-east-1", description="AWS region")
     endpoint_url: Optional[str] = Field(None, description="AWS endpoint URL")
-    max_retries: int = Field(3, description="Maximum number of retries for AWS API calls")
+    max_retries: int = Field(
+        3, description="Maximum number of retries for AWS API calls")
     timeout: int = Field(30, description="Timeout for AWS API calls in seconds")
 
     # AWS Services
@@ -106,19 +118,24 @@ class AWSProviderConfig(BaseProviderConfig):
     )
 
     # Symphony/Legacy configuration fields
-    credential_file: Optional[str] = Field(None, description="Path to AWS credentials file")
-    key_file: Optional[str] = Field(None, description="Path to directory containing key pair files")
+    credential_file: Optional[str] = Field(
+        None, description="Path to AWS credentials file")
+    key_file: Optional[str] = Field(
+        None, description="Path to directory containing key pair files")
     proxy_host: Optional[str] = Field(None, description="Proxy server hostname")
     proxy_port: Optional[int] = Field(None, description="Proxy server port")
-    connection_timeout_ms: int = Field(10000, description="Connection timeout in milliseconds")
-    request_retry_attempts: int = Field(0, description="Number of retry attempts for AWS requests")
+    connection_timeout_ms: int = Field(
+        10000, description="Connection timeout in milliseconds")
+    request_retry_attempts: int = Field(
+        0, description="Number of retry attempts for AWS requests")
     instance_pending_timeout_sec: int = Field(
         180, description="Timeout for pending instances in seconds"
     )
     describe_request_retry_attempts: int = Field(
         0, description="Number of retries for status requests"
     )
-    describe_request_interval: int = Field(0, description="Delay between retries in milliseconds")
+    describe_request_interval: int = Field(
+        0, description="Delay between retries in milliseconds")
 
     @model_validator(mode="after")
     def check_auth_method(self) -> "AWSProviderConfig":

@@ -86,7 +86,8 @@ class QueryBus:
                     )
                     raise
             else:
-                self.logger.error(f"No handler registered for query: {type(query).__name__}")
+                self.logger.error(
+                    f"No handler registered for query: {type(query).__name__}")
                 raise
         except Exception as e:
             self.logger.error(f"Query execution failed: {str(e)}")
@@ -160,7 +161,8 @@ class CommandBus:
                     )
                     raise
             else:
-                self.logger.error(f"No handler registered for command: {type(command).__name__}")
+                self.logger.error(
+                    f"No handler registered for command: {type(command).__name__}")
                 raise
         except Exception as e:
             self.logger.error(f"Command execution failed: {str(e)}")

@@ -91,13 +91,15 @@ class ConfigValidator:
 
         # Validate performance settings
         if config.performance.max_workers > 50:
-            result.add_warning("High number of max_workers may cause resource contention")
+            result.add_warning(
+                "High number of max_workers may cause resource contention")
 
         # Validate storage configuration
         if config.storage.strategy == "sql":
             sql_config = config.storage.sql_strategy
             if sql_config.pool_size > 20:
-                result.add_warning("Large SQL connection pool size may consume excessive resources")
+                result.add_warning(
+                    "Large SQL connection pool size may consume excessive resources")
 
     def validate_provider_config(
         self, provider_type: str, provider_config: Dict[str, Any]

@@ -57,10 +57,12 @@ class TestRequestBusinessRules:
     def test_template_id_cannot_be_empty(self):
         """Test that template ID cannot be empty."""
         with pytest.raises(RequestValidationError):
-            Request.create_new_request(template_id="", machine_count=1, requester_id="test-user")
+            Request.create_new_request(
+                template_id="", machine_count=1, requester_id="test-user")
 
         with pytest.raises(RequestValidationError):
-            Request.create_new_request(template_id=None, machine_count=1, requester_id="test-user")
+            Request.create_new_request(
+                template_id=None, machine_count=1, requester_id="test-user")
 
     def test_requester_id_cannot_be_empty(self):
         """Test that requester ID cannot be empty."""
@@ -157,7 +159,8 @@ class TestRequestBusinessRules:
         assert request.status == RequestStatus.PROCESSING
 
         # Valid transition: PROCESSING -> COMPLETED
-        request.complete_successfully(machine_ids=["i-123"], completion_message="Success")
+        request.complete_successfully(
+            machine_ids=["i-123"], completion_message="Success")
         assert request.status == RequestStatus.COMPLETED
 
         # Invalid transition: COMPLETED -> PROCESSING
@@ -172,7 +175,8 @@ class TestRequestBusinessRules:
 
         # Cannot complete directly from PENDING
         with pytest.raises(InvalidRequestStateError):
-            request.complete_successfully(machine_ids=["i-123"], completion_message="Success")
+            request.complete_successfully(
+                machine_ids=["i-123"], completion_message="Success")
 
     def test_completed_request_cannot_be_modified(self):
         """Test that completed requests cannot be modified."""
@@ -181,7 +185,8 @@ class TestRequestBusinessRules:
         )
 
         request.start_processing()
-        request.complete_successfully(machine_ids=["i-123"], completion_message="Success")
+        request.complete_successfully(
+            machine_ids=["i-123"], completion_message="Success")
 
         # Cannot modify completed request
         with pytest.raises(InvalidRequestStateError):
@@ -596,7 +601,8 @@ class TestBusinessRuleEnforcement:
         request.start_processing()
         assert request.machine_count == original_count
 
-        request.complete_successfully(machine_ids=["i-123", "i-456"], completion_message="Success")
+        request.complete_successfully(
+            machine_ids=["i-123", "i-456"], completion_message="Success")
         assert request.machine_count == original_count
 
     def test_business_rules_prevent_invalid_states(self):
@@ -632,4 +638,5 @@ class TestBusinessRuleEnforcement:
         request.start_processing()
 
         with pytest.raises((RequestValidationError, InvalidRequestStateError)):
-            request.complete_successfully(machine_ids=None, completion_message="Invalid")  # Invalid
+            request.complete_successfully(
+                machine_ids=None, completion_message="Invalid")  # Invalid

@@ -69,7 +69,8 @@ class JSONUnitOfWork(BaseUnitOfWork):
         )
 
         template_path = (
-            template_file if os.path.isabs(template_file) else os.path.join(data_dir, template_file)
+            template_file if os.path.isabs(
+                template_file) else os.path.join(data_dir, template_file)
         )
         template_strategy = JSONStorageStrategy(
             file_path=template_path, create_dirs=create_dirs, entity_type="templates"
@@ -80,7 +81,8 @@ class JSONUnitOfWork(BaseUnitOfWork):
         self.request_repository = RequestRepository(request_strategy)
         self.template_repository = TemplateRepository(template_strategy)
 
-        self.logger.debug(f"Initialized JSONUnitOfWork with simplified repositories in: {data_dir}")
+        self.logger.debug(
+            f"Initialized JSONUnitOfWork with simplified repositories in: {data_dir}")
 
     @property
     def machines(self):

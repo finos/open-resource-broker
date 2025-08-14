@@ -72,11 +72,13 @@ class ProviderStrategyFactory:
             elif mode == ProviderMode.MULTI:
                 return self._create_multi_provider_context(provider_config)
             else:
-                raise ConfigurationError("Provider", "No valid provider configuration found")
+                raise ConfigurationError(
+                    "Provider", "No valid provider configuration found")
 
         except Exception as e:
             self._logger.error(f"Failed to create provider context: {str(e)}")
-            raise ProviderCreationError(f"Provider context creation failed: {str(e)}") from e
+            raise ProviderCreationError(
+                f"Provider context creation failed: {str(e)}") from e
 
     def _create_single_provider_context(self, config: ProviderConfig) -> ProviderContext:
         """
@@ -96,7 +98,8 @@ class ProviderStrategyFactory:
             )
 
         provider_config = active_providers[0]
-        self._logger.info(f"Creating single provider context with provider: {provider_config.name}")
+        self._logger.info(
+            f"Creating single provider context with provider: {provider_config.name}")
 
         # Create provider context
         context = create_provider_context(self._logger)
@@ -132,7 +135,8 @@ class ProviderStrategyFactory:
                 "At least 2 active providers required for multi-provider mode",
             )
 
-        self._logger.info(f"Creating multi-provider context with {len(active_providers)} providers")
+        self._logger.info(
+            f"Creating multi-provider context with {len(active_providers)} providers")
 
         # Create provider context
         context = create_provider_context(self._logger)
@@ -142,7 +146,8 @@ class ProviderStrategyFactory:
             try:
                 strategy = self._create_provider_strategy(provider_config)
                 context.register_strategy(strategy, provider_config.name)
-                self._logger.debug(f"Registered provider strategy: {provider_config.name}")
+                self._logger.debug(
+                    f"Registered provider strategy: {provider_config.name}")
             except Exception as e:
                 self._logger.error(
                     f"Failed to create provider strategy { provider_config.name}: { str(e)}"
@@ -199,8 +204,10 @@ class ProviderStrategyFactory:
                 )
             else:
                 # Fallback to provider type (backward compatibility)
-                strategy = registry.create_strategy(provider_config.type, provider_config)
-                self._logger.debug(f"Created provider strategy from type: {provider_config.type}")
+                strategy = registry.create_strategy(
+                    provider_config.type, provider_config)
+                self._logger.debug(
+                    f"Created provider strategy from type: {provider_config.type}")
 
             # Set provider name for identification
             if hasattr(strategy, "name"):
@@ -250,7 +257,8 @@ class ProviderStrategyFactory:
         }
 
         if policy_name not in policy_mapping:
-            self._logger.warning(f"Unknown selection policy '{policy_name}', using FIRST_AVAILABLE")
+            self._logger.warning(
+                f"Unknown selection policy '{policy_name}', using FIRST_AVAILABLE")
             return SelectionPolicy.FIRST_AVAILABLE
 
         return policy_mapping[policy_name]
@@ -342,7 +350,8 @@ class ProviderStrategyFactory:
 
             # Validate based on mode
             if mode == ProviderMode.NONE:
-                validation_result["errors"].append("No valid provider configuration found")
+                validation_result["errors"].append(
+                    "No valid provider configuration found")
             elif mode == ProviderMode.SINGLE:
                 if len(active_providers) == 0:
                     validation_result["errors"].append(
@@ -374,7 +383,8 @@ class ProviderStrategyFactory:
             validation_result["valid"] = len(validation_result["errors"]) == 0
 
         except Exception as e:
-            validation_result["errors"].append(f"Configuration validation failed: {str(e)}")
+            validation_result["errors"].append(
+                f"Configuration validation failed: {str(e)}")
 
         return validation_result
 

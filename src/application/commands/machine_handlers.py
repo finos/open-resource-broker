@@ -189,7 +189,8 @@ class ConvertMachineStatusCommandHandler(
 
 @command_handler(ConvertBatchMachineStatusCommand)
 class ConvertBatchMachineStatusCommandHandler(
-    BaseCommandHandler[ConvertBatchMachineStatusCommand, ConvertBatchMachineStatusResponse]
+    BaseCommandHandler[ConvertBatchMachineStatusCommand,
+        ConvertBatchMachineStatusResponse]
 ):
     """Handler for batch machine status conversion."""
 
@@ -329,7 +330,8 @@ class CleanupMachineResourcesHandler(BaseCommandHandler[CleanupMachineResourcesC
         machine = await self._machine_repository.get_by_id(command.machine_id)
         if not machine:
             if self.logger:
-                self.logger.warning(f"Machine not found for cleanup: {command.machine_id}")
+                self.logger.warning(
+                    f"Machine not found for cleanup: {command.machine_id}")
             return None
 
         # Perform cleanup
@@ -411,7 +413,8 @@ class DeregisterMachineHandler(BaseCommandHandler[DeregisterMachineCommand, None
         machine = await self._machine_repository.get_by_id(command.machine_id)
         if not machine:
             if self.logger:
-                self.logger.warning(f"Machine not found for deregistration: {command.machine_id}")
+                self.logger.warning(
+                    f"Machine not found for deregistration: {command.machine_id}")
             return None
 
         # Deregister machine

@@ -176,7 +176,8 @@ class HyperbolicTermViolation(Violation):
     """Hyperbolic marketing term found in code or comments."""
 
     def __init__(self, file_path: str, line_num: int, content: str, term: str, suggestion: str):
-        super().__init__(file_path, line_num, content, f"Hyperbolic term '{term}' - {suggestion}")
+        super().__init__(file_path, line_num, content,
+              f"Hyperbolic term '{term}' - {suggestion}")
         self.term = term
         self.suggestion = suggestion
 
@@ -313,7 +314,8 @@ class LanguageChecker(FileChecker):
                 for match in matches:
                     term = match.group(0)
                     violations.append(
-                        HyperbolicTermViolation(file_path, line_num, line.strip(), term, suggestion)
+                        HyperbolicTermViolation(
+                            file_path, line_num, line.strip(), term, suggestion)
                     )
 
             # Check for implementation detail terms
@@ -355,7 +357,8 @@ class DocstringChecker(FileChecker):
                 # Skip empty __init__.py files - they're just package markers
                 if not (Path(file_path).name == "__init__.py" and len(content.strip()) == 0):
                     violations.append(
-                        MissingDocstringViolation(file_path, 1, "module", Path(file_path).name)
+                        MissingDocstringViolation(
+                            file_path, 1, "module", Path(file_path).name)
                     )
 
             # Check classes and functions
@@ -363,7 +366,8 @@ class DocstringChecker(FileChecker):
                 if isinstance(node, ast.ClassDef):
                     if not ast.get_docstring(node):
                         violations.append(
-                            MissingDocstringViolation(file_path, node.lineno, "class", node.name)
+                            MissingDocstringViolation(
+                                file_path, node.lineno, "class", node.name)
                         )
                 elif isinstance(node, ast.FunctionDef):
                     # Skip private methods (starting with _)
@@ -439,7 +443,8 @@ class ImportChecker(FileChecker):
             # If autoflake found issues, it returns non-zero exit code
             if result.returncode != 0:
                 violations.append(
-                    UnusedImportViolation(file_path, 1, "Run 'make format' to fix automatically")
+                    UnusedImportViolation(
+                        file_path, 1, "Run 'make format' to fix automatically")
                 )
 
         except (subprocess.SubprocessError, FileNotFoundError):
@@ -521,7 +526,8 @@ class CommentChecker(FileChecker):
                     or "noqa:commented" in line.lower()
                 ):
                     continue
-                violations.append(CommentedCodeViolation(file_path, line_num, line.strip()))
+                violations.append(CommentedCodeViolation(
+                    file_path, line_num, line.strip()))
 
             # Check for debug statements (skip for test files and markdown files)
             if (
@@ -531,7 +537,8 @@ class CommentChecker(FileChecker):
                 and "DEBUG" not in line.upper()
                 and "noqa" not in line.lower()
             ):
-                violations.append(DebugStatementViolation(file_path, line_num, line.strip()))
+                violations.append(DebugStatementViolation(
+                    file_path, line_num, line.strip()))
 
         return violations
 
@@ -616,7 +623,8 @@ class QualityChecker:
             for future in as_completed(future_to_file):
                 completed += 1
                 if completed % 10 == 0 or completed == len(valid_files):
-                    logger.info(f"Progress: {completed}/{len(valid_files)} files checked")
+                    logger.info(
+                        f"Progress: {completed}/{len(valid_files)} files checked")
 
                 try:
                     file_violations = future.result()
@@ -684,12 +692,14 @@ def main():
     """Run comprehensive code quality checks with configurable options."""
     """Main entry point for the quality checker."""
     parser = argparse.ArgumentParser(description="Professional Quality Check Tool")
-    parser.add_argument("--fix", action="store_true", help="Attempt to automatically fix issues")
+    parser.add_argument("--fix", action="store_true",
+                        help="Attempt to automatically fix issues")
     parser.add_argument(
         "--strict", action="store_true", help="Exit with error code on any violation"
     )
     parser.add_argument("--files", nargs="+", help="Specific files to check")
-    parser.add_argument("--all", action="store_true", help="Check all files in repository")
+    parser.add_argument("--all", action="store_true",
+                        help="Check all files in repository")
 
     args = parser.parse_args()
 

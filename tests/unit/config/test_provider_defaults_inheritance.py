@@ -218,7 +218,8 @@ class TestProviderDefaultsInheritance:
         provider1_defaults = provider_config.provider_defaults.get("provider1")
 
         aws_handlers = aws_provider.get_effective_handlers(aws_defaults)
-        provider1_handlers = provider1_provider.get_effective_handlers(provider1_defaults)
+        provider1_handlers = provider1_provider.get_effective_handlers(
+            provider1_defaults)
 
         assert len(aws_handlers) == 2
         assert "EC2Fleet" in aws_handlers

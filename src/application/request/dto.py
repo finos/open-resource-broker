@@ -131,7 +131,8 @@ class RequestDTO(BaseDTO):
 
         # Get existing machine references
         if hasattr(request, "machine_references") and request.machine_references:
-            machine_refs = [MachineReferenceDTO.from_domain(m) for m in request.machine_references]
+            machine_refs = [MachineReferenceDTO.from_domain(
+                m) for m in request.machine_references]
 
         # Create the DTO with all available fields
         return cls(

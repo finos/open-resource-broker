@@ -151,7 +151,8 @@ class ConfigurationLoader:
                 cls._merge_config(config, file_config)
                 get_config_logger().info("Loaded user configuration")
             else:
-                get_config_logger().warning(f"User configuration file not found: {config_path}")
+                get_config_logger().warning(
+                    f"User configuration file not found: {config_path}")
 
         # Override with environment variables (highest precedence)
         cls._load_from_env(config)
@@ -176,7 +177,8 @@ class ConfigurationLoader:
         get_config_logger().debug("Loading default configuration")
 
         # Use file loading method
-        config = cls._load_config_file("conf", cls.DEFAULT_CONFIG_FILENAME, required=False)
+        config = cls._load_config_file(
+            "conf", cls.DEFAULT_CONFIG_FILENAME, required=False)
 
         if config:
             get_config_logger().info("Loaded default configuration successfully")
@@ -210,11 +212,13 @@ class ConfigurationLoader:
 
         except ValueError as e:
             # Convert Pydantic validation errors to ConfigurationError
-            raise ConfigurationError("App", f"Configuration validation failed: {str(e)}")
+            raise ConfigurationError(
+                "App", f"Configuration validation failed: {str(e)}")
         except KeyError as e:
             raise ConfigurationError("App", f"Missing required configuration: {str(e)}")
         except Exception as e:
-            raise ConfigurationError("App", f"Failed to create typed configuration: {str(e)}")
+            raise ConfigurationError(
+                "App", f"Failed to create typed configuration: {str(e)}")
 
     @classmethod
     def _load_from_file(cls, config_path: str) -> Optional[Dict[str, Any]]:
@@ -233,7 +237,8 @@ class ConfigurationLoader:
         try:
             path = Path(config_path)
             if not path.exists():
-                get_config_logger().warning(f"Configuration file not found: {config_path}")
+                get_config_logger().warning(
+                    f"Configuration file not found: {config_path}")
                 return None
 
             with path.open() as f:
@@ -279,7 +284,8 @@ class ConfigurationLoader:
         resolved_path = cls._resolve_file_path(file_type, filename, explicit_path)
 
         if resolved_path:
-            get_config_logger().info(f"Loading {file_type} configuration from: {resolved_path}")
+            get_config_logger().info(
+                f"Loading {file_type} configuration from: {resolved_path}")
             return cls._load_from_file(resolved_path)
         else:
             if required:
@@ -313,7 +319,8 @@ class ConfigurationLoader:
 
         # 1. If explicit path provided and contains directory, use it directly
         if explicit_path and os.path.dirname(explicit_path):
-            get_config_logger().debug(f"Using explicit path with directory: {explicit_path}")
+            get_config_logger().debug(
+                f"Using explicit path with directory: {explicit_path}")
             return explicit_path if os.path.exists(explicit_path) else None
 
         # If explicit_path is just a filename, use it as the filename
@@ -344,10 +351,12 @@ class ConfigurationLoader:
         if env_dir:
             env_path = os.path.join(env_dir, filename)
             if os.path.exists(env_path):
-                get_config_logger().debug(f"Found file using {env_var_name}: {env_path}")
+                get_config_logger().debug(
+                    f"Found file using {env_var_name}: {env_path}")
                 return env_path
             else:
-                get_config_logger().debug(f"File not found in {env_var_name} directory: {env_path}")
+                get_config_logger().debug(
+                    f"File not found in {env_var_name} directory: {env_path}")
 
         # 3. Fall back to default directory + filename
         default_dirs = {
@@ -430,11 +439,14 @@ class ConfigurationLoader:
 
         # Set up logging path based on HF_PROVIDER_LOGDIR
         if logdir:
-            config.setdefault("logging", {})["file_path"] = os.path.join(logdir, "app.log")
-            get_config_logger().debug(f"Set logging file_path to {os.path.join(logdir, 'app.log')}")
+            config.setdefault("logging", {})[
+                              "file_path"] = os.path.join(logdir, "app.log")
+            get_config_logger().debug(
+                f"Set logging file_path to {os.path.join(logdir, 'app.log')}")
         elif workdir:
             log_dir = os.path.join(workdir, "logs")
-            config.setdefault("logging", {})["file_path"] = os.path.join(log_dir, "app.log")
+            config.setdefault("logging", {})[
+                              "file_path"] = os.path.join(log_dir, "app.log")
             get_config_logger().debug(
                 f"Set logging file_path to {os.path.join(log_dir, 'app.log')}"
             )
@@ -482,24 +494,29 @@ class ConfigurationLoader:
             events_config = config.setdefault("events", {})
             events_config["snapshot_store_path"] = snapshotsdir
             events_config["default_snapshots_path"] = snapshotsdir
-            get_config_logger().debug(f"Set snapshots snapshot_store_path to {snapshotsdir}")
+            get_config_logger().debug(
+                f"Set snapshots snapshot_store_path to {snapshotsdir}")
         elif workdir:
             snapshots_dir = os.path.join(workdir, "snapshots")
             events_config = config.setdefault("events", {})
             events_config["default_snapshots_path"] = snapshots_dir
-            get_config_logger().debug(f"Set snapshots default_snapshots_path to {snapshots_dir}")
+            get_config_logger().debug(
+                f"Set snapshots default_snapshots_path to {snapshots_dir}")
 
         # Process AMI resolution environment variables
         ami_resolution_enabled = os.environ.get("HF_TEMPLATE_AMI_RESOLUTION_ENABLED")
-        ami_resolution_fallback = os.environ.get("HF_TEMPLATE_AMI_RESOLUTION_FALLBACK_ON_FAILURE")
-        ami_resolution_cache_file = os.environ.get("HF_TEMPLATE_AMI_RESOLUTION_CACHE_FILE")
+        ami_resolution_fallback = os.environ.get(
+            "HF_TEMPLATE_AMI_RESOLUTION_FALLBACK_ON_FAILURE")
+        ami_resolution_cache_file = os.environ.get(
+            "HF_TEMPLATE_AMI_RESOLUTION_CACHE_FILE")
 
         if any([ami_resolution_enabled, ami_resolution_fallback, ami_resolution_cache_file]):
             template_config = config.setdefault("template", {})
             ami_resolution_config = template_config.setdefault("ami_resolution", {})
 
             if ami_resolution_enabled is not None:
-                ami_resolution_config["enabled"] = cls._convert_value(ami_resolution_enabled)
+                ami_resolution_config["enabled"] = cls._convert_value(
+                    ami_resolution_enabled)
                 get_config_logger().debug(
                     f"Set ami_resolution.enabled to {ami_resolution_config['enabled']}"
                 )
@@ -554,7 +571,7 @@ class ConfigurationLoader:
     def _merge_config(cls, base: Dict[str, Any], update: Dict[str, Any]) -> None:
         """
         Merge update configuration into base configuration.
-        
+
         Arrays are replaced entirely, not merged element by element.
 
         Args:

@@ -78,7 +78,8 @@ def injectable(cls: Type[T]) -> Type[T]:
             # Try to resolve from DI container
             if param_name in hints:
                 annotation = hints[param_name]
-                resolved_value = _resolve_dependency(annotation, param, cls.__name__, param_name)
+                resolved_value = _resolve_dependency(
+                    annotation, param, cls.__name__, param_name)
                 if resolved_value is not None:
                     resolved_kwargs[param_name] = resolved_value
                 elif param.default != inspect.Parameter.empty:
@@ -94,7 +95,8 @@ def injectable(cls: Type[T]) -> Type[T]:
         try:
             original_init(self, **resolved_kwargs)
         except Exception as e:
-            logger.error(f"Failed to initialize {cls.__name__} with resolved dependencies: {e}")
+            logger.error(
+                f"Failed to initialize {cls.__name__} with resolved dependencies: {e}")
             logger.debug(f"Resolved kwargs: {resolved_kwargs}")
             raise
 

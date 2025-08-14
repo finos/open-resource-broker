@@ -153,7 +153,8 @@ def is_binary_file(file_path: str) -> bool:
             if b"\0" in chunk:
                 return True
             # Check for high ratio of non-printable characters
-            text_chars = bytearray({7, 8, 9, 10, 12, 13, 27} | set(range(0x20, 0x100)) - {0x7F})
+            text_chars = bytearray({7, 8, 9, 10, 12, 13, 27} |
+                                   set(range(0x20, 0x100)) - {0x7F})
             return bool(chunk.translate(None, text_chars))
     except FileNotFoundError:
         raise FileNotFoundError(f"File not found: {file_path}")

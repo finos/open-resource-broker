@@ -225,14 +225,16 @@ class RoundRobinSelector(ProviderSelector):
             )
 
         # Round-robin selection
-        self._last_selected_index = (self._last_selected_index + 1) % len(suitable_strategies)
+        self._last_selected_index = (
+            self._last_selected_index + 1) % len(suitable_strategies)
         selected_type, selected_strategy = suitable_strategies[self._last_selected_index]
 
         selection_time = (time.time() - start_time) * 1000
         return SelectionResult(
             selected_strategy=selected_strategy,
             selection_reason=f"Round-robin selection: {selected_type} (index {self._last_selected_index})",
-            alternatives=[s[1] for s in suitable_strategies if s[1] != selected_strategy],
+            alternatives=[s[1]
+                for s in suitable_strategies if s[1] != selected_strategy],
             selection_time_ms=selection_time,
         )
 
@@ -304,7 +306,8 @@ class PerformanceBasedSelector(ProviderSelector):
         # Use 1000ms as baseline - strategies faster than this get bonus
         baseline_response_time = 1000.0
         if metrics.average_response_time_ms > 0:
-            speed_score = min(1.0, baseline_response_time / metrics.average_response_time_ms)
+            speed_score = min(1.0, baseline_response_time / \
+                              metrics.average_response_time_ms)
         else:
             speed_score = 1.0
 
@@ -356,7 +359,8 @@ class RandomSelector(ProviderSelector):
         return SelectionResult(
             selected_strategy=selected_strategy,
             selection_reason=f"Random selection: {selected_type}",
-            alternatives=[s[1] for s in suitable_strategies if s[1] != selected_strategy],
+            alternatives=[s[1]
+                for s in suitable_strategies if s[1] != selected_strategy],
             selection_time_ms=selection_time,
         )
 

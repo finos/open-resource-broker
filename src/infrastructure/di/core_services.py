@@ -32,7 +32,8 @@ def register_core_services(container: DIContainer) -> None:
         CommandBus, lambda c: CommandBus(container=c, logger=c.get(LoggingPort))
     )
 
-    container.register_factory(QueryBus, lambda c: QueryBus(container=c, logger=c.get(LoggingPort)))
+    container.register_factory(QueryBus, lambda c: QueryBus(
+        container=c, logger=c.get(LoggingPort)))
 
 
 def _create_scheduler_strategy(container: DIContainer) -> SchedulerPort:

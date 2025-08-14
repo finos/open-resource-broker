@@ -197,7 +197,8 @@ class RequestReturnMachinesRESTHandler(
                 }
 
                 # Create return request using CQRS command
-                command = CreateReturnRequestCommand(machine_ids=machine_ids, metadata=metadata)
+                command = CreateReturnRequestCommand(
+                    machine_ids=machine_ids, metadata=metadata)
                 request_id = await self._command_bus.execute(command)
 
                 # Record metrics if available

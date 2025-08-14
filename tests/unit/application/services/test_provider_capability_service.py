@@ -113,7 +113,8 @@ class TestProviderCapabilityService:
 
         assert not result.is_valid
         assert len(result.errors) > 0
-        assert any("does not support API 'UnsupportedAPI'" in error for error in result.errors)
+        assert any(
+            "does not support API 'UnsupportedAPI'" in error for error in result.errors)
 
     def test_validate_template_requirements_spot_on_runinstances(self, service):
         """Test validation of spot pricing on RunInstances (should fail)."""
@@ -171,7 +172,8 @@ class TestProviderCapabilityService:
         )
 
         assert not result.is_valid
-        assert any("does not support fleet type 'instant'" in error for error in result.errors)
+        assert any(
+            "does not support fleet type 'instant'" in error for error in result.errors)
 
     def test_validate_template_requirements_no_api_specified(self, service):
         """Test validation with no provider API specified."""
@@ -260,7 +262,8 @@ class TestProviderCapabilityService:
 
         # Mock the _get_provider_capabilities to raise an exception
         original_method = service._get_provider_capabilities
-        service._get_provider_capabilities = Mock(side_effect=Exception("Test exception"))
+        service._get_provider_capabilities = Mock(
+            side_effect=Exception("Test exception"))
 
         result = service.validate_template_requirements(
             template, "aws-us-east-1", ValidationLevel.STRICT
@@ -274,7 +277,8 @@ class TestProviderCapabilityService:
 
     def test_get_provider_api_capabilities(self, service):
         """Test getting provider API capabilities."""
-        capabilities = service.get_provider_api_capabilities("aws-us-east-1", "EC2Fleet")
+        capabilities = service.get_provider_api_capabilities(
+            "aws-us-east-1", "EC2Fleet")
 
         assert isinstance(capabilities, dict)
         assert "supports_spot" in capabilities
@@ -286,7 +290,8 @@ class TestProviderCapabilityService:
 
     def test_get_provider_api_capabilities_unknown_api(self, service):
         """Test getting capabilities for unknown API."""
-        capabilities = service.get_provider_api_capabilities("aws-us-east-1", "UnknownAPI")
+        capabilities = service.get_provider_api_capabilities(
+            "aws-us-east-1", "UnknownAPI")
 
         assert capabilities == {}
 
@@ -310,7 +315,8 @@ class TestProviderCapabilityService:
         """Test checking API compatibility across multiple providers."""
         provider_instances = ["aws-us-east-1", "aws-us-west-2", "aws-eu-west-1"]
 
-        results = service.check_api_compatibility(aws_template_ec2fleet, provider_instances)
+        results = service.check_api_compatibility(
+            aws_template_ec2fleet, provider_instances)
 
         assert isinstance(results, dict)
         assert len(results) == 3

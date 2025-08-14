@@ -83,12 +83,15 @@ async def handle_request_machines(args: "argparse.Namespace") -> Dict[str, Any]:
             # HostFactory nested format: {"template": {"templateId": "...",
             # "machineCount": ...}}
             template_data = input_data["template"]
-            template_id = template_data.get("templateId") or template_data.get("template_id")
-            machine_count = template_data.get("machineCount") or template_data.get("machine_count")
+            template_id = template_data.get(
+                "templateId") or template_data.get("template_id")
+            machine_count = template_data.get(
+                "machineCount") or template_data.get("machine_count")
         else:
             # Direct format: {"template_id": "...", "machine_count": ...}
             template_id = input_data.get("template_id") or input_data.get("templateId")
-            machine_count = input_data.get("machine_count") or input_data.get("machineCount")
+            machine_count = input_data.get(
+                "machine_count") or input_data.get("machineCount")
     else:
         # Use command line arguments
         template_id = getattr(args, "template_id", None)
@@ -151,7 +154,8 @@ async def handle_request_machines(args: "argparse.Namespace") -> Dict[str, Any]:
         # Fallback if we can't get request details
         from src.domain.base.ports import LoggingPort
 
-        container.get(LoggingPort).warning(f"Could not get request details for resource ID: {e}")
+        container.get(LoggingPort).warning(
+            f"Could not get request details for resource ID: {e}")
         if scheduler_strategy:
             return scheduler_strategy.convert_domain_to_hostfactory_output(
                 "requestMachines", request_id

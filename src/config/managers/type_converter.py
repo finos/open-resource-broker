@@ -105,8 +105,10 @@ class ConfigTypeConverter:
             # Create instance with validation
             return config_class(**config_data)
         except Exception as e:
-            logger.error(f"Failed to create typed config for {config_class.__name__}: {e}")
-            raise ConfigurationError(f"Invalid configuration for {config_class.__name__}: {e}")
+            logger.error(
+                f"Failed to create typed config for {config_class.__name__}: {e}")
+            raise ConfigurationError(
+                f"Invalid configuration for {config_class.__name__}: {e}")
 
     def _get_aws_provider_config(self, config_class: Type[T]) -> T:
         """Get AWS provider configuration from provider strategy system."""
@@ -130,7 +132,8 @@ class ConfigTypeConverter:
                         and provider.get("enabled", True)
                     ):
                         aws_provider_config = provider.get("config", {})
-                        logger.debug(f"Using AWS config from active provider: {active_provider}")
+                        logger.debug(
+                            f"Using AWS config from active provider: {active_provider}")
                         break
 
             # If no active provider found, use first enabled AWS provider
@@ -138,7 +141,8 @@ class ConfigTypeConverter:
                 for provider in providers:
                     if provider.get("type") == "aws" and provider.get("enabled", True):
                         aws_provider_config = provider.get("config", {})
-                        logger.debug(f"Using AWS config from provider: {provider.get('name')}")
+                        logger.debug(
+                            f"Using AWS config from provider: {provider.get('name')}")
                         break
 
             if aws_provider_config:

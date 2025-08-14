@@ -139,7 +139,8 @@ def test_aws_launch_template_manager_registration():
         print(f"   FAIL: Import error: {str(e)}")
         return False
     except Exception as e:
-        print(f"   FAIL: AWS Launch Template Manager registration test failed: {str(e)}")
+        print(
+            f"   FAIL: AWS Launch Template Manager registration test failed: {str(e)}")
         return False
 
 

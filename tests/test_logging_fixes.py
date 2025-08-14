@@ -134,7 +134,8 @@ class TestLoggingFixes:
             mock_provider_context.check_strategy_health("aws-aws-secondary")
 
             # Verify no health check errors
-            assert not log_capture.has_error_containing("Error checking health of strategy")
+            assert not log_capture.has_error_containing(
+                "Error checking health of strategy")
             assert not log_capture.has_error_containing("'aws'")
 
     def test_no_duplicate_ssm_resolution(self, mock_ami_resolver):
@@ -196,7 +197,8 @@ class TestLoggingFixes:
 
                 return {
                     "mode": (
-                        "multi" if len(mock_provider_context.available_strategies) > 1 else "single"
+                        "multi" if len(
+                            mock_provider_context.available_strategies) > 1 else "single"
                     ),
                     "current_strategy": mock_provider_context.current_strategy_type,
                     "available_strategies": mock_provider_context.available_strategies,
@@ -225,7 +227,8 @@ class TestLoggingFixes:
             mock_provider_context.initialize()
 
             # Count provider context initialization messages
-            init_messages = log_capture.count_messages_containing("Provider context initialized")
+            init_messages = log_capture.count_messages_containing(
+                "Provider context initialized")
 
             # Should have at most one initialization message
             assert init_messages <= 1
@@ -287,7 +290,8 @@ class TestLoggingFixes:
             result = template_manager._batch_resolve_amis(template_dicts)
 
             # Verify batch resolution log was called
-            logger.info.assert_called_with("Batch resolved 1 unique SSM parameters for 2 templates")
+            logger.info.assert_called_with(
+                "Batch resolved 1 unique SSM parameters for 2 templates")
 
             # Verify templates were processed correctly
             assert len(result) == 2
@@ -297,7 +301,8 @@ class TestLoggingFixes:
         """Test that provider strategy health checks work without errors."""
         with LogCapture() as log_capture:
             # Test health check for specific strategy
-            health_status = mock_provider_context.check_strategy_health("aws-aws-primary")
+            health_status = mock_provider_context.check_strategy_health(
+                "aws-aws-primary")
 
             # Verify health check succeeded
             assert health_status.is_healthy
@@ -316,7 +321,8 @@ class TestLoggingFixes:
         def get_provider_info():
             return {
                 "mode": (
-                    "multi" if len(mock_provider_context.available_strategies) > 1 else "single"
+                    "multi" if len(
+                        mock_provider_context.available_strategies) > 1 else "single"
                 ),
                 "current_strategy": mock_provider_context.current_strategy_type,
                 "available_strategies": mock_provider_context.available_strategies,

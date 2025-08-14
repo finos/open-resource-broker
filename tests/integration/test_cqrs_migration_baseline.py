@@ -291,7 +291,8 @@ class TestCQRSArchitectureIntegration:
         )
 
         # Execute operation
-        result = mock_provider_context.execute_with_strategy("aws-aws-default", operation)
+        result = mock_provider_context.execute_with_strategy(
+            "aws-aws-default", operation)
 
         # Verify result structure
         assert result.success is True
@@ -321,7 +322,8 @@ class TestCQRSArchitectureIntegration:
             await create_request_handler.execute_command(command)
 
         # Verify error type
-        assert "Template" in str(exc_info.value) or "not found" in str(exc_info.value).lower()
+        assert "Template" in str(exc_info.value) or "not found" in str(
+            exc_info.value).lower()
 
     @pytest.mark.asyncio
     async def test_error_handling_provider_failure(self, create_request_handler):

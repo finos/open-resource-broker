@@ -56,7 +56,8 @@ class ListSchedulerStrategiesHandler(
         for scheduler_type in scheduler_types:
             strategy_info = SchedulerStrategyDTO(
                 name=scheduler_type,
-                active=(scheduler_type == current_strategy if query.include_current else False),
+                active=(scheduler_type ==
+                        current_strategy if query.include_current else False),
                 registered=True,
                 description=(
                     self._get_scheduler_description(scheduler_type)
@@ -208,7 +209,8 @@ class ValidateSchedulerConfigurationHandler(
             try:
                 strategy = registry.create_strategy(scheduler_name, config_manager)
                 if strategy is None:
-                    errors.append(f"Failed to create scheduler strategy '{scheduler_name}'")
+                    errors.append(
+                        f"Failed to create scheduler strategy '{scheduler_name}'")
             except Exception as e:
                 errors.append(f"Scheduler strategy creation failed: {str(e)}")
 
@@ -216,7 +218,8 @@ class ValidateSchedulerConfigurationHandler(
             try:
                 app_config = config_manager.get_app_config()
                 if not hasattr(app_config, "scheduler"):
-                    warnings.append("No scheduler configuration section found in config")
+                    warnings.append(
+                        "No scheduler configuration section found in config")
                 elif not app_config.scheduler.type:
                     warnings.append("Scheduler type not specified in configuration")
             except Exception as e:

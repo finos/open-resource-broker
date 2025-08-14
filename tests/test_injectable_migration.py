@@ -97,7 +97,8 @@ class TestInjectableMigration(unittest.TestCase):
         self.container.register_factory(LoggingPort, lambda c: get_logger("test"))
 
         # Register configuration
-        self.container.register_singleton(ConfigurationPort, lambda c: MockConfigurationPort())
+        self.container.register_singleton(
+            ConfigurationPort, lambda c: MockConfigurationPort())
 
         # Register AWS config with valid authentication
         from src.providers.aws.configuration.config import AWSConfig
@@ -111,7 +112,8 @@ class TestInjectableMigration(unittest.TestCase):
 
         self.container.register_singleton(
             AWSClient,
-            lambda c: AWSClient(config=c.get(ConfigurationPort), logger=c.get(LoggingPort)),
+            lambda c: AWSClient(config=c.get(ConfigurationPort),
+                                logger=c.get(LoggingPort)),
         )
 
         # Register AWS handler factory manually

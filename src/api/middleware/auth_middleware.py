@@ -78,7 +78,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
             request.state.user_roles = auth_result.user_roles
             request.state.permissions = auth_result.permissions
 
-            self.logger.debug(f"Authentication successful for user: {auth_result.user_id}")
+            self.logger.debug(
+                f"Authentication successful for user: {auth_result.user_id}")
 
             # Continue to next middleware/handler
             response = await call_next(request)
@@ -211,7 +212,8 @@ class AuthDependency:
         # Check required permissions
         for permission in self.required_permissions:
             if not auth_result.has_permission(permission):
-                self.logger.warning(f"User {auth_result.user_id} missing permission: {permission}")
+                self.logger.warning(
+                    f"User {auth_result.user_id} missing permission: {permission}")
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"Missing required permission: {permission}",

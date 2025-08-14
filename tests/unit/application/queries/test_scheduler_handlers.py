@@ -46,7 +46,8 @@ class TestListSchedulerStrategiesHandler:
     @pytest.mark.asyncio
     async def test_list_strategies_basic(self, handler, mock_registry, mock_config_manager):
         """Test basic strategy listing."""
-        query = ListSchedulerStrategiesQuery(include_current=True, include_details=False)
+        query = ListSchedulerStrategiesQuery(
+            include_current=True, include_details=False)
 
         with patch(
             "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
@@ -85,7 +86,8 @@ class TestListSchedulerStrategiesHandler:
     @pytest.mark.asyncio
     async def test_list_strategies_config_error(self, handler, mock_registry):
         """Test strategy listing when config manager fails."""
-        query = ListSchedulerStrategiesQuery(include_current=True, include_details=False)
+        query = ListSchedulerStrategiesQuery(
+            include_current=True, include_details=False)
 
         with patch(
             "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",

@@ -11,7 +11,8 @@ import sys
 from src.cli.field_mapping import get_field_value, get_template_field_mapping
 
 # Add project root to path
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+project_root = os.path.dirname(os.path.dirname(
+    os.path.dirname(os.path.dirname(__file__))))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 

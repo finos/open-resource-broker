@@ -31,7 +31,8 @@ class ConfigurationAdapter(ConfigurationPort):
                 },
                 "prefixes": {
                     "request": (
-                        config.prefixes.request if hasattr(config.prefixes, "request") else "req-"
+                        config.prefixes.request if hasattr(
+                            config.prefixes, "request") else "req-"
                     ),
                     "return": (
                         config.prefixes.return_prefix
