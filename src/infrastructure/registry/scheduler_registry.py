@@ -52,6 +52,31 @@ class SchedulerRegistry(BaseRegistry):
         except ValueError as e:
             raise UnsupportedSchedulerError(str(e)) from e
 
+    def ensure_type_registered(self, scheduler_type: str) -> None:
+        """Ensure scheduler type is registered, register if not."""
+        if not self.is_registered(scheduler_type):
+            self._register_type_dynamically(scheduler_type)
+
+    def _register_type_dynamically(self, scheduler_type: str) -> None:
+        """Dynamically register scheduler type based on configuration."""
+        try:
+            if scheduler_type in ["hostfactory", "hf"]:
+                from src.infrastructure.scheduler.registration import (
+                    register_symphony_hostfactory_scheduler,
+                )
+
+                register_symphony_hostfactory_scheduler()
+            elif scheduler_type == "default":
+                from src.infrastructure.scheduler.registration import (
+                    register_default_scheduler,
+                )
+
+                register_default_scheduler()
+            else:
+                raise ValueError(f"Unknown scheduler type: {scheduler_type}")
+        except ImportError as e:
+            raise ConfigurationError(f"Scheduler type '{scheduler_type}' not available: {e}") from e
+
     def _create_registration(
         self,
         type_name: str,

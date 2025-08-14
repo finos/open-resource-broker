@@ -8,17 +8,17 @@ if TYPE_CHECKING:
 
 from src.config.manager import ConfigurationManager
 from src.domain.base.ports.logging_port import LoggingPort
-from src.domain.base.ports.scheduler_port import SchedulerPort
 from src.domain.machine.aggregate import Machine
 from src.domain.request.aggregate import Request
 from src.domain.template.aggregate import Template
+from src.infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
 from src.infrastructure.utilities.common.serialization import serialize_enum
 
 from .field_mappings import HostFactoryFieldMappings
 from .transformations import HostFactoryTransformations
 
 
-class HostFactorySchedulerStrategy(SchedulerPort):
+class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
     """HostFactory scheduler strategy for field mapping and response formatting."""
 
     def __init__(

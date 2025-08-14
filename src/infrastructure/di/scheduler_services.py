@@ -28,39 +28,28 @@ def _register_configured_scheduler_strategy(container: DIContainer) -> None:
     """Register only the configured scheduler strategy."""
     try:
         config = container.get(ConfigurationPort)
-        scheduler_type = config.get_scheduler_strategy()  # Defaults to "default"
+        scheduler_type = config.get_scheduler_strategy()
 
         logger = get_logger(__name__)
 
-        # Register only the configured scheduler type
-        if scheduler_type in ["hostfactory", "hf"]:
-            from src.infrastructure.scheduler.registration import (
-                register_symphony_hostfactory_scheduler,
-            )
+        # Registry handles dynamic registration - no hardcoded types here
+        from src.infrastructure.registry.scheduler_registry import (
+            get_scheduler_registry,
+        )
 
-            register_symphony_hostfactory_scheduler()
-            logger.info(f"Registered configured scheduler strategy: {scheduler_type}")
-        elif scheduler_type == "default":
-            from src.infrastructure.scheduler.registration import (
-                register_default_scheduler,
-            )
+        registry = get_scheduler_registry()
+        registry.ensure_type_registered(scheduler_type)
 
-            register_default_scheduler()
-            logger.info(f"Registered configured scheduler strategy: {scheduler_type}")
-        else:
-            logger.warning(f"Unknown scheduler strategy: {scheduler_type}, falling back to default")
-            from src.infrastructure.scheduler.registration import (
-                register_default_scheduler,
-            )
-
-            register_default_scheduler()
-            logger.info("Registered configured scheduler strategy: default (fallback)")
+        logger.info(f"Registered configured scheduler strategy: {scheduler_type}")
 
     except Exception as e:
         logger = get_logger(__name__)
         logger.error(f"Failed to register configured scheduler strategy: {e}")
         # Fallback to default
-        from src.infrastructure.scheduler.registration import register_default_scheduler
+        from src.infrastructure.registry.scheduler_registry import (
+            get_scheduler_registry,
+        )
 
-        register_default_scheduler()
-        logger.info("Registered configured scheduler strategy: default (fallback)")
+        registry = get_scheduler_registry()
+        registry.ensure_type_registered("default")
+        logger.info("Registered fallback scheduler strategy: default")

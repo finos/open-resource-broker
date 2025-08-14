@@ -4,13 +4,13 @@ from typing import Any, Dict, List
 
 from src.config.manager import ConfigurationManager
 from src.domain.base.ports.logging_port import LoggingPort
-from src.domain.base.ports.scheduler_port import SchedulerPort
 from src.domain.machine.aggregate import Machine
 from src.domain.request.aggregate import Request
 from src.domain.template.aggregate import Template
+from src.infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
 
 
-class DefaultSchedulerStrategy(SchedulerPort):
+class DefaultSchedulerStrategy(BaseSchedulerStrategy):
     """
     Default scheduler strategy using native domain fields.
 

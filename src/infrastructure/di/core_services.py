@@ -8,7 +8,6 @@ from src.domain.base.ports import (
 )
 from src.infrastructure.di.buses import CommandBus, QueryBus
 from src.infrastructure.di.container import DIContainer
-from src.infrastructure.registry.scheduler_registry import get_scheduler_registry
 from src.monitoring.metrics import MetricsCollector
 
 
@@ -40,8 +39,12 @@ def register_core_services(container: DIContainer) -> None:
 
 
 def _create_scheduler_strategy(container: DIContainer) -> SchedulerPort:
-    """Create scheduler strategy from registry."""
-    registry = get_scheduler_registry()
-    config_manager = container.get(ConfigurationPort)
-    scheduler_type = config_manager.get_scheduler_strategy()
-    return registry.create_strategy(scheduler_type, container)
+    """Create scheduler strategy using factory."""
+    from src.infrastructure.factories.scheduler_strategy_factory import (
+        SchedulerStrategyFactory,
+    )
+
+    factory = container.get(SchedulerStrategyFactory)
+    config = container.get(ConfigurationPort)
+    scheduler_type = config.get_scheduler_strategy()
+    return factory.create_strategy(scheduler_type, container)

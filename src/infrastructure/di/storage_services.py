@@ -2,10 +2,8 @@
 
 from src.domain.base.ports import ConfigurationPort
 from src.infrastructure.di.container import DIContainer
+from src.infrastructure.factories.storage_strategy_factory import StorageStrategyFactory
 from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.persistence.factories.strategy_factory import (
-    StorageStrategyFactory,
-)
 
 
 def register_storage_services(container: DIContainer) -> None:
@@ -28,46 +26,24 @@ def _register_configured_storage_strategy(container: DIContainer) -> None:
     """Register only the configured storage strategy."""
     try:
         config = container.get(ConfigurationPort)
-        storage_type = config.get_storage_strategy()  # Defaults to "json"
+        storage_type = config.get_storage_strategy()
 
         logger = get_logger(__name__)
 
-        # Register only the configured storage type
-        if storage_type == "json":
-            from src.infrastructure.persistence.json.registration import (
-                register_json_storage,
-            )
+        # Registry handles dynamic registration - no hardcoded types here
+        from src.infrastructure.registry.storage_registry import get_storage_registry
 
-            register_json_storage()
-            logger.info(f"Registered configured storage strategy: {storage_type}")
-        elif storage_type == "sql":
-            from src.infrastructure.persistence.sql.registration import (
-                register_sql_storage,
-            )
+        registry = get_storage_registry()
+        registry.ensure_type_registered(storage_type)
 
-            register_sql_storage()
-            logger.info(f"Registered configured storage strategy: {storage_type}")
-        elif storage_type == "dynamodb":
-            from src.providers.aws.persistence.dynamodb.registration import (
-                register_dynamodb_storage,
-            )
-
-            register_dynamodb_storage()
-            logger.info(f"Registered configured storage strategy: {storage_type}")
-        else:
-            logger.warning(f"Unknown storage strategy: {storage_type}, falling back to json")
-            from src.infrastructure.persistence.json.registration import (
-                register_json_storage,
-            )
-
-            register_json_storage()
+        logger.info(f"Registered configured storage strategy: {storage_type}")
 
     except Exception as e:
         logger = get_logger(__name__)
         logger.error(f"Failed to register configured storage strategy: {e}")
         # Fallback to json
-        from src.infrastructure.persistence.json.registration import (
-            register_json_storage,
-        )
+        from src.infrastructure.registry.storage_registry import get_storage_registry
 
-        register_json_storage()
+        registry = get_storage_registry()
+        registry.ensure_type_registered("json")
+        logger.info("Registered fallback storage strategy: json")

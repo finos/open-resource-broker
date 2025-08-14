@@ -165,6 +165,39 @@ class StorageRegistry(BaseRegistry):
         """Check if storage type is registered - backward compatibility method."""
         return self.is_registered(storage_type)
 
+    def ensure_type_registered(self, storage_type: str) -> None:
+        """Ensure storage type is registered, register if not."""
+        if not self.is_registered(storage_type):
+            self._register_type_dynamically(storage_type)
+
+    def _register_type_dynamically(self, storage_type: str) -> None:
+        """Dynamically register storage type based on configuration."""
+        try:
+            if storage_type == "json":
+                from src.infrastructure.persistence.json.registration import (
+                    register_json_storage,
+                )
+
+                register_json_storage()
+            elif storage_type == "sql":
+                from src.infrastructure.persistence.sql.registration import (
+                    register_sql_storage,
+                )
+
+                register_sql_storage()
+            elif storage_type == "dynamodb":
+                from src.providers.aws.persistence.dynamodb.registration import (
+                    register_dynamodb_storage,
+                )
+
+                register_dynamodb_storage()
+            else:
+                raise ValueError(f"Unknown storage type: {storage_type}")
+        except ImportError as e:
+            from src.domain.base.exceptions import ConfigurationError
+
+            raise ConfigurationError(f"Storage type '{storage_type}' not available: {e}") from e
+
     def _create_registration(
         self,
         type_name: str,
