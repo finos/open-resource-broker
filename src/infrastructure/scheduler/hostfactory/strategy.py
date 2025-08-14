@@ -35,9 +35,10 @@ class HostFactorySchedulerStrategy(SchedulerPort):
         
         # Initialize provider selection service for proper provider selection
         from src.application.services.provider_selection_service import ProviderSelectionService
-        self._provider_selection_service = ProviderSelectionService(
-            config_manager, logger
-        )
+        from src.infrastructure.di.container import get_container
+        
+        container = get_container()
+        self._provider_selection_service = container.get(ProviderSelectionService)
 
     def get_templates_file_path(self) -> str:
         """Get the templates file path for HostFactory."""

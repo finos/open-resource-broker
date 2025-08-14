@@ -139,10 +139,12 @@ class AWSClient:
             AWS profile or None if not found
         """
         try:
-            # Use provider selection service to get the active AWS provider
+            # Use provider selection service from DI container
             from src.application.services.provider_selection_service import ProviderSelectionService
+            from src.infrastructure.di.container import get_container
             
-            selection_service = ProviderSelectionService(config_manager, self._logger)
+            container = get_container()
+            selection_service = container.get(ProviderSelectionService)
             selection_result = selection_service.select_active_provider()
             
             self._logger.debug(f"Provider selection result: {selection_result.provider_type}, {selection_result.provider_instance}")

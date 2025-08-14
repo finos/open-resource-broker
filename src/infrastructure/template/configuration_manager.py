@@ -211,8 +211,10 @@ class TemplateConfigurationManager:
         # 2. Use active provider from configuration with proper selection logic
         try:
             from src.application.services.provider_selection_service import ProviderSelectionService
+            from src.infrastructure.di.container import get_container
             
-            selection_service = ProviderSelectionService(self.config_manager, self.logger)
+            container = get_container()
+            selection_service = container.get(ProviderSelectionService)
             selection_result = selection_service.select_active_provider()
             return selection_result.provider_instance
         except Exception as e:

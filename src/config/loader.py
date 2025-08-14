@@ -134,19 +134,7 @@ class ConfigurationLoader:
         # then config/)
         main_config = cls._load_config_file("conf", "config.json", required=False)
         if main_config:
-            # Handle schema differences: main config may have 'providers' at root level
-            # while default config has 'provider.providers'
-            if 'providers' in main_config and 'provider' not in main_config:
-                # Normalize main config to match default config structure
-                normalized_main_config = main_config.copy()
-                normalized_main_config['provider'] = {
-                    'providers': main_config['providers']
-                }
-                # Remove the root-level 'providers' to avoid duplication
-                del normalized_main_config['providers']
-                cls._merge_config(config, normalized_main_config)
-            else:
-                cls._merge_config(config, main_config)
+            cls._merge_config(config, main_config)
             get_config_logger().info("Loaded main configuration")
 
         # Load explicit configuration file if provided (higher precedence)

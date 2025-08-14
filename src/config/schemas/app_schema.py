@@ -82,12 +82,10 @@ class AppConfig(BaseModel):
         try:
             # Use provider selection service for proper provider selection
             from src.application.services.provider_selection_service import ProviderSelectionService
-            from src.config.manager import ConfigurationManager
-            from src.infrastructure.adapters.logging_adapter import LoggingAdapter
+            from src.infrastructure.di.container import get_container
             
-            config_manager = ConfigurationManager()
-            logger = LoggingAdapter("app_schema")
-            selection_service = ProviderSelectionService(config_manager, logger)
+            container = get_container()
+            selection_service = container.get(ProviderSelectionService)
             
             selection_result = selection_service.select_active_provider()
             return selection_result.provider_type
