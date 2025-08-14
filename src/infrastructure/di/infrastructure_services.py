@@ -157,7 +157,6 @@ def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
 
 def _register_repository_services(container: DIContainer) -> None:
     """Register repository services."""
-    from src.infrastructure.persistence.registration import register_all_storage_types
     from src.infrastructure.template.configuration_manager import (
         TemplateConfigurationManager,
     )
@@ -168,12 +167,8 @@ def _register_repository_services(container: DIContainer) -> None:
         RepositoryFactory,
     )
 
-    # Ensure all storage types are registered
-    try:
-        register_all_storage_types()
-    except Exception as e:
-        logger = get_logger(__name__)
-        logger.warning(f"Some storage types failed to register: {e}")
+    # Storage strategies are now registered by storage_services.py
+    # No need to register them here anymore
 
     # Register repository factory
     container.register_singleton(RepositoryFactory)

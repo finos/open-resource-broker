@@ -18,7 +18,9 @@ from src.infrastructure.di.infrastructure_services import (
     register_infrastructure_services,
 )
 from src.infrastructure.di.provider_services import register_provider_services
+from src.infrastructure.di.scheduler_services import register_scheduler_services
 from src.infrastructure.di.server_services import register_server_services
+from src.infrastructure.di.storage_services import register_storage_services
 
 
 def register_all_services(container: Optional[DIContainer] = None) -> DIContainer:
@@ -57,30 +59,11 @@ def _register_services_lazy(container: DIContainer) -> DIContainer:
 
     register_core_services(container)
 
-    # 2. Register minimal storage types (only JSON by default)
-    from src.infrastructure.persistence.registration import (
-        register_minimal_storage_types,
-    )
+    # 2. Register configured storage strategy only
+    register_storage_services(container)
 
-    register_minimal_storage_types()
-
-    # 3. Register active scheduler only
-    from src.infrastructure.scheduler.registration import register_active_scheduler_only
-
-    try:
-        from src.config.manager import get_config_manager
-
-        config_manager = get_config_manager()
-        scheduler_config = config_manager.get("scheduler", {"type": "default"})
-        scheduler_type = (
-            scheduler_config.get("type", "default")
-            if isinstance(scheduler_config, dict)
-            else str(scheduler_config)
-        )
-        register_active_scheduler_only(scheduler_type)
-    except Exception:
-        # Fallback to default scheduler
-        register_active_scheduler_only("default")
+    # 3. Register configured scheduler strategy only
+    register_scheduler_services(container)
 
     # 4. Register provider services immediately (fix for provider
     # context errors)
