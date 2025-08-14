@@ -49,7 +49,7 @@ try:
     from src.infrastructure.template.services.template_persistence_service import (
         TemplatePersistenceService,
     )
-    from src.providers.aws.configuration.config import AWSConfig
+    from src.providers.aws.configuration.config import AWSProviderConfig as AWSConfig
 
     IMPORTS_AVAILABLE = True
 except ImportError as e:
