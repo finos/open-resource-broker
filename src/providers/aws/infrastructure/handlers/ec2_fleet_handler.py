@@ -386,27 +386,13 @@ class EC2FleetHandler(AWSHandler):
 
         return strategy_map.get(strategy, "lowest-price")
 
-    async def check_hosts_status(self, request: Request) -> List[Dict[str, Any]]:
+    def check_hosts_status(self, request: Request) -> List[Dict[str, Any]]:
         """Check the status of instances in the fleet."""
         try:
             if not request.resource_ids:
-                self._logger.info("No Fleet IDs found in request")
-                return []
+                raise AWSInfrastructureError("No Fleet ID found in request")
 
-            all_instances = []
-            
-            # Process all fleet IDs instead of just the first one
-            for fleet_id in request.resource_ids:
-                try:
-                    fleet_instances = self._get_fleet_instances(fleet_id)
-                    if fleet_instances:
-                        formatted_instances = self._format_instance_data(fleet_instances, fleet_id)
-                        all_instances.extend(formatted_instances)
-                except Exception as e:
-                    self._logger.error(f"Failed to get instances for fleet {fleet_id}: {e}")
-                    continue
-
-            return all_instances
+            fleet_id = request.resource_ids[0]  # Use first resource ID as fleet ID
 
             # Get template using CQRS QueryBus
             container = get_container()
@@ -415,7 +401,7 @@ class EC2FleetHandler(AWSHandler):
                 raise AWSInfrastructureError("QueryBus not available")
 
             query = GetTemplateQuery(template_id=str(request.template_id))
-            template = await query_bus.execute(query)
+            template = query_bus.execute(query)
             if not template:
                 raise AWSEntityNotFoundError(f"Template {request.template_id} not found")
 
@@ -490,30 +476,9 @@ class EC2FleetHandler(AWSHandler):
         """
         try:
             if not request.resource_ids:
-                raise AWSInfrastructureError("No EC2 Fleet IDs found in request")
+                raise AWSInfrastructureError("No EC2 Fleet ID found in request")
 
-            # Process all fleet IDs instead of just the first one
-            for fleet_id in request.resource_ids:
-                try:
-                    if request.machine_references:
-                        # Terminate specific instances using existing utility
-                        instance_ids = [m.machine_id for m in request.machine_references]
-                        self.aws_ops.terminate_instances_with_fallback(
-                            instance_ids=instance_ids,
-                            context=f"EC2Fleet-{fleet_id}",
-                        )
-                    else:
-                        # Terminate entire fleet
-                        self._retry_with_backoff(
-                            lambda: self.aws_client.ec2_client.delete_fleets(
-                                FleetIds=[fleet_id], TerminateInstances=True
-                            ),
-                            operation_type="critical",
-                        )
-                        self._logger.info(f"Terminated EC2 Fleet: {fleet_id}")
-                except Exception as e:
-                    self._logger.error(f"Failed to terminate fleet {fleet_id}: {e}")
-                    continue
+            fleet_id = request.resource_ids[0]  # Use first resource ID as fleet ID
 
             # Get fleet configuration with pagination and retry
             fleet_list = self._retry_with_backoff(
