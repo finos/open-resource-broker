@@ -14,6 +14,10 @@ class ConfigurationAdapter(ConfigurationPort):
         """Initialize with configuration manager."""
         self._config_manager = config_manager
 
+    def get_app_config(self) -> Dict[str, Any]:
+        """Get structured application configuration."""
+        return self._config_manager.get_app_config()
+
     def get_naming_config(self) -> Dict[str, Any]:
         """Get naming configuration for domain layer."""
         try:
