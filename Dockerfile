@@ -24,16 +24,16 @@ LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 # Install system dependencies for building
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    git \
+    build-essential=12.12 \
+    curl=8.14.1-2 \
+    git=1:2.47.2-0.2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
 # Install UV for fast dependency management
-RUN pip install --no-cache-dir uv
+RUN pip install --no-cache-dir uv==0.8.11
 
 # Copy pyproject.toml first for better caching
 COPY pyproject.toml ./
@@ -52,10 +52,13 @@ RUN uv pip install --no-cache .
 # Production stage
 FROM python:${PYTHON_VERSION}-slim AS production
 
+# Re-declare build arguments for production stage
+ARG PACKAGE_NAME_SHORT
+
 # Install runtime system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    ca-certificates \
+    curl=8.14.1-2 \
+    ca-certificates=20250419 \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
