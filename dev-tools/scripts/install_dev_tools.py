@@ -357,43 +357,11 @@ class DevToolsInstaller:
         return self._run_command(["curl", "-LsSf", "https://astral.sh/uv/install.sh", "|", "sh"])
 
     def _install_actionlint_generic(self):
-        """Install actionlint using go install or binary download."""
-        # Try go install first
-        if self._run_command(
-            ["go", "install", "github.com/rhymond/actionlint/cmd/actionlint@latest"]
-        ):
-            return True
-
-        # Fallback to binary download with correct version
-        arch = platform.machine().lower()
-        if arch == "x86_64":
-            arch = "amd64"
-        elif arch in ["aarch64", "arm64"]:
-            arch = "arm64"
-
-        os_name = "linux"
-        if self.os_type == "darwin":
-            os_name = "darwin"
-
-        # Use a known working version
-        version = "1.7.1"
-        url = f"https://github.com/rhymond/actionlint/releases/download/v{version}/actionlint_{version}_{os_name}_{arch}.tar.gz"
-        
-        # Download and extract in separate steps for better error handling
-        import tempfile
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tarfile = f"{tmpdir}/actionlint.tar.gz"
-            
-            # Download
-            if not self._run_command(["curl", "-L", "-o", tarfile, url]):
-                return False
-                
-            # Extract
-            if not self._run_command(["tar", "-xzf", tarfile, "-C", tmpdir]):
-                return False
-                
-            # Install
-            return self._run_command(["sudo", "mv", f"{tmpdir}/actionlint", "/usr/local/bin/actionlint"])
+        """Install actionlint using official download script."""
+        return self._run_command(
+            "bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)",
+            shell=True
+        )
 
     def _install_shellcheck_generic(self):
         """Install shellcheck using binary download."""
