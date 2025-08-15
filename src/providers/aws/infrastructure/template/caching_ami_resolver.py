@@ -114,7 +114,7 @@ class CachingAMIResolver(TemplateResolverPort):
             self._logger.debug(f"Not SSM parameter, returning original: {ami_id_or_parameter}")
             return ami_id_or_parameter
 
-        self._logger.debug(f"Passed all early checks, proceeding with resolution")
+        self._logger.debug("Passed all early checks, proceeding with resolution")
 
         # Check cache first if enabled
         if self._cache_enabled:

@@ -776,42 +776,6 @@ show-package-info:  ## Show current package and version metadata
 	@echo "  Container Registry: $(CONTAINER_REGISTRY)"
 	@echo "  Documentation: $(DOCS_URL)"
 
-# Quick development workflow
-quick-start: ## Complete setup for new developers (install tools + dependencies + verify)
-	@echo "🚀 Open Host Factory Plugin - Quick Start Setup"
-	@echo "=============================================="
-	@echo ""
-	@echo "Step 1: Installing required system tools..."
-	./dev-tools/scripts/install_dev_tools.py --required-only
-	@echo ""
-	@echo "Step 2: Generating pyproject.toml from template..."
-	$(MAKE) generate-pyproject
-	@echo ""
-	@echo "Step 3: Installing Python development dependencies..."
-	$(MAKE) dev-install
-	@echo ""
-	@echo "Step 4: Verifying setup..."
-	@echo "  ✓ Checking uv installation..."
-	@uv --version || (echo "❌ UV not available" && exit 1)
-	@echo "  ✓ Checking yq installation..."  
-	@yq --version || (echo "❌ YQ not available" && exit 1)
-	@echo "  ✓ Checking Python environment..."
-	@$(PYTHON) --version
-	@echo "  ✓ Running quick tests..."
-	@$(MAKE) test-quick || echo "⚠️  Some tests failed (this is normal for new setup)"
-	@echo ""
-	@echo "🎉 Quick start completed successfully!"
-	@echo ""
-	@echo "Next steps:"
-	@echo "  make test              - Run full test suite"
-	@echo "  make docs-serve        - Start documentation server"
-	@echo "  make lint              - Run code quality checks"
-	@echo "  make dev               - Quick development workflow"
-	@echo "  make help              - Show all available commands"
-	@echo ""
-	@echo "Optional: Install additional security tools:"
-	@echo "  make install-dev-tools - Install all development tools"
-
 quick-start: ## Complete setup for new developers (install tools + dependencies + verify)
 	./dev-tools/scripts/quick_start.py
 
