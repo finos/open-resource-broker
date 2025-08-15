@@ -91,19 +91,21 @@ jobs:
 
     - name: Create deployment summary
       run: |
-        echo "## Package Published Successfully" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        if [ "${{ github.event.inputs.environment }}" = "pypi" ] || [ "${{ github.event_name }}" = "release" ]; then
-          echo "**Environment:** Production PyPI" >> $GITHUB_STEP_SUMMARY
-          echo "**Installation:** \`pip install open-hostfactory-plugin\`" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "**Environment:** Test PyPI" >> $GITHUB_STEP_SUMMARY
-          echo "**Installation:** \`pip install --index-url https://test.pypi.org/simple/ open-hostfactory-plugin\`" >> $GITHUB_STEP_SUMMARY
-        fi
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Commands:**" >> $GITHUB_STEP_SUMMARY
-        echo "- \`ohfp --help\`" >> $GITHUB_STEP_SUMMARY
-        echo "- \`open-hostfactory-plugin --help\`" >> $GITHUB_STEP_SUMMARY
+        {
+          echo "## Package Published Successfully"
+          echo ""
+          if [ "${{ github.event.inputs.environment }}" = "pypi" ] || [ "${{ github.event_name }}" = "release" ]; then
+            echo "**Environment:** Production PyPI"
+            echo "**Installation:** \`pip install open-hostfactory-plugin\`"
+          else
+            echo "**Environment:** Test PyPI"
+            echo "**Installation:** \`pip install --index-url https://test.pypi.org/simple/ open-hostfactory-plugin\`"
+          fi
+          echo ""
+          echo "**Commands:**"
+          echo "- \`ohfp --help\`"
+          echo "- \`open-hostfactory-plugin --help\`"
+        } >> "$GITHUB_STEP_SUMMARY"
 
   generate-sbom:
     name: Generate SBOM

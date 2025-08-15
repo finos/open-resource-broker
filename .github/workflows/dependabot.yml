@@ -65,7 +65,8 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           echo "Updating UV lock file after Dependabot changes..."
-          uv lock --upgrade-package $(echo "$PR_TITLE" | grep -oP 'Bump \K[^\s]+')
+          PACKAGE_NAME=$(echo "$PR_TITLE" | grep -oP 'Bump \K[^\s]+')
+          uv lock --upgrade-package "$PACKAGE_NAME"
 
       - name: Commit updated lock file
         run: |

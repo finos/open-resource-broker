@@ -210,17 +210,16 @@ jobs:
 
     - name: Display test summary
       run: |
-        echo "## Test Matrix Results" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-
         # Count test result files
         UNIT_RESULTS=$(find test-results/ -name "*unit.xml" | wc -l)
         INTEGRATION_RESULTS=$(find test-results/ -name "*integration.xml" | wc -l)
 
-        echo "- Unit test configurations: $UNIT_RESULTS" >> $GITHUB_STEP_SUMMARY
-        echo "- Integration test configurations: $INTEGRATION_RESULTS" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-
-        # List all test result files
-        echo "### Test Result Files:" >> $GITHUB_STEP_SUMMARY
-        find test-results/ -name "*.xml" | sort >> $GITHUB_STEP_SUMMARY
+        {
+          echo "## Test Matrix Results"
+          echo ""
+          echo "- Unit test configurations: $UNIT_RESULTS"
+          echo "- Integration test configurations: $INTEGRATION_RESULTS"
+          echo ""
+          echo "### Test Result Files:"
+        } >> "$GITHUB_STEP_SUMMARY"
+        find test-results/ -name "*.xml" | sort >> "$GITHUB_STEP_SUMMARY"
