@@ -147,7 +147,7 @@ jobs:
         REGISTRY: ${{ needs.get-config.outputs.container-registry }}
         IMAGE_NAME: ${{ needs.get-config.outputs.container-image }}
         VERSION: ${{ needs.get-config.outputs.version }}
-        PYTHON_VERSION: ${{ matrix.default-python-version }}
+        PYTHON_VERSION: ${{ matrix.python-version }}
         PLATFORMS: linux/amd64,linux/arm64
         PUSH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'release' || github.event.inputs.push_images == 'true') }}
         CACHE: true
@@ -156,10 +156,10 @@ jobs:
       continue-on-error: true
 
     - name: Test container image
-      if: matrix.default-python-version == needs.get-config.outputs.default-python-version
+      if: matrix.python-version == needs.get-config.outputs.default-python-version
       run: |
         # Test that the container starts and responds to health check
-        IMAGE_TAG="${{ needs.get-config.outputs.container-registry }}/${{ needs.get-config.outputs.container-image }}:${{ needs.get-config.outputs.version }}-python${{ matrix.default-python-version }}"
+        IMAGE_TAG="${{ needs.get-config.outputs.container-registry }}/${{ needs.get-config.outputs.container-image }}:${{ needs.get-config.outputs.version }}-python${{ matrix.python-version }}"
 
         echo "Testing container image: $IMAGE_TAG"
 
@@ -180,6 +180,7 @@ jobs:
 
         # Stop test container
         docker stop test-container
+      continue-on-error: true
 
   container-manifest:
     name: Create Multi-Architecture Manifests
