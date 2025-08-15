@@ -243,7 +243,7 @@ handle_command() {
         *)
             # Unknown command - pass through to application
             log_info "Passing command to application: $*"
-            exec python src/run.py "$@"
+            exec ohfp "$@"
             ;;
     esac
 }

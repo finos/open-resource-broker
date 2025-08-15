@@ -101,6 +101,17 @@ setup_builder() {
 build_image() {
     log_info "Building Docker image..."
 
+    # Build wheel first if it doesn't exist
+    if [[ ! -f "dist/"*.whl ]]; then
+        log_info "Building wheel package..."
+        make build || {
+            log_error "Failed to build wheel package"
+            exit 1
+        }
+    else
+        log_info "Using existing wheel package"
+    fi
+
     # Get values from Makefile if not provided
     local MAKEFILE_DEFAULT_PYTHON_VERSION="${PYTHON_VERSION:-$(make -s print-DEFAULT_PYTHON_VERSION 2>/dev/null || echo '3.13')}"
     local MAKEFILE_PACKAGE_SHORT="${PACKAGE_NAME_SHORT:-$(make -s print-PACKAGE_NAME_SHORT 2>/dev/null || echo 'ohfp')}"
@@ -191,6 +202,7 @@ test_image() {
 
     log_info "Testing built image..."
 
+    # Use the first tag that was built (which is what gets loaded)
     local test_image="${IMAGE_NAME}:${VERSION}"
     if [[ -n "${REGISTRY}" ]]; then
         test_image="${REGISTRY}/${IMAGE_NAME}:${VERSION}"
