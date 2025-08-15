@@ -520,6 +520,8 @@ validate-workflow-syntax: dev-install  ## Validate GitHub Actions workflow YAML 
 
 validate-workflow-logic: dev-install  ## Validate GitHub Actions workflows with actionlint
 	@echo "Validating workflows with actionlint..."
+	@echo "Ensuring actionlint is installed..."
+	./dev-tools/scripts/install_dev_tools.py --tool actionlint
 	$(call run-tool,actionlint,.github/workflows/*.yml)
 
 validate-shell-scripts: dev-install  ## Validate shell scripts with shellcheck
