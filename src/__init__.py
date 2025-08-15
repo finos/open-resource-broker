@@ -21,8 +21,6 @@ Architecture:
 
 from ._package import PACKAGE_NAME
 
-__author__ = "AWS Professional Services"
-__email__ = "aws-proserve@amazon.com"
 __package_name__ = PACKAGE_NAME
 
 """

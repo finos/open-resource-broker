@@ -97,12 +97,6 @@ from .provider_strategy import (
     ProviderStrategy,
 )
 
-# Version and metadata
-from src._package import __version__
-
-__author__ = "Symphony Team"
-__description__ = "Provider Strategy Pattern Implementation"
-
 # Public API exports
 __all__ = [
     # Core interfaces

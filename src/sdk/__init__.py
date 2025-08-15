@@ -36,4 +36,3 @@ __all__ = [
     "ProviderError",
 ]
 
-from src._package import __version__
