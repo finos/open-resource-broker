@@ -34,6 +34,7 @@ jobs:
       default-python-version: ${{ steps.config.outputs.default-python-version }}
     steps:
     - name: Checkout code
+      uses: actions/checkout@v5
 
     - name: Install yq
       uses: mikefarah/yq@master
@@ -65,6 +66,7 @@ jobs:
 
     steps:
     - name: Checkout code
+      uses: actions/checkout@v5
 
     - name: Install yq
       uses: mikefarah/yq@master
@@ -101,6 +103,7 @@ jobs:
 
     steps:
     - name: Checkout code
+      uses: actions/checkout@v5
 
     - name: Install yq
       uses: mikefarah/yq@master
@@ -136,6 +139,7 @@ jobs:
 
     steps:
     - name: Checkout code
+      uses: actions/checkout@v5
 
     - name: Install yq
       uses: mikefarah/yq@master
@@ -166,6 +170,7 @@ jobs:
 
     steps:
     - name: Checkout code
+      uses: actions/checkout@v5
 
     - name: Install yq
       uses: mikefarah/yq@master
@@ -199,6 +204,7 @@ jobs:
 
     steps:
     - name: Checkout code
+      uses: actions/checkout@v5
 
     - name: Install yq
       uses: mikefarah/yq@master
@@ -231,6 +237,7 @@ jobs:
 
     steps:
     - name: Checkout code
+      uses: actions/checkout@v5
 
     - name: Install yq
       uses: mikefarah/yq@master
@@ -253,6 +260,7 @@ jobs:
 
     steps:
     - name: Checkout code
+      uses: actions/checkout@v5
 
     - name: Install yq
       uses: mikefarah/yq@master
@@ -282,6 +290,7 @@ jobs:
 
     steps:
     - name: Checkout code
+      uses: actions/checkout@v5
 
     - name: Install yq
       uses: mikefarah/yq@master
@@ -337,6 +346,7 @@ jobs:
 
     steps:
     - name: Checkout code
+      uses: actions/checkout@v5
 
     - name: Install yq
       uses: mikefarah/yq@master
