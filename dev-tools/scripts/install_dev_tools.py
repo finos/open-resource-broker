@@ -20,6 +20,7 @@ Tools installed:
 - uv (Python package manager)
 - semgrep (Static analysis)
 - trufflehog (Secrets scanner)
+- pip-audit (Python package vulnerability scanner)
 
 Usage:
     python dev-tools/scripts/install_dev_tools.py [--dry-run] [--tool TOOL]
@@ -188,6 +189,20 @@ class DevToolsInstaller:
                     "centos": self._install_trufflehog_generic,
                     "fedora": self._install_trufflehog_generic,
                     "generic": self._install_trufflehog_generic,
+                },
+            },
+            "pip-audit": {
+                "description": "Python package vulnerability scanner",
+                "check_cmd": ["pip-audit", "--version"],
+                "install": {
+                    "darwin": self._install_pip_audit_python,
+                    "windows": self._install_pip_audit_python,
+                    "ubuntu": self._install_pip_audit_python,
+                    "debian": self._install_pip_audit_python,
+                    "rhel": self._install_pip_audit_python,
+                    "centos": self._install_pip_audit_python,
+                    "fedora": self._install_pip_audit_python,
+                    "generic": self._install_pip_audit_python,
                 },
             },
         }
@@ -402,6 +417,14 @@ class DevToolsInstaller:
         return self._run_command(
             ["curl", "-L", url, "|", "sudo", "tar", "-xz", "-C", "/usr/local/bin", "trufflehog"]
         )
+
+    def _install_pip_audit_python(self):
+        """Install pip-audit using Python package manager."""
+        # Try uv first, fall back to pip
+        if self._run_command(["uv", "--version"], capture_output=True):
+            return self._run_command(["uv", "tool", "install", "pip-audit"])
+        else:
+            return self._run_command(["pip", "install", "--user", "pip-audit"])
 
     def _install_docker_ubuntu(self):
         """Install Docker on Ubuntu/Debian."""

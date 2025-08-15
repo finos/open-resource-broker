@@ -45,7 +45,11 @@ fi
 # Install pip-audit if not already installed
 if ! command -v pip-audit &> /dev/null; then
     log_info "Installing pip-audit..."
-    pip install pip-audit
+    if command -v uv &> /dev/null; then
+        uv tool install pip-audit
+    else
+        pip install --user pip-audit
+    fi
 fi
 
 # Check all requirements files
