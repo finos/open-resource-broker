@@ -9,7 +9,7 @@ handler discovery for zero code duplication.
 from contextlib import suppress
 from typing import Any, Callable, Dict, List, Optional
 
-from src.bootstrap import Application
+from bootstrap import Application
 
 from .config import SDKConfig
 from .discovery import MethodInfo, SDKMethodDiscovery

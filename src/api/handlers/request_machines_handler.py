@@ -4,18 +4,18 @@ import time
 import uuid
 from typing import TYPE_CHECKING, Optional
 
-from src.api.models import RequestMachinesModel
-from src.api.validation import RequestValidator, ValidationException
-from src.application.base.infrastructure_handlers import BaseAPIHandler
-from src.application.dto.commands import CreateRequestCommand
-from src.application.request.dto import RequestMachinesResponse
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import ErrorHandlingPort, LoggingPort
-from src.infrastructure.error.decorators import handle_interface_exceptions
-from src.monitoring.metrics import MetricsCollector
+from api.models import RequestMachinesModel
+from api.validation import RequestValidator, ValidationException
+from application.base.infrastructure_handlers import BaseAPIHandler
+from application.dto.commands import CreateRequestCommand
+from application.request.dto import RequestMachinesResponse
+from domain.base.dependency_injection import injectable
+from domain.base.ports import ErrorHandlingPort, LoggingPort
+from infrastructure.error.decorators import handle_interface_exceptions
+from monitoring.metrics import MetricsCollector
 
 if TYPE_CHECKING:
-    from src.infrastructure.di.buses import CommandBus, QueryBus
+    from infrastructure.di.buses import CommandBus, QueryBus
 
 
 @injectable

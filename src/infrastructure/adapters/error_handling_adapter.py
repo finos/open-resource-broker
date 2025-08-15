@@ -3,10 +3,10 @@
 from functools import wraps
 from typing import Any, Callable, Optional, TypeVar
 
-from src.domain.base.exceptions import DomainException
-from src.domain.base.ports.error_handling_port import ErrorHandlingPort
-from src.infrastructure.di.decorators import injectable
-from src.infrastructure.error.decorators import (
+from domain.base.exceptions import DomainException
+from domain.base.ports.error_handling_port import ErrorHandlingPort
+from infrastructure.di.decorators import injectable
+from infrastructure.error.decorators import (
     handle_application_exceptions,
     handle_exceptions,
 )

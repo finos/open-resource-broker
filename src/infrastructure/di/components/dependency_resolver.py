@@ -7,9 +7,9 @@ import typing
 from contextlib import suppress
 from typing import Any, Callable, Dict, Optional, Set, Type, TypeVar, get_type_hints
 
-from src.domain.base.dependency_injection import get_injectable_metadata, is_injectable
-from src.domain.base.di_contracts import DependencyRegistration, DILifecycle, DIScope
-from src.infrastructure.di.exceptions import (
+from domain.base.dependency_injection import get_injectable_metadata, is_injectable
+from domain.base.di_contracts import DependencyRegistration, DILifecycle, DIScope
+from infrastructure.di.exceptions import (
     CircularDependencyError,
     DependencyResolutionError,
     FactoryError,
@@ -404,7 +404,7 @@ class DependencyResolver:
 
     def _get_container_instance(self):
         """Get the container instance for factory function parameters."""
-        from src.infrastructure.di.container import get_container
+        from infrastructure.di.container import get_container
 
         return get_container()
 

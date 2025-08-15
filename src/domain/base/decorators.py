@@ -9,7 +9,7 @@ from functools import wraps
 from typing import TYPE_CHECKING, Callable, Optional, TypeVar
 
 if TYPE_CHECKING:
-    from src.domain.base.ports import ContainerPort, ErrorHandlingPort
+    from domain.base.ports import ContainerPort, ErrorHandlingPort
 
 T = TypeVar("T")
 
@@ -51,7 +51,7 @@ def get_error_handling_port() -> Optional["ErrorHandlingPort"]:
     if _domain_container:
         try:
             # Import at function level to avoid circular imports
-            from src.domain.base.ports import ErrorHandlingPort
+            from domain.base.ports import ErrorHandlingPort
 
             return _domain_container.get(ErrorHandlingPort)
         except Exception:

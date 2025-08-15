@@ -2,9 +2,9 @@
 
 import pytest
 
-from src.domain.request.aggregate import Request
-from src.domain.request.value_objects import RequestId, RequestType
-from src.domain.template.aggregate import Template
+from domain.request.aggregate import Request
+from domain.request.value_objects import RequestId, RequestType
+from domain.template.aggregate import Template
 
 
 class TestTemplateMultiProviderFields:

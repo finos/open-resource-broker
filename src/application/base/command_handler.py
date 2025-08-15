@@ -12,7 +12,7 @@ Architecture:
 from typing import Any, Dict, Optional, TypeVar
 
 # Import the CQRS interface
-from src.application.interfaces.command_handler import CommandHandler
+from application.interfaces.command_handler import CommandHandler
 
 # Type variables for generic command handlers
 TCommand = TypeVar("TCommand")

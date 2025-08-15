@@ -6,12 +6,12 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.domain.base.ports import LoggingPort
-from src.providers.base.strategy.provider_context import (
+from domain.base.ports import LoggingPort
+from providers.base.strategy.provider_context import (
     ProviderContext,
     StrategyMetrics,
 )
-from src.providers.base.strategy.provider_strategy import (
+from providers.base.strategy.provider_strategy import (
     ProviderCapabilities,
     ProviderHealthStatus,
     ProviderOperation,

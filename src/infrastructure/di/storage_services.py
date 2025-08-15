@@ -1,9 +1,9 @@
 """Storage service registrations for dependency injection."""
 
-from src.domain.base.ports import ConfigurationPort
-from src.infrastructure.di.container import DIContainer
-from src.infrastructure.factories.storage_strategy_factory import StorageStrategyFactory
-from src.infrastructure.logging.logger import get_logger
+from domain.base.ports import ConfigurationPort
+from infrastructure.di.container import DIContainer
+from infrastructure.factories.storage_strategy_factory import StorageStrategyFactory
+from infrastructure.logging.logger import get_logger
 
 
 def register_storage_services(container: DIContainer) -> None:
@@ -31,7 +31,7 @@ def _register_configured_storage_strategy(container: DIContainer) -> None:
         logger = get_logger(__name__)
 
         # Registry handles dynamic registration - no hardcoded types here
-        from src.infrastructure.registry.storage_registry import get_storage_registry
+        from infrastructure.registry.storage_registry import get_storage_registry
 
         registry = get_storage_registry()
         registry.ensure_type_registered(storage_type)
@@ -42,7 +42,7 @@ def _register_configured_storage_strategy(container: DIContainer) -> None:
         logger = get_logger(__name__)
         logger.error(f"Failed to register configured storage strategy: {e}")
         # Fallback to json
-        from src.infrastructure.registry.storage_registry import get_storage_registry
+        from infrastructure.registry.storage_registry import get_storage_registry
 
         registry = get_storage_registry()
         registry.ensure_type_registered("json")

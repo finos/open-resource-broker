@@ -396,14 +396,14 @@ class TestCQRSMigrationValidation:
 
     def test_cqrs_buses_exist(self):
         """Test that CQRS buses exist and replace ApplicationService."""
-        from src.infrastructure.di.buses import CommandBus, QueryBus
+        from infrastructure.di.buses import CommandBus, QueryBus
 
         assert CommandBus is not None
         assert QueryBus is not None
 
     def test_command_handlers_exist(self):
         """Test that command handlers exist."""
-        from src.application.commands.request_handlers import (
+        from application.commands.request_handlers import (
             CreateMachineRequestHandler,
         )
 
@@ -413,12 +413,12 @@ class TestCQRSMigrationValidation:
         """Test that query handlers exist."""
         # Check if query handlers exist
         try:
-            from src.application.queries.handlers import GetTemplateHandler
+            from application.queries.handlers import GetTemplateHandler
 
             assert GetTemplateHandler is not None
         except ImportError:
             # Query handlers might be in different location
-            from src.application.template.query_handlers import GetTemplateHandler
+            from application.template.query_handlers import GetTemplateHandler
 
             assert GetTemplateHandler is not None
 
@@ -483,13 +483,13 @@ class TestApplicationEventsComprehensive:
     def test_event_bus_exists(self):
         """Test that event bus exists."""
         try:
-            from src.application.events.bus.event_bus import EventBus
+            from application.events.bus.event_bus import EventBus
 
             assert EventBus is not None
         except ImportError:
             # Event bus might be in different location
             try:
-                from src.infrastructure.di.buses import EventBus
+                from infrastructure.di.buses import EventBus
 
                 assert EventBus is not None
             except ImportError:

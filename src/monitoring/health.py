@@ -10,9 +10,9 @@ from typing import Any, Callable, Dict, List, Optional
 
 from botocore.exceptions import ClientError
 
-from src.config.config_manager import ConfigurationManager
-from src.infrastructure.logging.logger import get_logger
-from src.providers.aws.infrastructure.aws_client import AWSClient
+from config.config_manager import ConfigurationManager
+from infrastructure.logging.logger import get_logger
+from providers.aws.infrastructure.aws_client import AWSClient
 
 logger = get_logger(__name__)
 

@@ -1,6 +1,6 @@
 """Handlers package."""
 
-from src.infrastructure.handlers.base import (
+from infrastructure.handlers.base import (
     BaseAPIHandler,
     BaseEventHandler,
     BaseHandler,

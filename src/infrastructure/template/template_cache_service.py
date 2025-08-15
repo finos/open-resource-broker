@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from typing import Callable, List, Optional
 
-from src.domain.base.ports import LoggingPort
+from domain.base.ports import LoggingPort
 
 from .dtos import TemplateDTO
 

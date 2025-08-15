@@ -2,9 +2,9 @@
 
 from typing import Any, Dict
 
-from src.config import NamingConfig, RequestConfig, TemplateConfig
-from src.config.manager import ConfigurationManager
-from src.domain.base.ports import ConfigurationPort
+from config import NamingConfig, RequestConfig, TemplateConfig
+from config.manager import ConfigurationManager
+from domain.base.ports import ConfigurationPort
 
 
 class ConfigurationAdapter(ConfigurationPort):

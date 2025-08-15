@@ -9,19 +9,19 @@ This module provides a integrated interface to all command handlers organized by
 """
 
 # Import base handler
-from src.application.base.command_handler import CLICommandHandler
-from src.interface.request_command_handlers import (
+from application.base.command_handler import CLICommandHandler
+from interface.request_command_handlers import (
     handle_get_request_status,
     handle_get_return_requests,
     handle_request_machines,
     handle_request_return_machines,
 )
-from src.interface.scheduler_command_handlers import (
+from interface.scheduler_command_handlers import (
     handle_list_scheduler_strategies,
     handle_show_scheduler_config,
     handle_validate_scheduler_config,
 )
-from src.interface.storage_command_handlers import (
+from interface.storage_command_handlers import (
     handle_list_storage_strategies,
     handle_show_storage_config,
     handle_storage_health,
@@ -29,7 +29,7 @@ from src.interface.storage_command_handlers import (
     handle_test_storage,
     handle_validate_storage_config,
 )
-from src.interface.system_command_handlers import (
+from interface.system_command_handlers import (
     handle_execute_provider_operation,
     handle_list_providers,
     handle_provider_config,
@@ -41,7 +41,7 @@ from src.interface.system_command_handlers import (
 )
 
 # Import specialized handlers by category
-from src.interface.template_command_handlers import (
+from interface.template_command_handlers import (
     handle_get_template,
     handle_list_templates,
     handle_validate_template,

@@ -1,6 +1,6 @@
 """API models package."""
 
-from src.api.models.base import (
+from api.models.base import (
     APIBaseModel,
     APIRequest,
     APIResponse,
@@ -10,7 +10,7 @@ from src.api.models.base import (
     create_response_model,
     format_api_error_response,
 )
-from src.api.models.requests import (
+from api.models.requests import (
     BaseRequestModel,
     GetReturnRequestsModel,
     MachineReferenceModel,
@@ -18,7 +18,7 @@ from src.api.models.requests import (
     RequestReturnMachinesModel,
     RequestStatusModel,
 )
-from src.api.models.responses import (
+from api.models.responses import (
     SuccessResponse,
     create_error_response,
     format_error_for_api,

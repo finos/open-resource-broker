@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, TypeVar
 
-from src.application.base.handlers import BaseQueryHandler
-from src.application.decorators import query_handler
-from src.application.dto.queries import (
+from application.base.handlers import BaseQueryHandler
+from application.decorators import query_handler
+from application.dto.queries import (
     GetMachineQuery,
     GetRequestQuery,
     GetRequestStatusQuery,
@@ -17,14 +17,14 @@ from src.application.dto.queries import (
     ListTemplatesQuery,
     ValidateTemplateQuery,
 )
-from src.application.dto.responses import MachineDTO, RequestDTO
-from src.application.dto.system import ValidationDTO
-from src.domain.base import UnitOfWorkFactory
+from application.dto.responses import MachineDTO, RequestDTO
+from application.dto.system import ValidationDTO
+from domain.base import UnitOfWorkFactory
 
 # Exception handling through BaseQueryHandler (Clean Architecture compliant)
-from src.domain.base.exceptions import EntityNotFoundError
-from src.domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
-from src.domain.template.aggregate import Template
+from domain.base.exceptions import EntityNotFoundError
+from domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
+from domain.template.aggregate import Template
 
 T = TypeVar("T")
 
@@ -62,7 +62,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
             # Cache miss - get request from storage
             with self.uow_factory.create_unit_of_work() as uow:
-                from src.domain.request.value_objects import RequestId
+                from domain.request.value_objects import RequestId
 
                 request_id = RequestId(value=query.request_id)
                 request = uow.requests.get_by_id(request_id)
@@ -110,7 +110,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 )
 
             # Create machine references from machine data
-            from src.application.request.dto import MachineReferenceDTO
+            from application.request.dto import MachineReferenceDTO
 
             machine_references = []
             for machine_data in machines_data:
@@ -174,7 +174,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
             # Create operation for resource-to-instance discovery using stored
             # provider API
-            from src.providers.base.strategy import (
+            from providers.base.strategy import (
                 ProviderOperation,
                 ProviderOperationType,
             )
@@ -257,7 +257,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             # Get the request for the first machine (all should be same request)
             request_id = str(machines[0].request_id)
             with self.uow_factory.create_unit_of_work() as uow:
-                from src.domain.request.value_objects import RequestId
+                from domain.request.value_objects import RequestId
 
                 request = uow.requests.get_by_id(RequestId(value=request_id))
                 if not request:
@@ -267,7 +267,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             provider_context = self._get_provider_context()
 
             # Create operation to check instance status using instance IDs
-            from src.providers.base.strategy import (
+            from providers.base.strategy import (
                 ProviderOperation,
                 ProviderOperationType,
             )
@@ -312,7 +312,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
                 if domain_machine:
                     # Provider strategy already converted AWS data to domain format
-                    from src.domain.machine.machine_status import MachineStatus
+                    from domain.machine.machine_status import MachineStatus
 
                     new_status = MachineStatus(domain_machine["status"])
 
@@ -336,7 +336,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                         machine_data["version"] = machine.version + 1
 
                         # Create new machine instance with updated data
-                        from src.domain.machine.aggregate import Machine
+                        from domain.machine.aggregate import Machine
 
                         updated_machine = Machine.model_validate(machine_data)
 
@@ -360,7 +360,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
     def _get_provider_context(self):
         """Get provider context for AWS operations."""
         try:
-            from src.providers.base.strategy.provider_context import ProviderContext
+            from providers.base.strategy.provider_context import ProviderContext
 
             return self._container.get(ProviderContext)
         except Exception:
@@ -387,32 +387,32 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     # Use first resource_id for handler selection logic
                     resource_id = request.resource_ids[0]
                     if resource_id.startswith("fleet-"):
-                        from src.providers.aws.infrastructure.handlers.ec2_fleet_handler import (
+                        from providers.aws.infrastructure.handlers.ec2_fleet_handler import (
                             EC2FleetHandler,
                         )
 
                         return self.container.get(EC2FleetHandler)
                     elif resource_id.startswith("sfr-"):
-                        from src.providers.aws.infrastructure.handlers.spot_fleet_handler import (
+                        from providers.aws.infrastructure.handlers.spot_fleet_handler import (
                             SpotFleetHandler,
                         )
 
                         return self.container.get(SpotFleetHandler)
                     elif resource_id.startswith("run-instances-"):
-                        from src.providers.aws.infrastructure.handlers.run_instances_handler import (
+                        from providers.aws.infrastructure.handlers.run_instances_handler import (
                             RunInstancesHandler,
                         )
 
                         return self.container.get(RunInstancesHandler)
                     else:
-                        from src.providers.aws.infrastructure.handlers.asg_handler import (
+                        from providers.aws.infrastructure.handlers.asg_handler import (
                             ASGHandler,
                         )
 
                         return self.container.get(ASGHandler)
 
                 # Fallback to RunInstances
-                from src.providers.aws.infrastructure.handlers.run_instances_handler import (
+                from providers.aws.infrastructure.handlers.run_instances_handler import (
                     RunInstancesHandler,
                 )
 
@@ -422,8 +422,8 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
     def _create_machine_from_aws_data(self, aws_instance: Dict[str, Any], request):
         """Create machine aggregate from AWS instance data."""
-        from src.domain.base.value_objects import InstanceId
-        from src.domain.machine.aggregate import Machine
+        from domain.base.value_objects import InstanceId
+        from domain.machine.aggregate import Machine
 
         return Machine(
             instance_id=InstanceId(value=aws_instance["InstanceId"]),
@@ -440,7 +440,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
     def _map_aws_state_to_machine_status(self, aws_state: str):
         """Map AWS instance state to machine status."""
-        from src.domain.machine.machine_status import MachineStatus
+        from domain.machine.machine_status import MachineStatus
 
         state_mapping = {
             "pending": MachineStatus.PENDING,
@@ -468,8 +468,8 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
     def _get_cache_service(self):
         """Get cache service for request caching."""
         try:
-            from src.domain.base.ports import ConfigurationPort
-            from src.infrastructure.caching.request_cache_service import (
+            from domain.base.ports import ConfigurationPort
+            from infrastructure.caching.request_cache_service import (
                 RequestCacheService,
             )
 
@@ -487,7 +487,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
     def _get_event_publisher(self):
         """Get event publisher for domain events."""
         try:
-            from src.domain.base.ports import EventPublisherPort
+            from domain.base.ports import EventPublisherPort
 
             return self._container.get(EventPublisherPort)
         except Exception as e:
@@ -523,7 +523,7 @@ class GetRequestStatusQueryHandler(BaseQueryHandler[GetRequestStatusQuery, str])
         try:
             with self.uow_factory.create_unit_of_work() as uow:
                 # Convert string to RequestId value object
-                from src.domain.request.value_objects import RequestId
+                from domain.request.value_objects import RequestId
 
                 request_id = RequestId(value=query.request_id)
                 request = uow.requests.get_by_id(request_id)
@@ -562,7 +562,7 @@ class ListActiveRequestsHandler(BaseQueryHandler[ListActiveRequestsQuery, List[R
         try:
             with self.uow_factory.create_unit_of_work() as uow:
                 # Get active requests from repository
-                from src.domain.request.value_objects import RequestStatus
+                from domain.request.value_objects import RequestStatus
 
                 active_statuses = [
                     RequestStatus.PENDING,
@@ -614,7 +614,7 @@ class ListReturnRequestsHandler(BaseQueryHandler[ListReturnRequestsQuery, List[R
         try:
             with self.uow_factory.create_unit_of_work() as uow:
                 # Get return requests from repository
-                from src.domain.request.value_objects import RequestType
+                from domain.request.value_objects import RequestType
 
                 return_requests = uow.requests.find_by_type(RequestType.RETURN)
 
@@ -655,8 +655,8 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, Template]):
 
     async def execute_query(self, query: GetTemplateQuery) -> Template:
         """Execute get template query."""
-        from src.domain.template.aggregate import Template
-        from src.infrastructure.template.configuration_manager import (
+        from domain.template.aggregate import Template
+        from infrastructure.template.configuration_manager import (
             TemplateConfigurationManager,
         )
 
@@ -721,8 +721,8 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, List[Template]])
 
     async def execute_query(self, query: ListTemplatesQuery) -> List[Template]:
         """Execute list templates query."""
-        from src.domain.template.aggregate import Template
-        from src.infrastructure.template.configuration_manager import (
+        from domain.template.aggregate import Template
+        from infrastructure.template.configuration_manager import (
             TemplateConfigurationManager,
         )
 
@@ -802,7 +802,7 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
 
         try:
             # Get template configuration port for validation
-            from src.domain.base.ports.template_configuration_port import (
+            from domain.base.ports.template_configuration_port import (
                 TemplateConfigurationPort,
             )
 
@@ -904,7 +904,7 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, List[MachineDTO]])
             with self.uow_factory.create_unit_of_work() as uow:
                 # Get machines based on query filters
                 if query.status_filter:
-                    from src.domain.machine.value_objects import MachineStatus
+                    from domain.machine.value_objects import MachineStatus
 
                     status_enum = MachineStatus(query.status_filter)
                     machines = uow.machines.find_by_status(status_enum)

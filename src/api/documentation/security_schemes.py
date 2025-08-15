@@ -2,7 +2,7 @@
 
 from typing import Any, Dict
 
-from src.config.schemas.server_schema import AuthConfig
+from config.schemas.server_schema import AuthConfig
 
 
 def get_security_schemes(auth_config: AuthConfig) -> Dict[str, Any]:

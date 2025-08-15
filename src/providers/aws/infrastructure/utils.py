@@ -4,7 +4,7 @@ from typing import Any, Callable, Dict, List
 
 from botocore.exceptions import ClientError
 
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.logging.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -7,7 +7,7 @@ without requiring a separate server process.
 
 from typing import Any, Dict, List, Optional
 
-from src.sdk.client import OpenHFPluginSDK
+from sdk.client import OpenHFPluginSDK
 
 from .discovery import MCPToolDefinition, MCPToolDiscovery
 

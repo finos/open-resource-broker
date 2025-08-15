@@ -2,12 +2,12 @@
 
 from typing import Any, Dict, List
 
-from src.config.manager import ConfigurationManager
-from src.domain.base.ports.logging_port import LoggingPort
-from src.domain.machine.aggregate import Machine
-from src.domain.request.aggregate import Request
-from src.domain.template.aggregate import Template
-from src.infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
+from config.manager import ConfigurationManager
+from domain.base.ports.logging_port import LoggingPort
+from domain.machine.aggregate import Machine
+from domain.request.aggregate import Request
+from domain.template.aggregate import Template
+from infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
 
 
 class DefaultSchedulerStrategy(BaseSchedulerStrategy):

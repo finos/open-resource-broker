@@ -1,6 +1,6 @@
 """Integration tests for multi-provider configuration system."""
 
-from src.config.schemas.provider_strategy_schema import HandlerConfig, ProviderConfig
+from config.schemas.provider_strategy_schema import HandlerConfig, ProviderConfig
 
 
 class TestMultiProviderConfiguration:

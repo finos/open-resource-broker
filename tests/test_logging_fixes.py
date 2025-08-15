@@ -16,14 +16,14 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.application.services.provider_capability_service import (
+from application.services.provider_capability_service import (
     ProviderCapabilityService,
 )
-from src.bootstrap import Application
-from src.infrastructure.template.configuration_manager import (
+from bootstrap import Application
+from infrastructure.template.configuration_manager import (
     TemplateConfigurationManager,
 )
-from src.providers.base.strategy.provider_context import ProviderContext
+from providers.base.strategy.provider_context import ProviderContext
 
 
 class LogCapture:

@@ -1,7 +1,7 @@
 """AWS-specific request value objects."""
 
-from src.domain.request.value_objects import *
-from src.providers.aws.domain.template.value_objects import (
+from domain.request.value_objects import *
+from providers.aws.domain.template.value_objects import (
     AWSFleetId,
     AWSImageId,
     AWSInstanceType,

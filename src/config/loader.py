@@ -7,8 +7,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional, TypeVar
 
-from src.config.schemas import AppConfig, validate_config
-from src.domain.base.exceptions import ConfigurationError
+from config.schemas import AppConfig, validate_config
+from domain.base.exceptions import ConfigurationError
 
 T = TypeVar("T")
 
@@ -16,7 +16,7 @@ T = TypeVar("T")
 # Use lazy import to avoid circular dependency
 def _get_logger():
     """Lazy import of logger to avoid circular dependency."""
-    from src.infrastructure.logging.logger import get_logger
+    from infrastructure.logging.logger import get_logger
 
     return get_logger(__name__)
 
@@ -157,7 +157,7 @@ class ConfigurationLoader:
         cls._load_from_env(config)
 
         # Expand environment variables in the final configuration
-        from src.config.utils.env_expansion import expand_config_env_vars
+        from config.utils.env_expansion import expand_config_env_vars
 
         config = expand_config_env_vars(config)
 

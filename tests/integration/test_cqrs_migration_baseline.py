@@ -10,21 +10,21 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.application.commands.request_handlers import CreateMachineRequestHandler
-from src.application.dto.commands import CreateRequestCommand
-from src.application.services.provider_capability_service import (
+from application.commands.request_handlers import CreateMachineRequestHandler
+from application.dto.commands import CreateRequestCommand
+from application.services.provider_capability_service import (
     ProviderCapabilityService,
 )
-from src.application.services.provider_selection_service import ProviderSelectionService
-from src.domain.base import UnitOfWorkFactory
-from src.domain.base.ports import (
+from application.services.provider_selection_service import ProviderSelectionService
+from domain.base import UnitOfWorkFactory
+from domain.base.ports import (
     ContainerPort,
     ErrorHandlingPort,
     EventPublisherPort,
     LoggingPort,
 )
-from src.infrastructure.di.buses import CommandBus, QueryBus
-from src.providers.base.strategy import ProviderContext
+from infrastructure.di.buses import CommandBus, QueryBus
+from providers.base.strategy import ProviderContext
 
 
 @pytest.mark.integration
@@ -73,7 +73,7 @@ class TestCQRSArchitectureIntegration:
         bus = Mock(spec=QueryBus)
 
         # Mock template query response
-        from src.domain.template.aggregate import Template
+        from domain.template.aggregate import Template
 
         mock_template = Template(
             template_id="web-server-template",
@@ -99,7 +99,7 @@ class TestCQRSArchitectureIntegration:
         service = Mock(spec=ProviderSelectionService)
 
         # Mock selection result
-        from src.application.services.provider_selection_service import (
+        from application.services.provider_selection_service import (
             ProviderSelectionResult,
         )
 
@@ -118,7 +118,7 @@ class TestCQRSArchitectureIntegration:
         service = Mock(spec=ProviderCapabilityService)
 
         # Mock validation result
-        from src.application.services.provider_capability_service import (
+        from application.services.provider_capability_service import (
             ValidationResult,
         )
 
@@ -141,7 +141,7 @@ class TestCQRSArchitectureIntegration:
         context.current_strategy_type = "aws-aws-default"
 
         # Mock execution result
-        from src.providers.base.strategy.provider_strategy import ProviderResult
+        from providers.base.strategy.provider_strategy import ProviderResult
 
         result = ProviderResult(
             success=True,
@@ -227,7 +227,7 @@ class TestCQRSArchitectureIntegration:
 
     def test_provider_capability_service_integration(self, mock_provider_capability_service):
         """Test provider capability service integration."""
-        from src.domain.template.aggregate import Template
+        from domain.template.aggregate import Template
 
         # Create test template
         template = Template(
@@ -255,7 +255,7 @@ class TestCQRSArchitectureIntegration:
 
     def test_provider_selection_service_integration(self, mock_provider_selection_service):
         """Test provider selection service integration."""
-        from src.domain.template.aggregate import Template
+        from domain.template.aggregate import Template
 
         # Create test template
         template = Template(
@@ -281,7 +281,7 @@ class TestCQRSArchitectureIntegration:
 
     def test_provider_context_integration(self, mock_provider_context):
         """Test provider context integration."""
-        from src.providers.base.strategy import ProviderOperation, ProviderOperationType
+        from providers.base.strategy import ProviderOperation, ProviderOperationType
 
         # Create test operation
         operation = ProviderOperation(
@@ -327,7 +327,7 @@ class TestCQRSArchitectureIntegration:
     async def test_error_handling_provider_failure(self, create_request_handler):
         """Test error handling for provider failures."""
         # Mock provider context to return failure
-        from src.providers.base.strategy.provider_strategy import ProviderResult
+        from providers.base.strategy.provider_strategy import ProviderResult
 
         failure_result = ProviderResult(
             success=False,

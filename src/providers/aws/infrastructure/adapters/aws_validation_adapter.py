@@ -2,10 +2,10 @@
 
 from typing import Any, Dict, List
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports.logging_port import LoggingPort
-from src.domain.base.ports.provider_validation_port import BaseProviderValidationAdapter
-from src.providers.aws.configuration.validator import (
+from domain.base.dependency_injection import injectable
+from domain.base.ports.logging_port import LoggingPort
+from domain.base.ports.provider_validation_port import BaseProviderValidationAdapter
+from providers.aws.configuration.validator import (
     AWSProviderConfig,
     get_aws_config_manager,
 )
@@ -54,7 +54,7 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
         """
         try:
             # Get supported APIs from configuration
-            from src.config.manager import get_config_manager
+            from config.manager import get_config_manager
 
             config_manager = get_config_manager()
             raw_config = config_manager.get_raw_config()
@@ -89,7 +89,7 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
         """
         try:
             # Get supported APIs from configuration
-            from src.config.manager import get_config_manager
+            from config.manager import get_config_manager
 
             config_manager = get_config_manager()
             raw_config = config_manager.get_raw_config()
@@ -161,7 +161,7 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
 
         try:
             # Get fleet types from configuration
-            from src.config.manager import get_config_manager
+            from config.manager import get_config_manager
 
             config_manager = get_config_manager()
             raw_config = config_manager.get_raw_config()
@@ -378,7 +378,7 @@ def create_aws_validation_adapter(logger: LoggingPort) -> AWSValidationAdapter:
     except Exception as e:
         logger.debug(f"Could not load full AWS config for validation: {e}")
         # Create a minimal config with dummy auth for validation only
-        from src.providers.aws.configuration.config import AWSProviderConfig
+        from providers.aws.configuration.config import AWSProviderConfig
 
         aws_config = AWSProviderConfig(profile="validation-only")
 

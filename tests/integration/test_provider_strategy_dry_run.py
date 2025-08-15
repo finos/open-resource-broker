@@ -2,9 +2,9 @@
 
 from unittest.mock import MagicMock, Mock, patch
 
-from src.providers.aws.configuration.config import AWSProviderConfig
-from src.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
-from src.providers.base.strategy import ProviderOperation, ProviderOperationType
+from providers.aws.configuration.config import AWSProviderConfig
+from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
+from providers.base.strategy import ProviderOperation, ProviderOperationType
 
 
 class TestProviderStrategyDryRun:

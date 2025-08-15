@@ -8,20 +8,20 @@ backward compatibility while using the improved architecture.
 
 from typing import Any, Dict, List, Optional
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import ConfigurationPort, LoggingPort
-from src.domain.base.resource_manager import (
+from domain.base.dependency_injection import injectable
+from domain.base.ports import ConfigurationPort, LoggingPort
+from domain.base.resource_manager import (
     ResourceAllocation,
     ResourceId,
     ResourceSpecification,
     ResourceType,
 )
-from src.infrastructure.adapters.ports.cloud_resource_manager_port import (
+from infrastructure.adapters.ports.cloud_resource_manager_port import (
     CloudResourceManagerPort,
 )
-from src.providers.aws.exceptions.aws_exceptions import InfrastructureError
-from src.providers.aws.infrastructure.aws_client import AWSClient
-from src.providers.aws.managers.aws_resource_manager import AWSResourceManagerImpl
+from providers.aws.exceptions.aws_exceptions import InfrastructureError
+from providers.aws.infrastructure.aws_client import AWSClient
+from providers.aws.managers.aws_resource_manager import AWSResourceManagerImpl
 
 
 @injectable
@@ -47,7 +47,7 @@ class AWSResourceManagerAdapter(CloudResourceManagerPort):
         self._config = config
 
         # Use the new resource manager internally
-        from src.providers.aws.configuration.config import AWSProviderConfig
+        from providers.aws.configuration.config import AWSProviderConfig
 
         aws_config = AWSProviderConfig()  # This should be injected in real implementation
         self._resource_manager = AWSResourceManagerImpl(self._aws_client, aws_config, self._logger)

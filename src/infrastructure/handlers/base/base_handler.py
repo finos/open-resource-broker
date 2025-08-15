@@ -4,7 +4,7 @@ import time
 from functools import wraps
 from typing import Any, Callable, Dict, Optional, TypeVar
 
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.logging.logger import get_logger
 
 T = TypeVar("T")
 R = TypeVar("R")

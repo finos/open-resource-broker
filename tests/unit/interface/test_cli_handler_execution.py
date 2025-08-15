@@ -3,15 +3,15 @@
 import argparse
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.domain.base.ports import SchedulerPort
-from src.infrastructure.di.buses import QueryBus
-from src.infrastructure.di.container import DIContainer
-from src.interface.request_command_handlers import handle_get_request_status
-from src.interface.scheduler_command_handlers import handle_list_scheduler_strategies
-from src.interface.storage_command_handlers import handle_list_storage_strategies
+from domain.base.ports import SchedulerPort
+from infrastructure.di.buses import QueryBus
+from infrastructure.di.container import DIContainer
+from interface.request_command_handlers import handle_get_request_status
+from interface.scheduler_command_handlers import handle_list_scheduler_strategies
+from interface.storage_command_handlers import handle_list_storage_strategies
 
 # Import CLI handlers
-from src.interface.template_command_handlers import handle_list_templates
+from interface.template_command_handlers import handle_list_templates
 
 
 class TestCLIHandlerExecution:

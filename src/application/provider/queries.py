@@ -6,7 +6,7 @@ including health status, capabilities, metrics, and configuration.
 
 from typing import Optional
 
-from src.application.dto.base import BaseQuery
+from application.dto.base import BaseQuery
 
 
 class GetProviderHealthQuery(BaseQuery):

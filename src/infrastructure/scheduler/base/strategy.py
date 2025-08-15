@@ -7,7 +7,7 @@ ensuring consistent interface implementation across different scheduler types.
 from abc import ABC
 from typing import Any
 
-from src.domain.base.ports.scheduler_port import SchedulerPort
+from domain.base.ports.scheduler_port import SchedulerPort
 
 
 class BaseSchedulerStrategy(SchedulerPort, ABC):

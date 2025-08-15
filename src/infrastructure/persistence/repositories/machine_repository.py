@@ -3,15 +3,15 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from src.domain.base.ports.storage_port import StoragePort
-from src.domain.base.value_objects import InstanceId
-from src.domain.machine.aggregate import Machine
-from src.domain.machine.repository import (
+from domain.base.ports.storage_port import StoragePort
+from domain.base.value_objects import InstanceId
+from domain.machine.aggregate import Machine
+from domain.machine.repository import (
     MachineRepository as MachineRepositoryInterface,
 )
-from src.domain.machine.value_objects import MachineId, MachineStatus
-from src.infrastructure.error.decorators import handle_infrastructure_exceptions
-from src.infrastructure.logging.logger import get_logger
+from domain.machine.value_objects import MachineId, MachineStatus
+from infrastructure.error.decorators import handle_infrastructure_exceptions
+from infrastructure.logging.logger import get_logger
 
 
 class MachineSerializer:
@@ -66,8 +66,8 @@ class MachineSerializer:
     def from_dict(self, data: Dict[str, Any]) -> Machine:
         """Convert dictionary to Machine aggregate with field support."""
         try:
-            from src.domain.base.value_objects import InstanceType, Tags
-            from src.domain.machine.machine_status import MachineStatus
+            from domain.base.value_objects import InstanceType, Tags
+            from domain.machine.machine_status import MachineStatus
 
             # Parse datetime fields
             launch_time = (
@@ -229,7 +229,7 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
     def find_active_machines(self) -> List[Machine]:
         """Find all active (non-terminated) machines."""
         try:
-            from src.domain.machine.value_objects import MachineStatus
+            from domain.machine.value_objects import MachineStatus
 
             active_statuses = [
                 MachineStatus.PENDING,

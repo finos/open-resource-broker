@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, Mock
 
 import pytest
 
-from src.application.services.template_defaults_service import TemplateDefaultsService
-from src.domain.base.ports.logging_port import LoggingPort
+from application.services.template_defaults_service import TemplateDefaultsService
+from domain.base.ports.logging_port import LoggingPort
 
 
 class TestTemplateDefaultsService:
@@ -278,7 +278,7 @@ class TestTemplateDefaultsIntegration:
 
     def test_scheduler_strategy_integration(self):
         """Test integration with scheduler strategy."""
-        from src.infrastructure.scheduler.strategies.symphony_hostfactory import (
+        from infrastructure.scheduler.strategies.symphony_hostfactory import (
             SymphonyHostFactorySchedulerStrategy,
         )
 
@@ -313,10 +313,10 @@ class TestTemplateDefaultsIntegration:
 
     def test_template_configuration_manager_integration(self):
         """Test integration with template configuration manager."""
-        from src.infrastructure.template.configuration_manager import (
+        from infrastructure.template.configuration_manager import (
             TemplateConfigurationManager,
         )
-        from src.infrastructure.template.dtos import TemplateDTO
+        from infrastructure.template.dtos import TemplateDTO
 
         # Create mock dependencies
         mock_config_manager = Mock()
@@ -344,7 +344,7 @@ class TestTemplateDefaultsIntegration:
         from datetime import datetime
         from pathlib import Path
 
-        from src.infrastructure.template.configuration_manager import (
+        from infrastructure.template.configuration_manager import (
             TemplateFileMetadata,
         )
 

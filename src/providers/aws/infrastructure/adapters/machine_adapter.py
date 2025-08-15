@@ -7,20 +7,20 @@ It extracts AWS-specific logic from the domain layer.
 
 from typing import Any, Dict
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
-from src.domain.base.value_objects import InstanceType
-from src.domain.machine.aggregate import Machine
-from src.domain.machine.value_objects import MachineStatus, PriceType
-from src.providers.aws.domain.template.value_objects import ProviderApi
-from src.providers.aws.exceptions.aws_exceptions import (
+from domain.base.dependency_injection import injectable
+from domain.base.ports import LoggingPort
+from domain.base.value_objects import InstanceType
+from domain.machine.aggregate import Machine
+from domain.machine.value_objects import MachineStatus, PriceType
+from providers.aws.domain.template.value_objects import ProviderApi
+from providers.aws.exceptions.aws_exceptions import (
     AWSError,
     EC2InstanceNotFoundError,
     NetworkError,
     RateLimitError,
     ResourceCleanupError,
 )
-from src.providers.aws.infrastructure.aws_client import AWSClient
+from providers.aws.infrastructure.aws_client import AWSClient
 
 
 @injectable

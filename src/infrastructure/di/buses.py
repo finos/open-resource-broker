@@ -15,13 +15,13 @@ No middleware complexity - handlers own their cross-cutting concerns.
 
 from typing import TypeVar
 
-from src.application.decorators import (
+from application.decorators import (
     get_command_handler_for_type,
     get_query_handler_for_type,
 )
-from src.application.interfaces.command_query import Command, Query
-from src.domain.base.ports import LoggingPort
-from src.infrastructure.di.container import DIContainer
+from application.interfaces.command_query import Command, Query
+from domain.base.ports import LoggingPort
+from infrastructure.di.container import DIContainer
 
 TQuery = TypeVar("TQuery", bound=Query)
 TCommand = TypeVar("TCommand", bound=Command)
@@ -95,7 +95,7 @@ class QueryBus:
     def _trigger_lazy_cqrs_setup(self):
         """Trigger lazy CQRS infrastructure setup."""
         try:
-            from src.infrastructure.di.container import _setup_cqrs_infrastructure
+            from infrastructure.di.container import _setup_cqrs_infrastructure
 
             self.logger.info("Triggering lazy CQRS infrastructure setup")
             _setup_cqrs_infrastructure(self.container)
@@ -169,7 +169,7 @@ class CommandBus:
     def _trigger_lazy_cqrs_setup(self):
         """Trigger lazy CQRS infrastructure setup."""
         try:
-            from src.infrastructure.di.container import _setup_cqrs_infrastructure
+            from infrastructure.di.container import _setup_cqrs_infrastructure
 
             self.logger.info("Triggering lazy CQRS infrastructure setup")
             _setup_cqrs_infrastructure(self.container)

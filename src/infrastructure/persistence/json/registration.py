@@ -8,8 +8,8 @@ CLEAN ARCHITECTURE: Only handles storage strategies, no repository knowledge.
 
 from typing import Any, Dict
 
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.registry.storage_registry import get_storage_registry
+from infrastructure.logging.logger import get_logger
+from infrastructure.registry.storage_registry import get_storage_registry
 
 
 def create_json_strategy(config: Any) -> Any:
@@ -22,7 +22,7 @@ def create_json_strategy(config: Any) -> Any:
     Returns:
         JSONStorageStrategy instance
     """
-    from src.infrastructure.persistence.json.strategy import JSONStorageStrategy
+    from infrastructure.persistence.json.strategy import JSONStorageStrategy
 
     # Extract configuration parameters
     if hasattr(config, "json_strategy"):
@@ -53,7 +53,7 @@ def create_json_config(data: Dict[str, Any]) -> Any:
     Returns:
         JSON configuration object
     """
-    from src.config.schemas.storage_schema import JsonStrategyConfig
+    from config.schemas.storage_schema import JsonStrategyConfig
 
     return JsonStrategyConfig(**data)
 
@@ -68,16 +68,16 @@ def create_json_unit_of_work(config: Any) -> Any:
     Returns:
         JSONUnitOfWork instance with correctly extracted configuration
     """
-    from src.config.manager import ConfigurationManager
-    from src.config.schemas.storage_schema import StorageConfig
-    from src.domain.base.ports.scheduler_port import SchedulerPort
-    from src.infrastructure.persistence.json.unit_of_work import JSONUnitOfWork
+    from config.manager import ConfigurationManager
+    from config.schemas.storage_schema import StorageConfig
+    from domain.base.ports.scheduler_port import SchedulerPort
+    from infrastructure.persistence.json.unit_of_work import JSONUnitOfWork
 
     # Handle different config types
     if isinstance(config, ConfigurationManager):
         # Try to get scheduler strategy to determine base path
         try:
-            from src.infrastructure.di.container import get_container
+            from infrastructure.di.container import get_container
 
             container = get_container()
             scheduler_strategy = container.get(SchedulerPort)
@@ -146,7 +146,7 @@ def register_json_storage() -> None:
 
     try:
         # Get configuration manager at registration time to capture in closure
-        from src.config.manager import get_config_manager
+        from config.manager import get_config_manager
 
         config_manager = get_config_manager()
 

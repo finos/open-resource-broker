@@ -4,9 +4,9 @@ from abc import ABC, abstractmethod
 from types import TracebackType
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 
-from src.domain.base.ports.storage_port import StoragePort
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.persistence.exceptions import PersistenceError
+from domain.base.ports.storage_port import StoragePort
+from infrastructure.logging.logger import get_logger
+from infrastructure.persistence.exceptions import PersistenceError
 
 T = TypeVar("T")  # Entity type
 

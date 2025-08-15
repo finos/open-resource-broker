@@ -5,13 +5,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 
-from src._package import __version__
-from src.api.documentation import configure_openapi
-from src.api.middleware import AuthMiddleware, LoggingMiddleware
-from src.config.schemas.server_schema import ServerConfig
-from src.infrastructure.auth.registry import get_auth_registry
-from src.infrastructure.error.exception_handler import get_exception_handler
-from src.infrastructure.logging.logger import get_logger
+from _package import __version__
+from api.documentation import configure_openapi
+from api.middleware import AuthMiddleware, LoggingMiddleware
+from config.schemas.server_schema import ServerConfig
+from infrastructure.auth.registry import get_auth_registry
+from infrastructure.error.exception_handler import get_exception_handler
+from infrastructure.logging.logger import get_logger
 
 
 def create_fastapi_app(server_config: ServerConfig) -> FastAPI:
@@ -171,7 +171,7 @@ def _create_auth_strategy(auth_config):
             iam_config = auth_config.iam or {}
             # Register AWS IAM strategy if not already registered
             try:
-                from src.providers.aws.auth.iam_strategy import IAMAuthStrategy
+                from providers.aws.auth.iam_strategy import IAMAuthStrategy
 
                 auth_registry.register_strategy("iam", IAMAuthStrategy)
             except ImportError:
@@ -190,7 +190,7 @@ def _create_auth_strategy(auth_config):
             cognito_config = auth_config.cognito or {}
             # Register AWS Cognito strategy if not already registered
             try:
-                from src.providers.aws.auth.cognito_strategy import CognitoAuthStrategy
+                from providers.aws.auth.cognito_strategy import CognitoAuthStrategy
 
                 auth_registry.register_strategy("cognito", CognitoAuthStrategy)
             except ImportError:
@@ -222,7 +222,7 @@ def _register_routers(app: FastAPI):
         app: FastAPI application
     """
     try:
-        from src.api.routers import machines, requests, templates
+        from api.routers import machines, requests, templates
 
         app.include_router(templates.router, prefix="/api/v1")
         app.include_router(machines.router, prefix="/api/v1")

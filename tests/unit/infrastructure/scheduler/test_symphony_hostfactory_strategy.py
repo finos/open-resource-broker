@@ -2,8 +2,8 @@
 
 from unittest.mock import Mock
 
-from src.domain.template.aggregate import Template
-from src.infrastructure.scheduler.hostfactory.strategy import (
+from domain.template.aggregate import Template
+from infrastructure.scheduler.hostfactory.strategy import (
     HostFactorySchedulerStrategy,
 )
 

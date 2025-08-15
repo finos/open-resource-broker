@@ -7,13 +7,13 @@ It follows the Factory Method pattern to create the appropriate handler for each
 
 from typing import Dict, Type
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import ConfigurationPort, LoggingPort
-from src.domain.template.aggregate import Template
-from src.providers.aws.domain.template.value_objects import ProviderApi
-from src.providers.aws.exceptions.aws_exceptions import AWSValidationError
-from src.providers.aws.infrastructure.aws_client import AWSClient
-from src.providers.aws.infrastructure.handlers.base_handler import AWSHandler
+from domain.base.dependency_injection import injectable
+from domain.base.ports import ConfigurationPort, LoggingPort
+from domain.template.aggregate import Template
+from providers.aws.domain.template.value_objects import ProviderApi
+from providers.aws.exceptions.aws_exceptions import AWSValidationError
+from providers.aws.infrastructure.aws_client import AWSClient
+from providers.aws.infrastructure.handlers.base_handler import AWSHandler
 
 
 @injectable
@@ -84,7 +84,7 @@ class AWSHandlerFactory:
         handler_class = self._handler_classes[handler_type]
 
         # Use the DI container to create the handler
-        from src.infrastructure.di.container import get_container
+        from infrastructure.di.container import get_container
 
         container = get_container()
         handler = container.get(handler_class)
@@ -119,14 +119,14 @@ class AWSHandlerFactory:
     def _register_handler_classes(self) -> None:
         """Register handler classes for different AWS resource types."""
         # Import handler classes here to avoid circular imports
-        from src.providers.aws.infrastructure.handlers.asg_handler import ASGHandler
-        from src.providers.aws.infrastructure.handlers.ec2_fleet_handler import (
+        from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
+        from providers.aws.infrastructure.handlers.ec2_fleet_handler import (
             EC2FleetHandler,
         )
-        from src.providers.aws.infrastructure.handlers.run_instances_handler import (
+        from providers.aws.infrastructure.handlers.run_instances_handler import (
             RunInstancesHandler,
         )
-        from src.providers.aws.infrastructure.handlers.spot_fleet_handler import (
+        from providers.aws.infrastructure.handlers.spot_fleet_handler import (
             SpotFleetHandler,
         )
 

@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from src.infrastructure.interfaces.provider import BaseProviderConfig
+from infrastructure.interfaces.provider import BaseProviderConfig
 
 
 class ProviderOperationType(str, Enum):

@@ -2,17 +2,17 @@
 
 from typing import Any, Dict, List, Optional
 
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.persistence.base.strategy import BaseStorageStrategy
+from infrastructure.logging.logger import get_logger
+from infrastructure.persistence.base.strategy import BaseStorageStrategy
 
 # Import components
-from src.infrastructure.persistence.components import (
+from infrastructure.persistence.components import (
     FileManager,
     JSONSerializer,
     LockManager,
     MemoryTransactionManager,
 )
-from src.infrastructure.persistence.exceptions import PersistenceError
+from infrastructure.persistence.exceptions import PersistenceError
 
 
 class JSONStorageStrategy(BaseStorageStrategy):

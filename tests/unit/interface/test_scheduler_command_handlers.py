@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.interface.scheduler_command_handlers import (
+from interface.scheduler_command_handlers import (
     handle_list_scheduler_strategies,
     handle_show_scheduler_config,
     handle_validate_scheduler_config,
@@ -79,7 +79,7 @@ class TestSchedulerHandlerImports:
 
     def test_import_scheduler_handlers(self):
         """Test that all scheduler handlers can be imported."""
-        from src.interface.scheduler_command_handlers import (
+        from interface.scheduler_command_handlers import (
             handle_list_scheduler_strategies,
             handle_show_scheduler_config,
             handle_validate_scheduler_config,

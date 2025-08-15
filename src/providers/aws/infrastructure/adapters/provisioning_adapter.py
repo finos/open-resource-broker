@@ -7,29 +7,29 @@ It implements the ResourceProvisioningPort interface from the domain layer.
 
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.exceptions import EntityNotFoundError
-from src.domain.base.ports import LoggingPort
-from src.domain.request.aggregate import Request
-from src.domain.template.aggregate import Template
-from src.infrastructure.adapters.ports.resource_provisioning_port import (
+from domain.base.dependency_injection import injectable
+from domain.base.exceptions import EntityNotFoundError
+from domain.base.ports import LoggingPort
+from domain.request.aggregate import Request
+from domain.template.aggregate import Template
+from infrastructure.adapters.ports.resource_provisioning_port import (
     ResourceProvisioningPort,
 )
-from src.infrastructure.template.configuration_manager import (
+from infrastructure.template.configuration_manager import (
     TemplateConfigurationManager,
 )
-from src.providers.aws.exceptions.aws_exceptions import (
+from providers.aws.exceptions.aws_exceptions import (
     AWSEntityNotFoundError,
     AWSValidationError,
     InfrastructureError,
     QuotaExceededError,
 )
-from src.providers.aws.infrastructure.aws_client import AWSClient
-from src.providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
-from src.providers.aws.infrastructure.handlers.base_handler import AWSHandler
+from providers.aws.infrastructure.aws_client import AWSClient
+from providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
+from providers.aws.infrastructure.handlers.base_handler import AWSHandler
 
 if TYPE_CHECKING:
-    from src.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
+    from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
 
 @injectable
@@ -114,7 +114,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         Returns:
             str: The resource ID
         """
-        from src.providers.base.strategy import ProviderOperation, ProviderOperationType
+        from providers.base.strategy import ProviderOperation, ProviderOperationType
 
         # Create provider operation with dry-run context
         operation = ProviderOperation(
@@ -195,7 +195,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             self._logger.warning(
                 "TemplateConfigurationManager not injected, getting from container"
             )
-            from src.infrastructure.di.container import get_container
+            from infrastructure.di.container import get_container
 
             container = get_container()
             self._template_config_manager = container.get(TemplateConfigurationManager)
@@ -248,7 +248,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             self._logger.warning(
                 "TemplateConfigurationManager not injected, getting from container"
             )
-            from src.infrastructure.di.container import get_container
+            from infrastructure.di.container import get_container
 
             container = get_container()
             self._template_config_manager = container.get(TemplateConfigurationManager)

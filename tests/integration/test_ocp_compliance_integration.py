@@ -4,8 +4,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.config.schemas.provider_strategy_schema import ProviderInstanceConfig
-from src.infrastructure.registry.provider_registry import get_provider_registry
+from config.schemas.provider_strategy_schema import ProviderInstanceConfig
+from infrastructure.registry.provider_registry import get_provider_registry
 
 
 @pytest.mark.integration
@@ -58,7 +58,7 @@ class TestOCPComplianceIntegration:
     @patch("src.providers.aws.registration.AWSConfig")
     def test_aws_provider_registration_integration(self, mock_aws_config, mock_aws_strategy):
         """Test AWS provider registration integration."""
-        from src.providers.aws.registration import register_aws_provider
+        from providers.aws.registration import register_aws_provider
 
         # Setup mocks
         mock_config_instance = Mock()
@@ -91,11 +91,11 @@ class TestOCPComplianceIntegration:
     @patch("src.infrastructure.factories.provider_strategy_factory.get_provider_registry")
     def test_provider_strategy_factory_integration(self, mock_get_registry):
         """Test provider strategy factory integration with registry."""
-        from src.config.manager import ConfigurationManager
-        from src.infrastructure.factories.provider_strategy_factory import (
+        from config.manager import ConfigurationManager
+        from infrastructure.factories.provider_strategy_factory import (
             ProviderStrategyFactory,
         )
-        from src.infrastructure.logging.logger import get_logger
+        from infrastructure.logging.logger import get_logger
 
         # Setup mock registry
         mock_registry = Mock()
@@ -127,12 +127,12 @@ class TestOCPComplianceIntegration:
 
     def test_template_services_integration(self):
         """Test template services integration with registry."""
-        from src.domain.template.aggregate import Template
-        from src.domain.template.value_objects import TemplateId
-        from src.infrastructure.template.template_resolver_service import (
+        from domain.template.aggregate import Template
+        from domain.template.value_objects import TemplateId
+        from infrastructure.template.template_resolver_service import (
             TemplateResolverService,
         )
-        from src.infrastructure.template.template_validator_service import (
+        from infrastructure.template.template_validator_service import (
             TemplateValidatorService,
         )
 
@@ -186,10 +186,10 @@ class TestOCPComplianceIntegration:
 
     def test_command_handler_integration(self):
         """Test command handler integration with registry."""
-        from src.application.commands.provider_handlers import (
+        from application.commands.provider_handlers import (
             RegisterProviderStrategyHandler,
         )
-        from src.application.provider.commands import RegisterProviderStrategyCommand
+        from application.provider.commands import RegisterProviderStrategyCommand
 
         # Setup mock dependencies
         mock_provider_context = Mock()
@@ -270,7 +270,7 @@ class TestOCPComplianceIntegration:
 
     def test_configuration_schema_no_legacy_mode(self):
         """Test that configuration schema no longer supports legacy mode."""
-        from src.config.schemas.provider_strategy_schema import (
+        from config.schemas.provider_strategy_schema import (
             IntegratedProviderConfig,
             ProviderMode,
         )

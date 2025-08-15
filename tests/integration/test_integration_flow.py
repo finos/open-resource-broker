@@ -15,10 +15,10 @@ def test_aws_provider_strategy_uses_handlers():
     print("=== Integration Flow Test ===")
 
     try:
-        from src.infrastructure.logging.logger import get_logger
-        from src.providers.aws.configuration.config import AWSProviderConfig
-        from src.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
-        from src.providers.base.strategy import ProviderOperation, ProviderOperationType
+        from infrastructure.logging.logger import get_logger
+        from providers.aws.configuration.config import AWSProviderConfig
+        from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
+        from providers.base.strategy import ProviderOperation, ProviderOperationType
 
         # Create AWS provider strategy
         config = AWSProviderConfig(region="us-west-2", profile="default")
@@ -110,9 +110,9 @@ def test_no_instance_manager_bypass():
     print("\n=== No Instance Manager Bypass Test ===")
 
     try:
-        from src.infrastructure.logging.logger import get_logger
-        from src.providers.aws.configuration.config import AWSProviderConfig
-        from src.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
+        from infrastructure.logging.logger import get_logger
+        from providers.aws.configuration.config import AWSProviderConfig
+        from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
         # Create AWS provider strategy
         config = AWSProviderConfig(region="us-west-2", profile="default")

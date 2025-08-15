@@ -12,10 +12,10 @@ from typing import Any, Dict, List, Optional, Type
 
 # Import types - using string imports to avoid circular dependencies
 try:
-    from src.application.events.base.event_handler import EventHandler
-    from src.application.events.decorators import EventHandlerRegistry
-    from src.domain.base.events import DomainEvent
-    from src.domain.base.ports import LoggingPort
+    from application.events.base.event_handler import EventHandler
+    from application.events.decorators import EventHandlerRegistry
+    from domain.base.events import DomainEvent
+    from domain.base.ports import LoggingPort
 except ImportError:
     # Fallback for testing or when dependencies aren't available
     DomainEvent = Any

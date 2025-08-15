@@ -12,15 +12,15 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Dict, Generic, List, Optional, TypeVar
 
-from src.domain.base.ports import LoggingPort
-from src.domain.base.resource_manager import (
+from domain.base.ports import LoggingPort
+from domain.base.resource_manager import (
     ResourceAllocation,
     ResourceId,
     ResourceManagerPort,
     ResourceSpecification,
     ResourceType,
 )
-from src.infrastructure.error.exception_handler import InfrastructureErrorResponse
+from infrastructure.error.exception_handler import InfrastructureErrorResponse
 
 T = TypeVar("T")  # For provider-specific client types
 

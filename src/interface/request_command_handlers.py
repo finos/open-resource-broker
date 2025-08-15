@@ -2,10 +2,10 @@
 
 from typing import TYPE_CHECKING, Any, Dict
 
-from src.domain.base.ports.scheduler_port import SchedulerPort
-from src.infrastructure.di.buses import CommandBus, QueryBus
-from src.infrastructure.di.container import get_container
-from src.infrastructure.error.decorators import handle_interface_exceptions
+from domain.base.ports.scheduler_port import SchedulerPort
+from infrastructure.di.buses import CommandBus, QueryBus
+from infrastructure.di.container import get_container
+from infrastructure.error.decorators import handle_interface_exceptions
 
 if TYPE_CHECKING:
     import argparse
@@ -47,7 +47,7 @@ async def handle_get_request_status(args: "argparse.Namespace") -> Dict[str, Any
     if not request_id:
         return {"error": "No request ID provided", "message": "Request ID is required"}
 
-    from src.application.dto.queries import GetRequestQuery
+    from application.dto.queries import GetRequestQuery
 
     query = GetRequestQuery(request_id=request_id)
     request_dto = await query_bus.execute(query)
@@ -71,8 +71,8 @@ async def handle_request_machines(args: "argparse.Namespace") -> Dict[str, Any]:
     command_bus = container.get(CommandBus)
     scheduler_strategy = container.get(SchedulerPort)
 
-    from src.application.dto.commands import CreateRequestCommand
-    from src.infrastructure.mocking.dry_run_context import is_dry_run_active
+    from application.dto.commands import CreateRequestCommand
+    from infrastructure.mocking.dry_run_context import is_dry_run_active
 
     # Pass raw input data to scheduler strategy (scheduler-agnostic)
     if hasattr(args, "input_data") and args.input_data:
@@ -113,7 +113,7 @@ async def handle_request_machines(args: "argparse.Namespace") -> Dict[str, Any]:
 
     # Get the request details to include resource ID information
     try:
-        from src.application.dto.queries import GetRequestQuery
+        from application.dto.queries import GetRequestQuery
 
         query_bus = container.get(QueryBus)
         query = GetRequestQuery(request_id=request_id)
@@ -140,7 +140,7 @@ async def handle_request_machines(args: "argparse.Namespace") -> Dict[str, Any]:
             }
     except Exception as e:
         # Fallback if we can't get request details
-        from src.domain.base.ports import LoggingPort
+        from domain.base.ports import LoggingPort
 
         container.get(LoggingPort).warning(f"Could not get request details for resource ID: {e}")
         if scheduler_strategy:
@@ -167,7 +167,7 @@ async def handle_get_return_requests(args: "argparse.Namespace") -> Dict[str, An
     query_bus = container.get(QueryBus)
     container.get(SchedulerPort)
 
-    from src.application.dto.queries import ListReturnRequestsQuery
+    from application.dto.queries import ListReturnRequestsQuery
 
     query = ListReturnRequestsQuery()
     requests = await query_bus.execute(query)
@@ -194,7 +194,7 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> Dict[str
     command_bus = container.get(CommandBus)
     container.get(SchedulerPort)
 
-    from src.application.dto.commands import CreateReturnRequestCommand
+    from application.dto.commands import CreateReturnRequestCommand
 
     command = CreateReturnRequestCommand(
         request_id=getattr(args, "request_id", None),

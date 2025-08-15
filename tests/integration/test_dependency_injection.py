@@ -84,7 +84,7 @@ def test_aws_launch_template_manager_registration():
         print("   PASS: AWSLaunchTemplateManager import successful")
 
         # Test that the registration function exists
-        from src.providers.aws.registration import register_aws_services_with_di
+        from providers.aws.registration import register_aws_services_with_di
 
         print("   PASS: register_aws_services_with_di function exists")
 
@@ -149,7 +149,7 @@ def test_repository_factory_machine_support():
         print("   Testing repository factory machine support...")
 
         # Test that repository factory can be imported
-        from src.infrastructure.utilities.factories.repository_factory import (
+        from infrastructure.utilities.factories.repository_factory import (
             RepositoryFactory,
         )
 
@@ -190,7 +190,7 @@ def test_di_container_resolution():
         print("   Testing DI container resolution...")
 
         # Test that DI container can be imported
-        from src.infrastructure.di.container import DIContainer
+        from infrastructure.di.container import DIContainer
 
         print("   PASS: DIContainer import successful")
 

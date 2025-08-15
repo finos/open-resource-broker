@@ -1,6 +1,6 @@
 """Unit tests for provider defaults inheritance system."""
 
-from src.config.schemas.provider_strategy_schema import (
+from config.schemas.provider_strategy_schema import (
     HandlerConfig,
     ProviderConfig,
     ProviderInstanceConfig,

@@ -7,20 +7,20 @@ import pytest
 
 # Import domain components
 try:
-    from src.domain.machine.aggregate import Machine
-    from src.domain.machine.exceptions import (
+    from domain.machine.aggregate import Machine
+    from domain.machine.exceptions import (
         InvalidMachineStateError,
         MachineValidationError,
     )
-    from src.domain.machine.value_objects import MachineStatus
-    from src.domain.request.aggregate import Request
-    from src.domain.request.exceptions import (
+    from domain.machine.value_objects import MachineStatus
+    from domain.request.aggregate import Request
+    from domain.request.exceptions import (
         InvalidRequestStateError,
         RequestValidationError,
     )
-    from src.domain.request.value_objects import RequestStatus
-    from src.domain.template.aggregate import Template
-    from src.domain.template.exceptions import TemplateValidationError
+    from domain.request.value_objects import RequestStatus
+    from domain.template.aggregate import Template
+    from domain.template.exceptions import TemplateValidationError
 
     IMPORTS_AVAILABLE = True
 except ImportError as e:

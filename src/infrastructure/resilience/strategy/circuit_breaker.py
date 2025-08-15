@@ -5,9 +5,9 @@ import time
 from enum import Enum
 from typing import Any, Dict
 
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.resilience.exceptions import CircuitBreakerOpenError
-from src.infrastructure.resilience.strategy.base import RetryStrategy
+from infrastructure.logging.logger import get_logger
+from infrastructure.resilience.exceptions import CircuitBreakerOpenError
+from infrastructure.resilience.strategy.base import RetryStrategy
 
 logger = get_logger(__name__)
 

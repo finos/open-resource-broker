@@ -2,9 +2,9 @@
 
 from typing import Any, Dict
 
-from src.infrastructure.di.buses import QueryBus
-from src.infrastructure.di.container import get_container
-from src.infrastructure.error.decorators import handle_interface_exceptions
+from infrastructure.di.buses import QueryBus
+from infrastructure.di.container import get_container
+from infrastructure.error.decorators import handle_interface_exceptions
 
 
 @handle_interface_exceptions(context="provider_health", interface_type="cli")
@@ -13,7 +13,7 @@ async def handle_provider_health(args) -> Dict[str, Any]:
     container = get_container()
     query_bus = container.get(QueryBus)
 
-    from src.application.queries.system import GetSystemStatusQuery
+    from application.queries.system import GetSystemStatusQuery
 
     query = GetSystemStatusQuery()
     health_status = await query_bus.execute(query)
@@ -31,7 +31,7 @@ async def handle_list_providers(args) -> Dict[str, Any]:
 
     try:
         # Get configuration manager
-        from src.domain.base.ports.configuration_port import ConfigurationPort
+        from domain.base.ports.configuration_port import ConfigurationPort
 
         config_manager = container.get(ConfigurationPort)
         provider_config = config_manager.get_provider_config()
@@ -88,7 +88,7 @@ async def handle_provider_config(args) -> Dict[str, Any]:
     container = get_container()
     query_bus = container.get(QueryBus)
 
-    from src.application.queries.system import GetProviderConfigQuery
+    from application.queries.system import GetProviderConfigQuery
 
     query = GetProviderConfigQuery()
     config = await query_bus.execute(query)
@@ -143,7 +143,7 @@ async def handle_provider_metrics(args) -> Dict[str, Any]:
     container = get_container()
     query_bus = container.get(QueryBus)
 
-    from src.application.queries.system import GetProviderMetricsQuery
+    from application.queries.system import GetProviderMetricsQuery
 
     query = GetProviderMetricsQuery(provider_name=getattr(args, "provider", None))
     metrics = await query_bus.execute(query)

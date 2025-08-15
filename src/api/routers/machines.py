@@ -6,11 +6,11 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.api.dependencies import (
+from api.dependencies import (
     get_request_machines_handler,
     get_return_machines_handler,
 )
-from src.infrastructure.error.decorators import handle_rest_exceptions
+from infrastructure.error.decorators import handle_rest_exceptions
 
 router = APIRouter(prefix="/machines", tags=["Machines"])
 

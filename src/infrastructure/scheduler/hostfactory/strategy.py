@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING, Any, Dict, List
 if TYPE_CHECKING:
     pass
 
-from src.config.manager import ConfigurationManager
-from src.domain.base.ports.logging_port import LoggingPort
-from src.domain.machine.aggregate import Machine
-from src.domain.request.aggregate import Request
-from src.domain.template.aggregate import Template
-from src.infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
-from src.infrastructure.utilities.common.serialization import serialize_enum
+from config.manager import ConfigurationManager
+from domain.base.ports.logging_port import LoggingPort
+from domain.machine.aggregate import Machine
+from domain.request.aggregate import Request
+from domain.template.aggregate import Template
+from infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
+from infrastructure.utilities.common.serialization import serialize_enum
 
 from .field_mappings import HostFactoryFieldMappings
 from .transformations import HostFactoryTransformations
@@ -33,10 +33,10 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         self.template_defaults_service = template_defaults_service
 
         # Initialize provider selection service for provider selection
-        from src.application.services.provider_selection_service import (
+        from application.services.provider_selection_service import (
             ProviderSelectionService,
         )
-        from src.infrastructure.di.container import get_container
+        from infrastructure.di.container import get_container
 
         container = get_container()
         self._provider_selection_service = container.get(ProviderSelectionService)

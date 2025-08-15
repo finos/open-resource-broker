@@ -8,17 +8,17 @@ from moto import mock_aws
 
 # Import AWS components
 try:
-    from src.providers.aws.infrastructure.handlers.asg_handler import ASGHandler
-    from src.providers.aws.infrastructure.handlers.ec2_fleet_handler import (
+    from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
+    from providers.aws.infrastructure.handlers.ec2_fleet_handler import (
         EC2FleetHandler,
     )
-    from src.providers.aws.infrastructure.handlers.run_instances_handler import (
+    from providers.aws.infrastructure.handlers.run_instances_handler import (
         RunInstancesHandler,
     )
-    from src.providers.aws.infrastructure.handlers.spot_fleet_handler import (
+    from providers.aws.infrastructure.handlers.spot_fleet_handler import (
         SpotFleetHandler,
     )
-    from src.providers.aws.utilities.aws_operations import AWSOperations
+    from providers.aws.utilities.aws_operations import AWSOperations
 
     IMPORTS_AVAILABLE = True
 except ImportError as e:

@@ -8,8 +8,8 @@ with appropriate JSON schemas for AI assistant integration.
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from src.sdk.client import OpenHFPluginSDK
-from src.sdk.discovery import MethodInfo
+from sdk.client import OpenHFPluginSDK
+from sdk.discovery import MethodInfo
 
 
 @dataclass

@@ -7,28 +7,28 @@ import pytest
 
 # Import CQRS components that actually exist
 try:
-    from src.application.commands.request_handlers import CreateRequestHandler
-    from src.application.dto.commands import (
+    from application.commands.request_handlers import CreateRequestHandler
+    from application.dto.commands import (
         CreateRequestCommand,
         UpdateRequestStatusCommand,
     )
-    from src.application.dto.queries import (
+    from application.dto.queries import (
         GetMachineQuery,  # Use this instead of GetMachinesByRequestQuery
     )
-    from src.application.dto.queries import (
+    from application.dto.queries import (
         ListTemplatesQuery,  # Use this instead of GetAvailableTemplatesQuery
     )
-    from src.application.dto.queries import GetRequestStatusQuery
-    from src.application.queries.handlers import (
+    from application.dto.queries import GetRequestStatusQuery
+    from application.queries.handlers import (
         GetMachineHandler,  # Use this instead of GetMachinesByRequestHandler
     )
-    from src.application.queries.handlers import (
+    from application.queries.handlers import (
         GetRequestStatusQueryHandler,  # Note: different name than expected
     )
-    from src.application.queries.handlers import (
+    from application.queries.handlers import (
         ListTemplatesHandler,  # Use this instead of GetAvailableTemplatesHandler
     )
-    from src.infrastructure.di.buses import CommandBus, QueryBus
+    from infrastructure.di.buses import CommandBus, QueryBus
 
     IMPORTS_AVAILABLE = True
 except ImportError as e:

@@ -2,10 +2,10 @@
 
 from typing import Any, Dict, List, Optional
 
-from src.domain.base.ports import LoggingPort
-from src.domain.template.aggregate import Template
-from src.domain.template.repository import TemplateRepository
-from src.infrastructure.template.configuration_manager import (
+from domain.base.ports import LoggingPort
+from domain.template.aggregate import Template
+from domain.template.repository import TemplateRepository
+from infrastructure.template.configuration_manager import (
     TemplateConfigurationManager,
 )
 

@@ -11,12 +11,12 @@ from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 from botocore.exceptions import ClientError
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import ErrorHandlingPort, LoggingPort
-from src.domain.request.aggregate import Request
-from src.infrastructure.resilience import retry
-from src.providers.aws.domain.template.aggregate import AWSTemplate
-from src.providers.aws.exceptions.aws_exceptions import (
+from domain.base.dependency_injection import injectable
+from domain.base.ports import ErrorHandlingPort, LoggingPort
+from domain.request.aggregate import Request
+from infrastructure.resilience import retry
+from providers.aws.domain.template.aggregate import AWSTemplate
+from providers.aws.exceptions.aws_exceptions import (
     AuthorizationError,
     AWSEntityNotFoundError,
     AWSValidationError,
@@ -26,7 +26,7 @@ from src.providers.aws.exceptions.aws_exceptions import (
     RateLimitError,
     ResourceInUseError,
 )
-from src.providers.aws.infrastructure.aws_client import AWSClient
+from providers.aws.infrastructure.aws_client import AWSClient
 
 T = TypeVar("T")
 
@@ -323,7 +323,7 @@ class AWSHandler(ABC):
         Returns:
             Combined results from all pages
         """
-        from src.providers.aws.infrastructure.utils import paginate
+        from providers.aws.infrastructure.utils import paginate
 
         return paginate(client_method, result_key, **kwargs)
 

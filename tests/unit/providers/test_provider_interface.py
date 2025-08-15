@@ -2,8 +2,8 @@
 
 import pytest
 
-from src.domain.base.value_objects import InstanceId
-from src.infrastructure.interfaces.provider import ProviderConfig
+from domain.base.value_objects import InstanceId
+from infrastructure.interfaces.provider import ProviderConfig
 from tests.fixtures.mock_provider import MockProvider, create_mock_provider
 
 
@@ -42,7 +42,7 @@ class TestProviderPort:
 
     def test_provider_factory_registration(self):
         """Test provider factory can register new providers."""
-        from src.infrastructure.utilities.factories.provider_factory import (
+        from infrastructure.utilities.factories.provider_factory import (
             ProviderFactory,
         )
 

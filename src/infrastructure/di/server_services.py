@@ -1,9 +1,9 @@
 """Server service registrations for dependency injection."""
 
-from src.config.schemas.server_schema import ServerConfig
-from src.domain.base.ports.configuration_port import ConfigurationPort
-from src.infrastructure.di.container import DIContainer
-from src.infrastructure.logging.logger import get_logger
+from config.schemas.server_schema import ServerConfig
+from domain.base.ports.configuration_port import ConfigurationPort
+from infrastructure.di.container import DIContainer
+from infrastructure.logging.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -41,7 +41,7 @@ def _register_fastapi_services(container: DIContainer, server_config: ServerConf
     """Register FastAPI core services."""
     from fastapi import FastAPI
 
-    from src.api.server import create_fastapi_app
+    from api.server import create_fastapi_app
 
     # Register FastAPI app as singleton
     container.register_singleton(FastAPI, lambda c: create_fastapi_app(server_config))
@@ -54,12 +54,12 @@ def _register_api_handlers(container: DIContainer) -> None:
     """Register API handlers with dependency injection."""
     try:
         # Register template handler with constructor injection
-        from src.api.handlers.get_available_templates_handler import (
+        from api.handlers.get_available_templates_handler import (
             GetAvailableTemplatesRESTHandler,
         )
-        from src.domain.base.ports import SchedulerPort
-        from src.infrastructure.di.buses import CommandBus, QueryBus
-        from src.monitoring.metrics import MetricsCollector
+        from domain.base.ports import SchedulerPort
+        from infrastructure.di.buses import CommandBus, QueryBus
+        from monitoring.metrics import MetricsCollector
 
         if not container.is_registered(GetAvailableTemplatesRESTHandler):
             container.register_singleton(
@@ -79,7 +79,7 @@ def _register_api_handlers(container: DIContainer) -> None:
 
     try:
         # Register request machines handler
-        from src.api.handlers.request_machines_handler import RequestMachinesRESTHandler
+        from api.handlers.request_machines_handler import RequestMachinesRESTHandler
 
         if not container.is_registered(RequestMachinesRESTHandler):
             container.register_singleton(
@@ -103,10 +103,10 @@ def _register_api_handlers(container: DIContainer) -> None:
 
     try:
         # Register request status handler
-        from src.api.handlers.get_request_status_handler import (
+        from api.handlers.get_request_status_handler import (
             GetRequestStatusRESTHandler,
         )
-        from src.domain.base.ports import ErrorHandlingPort, LoggingPort
+        from domain.base.ports import ErrorHandlingPort, LoggingPort
 
         if not container.is_registered(GetRequestStatusRESTHandler):
             container.register_singleton(
@@ -130,7 +130,7 @@ def _register_api_handlers(container: DIContainer) -> None:
 
     try:
         # Register return requests handler
-        from src.api.handlers.get_return_requests_handler import (
+        from api.handlers.get_return_requests_handler import (
             GetReturnRequestsRESTHandler,
         )
 
@@ -156,7 +156,7 @@ def _register_api_handlers(container: DIContainer) -> None:
 
     try:
         # Register return machines handler
-        from src.api.handlers.request_return_machines_handler import (
+        from api.handlers.request_return_machines_handler import (
             RequestReturnMachinesRESTHandler,
         )
 

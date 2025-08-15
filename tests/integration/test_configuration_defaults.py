@@ -15,12 +15,12 @@ def test_template_defaults_integration():
     print("=== Configuration Defaults Integration Test ===")
 
     try:
-        from src.application.services.template_defaults_service import (
+        from application.services.template_defaults_service import (
             TemplateDefaultsService,
         )
-        from src.config.manager import ConfigurationManager
-        from src.infrastructure.logging.logger import get_logger
-        from src.infrastructure.persistence.repositories.template_repository import (
+        from config.manager import ConfigurationManager
+        from infrastructure.logging.logger import get_logger
+        from infrastructure.persistence.repositories.template_repository import (
             TemplateSerializer,
         )
 
@@ -76,12 +76,12 @@ def test_template_defaults_precedence():
     print("\n=== Template Defaults Precedence Test ===")
 
     try:
-        from src.application.services.template_defaults_service import (
+        from application.services.template_defaults_service import (
             TemplateDefaultsService,
         )
-        from src.config.manager import ConfigurationManager
-        from src.infrastructure.logging.logger import get_logger
-        from src.infrastructure.persistence.repositories.template_repository import (
+        from config.manager import ConfigurationManager
+        from infrastructure.logging.logger import get_logger
+        from infrastructure.persistence.repositories.template_repository import (
             TemplateSerializer,
         )
 
@@ -140,11 +140,11 @@ def test_defaults_service_directly():
     print("\n=== Direct TemplateDefaultsService Test ===")
 
     try:
-        from src.application.services.template_defaults_service import (
+        from application.services.template_defaults_service import (
             TemplateDefaultsService,
         )
-        from src.config.manager import ConfigurationManager
-        from src.infrastructure.logging.logger import get_logger
+        from config.manager import ConfigurationManager
+        from infrastructure.logging.logger import get_logger
 
         # Create service
         config_manager = ConfigurationManager()

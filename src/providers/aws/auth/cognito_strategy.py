@@ -6,9 +6,9 @@ import boto3
 import jwt
 from botocore.exceptions import ClientError
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
-from src.infrastructure.adapters.ports.auth import (
+from domain.base.dependency_injection import injectable
+from domain.base.ports import LoggingPort
+from infrastructure.adapters.ports.auth import (
     AuthContext,
     AuthPort,
     AuthResult,

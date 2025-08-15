@@ -4,9 +4,9 @@ All query handlers are now automatically discovered and registered via
 @query_handler decorators through the Handler Discovery System.
 """
 
-from src.domain.base.ports import LoggingPort
-from src.infrastructure.di.buses import QueryBus
-from src.infrastructure.di.container import DIContainer
+from domain.base.ports import LoggingPort
+from infrastructure.di.buses import QueryBus
+from infrastructure.di.container import DIContainer
 
 
 def register_query_handler_services(container: DIContainer) -> None:
@@ -72,12 +72,12 @@ def register_query_handlers_with_bus(container: DIContainer) -> None:
 
         # Register template query handlers
         try:
-            from src.application.dto.queries import (
+            from application.dto.queries import (
                 GetTemplateQuery,
                 ListTemplatesQuery,
                 ValidateTemplateQuery,
             )
-            from src.application.queries.handlers import (
+            from application.queries.handlers import (
                 GetTemplateHandler,
                 ListTemplatesHandler,
                 ValidateTemplateHandler,
@@ -92,13 +92,13 @@ def register_query_handlers_with_bus(container: DIContainer) -> None:
 
         # Register request query handlers
         try:
-            from src.application.dto.queries import (
+            from application.dto.queries import (
                 GetRequestQuery,
                 GetRequestStatusQuery,
                 ListActiveRequestsQuery,
                 ListReturnRequestsQuery,
             )
-            from src.application.queries.handlers import (
+            from application.queries.handlers import (
                 GetRequestHandler,
                 GetRequestStatusQueryHandler,
                 ListActiveRequestsHandler,
@@ -115,8 +115,8 @@ def register_query_handlers_with_bus(container: DIContainer) -> None:
 
         # Register machine query handlers
         try:
-            from src.application.dto.queries import GetMachineQuery, ListMachinesQuery
-            from src.application.queries.handlers import (
+            from application.dto.queries import GetMachineQuery, ListMachinesQuery
+            from application.queries.handlers import (
                 GetMachineHandler,
                 ListMachinesHandler,
             )
@@ -129,13 +129,13 @@ def register_query_handlers_with_bus(container: DIContainer) -> None:
 
         # Register system query handlers
         try:
-            from src.application.queries.system import (
+            from application.queries.system import (
                 GetProviderConfigQuery,
                 GetProviderMetricsQuery,
                 GetSystemStatusQuery,
                 ValidateProviderConfigQuery,
             )
-            from src.application.queries.system_handlers import (
+            from application.queries.system_handlers import (
                 GetProviderConfigHandler,
                 GetProviderMetricsHandler,
                 GetSystemStatusHandler,
@@ -155,12 +155,12 @@ def register_query_handlers_with_bus(container: DIContainer) -> None:
 
         # Register specialized query handlers
         try:
-            from src.application.dto.queries import (
+            from application.dto.queries import (
                 GetActiveMachineCountQuery,
                 GetMachineHealthQuery,
                 GetRequestSummaryQuery,
             )
-            from src.application.queries.specialized_handlers import (
+            from application.queries.specialized_handlers import (
                 GetActiveMachineCountHandler,
                 GetMachineHealthHandler,
                 GetRequestSummaryHandler,

@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from src.sdk.client import OpenHFPluginSDK
-from src.sdk.config import SDKConfig
-from src.sdk.exceptions import ConfigurationError, ProviderError, SDKError
+from sdk.client import OpenHFPluginSDK
+from sdk.config import SDKConfig
+from sdk.exceptions import ConfigurationError, ProviderError, SDKError
 
 
 class TestOpenHFPluginSDK:

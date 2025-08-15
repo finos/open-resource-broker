@@ -4,17 +4,17 @@ All command handlers are now automatically discovered and registered via
 @command_handler decorators through the Handler Discovery System.
 """
 
-from src.application.commands.machine_handlers import (
+from application.commands.machine_handlers import (
     CleanupMachineResourcesHandler,
     ConvertBatchMachineStatusCommandHandler,
     ConvertMachineStatusCommandHandler,
     UpdateMachineStatusHandler,
     ValidateProviderStateCommandHandler,
 )
-from src.domain.base.ports import LoggingPort
-from src.infrastructure.di.buses import CommandBus
-from src.infrastructure.di.container import DIContainer
-from src.providers.base.strategy.provider_context import ProviderContext
+from domain.base.ports import LoggingPort
+from infrastructure.di.buses import CommandBus
+from infrastructure.di.container import DIContainer
+from providers.base.strategy.provider_context import ProviderContext
 
 
 def register_command_handler_services(container: DIContainer) -> None:
@@ -95,7 +95,7 @@ def register_command_handlers_with_bus(container: DIContainer) -> None:
         container.get(ProviderContext)
 
         # Register machine command handlers
-        from src.application.machine.commands import (
+        from application.machine.commands import (
             CleanupMachineResourcesCommand,
             ConvertBatchMachineStatusCommand,
             ConvertMachineStatusCommand,
@@ -127,13 +127,13 @@ def register_command_handlers_with_bus(container: DIContainer) -> None:
 
         # Register request command handlers
         try:
-            from src.application.commands.request_handlers import (
+            from application.commands.request_handlers import (
                 CancelRequestHandler,
                 CreateMachineRequestHandler,
                 CreateReturnRequestHandler,
                 UpdateRequestStatusHandler,
             )
-            from src.application.dto.commands import (
+            from application.dto.commands import (
                 CancelRequestCommand,
                 CleanupOldRequestsCommand,
                 CreateRequestCommand,
@@ -155,7 +155,7 @@ def register_command_handlers_with_bus(container: DIContainer) -> None:
 
             # Register CleanupOldRequestsCommand if handler exists
             try:
-                from src.application.commands.cleanup_handlers import (
+                from application.commands.cleanup_handlers import (
                     CleanupOldRequestsHandler,
                 )
 

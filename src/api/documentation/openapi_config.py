@@ -5,8 +5,8 @@ from typing import Any, Dict
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
-from src._package import __version__
-from src.config.schemas.server_schema import ServerConfig
+from _package import __version__
+from config.schemas.server_schema import ServerConfig
 
 from .examples import get_api_examples
 from .security_schemes import get_security_schemes

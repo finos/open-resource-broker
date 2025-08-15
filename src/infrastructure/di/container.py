@@ -7,25 +7,25 @@ import time
 from contextlib import contextmanager
 from typing import Any, Dict, Iterator, List, Optional, Set, Type, TypeVar
 
-from src.domain.base.dependency_injection import is_injectable
-from src.domain.base.di_contracts import (
+from domain.base.dependency_injection import is_injectable
+from domain.base.di_contracts import (
     CQRSHandlerRegistrationPort,
     DependencyRegistration,
     DIContainerPort,
     DIScope,
 )
-from src.domain.base.ports import ContainerPort
-from src.infrastructure.di.components import (
+from domain.base.ports import ContainerPort
+from infrastructure.di.components import (
     CQRSHandlerRegistry,
     DependencyResolver,
     ServiceRegistry,
 )
-from src.infrastructure.di.exceptions import (
+from infrastructure.di.exceptions import (
     CircularDependencyError,
     DependencyResolutionError,
     UnregisteredDependencyError,
 )
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.logging.logger import get_logger
 
 T = TypeVar("T")
 logger = get_logger(__name__)
@@ -50,7 +50,7 @@ class LazyLoadingConfig:
         """Create lazy loading config from configuration manager."""
         if config_manager is None:
             try:
-                from src.config.manager import get_config_manager
+                from config.manager import get_config_manager
 
                 config_manager = get_config_manager()
             except ImportError:
@@ -343,9 +343,9 @@ def _create_configured_container() -> DIContainer:
 def _setup_cqrs_infrastructure(container: DIContainer) -> None:
     """Set up CQRS infrastructure: handler discovery and buses."""
     try:
-        from src.domain.base.ports import LoggingPort
-        from src.infrastructure.di.buses import BusFactory
-        from src.infrastructure.di.handler_discovery import (
+        from domain.base.ports import LoggingPort
+        from infrastructure.di.buses import BusFactory
+        from infrastructure.di.handler_discovery import (
             create_handler_discovery_service,
         )
 
@@ -365,7 +365,7 @@ def _setup_cqrs_infrastructure(container: DIContainer) -> None:
 
         # Check registration results
         try:
-            from src.application.decorators import get_handler_registry_stats
+            from application.decorators import get_handler_registry_stats
 
             stats = get_handler_registry_stats()
             logger.info(f"Handler discovery results: {stats}")
@@ -378,7 +378,7 @@ def _setup_cqrs_infrastructure(container: DIContainer) -> None:
         query_bus, command_bus = BusFactory.create_buses(container, logging_port)
 
         # Register buses as singletons
-        from src.infrastructure.di.buses import CommandBus, QueryBus
+        from infrastructure.di.buses import CommandBus, QueryBus
 
         container.register_instance(QueryBus, query_bus)
         container.register_instance(CommandBus, command_bus)
@@ -395,7 +395,7 @@ def _setup_cqrs_infrastructure(container: DIContainer) -> None:
 def _ensure_infrastructure_services(container: DIContainer) -> None:
     """Ensure infrastructure services are registered for CQRS setup."""
     try:
-        from src.infrastructure.di.infrastructure_services import (
+        from infrastructure.di.infrastructure_services import (
             register_infrastructure_services,
         )
 

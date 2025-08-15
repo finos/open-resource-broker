@@ -4,8 +4,8 @@ from dataclasses import dataclass, field
 from typing import Optional
 from uuid import uuid4
 
-from src.domain.base.events.base_events import DomainEvent
-from src.domain.base.provider_interfaces import ProviderInstanceState, ProviderType
+from domain.base.events.base_events import DomainEvent
+from domain.base.provider_interfaces import ProviderInstanceState, ProviderType
 
 
 @dataclass(frozen=True)

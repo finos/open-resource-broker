@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import field_validator, model_validator
 
-from src.domain.base.value_objects import IPAddress, ValueObject
+from domain.base.value_objects import IPAddress, ValueObject
 
 
 class PriceType(str, Enum):

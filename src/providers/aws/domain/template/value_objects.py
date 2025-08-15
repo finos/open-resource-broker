@@ -7,7 +7,7 @@ from typing import Any, ClassVar, Dict, List, Optional
 from pydantic import ConfigDict, field_validator, model_validator
 
 # Import core domain primitives
-from src.domain.base.value_objects import (
+from domain.base.value_objects import (
     ARN,
     AllocationStrategy,
     InstanceType,
@@ -30,8 +30,8 @@ class ResourceId(ResourceId):
     def validate_format(cls, v: str) -> str:
         """Validate AWS resource ID format."""
         # Get pattern from AWS configuration
-        from src.providers.aws.configuration.config import get_aws_config_manager
-        from src.providers.aws.configuration.validator import AWSNamingConfig
+        from providers.aws.configuration.config import get_aws_config_manager
+        from providers.aws.configuration.validator import AWSNamingConfig
 
         config = get_aws_config_manager().get_typed(AWSNamingConfig)
         pattern = config.patterns.get(cls.pattern_key)
@@ -103,8 +103,8 @@ class AWSInstanceType(InstanceType):
     def validate_instance_type(cls, v: str) -> str:
         """Validate AWS instance type format."""
         # Get pattern from AWS configuration
-        from src.providers.aws.configuration.config import get_aws_config_manager
-        from src.providers.aws.configuration.validator import AWSNamingConfig
+        from providers.aws.configuration.config import get_aws_config_manager
+        from providers.aws.configuration.validator import AWSNamingConfig
 
         config = get_aws_config_manager().get_typed(AWSNamingConfig)
         pattern = config.patterns["instance_type"]
@@ -132,8 +132,8 @@ class AWSTags(Tags):
     def validate_aws_tags(cls, v: Dict[str, str]) -> Dict[str, str]:
         """Validate AWS tags format and constraints."""
         # Get AWS tag validation rules from configuration
-        from src.providers.aws.configuration.config import get_aws_config_manager
-        from src.providers.aws.configuration.validator import AWSNamingConfig
+        from providers.aws.configuration.config import get_aws_config_manager
+        from providers.aws.configuration.validator import AWSNamingConfig
 
         config = get_aws_config_manager().get_typed(AWSNamingConfig)
 
@@ -175,8 +175,8 @@ class AWSARN(ARN):
     def validate_arn(cls, v: str) -> str:
         """Validate AWS ARN format."""
         # Get pattern from AWS configuration
-        from src.providers.aws.configuration.config import get_aws_config_manager
-        from src.providers.aws.configuration.validator import AWSNamingConfig
+        from providers.aws.configuration.config import get_aws_config_manager
+        from providers.aws.configuration.validator import AWSNamingConfig
 
         config = get_aws_config_manager().get_typed(AWSNamingConfig)
         pattern = config.patterns["arn"]
@@ -204,7 +204,7 @@ class ProviderApi(str, Enum):
         """Handle missing enum values by checking configuration."""
         # Get valid APIs from configuration
         try:
-            from src.config.manager import get_config_manager
+            from config.manager import get_config_manager
 
             config_manager = get_config_manager()
             raw_config = config_manager.get_raw_config()
@@ -257,7 +257,7 @@ class AWSFleetType(str, Enum):
         """Handle missing enum values by checking configuration."""
         # Get valid fleet types from configuration
         try:
-            from src.config.manager import get_config_manager
+            from config.manager import get_config_manager
 
             config_manager = get_config_manager()
             raw_config = config_manager.get_raw_config()

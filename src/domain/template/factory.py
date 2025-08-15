@@ -3,9 +3,9 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, Protocol
 
-from src.domain.base.ports.logging_port import LoggingPort
-from src.domain.template.aggregate import Template
-from src.domain.template.extensions import TemplateExtensionRegistry
+from domain.base.ports.logging_port import LoggingPort
+from domain.template.aggregate import Template
+from domain.template.extensions import TemplateExtensionRegistry
 
 
 class TemplateFactoryPort(Protocol):
@@ -71,7 +71,7 @@ class TemplateFactory(BaseTemplateFactory):
         """Register built-in provider template classes."""
         try:
             # Register AWS template class
-            from src.providers.aws.domain.template.aggregate import AWSTemplate
+            from providers.aws.domain.template.aggregate import AWSTemplate
 
             self._provider_template_classes["aws"] = AWSTemplate
 
@@ -84,7 +84,7 @@ class TemplateFactory(BaseTemplateFactory):
         # Future providers can be registered here or via register_provider_template_class
         # noqa:COMMENTED section-start
         # try:
-        #     from src.providers.provider1.domain.template.aggregate import Provider1Template
+        #     from providers.provider1.domain.template.aggregate import Provider1Template
         #     self._provider_template_classes['provider1'] = Provider1Template
         # except ImportError:
         #     pass

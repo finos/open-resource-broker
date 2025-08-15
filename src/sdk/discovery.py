@@ -10,7 +10,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Type, get_type_hints
 
-from src.application.decorators import (
+from application.decorators import (
     get_registered_command_handlers,
     get_registered_query_handlers,
 )

@@ -2,8 +2,8 @@
 
 from typing import Callable, Dict, List
 
-from src.domain.base.events import DomainEvent, EventPublisher
-from src.infrastructure.logging.logger import get_logger
+from domain.base.events import DomainEvent, EventPublisher
+from infrastructure.logging.logger import get_logger
 
 
 class ConfigurableEventPublisher(EventPublisher):

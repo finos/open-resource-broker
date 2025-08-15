@@ -8,26 +8,26 @@ maintaining all existing AWS functionality and adding new capabilities.
 import time
 from typing import Any, Dict, List, Optional
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
+from domain.base.dependency_injection import injectable
+from domain.base.ports import LoggingPort
 
 # Import AWS-specific components
-from src.providers.aws.configuration.config import AWSProviderConfig
-from src.providers.aws.infrastructure.aws_client import AWSClient
-from src.providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHandler
-from src.providers.aws.infrastructure.handlers.run_instances_handler import (
+from providers.aws.configuration.config import AWSProviderConfig
+from providers.aws.infrastructure.aws_client import AWSClient
+from providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHandler
+from providers.aws.infrastructure.handlers.run_instances_handler import (
     RunInstancesHandler,
 )
-from src.providers.aws.infrastructure.handlers.spot_fleet_handler import (
+from providers.aws.infrastructure.handlers.spot_fleet_handler import (
     SpotFleetHandler,
 )
-from src.providers.aws.infrastructure.launch_template.manager import (
+from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
 )
-from src.providers.aws.managers.aws_resource_manager import AWSResourceManager
+from providers.aws.managers.aws_resource_manager import AWSResourceManager
 
 # Import strategy pattern interfaces
-from src.providers.base.strategy import (
+from providers.base.strategy import (
     ProviderCapabilities,
     ProviderHealthStatus,
     ProviderOperation,
@@ -131,7 +131,7 @@ class AWSProviderStrategy(ProviderStrategy):
             self._logger.debug("Creating AWS handlers on first access")
 
             # Initialize AWS operations utility
-            from src.providers.aws.utilities.aws_operations import AWSOperations
+            from providers.aws.utilities.aws_operations import AWSOperations
 
             aws_ops = AWSOperations(self.aws_client, self._logger)
 
@@ -205,7 +205,7 @@ class AWSProviderStrategy(ProviderStrategy):
 
         try:
             # Import dry-run context here to avoid circular imports
-            from src.providers.aws.infrastructure.dry_run_adapter import (
+            from providers.aws.infrastructure.dry_run_adapter import (
                 aws_dry_run_context,
             )
 
@@ -308,7 +308,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             # Convert template_config to AWSTemplate domain object
-            from src.providers.aws.domain.template.aggregate import AWSTemplate
+            from providers.aws.domain.template.aggregate import AWSTemplate
 
             try:
                 aws_template = AWSTemplate.model_validate(template_config)
@@ -324,8 +324,8 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             # Create a minimal request object for handler using domain factory
-            from src.domain.request.aggregate import Request
-            from src.domain.request.value_objects import RequestType
+            from domain.request.aggregate import Request
+            from domain.request.value_objects import RequestType
 
             # Use the domain aggregate's factory method - it handles RequestId generation
             request = Request.create_new_request(
@@ -530,8 +530,8 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             # Create a minimal request object for the handler
-            from src.domain.request.aggregate import Request
-            from src.domain.request.value_objects import RequestType
+            from domain.request.aggregate import Request
+            from domain.request.value_objects import RequestType
 
             # Create request with the resource IDs
             request = Request.create_new_request(
@@ -678,7 +678,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             # Check if we're in dry-run mode
-            from src.infrastructure.mocking.dry_run_context import is_dry_run_active
+            from infrastructure.mocking.dry_run_context import is_dry_run_active
 
             if is_dry_run_active():
                 # In dry-run mode, return a healthy status without making real AWS calls
@@ -692,7 +692,7 @@ class AWSProviderStrategy(ProviderStrategy):
             # This is a lightweight operation to verify AWS access
             try:
                 # Import dry-run context here to avoid circular imports
-                from src.providers.aws.infrastructure.dry_run_adapter import (
+                from providers.aws.infrastructure.dry_run_adapter import (
                     aws_dry_run_context,
                 )
 
@@ -762,7 +762,7 @@ class AWSProviderStrategy(ProviderStrategy):
         """Get available AWS templates using scheduler strategy."""
         try:
             # Use scheduler strategy to load templates from configuration
-            from src.infrastructure.registry.scheduler_registry import (
+            from infrastructure.registry.scheduler_registry import (
                 get_scheduler_registry,
             )
 
@@ -817,7 +817,7 @@ class AWSProviderStrategy(ProviderStrategy):
         This method translates AWS-specific field names and formats to domain entity format,
         ensuring the application layer only works with domain objects.
         """
-        from src.domain.machine.machine_status import MachineStatus
+        from domain.machine.machine_status import MachineStatus
 
         # Extract AWS state information
         aws_state = aws_instance.get("State", {})

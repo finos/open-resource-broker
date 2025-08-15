@@ -5,17 +5,17 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any, Dict
 
-from src.application.base.handlers import BaseCommandHandler
-from src.application.decorators import command_handler
-from src.application.dto.commands import (
+from application.base.handlers import BaseCommandHandler
+from application.decorators import command_handler
+from application.dto.commands import (
     CleanupAllResourcesCommand,
     CleanupOldRequestsCommand,
 )
-from src.domain.base import UnitOfWorkFactory
-from src.domain.base.events.infrastructure_events import ResourcesCleanedEvent
-from src.domain.base.ports import ErrorHandlingPort, EventPublisherPort, LoggingPort
-from src.domain.machine.repository import MachineRepository
-from src.domain.request.repository import RequestRepository
+from domain.base import UnitOfWorkFactory
+from domain.base.events.infrastructure_events import ResourcesCleanedEvent
+from domain.base.ports import ErrorHandlingPort, EventPublisherPort, LoggingPort
+from domain.machine.repository import MachineRepository
+from domain.request.repository import RequestRepository
 
 
 @command_handler(CleanupOldRequestsCommand)

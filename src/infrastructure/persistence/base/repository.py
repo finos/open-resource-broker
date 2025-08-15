@@ -4,11 +4,11 @@ from typing import Any, Dict, Generic, List, Optional, TypeVar
 
 from pydantic import ValidationError as PydanticValidationError
 
-from src.domain.base.domain_interfaces import Repository
-from src.domain.base.exceptions import ConcurrencyError, EntityNotFoundError
+from domain.base.domain_interfaces import Repository
+from domain.base.exceptions import ConcurrencyError, EntityNotFoundError
 
 # Use lazy import for event_publisher to avoid circular imports
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.logging.logger import get_logger
 
 T = TypeVar("T")  # Entity type
 
@@ -64,7 +64,7 @@ class StrategyBasedRepository(Repository[T], Generic[T]):
             # objects
             data = entity.model_dump()
             # Lazy import to avoid circular dependency
-            from src.infrastructure.utilities.common.serialization import (
+            from infrastructure.utilities.common.serialization import (
                 process_value_objects,
             )
 
@@ -73,7 +73,7 @@ class StrategyBasedRepository(Repository[T], Generic[T]):
             # Process the result to handle value objects
             data = entity.to_dict()
             # Lazy import to avoid circular dependency
-            from src.infrastructure.utilities.common.serialization import (
+            from infrastructure.utilities.common.serialization import (
                 process_value_objects,
             )
 
@@ -82,7 +82,7 @@ class StrategyBasedRepository(Repository[T], Generic[T]):
             # Process the result to handle value objects
             data = vars(entity)
             # Lazy import to avoid circular dependency
-            from src.infrastructure.utilities.common.serialization import (
+            from infrastructure.utilities.common.serialization import (
                 process_value_objects,
             )
 
@@ -169,7 +169,7 @@ class StrategyBasedRepository(Repository[T], Generic[T]):
                 # Lazy import to avoid circular imports
                 import asyncio
 
-                from src.infrastructure.events import get_event_bus
+                from infrastructure.events import get_event_bus
 
                 event_bus = get_event_bus()
 

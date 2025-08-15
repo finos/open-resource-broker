@@ -12,10 +12,10 @@ Architecture:
 
 from typing import TYPE_CHECKING
 
-from src.domain.base.ports.container_port import ContainerPort
+from domain.base.ports.container_port import ContainerPort
 
 if TYPE_CHECKING:
-    from src.infrastructure.di.container import DIContainer
+    from infrastructure.di.container import DIContainer
 
 
 class ContainerAdapterFactory:
@@ -39,7 +39,7 @@ class ContainerAdapterFactory:
             Uses lazy import to avoid circular dependency at module level.
         """
         # Lazy import to avoid circular dependency
-        from src.infrastructure.adapters.container_adapter import ContainerAdapter
+        from infrastructure.adapters.container_adapter import ContainerAdapter
 
         return ContainerAdapter(container)
 

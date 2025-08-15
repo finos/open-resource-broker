@@ -17,7 +17,7 @@ try:
     from cli.main import main
 except ImportError:
     # Fallback to development mode import
-    from src.cli.main import main
+    from cli.main import main
 
 # Import version for help text
 try:

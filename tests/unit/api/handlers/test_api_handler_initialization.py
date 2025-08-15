@@ -2,18 +2,18 @@
 
 from unittest.mock import MagicMock, patch
 
-from src.api.handlers.get_available_templates_handler import (
+from api.handlers.get_available_templates_handler import (
     GetAvailableTemplatesRESTHandler,
 )
-from src.api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
-from src.api.handlers.get_return_requests_handler import GetReturnRequestsRESTHandler
-from src.api.handlers.request_machines_handler import RequestMachinesRESTHandler
-from src.api.handlers.request_return_machines_handler import (
+from api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
+from api.handlers.get_return_requests_handler import GetReturnRequestsRESTHandler
+from api.handlers.request_machines_handler import RequestMachinesRESTHandler
+from api.handlers.request_return_machines_handler import (
     RequestReturnMachinesRESTHandler,
 )
-from src.domain.base.ports import ErrorHandlingPort, LoggingPort, SchedulerPort
-from src.infrastructure.di.buses import CommandBus, QueryBus
-from src.monitoring.metrics import MetricsCollector
+from domain.base.ports import ErrorHandlingPort, LoggingPort, SchedulerPort
+from infrastructure.di.buses import CommandBus, QueryBus
+from monitoring.metrics import MetricsCollector
 
 
 class TestAPIHandlerInitialization:
@@ -130,8 +130,8 @@ class TestAPIHandlerRegistration:
     def test_register_server_services(self, mock_register_api_handlers):
         """Test that register_server_services calls _register_api_handlers when server is enabled."""
         # Arrange
-        from src.config.schemas.server_schema import ServerConfig
-        from src.infrastructure.di.server_services import register_server_services
+        from config.schemas.server_schema import ServerConfig
+        from infrastructure.di.server_services import register_server_services
 
         container = MagicMock()
         config_manager = MagicMock()
@@ -150,8 +150,8 @@ class TestAPIHandlerRegistration:
     def test_register_server_services_disabled(self, mock_register_api_handlers):
         """Test that register_server_services doesn't call _register_api_handlers when server is disabled."""
         # Arrange
-        from src.config.schemas.server_schema import ServerConfig
-        from src.infrastructure.di.server_services import register_server_services
+        from config.schemas.server_schema import ServerConfig
+        from infrastructure.di.server_services import register_server_services
 
         container = MagicMock()
         config_manager = MagicMock()

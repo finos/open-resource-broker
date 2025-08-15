@@ -1,6 +1,6 @@
 """Core service registrations for dependency injection."""
 
-from src.domain.base.ports import (
+from domain.base.ports import (
     ConfigurationPort,
     EventPublisherPort,
     LoggingPort,
@@ -8,9 +8,9 @@ from src.domain.base.ports import (
     SchedulerPort,
     StoragePort,
 )
-from src.infrastructure.di.buses import CommandBus, QueryBus
-from src.infrastructure.di.container import DIContainer
-from src.monitoring.metrics import MetricsCollector
+from infrastructure.di.buses import CommandBus, QueryBus
+from infrastructure.di.container import DIContainer
+from monitoring.metrics import MetricsCollector
 
 
 def register_core_services(container: DIContainer) -> None:
@@ -31,7 +31,7 @@ def register_core_services(container: DIContainer) -> None:
     container.register_factory(ProviderPort, lambda c: _create_provider_strategy(c))
 
     # Register event publisher
-    from src.infrastructure.events.publisher import ConfigurableEventPublisher
+    from infrastructure.events.publisher import ConfigurableEventPublisher
 
     container.register_factory(
         EventPublisherPort,
@@ -48,7 +48,7 @@ def register_core_services(container: DIContainer) -> None:
 
 def _create_scheduler_strategy(container: DIContainer) -> SchedulerPort:
     """Create scheduler strategy using factory."""
-    from src.infrastructure.factories.scheduler_strategy_factory import (
+    from infrastructure.factories.scheduler_strategy_factory import (
         SchedulerStrategyFactory,
     )
 
@@ -60,7 +60,7 @@ def _create_scheduler_strategy(container: DIContainer) -> SchedulerPort:
 
 def _create_storage_strategy(container: DIContainer) -> StoragePort:
     """Create storage strategy using factory."""
-    from src.infrastructure.factories.storage_strategy_factory import (
+    from infrastructure.factories.storage_strategy_factory import (
         StorageStrategyFactory,
     )
 
@@ -72,10 +72,10 @@ def _create_storage_strategy(container: DIContainer) -> StoragePort:
 
 def _create_provider_strategy(container: DIContainer) -> ProviderPort:
     """Create provider strategy using adapter pattern."""
-    from src.infrastructure.adapters.provider_context_adapter import (
+    from infrastructure.adapters.provider_context_adapter import (
         ProviderContextAdapter,
     )
-    from src.providers.base.strategy.provider_context import ProviderContext
+    from providers.base.strategy.provider_context import ProviderContext
 
     provider_context = container.get(ProviderContext)
     return ProviderContextAdapter(provider_context)

@@ -4,14 +4,14 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.application.services.provider_capability_service import (
+from application.services.provider_capability_service import (
     ProviderCapabilityService,
     ValidationLevel,
     ValidationResult,
 )
-from src.domain.base.ports import LoggingPort
-from src.domain.template.aggregate import Template
-from src.providers.base.strategy.provider_strategy import ProviderOperationType
+from domain.base.ports import LoggingPort
+from domain.template.aggregate import Template
+from providers.base.strategy.provider_strategy import ProviderOperationType
 
 
 class TestProviderCapabilityService:

@@ -4,18 +4,18 @@ from typing import Any, Dict, List, Optional
 
 from botocore.exceptions import ClientError
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
-from src.infrastructure.persistence.base.strategy import BaseStorageStrategy
+from domain.base.dependency_injection import injectable
+from domain.base.ports import LoggingPort
+from infrastructure.persistence.base.strategy import BaseStorageStrategy
 
 # Import components
-from src.infrastructure.persistence.components import (
+from infrastructure.persistence.components import (
     DynamoDBClientManager,
     DynamoDBConverter,
     DynamoDBTransactionManager,
     LockManager,
 )
-from src.infrastructure.persistence.exceptions import PersistenceError
+from infrastructure.persistence.exceptions import PersistenceError
 
 
 @injectable

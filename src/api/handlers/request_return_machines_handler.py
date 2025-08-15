@@ -3,19 +3,19 @@
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from src.application.base.infrastructure_handlers import BaseAPIHandler, RequestContext
-from src.application.dto.commands import CreateReturnRequestCommand
-from src.application.dto.responses import (
+from application.base.infrastructure_handlers import BaseAPIHandler, RequestContext
+from application.dto.commands import CreateReturnRequestCommand
+from application.dto.responses import (
     CleanupResourcesResponse,
     RequestReturnMachinesResponse,
 )
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import ErrorHandlingPort, LoggingPort
-from src.domain.base.ports.scheduler_port import SchedulerPort
+from domain.base.dependency_injection import injectable
+from domain.base.ports import ErrorHandlingPort, LoggingPort
+from domain.base.ports.scheduler_port import SchedulerPort
 
 # Exception handling infrastructure
-from src.infrastructure.error.decorators import handle_interface_exceptions
-from src.monitoring.metrics import MetricsCollector
+from infrastructure.error.decorators import handle_interface_exceptions
+from monitoring.metrics import MetricsCollector
 
 
 @injectable
@@ -295,4 +295,4 @@ class RequestReturnMachinesRESTHandler(
 
 
 if TYPE_CHECKING:
-    from src.infrastructure.di.buses import CommandBus, QueryBus
+    from infrastructure.di.buses import CommandBus, QueryBus

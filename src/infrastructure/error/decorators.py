@@ -9,7 +9,7 @@ import inspect
 from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, Type
 
-from src.infrastructure.error.exception_handler import (
+from infrastructure.error.exception_handler import (
     ExceptionContext,
     ExceptionHandler,
     get_exception_handler,

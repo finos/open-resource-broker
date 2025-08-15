@@ -4,9 +4,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.domain.base.exceptions import ConfigurationError
-from src.infrastructure.registry.base_registry import BaseRegistration, BaseRegistry
-from src.infrastructure.registry.scheduler_registry import (
+from domain.base.exceptions import ConfigurationError
+from infrastructure.registry.base_registry import BaseRegistration, BaseRegistry
+from infrastructure.registry.scheduler_registry import (
     SchedulerRegistry,
     UnsupportedSchedulerError,
     get_scheduler_registry,

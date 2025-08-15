@@ -3,7 +3,7 @@
 import logging
 from typing import Any, Dict, List, Optional, Type, TypeVar
 
-from src.domain.base.exceptions import ConfigurationError
+from domain.base.exceptions import ConfigurationError
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)

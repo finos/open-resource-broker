@@ -11,8 +11,8 @@ from unittest.mock import patch
 import psutil
 import pytest
 
-from src.bootstrap import Application
-from src.infrastructure.di.container import get_container
+from bootstrap import Application
+from infrastructure.di.container import get_container
 
 
 class TestLazyLoadingPerformance:
@@ -121,7 +121,7 @@ class TestLazyLoadingPerformance:
 
     def test_component_registration_performance(self):
         """Test component registration performance."""
-        from src.infrastructure.di.services import register_all_services
+        from infrastructure.di.services import register_all_services
 
         container = get_container()
 
@@ -136,8 +136,8 @@ class TestLazyLoadingPerformance:
 
     def test_handler_discovery_performance(self):
         """Test handler discovery performance."""
-        from src.infrastructure.di.container import get_container
-        from src.infrastructure.di.handler_discovery import HandlerDiscoveryService
+        from infrastructure.di.container import get_container
+        from infrastructure.di.handler_discovery import HandlerDiscoveryService
 
         container = get_container()
         discovery_service = HandlerDiscoveryService(container)
@@ -158,7 +158,7 @@ class TestLazyLoadingPerformance:
 
     def test_storage_registration_performance(self):
         """Test storage registration performance."""
-        from src.infrastructure.persistence.registration import (
+        from infrastructure.persistence.registration import (
             register_minimal_storage_types,
         )
 
@@ -173,7 +173,7 @@ class TestLazyLoadingPerformance:
 
     def test_scheduler_registration_performance(self):
         """Test scheduler registration performance."""
-        from src.infrastructure.scheduler.registration import (
+        from infrastructure.scheduler.registration import (
             register_active_scheduler_only,
         )
 

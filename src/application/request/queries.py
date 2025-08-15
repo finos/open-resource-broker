@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from src.application.dto.base import BaseQuery
+from application.dto.base import BaseQuery
 
 
 class GetRequestStatusQuery(BaseQuery):

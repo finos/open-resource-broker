@@ -8,12 +8,12 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from src.config.schemas.provider_strategy_schema import ProviderInstanceConfig
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
-from src.domain.base.ports.configuration_port import ConfigurationPort
-from src.domain.template.aggregate import Template
-from src.infrastructure.registry.provider_registry import ProviderRegistry
+from config.schemas.provider_strategy_schema import ProviderInstanceConfig
+from domain.base.dependency_injection import injectable
+from domain.base.ports import LoggingPort
+from domain.base.ports.configuration_port import ConfigurationPort
+from domain.template.aggregate import Template
+from infrastructure.registry.provider_registry import ProviderRegistry
 
 
 @dataclass

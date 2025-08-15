@@ -2,12 +2,12 @@
 
 import logging
 
-from src.domain.base.events import DomainEvent
+from domain.base.events import DomainEvent
 
 
 def handle_aws_client_operation(event: DomainEvent) -> None:
     """Handle AWS client operation events."""
-    from src.application.events.handlers.system_handlers import system_handler
+    from application.events.handlers.system_handlers import system_handler
 
     fields = system_handler.extract_fields(
         event,
@@ -36,7 +36,7 @@ def handle_aws_client_operation(event: DomainEvent) -> None:
 
 def handle_aws_rate_limit(event: DomainEvent) -> None:
     """Handle AWS rate limit events."""
-    from src.application.events.handlers.system_handlers import system_handler
+    from application.events.handlers.system_handlers import system_handler
 
     fields = system_handler.extract_fields(
         event,
@@ -62,7 +62,7 @@ def handle_aws_rate_limit(event: DomainEvent) -> None:
 
 def handle_aws_credentials_event(event: DomainEvent) -> None:
     """Handle AWS credentials events."""
-    from src.application.events.handlers.system_handlers import system_handler
+    from application.events.handlers.system_handlers import system_handler
 
     fields = system_handler.extract_fields(
         event, {"event_type": "unknown", "profile": None, "region": None}

@@ -3,7 +3,7 @@
 from abc import ABC
 from typing import Any, Dict
 
-from src.domain.base.ports.provider_port import ProviderPort
+from domain.base.ports.provider_port import ProviderPort
 
 
 class BaseProviderStrategy(ProviderPort, ABC):

@@ -4,9 +4,9 @@ import json
 import os
 from typing import Any, Dict, List, Optional
 
-from src.config.managers.configuration_manager import ConfigurationManager
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.persistence.json.strategy import JSONStorageStrategy
+from config.managers.configuration_manager import ConfigurationManager
+from infrastructure.logging.logger import get_logger
+from infrastructure.persistence.json.strategy import JSONStorageStrategy
 
 
 class ProviderTemplateStrategy(JSONStorageStrategy):

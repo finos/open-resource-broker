@@ -7,8 +7,8 @@ from typing import Any, Dict, List, Optional
 
 from boto3.dynamodb.conditions import Attr
 
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.persistence.components.resource_manager import DataConverter
+from infrastructure.logging.logger import get_logger
+from infrastructure.persistence.components.resource_manager import DataConverter
 
 
 class DynamoDBConverter(DataConverter):

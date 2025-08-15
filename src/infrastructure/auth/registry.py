@@ -3,8 +3,8 @@
 import threading
 from typing import Callable, Dict
 
-from src.infrastructure.adapters.ports.auth import AuthPort
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.adapters.ports.auth import AuthPort
+from infrastructure.logging.logger import get_logger
 
 
 class AuthRegistry:

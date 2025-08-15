@@ -8,8 +8,8 @@ from typing import Optional
 
 from pydantic import field_validator
 
-from src.domain.base.value_objects import ValueObject
-from src.domain.request.request_types import RequestType
+from domain.base.value_objects import ValueObject
+from domain.request.request_types import RequestType
 
 
 class RequestId(ValueObject):
@@ -58,7 +58,7 @@ class RequestId(ValueObject):
             New RequestId instance
         """
         try:
-            from src.domain.base.configuration_service import get_domain_config_service
+            from domain.base.configuration_service import get_domain_config_service
 
             config_service = get_domain_config_service()
             if config_service:
@@ -76,7 +76,7 @@ class RequestId(ValueObject):
     def _is_valid_format(value: str) -> bool:
         """Check if value matches required format."""
         try:
-            from src.domain.base.configuration_service import get_domain_config_service
+            from domain.base.configuration_service import get_domain_config_service
 
             config_service = get_domain_config_service()
             if config_service:

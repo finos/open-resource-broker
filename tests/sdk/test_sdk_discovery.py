@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from src.sdk.discovery import MethodInfo, SDKMethodDiscovery
-from src.sdk.exceptions import HandlerDiscoveryError, MethodExecutionError
+from sdk.discovery import MethodInfo, SDKMethodDiscovery
+from sdk.exceptions import HandlerDiscoveryError, MethodExecutionError
 
 
 class MockQuery:

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from src.domain.base.ports.scheduler_port import SchedulerPort
-from src.infrastructure.di.buses import CommandBus, QueryBus
-from src.infrastructure.di.container import get_container
-from src.infrastructure.error.decorators import handle_interface_exceptions
+from domain.base.ports.scheduler_port import SchedulerPort
+from infrastructure.di.buses import CommandBus, QueryBus
+from infrastructure.di.container import get_container
+from infrastructure.error.decorators import handle_interface_exceptions
 
 
 @handle_interface_exceptions(context="list_storage_strategies", interface_type="cli")
@@ -17,7 +17,7 @@ async def handle_list_storage_strategies(args) -> Dict[str, Any]:
     query_bus = container.get(QueryBus)
     container.get(SchedulerPort)
 
-    from src.application.queries.storage import ListStorageStrategiesQuery
+    from application.queries.storage import ListStorageStrategiesQuery
 
     query = ListStorageStrategiesQuery()
     strategies = await query_bus.execute(query)
@@ -43,7 +43,7 @@ async def handle_show_storage_config(args) -> Dict[str, Any]:
     container = get_container()
     query_bus = container.get(QueryBus)
 
-    from src.application.queries.system import GetStorageConfigQuery
+    from application.queries.system import GetStorageConfigQuery
 
     query = GetStorageConfigQuery()
     config = await query_bus.execute(query)
@@ -65,7 +65,7 @@ async def handle_validate_storage_config(args) -> Dict[str, Any]:
     container = get_container()
     query_bus = container.get(QueryBus)
 
-    from src.application.queries.system import ValidateStorageConfigQuery
+    from application.queries.system import ValidateStorageConfigQuery
 
     query = ValidateStorageConfigQuery()
     validation = await query_bus.execute(query)
@@ -90,7 +90,7 @@ async def handle_test_storage(args) -> Dict[str, Any]:
     container = get_container()
     command_bus = container.get(CommandBus)
 
-    from src.application.commands.system import TestStorageCommand
+    from application.commands.system import TestStorageCommand
 
     command = TestStorageCommand()
     result = await command_bus.execute(command)
@@ -112,7 +112,7 @@ async def handle_storage_health(args) -> Dict[str, Any]:
     container = get_container()
     query_bus = container.get(QueryBus)
 
-    from src.application.queries.system import GetStorageHealthQuery
+    from application.queries.system import GetStorageHealthQuery
 
     query = GetStorageHealthQuery()
     health = await query_bus.execute(query)
@@ -134,7 +134,7 @@ async def handle_storage_metrics(args) -> Dict[str, Any]:
     container = get_container()
     query_bus = container.get(QueryBus)
 
-    from src.application.queries.system import GetStorageMetricsQuery
+    from application.queries.system import GetStorageMetricsQuery
 
     query = GetStorageMetricsQuery()
     metrics = await query_bus.execute(query)

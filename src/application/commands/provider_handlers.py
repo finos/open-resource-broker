@@ -7,23 +7,23 @@ integrating the existing provider strategy ecosystem with the CQRS architecture.
 import time
 from typing import Any, Dict
 
-from src.application.base.handlers import BaseCommandHandler
-from src.application.decorators import command_handler
-from src.application.provider.commands import (
+from application.base.handlers import BaseCommandHandler
+from application.decorators import command_handler
+from application.provider.commands import (
     ConfigureProviderStrategyCommand,
     ExecuteProviderOperationCommand,
     RegisterProviderStrategyCommand,
     SelectProviderStrategyCommand,
     UpdateProviderHealthCommand,
 )
-from src.domain.base.events.provider_events import (
+from domain.base.events.provider_events import (
     ProviderHealthChangedEvent,
     ProviderOperationExecutedEvent,
     ProviderStrategyRegisteredEvent,
     ProviderStrategySelectedEvent,
 )
-from src.domain.base.ports import ErrorHandlingPort, EventPublisherPort, LoggingPort
-from src.providers.base.strategy import (
+from domain.base.ports import ErrorHandlingPort, EventPublisherPort, LoggingPort
+from providers.base.strategy import (
     ProviderContext,
     ProviderResult,
     SelectionPolicy,
@@ -209,7 +209,7 @@ class RegisterProviderStrategyHandler(
 
         try:
             # Use provider registry to create strategy
-            from src.infrastructure.registry.provider_registry import (
+            from infrastructure.registry.provider_registry import (
                 get_provider_registry,
             )
 

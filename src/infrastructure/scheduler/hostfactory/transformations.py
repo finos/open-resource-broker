@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, List
 
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.logging.logger import get_logger
 
 
 class HostFactoryTransformations:

@@ -3,16 +3,16 @@
 import time
 from typing import Any, Dict, Optional
 
-from src.application.base.infrastructure_handlers import BaseAPIHandler
-from src.application.dto.queries import ListTemplatesQuery
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import ErrorHandlingPort, LoggingPort
-from src.domain.base.ports.scheduler_port import SchedulerPort
-from src.infrastructure.di.buses import CommandBus, QueryBus
+from application.base.infrastructure_handlers import BaseAPIHandler
+from application.dto.queries import ListTemplatesQuery
+from domain.base.dependency_injection import injectable
+from domain.base.ports import ErrorHandlingPort, LoggingPort
+from domain.base.ports.scheduler_port import SchedulerPort
+from infrastructure.di.buses import CommandBus, QueryBus
 
 # Exception handling infrastructure
-from src.infrastructure.error.decorators import handle_interface_exceptions
-from src.monitoring.metrics import MetricsCollector
+from infrastructure.error.decorators import handle_interface_exceptions
+from monitoring.metrics import MetricsCollector
 
 
 @injectable

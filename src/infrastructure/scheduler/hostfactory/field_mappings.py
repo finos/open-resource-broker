@@ -2,7 +2,7 @@
 
 from typing import Dict
 
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.logging.logger import get_logger
 
 
 class HostFactoryFieldMappings:

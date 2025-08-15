@@ -2,22 +2,22 @@
 
 from typing import Optional
 
-from src.domain.base.dependency_injection import injectable
-from src.infrastructure.persistence.base.unit_of_work import BaseUnitOfWork
+from domain.base.dependency_injection import injectable
+from infrastructure.persistence.base.unit_of_work import BaseUnitOfWork
 
 # Import new simplified repositories
-from src.infrastructure.persistence.repositories.machine_repository import (
+from infrastructure.persistence.repositories.machine_repository import (
     MachineRepositoryImpl as MachineRepository,
 )
-from src.infrastructure.persistence.repositories.request_repository import (
+from infrastructure.persistence.repositories.request_repository import (
     RequestRepositoryImpl as RequestRepository,
 )
-from src.infrastructure.persistence.repositories.template_repository import (
+from infrastructure.persistence.repositories.template_repository import (
     TemplateRepositoryImpl as TemplateRepository,
 )
 
 # Import DynamoDB storage strategy
-from src.providers.aws.persistence.dynamodb.strategy import DynamoDBStorageStrategy
+from providers.aws.persistence.dynamodb.strategy import DynamoDBStorageStrategy
 
 
 @injectable

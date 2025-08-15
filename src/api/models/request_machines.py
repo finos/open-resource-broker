@@ -4,7 +4,7 @@ from typing import Optional
 
 from pydantic import Field, field_validator
 
-from src.api.models.base import APIRequest, APIResponse
+from api.models.base import APIRequest, APIResponse
 
 
 class MachineTemplate(APIRequest):

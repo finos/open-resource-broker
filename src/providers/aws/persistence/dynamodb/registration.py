@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING, Any, Dict
 
 # Use TYPE_CHECKING to avoid direct infrastructure import
 if TYPE_CHECKING:
-    from src.domain.base.ports import LoggingPort
-    from src.infrastructure.registry.storage_registry import StorageRegistry
+    from domain.base.ports import LoggingPort
+    from infrastructure.registry.storage_registry import StorageRegistry
 
 
 def create_dynamodb_strategy(config: Any) -> Any:
@@ -24,7 +24,7 @@ def create_dynamodb_strategy(config: Any) -> Any:
     Returns:
         DynamoDBStorageStrategy instance
     """
-    from src.providers.aws.persistence.dynamodb.strategy import DynamoDBStorageStrategy
+    from providers.aws.persistence.dynamodb.strategy import DynamoDBStorageStrategy
 
     # Extract configuration parameters
     if hasattr(config, "dynamodb_strategy"):
@@ -63,7 +63,7 @@ def create_dynamodb_config(data: Dict[str, Any]) -> Any:
     Returns:
         DynamoDB configuration object
     """
-    from src.config.schemas.storage_schema import DynamodbStrategyConfig
+    from config.schemas.storage_schema import DynamodbStrategyConfig
 
     return DynamodbStrategyConfig(**data)
 
@@ -80,9 +80,9 @@ def create_dynamodb_unit_of_work(config: Any) -> Any:
     """
     import boto3
 
-    from src.config.manager import ConfigurationManager
-    from src.config.schemas.storage_schema import StorageConfig
-    from src.providers.aws.persistence.dynamodb.unit_of_work import DynamoDBUnitOfWork
+    from config.manager import ConfigurationManager
+    from config.schemas.storage_schema import StorageConfig
+    from providers.aws.persistence.dynamodb.unit_of_work import DynamoDBUnitOfWork
 
     # Handle different config types
     if isinstance(config, ConfigurationManager):
@@ -141,7 +141,7 @@ def register_dynamodb_storage(
     """
     if registry is None:
         # Import here to avoid circular dependencies
-        from src.infrastructure.registry.storage_registry import get_storage_registry
+        from infrastructure.registry.storage_registry import get_storage_registry
 
         registry = get_storage_registry()
 

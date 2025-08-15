@@ -7,9 +7,9 @@ import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import ConfigurationPort, LoggingPort
-from src.providers.aws.exceptions.aws_exceptions import (
+from domain.base.dependency_injection import injectable
+from domain.base.ports import ConfigurationPort, LoggingPort
+from providers.aws.exceptions.aws_exceptions import (
     AuthorizationError,
     AWSConfigurationError,
     NetworkError,
@@ -117,7 +117,7 @@ class AWSClient:
         """
         try:
             # Try to get AWS config from ConfigurationManager
-            from src.providers.aws.configuration.config import AWSProviderConfig
+            from providers.aws.configuration.config import AWSProviderConfig
 
             aws_config = config_manager.get_typed(AWSProviderConfig)
             if aws_config and aws_config.region:
@@ -140,10 +140,10 @@ class AWSClient:
         """
         try:
             # Use provider selection service from DI container
-            from src.application.services.provider_selection_service import (
+            from application.services.provider_selection_service import (
                 ProviderSelectionService,
             )
-            from src.infrastructure.di.container import get_container
+            from infrastructure.di.container import get_container
 
             container = get_container()
             selection_service = container.get(ProviderSelectionService)
@@ -204,7 +204,7 @@ class AWSClient:
 
         # Fallback: try legacy AWSProviderConfig approach
         try:
-            from src.providers.aws.configuration.config import AWSProviderConfig
+            from providers.aws.configuration.config import AWSProviderConfig
 
             aws_config = config_manager.get_typed(AWSProviderConfig)
             if aws_config and aws_config.profile:
@@ -229,7 +229,7 @@ class AWSClient:
         """
         try:
             # Try to get performance config from ConfigurationManager
-            from src.config import PerformanceConfig
+            from config import PerformanceConfig
 
             perf_config = config_manager.get_typed(PerformanceConfig)
             if perf_config:

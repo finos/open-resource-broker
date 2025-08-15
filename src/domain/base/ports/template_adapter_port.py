@@ -8,7 +8,7 @@ while maintaining a consistent interface.
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
-from src.domain.base.contracts.template_contract import (
+from domain.base.contracts.template_contract import (
     TemplateContract,
     TemplateValidationResult,
 )

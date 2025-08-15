@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from threading import Lock
 from typing import Any, Dict, List, Optional
 
-from src.domain.base.ports import LoggingPort
-from src.providers.base.strategy.provider_strategy import (
+from domain.base.ports import LoggingPort
+from providers.base.strategy.provider_strategy import (
     ProviderCapabilities,
     ProviderHealthStatus,
     ProviderOperation,

@@ -4,7 +4,7 @@ import asyncio
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
-from src.application.dto.base import BaseCommand, BaseResponse
+from application.dto.base import BaseCommand, BaseResponse
 
 TCommand = TypeVar("TCommand", bound=BaseCommand)
 TResponse = TypeVar("TResponse", bound=BaseResponse)

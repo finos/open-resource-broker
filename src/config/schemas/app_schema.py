@@ -81,10 +81,10 @@ class AppConfig(BaseModel):
         """Get provider type using selection logic."""
         try:
             # Use provider selection service for provider selection
-            from src.application.services.provider_selection_service import (
+            from application.services.provider_selection_service import (
                 ProviderSelectionService,
             )
-            from src.infrastructure.di.container import get_container
+            from infrastructure.di.container import get_container
 
             container = get_container()
             selection_service = container.get(ProviderSelectionService)

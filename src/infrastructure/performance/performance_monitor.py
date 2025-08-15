@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
 if TYPE_CHECKING:
-    from src.domain.base.ports import LoggingPort
+    from domain.base.ports import LoggingPort
 
 
 class PerformanceMonitor:

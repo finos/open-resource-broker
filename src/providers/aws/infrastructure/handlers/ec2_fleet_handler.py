@@ -31,27 +31,27 @@ from typing import Any, Dict, List
 
 from botocore.exceptions import ClientError
 
-from src.application.dto.queries import GetTemplateQuery
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
-from src.domain.request.aggregate import Request
-from src.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
-from src.infrastructure.di.buses import QueryBus
-from src.infrastructure.di.container import get_container
-from src.infrastructure.error.decorators import handle_infrastructure_exceptions
-from src.infrastructure.resilience import CircuitBreakerOpenError
-from src.providers.aws.domain.template.aggregate import AWSTemplate
-from src.providers.aws.domain.template.value_objects import AWSFleetType
-from src.providers.aws.exceptions.aws_exceptions import (
+from application.dto.queries import GetTemplateQuery
+from domain.base.dependency_injection import injectable
+from domain.base.ports import LoggingPort
+from domain.request.aggregate import Request
+from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
+from infrastructure.di.buses import QueryBus
+from infrastructure.di.container import get_container
+from infrastructure.error.decorators import handle_infrastructure_exceptions
+from infrastructure.resilience import CircuitBreakerOpenError
+from providers.aws.domain.template.aggregate import AWSTemplate
+from providers.aws.domain.template.value_objects import AWSFleetType
+from providers.aws.exceptions.aws_exceptions import (
     AWSEntityNotFoundError,
     AWSInfrastructureError,
     AWSValidationError,
 )
-from src.providers.aws.infrastructure.handlers.base_handler import AWSHandler
-from src.providers.aws.infrastructure.launch_template.manager import (
+from providers.aws.infrastructure.handlers.base_handler import AWSHandler
+from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
 )
-from src.providers.aws.utilities.aws_operations import AWSOperations
+from providers.aws.utilities.aws_operations import AWSOperations
 
 
 @injectable
@@ -128,7 +128,7 @@ class EC2FleetHandler(AWSHandler):
             raise AWSValidationError("Fleet type is required for EC2Fleet")
 
         # Validate fleet type using existing validation system
-        from src.providers.aws.infrastructure.adapters.aws_validation_adapter import (
+        from providers.aws.infrastructure.adapters.aws_validation_adapter import (
             create_aws_validation_adapter,
         )
 

@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import Field
 
-from src.application.dto.base import BaseDTO
+from application.dto.base import BaseDTO
 
 
 class ProviderConfigDTO(BaseDTO):

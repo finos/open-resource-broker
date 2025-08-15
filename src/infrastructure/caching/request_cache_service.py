@@ -3,10 +3,10 @@
 from datetime import datetime, timedelta
 from typing import Optional
 
-from src.application.dto.responses import RequestDTO
-from src.config.manager import ConfigurationManager
-from src.domain.base import UnitOfWorkFactory
-from src.domain.base.ports import LoggingPort
+from application.dto.responses import RequestDTO
+from config.manager import ConfigurationManager
+from domain.base import UnitOfWorkFactory
+from domain.base.ports import LoggingPort
 
 
 class RequestCacheService:
@@ -54,7 +54,7 @@ class RequestCacheService:
 
         try:
             with self.uow_factory.create_unit_of_work() as uow:
-                from src.domain.request.value_objects import RequestId
+                from domain.request.value_objects import RequestId
 
                 request_id_obj = RequestId(value=request_id)
                 request = uow.requests.get_by_id(request_id_obj)
@@ -112,7 +112,7 @@ class RequestCacheService:
             # The request is already stored in the database by the command handler
             # We just need to update the timestamp to mark it as "cached"
             with self.uow_factory.create_unit_of_work() as uow:
-                from src.domain.request.value_objects import RequestId
+                from domain.request.value_objects import RequestId
 
                 request_id_obj = RequestId(value=request_dto.request_id)
                 request = uow.requests.get_by_id(request_id_obj)
@@ -139,7 +139,7 @@ class RequestCacheService:
         """Invalidate cache for a specific request."""
         try:
             with self.uow_factory.create_unit_of_work() as uow:
-                from src.domain.request.value_objects import RequestId
+                from domain.request.value_objects import RequestId
 
                 request_id_obj = RequestId(value=request_id)
                 request = uow.requests.get_by_id(request_id_obj)

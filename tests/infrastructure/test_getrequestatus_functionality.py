@@ -2,9 +2,9 @@
 
 import pytest
 
-from src.config.manager import ConfigurationManager
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.scheduler.hostfactory.strategy import (
+from config.manager import ConfigurationManager
+from infrastructure.logging.logger import get_logger
+from infrastructure.scheduler.hostfactory.strategy import (
     HostFactorySchedulerStrategy,
 )
 

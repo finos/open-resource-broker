@@ -8,10 +8,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from src.domain.base.ports import LoggingPort
-from src.domain.template.aggregate import Template
-from src.infrastructure.registry.provider_registry import ProviderRegistry
-from src.providers.base.strategy.provider_strategy import (
+from domain.base.ports import LoggingPort
+from domain.template.aggregate import Template
+from infrastructure.registry.provider_registry import ProviderRegistry
+from providers.base.strategy.provider_strategy import (
     ProviderCapabilities,
     ProviderOperationType,
 )

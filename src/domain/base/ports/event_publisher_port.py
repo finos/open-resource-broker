@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import List
 
-from src.domain.base.events import DomainEvent
+from domain.base.events import DomainEvent
 
 
 class EventPublisherPort(ABC):

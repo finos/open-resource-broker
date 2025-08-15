@@ -2,7 +2,7 @@
 
 from typing import Any, Callable
 
-from src.domain.base.exceptions import ConfigurationError
+from domain.base.exceptions import ConfigurationError
 
 from .base_registry import BaseRegistration, BaseRegistry, RegistryMode
 
@@ -61,13 +61,13 @@ class SchedulerRegistry(BaseRegistry):
         """Dynamically register scheduler type based on configuration."""
         try:
             if scheduler_type in ["hostfactory", "hf"]:
-                from src.infrastructure.scheduler.registration import (
+                from infrastructure.scheduler.registration import (
                     register_symphony_hostfactory_scheduler,
                 )
 
                 register_symphony_hostfactory_scheduler()
             elif scheduler_type == "default":
-                from src.infrastructure.scheduler.registration import (
+                from infrastructure.scheduler.registration import (
                     register_default_scheduler,
                 )
 

@@ -6,8 +6,8 @@ eliminating hard-coded scheduler conditionals and maintaining clean architecture
 
 from typing import Any, Dict, Optional
 
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.registry.scheduler_registry import get_scheduler_registry
+from infrastructure.logging.logger import get_logger
+from infrastructure.registry.scheduler_registry import get_scheduler_registry
 
 
 class SchedulerStrategyFactory:

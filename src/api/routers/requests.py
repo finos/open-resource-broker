@@ -5,8 +5,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
-from src.api.dependencies import get_request_status_handler, get_return_requests_handler
-from src.infrastructure.error.decorators import handle_rest_exceptions
+from api.dependencies import get_request_status_handler, get_return_requests_handler
+from infrastructure.error.decorators import handle_rest_exceptions
 
 router = APIRouter(prefix="/requests", tags=["Requests"])
 

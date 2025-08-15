@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from src.interface.mcp.server.core import MCPMessage, OpenHFPluginMCPServer
+from interface.mcp.server.core import MCPMessage, OpenHFPluginMCPServer
 
 
 class TestMCPMessage:

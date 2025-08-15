@@ -6,15 +6,15 @@ import pytest
 
 # Import domain events and aggregates
 try:
-    from src.domain.base.events import (
+    from domain.base.events import (
         RequestCompletedEvent,
         RequestCreatedEvent,
         RequestStatusChangedEvent,
     )
-    from src.domain.base.events.base_events import BaseEvent
-    from src.domain.base.events.domain_events import DomainEvent
-    from src.domain.request.aggregate import Request
-    from src.domain.request.value_objects import RequestStatus, RequestType
+    from domain.base.events.base_events import BaseEvent
+    from domain.base.events.domain_events import DomainEvent
+    from domain.request.aggregate import Request
+    from domain.request.value_objects import RequestStatus, RequestType
 
     IMPORTS_AVAILABLE = True
 except ImportError as e:

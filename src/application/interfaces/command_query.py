@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
-from src.application.interfaces.command_handler import CommandHandler
+from application.interfaces.command_handler import CommandHandler
 
 T = TypeVar("T")  # Query type
 R = TypeVar("R")  # Result type

@@ -1,11 +1,11 @@
 """Scheduler service registrations for dependency injection."""
 
-from src.domain.base.ports import ConfigurationPort
-from src.infrastructure.di.container import DIContainer
-from src.infrastructure.factories.scheduler_strategy_factory import (
+from domain.base.ports import ConfigurationPort
+from infrastructure.di.container import DIContainer
+from infrastructure.factories.scheduler_strategy_factory import (
     SchedulerStrategyFactory,
 )
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.logging.logger import get_logger
 
 
 def register_scheduler_services(container: DIContainer) -> None:
@@ -33,7 +33,7 @@ def _register_configured_scheduler_strategy(container: DIContainer) -> None:
         logger = get_logger(__name__)
 
         # Registry handles dynamic registration - no hardcoded types here
-        from src.infrastructure.registry.scheduler_registry import (
+        from infrastructure.registry.scheduler_registry import (
             get_scheduler_registry,
         )
 
@@ -46,7 +46,7 @@ def _register_configured_scheduler_strategy(container: DIContainer) -> None:
         logger = get_logger(__name__)
         logger.error(f"Failed to register configured scheduler strategy: {e}")
         # Fallback to default
-        from src.infrastructure.registry.scheduler_registry import (
+        from infrastructure.registry.scheduler_registry import (
             get_scheduler_registry,
         )
 

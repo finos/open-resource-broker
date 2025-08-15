@@ -15,8 +15,8 @@ modules to ensure consistent usage across the application. This allows us to:
 from __future__ import annotations
 
 # Import base DTO class
-from src.application.dto.base import BaseDTO
-from src.application.dto.system import (
+from application.dto.base import BaseDTO
+from application.dto.system import (
     ProviderCapabilitiesDTO,
     ProviderConfigDTO,
     ProviderHealthDTO,
@@ -28,8 +28,8 @@ from src.application.dto.system import (
 )
 
 # Import domain-specific DTOs
-from src.application.machine.dto import MachineDTO, MachineHealthDTO
-from src.application.request.dto import (
+from application.machine.dto import MachineDTO, MachineHealthDTO
+from application.request.dto import (
     CleanupResourcesResponse,
     RequestDTO,
     RequestMachinesResponse,
@@ -40,7 +40,7 @@ from src.application.request.dto import (
 )
 
 # Templates use domain objects directly with scheduler strategy for formatting
-from src.domain.template.aggregate import Template
+from domain.template.aggregate import Template
 
 __all__ = [
     "BaseDTO",

@@ -4,9 +4,9 @@ import asyncio
 import sys
 from typing import Any, Dict
 
-from src.infrastructure.di.container import get_container
-from src.infrastructure.error.decorators import handle_interface_exceptions
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.di.container import get_container
+from infrastructure.error.decorators import handle_interface_exceptions
+from infrastructure.logging.logger import get_logger
 
 from .core import OpenHFPluginMCPServer
 

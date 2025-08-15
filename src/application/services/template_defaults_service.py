@@ -2,13 +2,13 @@
 
 from typing import Any, Dict, Optional
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports.configuration_port import ConfigurationPort
-from src.domain.base.ports.logging_port import LoggingPort
-from src.domain.template.aggregate import Template
-from src.domain.template.extensions import TemplateExtensionRegistry
-from src.domain.template.factory import TemplateFactoryPort
-from src.domain.template.ports.template_defaults_port import TemplateDefaultsPort
+from domain.base.dependency_injection import injectable
+from domain.base.ports.configuration_port import ConfigurationPort
+from domain.base.ports.logging_port import LoggingPort
+from domain.template.aggregate import Template
+from domain.template.extensions import TemplateExtensionRegistry
+from domain.template.factory import TemplateFactoryPort
+from domain.template.ports.template_defaults_port import TemplateDefaultsPort
 
 
 @injectable

@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict
 
-from src.domain.base.value_objects import InstanceId
+from domain.base.value_objects import InstanceId
 
 
 class BaseProviderConfig(BaseModel):

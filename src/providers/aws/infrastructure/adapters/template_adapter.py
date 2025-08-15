@@ -9,16 +9,16 @@ Follows the Adapter/Port pattern established in the codebase.
 import re
 from typing import Any, Dict, List, Optional
 
-from src.domain.base.ports.configuration_port import ConfigurationPort
-from src.domain.base.ports.logging_port import LoggingPort
-from src.domain.base.ports.template_adapter_port import TemplateAdapterPort
-from src.domain.template.aggregate import Template
-from src.infrastructure.template.configuration_manager import (
+from domain.base.ports.configuration_port import ConfigurationPort
+from domain.base.ports.logging_port import LoggingPort
+from domain.base.ports.template_adapter_port import TemplateAdapterPort
+from domain.template.aggregate import Template
+from infrastructure.template.configuration_manager import (
     TemplateConfigurationManager,
 )
-from src.infrastructure.template.dtos import TemplateDTO
-from src.providers.aws.exceptions.aws_exceptions import AWSValidationError
-from src.providers.aws.infrastructure.aws_client import AWSClient
+from infrastructure.template.dtos import TemplateDTO
+from providers.aws.exceptions.aws_exceptions import AWSValidationError
+from providers.aws.infrastructure.aws_client import AWSClient
 
 
 class AWSTemplateAdapter(TemplateAdapterPort):

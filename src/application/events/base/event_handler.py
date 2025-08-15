@@ -13,8 +13,8 @@ from typing import Any, Dict, Optional
 
 # Import types - using string imports to avoid circular dependencies
 try:
-    from src.domain.base.events import DomainEvent
-    from src.domain.base.ports import LoggingPort
+    from domain.base.events import DomainEvent
+    from domain.base.ports import LoggingPort
 except ImportError:
     # Fallback for testing or when dependencies aren't available
     DomainEvent = Any

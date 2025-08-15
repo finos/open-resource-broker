@@ -8,8 +8,8 @@ from typing import Any, Dict
 # Add src directory to path
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from src.domain.base.ports import ConfigurationPort, LoggingPort
-from src.infrastructure.di.container import DIContainer
+from domain.base.ports import ConfigurationPort, LoggingPort
+from infrastructure.di.container import DIContainer
 
 
 class MockConfigurationPort(ConfigurationPort):
@@ -92,7 +92,7 @@ class TestInjectableMigration(unittest.TestCase):
         self.container = DIContainer()
 
         # Register basic dependencies
-        from src.infrastructure.logging.logger import get_logger
+        from infrastructure.logging.logger import get_logger
 
         self.container.register_factory(LoggingPort, lambda c: get_logger("test"))
 
@@ -100,14 +100,14 @@ class TestInjectableMigration(unittest.TestCase):
         self.container.register_singleton(ConfigurationPort, lambda c: MockConfigurationPort())
 
         # Register AWS config with valid authentication
-        from src.providers.aws.configuration.config import AWSConfig
+        from providers.aws.configuration.config import AWSConfig
 
         self.container.register_singleton(
             AWSConfig, lambda c: AWSConfig(region="us-east-1", profile="default")
         )
 
         # Register AWS client manually
-        from src.providers.aws.infrastructure.aws_client import AWSClient
+        from providers.aws.infrastructure.aws_client import AWSClient
 
         self.container.register_singleton(
             AWSClient,
@@ -115,7 +115,7 @@ class TestInjectableMigration(unittest.TestCase):
         )
 
         # Register AWS handler factory manually
-        from src.providers.aws.infrastructure.aws_handler_factory import (
+        from providers.aws.infrastructure.aws_handler_factory import (
             AWSHandlerFactory,
         )
 
@@ -131,14 +131,14 @@ class TestInjectableMigration(unittest.TestCase):
     def test_aws_strategy_classes(self):
         """Test that AWS strategy classes are properly registered and injectable."""
         # Register and test AWSProviderAdapter
-        from src.providers.aws.strategy.aws_provider_adapter import AWSProviderAdapter
+        from providers.aws.strategy.aws_provider_adapter import AWSProviderAdapter
 
         self.container.register_singleton(AWSProviderAdapter)
         provider_adapter = self.container.get(AWSProviderAdapter)
         self.assertIsNotNone(provider_adapter)
 
         # Register and test AWSProviderStrategy
-        from src.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
+        from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
         self.container.register_singleton(AWSProviderStrategy)
         provider_strategy = self.container.get(AWSProviderStrategy)
@@ -147,14 +147,14 @@ class TestInjectableMigration(unittest.TestCase):
     def test_aws_manager_classes(self):
         """Test that AWS manager classes are properly registered and injectable."""
         # Register and test AWSInstanceManager
-        from src.providers.aws.managers.aws_instance_manager import AWSInstanceManager
+        from providers.aws.managers.aws_instance_manager import AWSInstanceManager
 
         self.container.register_singleton(AWSInstanceManager)
         instance_manager = self.container.get(AWSInstanceManager)
         self.assertIsNotNone(instance_manager)
 
         # Register and test AWSResourceManagerImpl
-        from src.providers.aws.managers.aws_resource_manager import (
+        from providers.aws.managers.aws_resource_manager import (
             AWSResourceManagerImpl,
         )
 

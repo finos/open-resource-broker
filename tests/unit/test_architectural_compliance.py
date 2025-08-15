@@ -107,7 +107,7 @@ class TestDDDCompliance:
         """Test that aggregate roots maintain business invariants."""
         # Import domain aggregates
         try:
-            from src.domain.request.aggregate import Request
+            from domain.request.aggregate import Request
         except ImportError as e:
             pytest.skip(f"Could not import aggregates: {e}")
 
@@ -120,7 +120,7 @@ class TestDDDCompliance:
         assert request.machine_count > 0
 
         # Invariant: status should be valid
-        from src.domain.request.value_objects import RequestStatus
+        from domain.request.value_objects import RequestStatus
 
         assert request.status in RequestStatus
 
@@ -130,7 +130,7 @@ class TestDDDCompliance:
     def test_domain_events_are_immutable(self):
         """Ensure all domain events are immutable."""
         try:
-            from src.domain.base.events import RequestCreatedEvent
+            from domain.base.events import RequestCreatedEvent
         except ImportError as e:
             pytest.skip(f"Could not import domain events: {e}")
 
@@ -169,7 +169,7 @@ class TestSOLIDCompliance:
         """Ensure each class has only one reason to change."""
         # Test that ApplicationService has a single responsibility (orchestration)
         try:
-            from src.application.service import ApplicationService
+            from application.service import ApplicationService
         except ImportError as e:
             pytest.skip(f"Could not import ApplicationService: {e}")
 
@@ -205,7 +205,7 @@ class TestSOLIDCompliance:
         """Ensure classes are open for extension, closed for modification."""
         # Test that provider interface allows extension without modification
         try:
-            from src.infrastructure.interfaces.provider import ProviderPort
+            from infrastructure.interfaces.provider import ProviderPort
         except ImportError as e:
             pytest.skip(f"Could not import ProviderPort: {e}")
 
@@ -218,8 +218,8 @@ class TestSOLIDCompliance:
         """Ensure subtypes are substitutable for base types."""
         # Test that all providers can substitute the base interface
         try:
-            from src.infrastructure.interfaces.provider import ProviderPort
-            from src.providers.aws.strategy.aws_provider_strategy import (
+            from infrastructure.interfaces.provider import ProviderPort
+            from providers.aws.strategy.aws_provider_strategy import (
                 AWSProviderStrategy as AWSProvider,
             )
         except ImportError as e:
@@ -234,7 +234,7 @@ class TestSOLIDCompliance:
         """Ensure clients depend only on interfaces they use."""
         # Test that interfaces are focused and not bloated
         try:
-            from src.infrastructure.interfaces.provider import ProviderPort
+            from infrastructure.interfaces.provider import ProviderPort
         except ImportError as e:
             pytest.skip(f"Could not import ProviderPort: {e}")
 
@@ -254,7 +254,7 @@ class TestSOLIDCompliance:
         try:
             import inspect
 
-            from src.application.service import ApplicationService
+            from application.service import ApplicationService
         except ImportError as e:
             pytest.skip(f"Could not import ApplicationService: {e}")
 
@@ -296,7 +296,7 @@ class TestCleanArchitectureCompliance:
 
             with open(py_file, "r") as f:
                 content = f.read()
-                if "from src.domain" in content or "import src.domain" in content:
+                if "from domain" in content or "import domain" in content:
                     app_imports_domain = True
 
         # Check domain layer imports
@@ -307,7 +307,7 @@ class TestCleanArchitectureCompliance:
 
             with open(py_file, "r") as f:
                 content = f.read()
-                if "from src.application" in content or "import src.application" in content:
+                if "from application" in content or "import application" in content:
                     domain_imports_app = True
 
         assert app_imports_domain, "Application layer should import domain layer"
@@ -390,7 +390,7 @@ class TestDesignPatternCompliance:
     def test_repository_pattern_compliance(self):
         """Test Repository pattern implementation."""
         try:
-            from src.domain.base.ports import RepositoryPort as Repository
+            from domain.base.ports import RepositoryPort as Repository
         except ImportError as e:
             pytest.skip(f"Could not import Repository: {e}")
 
@@ -402,7 +402,7 @@ class TestDesignPatternCompliance:
     def test_factory_pattern_compliance(self):
         """Test Factory pattern implementation."""
         try:
-            from src.infrastructure.di.container import DIContainer
+            from infrastructure.di.container import DIContainer
         except ImportError as e:
             pytest.skip(f"Could not import DIContainer: {e}")
 
@@ -414,8 +414,8 @@ class TestDesignPatternCompliance:
     def test_aggregate_pattern_compliance(self):
         """Test Aggregate pattern implementation."""
         try:
-            from src.domain.base.entity import AggregateRoot
-            from src.domain.request.aggregate import Request
+            from domain.base.entity import AggregateRoot
+            from domain.request.aggregate import Request
         except ImportError as e:
             pytest.skip(f"Could not import aggregate classes: {e}")
 
@@ -473,8 +473,8 @@ class TestCodeQualityCompliance:
     def test_proper_exception_hierarchy(self):
         """Test that exceptions follow correct hierarchy."""
         try:
-            from src.domain.base.exceptions import DomainException
-            from src.domain.request.exceptions import RequestValidationError
+            from domain.base.exceptions import DomainException
+            from domain.request.exceptions import RequestValidationError
         except ImportError as e:
             pytest.skip(f"Could not import exception classes: {e}")
 

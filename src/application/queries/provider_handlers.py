@@ -7,21 +7,21 @@ leveraging the existing provider strategy ecosystem through clean CQRS interface
 import time
 from typing import Any, Dict, List
 
-from src.application.base.handlers import BaseQueryHandler
-from src.application.decorators import query_handler
-from src.application.dto.system import (
+from application.base.handlers import BaseQueryHandler
+from application.decorators import query_handler
+from application.dto.system import (
     ProviderCapabilitiesDTO,
     ProviderHealthDTO,
     ProviderStrategyConfigDTO,
 )
-from src.application.provider.queries import (
+from application.provider.queries import (
     GetProviderCapabilitiesQuery,
     GetProviderHealthQuery,
     GetProviderMetricsQuery,
     GetProviderStrategyConfigQuery,
     ListAvailableProvidersQuery,
 )
-from src.domain.base.ports import ErrorHandlingPort, LoggingPort, ProviderPort
+from domain.base.ports import ErrorHandlingPort, LoggingPort, ProviderPort
 
 
 @query_handler(GetProviderHealthQuery)

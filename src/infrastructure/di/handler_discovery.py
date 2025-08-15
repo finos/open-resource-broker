@@ -24,13 +24,13 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any, Dict, Optional, Type
 
-from src.application.decorators import (
+from application.decorators import (
     get_handler_registry_stats,
     get_registered_command_handlers,
     get_registered_query_handlers,
 )
-from src.infrastructure.di.container import DIContainer
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.di.container import DIContainer
+from infrastructure.logging.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -52,8 +52,8 @@ class HandlerDiscoveryService:
 
         # Get caching configuration from performance settings
         try:
-            from src.config.manager import get_config_manager
-            from src.config.schemas.performance_schema import PerformanceConfig
+            from config.manager import get_config_manager
+            from config.schemas.performance_schema import PerformanceConfig
 
             config_manager = get_config_manager()
             perf_config = config_manager.get_typed(PerformanceConfig)

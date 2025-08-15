@@ -6,8 +6,8 @@ import logging
 import threading
 from typing import Any, Dict, Optional
 
-from src.infrastructure.logging.logger import ContextLogger, with_context
-from src.infrastructure.patterns.singleton_registry import SingletonRegistry
+from infrastructure.logging.logger import ContextLogger, with_context
+from infrastructure.patterns.singleton_registry import SingletonRegistry
 
 # Global singleton instance - initialized early to avoid circular imports
 _logger_singleton_instance = None
@@ -50,7 +50,7 @@ class LoggerSingleton:
             if name not in self._loggers:
                 # Import the logger module's get_logger function directly to avoid
                 # recursion
-                from src.infrastructure.logging.logger import (
+                from infrastructure.logging.logger import (
                     get_logger as logger_module_get_logger,
                 )
 
@@ -133,7 +133,7 @@ def register_logger_with_container() -> None:
     to register the already-created logger singleton instance.
     """
     try:
-        from src.infrastructure.di.container import get_container
+        from infrastructure.di.container import get_container
 
         container = get_container()
 
@@ -146,7 +146,7 @@ def register_logger_with_container() -> None:
 
         # Also register with the singleton registry if available
         try:
-            from src.infrastructure.patterns.singleton_registry import SingletonRegistry
+            from infrastructure.patterns.singleton_registry import SingletonRegistry
 
             registry = SingletonRegistry.get_instance()
             # Check if the singleton is already registered by checking if it exists in

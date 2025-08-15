@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from threading import RLock
 from typing import Dict, List, Optional, Type
 
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.logging.logger import get_logger
 
 
 class Lifecycle(ABC):

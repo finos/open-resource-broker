@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, List
 
-from src.domain.base.value_objects import InstanceId
+from domain.base.value_objects import InstanceId
 
 
 class ProviderScenarios:

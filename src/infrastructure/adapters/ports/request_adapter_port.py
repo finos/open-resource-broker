@@ -7,7 +7,7 @@ This module defines the interface for request adapters.
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List
 
-from src.domain.request.aggregate import Request
+from domain.request.aggregate import Request
 
 
 class RequestAdapterPort(ABC):

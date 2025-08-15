@@ -21,8 +21,8 @@ from typing import Any, Callable, Dict, Optional, Type
 
 from pydantic import Field
 
-from src.application.dto.base import BaseDTO
-from src.domain.base.exceptions import (
+from application.dto.base import BaseDTO
+from domain.base.exceptions import (
     BusinessRuleViolationError,
     ConfigurationError,
     DomainException,
@@ -30,22 +30,22 @@ from src.domain.base.exceptions import (
     InfrastructureError,
     ValidationError,
 )
-from src.domain.machine.exceptions import (
+from domain.machine.exceptions import (
     MachineException,
     MachineNotFoundError,
     MachineValidationError,
 )
-from src.domain.request.exceptions import (
+from domain.request.exceptions import (
     RequestException,
     RequestNotFoundError,
     RequestValidationError,
 )
-from src.domain.template.exceptions import (
+from domain.template.exceptions import (
     TemplateException,
     TemplateNotFoundError,
     TemplateValidationError,
 )
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.logging.logger import get_logger
 
 
 class ErrorCategory:

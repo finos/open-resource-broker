@@ -5,13 +5,13 @@ from typing import List
 
 import jwt
 
-from src.infrastructure.adapters.ports.auth import (
+from infrastructure.adapters.ports.auth import (
     AuthContext,
     AuthPort,
     AuthResult,
     AuthStatus,
 )
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.logging.logger import get_logger
 
 
 class BearerTokenStrategy(AuthPort):

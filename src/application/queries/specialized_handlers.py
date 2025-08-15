@@ -2,21 +2,21 @@
 
 from __future__ import annotations
 
-from src.application.base.handlers import BaseQueryHandler
-from src.application.decorators import query_handler
-from src.application.dto.queries import (
+from application.base.handlers import BaseQueryHandler
+from application.decorators import query_handler
+from application.dto.queries import (
     GetActiveMachineCountQuery,
     GetMachineHealthQuery,
     GetRequestSummaryQuery,
 )
-from src.application.dto.responses import MachineHealthDTO, RequestSummaryDTO
-from src.domain.base import UnitOfWorkFactory
-from src.domain.base.exceptions import EntityNotFoundError
-from src.domain.base.ports import ErrorHandlingPort, LoggingPort
+from application.dto.responses import MachineHealthDTO, RequestSummaryDTO
+from domain.base import UnitOfWorkFactory
+from domain.base.exceptions import EntityNotFoundError
+from domain.base.ports import ErrorHandlingPort, LoggingPort
 
 # Exception handling infrastructure
-from src.domain.machine.value_objects import MachineStatus
-from src.infrastructure.adapters.ports.resource_provisioning_port import (
+from domain.machine.value_objects import MachineStatus
+from infrastructure.adapters.ports.resource_provisioning_port import (
     ResourceProvisioningPort,
 )
 

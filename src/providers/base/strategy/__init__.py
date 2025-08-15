@@ -14,7 +14,7 @@ Key Components:
 - Value Objects: Operation, Result, Capabilities, Health status
 
 Usage Example:
-    from src.providers.base.strategy import (
+    from providers.base.strategy import (
         ProviderContext,
         ProviderOperation,
         ProviderOperationType,
@@ -154,7 +154,7 @@ def create_provider_context(logger=None) -> ProviderContext:
 
     # Load strategies from the provider registry
     try:
-        from src.infrastructure.registry.provider_registry import get_provider_registry
+        from infrastructure.registry.provider_registry import get_provider_registry
 
         registry = get_provider_registry()
 
@@ -166,7 +166,7 @@ def create_provider_context(logger=None) -> ProviderContext:
                 registration = registry.get_provider_instance_registration(instance_name)
                 if registration:
                     # Get the actual provider config from configuration manager
-                    from src.config.manager import get_config_manager
+                    from config.manager import get_config_manager
 
                     config_manager = get_config_manager()
                     provider_config = config_manager.get_provider_config()

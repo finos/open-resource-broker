@@ -2,9 +2,9 @@
 
 from unittest.mock import MagicMock, patch
 
-from src.domain.base.ports import SchedulerPort
-from src.infrastructure.scheduler.default.strategy import DefaultSchedulerStrategy
-from src.infrastructure.scheduler.hostfactory.strategy import (
+from domain.base.ports import SchedulerPort
+from infrastructure.scheduler.default.strategy import DefaultSchedulerStrategy
+from infrastructure.scheduler.hostfactory.strategy import (
     HostFactorySchedulerStrategy,
 )
 
@@ -166,7 +166,7 @@ class TestFormatConversionInHandlers:
     def test_format_conversion_in_api_handler(self, mock_handle):
         """Test that format conversion is done using the scheduler strategy in API handlers."""
         # Arrange
-        from src.api.handlers.get_available_templates_handler import (
+        from api.handlers.get_available_templates_handler import (
             GetAvailableTemplatesRESTHandler,
         )
 
@@ -212,7 +212,7 @@ class TestFormatConversionInHandlers:
         # Arrange
         import argparse
 
-        from src.interface.template_command_handlers import handle_list_templates
+        from interface.template_command_handlers import handle_list_templates
 
         container = MagicMock()
         query_bus = MagicMock()

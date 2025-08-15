@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from enum import Enum
 from typing import Any, Callable, List, Optional
 
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.logging.logger import get_logger
 
 
 class TransactionState(str, Enum):

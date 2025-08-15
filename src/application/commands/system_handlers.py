@@ -2,10 +2,10 @@
 
 from typing import Any, Dict
 
-from src.application.base.handlers import BaseCommandHandler
-from src.application.commands.system import ReloadProviderConfigCommand
-from src.application.decorators import command_handler
-from src.domain.base.ports import (
+from application.base.handlers import BaseCommandHandler
+from application.commands.system import ReloadProviderConfigCommand
+from application.decorators import command_handler
+from domain.base.ports import (
     ContainerPort,
     ErrorHandlingPort,
     EventPublisherPort,
@@ -44,7 +44,7 @@ class ReloadProviderConfigHandler(BaseCommandHandler[ReloadProviderConfigCommand
 
         try:
             # Get configuration manager from container
-            from src.domain.base.ports import ConfigurationPort
+            from domain.base.ports import ConfigurationPort
 
             config_manager = self.container.get(ConfigurationPort)
 
@@ -54,7 +54,7 @@ class ReloadProviderConfigHandler(BaseCommandHandler[ReloadProviderConfigCommand
                 config_manager.reload(command.config_path)
             else:
                 # Fallback: create new configuration manager instance using factory
-                from src.config.manager import get_config_manager
+                from config.manager import get_config_manager
 
                 get_config_manager(command.config_path)
 

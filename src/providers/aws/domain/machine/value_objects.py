@@ -1,7 +1,7 @@
 """AWS-specific machine value objects."""
 
-from src.domain.machine.value_objects import *
-from src.providers.aws.domain.template.value_objects import (
+from domain.machine.value_objects import *
+from providers.aws.domain.template.value_objects import (
     AWSImageId,
     AWSInstanceType,
     AWSSecurityGroupId,

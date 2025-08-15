@@ -8,12 +8,12 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.config.managers.configuration_manager import ConfigurationManager
-from src.config.schemas.provider_strategy_schema import (
+from config.managers.configuration_manager import ConfigurationManager
+from config.schemas.provider_strategy_schema import (
     ProviderConfig,
     ProviderInstanceConfig,
 )
-from src.infrastructure.persistence.json.provider_template_strategy import (
+from infrastructure.persistence.json.provider_template_strategy import (
     ProviderTemplateStrategy,
 )
 

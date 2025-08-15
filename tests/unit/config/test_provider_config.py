@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.config.schemas.provider_strategy_schema import (
+from config.schemas.provider_strategy_schema import (
     CircuitBreakerConfig,
     HealthCheckConfig,
     ProviderConfig,

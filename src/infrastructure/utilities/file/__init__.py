@@ -149,6 +149,6 @@ __all__ = [
 
 def get_file_utils_logger():
     """Get logger for file utilities."""
-    from src.infrastructure.logging.logger import get_logger
+    from infrastructure.logging.logger import get_logger
 
     return get_logger(__name__)

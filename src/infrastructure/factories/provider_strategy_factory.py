@@ -6,19 +6,19 @@ integrating the existing provider strategy ecosystem with the CQRS architecture.
 
 from typing import Any, Dict, Optional
 
-from src.config.schemas.provider_strategy_schema import (
+from config.schemas.provider_strategy_schema import (
     ProviderConfig,
     ProviderInstanceConfig,
     ProviderMode,
 )
-from src.domain.base.exceptions import ConfigurationError
-from src.domain.base.ports import ConfigurationPort, LoggingPort
-from src.infrastructure.error.decorators import handle_infrastructure_exceptions
-from src.infrastructure.registry.provider_registry import (
+from domain.base.exceptions import ConfigurationError
+from domain.base.ports import ConfigurationPort, LoggingPort
+from infrastructure.error.decorators import handle_infrastructure_exceptions
+from infrastructure.registry.provider_registry import (
     UnsupportedProviderError,
     get_provider_registry,
 )
-from src.providers.base.strategy import (
+from providers.base.strategy import (
     ProviderContext,
     ProviderStrategy,
     SelectionPolicy,

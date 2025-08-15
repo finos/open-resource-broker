@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
-from src.domain.template.aggregate import Template
+from domain.template.aggregate import Template
 
 
 class TemplateConfigurationPort(ABC):

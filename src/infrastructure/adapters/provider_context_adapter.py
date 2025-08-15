@@ -2,11 +2,11 @@
 
 from typing import Any, Dict, List
 
-from src.domain.base.ports.provider_port import ProviderPort
-from src.domain.machine.aggregate import Machine
-from src.domain.request.aggregate import Request
-from src.domain.template.aggregate import Template
-from src.providers.base.strategy.provider_context import ProviderContext
+from domain.base.ports.provider_port import ProviderPort
+from domain.machine.aggregate import Machine
+from domain.request.aggregate import Request
+from domain.template.aggregate import Template
+from providers.base.strategy.provider_context import ProviderContext
 
 
 class ProviderContextAdapter(ProviderPort):

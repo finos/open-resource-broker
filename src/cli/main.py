@@ -14,11 +14,11 @@ import os
 import sys
 from typing import Any, Dict
 
-from src.cli.completion import generate_bash_completion, generate_zsh_completion
-from src.cli.formatters import format_output
-from src.domain.base.exceptions import DomainException
-from src.domain.request.value_objects import RequestStatus
-from src.infrastructure.logging.logger import get_logger
+from cli.completion import generate_bash_completion, generate_zsh_completion
+from cli.formatters import format_output
+from domain.base.exceptions import DomainException
+from domain.request.value_objects import RequestStatus
+from infrastructure.logging.logger import get_logger
 
 
 def parse_args() -> tuple[argparse.Namespace, dict]:
@@ -81,7 +81,7 @@ For more information, visit: https://github.com/aws-samples/open-hostfactory-plu
     parser.add_argument("-d", "--data", help="Input JSON data string (HostFactory compatibility)")
     # Get version dynamically
     try:
-        from src._package import __version__
+        from _package import __version__
 
         version_string = f"%(prog)s {__version__}"
     except ImportError:
@@ -512,7 +512,7 @@ async def execute_command(args, app) -> Dict[str, Any]:
             with open(args.file, "r") as f:
                 input_data = json.load(f)
         except Exception as e:
-            from src.infrastructure.logging.logger import get_logger
+            from infrastructure.logging.logger import get_logger
 
             logger = get_logger(__name__)
             logger.error(f"Failed to load input file {args.file}: {e}")
@@ -523,7 +523,7 @@ async def execute_command(args, app) -> Dict[str, Any]:
 
             input_data = json.loads(args.data)
         except Exception as e:
-            from src.infrastructure.logging.logger import get_logger
+            from infrastructure.logging.logger import get_logger
 
             logger = get_logger(__name__)
             logger.error(f"Failed to parse input data: {e}")
@@ -545,33 +545,33 @@ async def execute_command(args, app) -> Dict[str, Any]:
             app.config_manager.override_scheduler_strategy(args.scheduler)
             scheduler_override_active = True
         except Exception as e:
-            from src.infrastructure.logging.logger import get_logger
+            from infrastructure.logging.logger import get_logger
 
             logger = get_logger(__name__)
             logger.warning(f"Failed to override scheduler strategy: {e}")
 
     try:
         # Import function handlers - all are now async functions with decorators
-        from src.interface.mcp.server.handler import handle_mcp_serve
-        from src.interface.mcp_command_handlers import (
+        from interface.mcp.server.handler import handle_mcp_serve
+        from interface.mcp_command_handlers import (
             handle_mcp_tools_call,
             handle_mcp_tools_info,
             handle_mcp_tools_list,
             handle_mcp_validate,
         )
-        from src.interface.request_command_handlers import (
+        from interface.request_command_handlers import (
             handle_get_request_status,
             handle_get_return_requests,
             handle_request_machines,
             handle_request_return_machines,
         )
-        from src.interface.scheduler_command_handlers import (
+        from interface.scheduler_command_handlers import (
             handle_list_scheduler_strategies,
             handle_show_scheduler_config,
             handle_validate_scheduler_config,
         )
-        from src.interface.serve_command_handler import handle_serve_api
-        from src.interface.storage_command_handlers import (
+        from interface.serve_command_handler import handle_serve_api
+        from interface.storage_command_handlers import (
             handle_list_storage_strategies,
             handle_show_storage_config,
             handle_storage_health,
@@ -579,7 +579,7 @@ async def execute_command(args, app) -> Dict[str, Any]:
             handle_test_storage,
             handle_validate_storage_config,
         )
-        from src.interface.system_command_handlers import (
+        from interface.system_command_handlers import (
             handle_execute_provider_operation,
             handle_list_providers,
             handle_provider_config,
@@ -589,7 +589,7 @@ async def execute_command(args, app) -> Dict[str, Any]:
             handle_select_provider_strategy,
             handle_validate_provider_config,
         )
-        from src.interface.template_command_handlers import (
+        from interface.template_command_handlers import (
             handle_create_template,
             handle_delete_template,
             handle_get_template,
@@ -671,7 +671,7 @@ async def execute_command(args, app) -> Dict[str, Any]:
             try:
                 app.config_manager.restore_scheduler_strategy()
             except Exception as e:
-                from src.infrastructure.logging.logger import get_logger
+                from infrastructure.logging.logger import get_logger
 
                 logger = get_logger(__name__)
                 logger.warning(f"Failed to restore scheduler strategy: {e}")
@@ -746,7 +746,7 @@ async def main() -> None:
 
         # Initialize application with dry-run mode if requested
         try:
-            from src.bootstrap import Application
+            from bootstrap import Application
 
             app = Application(args.config)
             if not await app.initialize(dry_run=args.dry_run):
@@ -762,7 +762,7 @@ async def main() -> None:
         # Execute command with dry-run context if requested
         try:
             # Import dry-run context
-            from src.infrastructure.mocking.dry_run_context import dry_run_context
+            from infrastructure.mocking.dry_run_context import dry_run_context
 
             # Execute command within dry-run context if flag is set
             if args.dry_run:

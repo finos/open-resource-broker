@@ -3,7 +3,7 @@
 from abc import abstractmethod
 from typing import Any, Dict, List, Optional
 
-from src.domain.base.domain_interfaces import AggregateRepository
+from domain.base.domain_interfaces import AggregateRepository
 
 from .aggregate import Template
 

@@ -2,7 +2,7 @@
 
 from enum import Enum
 
-from src.domain.base.dependency_injection import injectable
+from domain.base.dependency_injection import injectable
 
 
 @injectable

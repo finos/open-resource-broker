@@ -3,8 +3,8 @@
 import signal
 from typing import Any, Dict
 
-from src.infrastructure.error.decorators import handle_interface_exceptions
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.error.decorators import handle_interface_exceptions
+from infrastructure.logging.logger import get_logger
 
 
 @handle_interface_exceptions(context="serve_api", interface_type="cli")
@@ -30,10 +30,10 @@ async def handle_serve_api(args) -> Dict[str, Any]:
 
     try:
         # Import here to avoid circular dependencies
-        from src.api.server import create_fastapi_app
-        from src.config.schemas.server_schema import ServerConfig
-        from src.domain.base.ports.configuration_port import ConfigurationPort
-        from src.infrastructure.di.container import get_container
+        from api.server import create_fastapi_app
+        from config.schemas.server_schema import ServerConfig
+        from domain.base.ports.configuration_port import ConfigurationPort
+        from infrastructure.di.container import get_container
 
         # Get configuration through DI
         container = get_container()

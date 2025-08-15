@@ -1,7 +1,7 @@
 """Collection utility functions organized by responsibility."""
 
 # Import specific functions from submodules
-from src.infrastructure.utilities.common.collections.filtering import (
+from infrastructure.utilities.common.collections.filtering import (
     contains,
     contains_all,
     contains_any,
@@ -14,7 +14,7 @@ from src.infrastructure.utilities.common.collections.filtering import (
     has_duplicates,
     remove_duplicates,
 )
-from src.infrastructure.utilities.common.collections.grouping import (
+from infrastructure.utilities.common.collections.grouping import (
     count_by,
     count_occurrences,
     frequency_map,
@@ -23,7 +23,7 @@ from src.infrastructure.utilities.common.collections.grouping import (
     most_common,
     partition,
 )
-from src.infrastructure.utilities.common.collections.transforming import (
+from infrastructure.utilities.common.collections.transforming import (
     chunk,
     deep_flatten,
     deep_merge_dicts,
@@ -38,7 +38,7 @@ from src.infrastructure.utilities.common.collections.transforming import (
     to_set,
     to_tuple,
 )
-from src.infrastructure.utilities.common.collections.validation import (
+from infrastructure.utilities.common.collections.validation import (
     all_match,
     any_match,
     is_disjoint,

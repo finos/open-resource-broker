@@ -12,20 +12,20 @@ from __future__ import annotations
 import argparse
 from typing import Any, Dict
 
-from src.application.dto.queries import (
+from application.dto.queries import (
     GetTemplateQuery,
     ListTemplatesQuery,
     ValidateTemplateQuery,
 )
-from src.application.template.commands import (
+from application.template.commands import (
     CreateTemplateCommand,
     DeleteTemplateCommand,
     UpdateTemplateCommand,
 )
-from src.domain.base.ports.scheduler_port import SchedulerPort
-from src.infrastructure.di.buses import CommandBus, QueryBus
-from src.infrastructure.di.container import get_container
-from src.infrastructure.error.decorators import handle_interface_exceptions
+from domain.base.ports.scheduler_port import SchedulerPort
+from infrastructure.di.buses import CommandBus, QueryBus
+from infrastructure.di.container import get_container
+from infrastructure.error.decorators import handle_interface_exceptions
 
 
 @handle_interface_exceptions(context="list_templates", interface_type="cli")
@@ -182,7 +182,7 @@ async def handle_create_template(args: argparse.Namespace) -> Dict[str, Any]:
             return {"success": False, "error": "CommandBus not available"}
 
         # Check dry-run context
-        from src.infrastructure.mocking.dry_run_context import is_dry_run_active
+        from infrastructure.mocking.dry_run_context import is_dry_run_active
 
         if is_dry_run_active():
             return {
@@ -265,7 +265,7 @@ async def handle_update_template(args: argparse.Namespace) -> Dict[str, Any]:
             return {"success": False, "error": "Template ID is required"}
 
         # Check dry-run context
-        from src.infrastructure.mocking.dry_run_context import is_dry_run_active
+        from infrastructure.mocking.dry_run_context import is_dry_run_active
 
         if is_dry_run_active():
             return {
@@ -334,7 +334,7 @@ async def handle_delete_template(args: argparse.Namespace) -> Dict[str, Any]:
             return {"success": False, "error": "Template ID is required"}
 
         # Check dry-run context
-        from src.infrastructure.mocking.dry_run_context import is_dry_run_active
+        from infrastructure.mocking.dry_run_context import is_dry_run_active
 
         if is_dry_run_active():
             return {

@@ -8,17 +8,17 @@ import pytest
 
 # Import repository components
 try:
-    from src.domain.request.aggregate import Request
-    from src.domain.request.value_objects import RequestStatus
-    from src.infrastructure.persistence.base.base_repository import BaseRepository
-    from src.infrastructure.persistence.components.json_storage import JSONStorage
-    from src.infrastructure.persistence.repositories.machine_repository import (
+    from domain.request.aggregate import Request
+    from domain.request.value_objects import RequestStatus
+    from infrastructure.persistence.base.base_repository import BaseRepository
+    from infrastructure.persistence.components.json_storage import JSONStorage
+    from infrastructure.persistence.repositories.machine_repository import (
         MachineRepository,
     )
-    from src.infrastructure.persistence.repositories.request_repository import (
+    from infrastructure.persistence.repositories.request_repository import (
         RequestRepository,
     )
-    from src.infrastructure.persistence.repositories.template_repository import (
+    from infrastructure.persistence.repositories.template_repository import (
         TemplateRepository,
     )
 

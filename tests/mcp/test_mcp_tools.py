@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from src.mcp.discovery import MCPToolDiscovery
-from src.mcp.tools import OpenHFPluginMCPTools
-from src.sdk.client import OpenHFPluginSDK
+from mcp.discovery import MCPToolDiscovery
+from mcp.tools import OpenHFPluginMCPTools
+from sdk.client import OpenHFPluginSDK
 
 
 class TestOpenHFPluginMCPTools:

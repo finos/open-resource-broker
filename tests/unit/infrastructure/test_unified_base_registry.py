@@ -4,16 +4,16 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.infrastructure.registry.base_registry import RegistryMode
-from src.infrastructure.registry.provider_registry import (
+from infrastructure.registry.base_registry import RegistryMode
+from infrastructure.registry.provider_registry import (
     ProviderRegistry,
     get_provider_registry,
 )
-from src.infrastructure.registry.scheduler_registry import (
+from infrastructure.registry.scheduler_registry import (
     SchedulerRegistry,
     get_scheduler_registry,
 )
-from src.infrastructure.registry.storage_registry import (
+from infrastructure.registry.storage_registry import (
     StorageRegistry,
     get_storage_registry,
 )

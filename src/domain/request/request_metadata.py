@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import field_validator, model_validator
 
-from src.domain.base.value_objects import ValueObject
+from domain.base.value_objects import ValueObject
 
 
 class RequestTimeout(ValueObject):
@@ -69,7 +69,7 @@ class RequestTimeout(ValueObject):
     def default(cls) -> "RequestTimeout":
         """Create default timeout from configuration."""
         try:
-            from src.domain.base.configuration_service import get_domain_config_service
+            from domain.base.configuration_service import get_domain_config_service
 
             config_service = get_domain_config_service()
             if config_service:
@@ -116,7 +116,7 @@ class MachineCount(ValueObject):
         max_allowed = self.max_allowed
         if max_allowed is None:
             try:
-                from src.domain.base.configuration_service import (
+                from domain.base.configuration_service import (
                     get_domain_config_service,
                 )
 

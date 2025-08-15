@@ -4,7 +4,7 @@ import threading
 
 import pytest
 
-from src.infrastructure.mocking.dry_run_context import (
+from infrastructure.mocking.dry_run_context import (
     dry_run_context,
     get_dry_run_status,
     is_dry_run_active,

@@ -1,6 +1,6 @@
 """Request domain exceptions."""
 
-from src.domain.base.exceptions import (
+from domain.base.exceptions import (
     DomainException,
     EntityNotFoundError,
     ValidationError,

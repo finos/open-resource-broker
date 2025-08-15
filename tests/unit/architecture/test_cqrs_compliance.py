@@ -14,13 +14,13 @@ import pytest
 
 # Import available components
 try:
-    from src.application.base.command_handler import ApplicationCommandHandler
-    from src.application.dto.commands import (
+    from application.base.command_handler import ApplicationCommandHandler
+    from application.dto.commands import (
         CreateRequestCommand,
         UpdateRequestStatusCommand,
     )
-    from src.application.dto.queries import GetTemplateQuery, ListTemplatesQuery
-    from src.infrastructure.di.container import DIContainer
+    from application.dto.queries import GetTemplateQuery, ListTemplatesQuery
+    from infrastructure.di.container import DIContainer
 
     COMPONENTS_AVAILABLE = True
 except ImportError as e:
@@ -187,7 +187,7 @@ class TestCQRSCompliance:
     def test_event_driven_architecture_support(self):
         """Test that CQRS supports event-driven patterns."""
         # Commands should potentially trigger events
-        from src.domain.request.value_objects import RequestStatus
+        from domain.request.value_objects import RequestStatus
 
         command = UpdateRequestStatusCommand(
             request_id="test-request", status=RequestStatus.COMPLETED

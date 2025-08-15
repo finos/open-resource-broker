@@ -6,9 +6,9 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from src.application.dto.base import BaseCommand
-from src.application.interfaces.command_query import Command
-from src.domain.request.value_objects import RequestStatus
+from application.dto.base import BaseCommand
+from application.interfaces.command_query import Command
+from domain.request.value_objects import RequestStatus
 
 
 class CreateRequestCommand(BaseCommand):

@@ -8,16 +8,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.events.domain_events import (
+from domain.base.dependency_injection import injectable
+from domain.base.events.domain_events import (
     TemplateCreatedEvent,
     TemplateDeletedEvent,
     TemplateUpdatedEvent,
 )
-from src.domain.base.ports.event_publisher_port import EventPublisherPort
-from src.domain.base.ports.logging_port import LoggingPort
-from src.domain.base.ports.scheduler_port import SchedulerPort
-from src.infrastructure.template.dtos import TemplateDTO
+from domain.base.ports.event_publisher_port import EventPublisherPort
+from domain.base.ports.logging_port import LoggingPort
+from domain.base.ports.scheduler_port import SchedulerPort
+from infrastructure.template.dtos import TemplateDTO
 
 
 @injectable

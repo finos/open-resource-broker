@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional
 
-from src.domain.base.exceptions import ConfigurationError
+from domain.base.exceptions import ConfigurationError
 
 from .base_registry import BaseRegistration, BaseRegistry, RegistryMode
 
@@ -174,19 +174,19 @@ class StorageRegistry(BaseRegistry):
         """Dynamically register storage type based on configuration."""
         try:
             if storage_type == "json":
-                from src.infrastructure.persistence.json.registration import (
+                from infrastructure.persistence.json.registration import (
                     register_json_storage,
                 )
 
                 register_json_storage()
             elif storage_type == "sql":
-                from src.infrastructure.persistence.sql.registration import (
+                from infrastructure.persistence.sql.registration import (
                     register_sql_storage,
                 )
 
                 register_sql_storage()
             elif storage_type == "dynamodb":
-                from src.providers.aws.persistence.dynamodb.registration import (
+                from providers.aws.persistence.dynamodb.registration import (
                     register_dynamodb_storage,
                 )
 
@@ -194,7 +194,7 @@ class StorageRegistry(BaseRegistry):
             else:
                 raise ValueError(f"Unknown storage type: {storage_type}")
         except ImportError as e:
-            from src.domain.base.exceptions import ConfigurationError
+            from domain.base.exceptions import ConfigurationError
 
             raise ConfigurationError(f"Storage type '{storage_type}' not available: {e}") from e
 

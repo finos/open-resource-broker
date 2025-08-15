@@ -13,26 +13,26 @@ Architecture Principles:
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.exceptions import (
+from domain.base.dependency_injection import injectable
+from domain.base.exceptions import (
     DomainException,
     EntityNotFoundError,
     ValidationError,
 )
-from src.domain.base.ports.configuration_port import ConfigurationPort
-from src.domain.base.ports.event_publisher_port import EventPublisherPort
-from src.domain.base.ports.logging_port import LoggingPort
-from src.domain.base.ports.scheduler_port import SchedulerPort
+from domain.base.ports.configuration_port import ConfigurationPort
+from domain.base.ports.event_publisher_port import EventPublisherPort
+from domain.base.ports.logging_port import LoggingPort
+from domain.base.ports.scheduler_port import SchedulerPort
 
 from .dtos import TemplateDTO
 from .services.template_persistence_service import TemplatePersistenceService
 from .template_cache_service import TemplateCacheService, create_template_cache_service
 
 if TYPE_CHECKING:
-    from src.application.services.provider_capability_service import (
+    from application.services.provider_capability_service import (
         ProviderCapabilityService,
     )
-    from src.application.services.template_defaults_service import (
+    from application.services.template_defaults_service import (
         TemplateDefaultsService,
     )
 
@@ -210,10 +210,10 @@ class TemplateConfigurationManager:
 
         # 2. Use active provider from configuration with appropriate selection logic
         try:
-            from src.application.services.provider_selection_service import (
+            from application.services.provider_selection_service import (
                 ProviderSelectionService,
             )
-            from src.infrastructure.di.container import get_container
+            from infrastructure.di.container import get_container
 
             container = get_container()
             selection_service = container.get(ProviderSelectionService)
@@ -281,7 +281,7 @@ class TemplateConfigurationManager:
             ):
                 aws_defaults = provider_config.provider_defaults["aws"]
                 if hasattr(aws_defaults, "extensions"):
-                    from src.domain.template.extensions import TemplateExtensionRegistry
+                    from domain.template.extensions import TemplateExtensionRegistry
 
                     aws_extension_config = TemplateExtensionRegistry.create_extension_config(
                         "aws", aws_defaults.extensions or {}
@@ -301,12 +301,12 @@ class TemplateConfigurationManager:
     def _get_ami_resolver(self):
         """Get AMI resolver from DI container using port interface."""
         try:
-            from src.infrastructure.di.container import get_container
+            from infrastructure.di.container import get_container
 
             container = get_container()
 
             # Use port interface instead of concrete implementation
-            from src.domain.base.ports.template_resolver_port import (
+            from domain.base.ports.template_resolver_port import (
                 TemplateResolverPort,
             )
 
@@ -583,7 +583,7 @@ class TemplateConfigurationManager:
         """Validate template against provider capabilities."""
         try:
             # Convert TemplateDTO to Template domain object for capability service
-            from src.domain.template.aggregate import Template
+            from domain.template.aggregate import Template
 
             # Create minimal Template object for validation
             domain_template = Template(
@@ -594,7 +594,7 @@ class TemplateConfigurationManager:
             )
 
             # Use provider capability service for validation
-            from src.application.services.provider_capability_service import (
+            from application.services.provider_capability_service import (
                 ValidationLevel,
             )
 

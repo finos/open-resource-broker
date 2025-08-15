@@ -5,9 +5,9 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import Field
 
-from src.application.dto.base import BaseDTO
-from src.domain.request.aggregate import Request
-from src.domain.request.value_objects import MachineReference
+from application.dto.base import BaseDTO
+from domain.request.aggregate import Request
+from domain.request.value_objects import MachineReference
 
 
 class MachineReferenceDTO(BaseDTO):

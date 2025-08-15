@@ -5,15 +5,15 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import ConfigDict, Field
 
-from src.domain.base.entity import AggregateRoot
-from src.domain.base.events import (
+from domain.base.entity import AggregateRoot
+from domain.base.events import (
     RequestCompletedEvent,
     RequestCreatedEvent,
     RequestStatusChangedEvent,
 )
-from src.domain.base.value_objects import InstanceId
-from src.domain.request.request_types import RequestStatus
-from src.domain.request.value_objects import RequestId, RequestType
+from domain.base.value_objects import InstanceId
+from domain.request.request_types import RequestStatus
+from domain.request.value_objects import RequestId, RequestType
 
 
 class Request(AggregateRoot):

@@ -5,8 +5,8 @@ import os
 import tempfile
 from unittest.mock import patch
 
-from src.bootstrap import Application
-from src.config.manager import ConfigurationManager
+from bootstrap import Application
+from config.manager import ConfigurationManager
 
 
 class TestConfigurationIntegration:
@@ -187,7 +187,7 @@ class TestConfigurationIntegration:
         """Test provider strategy factory integration with configuration."""
         from unittest.mock import Mock
 
-        from src.infrastructure.factories.provider_strategy_factory import (
+        from infrastructure.factories.provider_strategy_factory import (
             ProviderStrategyFactory,
         )
 
@@ -233,7 +233,7 @@ class TestConfigurationIntegration:
         """Test end-to-end configuration validation."""
         from unittest.mock import Mock
 
-        from src.infrastructure.factories.provider_strategy_factory import (
+        from infrastructure.factories.provider_strategy_factory import (
             ProviderStrategyFactory,
         )
 
@@ -407,7 +407,7 @@ class TestConfigurationIntegration:
         # Test template defaults service integration
         from unittest.mock import Mock
 
-        from src.application.services.template_defaults_service import (
+        from application.services.template_defaults_service import (
             TemplateDefaultsService,
         )
 

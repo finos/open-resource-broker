@@ -6,9 +6,9 @@ from unittest.mock import Mock
 import pytest
 from fastapi.testclient import TestClient
 
-from src.api.server import create_fastapi_app
-from src.config.schemas.server_schema import AuthConfig, ServerConfig
-from src.infrastructure.auth.strategies import BearerTokenStrategy, NoAuthStrategy
+from api.server import create_fastapi_app
+from config.schemas.server_schema import AuthConfig, ServerConfig
+from infrastructure.auth.strategies import BearerTokenStrategy, NoAuthStrategy
 
 
 class TestAuthenticationFlows:
@@ -139,7 +139,7 @@ class TestAuthenticationFlows:
     @pytest.mark.asyncio
     async def test_auth_context_creation(self):
         """Test authentication context creation from requests."""
-        from src.api.middleware.auth_middleware import AuthMiddleware
+        from api.middleware.auth_middleware import AuthMiddleware
 
         # Create mock request
         class MockRequest:

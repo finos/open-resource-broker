@@ -9,23 +9,23 @@ maintaining clean separation of concerns:
 
 from typing import Any
 
-from src.config.manager import ConfigurationManager
-from src.domain.base import UnitOfWorkFactory as AbstractUnitOfWorkFactory
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.domain_interfaces import UnitOfWork
-from src.domain.base.ports import LoggingPort
+from config.manager import ConfigurationManager
+from domain.base import UnitOfWorkFactory as AbstractUnitOfWorkFactory
+from domain.base.dependency_injection import injectable
+from domain.base.domain_interfaces import UnitOfWork
+from domain.base.ports import LoggingPort
 
 # Import repository interfaces
-from src.domain.machine.repository import (
+from domain.machine.repository import (
     MachineRepository as MachineRepositoryInterface,
 )
-from src.domain.request.repository import (
+from domain.request.repository import (
     RequestRepository as RequestRepositoryInterface,
 )
-from src.domain.template.repository import (
+from domain.template.repository import (
     TemplateRepository as TemplateRepositoryInterface,
 )
-from src.infrastructure.registry.storage_registry import get_storage_registry
+from infrastructure.registry.storage_registry import get_storage_registry
 
 
 @injectable
@@ -47,14 +47,14 @@ class RepositoryFactory:
 
     def create_machine_repository(self) -> MachineRepositoryInterface:
         """Create machine repository with injected storage port."""
-        from src.infrastructure.persistence.repositories.machine_repository import (
+        from infrastructure.persistence.repositories.machine_repository import (
             MachineRepositoryImpl as MachineRepository,
         )
 
         try:
             # Get storage port from DI container
-            from src.domain.base.ports.storage_port import StoragePort
-            from src.infrastructure.di.container import get_container
+            from domain.base.ports.storage_port import StoragePort
+            from infrastructure.di.container import get_container
 
             container = get_container()
             storage_port = container.get(StoragePort)
@@ -68,14 +68,14 @@ class RepositoryFactory:
 
     def create_request_repository(self) -> RequestRepositoryInterface:
         """Create request repository with injected storage port."""
-        from src.infrastructure.persistence.repositories.request_repository import (
+        from infrastructure.persistence.repositories.request_repository import (
             RequestRepositoryImpl as RequestRepository,
         )
 
         try:
             # Get storage port from DI container
-            from src.domain.base.ports.storage_port import StoragePort
-            from src.infrastructure.di.container import get_container
+            from domain.base.ports.storage_port import StoragePort
+            from infrastructure.di.container import get_container
 
             container = get_container()
             storage_port = container.get(StoragePort)
@@ -89,7 +89,7 @@ class RepositoryFactory:
 
     def create_template_repository(self) -> TemplateRepositoryInterface:
         """Create template repository with injected storage strategy."""
-        from src.infrastructure.persistence.repositories.template_repository import (
+        from infrastructure.persistence.repositories.template_repository import (
             TemplateRepositoryImpl as TemplateRepository,
         )
 
@@ -161,7 +161,7 @@ class RepositoryFactoryWithStrategies:
     def _get_config_manager(self):
         """Get configuration manager."""
         if self._config_manager is None:
-            from src.config.manager import get_config_manager
+            from config.manager import get_config_manager
 
             self._config_manager = get_config_manager()
         return self._config_manager

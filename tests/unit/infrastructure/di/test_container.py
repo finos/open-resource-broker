@@ -5,9 +5,9 @@ from unittest.mock import patch
 
 import pytest
 
-from src.domain.base.di_contracts import DIScope
-from src.infrastructure.di.container import DIContainer, timed_operation
-from src.infrastructure.di.exceptions import (
+from domain.base.di_contracts import DIScope
+from infrastructure.di.container import DIContainer, timed_operation
+from infrastructure.di.exceptions import (
     CircularDependencyError,
     DependencyResolutionError,
 )

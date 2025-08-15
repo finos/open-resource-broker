@@ -4,11 +4,11 @@ import functools
 import json
 from typing import Any, Callable, Dict, Optional
 
-from src.infrastructure.error.exception_handler import (
+from infrastructure.error.exception_handler import (
     ExceptionHandler,
     get_exception_handler,
 )
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.logging.logger import get_logger
 
 # Configure logger
 logger = get_logger(__name__)

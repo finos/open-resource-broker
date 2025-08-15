@@ -1,11 +1,11 @@
 """Error handling infrastructure package."""
 
-from src.infrastructure.error.error_middleware import (
+from infrastructure.error.error_middleware import (
     ErrorMiddleware,
     with_api_error_handling,
     with_error_handling,
 )
-from src.infrastructure.error.exception_handler import (
+from infrastructure.error.exception_handler import (
     ErrorCategory,
     ErrorCode,
     ErrorResponse,

@@ -7,7 +7,7 @@ Following the same pattern as CommandHandler and QueryHandler decorators.
 from typing import TYPE_CHECKING, Dict, Type
 
 if TYPE_CHECKING:
-    from src.application.events.base.event_handler import EventHandler
+    from application.events.base.event_handler import EventHandler
 
 
 class EventHandlerRegistry:

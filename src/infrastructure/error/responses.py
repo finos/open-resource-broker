@@ -6,8 +6,8 @@ from typing import Any, Dict, Optional
 
 from pydantic import Field
 
-from src.application.dto.base import BaseDTO
-from src.domain.base.exceptions import (
+from application.dto.base import BaseDTO
+from domain.base.exceptions import (
     BusinessRuleViolationError,
     ConfigurationError,
     EntityNotFoundError,

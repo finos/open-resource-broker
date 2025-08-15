@@ -1,23 +1,23 @@
 """Template command handlers for CQRS pattern."""
 
-from src.application.base.handlers import BaseCommandHandler
-from src.application.decorators import command_handler
-from src.application.template.commands import (
+from application.base.handlers import BaseCommandHandler
+from application.decorators import command_handler
+from application.template.commands import (
     CreateTemplateCommand,
     DeleteTemplateCommand,
     TemplateCommandResponse,
     UpdateTemplateCommand,
     ValidateTemplateCommand,
 )
-from src.domain.base import UnitOfWorkFactory
-from src.domain.base.exceptions import BusinessRuleError, EntityNotFoundError
-from src.domain.base.ports import (
+from domain.base import UnitOfWorkFactory
+from domain.base.exceptions import BusinessRuleError, EntityNotFoundError
+from domain.base.ports import (
     ContainerPort,
     ErrorHandlingPort,
     EventPublisherPort,
     LoggingPort,
 )
-from src.domain.template.aggregate import Template
+from domain.template.aggregate import Template
 
 
 @command_handler(CreateTemplateCommand)
@@ -61,7 +61,7 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, TemplateCo
 
         try:
             # Get template configuration port for validation
-            from src.domain.base.ports.template_configuration_port import (
+            from domain.base.ports.template_configuration_port import (
                 TemplateConfigurationPort,
             )
 
@@ -155,7 +155,7 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, TemplateCo
 
         try:
             # Get template configuration port for validation
-            from src.domain.base.ports.template_configuration_port import (
+            from domain.base.ports.template_configuration_port import (
                 TemplateConfigurationPort,
             )
 
@@ -320,7 +320,7 @@ class ValidateTemplateHandler(BaseCommandHandler[ValidateTemplateCommand, Templa
 
         try:
             # Get template configuration port for validation
-            from src.domain.base.ports.template_configuration_port import (
+            from domain.base.ports.template_configuration_port import (
                 TemplateConfigurationPort,
             )
 

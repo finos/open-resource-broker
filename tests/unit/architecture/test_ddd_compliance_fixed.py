@@ -10,9 +10,9 @@ This module validates that the codebase properly implements DDD patterns includi
 
 import pytest
 
-from src.domain.base.exceptions import DomainException
-from src.domain.base.value_objects import InstanceId, ResourceId, ResourceQuota
-from src.domain.template.aggregate import Template
+from domain.base.exceptions import DomainException
+from domain.base.value_objects import InstanceId, ResourceId, ResourceQuota
+from domain.template.aggregate import Template
 
 
 @pytest.mark.unit

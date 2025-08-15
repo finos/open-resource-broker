@@ -3,10 +3,10 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, TypeVar
 
-from src.domain.base.domain_interfaces import UnitOfWork
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.persistence.base.repository import StrategyBasedRepository
-from src.infrastructure.persistence.exceptions import TransactionError
+from domain.base.domain_interfaces import UnitOfWork
+from infrastructure.logging.logger import get_logger
+from infrastructure.persistence.base.repository import StrategyBasedRepository
+from infrastructure.persistence.exceptions import TransactionError
 
 T = TypeVar("T")  # Repository type
 

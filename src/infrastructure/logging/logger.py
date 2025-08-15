@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from src.config import LoggingConfig
+from config import LoggingConfig
 
 
 class JsonFormatter(logging.Formatter):
@@ -144,7 +144,7 @@ def setup_logging(config: LoggingConfig) -> None:
 
     # Configure console logging based on config
     # Use ConfigurationManager to get console_enabled value
-    from src.config.manager import get_config_manager
+    from config.manager import get_config_manager
 
     try:
         config_manager = get_config_manager()

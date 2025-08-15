@@ -3,9 +3,9 @@
 import re
 from typing import Optional
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
-from src.domain.base.provider_interfaces import (
+from domain.base.dependency_injection import injectable
+from domain.base.ports import LoggingPort
+from domain.base.provider_interfaces import (
     ProviderInstanceState,
     ProviderLaunchTemplate,
     ProviderResourceIdentifier,

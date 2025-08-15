@@ -5,9 +5,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.domain.request.aggregate import Request
-from src.domain.template.aggregate import Template
-from src.providers.aws.infrastructure.handlers.components import FleetTagBuilder
+from domain.request.aggregate import Request
+from domain.template.aggregate import Template
+from providers.aws.infrastructure.handlers.components import FleetTagBuilder
 
 
 @pytest.mark.unit

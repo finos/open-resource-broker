@@ -6,9 +6,9 @@ eliminating hard-coded storage conditionals and maintaining clean architecture.
 
 from typing import Any, Dict, Optional
 
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.persistence.base.strategy import BaseStorageStrategy
-from src.infrastructure.registry.storage_registry import get_storage_registry
+from infrastructure.logging.logger import get_logger
+from infrastructure.persistence.base.strategy import BaseStorageStrategy
+from infrastructure.registry.storage_registry import get_storage_registry
 
 
 class StorageStrategyFactory:

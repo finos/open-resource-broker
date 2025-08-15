@@ -6,19 +6,19 @@ from fastapi import APIRouter, Body, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.application.dto.queries import (
+from application.dto.queries import (
     GetTemplateQuery,
     ListTemplatesQuery,
     ValidateTemplateQuery,
 )
-from src.application.template.commands import (
+from application.template.commands import (
     CreateTemplateCommand,
     DeleteTemplateCommand,
     UpdateTemplateCommand,
 )
-from src.infrastructure.di.buses import CommandBus, QueryBus
-from src.infrastructure.di.container import get_container
-from src.infrastructure.error.decorators import handle_rest_exceptions
+from infrastructure.di.buses import CommandBus, QueryBus
+from infrastructure.di.container import get_container
+from infrastructure.error.decorators import handle_rest_exceptions
 
 router = APIRouter(prefix="/templates", tags=["Templates"])
 

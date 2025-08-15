@@ -1,11 +1,11 @@
 """Base persistence package."""
 
-from src.infrastructure.persistence.base.repository import StrategyBasedRepository
-from src.infrastructure.persistence.base.strategy import (
+from infrastructure.persistence.base.repository import StrategyBasedRepository
+from infrastructure.persistence.base.strategy import (
     BaseStorageStrategy,
     StorageStrategy,
 )
-from src.infrastructure.persistence.base.unit_of_work import (
+from infrastructure.persistence.base.unit_of_work import (
     BaseUnitOfWork,
     StrategyUnitOfWork,
 )

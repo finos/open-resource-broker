@@ -28,15 +28,15 @@ Note:
 
 from typing import Any, Dict, List
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
-from src.domain.request.aggregate import Request
-from src.infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
-from src.infrastructure.error.decorators import handle_infrastructure_exceptions
-from src.providers.aws.domain.template.aggregate import AWSTemplate
-from src.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
-from src.providers.aws.infrastructure.handlers.base_handler import AWSHandler
-from src.providers.aws.utilities.aws_operations import AWSOperations
+from domain.base.dependency_injection import injectable
+from domain.base.ports import LoggingPort
+from domain.request.aggregate import Request
+from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
+from infrastructure.error.decorators import handle_infrastructure_exceptions
+from providers.aws.domain.template.aggregate import AWSTemplate
+from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
+from providers.aws.infrastructure.handlers.base_handler import AWSHandler
+from providers.aws.utilities.aws_operations import AWSOperations
 
 
 @injectable
