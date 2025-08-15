@@ -50,4 +50,8 @@ jobs:
         make validate-workflow-syntax
 
     - name: Validate workflows with actionlint
-      uses: rhymond/github-action-actionlint@v1
+      run: |
+        echo "::add-matcher::.github/actionlint-matcher.json"
+        bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+        ./actionlint -color
+      shell: bash
