@@ -9,9 +9,7 @@ from moto import mock_aws
 # Import AWS components
 try:
     from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
-    from providers.aws.infrastructure.handlers.ec2_fleet_handler import (
-        EC2FleetHandler,
-    )
+    from providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHandler
     from providers.aws.infrastructure.handlers.run_instances_handler import (
         RunInstancesHandler,
     )

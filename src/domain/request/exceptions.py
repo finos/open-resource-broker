@@ -1,10 +1,6 @@
 """Request domain exceptions."""
 
-from domain.base.exceptions import (
-    DomainException,
-    EntityNotFoundError,
-    ValidationError,
-)
+from domain.base.exceptions import DomainException, EntityNotFoundError, ValidationError
 
 
 class RequestException(DomainException):

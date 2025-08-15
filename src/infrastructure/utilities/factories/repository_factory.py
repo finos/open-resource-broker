@@ -16,15 +16,9 @@ from domain.base.domain_interfaces import UnitOfWork
 from domain.base.ports import LoggingPort
 
 # Import repository interfaces
-from domain.machine.repository import (
-    MachineRepository as MachineRepositoryInterface,
-)
-from domain.request.repository import (
-    RequestRepository as RequestRepositoryInterface,
-)
-from domain.template.repository import (
-    TemplateRepository as TemplateRepositoryInterface,
-)
+from domain.machine.repository import MachineRepository as MachineRepositoryInterface
+from domain.request.repository import RequestRepository as RequestRepositoryInterface
+from domain.template.repository import TemplateRepository as TemplateRepositoryInterface
 from infrastructure.registry.storage_registry import get_storage_registry
 
 

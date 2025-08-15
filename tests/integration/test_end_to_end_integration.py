@@ -30,9 +30,7 @@ from infrastructure.persistence.repositories.template_repository import (
 )
 from providers.aws.domain.template.aggregate import AWSTemplate
 from providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHandler
-from providers.aws.infrastructure.handlers.spot_fleet_handler import (
-    SpotFleetHandler,
-)
+from providers.aws.infrastructure.handlers.spot_fleet_handler import SpotFleetHandler
 from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
     LaunchTemplateResult,

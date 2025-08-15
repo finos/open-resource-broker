@@ -116,9 +116,7 @@ class MachineCount(ValueObject):
         max_allowed = self.max_allowed
         if max_allowed is None:
             try:
-                from domain.base.configuration_service import (
-                    get_domain_config_service,
-                )
+                from domain.base.configuration_service import get_domain_config_service
 
                 config_service = get_domain_config_service()
                 if config_service:

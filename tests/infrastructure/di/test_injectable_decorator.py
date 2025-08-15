@@ -9,11 +9,7 @@ import pytest
 
 from domain.base.ports import LoggingPort
 from infrastructure.di.container import DIContainer
-from infrastructure.di.decorators import (
-    get_injectable_info,
-    injectable,
-    is_injectable,
-)
+from infrastructure.di.decorators import get_injectable_info, injectable, is_injectable
 
 
 # Test interfaces

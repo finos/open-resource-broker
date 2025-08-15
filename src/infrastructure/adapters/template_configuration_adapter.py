@@ -4,9 +4,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from domain.base.ports.logging_port import LoggingPort
 from domain.base.ports.template_configuration_port import TemplateConfigurationPort
-from infrastructure.template.configuration_manager import (
-    TemplateConfigurationManager,
-)
+from infrastructure.template.configuration_manager import TemplateConfigurationManager
 
 # Use TYPE_CHECKING to avoid direct domain import
 if TYPE_CHECKING:

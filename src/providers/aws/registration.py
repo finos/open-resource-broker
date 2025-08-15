@@ -11,9 +11,7 @@ if TYPE_CHECKING:
 # Template extension imports for our new functionality
 from domain.template.extensions import TemplateExtensionRegistry
 from domain.template.factory import TemplateFactory
-from providers.aws.configuration.template_extension import (
-    AWSTemplateExtensionConfig,
-)
+from providers.aws.configuration.template_extension import AWSTemplateExtensionConfig
 
 
 def create_aws_strategy(provider_config: Any) -> Any:

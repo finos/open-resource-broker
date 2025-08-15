@@ -89,9 +89,7 @@ def get_request_status_handler():
 
     def _get_handler():
         container = get_di_container()
-        from api.handlers.get_request_status_handler import (
-            GetRequestStatusRESTHandler,
-        )
+        from api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
 
         return container.get(GetRequestStatusRESTHandler)
 

@@ -5,9 +5,7 @@ from typing import Any, Dict, List, Optional
 from domain.base.ports import LoggingPort
 from domain.template.aggregate import Template
 from domain.template.repository import TemplateRepository
-from infrastructure.template.configuration_manager import (
-    TemplateConfigurationManager,
-)
+from infrastructure.template.configuration_manager import TemplateConfigurationManager
 
 
 class TemplateRepositoryImpl(TemplateRepository):

@@ -14,11 +14,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from domain.base.dependency_injection import injectable
-from domain.base.exceptions import (
-    DomainException,
-    EntityNotFoundError,
-    ValidationError,
-)
+from domain.base.exceptions import DomainException, EntityNotFoundError, ValidationError
 from domain.base.ports.configuration_port import ConfigurationPort
 from domain.base.ports.event_publisher_port import EventPublisherPort
 from domain.base.ports.logging_port import LoggingPort
@@ -32,9 +28,7 @@ if TYPE_CHECKING:
     from application.services.provider_capability_service import (
         ProviderCapabilityService,
     )
-    from application.services.template_defaults_service import (
-        TemplateDefaultsService,
-    )
+    from application.services.template_defaults_service import TemplateDefaultsService
 
 
 class TemplateConfigurationError(DomainException):
@@ -306,9 +300,7 @@ class TemplateConfigurationManager:
             container = get_container()
 
             # Use port interface instead of concrete implementation
-            from domain.base.ports.template_resolver_port import (
-                TemplateResolverPort,
-            )
+            from domain.base.ports.template_resolver_port import TemplateResolverPort
 
             return container.get(TemplateResolverPort)
 
@@ -594,9 +586,7 @@ class TemplateConfigurationManager:
             )
 
             # Use provider capability service for validation
-            from application.services.provider_capability_service import (
-                ValidationLevel,
-            )
+            from application.services.provider_capability_service import ValidationLevel
 
             capability_result = self.provider_capability_service.validate_template_requirements(
                 domain_template, provider_instance, ValidationLevel.STRICT

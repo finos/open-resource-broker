@@ -12,9 +12,7 @@ import pytest
 
 from application.commands.request_handlers import CreateMachineRequestHandler
 from application.dto.commands import CreateRequestCommand
-from application.services.provider_capability_service import (
-    ProviderCapabilityService,
-)
+from application.services.provider_capability_service import ProviderCapabilityService
 from application.services.provider_selection_service import ProviderSelectionService
 from domain.base import UnitOfWorkFactory
 from domain.base.ports import (
@@ -118,9 +116,7 @@ class TestCQRSArchitectureIntegration:
         service = Mock(spec=ProviderCapabilityService)
 
         # Mock validation result
-        from application.services.provider_capability_service import (
-            ValidationResult,
-        )
+        from application.services.provider_capability_service import ValidationResult
 
         validation_result = ValidationResult(
             is_valid=True,

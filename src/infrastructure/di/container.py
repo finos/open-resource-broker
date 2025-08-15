@@ -345,9 +345,7 @@ def _setup_cqrs_infrastructure(container: DIContainer) -> None:
     try:
         from domain.base.ports import LoggingPort
         from infrastructure.di.buses import BusFactory
-        from infrastructure.di.handler_discovery import (
-            create_handler_discovery_service,
-        )
+        from infrastructure.di.handler_discovery import create_handler_discovery_service
 
         logger.info("Setting up CQRS infrastructure")
 

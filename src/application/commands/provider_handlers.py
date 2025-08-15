@@ -209,9 +209,7 @@ class RegisterProviderStrategyHandler(
 
         try:
             # Use provider registry to create strategy
-            from infrastructure.registry.provider_registry import (
-                get_provider_registry,
-            )
+            from infrastructure.registry.provider_registry import get_provider_registry
 
             registry = get_provider_registry()
 

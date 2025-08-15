@@ -16,13 +16,9 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from application.services.provider_capability_service import (
-    ProviderCapabilityService,
-)
+from application.services.provider_capability_service import ProviderCapabilityService
 from bootstrap import Application
-from infrastructure.template.configuration_manager import (
-    TemplateConfigurationManager,
-)
+from infrastructure.template.configuration_manager import TemplateConfigurationManager
 from providers.base.strategy.provider_context import ProviderContext
 
 

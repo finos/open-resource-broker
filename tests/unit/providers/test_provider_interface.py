@@ -42,9 +42,7 @@ class TestProviderPort:
 
     def test_provider_factory_registration(self):
         """Test provider factory can register new providers."""
-        from infrastructure.utilities.factories.provider_factory import (
-            ProviderFactory,
-        )
+        from infrastructure.utilities.factories.provider_factory import ProviderFactory
 
         factory = ProviderFactory()
 

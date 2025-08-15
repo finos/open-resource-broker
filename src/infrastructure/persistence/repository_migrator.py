@@ -15,9 +15,7 @@ from typing import Any, Dict, Optional
 
 from domain.base.domain_interfaces import Repository
 from domain.base.ports.configuration_port import ConfigurationPort
-from domain.template.repository import (
-    TemplateRepository as TemplateRepositoryInterface,
-)
+from domain.template.repository import TemplateRepository as TemplateRepositoryInterface
 from infrastructure.di.container import DIContainer
 from infrastructure.logging.logger import get_logger
 

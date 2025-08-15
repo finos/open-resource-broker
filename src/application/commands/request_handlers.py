@@ -329,10 +329,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
         """Execute actual provisioning via selected provider using existing ProviderContext."""
         try:
             # Import required types (using existing imports)
-            from providers.base.strategy import (
-                ProviderOperation,
-                ProviderOperationType,
-            )
+            from providers.base.strategy import ProviderOperation, ProviderOperationType
 
             # Create provider operation using existing pattern
             operation = ProviderOperation(

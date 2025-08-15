@@ -18,11 +18,12 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
 
+    - name: Install yq
+      uses: mikefarah/yq@master
+
     - name: Get default Python version from project config
       id: version
       run: |
-    - name: Install yq
-      uses: mikefarah/yq@master
         DEFAULT_PYTHON_VERSION=$(yq '.python.default_version' .project.yml)
         echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> $GITHUB_OUTPUT
         echo "Using Python version: $DEFAULT_PYTHON_VERSION"
@@ -42,6 +43,9 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+
+      - name: Install yq
+        uses: mikefarah/yq@master
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -183,6 +187,9 @@ jobs:
 
     steps:
       - name: Checkout code
+
+    - name: Install yq
+      uses: mikefarah/yq@master
         uses: actions/checkout@v5
 
       - name: Set up Python

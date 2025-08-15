@@ -173,9 +173,7 @@ class TestLazyLoadingPerformance:
 
     def test_scheduler_registration_performance(self):
         """Test scheduler registration performance."""
-        from infrastructure.scheduler.registration import (
-            register_active_scheduler_only,
-        )
+        from infrastructure.scheduler.registration import register_active_scheduler_only
 
         start_time = time.time()
         register_active_scheduler_only("default")

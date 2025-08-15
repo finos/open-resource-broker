@@ -174,10 +174,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
             # Create operation for resource-to-instance discovery using stored
             # provider API
-            from providers.base.strategy import (
-                ProviderOperation,
-                ProviderOperationType,
-            )
+            from providers.base.strategy import ProviderOperation, ProviderOperationType
 
             operation = ProviderOperation(
                 operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
@@ -267,10 +264,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             provider_context = self._get_provider_context()
 
             # Create operation to check instance status using instance IDs
-            from providers.base.strategy import (
-                ProviderOperation,
-                ProviderOperationType,
-            )
+            from providers.base.strategy import ProviderOperation, ProviderOperationType
 
             # Extract instance IDs from machines
             instance_ids = [str(machine.instance_id.value) for machine in machines]
@@ -469,9 +463,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
         """Get cache service for request caching."""
         try:
             from domain.base.ports import ConfigurationPort
-            from infrastructure.caching.request_cache_service import (
-                RequestCacheService,
-            )
+            from infrastructure.caching.request_cache_service import RequestCacheService
 
             config_manager = self._container.get(ConfigurationPort)
             cache_service = RequestCacheService(

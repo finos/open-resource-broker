@@ -27,6 +27,9 @@ jobs:
       default-python-version: ${{ steps.config.outputs.default-python-version }}
     steps:
     - name: Checkout code
+
+    - name: Install yq
+      uses: mikefarah/yq@master
       uses: actions/checkout@v5
 
     - name: Get configuration from project config
@@ -34,8 +37,6 @@ jobs:
       run: |
         # Use consistent print-* and print-json-* targets
         PYTHON_VERSIONS_JSON=$(make print-json-PYTHON_VERSIONS)
-    - name: Install yq
-      uses: mikefarah/yq@master
         DEFAULT_PYTHON_VERSION=$(yq '.python.default_version' .project.yml)
 
         echo "python-versions=$PYTHON_VERSIONS_JSON" >> $GITHUB_OUTPUT
@@ -56,6 +57,9 @@ jobs:
 
     steps:
     - name: Checkout code
+
+    - name: Install yq
+      uses: mikefarah/yq@master
       uses: actions/checkout@v5
 
     - name: Set up Python ${{ matrix.python-version }}
@@ -106,6 +110,9 @@ jobs:
 
     steps:
     - name: Checkout code
+
+    - name: Install yq
+      uses: mikefarah/yq@master
       uses: actions/checkout@v5
 
     - name: Set up Python ${{ matrix.python-version }}
@@ -156,6 +163,9 @@ jobs:
 
     steps:
     - name: Checkout code
+
+    - name: Install yq
+      uses: mikefarah/yq@master
       uses: actions/checkout@v5
 
     - name: Set up Python ${{ matrix.python-version }}

@@ -10,9 +10,7 @@ from domain.base.ports.logging_port import LoggingPort
 from domain.template.aggregate import Template
 from domain.template.extensions import TemplateExtensionRegistry
 from domain.template.factory import TemplateFactory
-from providers.aws.configuration.template_extension import (
-    AWSTemplateExtensionConfig,
-)
+from providers.aws.configuration.template_extension import AWSTemplateExtensionConfig
 
 
 class TestCleanArchitectureIntegration:

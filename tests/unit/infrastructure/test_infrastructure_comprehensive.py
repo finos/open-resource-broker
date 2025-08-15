@@ -380,7 +380,7 @@ class TestErrorHandlingComprehensive:
     def test_error_middleware_exists(self):
         """Test that error middleware exists."""
         try:
-            import infrastructure.error.error_middleware
+            pass
 
             assert src.infrastructure.error.error_middleware is not None
         except ImportError:

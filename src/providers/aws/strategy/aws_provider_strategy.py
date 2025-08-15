@@ -18,9 +18,7 @@ from providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHand
 from providers.aws.infrastructure.handlers.run_instances_handler import (
     RunInstancesHandler,
 )
-from providers.aws.infrastructure.handlers.spot_fleet_handler import (
-    SpotFleetHandler,
-)
+from providers.aws.infrastructure.handlers.spot_fleet_handler import SpotFleetHandler
 from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
 )
@@ -205,9 +203,7 @@ class AWSProviderStrategy(ProviderStrategy):
 
         try:
             # Import dry-run context here to avoid circular imports
-            from providers.aws.infrastructure.dry_run_adapter import (
-                aws_dry_run_context,
-            )
+            from providers.aws.infrastructure.dry_run_adapter import aws_dry_run_context
 
             # Execute operation within appropriate context
             if is_dry_run:

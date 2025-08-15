@@ -10,7 +10,7 @@ This project and everyone participating in it is governed by our [Code of Conduc
 
 ### Reporting Bugs
 
-Before creating bug reports, please check [the issue list](https://github.com/aws-samples/awsome-hostfactory-plugin/issues) as you might find out that you don't need to create one. When you are creating a bug report, please include as many details as possible:
+Before creating bug reports, please check [the issue list](https://github.com/awslabs/open-hostfactory-plugin/issues) as you might find out that you don't need to create one. When you are creating a bug report, please include as many details as possible:
 
 * Use a clear and descriptive title
 * Describe the exact steps which reproduce the problem
@@ -283,7 +283,7 @@ make install-completions
 
 If you need help with anything:
 * Check our [FAQ](docs/FAQ.md)
-* Ask in our [Discussions](https://github.com/aws-samples/awsome-hostfactory-plugin/discussions)
+* Ask in our [Discussions](https://github.com/awslabs/open-hostfactory-plugin/discussions)
 * Contact the maintainers
 
 ## Recognition

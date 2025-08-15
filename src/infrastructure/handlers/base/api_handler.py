@@ -6,11 +6,7 @@ import uuid
 from abc import abstractmethod
 from typing import Any, Callable, Dict, Generic, Optional, TypeVar
 
-from domain.base.exceptions import (
-    DomainException,
-    EntityNotFoundError,
-    ValidationError,
-)
+from domain.base.exceptions import DomainException, EntityNotFoundError, ValidationError
 from infrastructure.handlers.base.base_handler import BaseHandler
 from infrastructure.resilience import retry
 

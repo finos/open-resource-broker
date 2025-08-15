@@ -13,9 +13,7 @@ from domain.base.ports.configuration_port import ConfigurationPort
 from domain.base.ports.logging_port import LoggingPort
 from domain.base.ports.template_adapter_port import TemplateAdapterPort
 from domain.template.aggregate import Template
-from infrastructure.template.configuration_manager import (
-    TemplateConfigurationManager,
-)
+from infrastructure.template.configuration_manager import TemplateConfigurationManager
 from infrastructure.template.dtos import TemplateDTO
 from providers.aws.exceptions.aws_exceptions import AWSValidationError
 from providers.aws.infrastructure.aws_client import AWSClient

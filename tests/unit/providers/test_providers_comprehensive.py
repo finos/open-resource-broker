@@ -174,9 +174,7 @@ class TestAWSProviderComprehensive:
     def test_aws_strategy_exists(self):
         """Test that AWS strategy exists."""
         try:
-            from providers.aws.strategy.aws_provider_strategy import (
-                AWSProviderStrategy,
-            )
+            from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
             assert AWSProviderStrategy is not None
         except ImportError:
@@ -185,9 +183,7 @@ class TestAWSProviderComprehensive:
     def test_aws_strategy_initialization(self):
         """Test AWS strategy initialization."""
         try:
-            from providers.aws.strategy.aws_provider_strategy import (
-                AWSProviderStrategy,
-            )
+            from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
             # Try to create strategy with mocked dependencies
             mock_deps = [Mock() for _ in range(10)]
@@ -220,7 +216,7 @@ class TestAWSProviderComprehensive:
     def test_aws_exceptions_exist(self):
         """Test that AWS exceptions exist."""
         try:
-            import providers.aws.exceptions.aws_exceptions
+            pass
 
             assert src.providers.aws.exceptions.aws_exceptions is not None
         except ImportError:
@@ -464,7 +460,7 @@ class TestAWSPersistenceComprehensive:
     def test_dynamodb_registration_exists(self):
         """Test that DynamoDB registration exists."""
         try:
-            import providers.aws.persistence.dynamodb.registration
+            pass
 
             assert src.providers.aws.persistence.dynamodb.registration is not None
         except ImportError:
@@ -528,7 +524,7 @@ class TestAWSResilienceComprehensive:
     def test_aws_retry_config_exists(self):
         """Test that AWS retry config exists."""
         try:
-            import providers.aws.resilience.aws_retry_config
+            pass
 
             assert src.providers.aws.resilience.aws_retry_config is not None
         except ImportError:
@@ -546,7 +542,7 @@ class TestAWSResilienceComprehensive:
     def test_aws_retry_errors_exist(self):
         """Test that AWS retry errors exist."""
         try:
-            import providers.aws.resilience.aws_retry_errors
+            pass
 
             assert src.providers.aws.resilience.aws_retry_errors is not None
         except ImportError:
@@ -634,7 +630,7 @@ class TestProviderRegistrationComprehensive:
     def test_aws_registration_exists(self):
         """Test that AWS registration exists."""
         try:
-            import providers.aws.registration
+            pass
 
             assert src.providers.aws.registration is not None
         except ImportError:

@@ -24,9 +24,7 @@ class TestJSONStorageRegistration:
     @patch("src.infrastructure.persistence.json.registration.JSONStorageStrategy")
     def test_create_json_strategy(self, mock_strategy_class):
         """Test creating JSON storage strategy."""
-        from infrastructure.persistence.json.registration import (
-            create_json_strategy,
-        )
+        from infrastructure.persistence.json.registration import create_json_strategy
 
         # Mock configuration
         mock_config = Mock()
@@ -89,9 +87,7 @@ class TestJSONStorageRegistration:
 
     def test_register_json_storage(self):
         """Test registering JSON storage type."""
-        from infrastructure.persistence.json.registration import (
-            register_json_storage,
-        )
+        from infrastructure.persistence.json.registration import register_json_storage
 
         registry = get_storage_registry()
 
@@ -167,9 +163,7 @@ class TestSQLStorageRegistration:
 
     def test_build_connection_string_sqlite(self):
         """Test building SQLite connection string."""
-        from infrastructure.persistence.sql.registration import (
-            _build_connection_string,
-        )
+        from infrastructure.persistence.sql.registration import _build_connection_string
 
         mock_config = Mock()
         mock_config.type = "sqlite"
@@ -180,9 +174,7 @@ class TestSQLStorageRegistration:
 
     def test_build_connection_string_postgresql(self):
         """Test building PostgreSQL connection string."""
-        from infrastructure.persistence.sql.registration import (
-            _build_connection_string,
-        )
+        from infrastructure.persistence.sql.registration import _build_connection_string
 
         mock_config = Mock()
         mock_config.type = "postgresql"
@@ -325,9 +317,7 @@ class TestCentralStorageRegistration:
     @patch("src.infrastructure.persistence.registration.register_dynamodb_storage")
     def test_register_all_storage_types_success(self, mock_dynamodb, mock_sql, mock_json):
         """Test successful registration of all storage types."""
-        from infrastructure.persistence.registration import (
-            register_all_storage_types,
-        )
+        from infrastructure.persistence.registration import register_all_storage_types
 
         # Mock successful registrations
         mock_json.return_value = None
@@ -347,9 +337,7 @@ class TestCentralStorageRegistration:
     @patch("src.infrastructure.persistence.registration.register_dynamodb_storage")
     def test_register_all_storage_types_partial_failure(self, mock_dynamodb, mock_sql, mock_json):
         """Test registration with some failures."""
-        from infrastructure.persistence.registration import (
-            register_all_storage_types,
-        )
+        from infrastructure.persistence.registration import register_all_storage_types
 
         # Mock partial failures
         mock_json.return_value = None  # Success
@@ -369,9 +357,7 @@ class TestCentralStorageRegistration:
     @patch("src.infrastructure.persistence.registration.register_dynamodb_storage")
     def test_register_all_storage_types_complete_failure(self, mock_dynamodb, mock_sql, mock_json):
         """Test registration with complete failure."""
-        from infrastructure.persistence.registration import (
-            register_all_storage_types,
-        )
+        from infrastructure.persistence.registration import register_all_storage_types
 
         # Mock complete failures
         mock_json.side_effect = Exception("JSON registration failed")
@@ -384,9 +370,7 @@ class TestCentralStorageRegistration:
 
     def test_get_available_storage_types(self):
         """Test getting available storage types."""
-        from infrastructure.persistence.registration import (
-            get_available_storage_types,
-        )
+        from infrastructure.persistence.registration import get_available_storage_types
 
         # Mock successful imports
         with patch("src.infrastructure.persistence.registration.JSONStorageStrategy"), patch(
@@ -400,9 +384,7 @@ class TestCentralStorageRegistration:
 
     def test_is_storage_type_available(self):
         """Test checking if storage type is available."""
-        from infrastructure.persistence.registration import (
-            is_storage_type_available,
-        )
+        from infrastructure.persistence.registration import is_storage_type_available
 
         # Mock available types
         with patch(

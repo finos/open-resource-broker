@@ -7,10 +7,7 @@ from api.models import RequestStatusModel
 from api.validation import RequestValidator, ValidationException
 from application.base.infrastructure_handlers import BaseAPIHandler, RequestContext
 from application.request.dto import RequestStatusResponse
-from application.request.queries import (
-    GetActiveRequestsQuery,
-    GetRequestStatusQuery,
-)
+from application.request.queries import GetActiveRequestsQuery, GetRequestStatusQuery
 from domain.base.dependency_injection import injectable
 from domain.base.ports import ErrorHandlingPort, LoggingPort
 from domain.base.ports.scheduler_port import SchedulerPort

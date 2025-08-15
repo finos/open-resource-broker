@@ -173,12 +173,8 @@ class TestBackwardCompatibility:
 
     def test_provider_layer_imports(self):
         """Test imports used in provider layer."""
-        from providers.aws.infrastructure.adapters.machine_adapter import (
-            MachineStatus,
-        )
-        from providers.aws.infrastructure.adapters.request_adapter import (
-            RequestType,
-        )
+        from providers.aws.infrastructure.adapters.machine_adapter import MachineStatus
+        from providers.aws.infrastructure.adapters.request_adapter import RequestType
 
         assert MachineStatus is not None
         assert RequestType is not None

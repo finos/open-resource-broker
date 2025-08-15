@@ -9,12 +9,8 @@ from unittest.mock import Mock
 import pytest
 
 from config.manager import ConfigurationManager
-from infrastructure.scheduler.hostfactory.field_mappings import (
-    HostFactoryFieldMappings,
-)
-from infrastructure.scheduler.hostfactory.strategy import (
-    HostFactorySchedulerStrategy,
-)
+from infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings
+from infrastructure.scheduler.hostfactory.strategy import HostFactorySchedulerStrategy
 from infrastructure.scheduler.hostfactory.transformations import (
     HostFactoryTransformations,
 )

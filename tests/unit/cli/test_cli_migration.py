@@ -22,12 +22,7 @@ class TestCLIMigration:
     def test_cli_modules_can_be_imported(self):
         """Test that all CLI modules can be imported successfully."""
         # Test main CLI module
-        from cli.main import (
-            convert_to_legacy_args,
-            execute_command,
-            main,
-            parse_args,
-        )
+        from cli.main import convert_to_legacy_args, execute_command, main, parse_args
 
         assert callable(main)
         assert callable(parse_args)

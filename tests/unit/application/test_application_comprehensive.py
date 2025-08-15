@@ -403,9 +403,7 @@ class TestCQRSMigrationValidation:
 
     def test_command_handlers_exist(self):
         """Test that command handlers exist."""
-        from application.commands.request_handlers import (
-            CreateMachineRequestHandler,
-        )
+        from application.commands.request_handlers import CreateMachineRequestHandler
 
         assert CreateMachineRequestHandler is not None
 

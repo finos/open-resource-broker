@@ -44,9 +44,7 @@ def create_hostfactory_config(data: Dict[str, Any]) -> Any:
 def register_symphony_hostfactory_scheduler(registry: "SchedulerRegistry" = None):
     """Register Symphony HostFactory scheduler."""
     if registry is None:
-        from infrastructure.registry.scheduler_registry import (
-            get_scheduler_registry,
-        )
+        from infrastructure.registry.scheduler_registry import get_scheduler_registry
 
         registry = get_scheduler_registry()
 
@@ -105,9 +103,7 @@ def create_default_config(data: Dict[str, Any]) -> Any:
 def register_default_scheduler(registry: "SchedulerRegistry" = None):
     """Register default scheduler."""
     if registry is None:
-        from infrastructure.registry.scheduler_registry import (
-            get_scheduler_registry,
-        )
+        from infrastructure.registry.scheduler_registry import get_scheduler_registry
 
         registry = get_scheduler_registry()
 

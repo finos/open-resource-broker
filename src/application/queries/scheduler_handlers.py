@@ -36,9 +36,7 @@ class ListSchedulerStrategiesHandler(
             Scheduler strategies list response
         """
         from config.manager import ConfigurationManager
-        from infrastructure.registry.scheduler_registry import (
-            get_scheduler_registry,
-        )
+        from infrastructure.registry.scheduler_registry import get_scheduler_registry
 
         registry = get_scheduler_registry()
         scheduler_types = registry.get_registered_types()
@@ -123,9 +121,7 @@ class GetSchedulerConfigurationHandler(
             Scheduler configuration response
         """
         from config.manager import ConfigurationManager
-        from infrastructure.registry.scheduler_registry import (
-            get_scheduler_registry,
-        )
+        from infrastructure.registry.scheduler_registry import get_scheduler_registry
 
         config_manager = ConfigurationManager()
         registry = get_scheduler_registry()
@@ -181,9 +177,7 @@ class ValidateSchedulerConfigurationHandler(
             Validation result
         """
         from config.manager import ConfigurationManager
-        from infrastructure.registry.scheduler_registry import (
-            get_scheduler_registry,
-        )
+        from infrastructure.registry.scheduler_registry import get_scheduler_registry
 
         config_manager = ConfigurationManager()
         registry = get_scheduler_registry()

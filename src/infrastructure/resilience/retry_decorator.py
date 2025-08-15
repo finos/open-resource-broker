@@ -9,12 +9,8 @@ from infrastructure.resilience.exceptions import (
     InvalidRetryStrategyError,
     MaxRetriesExceededError,
 )
-from infrastructure.resilience.strategy.circuit_breaker import (
-    CircuitBreakerStrategy,
-)
-from infrastructure.resilience.strategy.exponential import (
-    ExponentialBackoffStrategy,
-)
+from infrastructure.resilience.strategy.circuit_breaker import CircuitBreakerStrategy
+from infrastructure.resilience.strategy.exponential import ExponentialBackoffStrategy
 
 T = TypeVar("T")
 logger = get_logger(__name__)

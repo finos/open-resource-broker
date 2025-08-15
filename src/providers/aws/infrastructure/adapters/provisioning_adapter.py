@@ -15,9 +15,7 @@ from domain.template.aggregate import Template
 from infrastructure.adapters.ports.resource_provisioning_port import (
     ResourceProvisioningPort,
 )
-from infrastructure.template.configuration_manager import (
-    TemplateConfigurationManager,
-)
+from infrastructure.template.configuration_manager import TemplateConfigurationManager
 from providers.aws.exceptions.aws_exceptions import (
     AWSEntityNotFoundError,
     AWSValidationError,

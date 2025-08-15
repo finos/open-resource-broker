@@ -115,9 +115,7 @@ class TestInjectableMigration(unittest.TestCase):
         )
 
         # Register AWS handler factory manually
-        from providers.aws.infrastructure.aws_handler_factory import (
-            AWSHandlerFactory,
-        )
+        from providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
 
         self.container.register_singleton(
             AWSHandlerFactory,
@@ -154,9 +152,7 @@ class TestInjectableMigration(unittest.TestCase):
         self.assertIsNotNone(instance_manager)
 
         # Register and test AWSResourceManagerImpl
-        from providers.aws.managers.aws_resource_manager import (
-            AWSResourceManagerImpl,
-        )
+        from providers.aws.managers.aws_resource_manager import AWSResourceManagerImpl
 
         self.container.register_singleton(AWSResourceManagerImpl)
         resource_manager = self.container.get(AWSResourceManagerImpl)

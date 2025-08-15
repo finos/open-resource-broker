@@ -37,9 +37,7 @@ class TestProviderContextIntegration:
             mock_aws_strategy.is_initialized.return_value = True
 
             # Mock capabilities
-            from providers.base.strategy.provider_strategy import (
-                ProviderCapabilities,
-            )
+            from providers.base.strategy.provider_strategy import ProviderCapabilities
 
             mock_capabilities = ProviderCapabilities(
                 supported_operations=[

@@ -5,9 +5,7 @@ from unittest.mock import MagicMock, patch
 from config.manager import ConfigurationManager
 from domain.base.ports import LoggingPort, SchedulerPort
 from infrastructure.scheduler.default.strategy import DefaultSchedulerStrategy
-from infrastructure.scheduler.hostfactory.strategy import (
-    HostFactorySchedulerStrategy,
-)
+from infrastructure.scheduler.hostfactory.strategy import HostFactorySchedulerStrategy
 from infrastructure.scheduler.registration import create_default_strategy
 
 
@@ -69,9 +67,7 @@ class TestSchedulerStrategyRegistration:
     def test_register_scheduler_strategies(self, mock_create_default_strategy):
         """Test that register_scheduler_strategies registers the default strategy."""
         # Arrange
-        from infrastructure.scheduler.registration import (
-            register_scheduler_strategies,
-        )
+        from infrastructure.scheduler.registration import register_scheduler_strategies
 
         container = MagicMock()
         mock_strategy = MagicMock(spec=SchedulerPort)

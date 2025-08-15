@@ -41,7 +41,7 @@ Examples:
   %(prog)s machines request template-id 5    # Request 5 machines
   %(prog)s requests list --status pending    # List pending requests
 
-For more information, visit: https://github.com/aws-samples/open-hostfactory-plugin
+For more information, visit: https://github.com/awslabs/open-hostfactory-plugin
         """,
     )
 

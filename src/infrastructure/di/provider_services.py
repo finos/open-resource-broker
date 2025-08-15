@@ -1,14 +1,10 @@
 """Provider service registrations for dependency injection."""
 
-from application.services.provider_capability_service import (
-    ProviderCapabilityService,
-)
+from application.services.provider_capability_service import ProviderCapabilityService
 from application.services.provider_selection_service import ProviderSelectionService
 from domain.base.ports import ConfigurationPort, LoggingPort
 from infrastructure.di.container import DIContainer
-from infrastructure.factories.provider_strategy_factory import (
-    ProviderStrategyFactory,
-)
+from infrastructure.factories.provider_strategy_factory import ProviderStrategyFactory
 from infrastructure.logging.logger import get_logger
 from providers.base.strategy import ProviderContext
 
@@ -262,9 +258,7 @@ def _register_provider_instance(provider_instance) -> bool:
         )
 
         if provider_instance.type == "aws":
-            from infrastructure.registry.provider_registry import (
-                get_provider_registry,
-            )
+            from infrastructure.registry.provider_registry import get_provider_registry
             from providers.aws.registration import register_aws_provider
 
             # Get provider registry
@@ -535,25 +529,19 @@ def _register_aws_services(container: DIContainer) -> None:
             raise
 
         try:
-            from providers.aws.strategy.aws_provider_adapter import (
-                AWSProviderAdapter,
-            )
+            from providers.aws.strategy.aws_provider_adapter import AWSProviderAdapter
         except Exception as e:
             logger.debug(f"Failed to import AWSProviderAdapter: {e}")
             raise
 
         try:
-            from providers.aws.strategy.aws_provider_strategy import (
-                AWSProviderStrategy,
-            )
+            from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
         except Exception as e:
             logger.debug(f"Failed to import AWSProviderStrategy: {e}")
             raise
 
         try:
-            from providers.aws.managers.aws_instance_manager import (
-                AWSInstanceManager,
-            )
+            from providers.aws.managers.aws_instance_manager import AWSInstanceManager
         except Exception as e:
             logger.debug(f"Failed to import AWSInstanceManager: {e}")
             raise

@@ -344,9 +344,7 @@ class TestTemplateDefaultsIntegration:
         from datetime import datetime
         from pathlib import Path
 
-        from infrastructure.template.configuration_manager import (
-            TemplateFileMetadata,
-        )
+        from infrastructure.template.configuration_manager import TemplateFileMetadata
 
         file_metadata = TemplateFileMetadata(
             path=Path("/fake/path"),

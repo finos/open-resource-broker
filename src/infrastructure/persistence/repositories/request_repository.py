@@ -15,9 +15,7 @@ from domain.base.events import (
 from domain.base.ports.storage_port import StoragePort
 from domain.base.value_objects import InstanceId  # Add InstanceId import
 from domain.request.aggregate import Request
-from domain.request.repository import (
-    RequestRepository as RequestRepositoryInterface,
-)
+from domain.request.repository import RequestRepository as RequestRepositoryInterface
 from domain.request.value_objects import RequestId, RequestStatus, RequestType
 from infrastructure.error.decorators import handle_infrastructure_exceptions
 from infrastructure.logging.logger import get_logger

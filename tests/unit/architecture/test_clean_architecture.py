@@ -300,9 +300,7 @@ class TestCleanArchitecture:
         """Test infrastructure layer boundaries and responsibilities."""
         # Infrastructure should handle external concerns
         from infrastructure.di.container import DIContainer
-        from infrastructure.persistence.base.repository import (
-            StrategyBasedRepository,
-        )
+        from infrastructure.persistence.base.repository import StrategyBasedRepository
 
         # Infrastructure components should exist
         assert StrategyBasedRepository is not None

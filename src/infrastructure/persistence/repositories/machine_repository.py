@@ -6,9 +6,7 @@ from typing import Any, Dict, List, Optional
 from domain.base.ports.storage_port import StoragePort
 from domain.base.value_objects import InstanceId
 from domain.machine.aggregate import Machine
-from domain.machine.repository import (
-    MachineRepository as MachineRepositoryInterface,
-)
+from domain.machine.repository import MachineRepository as MachineRepositoryInterface
 from domain.machine.value_objects import MachineId, MachineStatus
 from infrastructure.error.decorators import handle_infrastructure_exceptions
 from infrastructure.logging.logger import get_logger

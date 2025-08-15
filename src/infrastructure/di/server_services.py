@@ -103,9 +103,7 @@ def _register_api_handlers(container: DIContainer) -> None:
 
     try:
         # Register request status handler
-        from api.handlers.get_request_status_handler import (
-            GetRequestStatusRESTHandler,
-        )
+        from api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
         from domain.base.ports import ErrorHandlingPort, LoggingPort
 
         if not container.is_registered(GetRequestStatusRESTHandler):

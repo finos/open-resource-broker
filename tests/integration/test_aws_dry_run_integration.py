@@ -4,10 +4,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from infrastructure.mocking.dry_run_context import (
-    dry_run_context,
-    is_dry_run_active,
-)
+from infrastructure.mocking.dry_run_context import dry_run_context, is_dry_run_active
 from providers.aws.infrastructure.dry_run_adapter import (
     aws_dry_run_context,
     get_aws_dry_run_status,

@@ -14,9 +14,7 @@ from infrastructure.di.container import DIContainer, get_container
 
 # Import focused service registration modules
 from infrastructure.di.core_services import register_core_services
-from infrastructure.di.infrastructure_services import (
-    register_infrastructure_services,
-)
+from infrastructure.di.infrastructure_services import register_infrastructure_services
 from infrastructure.di.provider_services import register_provider_services
 from infrastructure.di.scheduler_services import register_scheduler_services
 from infrastructure.di.server_services import register_server_services
@@ -160,9 +158,7 @@ def _register_lazy_service_factories(container: DIContainer) -> None:
     # Register scheduler services as lazy
     def register_scheduler_lazy(c):
         """Register scheduler services lazily when needed."""
-        from infrastructure.scheduler.registration import (
-            register_active_scheduler_only,
-        )
+        from infrastructure.scheduler.registration import register_active_scheduler_only
 
         # Get scheduler type from config if available
         try:

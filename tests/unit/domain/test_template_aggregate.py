@@ -6,10 +6,7 @@ import pytest
 
 from domain.base.value_objects import InstanceType
 from domain.template.aggregate import Template
-from domain.template.exceptions import (
-    TemplateNotFoundError,
-    TemplateValidationError,
-)
+from domain.template.exceptions import TemplateNotFoundError, TemplateValidationError
 from domain.template.value_objects import TemplateId
 
 # Try to import optional classes - create mocks if not available

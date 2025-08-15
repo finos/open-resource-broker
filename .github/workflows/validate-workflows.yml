@@ -15,6 +15,9 @@ jobs:
 
     steps:
     - name: Checkout code
+
+    - name: Install yq
+      uses: mikefarah/yq@master
       uses: actions/checkout@v5
 
     - name: Validate workflow files
@@ -23,8 +26,6 @@ jobs:
         for file in .github/workflows/*.yml .github/workflows/*.yaml; do
           if [ -f "$file" ]; then
             echo "Validating $file..."
-    - name: Install yq
-      uses: mikefarah/yq@master
             yq . "$file" > /dev/null && echo "VALID: $file" || (echo "INVALID: $file" && exit 1)
           fi
         done

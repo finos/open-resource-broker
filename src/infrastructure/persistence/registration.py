@@ -27,9 +27,7 @@ def register_all_storage_types() -> None:
 
     # Register JSON storage
     try:
-        from infrastructure.persistence.json.registration import (
-            register_json_storage,
-        )
+        from infrastructure.persistence.json.registration import register_json_storage
 
         register_json_storage()
         registered_types.append("json")
@@ -104,9 +102,7 @@ def register_storage_type_on_demand(storage_type: str) -> bool:
 
             register_json_storage()
         elif storage_type == "sql":
-            from infrastructure.persistence.sql.registration import (
-                register_sql_storage,
-            )
+            from infrastructure.persistence.sql.registration import register_sql_storage
 
             register_sql_storage()
         elif storage_type == "dynamodb":
@@ -137,9 +133,7 @@ def register_minimal_storage_types() -> None:
 
     # Register only JSON storage (lightweight, always available)
     try:
-        from infrastructure.persistence.json.registration import (
-            register_json_storage,
-        )
+        from infrastructure.persistence.json.registration import register_json_storage
 
         register_json_storage()
         logger.info("Minimal storage registration complete: json")
@@ -217,9 +211,7 @@ def register_storage_type(storage_type: str) -> bool:
 
             register_json_storage()
         elif storage_type == "sql":
-            from infrastructure.persistence.sql.registration import (
-                register_sql_storage,
-            )
+            from infrastructure.persistence.sql.registration import register_sql_storage
 
             register_sql_storage()
         elif storage_type == "dynamodb":

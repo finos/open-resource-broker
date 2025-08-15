@@ -7,13 +7,14 @@ Users can import as: from ohfp.domain import ... or import ohfp.cli
 
 __version__ = "0.1.0"
 
+import api
+import application
+
 # Import submodules using absolute imports
 import cli
-import domain  
-import infrastructure
-import application
 import config
-import api
+import domain
+import infrastructure
 import providers
 
 __all__ = ["cli", "domain", "infrastructure", "application", "config", "api", "providers"]

@@ -4,9 +4,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from domain.template.aggregate import Template
-from domain.template.repository import (
-    TemplateRepository as TemplateRepositoryInterface,
-)
+from domain.template.repository import TemplateRepository as TemplateRepositoryInterface
 from domain.template.value_objects import TemplateId
 from infrastructure.error.decorators import handle_infrastructure_exceptions
 from infrastructure.logging.logger import get_logger

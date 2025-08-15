@@ -15,9 +15,7 @@ from infrastructure.adapters.error_handling_adapter import ErrorHandlingAdapter
 from infrastructure.adapters.factories.container_adapter_factory import (
     ContainerAdapterFactory,
 )
-from infrastructure.template.configuration_manager import (
-    TemplateConfigurationManager,
-)
+from infrastructure.template.configuration_manager import TemplateConfigurationManager
 
 
 def register_port_adapters(container):
@@ -27,9 +25,7 @@ def register_port_adapters(container):
     def create_configuration_adapter(c):
         """Create configuration adapter bridging domain port to infrastructure manager."""
         from config.manager import get_config_manager
-        from infrastructure.adapters.configuration_adapter import (
-            ConfigurationAdapter,
-        )
+        from infrastructure.adapters.configuration_adapter import ConfigurationAdapter
 
         return ConfigurationAdapter(get_config_manager())
 
@@ -40,9 +36,7 @@ def register_port_adapters(container):
     # Using consistent Base* naming pattern for abstract classes
     from domain.base import UnitOfWorkFactory as BaseUnitOfWorkFactory
     from infrastructure.adapters.logging_adapter import LoggingAdapter
-    from infrastructure.utilities.factories.repository_factory import (
-        UnitOfWorkFactory,
-    )
+    from infrastructure.utilities.factories.repository_factory import UnitOfWorkFactory
 
     config_manager = get_config_manager()
     container.register_instance(

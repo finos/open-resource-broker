@@ -7,9 +7,7 @@ from domain.request.repository import RequestRepository
 from domain.template.repository import TemplateRepository
 from infrastructure.di.container import DIContainer
 from infrastructure.logging.logger import get_logger
-from infrastructure.template.configuration_manager import (
-    TemplateConfigurationManager,
-)
+from infrastructure.template.configuration_manager import TemplateConfigurationManager
 from providers.aws.infrastructure.template.caching_ami_resolver import (
     CachingAMIResolver,
 )
@@ -169,9 +167,7 @@ def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
             # Register with default configuration as fallback
             container.register_singleton(CachingAMIResolver)
             # Register interface to resolve to concrete implementation
-            from domain.base.ports.template_resolver_port import (
-                TemplateResolverPort,
-            )
+            from domain.base.ports.template_resolver_port import TemplateResolverPort
 
             container.register_singleton(TemplateResolverPort, lambda c: c.get(CachingAMIResolver))
             logger.info("AMI resolver registered with fallback configuration")
@@ -189,9 +185,7 @@ def _register_repository_services(container: DIContainer) -> None:
     from infrastructure.template.template_repository_impl import (
         create_template_repository_impl,
     )
-    from infrastructure.utilities.factories.repository_factory import (
-        RepositoryFactory,
-    )
+    from infrastructure.utilities.factories.repository_factory import RepositoryFactory
 
     # Storage strategies are now registered by storage_services.py
     # No need to register them here anymore

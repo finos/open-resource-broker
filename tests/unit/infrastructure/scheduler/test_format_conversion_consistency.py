@@ -4,9 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from domain.base.ports import SchedulerPort
 from infrastructure.scheduler.default.strategy import DefaultSchedulerStrategy
-from infrastructure.scheduler.hostfactory.strategy import (
-    HostFactorySchedulerStrategy,
-)
+from infrastructure.scheduler.hostfactory.strategy import HostFactorySchedulerStrategy
 
 
 class TestFormatConversionConsistency:
