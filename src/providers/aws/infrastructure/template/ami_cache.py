@@ -1,10 +1,13 @@
 """Runtime AMI cache for script execution with optional persistence."""
 
 import json
+import logging
 import os
 import time
 from contextlib import suppress
 from typing import Dict, Optional, Set
+
+logger = logging.getLogger(__name__)
 
 
 class RuntimeAMICache:

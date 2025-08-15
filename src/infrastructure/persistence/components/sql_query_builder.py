@@ -131,7 +131,10 @@ class SQLQueryBuilder(QueryManager):
         # 1. Validating table_name and column names against a whitelist pattern
         # 2. Using parameterized queries for all values with :param syntax
         # nosec B608
-        query = f"INSERT INTO {self.table_name} ({', '.join(columns)}) VALUES ({', '.join(placeholders)})"  # nosec B608"  # nosec B608
+        query = (
+            f"INSERT INTO {self.table_name} "  # nosec B608
+            f"({', '.join(columns)}) VALUES ({', '.join(placeholders)})"  # nosec B608
+        )
 
         self.logger.debug(f"Built INSERT query for {self.table_name}")
         return query, filtered_data
@@ -150,7 +153,10 @@ class SQLQueryBuilder(QueryManager):
         self._validate_identifier(id_column)
 
         # nosec B608
-        query = f"SELECT * FROM {self.table_name} WHERE {id_column} = :{id_column}"  # nosec B608
+        query = (
+            f"SELECT * FROM {self.table_name} "  # nosec B608
+            f"WHERE {id_column} = :{id_column}"  # nosec B608
+        )
 
         self.logger.debug(f"Built SELECT by ID query for {self.table_name}")
         return query, id_column
