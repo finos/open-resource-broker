@@ -364,7 +364,7 @@ class DevToolsInstaller:
         ):
             return True
 
-        # Fallback to binary download
+        # Fallback to binary download with correct version
         arch = platform.machine().lower()
         if arch == "x86_64":
             arch = "amd64"
@@ -375,12 +375,25 @@ class DevToolsInstaller:
         if self.os_type == "darwin":
             os_name = "darwin"
 
-        url = f"https://github.com/rhymond/actionlint/releases/latest/download/actionlint_1.6.26_{os_name}_{arch}.tar.gz"
-        # Use shell=True for pipe command
-        return self._run_command(
-            f"curl -L {url} | sudo tar -xz -C /usr/local/bin actionlint",
-            shell=True
-        )
+        # Use a known working version
+        version = "1.7.1"
+        url = f"https://github.com/rhymond/actionlint/releases/download/v{version}/actionlint_{version}_{os_name}_{arch}.tar.gz"
+        
+        # Download and extract in separate steps for better error handling
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tarfile = f"{tmpdir}/actionlint.tar.gz"
+            
+            # Download
+            if not self._run_command(["curl", "-L", "-o", tarfile, url]):
+                return False
+                
+            # Extract
+            if not self._run_command(["tar", "-xzf", tarfile, "-C", tmpdir]):
+                return False
+                
+            # Install
+            return self._run_command(["sudo", "mv", f"{tmpdir}/actionlint", "/usr/local/bin/actionlint"])
 
     def _install_shellcheck_generic(self):
         """Install shellcheck using binary download."""

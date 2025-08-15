@@ -47,4 +47,7 @@ jobs:
 
     - name: Validate workflow syntax and logic
       run: |
-        make validate-all-workflows
+        make validate-workflow-syntax
+
+    - name: Validate workflows with actionlint
+      uses: rhymond/github-action-actionlint@v1
