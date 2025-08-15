@@ -63,14 +63,16 @@ ENV PYTHONPATH=/app \
     HF_SERVER_WORKERS=1 \
     HF_SERVER_LOG_LEVEL=info \
     HF_SERVER_DOCS_ENABLED=true \
-    HF_AUTH_ENABLED=false \
-    HF_AUTH_STRATEGY=none \
     HF_LOGGING_LEVEL=INFO \
     HF_LOGGING_CONSOLE_ENABLED=true \
     HF_STORAGE_STRATEGY=json \
     HF_STORAGE_BASE_PATH=/app/data \
     HF_PROVIDER_TYPE=aws \
     HF_PROVIDER_AWS_REGION=us-east-1
+
+# Auth configuration - these are public configuration settings, not secrets
+ENV HF_AUTH_ENABLED=false \
+    HF_AUTH_STRATEGY=none
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

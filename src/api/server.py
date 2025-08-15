@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 
+from src._package import __version__
 from src.api.documentation import configure_openapi
 from src.api.middleware import AuthMiddleware, LoggingMiddleware
 from src.config.schemas.server_schema import ServerConfig
@@ -27,7 +28,7 @@ def create_fastapi_app(server_config: ServerConfig) -> FastAPI:
     app = FastAPI(
         title="Open Host Factory Plugin API",
         description="REST API for Open Host Factory Plugin - Dynamic cloud resource provisioning",
-        version="1.0.0",
+        version=__version__,
         docs_url=server_config.docs_url if server_config.docs_enabled else None,
         redoc_url=server_config.redoc_url if server_config.docs_enabled else None,
         openapi_url=server_config.openapi_url if server_config.docs_enabled else None,
@@ -112,7 +113,7 @@ def create_fastapi_app(server_config: ServerConfig) -> FastAPI:
         return {
             "status": "healthy",
             "service": "open-hostfactory-plugin",
-            "version": "1.0.0",
+            "version": __version__,
         }
 
     # Add info endpoint
@@ -121,7 +122,7 @@ def create_fastapi_app(server_config: ServerConfig) -> FastAPI:
         """Service information endpoint."""
         return {
             "service": "open-hostfactory-plugin",
-            "version": "1.0.0",
+            "version": __version__,
             "description": "REST API for Open Host Factory Plugin",
             "auth_enabled": server_config.auth.enabled,
             "auth_strategy": (server_config.auth.strategy if server_config.auth.enabled else None),

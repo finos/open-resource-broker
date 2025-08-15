@@ -98,7 +98,8 @@ from .provider_strategy import (
 )
 
 # Version and metadata
-__version__ = "1.0.0"
+from src._package import __version__
+
 __author__ = "Symphony Team"
 __description__ = "Provider Strategy Pattern Implementation"
 
