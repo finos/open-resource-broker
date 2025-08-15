@@ -30,12 +30,15 @@ async def handle_serve_api(args) -> Dict[str, Any]:
 
     try:
         # Import here to avoid circular dependencies
-        from src.config.manager import ConfigurationManager
-        from src.interface.rest.server import create_app
+        from src.api.server import create_fastapi_app
+        from src.config.schemas.server_schema import ServerConfig
+        from src.domain.base.ports.configuration_port import ConfigurationPort
+        from src.infrastructure.di.container import get_container
 
-        # Get server configuration
-        config_manager = ConfigurationManager()
-        server_config = config_manager.get_server_config()
+        # Get configuration through DI
+        container = get_container()
+        config_manager = container.get(ConfigurationPort)
+        server_config = config_manager.get_typed(ServerConfig)
 
         # Override with CLI arguments if provided
         if host:
@@ -53,7 +56,7 @@ async def handle_serve_api(args) -> Dict[str, Any]:
         )
 
         # Create and configure the FastAPI app
-        app = create_app()
+        app = create_fastapi_app(server_config)
 
         # Start the server
         import uvicorn
