@@ -30,6 +30,7 @@ fi
 echo "INFO: Building package..."
 BUILD_ARGS="${BUILD_ARGS:-}"
 if [ -n "$BUILD_ARGS" ]; then
+    # shellcheck disable=SC2086
     $RUN_TOOL python -m build $BUILD_ARGS
 else
     $RUN_TOOL python -m build
