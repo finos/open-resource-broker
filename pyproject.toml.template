@@ -149,8 +149,8 @@ dev = [
 
 [project.optional-dependencies]
 [project.scripts]
-{{PACKAGE_NAME_SHORT}} = "src.run:cli_main"     # From src._package.PACKAGE_NAME_SHORT
-{{PACKAGE_NAME}} = "src.run:cli_main"           # From src._package.PACKAGE_NAME
+{{PACKAGE_NAME_SHORT}} = "run:cli_main"     # From src._package.PACKAGE_NAME_SHORT
+{{PACKAGE_NAME}} = "run:cli_main"           # From src._package.PACKAGE_NAME
 
 # URLs using centralized repository detection  
 [project.urls]
@@ -159,12 +159,11 @@ Documentation = "{{DOCS_URL}}"      # From src._package.DOCS_URL
 Repository = "{{REPO_URL}}"         # From src._package.REPO_URL
 "Bug Reports" = "{{REPO_ISSUES_URL}}"  # From src._package.REPO_ISSUES_URL
 
-[tool.setuptools]
-py-modules = ["src.run"]
-
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["src*"]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
 
 
 
@@ -173,7 +172,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --cov=src --cov-report=term-missing --cov-report=html"
+addopts = "-v --cov=ohfp --cov-report=term-missing --cov-report=html"
 env = [
     "AWS_DEFAULT_REGION=us-east-1",
     "AWS_ACCESS_KEY_ID=testing",
