@@ -159,8 +159,16 @@ build_image() {
 
     # Prepare platform arguments
     local platform_args=()
-    if [[ -n "${PLATFORMS}" ]]; then
-        platform_args+=("--platform" "${PLATFORMS}")
+    if [[ "${PUSH}" == "true" ]]; then
+        # Multi-platform for registry pushes
+        if [[ -n "${PLATFORMS}" ]]; then
+            platform_args+=("--platform" "${PLATFORMS}")
+        fi
+    else
+        # Single platform for local builds (so we can use --load)
+        local_platform=$(docker info --format '{{.Architecture}}' 2>/dev/null || echo 'amd64')
+        platform_args+=("--platform" "linux/${local_platform}")
+        log_info "Using single platform linux/${local_platform} for local build"
     fi
 
     # Prepare push arguments
@@ -168,12 +176,8 @@ build_image() {
     if [[ "${PUSH}" == "true" ]]; then
         push_args+=("--push")
     else
-        # --load only works with single platform builds
-        if [[ "${PLATFORMS}" == *","* ]]; then
-            log_warn "Multi-platform build detected, skipping --load (cannot load multi-platform images)"
-        else
-            push_args+=("--load")
-        fi
+        # Always use --load for local builds (single platform)
+        push_args+=("--load")
     fi
 
     # Build command
