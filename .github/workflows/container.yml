@@ -202,7 +202,7 @@ jobs:
 
     - name: Create and push manifests
       env:
-        PYTHON_VERSIONS: ${{ join(fromJSON(needs.get-config.outputs.default-python-versions), ' ') }}
+        PYTHON_VERSIONS: ${{ join(fromJSON(needs.get-config.outputs.python-versions), ' ') }}
         DEFAULT_PYTHON_VERSION: ${{ needs.get-config.outputs.default-python-version }}
         REGISTRY: ${{ needs.get-config.outputs.container-registry }}
         IMAGE: ${{ needs.get-config.outputs.container-image }}
