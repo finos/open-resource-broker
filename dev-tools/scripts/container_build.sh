@@ -134,6 +134,7 @@ build_image() {
         "--build-arg" "VERSION=${VERSION}"
         "--build-arg" "VCS_REF=${VCS_REF}"
         "--build-arg" "PYTHON_VERSION=${PYTHON_VERSION}"
+        "--build-arg" "PACKAGE_NAME_SHORT=${MAKEFILE_PACKAGE_SHORT}"
     )
 
     # Prepare cache arguments
