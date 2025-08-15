@@ -102,7 +102,7 @@ build_image() {
     log_info "Building Docker image..."
 
     # Build wheel first if it doesn't exist
-    if [[ ! -f "dist/"*.whl ]]; then
+    if ! ls dist/*.whl 1> /dev/null 2>&1; then
         log_info "Building wheel package..."
         make build || {
             log_error "Failed to build wheel package"

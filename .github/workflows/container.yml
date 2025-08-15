@@ -42,7 +42,6 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
-      uses: actions/checkout@v5
 
     - name: Install yq
       uses: mikefarah/yq@master
@@ -110,7 +109,6 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
       uses: actions/checkout@v5
       with:
         fetch-depth: 0

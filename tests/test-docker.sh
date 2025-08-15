@@ -137,9 +137,7 @@ test_container_startup() {
 
     # Test version command
     local version_output
-    version_output=$(docker run --rm "${TEST_IMAGE_NAME}" version 2>&1)
-
-    if [[ $? -ne 0 ]]; then
+    if ! version_output=$(docker run --rm "${TEST_IMAGE_NAME}" version 2>&1); then
         log_error "Container version command failed"
         log_error "Output: ${version_output}"
         return 1
