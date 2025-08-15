@@ -35,7 +35,6 @@ jobs:
 
     - name: Install yq
       uses: mikefarah/yq@master
-      uses: actions/checkout@v5
 
     - name: Get default Python version from project config
       id: version

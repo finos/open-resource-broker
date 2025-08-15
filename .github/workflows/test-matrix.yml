@@ -31,7 +31,6 @@ jobs:
 
     - name: Install yq
       uses: mikefarah/yq@master
-      uses: actions/checkout@v5
 
     - name: Get configuration from project config
       id: config
@@ -62,7 +61,6 @@ jobs:
 
     - name: Install yq
       uses: mikefarah/yq@master
-      uses: actions/checkout@v5
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
@@ -116,7 +114,6 @@ jobs:
 
     - name: Install yq
       uses: mikefarah/yq@master
-      uses: actions/checkout@v5
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
@@ -170,7 +167,6 @@ jobs:
 
     - name: Install yq
       uses: mikefarah/yq@master
-      uses: actions/checkout@v5
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5

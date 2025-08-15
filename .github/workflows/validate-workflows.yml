@@ -19,7 +19,6 @@ jobs:
 
     - name: Install yq
       uses: mikefarah/yq@master
-      uses: actions/checkout@v5
 
     - name: Validate workflow files
       run: |
