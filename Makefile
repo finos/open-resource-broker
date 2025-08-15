@@ -514,7 +514,9 @@ file-sizes-report: dev-install  ## Generate detailed file size report
 
 validate-workflow-syntax: dev-install  ## Validate GitHub Actions workflow YAML syntax
 	@echo "Validating workflow files..."
-	$(BIN)/python ./dev-tools/scripts/validate_workflows.py
+	# Use 'uv run' because this script imports PyYAML (third-party package)
+	# Other dev-tools scripts use only standard library so work with shebang
+	uv run ./dev-tools/scripts/validate_workflows.py
 
 validate-workflow-logic: dev-install  ## Validate GitHub Actions workflows with actionlint
 	@echo "Validating workflows with actionlint..."
