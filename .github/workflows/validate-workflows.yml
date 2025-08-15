@@ -9,9 +9,29 @@ on:
       - '.github/workflows/**'
 
 jobs:
+  get-config:
+    name: Get Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      default-python-version: ${{ steps.config.outputs.default-python-version }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Install yq
+      uses: mikefarah/yq@master
+
+    - name: Get configuration from project config
+      id: config
+      run: |
+        DEFAULT_PYTHON_VERSION=$(make print-DEFAULT_PYTHON_VERSION)
+        echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> "$GITHUB_OUTPUT"
+
   validate-workflows:
     name: Validate Workflow Files
     runs-on: ubuntu-latest
+    needs: get-config
 
     steps:
     - name: Checkout code
@@ -20,13 +40,10 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.12'
+        python-version: ${{ needs.get-config.outputs.default-python-version }}
 
     - name: Install uv
       uses: astral-sh/setup-uv@v6
-
-    - name: Install yq
-      uses: mikefarah/yq@master
 
     - name: Validate workflow syntax and logic
       run: |
