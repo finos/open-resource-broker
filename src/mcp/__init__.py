@@ -26,7 +26,6 @@ Usage:
     await server.start_stdio()
 """
 
-
 from .discovery import MCPToolDiscovery
 from .tools import OpenHFPluginMCPTools
 

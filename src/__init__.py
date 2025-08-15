@@ -5,7 +5,7 @@ and structured architecture implementation supporting multiple cloud providers.
 
 Key Features:
 - Multi-provider architecture (AWS supported)
-- REST API with OpenAPI documentation  
+- REST API with OpenAPI documentation
 - Command-line interface
 - Clean Architecture with DDD patterns
 - CQRS for scalable operations
