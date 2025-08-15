@@ -114,7 +114,7 @@ if [ "$INSTALL_ZSH" = true ]; then
     print_success "Zsh completions installed to ~/.local/share/zsh/site-functions/_ohfp"
 
     # Check if fpath is configured
-    if ! grep -q "~/.local/share/zsh/site-functions" ~/.zshrc 2>/dev/null; then
+    if ! grep -q "$HOME/.local/share/zsh/site-functions" ~/.zshrc 2>/dev/null; then
         print_warning "You may need to add this to your ~/.zshrc:"
         echo "  # Enable zsh completion"
         echo "  fpath=(~/.local/share/zsh/site-functions \$fpath)"

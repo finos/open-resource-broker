@@ -157,7 +157,7 @@ test_environment_configuration() {
 
     # Test with various environment variables
     local env_test_output
-    env_test_output=$(docker run --rm \
+    if ! env_test_output=$(docker run --rm \
         -e HF_SERVER_ENABLED=true \
         -e HF_SERVER_HOST=127.0.0.1 \
         -e HF_SERVER_PORT=9000 \
@@ -165,9 +165,7 @@ test_environment_configuration() {
         -e HF_PROVIDER_TYPE=aws \
         -e HF_PROVIDER_AWS_REGION=us-west-2 \
         -e HF_DEBUG=true \
-        "${TEST_IMAGE_NAME}" version 2>&1)
-
-    if [[ $? -ne 0 ]]; then
+        "${TEST_IMAGE_NAME}" version 2>&1); then
         log_error "Environment configuration test failed"
         log_error "Output: ${env_test_output}"
         return 1
@@ -182,15 +180,13 @@ test_server_functionality() {
 
     # Start container in background
     local container_id
-    container_id=$(docker run -d \
+    if ! container_id=$(docker run -d \
         --name "${CONTAINER_NAME}" \
         -p "${TEST_PORT}:8000" \
         -e HF_SERVER_ENABLED=true \
         -e HF_AUTH_ENABLED=false \
         -e HF_LOGGING_LEVEL=DEBUG \
-        "${TEST_IMAGE_NAME}" serve)
-
-    if [[ $? -ne 0 ]]; then
+        "${TEST_IMAGE_NAME}" serve); then
         log_error "Failed to start container"
         return 1
     fi

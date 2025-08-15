@@ -13,6 +13,7 @@ TEMP_VENV=$(mktemp -d)
 echo "Creating temporary virtual environment at $TEMP_VENV"
 
 python3 -m venv "$TEMP_VENV"
+# shellcheck disable=SC1091
 source "$TEMP_VENV/bin/activate"
 
 # Verify Python version in test environment

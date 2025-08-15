@@ -47,7 +47,7 @@ run_tool() {
     echo "Running ${TOOL_NAME}..."
 
     # Try different execution methods in order of preference
-    if command -v uv >/dev/null 2>&1 && ([ -f "pyproject.toml" ] || [ -f "uv.lock" ]); then
+    if command -v uv >/dev/null 2>&1 && { [ -f "pyproject.toml" ] || [ -f "uv.lock" ]; }; then
         echo "Executing with UV..."
         uv run "${TOOL_NAME}" "$@"
     elif [ -f ".venv/bin/${TOOL_NAME}" ]; then
