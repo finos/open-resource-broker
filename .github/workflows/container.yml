@@ -60,50 +60,8 @@ jobs:
         echo "container-registry=$CONTAINER_REGISTRY" >> $GITHUB_OUTPUT
         echo "container-image=$CONTAINER_IMAGE" >> $GITHUB_OUTPUT
         echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-    - name: Get default Python version from project config
-      id: default-python-version
-      run: |
-        # Use project config directly with yq
-        DEFAULT_PYTHON_VERSION=$(yq '.python.default_version' .project.yml)
-        echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> $GITHUB_OUTPUT
-        echo "Using Python version: $DEFAULT_PYTHON_VERSION"
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ steps.default-python-version.outputs.default-python-version }}
-
-    - name: Install uv
-      uses: astral-sh/setup-uv@v6
-      with:
-        enable-cache: true
-        cache-dependency-glob: "pyproject.toml.template"
-
-    - name: Generate pyproject.toml
-      run: |
-        make generate-pyproject
-
-    - name: Install dependencies with uv
-      run: |
-        make ci-install
-
-    - name: Extract all configuration from Makefile
-      id: config
-      run: |
-        PYTHON_VERSIONS_JSON=$(make print-json-PYTHON_VERSIONS)
-        DEFAULT_PYTHON_VERSION=$(yq '.python.default_version' .project.yml)
-        CONTAINER_REGISTRY=$(make print-CONTAINER_REGISTRY)
-        CONTAINER_IMAGE=$(make print-CONTAINER_IMAGE)
-        VERSION=$(make print-VERSION)
-
-        echo "python-versions=$PYTHON_VERSIONS_JSON" >> $GITHUB_OUTPUT
-        echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> $GITHUB_OUTPUT
-        echo "container-registry=$CONTAINER_REGISTRY" >> $GITHUB_OUTPUT
-        echo "container-image=$CONTAINER_IMAGE" >> $GITHUB_OUTPUT
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-        echo "Found Python versions: $(make print-PYTHON_VERSIONS)"
+        
+        echo "Found Python versions: $PYTHON_VERSIONS"
         echo "Default Python version: $DEFAULT_PYTHON_VERSION"
         echo "Container registry: $CONTAINER_REGISTRY"
         echo "Container image: $CONTAINER_IMAGE"
