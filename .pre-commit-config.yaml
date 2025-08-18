@@ -59,7 +59,6 @@ repos:
         files: \.(py)$
         pass_filenames: false
         description: "Run bandit security analysis"
-        warning_only: true  # Allow this to fail without blocking commit
 
       - id: safety
         name: safety (Dependency Security)
@@ -68,7 +67,6 @@ repos:
         files: requirements.*\.txt$|pyproject\.toml$
         pass_filenames: false
         description: "Check dependencies for known security vulnerabilities"
-        warning_only: true  # Allow this to fail without blocking commit
 
       - id: hadolint
         name: hadolint (Dockerfile Linting)
