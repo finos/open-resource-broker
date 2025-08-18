@@ -72,6 +72,9 @@ class AWSTemplateExtensionConfig(BaseModel):
     subnet_ids: Optional[List[str]] = Field(None, description="Default subnet IDs")
     security_group_ids: Optional[List[str]] = Field(None, description="Default security group IDs")
 
+    # AWS Context field for fleet operations
+    context: Optional[str] = Field(None, description="AWS Context field for EC2 Fleet, ASG, and Spot Fleet")
+
     @field_validator("subnet_ids")
     @classmethod
     def validate_subnet_ids(cls, v: Optional[List[str]]) -> Optional[List[str]]:

@@ -366,6 +366,10 @@ class EC2FleetHandler(AWSHandler):
                     {"SubnetId": subnet_id} for subnet_id in template.subnet_ids
                 ]
 
+        # Add Context field if specified
+        if template.context:
+            fleet_config["Context"] = template.context
+
         return fleet_config
 
     def _get_allocation_strategy(self, strategy: str) -> str:

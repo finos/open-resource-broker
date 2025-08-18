@@ -141,6 +141,39 @@ class ASGHandler(AWSHandler):
 
         return asg_name
 
+    def _create_asg_config(
+        self,
+        asg_name: str,
+        aws_template: AWSTemplate,
+        request: Request,
+        launch_template_id: str,
+        launch_template_version: str,
+    ) -> Dict[str, Any]:
+        """Create Auto Scaling Group configuration."""
+        asg_config = {
+            "AutoScalingGroupName": asg_name,
+            "LaunchTemplate": {
+                "LaunchTemplateId": launch_template_id,
+                "Version": launch_template_version,
+            },
+            "MinSize": 0,
+            "MaxSize": request.requested_count * 2,  # Allow some buffer
+            "DesiredCapacity": request.requested_count,
+            "DefaultCooldown": 300,
+            "HealthCheckType": "EC2",
+            "HealthCheckGracePeriod": 300,
+        }
+
+        # Add subnet configuration
+        if aws_template.subnet_ids:
+            asg_config["VPCZoneIdentifier"] = ",".join(aws_template.subnet_ids)
+
+        # Add Context field if specified
+        if aws_template.context:
+            asg_config["Context"] = aws_template.context
+
+        return asg_config
+
     @handle_infrastructure_exceptions(context="asg_termination")
     def _get_asg_instances(self, asg_name: str) -> List[Dict[str, Any]]:
         """Get instances for a specific ASG."""

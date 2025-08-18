@@ -1,5 +1,26 @@
 # Provider Configuration Examples
 
+## AWS Context Field Support
+
+The AWS provider supports an optional `context` field for EC2 Fleet, Auto Scaling Group, and Spot Fleet operations. This field maps directly to the AWS Context parameter in the respective APIs.
+
+### Template with Context Field
+```json
+{
+  "template_defaults": {
+    "context": "production-workload",
+    "provider_api": "EC2Fleet",
+    "instance_type": "t3.medium"
+  }
+}
+```
+
+**Supported Handlers:**
+- EC2 Fleet: Maps to `Context` parameter in `create_fleet()`
+- Auto Scaling Group: Maps to `Context` parameter in `create_auto_scaling_group()`
+- Spot Fleet: Maps to `Context` parameter in `request_spot_fleet()`
+- RunInstances: Not supported (AWS API limitation)
+
 ## Basic Single Provider
 
 ### Minimal Configuration

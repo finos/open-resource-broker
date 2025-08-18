@@ -1,4 +1,4 @@
-"""Comprehensive tests for AWS handler implementations."""
+"""Tests for AWS handler implementations."""
 
 from unittest.mock import Mock
 
@@ -22,6 +22,146 @@ try:
 except ImportError as e:
     IMPORTS_AVAILABLE = False
     pytestmark = pytest.mark.skip(f"AWS provider imports not available: {e}")
+
+
+@pytest.mark.unit
+@pytest.mark.aws
+class TestContextFieldSupport:
+    """Test Context field support in AWS handlers."""
+
+    def test_ec2_fleet_context_field(self):
+        """Test that EC2 Fleet handler includes Context field when specified."""
+        # Mock template with context
+        template = Mock()
+        template.context = "production-workload"
+        template.fleet_type = "instant"
+        template.instance_types = None
+        template.subnet_ids = None
+        template.tags = None
+        template.price_type = "ondemand"
+        template.allocation_strategy = None
+        template.max_spot_price = None
+        template.percent_on_demand = None
+        template.allocation_strategy_on_demand = None
+        template.instance_types_ondemand = None
+
+        # Mock request
+        request = Mock()
+        request.requested_count = 2
+        request.request_id = "test-123"
+
+        # Create handler with mocked dependencies
+        handler = EC2FleetHandler(Mock(), Mock(), Mock(), Mock(), Mock())
+        
+        # Test _create_fleet_config method
+        config = handler._create_fleet_config(
+            template=template,
+            request=request,
+            launch_template_id="lt-123",
+            launch_template_version="1"
+        )
+        
+        # Assert Context field is included
+        assert "Context" in config
+        assert config["Context"] == "production-workload"
+
+    def test_asg_context_field(self):
+        """Test that ASG handler includes Context field when specified."""
+        # Mock template with context
+        template = Mock()
+        template.context = "staging-environment"
+        template.subnet_ids = ["subnet-123"]
+
+        # Mock request
+        request = Mock()
+        request.requested_count = 3
+
+        # Create handler with mocked dependencies
+        handler = ASGHandler(Mock(), Mock(), Mock(), Mock(), Mock())
+        
+        # Test _create_asg_config method
+        config = handler._create_asg_config(
+            asg_name="test-asg",
+            aws_template=template,
+            request=request,
+            launch_template_id="lt-456",
+            launch_template_version="2"
+        )
+        
+        # Assert Context field is included
+        assert "Context" in config
+        assert config["Context"] == "staging-environment"
+
+    def test_spot_fleet_context_field(self):
+        """Test that Spot Fleet handler includes Context field when specified."""
+        # Mock template with context
+        template = Mock()
+        template.context = "development-testing"
+        template.fleet_role = "arn:aws:iam::123456789012:role/aws-service-role/spotfleet.amazonaws.com/AWSServiceRoleForEC2SpotFleet"
+        template.fleet_type = "request"  # Use string instead of Mock
+        template.instance_types = None
+        template.subnet_ids = None
+        template.tags = None
+        template.allocation_strategy = None
+        template.max_spot_price = None
+        template.spot_fleet_request_expiry = 30
+
+        # Mock request
+        request = Mock()
+        request.requested_count = 1
+        request.request_id = "test-456"
+
+        # Create handler with mocked dependencies
+        aws_client = Mock()
+        aws_client.sts_client.get_caller_identity.return_value = {"Account": "123456789012"}
+        handler = SpotFleetHandler(aws_client, Mock(), Mock(), Mock(), Mock())
+        
+        # Test _create_spot_fleet_config method
+        config = handler._create_spot_fleet_config(
+            template=template,
+            request=request,
+            launch_template_id="lt-789",
+            launch_template_version="3"
+        )
+        
+        # Assert Context field is included
+        assert "Context" in config
+        assert config["Context"] == "development-testing"
+
+    def test_handlers_without_context_field(self):
+        """Test that handlers work correctly when Context field is not specified."""
+        # Mock template without context
+        template = Mock()
+        template.context = None
+        template.fleet_type = "instant"
+        template.instance_types = None
+        template.subnet_ids = None
+        template.tags = None
+        template.price_type = "ondemand"
+        template.allocation_strategy = None
+        template.max_spot_price = None
+        template.percent_on_demand = None
+        template.allocation_strategy_on_demand = None
+        template.instance_types_ondemand = None
+
+        # Mock request
+        request = Mock()
+        request.requested_count = 1
+        request.request_id = "test-789"
+
+        # Create handler with mocked dependencies
+        handler = EC2FleetHandler(Mock(), Mock(), Mock(), Mock(), Mock())
+        
+        # Test _create_fleet_config method
+        config = handler._create_fleet_config(
+            template=template,
+            request=request,
+            launch_template_id="lt-999",
+            launch_template_version="1"
+        )
+        
+        # Assert Context field is not included when not specified
+        assert "Context" not in config
 
 
 @pytest.mark.unit

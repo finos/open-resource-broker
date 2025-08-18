@@ -512,6 +512,10 @@ class SpotFleetHandler(AWSHandler):
                     {"SubnetId": subnet_id} for subnet_id in template.subnet_ids
                 ]
 
+        # Add Context field if specified
+        if template.context:
+            fleet_config["Context"] = template.context
+
         # Log the final configuration
         self._logger.debug(f"Spot Fleet configuration: {json.dumps(fleet_config, indent=2)}")
 
