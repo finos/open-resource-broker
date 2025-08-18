@@ -89,7 +89,7 @@ class BaseResourceManager(ResourceManagerPort, ABC):
             duration = time.time() - start_time
             if self.logger:
                 self.logger.error(
-                    "Resource provisioning failed: %s in %ss - %s",  specification.name, duration:.3f,  str(e)
+                    "Resource provisioning failed: %s in %.3fs - %s", specification.name, duration, str(e)
                 )
 
             self._record_metric(operation_id, duration, "error", str(e))
@@ -122,7 +122,7 @@ class BaseResourceManager(ResourceManagerPort, ABC):
             duration = time.time() - start_time
             if self.logger:
                 self.logger.info(
-                    "Resource deprovisioned successfully: %s in %ss",  allocation.resource_id,  duration:.3f
+                    "Resource deprovisioned successfully: %s in %.3fs", allocation.resource_id, duration
                 )
 
             self._record_metric(operation_id, duration, "success")
@@ -131,7 +131,7 @@ class BaseResourceManager(ResourceManagerPort, ABC):
             duration = time.time() - start_time
             if self.logger:
                 self.logger.error(
-                    "Resource deprovisioning failed: %s in %ss - %s",  allocation.resource_id, duration:.3f,  str(e)
+                    "Resource deprovisioning failed: %s in %.3fs - %s", allocation.resource_id, duration, str(e)
                 )
 
             self._record_metric(operation_id, duration, "error", str(e))
@@ -167,7 +167,7 @@ class BaseResourceManager(ResourceManagerPort, ABC):
 
             duration = time.time() - start_time
             if self.logger:
-                self.logger.debug("Listed %s resources in %ss", len(resources), duration:.3f)
+                self.logger.debug("Listed %s resources in %.3fs", len(resources), duration)
 
             self._record_metric(operation_id, duration, "success")
             return resources

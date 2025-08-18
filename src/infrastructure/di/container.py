@@ -73,9 +73,9 @@ def timed_operation(operation_name: str) -> Iterator[None]:
     finally:
         elapsed = time.time() - start_time
         if elapsed > 0.1:
-            logger.warning("Slow DI operation '%s': %ss", operation_name, elapsed:.3f)
+            logger.warning("Slow DI operation '%s': %.3fs", operation_name, elapsed)
         else:
-            logger.debug("DI operation '%s': %ss", operation_name, elapsed:.3f)
+            logger.debug("DI operation '%s': %.3fs", operation_name, elapsed)
 
 
 class DIContainer(DIContainerPort, CQRSHandlerRegistrationPort, ContainerPort):
