@@ -23,7 +23,9 @@ class JSONStorageStrategy(BaseStorageStrategy):
     and transaction management. Reduced from 935 lines to ~200 lines.
     """
 
-    def __init__(self, file_path: str, create_dirs: bool = True, entity_type: str = "entities") -> None:
+    def __init__(
+        self, file_path: str, create_dirs: bool = True, entity_type: str = "entities"
+    ) -> None:
         """
         Initialize JSON storage strategy with components.
 
@@ -149,7 +151,9 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 self.logger.debug("Deleted %s entity: %s", self.entity_type, entity_id)
 
             except Exception as e:
-                self.logger.error("Failed to delete %s entity %s: %s", self.entity_type, entity_id, e)
+                self.logger.error(
+                    "Failed to delete %s entity %s: %s", self.entity_type, entity_id, e
+                )
                 raise PersistenceError(f"Failed to delete entity {entity_id}: {e}") from e
 
     def exists(self, entity_id: str) -> bool:
@@ -171,7 +175,7 @@ class JSONStorageStrategy(BaseStorageStrategy):
 
             except Exception as e:
                 self.logger.error(
-                    "Failed to check existence of %s entity %s: %s",  self.entity_type, entity_id, e
+                    "Failed to check existence of %s entity %s: %s", self.entity_type, entity_id, e
                 )
                 return False
 
@@ -195,7 +199,9 @@ class JSONStorageStrategy(BaseStorageStrategy):
                         matching_entities.append(entity_data)
 
                 self.logger.debug(
-                    "Found %s %s entities matching criteria",  len(matching_entities),  self.entity_type
+                    "Found %s %s entities matching criteria",
+                    len(matching_entities),
+                    self.entity_type,
                 )
                 return matching_entities
 
@@ -240,7 +246,9 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 self._save_data(all_data)
                 self._cache_valid = False
 
-                self.logger.debug("Deleted batch of %s %s entities", len(entity_ids), self.entity_type)
+                self.logger.debug(
+                    "Deleted batch of %s %s entities", len(entity_ids), self.entity_type
+                )
 
             except Exception as e:
                 self.logger.error("Failed to delete batch of %s entities: %s", self.entity_type, e)

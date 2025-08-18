@@ -54,7 +54,9 @@ from infrastructure.utilities.common.collections.validation import (
 
 
 # Utility aliases for backward compatibility
-def filter_dict(dictionary: dict[Any, Any], predicate: Callable[[Any, Any], bool]) -> dict[Any, Any]:
+def filter_dict(
+    dictionary: dict[Any, Any], predicate: Callable[[Any, Any], bool]
+) -> dict[Any, Any]:
     """Filter dictionary by predicate - alias for compatibility."""
     return {k: v for k, v in dictionary.items() if predicate(k, v)}
 

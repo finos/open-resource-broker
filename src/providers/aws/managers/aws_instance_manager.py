@@ -13,7 +13,9 @@ from providers.aws.infrastructure.dry_run_adapter import aws_dry_run_context
 class AWSInstanceManager:
     """AWS implementation of InstanceManagerPort."""
 
-    def __init__(self, aws_client: AWSClient, config: AWSProviderConfig, logger: LoggingPort) -> None:
+    def __init__(
+        self, aws_client: AWSClient, config: AWSProviderConfig, logger: LoggingPort
+    ) -> None:
         """Initialize AWS instance manager."""
         self._aws_client = aws_client
         self._config = config

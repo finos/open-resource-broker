@@ -39,7 +39,7 @@ class ReloadProviderConfigHandler(BaseCommandHandler[ReloadProviderConfigCommand
     async def execute_command(self, command: ReloadProviderConfigCommand) -> Dict[str, Any]:
         """Execute provider configuration reload command."""
         self.logger.info(
-            "Reloading provider configuration from: %s", command.config_path or 'default location'
+            "Reloading provider configuration from: %s", command.config_path or "default location"
         )
 
         try:

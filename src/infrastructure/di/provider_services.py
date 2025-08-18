@@ -96,7 +96,7 @@ def _register_providers() -> None:
                     registered_names.append(f"{provider_instance.name}({provider_instance.type})")
             else:
                 logger.debug(
-                    "Provider instance '%s' is disabled - skipping",  provider_instance.name
+                    "Provider instance '%s' is disabled - skipping", provider_instance.name
                 )
 
         if registered_count > 0:
@@ -117,7 +117,7 @@ def _register_providers() -> None:
                 )
 
             logger.info(
-                "Registered %s provider instances - %s", registered_count, '; '.join(type_summaries)
+                "Registered %s provider instances - %s", registered_count, "; ".join(type_summaries)
             )
         else:
             logger.warning("No provider instances were successfully registered")
@@ -173,7 +173,7 @@ def _register_providers_with_di_context(container: DIContainer) -> None:
                 if _register_provider_instance_with_di(provider_instance, container):
                     registered_count += 1
             else:
-                logger.info("Provider instance '%s' is disabled - skipping",  provider_instance.name)
+                logger.info("Provider instance '%s' is disabled - skipping", provider_instance.name)
 
         logger.info("Successfully registered %s provider instance(s)", registered_count)
         _providers_registered = True
@@ -197,7 +197,9 @@ def _register_provider_instance_with_di(provider_instance, container: DIContaine
             return False
 
     except Exception as e:
-        logger.error("Failed to register provider instance '%s': %s", provider_instance.name, str(e))
+        logger.error(
+            "Failed to register provider instance '%s': %s", provider_instance.name, str(e)
+        )
         return False
 
 
@@ -238,7 +240,9 @@ def _validate_provider_config(provider_config) -> bool:
             supported_types = ["aws"]  # Add more as they're implemented
             if provider_instance.type not in supported_types:
                 logger.warning(
-                    "Provider type '%s' is not supported (supported: %s)",  provider_instance.type, supported_types
+                    "Provider type '%s' is not supported (supported: %s)",
+                    provider_instance.type,
+                    supported_types,
                 )
 
         return True
@@ -254,7 +258,9 @@ def _register_provider_instance(provider_instance) -> bool:
 
     try:
         logger.debug(
-            "Registering provider instance: %s (type: %s)",  provider_instance.name,  provider_instance.type
+            "Registering provider instance: %s (type: %s)",
+            provider_instance.name,
+            provider_instance.type,
         )
 
         if provider_instance.type == "aws":
@@ -267,12 +273,14 @@ def _register_provider_instance(provider_instance) -> bool:
             # Register AWS provider instance with unique name
             register_aws_provider(registry=registry, instance_name=provider_instance.name)
             logger.debug(
-                "AWS provider instance '%s' registered successfully",  provider_instance.name
+                "AWS provider instance '%s' registered successfully", provider_instance.name
             )
             return True
         else:
             logger.warning(
-                "Unknown provider type: %s for instance: %s",  provider_instance.type,  provider_instance.name
+                "Unknown provider type: %s for instance: %s",
+                provider_instance.type,
+                provider_instance.name,
             )
             return False
 
@@ -280,7 +288,9 @@ def _register_provider_instance(provider_instance) -> bool:
         logger.warning("Provider type '%s' not available: %s", provider_instance.type, str(e))
         return False
     except Exception as e:
-        logger.error("Failed to register provider instance '%s': %s", provider_instance.name, str(e))
+        logger.error(
+            "Failed to register provider instance '%s': %s", provider_instance.name, str(e)
+        )
         return False
 
 
@@ -337,7 +347,9 @@ def _create_lazy_provider_context(
             ):
                 registered_count += 1
                 logger.info(
-                    "Registered provider: %s (type: %s)",  provider_instance.name,  provider_instance.type
+                    "Registered provider: %s (type: %s)",
+                    provider_instance.name,
+                    provider_instance.type,
                 )
 
         if registered_count > 0:
@@ -396,7 +408,9 @@ def _register_provider_to_context(
 
     except Exception as e:
         logger.error(
-            "Failed to register provider instance '%s' to context: %s",  provider_instance.name,  str(e)
+            "Failed to register provider instance '%s' to context: %s",
+            provider_instance.name,
+            str(e),
         )
         return False
 
@@ -428,7 +442,7 @@ def _register_aws_provider_to_context(
 
     except Exception as e:
         logger.error(
-            "Failed to register AWS provider '%s' to context: %s",  provider_instance.name,  str(e)
+            "Failed to register AWS provider '%s' to context: %s", provider_instance.name, str(e)
         )
         return False
 

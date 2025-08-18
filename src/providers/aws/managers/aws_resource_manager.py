@@ -20,7 +20,9 @@ from providers.aws.infrastructure.dry_run_adapter import aws_dry_run_context
 class AWSResourceManagerImpl(CloudProviderResourceManager[AWSClient]):
     """AWS implementation of integrated resource manager hierarchy."""
 
-    def __init__(self, aws_client: AWSClient, config: AWSProviderConfig, logger: LoggingPort) -> None:
+    def __init__(
+        self, aws_client: AWSClient, config: AWSProviderConfig, logger: LoggingPort
+    ) -> None:
         """Initialize AWS resource manager."""
         super().__init__(aws_client, logger)
         self._config = config

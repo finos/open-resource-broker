@@ -71,7 +71,9 @@ class HostFactoryTransformations:
                 original_value
             )
             logger.debug(
-                "HostFactory: Transformed subnet_ids: %s -> %s", original_value, mapped_data['subnet_ids']
+                "HostFactory: Transformed subnet_ids: %s -> %s",
+                original_value,
+                mapped_data["subnet_ids"],
             )
 
         # Transform tags
@@ -79,7 +81,7 @@ class HostFactoryTransformations:
             original_value = mapped_data["tags"]
             mapped_data["tags"] = HostFactoryTransformations.transform_instance_tags(original_value)
             logger.debug(
-                "HostFactory: Transformed tags: %s -> %s", original_value, mapped_data['tags']
+                "HostFactory: Transformed tags: %s -> %s", original_value, mapped_data["tags"]
             )
 
         # Ensure instance type consistency

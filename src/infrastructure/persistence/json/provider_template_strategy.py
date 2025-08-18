@@ -49,7 +49,8 @@ class ProviderTemplateStrategy(JSONStorageStrategy):
         self._template_files = self._discover_template_files()
 
         self.logger.info(
-            "Initialized provider template strategy with %s template files", len(self._template_files)
+            "Initialized provider template strategy with %s template files",
+            len(self._template_files),
         )
         for file_path in self._template_files:
             self.logger.debug("Template file: %s", file_path)
@@ -76,7 +77,9 @@ class ProviderTemplateStrategy(JSONStorageStrategy):
                     )
                     if os.path.exists(instance_file):
                         template_files.append(instance_file)
-                        self.logger.debug("Found provider instance template file: %s", instance_file)
+                        self.logger.debug(
+                            "Found provider instance template file: %s", instance_file
+                        )
 
             # 2. Provider type-specific files
             provider_types = set()
@@ -148,7 +151,9 @@ class ProviderTemplateStrategy(JSONStorageStrategy):
                                 )
 
                     self.logger.info(
-                        "Loaded %s templates from %s",  len(file_data) if isinstance( file_data, (list, dict)) else 0, file_path
+                        "Loaded %s templates from %s",
+                        len(file_data) if isinstance(file_data, (list, dict)) else 0,
+                        file_path,
                     )
 
             except Exception as e:
@@ -156,7 +161,9 @@ class ProviderTemplateStrategy(JSONStorageStrategy):
                 continue
 
         self.logger.info(
-            "Merged %s unique templates from %s files", len(merged_templates), len(self._template_files)
+            "Merged %s unique templates from %s files",
+            len(merged_templates),
+            len(self._template_files),
         )
         return merged_templates
 
@@ -318,7 +325,9 @@ class ProviderTemplateStrategy(JSONStorageStrategy):
                     self.logger.info("Deleted template '%s' from %s", entity_id, file_path)
 
             except Exception as e:
-                self.logger.error("Error deleting template '%s' from %s: %s", entity_id, file_path, e)
+                self.logger.error(
+                    "Error deleting template '%s' from %s: %s", entity_id, file_path, e
+                )
                 continue
 
         if deleted:

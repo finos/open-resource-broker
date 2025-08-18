@@ -108,7 +108,7 @@ class RepositoryMigrator:
             stats["status"] = "success"
             stats["completed_at"] = datetime.utcnow().isoformat()
 
-            self.logger.info("Migration completed: %s items migrated", stats['total_migrated'])
+            self.logger.info("Migration completed: %s items migrated", stats["total_migrated"])
 
         except Exception as e:
             self.logger.error("Migration failed: %s", str(e))
@@ -284,7 +284,7 @@ class RepositoryMigrator:
                             indent=2,
                         )
                     self.logger.debug(
-                        "Backed up %s items from %s to %s",  len(items), collection, backup_file
+                        "Backed up %s items from %s to %s", len(items), collection, backup_file
                     )
             except Exception as e:
                 self.logger.warning("Failed to backup %s: %s", collection, str(e))
@@ -321,7 +321,7 @@ class RepositoryMigrator:
         try:
             items = source_repo.find_all()
             stats["total_items"] = len(items)
-            self.logger.info("Migrating %s items from %s", stats['total_items'], collection_name)
+            self.logger.info("Migrating %s items from %s", stats["total_items"], collection_name)
 
             # Process in batches
             for i in range(0, len(items), batch_size):
@@ -361,10 +361,12 @@ class RepositoryMigrator:
                                         target_repo.save(entity)
                                     except Exception as conversion_error:
                                         self.logger.error(
-                                            "Failed to convert item %s to entity: %s", item_id,  str(conversion_error)
+                                            "Failed to convert item %s to entity: %s",
+                                            item_id,
+                                            str(conversion_error),
                                         )
                                         raise ValueError(
-                                            f"Entity conversion failed: { str(conversion_error) from conversion_error}"
+                                            f"Entity conversion failed: { str(conversion_error)}"
                                         )
                                 else:
                                     # Try to determine the entity class from the
@@ -391,15 +393,18 @@ class RepositoryMigrator:
                                             target_repo.save(entity)
                                         except Exception as conversion_error:
                                             self.logger.error(
-                                                "Failed to create entity from item %s: %s", item_id,  str(conversion_error)
+                                                "Failed to create entity from item %s: %s",
+                                                item_id,
+                                                str(conversion_error),
                                             )
                                             raise ValueError(
-                                                f"Entity creation failed: { str(conversion_error) from conversion_error}"
+                                                f"Entity creation failed: { str(conversion_error)}"
                                             )
                                     else:
                                         # Fallback to direct save, which might fail
                                         self.logger.warning(
-                                            "No entity class found for repository, attempting direct save for item %s", item_id
+                                            "No entity class found for repository, attempting direct save for item %s",
+                                            item_id,
                                         )
                                         target_repo.save(item)
                             except Exception as e:
@@ -413,7 +418,11 @@ class RepositoryMigrator:
                         self.logger.warning("Failed to migrate item %s: %s", error_id, str(e))
 
                 self.logger.debug(
-                    "Migrated batch %s (%s-%s) of %s", stats['batches'], i+1, min(i+batch_size, len(items)), collection_name
+                    "Migrated batch %s (%s-%s) of %s",
+                    stats["batches"],
+                    i + 1,
+                    min(i + batch_size, len(items)),
+                    collection_name,
                 )
 
         except Exception as e:

@@ -16,7 +16,7 @@ def _get_from_project_yml() -> Optional[dict]:
         project_file = project_root / ".project.yml"
         if project_file.exists():
             with open(project_file) as f:
-                return yaml.safe_load(f)
+                return yaml.safe_load(f)  # type: ignore[no-any-return]
     except Exception as e:
         logger.debug("Failed to read project.yml: %s", e)
     return None

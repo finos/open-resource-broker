@@ -216,7 +216,9 @@ class AuthDependency:
         # Check required permissions
         for permission in self.required_permissions:
             if not auth_result.has_permission(permission):
-                self.logger.warning("User %s missing permission: %s", auth_result.user_id, permission)
+                self.logger.warning(
+                    "User %s missing permission: %s", auth_result.user_id, permission
+                )
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"Missing required permission: {permission}",

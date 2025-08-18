@@ -85,7 +85,9 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             InfrastructureError: For other infrastructure errors
         """
         self._logger.info(
-            "Provisioning resources for request %s using template %s", request.request_id, template.template_id
+            "Provisioning resources for request %s using template %s",
+            request.request_id,
+            template.template_id,
         )
 
         # Check if dry-run mode is requested
@@ -137,7 +139,9 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             return resource_id
         else:
             self._logger.error("Provider strategy operation failed: %s", result.error_message)
-            raise InfrastructureError(f"Failed to provision resources: {result.error_message}") from e
+            raise InfrastructureError(
+                f"Failed to provision resources: {result.error_message}"
+            ) from e
 
     def _provision_via_handlers(self, request: Request, template: Template) -> str:
         """
@@ -186,7 +190,9 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
 
         if not request.resource_id:
             self._logger.error("No resource ID found in request %s", request.request_id)
-            raise AWSEntityNotFoundError(f"No resource ID found in request {request.request_id}") from e
+            raise AWSEntityNotFoundError(
+                f"No resource ID found in request {request.request_id}"
+            ) from e
 
         # Get the template to determine the handler type
         if not self._template_config_manager:
@@ -239,7 +245,9 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
 
         if not request.resource_id:
             self._logger.error("No resource ID found in request %s", request.request_id)
-            raise AWSEntityNotFoundError(f"No resource ID found in request {request.request_id}") from e
+            raise AWSEntityNotFoundError(
+                f"No resource ID found in request {request.request_id}"
+            ) from e
 
         # Get the template to determine the handler type
         if not self._template_config_manager:
@@ -365,7 +373,8 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
                         }
                 except Exception as e:
                     self._logger.warning(
-                        "Failed to process auto scaling group details: %s", e,
+                        "Failed to process auto scaling group details: %s",
+                        e,
                         extra={"resource_id": resource_id},
                     )
 

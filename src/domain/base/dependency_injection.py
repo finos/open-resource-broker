@@ -144,7 +144,7 @@ def injectable(cls: Type[T]) -> Type[T]:
                 self.repository = repository
     """
     # Preserve existing functionality
-    cls._injectable = True
+    cls._injectable = True  # type: ignore[attr-defined]
 
     # Additional metadata
     metadata = InjectableMetadata(
@@ -155,11 +155,11 @@ def injectable(cls: Type[T]) -> Type[T]:
         lazy=getattr(cls, "_lazy", False),
     )
 
-    cls._injectable_metadata = metadata
+    cls._injectable_metadata = metadata  # type: ignore[attr-defined]
 
     # Store original __init__ for dependency analysis
     if hasattr(cls, "__init__"):
-        cls._original_init = cls.__init__
+        cls._original_init = cls.__init__  # type: ignore[attr-defined]
 
         # Analyze constructor parameters for auto-wiring
         sig = inspect.signature(cls.__init__)
@@ -193,7 +193,7 @@ def singleton(cls: Type[T]) -> Type[T]:
         class ConfigurationService:
             pass
     """
-    cls._singleton = True
+    cls._singleton = True  # type: ignore[attr-defined]
     return cls
 
 

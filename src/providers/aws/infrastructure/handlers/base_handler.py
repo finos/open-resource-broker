@@ -199,7 +199,9 @@ class AWSHandler(ABC):
             if hasattr(e, "__class__") and "CircuitBreakerOpenError" in str(type(e)):
                 # Log circuit breaker state and re-raise
                 self._logger.error(
-                    "Circuit breaker OPEN for %s.%s", service_name, operation_name,
+                    "Circuit breaker OPEN for %s.%s",
+                    service_name,
+                    operation_name,
                     extra={
                         "service": service_name,
                         "operation": operation_name,

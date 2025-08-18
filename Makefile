@@ -60,9 +60,9 @@ DOCS_DIR := docs
 DOCS_BUILD_DIR := $(DOCS_DIR)/site
 
 # Centralized tool execution function
-# Usage: $(call run-tool,tool-name,arguments)
+# Usage: $(call run-tool,tool-name,arguments[,working-dir])
 define run-tool
-	@dev-tools/scripts/run_tool.sh $(1) $(2)
+	$(if $(3),cd $(3) && ../dev-tools/scripts/run_tool.sh $(1) $(2),@dev-tools/scripts/run_tool.sh $(1) $(2))
 endef
 
 help:  ## Show this help message
@@ -476,7 +476,7 @@ ci-quality-flake8:  ## Run flake8 style guide check
 
 ci-quality-mypy:  ## Run mypy type checking
 	@echo "Running mypy type check..."
-	$(call run-tool,mypy,$(PACKAGE) $(TESTS))
+	$(call run-tool,mypy,. ../$(TESTS),$(PACKAGE))
 
 ci-quality-pylint:  ## Run pylint code analysis
 	@echo "Running pylint analysis..."

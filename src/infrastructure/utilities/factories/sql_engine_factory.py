@@ -94,7 +94,9 @@ class SQLEngineFactory:
 
             # Build connection string
             connection_string = f"postgresql://{username}:{password}@{host}:{port}/{database}"
-            logger.debug("Creating PostgreSQL engine with connection to %s:%s/%s", host, port, database)
+            logger.debug(
+                "Creating PostgreSQL engine with connection to %s:%s/%s", host, port, database
+            )
 
             # Add pooling configuration
             engine_kwargs.update(

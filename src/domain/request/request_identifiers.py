@@ -228,7 +228,9 @@ class ResourceIdentifier(ValueObject):
 
         # Basic validation of allowed characters
         if not re.match(r"^[a-z_][a-z0-9_]*$", normalized):
-            raise ValueError("Resource type must contain only letters, numbers, and underscores") from e
+            raise ValueError(
+                "Resource type must contain only letters, numbers, and underscores"
+            ) from e
 
         return normalized
 

@@ -104,7 +104,9 @@ class ServiceRegistry:
             )
             self._registrations[interface_type] = registration
             logger.debug(
-                "Registered type mapping: %s -> %s", interface_type.__name__, implementation_type.__name__
+                "Registered type mapping: %s -> %s",
+                interface_type.__name__,
+                implementation_type.__name__,
             )
 
     def register_injectable_class(self, cls: Type[T]) -> None:

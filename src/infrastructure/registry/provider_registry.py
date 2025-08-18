@@ -77,7 +77,7 @@ class ProviderRegistry(BaseRegistry):
                 validator_factory=validator_factory,
             )
         except ValueError as e:
-            raise ConfigurationError(str(e) from e) from e
+            raise ConfigurationError(str(e)) from e
 
     def register_provider(
         self,

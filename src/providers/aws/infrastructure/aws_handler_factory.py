@@ -25,7 +25,9 @@ class AWSHandlerFactory:
     ensuring that only one handler instance exists for each type.
     """
 
-    def __init__(self, aws_client: AWSClient, logger: LoggingPort, config: ConfigurationPort) -> None:
+    def __init__(
+        self, aws_client: AWSClient, logger: LoggingPort, config: ConfigurationPort
+    ) -> None:
         """
         Initialize the factory.
 

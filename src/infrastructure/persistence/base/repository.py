@@ -160,7 +160,9 @@ class StrategyBasedRepository(Repository[T], Generic[T]):
             self._version_map[entity_id] = entity_version + 1
 
             self.logger.debug(
-                "Saved %s %s", self.entity_class.__name__, entity_id,
+                "Saved %s %s",
+                self.entity_class.__name__,
+                entity_id,
                 extra={"entity_id": entity_id},
             )
 
@@ -193,7 +195,9 @@ class StrategyBasedRepository(Repository[T], Generic[T]):
                                     event_bus.publish(event)
                                 except Exception as sync_error:
                                     self.logger.error(
-                                        "Failed to publish event %s via sync fallback: %s",  event.__class__.__name__, sync_error
+                                        "Failed to publish event %s via sync fallback: %s",
+                                        event.__class__.__name__,
+                                        sync_error,
                                     )
                                     # Event publishing failed completely - this is
                                     # serious for domain consistency
@@ -213,7 +217,10 @@ class StrategyBasedRepository(Repository[T], Generic[T]):
                     self._cache[entity_id] = updated_entity
 
                 self.logger.debug(
-                    "Published %s events for %s %s",  len(events),  self.entity_class.__name__, entity_id,
+                    "Published %s events for %s %s",
+                    len(events),
+                    self.entity_class.__name__,
+                    entity_id,
                     extra={"entity_id": entity_id},
                 )
         except PydanticValidationError as e:
@@ -338,7 +345,9 @@ class StrategyBasedRepository(Repository[T], Generic[T]):
             del self._version_map[entity_id_str]
 
         self.logger.debug(
-            "Deleted %s %s", self.entity_class.__name__, entity_id_str,
+            "Deleted %s %s",
+            self.entity_class.__name__,
+            entity_id_str,
             extra={"entity_id": entity_id_str},
         )
 
@@ -451,7 +460,7 @@ class StrategyBasedRepository(Repository[T], Generic[T]):
                 self.storage_strategy.save_batch(entity_batch)
 
                 self.logger.debug(
-                    "Saved batch of %s %s entities",  len(entity_batch),  self.entity_class.__name__
+                    "Saved batch of %s %s entities", len(entity_batch), self.entity_class.__name__
                 )
         except PydanticValidationError as e:
             # Convert Pydantic validation error to ValueError
@@ -486,7 +495,7 @@ class StrategyBasedRepository(Repository[T], Generic[T]):
                 del self._version_map[entity_id_str]
 
         self.logger.debug(
-            "Deleted batch of %s %s entities",  len(entity_id_strs),  self.entity_class.__name__
+            "Deleted batch of %s %s entities", len(entity_id_strs), self.entity_class.__name__
         )
 
     def clear_cache(self) -> None:

@@ -71,7 +71,7 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, TemplateCo
             validation_errors = template_port.validate_template_config(command.configuration)
             if validation_errors:
                 self.logger.warning(
-                    "Template validation failed for %s: %s",  command.template_id, validation_errors
+                    "Template validation failed for %s: %s", command.template_id, validation_errors
                 )
                 return TemplateCommandResponse(
                     template_id=command.template_id, validation_errors=validation_errors
@@ -167,7 +167,9 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, TemplateCo
                 validation_errors = template_port.validate_template_config(command.configuration)
                 if validation_errors:
                     self.logger.warning(
-                        "Template update validation failed for %s: %s",  command.template_id, validation_errors
+                        "Template update validation failed for %s: %s",
+                        command.template_id,
+                        validation_errors,
                     )
                     return TemplateCommandResponse(
                         template_id=command.template_id,
@@ -332,7 +334,7 @@ class ValidateTemplateHandler(BaseCommandHandler[ValidateTemplateCommand, Templa
             # Log validation results
             if validation_errors:
                 self.logger.warning(
-                    "Template validation failed for %s: %s",  command.template_id, validation_errors
+                    "Template validation failed for %s: %s", command.template_id, validation_errors
                 )
             else:
                 self.logger.info("Template validation passed for %s", command.template_id)

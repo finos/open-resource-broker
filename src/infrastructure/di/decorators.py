@@ -155,7 +155,10 @@ def _resolve_dependency(
             # Don't try to resolve primitive types from DI container
             if _is_primitive_type(inner_type):
                 logger.debug(
-                    "Skipping primitive type resolution for %s: %s in %s", param_name,  inner_type.__name__, class_name
+                    "Skipping primitive type resolution for %s: %s in %s",
+                    param_name,
+                    inner_type.__name__,
+                    class_name,
                 )
                 return param.default if param.default != inspect.Parameter.empty else None
 
@@ -163,14 +166,21 @@ def _resolve_dependency(
                 return container.get(inner_type)
             except Exception as e:
                 logger.debug(
-                    "Could not resolve optional dependency %s: %s for %s: %s", param_name,  inner_type.__name__, class_name, e
+                    "Could not resolve optional dependency %s: %s for %s: %s",
+                    param_name,
+                    inner_type.__name__,
+                    class_name,
+                    e,
                 )
                 return param.default if param.default != inspect.Parameter.empty else None
 
         # Don't try to resolve primitive types from DI container
         if _is_primitive_type(annotation):
             logger.debug(
-                "Skipping primitive type resolution for %s: %s in %s", param_name,  annotation.__name__, class_name
+                "Skipping primitive type resolution for %s: %s in %s",
+                param_name,
+                annotation.__name__,
+                class_name,
             )
             return param.default if param.default != inspect.Parameter.empty else None
 
@@ -179,7 +189,11 @@ def _resolve_dependency(
             return container.get(annotation)
         except Exception as e:
             logger.debug(
-                "Could not resolve dependency %s: %s for %s: %s", param_name,  annotation.__name__, class_name, e
+                "Could not resolve dependency %s: %s for %s: %s",
+                param_name,
+                annotation.__name__,
+                class_name,
+                e,
             )
             return None
 

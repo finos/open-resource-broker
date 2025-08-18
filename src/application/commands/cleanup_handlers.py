@@ -141,8 +141,9 @@ class CleanupAllResourcesHandler(BaseCommandHandler[CleanupAllResourcesCommand, 
 
                 if command.dry_run:
                     self.logger.info(
-                        "DRY RUN: Would cleanup %s requests ", len(old_requests)
-                        f"and {len(old_machines)} machines"
+                        "DRY RUN: Would cleanup %s requests and %s machines",
+                        len(old_requests),
+                        len(old_machines),
                     )
                     return {
                         "dry_run": True,
@@ -187,8 +188,9 @@ class CleanupAllResourcesHandler(BaseCommandHandler[CleanupAllResourcesCommand, 
                 self.event_publisher.publish(cleanup_event)
 
                 self.logger.info(
-                    "Successfully cleaned up %s requests ", requests_cleaned
-                    f"and {machines_cleaned} machines"
+                    "Successfully cleaned up %s requests and %s machines",
+                    requests_cleaned,
+                    machines_cleaned,
                 )
 
                 return {

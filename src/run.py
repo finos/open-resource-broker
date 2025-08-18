@@ -27,7 +27,7 @@ except ImportError:
     __version__ = "0.1.0"
 
 
-def cli_main():
+def cli_main() -> None:
     """Entry point function for console scripts."""
     return asyncio.run(main())
 

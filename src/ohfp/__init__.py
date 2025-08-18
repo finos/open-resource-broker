@@ -17,4 +17,12 @@ import domain
 import infrastructure
 import providers
 
-__all__: list[str] = ["cli", "domain", "infrastructure", "application", "config", "api", "providers"]
+__all__: list[str] = [
+    "cli",
+    "domain",
+    "infrastructure",
+    "application",
+    "config",
+    "api",
+    "providers",
+]

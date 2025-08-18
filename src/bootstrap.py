@@ -118,7 +118,8 @@ class Application:
 
             self._initialized = True
             self.logger.info(
-                "Open HostFactory Plugin initialized successfully with %s provider", self.provider_type
+                "Open HostFactory Plugin initialized successfully with %s provider",
+                self.provider_type,
             )
             return True
 
@@ -319,7 +320,9 @@ async def create_application(config_path: Optional[str] = None) -> Application:
     """Create and initialize a provider-aware application."""
     app = Application(config_path)
     if not await app.initialize():
-        raise RuntimeError(f"Failed to initialize application with {app.provider_type} provider") from e
+        raise RuntimeError(
+            f"Failed to initialize application with {app.provider_type} provider"
+        ) from e
     return app
 
 
@@ -344,14 +347,14 @@ async def main() -> None:
             # Get provider info
             provider_info = app.get_provider_info()
             if "provider_names" in provider_info:
-                app.logger.info("Provider names: %s", provider_info['provider_names'])
+                app.logger.info("Provider names: %s", provider_info["provider_names"])
             elif hasattr(app, "provider_type"):
                 app.logger.info("Provider type: %s", app.provider_type)
-            app.logger.info("Status: %s", provider_info.get('initialized', False))
+            app.logger.info("Status: %s", provider_info.get("initialized", False))
 
             # Health check
             health = app.health_check()
-            app.logger.info("Health check status: %s", health.get('status'))
+            app.logger.info("Health check status: %s", health.get("status"))
 
             # Application is ready - in production this would start the API server
             app.logger.info("Application initialized and ready")

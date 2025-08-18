@@ -146,7 +146,8 @@ class EventHandler(ABC):
                     # Not the last attempt, wait and retry
                     if self.logger:
                         self.logger.warning(
-                            "Event processing failed (attempt %s/%s): ", attempt + 1, self.retry_count
+                            "Event processing failed (attempt %s/%s): ", attempt + \
+                                                      1, self.retry_count
                             f"{event.event_type} - {str(e)}"
                         )
                     await asyncio.sleep(self.retry_delay * (attempt + 1))
@@ -191,7 +192,8 @@ class EventHandler(ABC):
             error: The exception that occurred
         """
         if self.logger:
-            self.logger.error("Event sent to dead letter queue: %s - %s", event.event_type, str(error))
+            self.logger.error("Event sent to dead letter queue: %s - %s",
+                              event.event_type, str(error))
         # Future: Implement actual dead letter queue integration
 
     def extract_fields(self, event: DomainEvent, field_mapping: Dict[str, Any]) -> Dict[str, Any]:

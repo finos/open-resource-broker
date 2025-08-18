@@ -75,7 +75,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
             raise ValueError(error_msg) from e
 
         self.logger.debug(
-            "Available provider strategies: %s",  self._provider_context.available_strategies
+            "Available provider strategies: %s", self._provider_context.available_strategies
         )
 
         # Initialize request variable
@@ -99,7 +99,9 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                 template
             )
             self.logger.info(
-                "Selected provider: %s (%s)",  selection_result.provider_instance,  selection_result.selection_reason
+                "Selected provider: %s (%s)",
+                selection_result.provider_instance,
+                selection_result.selection_reason,
             )
 
             # Validate template compatibility with selected provider
@@ -138,7 +140,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
             if is_dry_run:
                 # In dry-run mode, skip actual provisioning
                 self.logger.info(
-                    "Skipping actual provisioning for request %s (dry-run mode)",  request.request_id
+                    "Skipping actual provisioning for request %s (dry-run mode)", request.request_id
                 )
                 from domain.request.value_objects import RequestStatus
 
@@ -158,7 +160,9 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                         resource_ids = provisioning_result.get("resource_ids", [])
                         self.logger.info("Provisioning result: %s", provisioning_result)
                         self.logger.info(
-                            "Extracted resource_ids: %s (type: %s)", resource_ids,  type(resource_ids)
+                            "Extracted resource_ids: %s (type: %s)",
+                            resource_ids,
+                            type(resource_ids),
                         )
 
                         # Store provider API information for later handler selection
@@ -168,23 +172,31 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                         request.metadata["handler_used"] = provisioning_result.get(
                             "provider_data", {}
                         ).get("handler_used", "RunInstancesHandler")
-                        self.logger.info("Stored provider API: %s", request.metadata['provider_api'])
+                        self.logger.info(
+                            "Stored provider API: %s", request.metadata["provider_api"]
+                        )
 
                         # Ensure resource_ids is actually a list
                         if isinstance(resource_ids, list):
                             for resource_id in resource_ids:
                                 self.logger.info(
-                                    "Adding resource_id: %s (type: %s)", resource_id,  type(resource_id)
+                                    "Adding resource_id: %s (type: %s)",
+                                    resource_id,
+                                    type(resource_id),
                                 )
                                 if isinstance(resource_id, str):
                                     request = request.add_resource_id(resource_id)
                                 else:
                                     self.logger.error(
-                                        "Expected string resource_id, got: %s - %s",  type(resource_id), resource_id
+                                        "Expected string resource_id, got: %s - %s",
+                                        type(resource_id),
+                                        resource_id,
                                     )
                         else:
                             self.logger.error(
-                                "Expected list for resource_ids, got: %s - %s",  type(resource_ids), resource_ids
+                                "Expected list for resource_ids, got: %s - %s",
+                                type(resource_ids),
+                                resource_ids,
                             )
 
                         # Create machine aggregates for each instance
@@ -250,7 +262,9 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                     request.metadata["error_type"] = type(provisioning_error).__name__
 
                     self.logger.error(
-                        "Provisioning failed for request %s: %s",  request.request_id, provisioning_error
+                        "Provisioning failed for request %s: %s",
+                        request.request_id,
+                        provisioning_error,
                     )
 
         except Exception as provisioning_error:
@@ -264,7 +278,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                     f"Provisioning failed: {str(provisioning_error)}",
                 )
                 self.logger.error(
-                    "Provisioning failed for request %s: %s",  request.request_id, provisioning_error
+                    "Provisioning failed for request %s: %s", request.request_id, provisioning_error
                 )
 
                 # Save failed request for audit trail
@@ -373,7 +387,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                 instances = result.data.get("instances", [])
 
                 self.logger.info(
-                    "Extracted resource_ids: %s (type: %s)", resource_ids,  type(resource_ids)
+                    "Extracted resource_ids: %s (type: %s)", resource_ids, type(resource_ids)
                 )
                 self.logger.info("Extracted instances: %s instances", len(instances))
 
@@ -381,7 +395,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                 if resource_ids:
                     for i, resource_id in enumerate(resource_ids):
                         self.logger.info(
-                            "Resource ID %s: %s (type: %s)",  i+ 1, resource_id,  type(resource_id)
+                            "Resource ID %s: %s (type: %s)", i + 1, resource_id, type(resource_id)
                         )
 
                 return {
@@ -462,7 +476,8 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                 except Exception as e:
                     # Fallback to generic return template
                     self.logger.warning(
-                        "Failed to determine return template ID from machine: %s", e,
+                        "Failed to determine return template ID from machine: %s",
+                        e,
                         extra={
                             "machine_ids": command.machine_ids,
                             "request_id": command.request_id,

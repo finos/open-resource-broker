@@ -660,7 +660,9 @@ async def execute_command(args, app) -> Dict[str, Any]:
         handler_func = COMMAND_HANDLERS[handler_key]
 
         if handler_func is None:
-            raise NotImplementedError(f"Command not yet implemented: {args.resource} {args.action}") from e
+            raise NotImplementedError(
+                f"Command not yet implemented: {args.resource} {args.action}"
+            ) from e
 
         # All handlers are async functions with decorators
         result = await handler_func(args)

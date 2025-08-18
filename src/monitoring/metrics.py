@@ -169,7 +169,8 @@ class MetricsCollector:
 
         if metadata:
             logger.info(
-                "%s completed successfully", operation,
+                "%s completed successfully",
+                operation,
                 extra={"duration": duration, "metadata": metadata},
             )
 
@@ -186,7 +187,8 @@ class MetricsCollector:
 
         if metadata:
             logger.error(
-                "%s failed", operation,
+                "%s failed",
+                operation,
                 extra={"duration": duration, "metadata": metadata},
             )
 

@@ -86,9 +86,10 @@ class TestFullWorkflow:
         service = app.get_application_service()
 
         # Mock command and query buses for this test
-        with patch.object(service, "_command_bus") as mock_command_bus, patch.object(
-            service, "_query_bus"
-        ) as mock_query_bus:
+        with (
+            patch.object(service, "_command_bus") as mock_command_bus,
+            patch.object(service, "_query_bus") as mock_query_bus,
+        ):
 
             # Mock request machines response
             mock_command_bus.dispatch.return_value = {
@@ -132,9 +133,10 @@ class TestFullWorkflow:
         service = app.get_application_service()
 
         # Mock command and query buses
-        with patch.object(service, "_command_bus") as mock_command_bus, patch.object(
-            service, "_query_bus"
-        ) as mock_query_bus:
+        with (
+            patch.object(service, "_command_bus") as mock_command_bus,
+            patch.object(service, "_query_bus") as mock_query_bus,
+        ):
 
             # Mock return request response
             mock_command_bus.dispatch.return_value = {
@@ -344,9 +346,11 @@ class TestEndToEndScenarios:
         service = app.get_application_service()
 
         # Mock all the buses for end-to-end flow
-        with patch.object(service, "_command_bus") as mock_command_bus, patch.object(
-            service, "_query_bus"
-        ) as mock_query_bus, patch.object(service, "_template_service") as mock_template_service:
+        with (
+            patch.object(service, "_command_bus") as mock_command_bus,
+            patch.object(service, "_query_bus") as mock_query_bus,
+            patch.object(service, "_template_service") as mock_template_service,
+        ):
 
             # Get available templates
             mock_template = Template(
@@ -440,9 +444,10 @@ class TestEndToEndScenarios:
         app.initialize()
         service = app.get_application_service()
 
-        with patch.object(service, "_command_bus") as mock_command_bus, patch.object(
-            service, "_query_bus"
-        ) as mock_query_bus:
+        with (
+            patch.object(service, "_command_bus") as mock_command_bus,
+            patch.object(service, "_query_bus") as mock_query_bus,
+        ):
 
             # Simulate initial failure
             mock_command_bus.dispatch.side_effect = Exception("Temporary failure")

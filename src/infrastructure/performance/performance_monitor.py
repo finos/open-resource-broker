@@ -55,7 +55,8 @@ class PerformanceMonitor:
 
     def get_slowest_operations(self, limit: int = 10) -> Dict[str, Dict[str, Any]]:
         """Get the slowest operations by average time."""
-        sorted_ops = sorted(self._metrics.items(), key=lambda x: x[1]["avg_time"], reverse=True)
+        sorted_ops = sorted(self._metrics.items(),
+                            key=lambda x: x[1]["avg_time"], reverse=True)
         return dict(sorted_ops[:limit])
 
     def reset_metrics(self) -> None:

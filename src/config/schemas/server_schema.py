@@ -71,8 +71,8 @@ class ServerConfig(BaseModel):
     openapi_url: str = Field("/openapi.json", description="OpenAPI schema URL")
 
     # Authentication and CORS
-    auth: AuthConfig = Field(default_factory=AuthConfig, description="Authentication configuration")
-    cors: CORSConfig = Field(default_factory=CORSConfig, description="CORS configuration")
+    auth: AuthConfig = Field(default=AuthConfig(), description="Authentication configuration")
+    cors: CORSConfig = Field(default=CORSConfig(), description="CORS configuration")
 
     # Security
     require_https: bool = Field(False, description="Require HTTPS for all requests")

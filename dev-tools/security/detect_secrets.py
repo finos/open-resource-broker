@@ -57,7 +57,9 @@ def detect_secrets(source_dir: str = "src") -> bool:
         logger.error("Potential hardcoded secrets found:")
         for secret in found_secrets:
             # Security: Don't log the actual secret content, only the location
-            logger.error(f"  Secret detected at: {secret.split(':')[0] if ':' in secret else 'unknown location'}")
+            logger.error(
+                f"  Secret detected at: {secret.split(':')[0] if ':' in secret else 'unknown location'}"
+            )
         return False
     else:
         logger.info("No hardcoded secrets detected")

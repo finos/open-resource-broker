@@ -74,7 +74,7 @@ class GetProviderHealthHandler(BaseQueryHandler[GetProviderHealthQuery, Provider
                 detailed_health = strategy.get_health_status()
                 health_info.update(detailed_health)
 
-            self.logger.info("Provider %s health: %s", query.provider_name, health_info['health'])
+            self.logger.info("Provider %s health: %s", query.provider_name, health_info["health"])
             return health_info
 
         except Exception as e:

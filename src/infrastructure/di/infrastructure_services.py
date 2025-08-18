@@ -138,12 +138,13 @@ def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
                                     lambda c: c.get(CachingAMIResolver),
                                 )
                                 logger.info(
-                                    "AMI resolver registered - enabled in AWS provider instance: %s", provider.name
+                                    "AMI resolver registered - enabled in AWS provider instance: %s",
+                                    provider.name,
                                 )
                                 return
                         except Exception as e:
                             logger.debug(
-                                "Could not parse extensions for provider %s: %s",  provider.name, e
+                                "Could not parse extensions for provider %s: %s", provider.name, e
                             )
 
             # Default: register with default AWS extension config

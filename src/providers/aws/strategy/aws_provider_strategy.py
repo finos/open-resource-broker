@@ -776,7 +776,9 @@ class AWSProviderStrategy(ProviderStrategy):
                         template_data = scheduler_strategy.load_templates_from_path(template_path)
                         templates.extend(template_data)
                     except Exception as e:
-                        self._logger.warning("Failed to load templates from %s: %s", template_path, e)
+                        self._logger.warning(
+                            "Failed to load templates from %s: %s", template_path, e
+                        )
 
                 return templates
             else:

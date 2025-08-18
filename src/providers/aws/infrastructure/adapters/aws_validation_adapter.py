@@ -220,7 +220,9 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
             return is_valid
 
         except Exception as e:
-            self._logger.error("Error validating fleet type %s for AWS API %s: %s", fleet_type, api, e)
+            self._logger.error(
+                "Error validating fleet type %s for AWS API %s: %s", fleet_type, api, e
+            )
             return False
 
     def validate_template_configuration(self, template_config: Dict[str, Any]) -> Dict[str, Any]:

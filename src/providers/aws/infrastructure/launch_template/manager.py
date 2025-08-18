@@ -120,7 +120,9 @@ class AWSLaunchTemplateManager:
             # Template exists, create a new version
             template_id = existing_template["LaunchTemplates"][0]["LaunchTemplateId"]
             self._logger.info(
-                "Launch template %s exists with ID %s. Creating/reusing version.", launch_template_name, template_id
+                "Launch template %s exists with ID %s. Creating/reusing version.",
+                launch_template_name,
+                template_id,
             )
 
             response = self.aws_client.ec2_client.create_launch_template_version(
@@ -228,7 +230,9 @@ class AWSLaunchTemplateManager:
         Returns:
             LaunchTemplateResult with new template details
         """
-        self._logger.info("Launch template %s does not exist. Creating new template.", template_name)
+        self._logger.info(
+            "Launch template %s does not exist. Creating new template.", template_name
+        )
 
         response = self.aws_client.ec2_client.create_launch_template(
             LaunchTemplateName=template_name,
@@ -244,7 +248,7 @@ class AWSLaunchTemplateManager:
         )
 
         launch_template = response["LaunchTemplate"]
-        self._logger.info("Created launch template %s", launch_template['LaunchTemplateId'])
+        self._logger.info("Created launch template %s", launch_template["LaunchTemplateId"])
 
         return LaunchTemplateResult(
             template_id=launch_template["LaunchTemplateId"],

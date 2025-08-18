@@ -138,7 +138,9 @@ class InstantiationError(DependencyResolutionError):
 class FactoryError(DependencyResolutionError):
     """Error raised when a factory function fails to create a dependency."""
 
-    def __init__(self, dependency_type: Type, message: str, cause: Optional[Exception] = None) -> None:
+    def __init__(
+        self, dependency_type: Type, message: str, cause: Optional[Exception] = None
+    ) -> None:
         """
         Initialize factory error.
 

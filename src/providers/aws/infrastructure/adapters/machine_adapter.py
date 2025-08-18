@@ -61,7 +61,7 @@ class AWSMachineAdapter:
             AWSError: If there's an issue processing the AWS instance data
         """
         self._logger.debug(
-            "Creating machine from AWS instance: %s", aws_instance_data.get('InstanceId')
+            "Creating machine from AWS instance: %s", aws_instance_data.get("InstanceId")
         )
 
         try:
@@ -92,7 +92,7 @@ class AWSMachineAdapter:
             try:
                 InstanceType(aws_instance_data["InstanceType"])
             except ValueError:
-                self._logger.error("Invalid instance type: %s", aws_instance_data['InstanceType'])
+                self._logger.error("Invalid instance type: %s", aws_instance_data["InstanceType"])
                 raise AWSError(f"Invalid instance type: {aws_instance_data['InstanceType']}") from e
 
             # Extract core machine data
@@ -124,7 +124,7 @@ class AWSMachineAdapter:
             }
 
             self._logger.debug(
-                "Successfully created machine data for %s", machine_data['machine_id']
+                "Successfully created machine data for %s", machine_data["machine_id"]
             )
             return machine_data
 
@@ -183,7 +183,7 @@ class AWSMachineAdapter:
                 error_code = getattr(e, "error_code", "")
                 if error_code == "InvalidInstanceID.NotFound":
                     self._logger.error("Instance not found: %s", machine.machine_id)
-                    raise EC2InstanceNotFoundError(str(machine.machine_id) from e)
+                    raise EC2InstanceNotFoundError(str(machine.machine_id))
                 else:
                     self._logger.error("AWS error during health check: %s", str(e))
                     raise AWSError(
@@ -224,7 +224,10 @@ class AWSMachineAdapter:
             }
 
             self._logger.debug(
-                "Health check completed for %s: system=%s, instance=%s", machine.machine_id, system_status, instance_health
+                "Health check completed for %s: system=%s, instance=%s",
+                machine.machine_id,
+                system_status,
+                instance_health,
             )
             return health_checks
 
@@ -281,7 +284,7 @@ class AWSMachineAdapter:
                 error_code = getattr(e, "error_code", "")
                 if error_code == "InvalidInstanceID.NotFound":
                     self._logger.error("Instance not found during cleanup: %s", machine.machine_id)
-                    raise EC2InstanceNotFoundError(str(machine.machine_id) from e)
+                    raise EC2InstanceNotFoundError(str(machine.machine_id))
                 else:
                     self._logger.error("AWS error during cleanup: %s", str(e))
                     raise AWSError(f"AWS error during cleanup: {str(e)}", error_code=error_code)
@@ -337,7 +340,9 @@ class AWSMachineAdapter:
                             {"id": volume_id, "error": str(e)}
                         )
             except AWSError as e:
-                self._logger.error("Error processing volumes for %s: %s", machine.machine_id, str(e))
+                self._logger.error(
+                    "Error processing volumes for %s: %s", machine.machine_id, str(e)
+                )
                 # Continue with other resources even if volumes fail
 
             # Delete network interfaces using circuit breaker
@@ -469,7 +474,7 @@ class AWSMachineAdapter:
                 error_code = getattr(e, "error_code", "")
                 if error_code == "InvalidInstanceID.NotFound":
                     self._logger.error("Instance not found: %s", machine.machine_id)
-                    raise EC2InstanceNotFoundError(str(machine.machine_id) from e)
+                    raise EC2InstanceNotFoundError(str(machine.machine_id))
                 else:
                     self._logger.error("AWS error getting machine details: %s", str(e))
                     raise AWSError(

@@ -82,7 +82,9 @@ class AdaptiveBatchSizingConfig(BaseModel):
             self.initial_batch_size < self.min_batch_size
             or self.initial_batch_size > self.max_batch_size
         ):
-            raise ValueError("Initial batch size must be between minimum and maximum batch sizes") from e
+            raise ValueError(
+                "Initial batch size must be between minimum and maximum batch sizes"
+            ) from e
 
         return self
 

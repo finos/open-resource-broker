@@ -109,7 +109,7 @@ class BaseHandler(ABC):
                     duration = time.time() - start_time
 
                     if self.logger:
-                        self.logger.info("Completed operation: %s in %ss", operation_id, duration:.3f)
+                        self.logger.info("Completed operation: %s in %.3fs", operation_id, duration)
 
                     self._metrics[operation_id] = {
                         "duration": duration,
@@ -124,7 +124,7 @@ class BaseHandler(ABC):
 
                     if self.logger:
                         self.logger.error(
-                            "Failed operation: %s in %ss - %s", operation_id, duration:.3f, str(e)
+                            "Failed operation: %s in %.3fs - %s", operation_id, duration, str(e)
                         )
 
                     self._metrics[operation_id] = {
@@ -154,7 +154,7 @@ class BaseHandler(ABC):
 
                         if self.logger:
                             self.logger.info(
-                                "Completed operation: %s in %ss", operation_id,  duration:.3f
+                                "Completed operation: %s in %.3fs", operation_id, duration
                             )
 
                         return result
@@ -164,7 +164,7 @@ class BaseHandler(ABC):
 
                         if self.logger:
                             self.logger.error(
-                                "Failed operation: %s in %ss - %s", operation_id, duration:.3f, str(e)
+                                "Failed operation: %s in %.3fs - %s", operation_id, duration, str(e)
                             )
 
                         raise
@@ -241,7 +241,7 @@ class BaseCommandHandler(BaseHandler, CommandHandler[TCommand, TResponse]):
         # Log completion
         duration = time.time() - start_time
         if self.logger:
-            self.logger.info("Completed command: %s in %ss", operation_id, duration:.3f)
+            self.logger.info("Completed command: %s in %.3fs", operation_id, duration)
 
         return result
 
@@ -317,14 +317,14 @@ class BaseQueryHandler(BaseHandler, QueryHandler[TQuery, TResult]):
 
             duration = time.time() - start_time
             if self.logger:
-                self.logger.info("Completed query: %s in %ss", operation_id, duration:.3f)
+                self.logger.info("Completed query: %s in %.3fs", operation_id, duration)
 
             return result
 
         except Exception as e:
             duration = time.time() - start_time
             if self.logger:
-                self.logger.error("Failed query: %s in %ss - %s", operation_id, duration:.3f, str(e))
+                self.logger.error("Failed query: %s in %.3fs - %s", operation_id, duration, str(e))
             raise
 
     def get_cache_key(self, query: TQuery) -> Optional[str]:
@@ -389,7 +389,7 @@ class BaseProviderHandler(BaseHandler):
                 duration = time.time() - start_time
                 if self.logger:
                     self.logger.info(
-                        "Completed provider operation: %s in %ss", operation_id,  duration:.3f
+                        "Completed provider operation: %s in %.3fs", operation_id, duration
                     )
 
                 return result
@@ -399,13 +399,16 @@ class BaseProviderHandler(BaseHandler):
                     duration = time.time() - start_time
                     if self.logger:
                         self.logger.error(
-                            "Failed provider operation: %s in %ss - %s", operation_id, duration:.3f, str(e)
+                            "Failed provider operation: %s in %.3fs - %s",
+                            operation_id,
+                            duration,
+                            str(e),
                         )
                     raise
                 else:
                     if self.logger:
                         self.logger.warning(
-                            "Provider operation failed (attempt %s): %s",  attempt + 1,  str(e)
+                            "Provider operation failed (attempt %s): %s", attempt + 1, str(e)
                         )
                     await asyncio.sleep(self.retry_delay * (attempt + 1))
 

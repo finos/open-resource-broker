@@ -155,7 +155,7 @@ class ExecuteProviderOperationHandler(
             self.event_publisher.publish(event)
 
             if result.success:
-                self.logger.info("Operation completed successfully in %sms", execution_time:.2f)
+                self.logger.info("Operation completed successfully in %.2fms", execution_time)
             else:
                 self.logger.error("Operation failed: %s", result.error_message)
 

@@ -80,7 +80,9 @@ class JSONUnitOfWork(BaseUnitOfWork):
         self.request_repository = RequestRepository(request_strategy)
         self.template_repository = TemplateRepository(template_strategy)
 
-        self.logger.debug("Initialized JSONUnitOfWork with simplified repositories in: %s", data_dir)
+        self.logger.debug(
+            "Initialized JSONUnitOfWork with simplified repositories in: %s", data_dir
+        )
 
     @property
     def machines(self):

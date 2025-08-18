@@ -217,7 +217,9 @@ class BaseRegistry(ABC):
             self.logger.debug("Created %s for type: %s", factory_name, type_name)
             return component
         except Exception as e:
-            self.logger.warning("Failed to create %s for type '%s': %s", factory_name, type_name, str(e))
+            self.logger.warning(
+                "Failed to create %s for type '%s': %s", factory_name, type_name, str(e)
+            )
             return None
 
     def clear_registrations(self) -> None:

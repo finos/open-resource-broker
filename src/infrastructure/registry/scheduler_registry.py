@@ -14,7 +14,9 @@ class UnsupportedSchedulerError(Exception):
 class SchedulerRegistration(BaseRegistration):
     """Scheduler registration container."""
 
-    def __init__(self, scheduler_type: str, strategy_factory: Callable, config_factory: Callable) -> None:
+    def __init__(
+        self, scheduler_type: str, strategy_factory: Callable, config_factory: Callable
+    ) -> None:
         """Initialize the instance."""
         super().__init__(scheduler_type, strategy_factory, config_factory)
         self.scheduler_type = scheduler_type
@@ -43,14 +45,14 @@ class SchedulerRegistry(BaseRegistry):
         try:
             self.register_type(scheduler_type, strategy_factory, config_factory, **kwargs)
         except ValueError as e:
-            raise ConfigurationError(str(e) from e) from e
+            raise ConfigurationError(str(e)) from e
 
     def create_strategy(self, scheduler_type: str, config: Any) -> Any:
         """Create scheduler strategy - implements abstract method."""
         try:
             return self.create_strategy_by_type(scheduler_type, config)
         except ValueError as e:
-            raise UnsupportedSchedulerError(str(e) from e) from e
+            raise UnsupportedSchedulerError(str(e)) from e
 
     def ensure_type_registered(self, scheduler_type: str) -> None:
         """Ensure scheduler type is registered, register if not."""

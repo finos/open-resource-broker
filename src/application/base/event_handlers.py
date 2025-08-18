@@ -82,7 +82,7 @@ class BaseEventHandler(Generic[TEvent], EventHandler[TEvent], ABC):
             self._record_success_metrics(event_type, duration)
 
             if self.logger:
-                self.logger.info("Event processed successfully: %s (%ss)", event_type, duration:.3f)
+                self.logger.info("Event processed successfully: %s (%.3fs)", event_type, duration)
 
         except Exception as e:
             # Record failure metrics
@@ -156,7 +156,7 @@ class BaseEventHandler(Generic[TEvent], EventHandler[TEvent], ABC):
                     await self.event_publisher.publish(cascading_event)
                     if self.logger:
                         self.logger.debug(
-                            "Published cascading event: %s",  cascading_event.__class__.__name__
+                            "Published cascading event: %s", cascading_event.__class__.__name__
                         )
                 except Exception as e:
                     if self.logger:

@@ -148,7 +148,8 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[Dict[str, Any], RequestStatusRe
 
                         if self.logger:
                             self.logger.info(
-                                "Retrieved status for request %s", request_id,
+                                "Retrieved status for request %s",
+                                request_id,
                                 extra={
                                     "request_id": request_id,
                                     "correlation_id": correlation_id,
@@ -174,7 +175,8 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[Dict[str, Any], RequestStatusRe
                     except Exception as e:
                         if self.logger:
                             self.logger.error(
-                                "Failed to get status for request %s", request_id,
+                                "Failed to get status for request %s",
+                                request_id,
                                 extra={
                                     "request_id": request_id,
                                     "correlation_id": correlation_id,

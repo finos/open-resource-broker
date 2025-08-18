@@ -1,5 +1,6 @@
 """Provider-agnostic domain events."""
 
+from dataclasses import dataclass, field
 from typing import Any, Optional
 from uuid import uuid4
 
@@ -20,6 +21,7 @@ class ProviderOperationEvent(DomainEvent):
     error_message: Optional[str] = Field(default=None)
 
     def model_post_init(self, __context: Any) -> None:
+        """Initialize aggregate information after model creation."""
         # Set the base class fields
         object.__setattr__(self, "aggregate_id", self.provider_resource_id or str(uuid4()))
         object.__setattr__(self, "aggregate_type", f"{self.provider_type.value}_resource")

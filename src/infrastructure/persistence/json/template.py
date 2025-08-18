@@ -53,7 +53,7 @@ class TemplateJSONStorageStrategy(JSONStorageStrategy):
             self.logger.info("Found only templates.json: %s", self.file_path)
         else:
             self.logger.warning(
-                "No template files found at %s or %s",  self.file_path,  self.legacy_file_path
+                "No template files found at %s or %s", self.file_path, self.legacy_file_path
             )
 
     def find_by_id(self, entity_id: str) -> Optional[Dict[str, Any]]:
@@ -133,7 +133,9 @@ class TemplateJSONStorageStrategy(JSONStorageStrategy):
 class TemplateJSONRepository(StrategyBasedRepository, TemplateRepository):
     """JSON-based template repository with provider-specific file support."""
 
-    def __init__(self, config_manager: ConfigurationManager, use_provider_strategy: bool = True) -> None:
+    def __init__(
+        self, config_manager: ConfigurationManager, use_provider_strategy: bool = True
+    ) -> None:
         """
         Initialize template repository.
 
@@ -304,7 +306,9 @@ class TemplateJSONRepository(StrategyBasedRepository, TemplateRepository):
 
         max_instances = data.get("max_instances", 1)
         if max_instances <= 0:
-            raise ValueError(f"Template '{template_id}' max_instances must be greater than 0") from e
+            raise ValueError(
+                f"Template '{template_id}' max_instances must be greater than 0"
+            ) from e
 
         # Create Template aggregate with all fields
         return Template(

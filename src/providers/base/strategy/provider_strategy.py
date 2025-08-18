@@ -249,7 +249,9 @@ class ProviderStrategy(ABC):
     def __enter__(self) -> "ProviderStrategy":
         """Context manager entry."""
         if not self._initialized and not self.initialize():
-            raise RuntimeError(f"Failed to initialize {self.provider_type} provider strategy") from e
+            raise RuntimeError(
+                f"Failed to initialize {self.provider_type} provider strategy"
+            ) from e
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:

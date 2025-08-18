@@ -48,12 +48,17 @@ class OptimisticConcurrencyControl:
                     retries += 1
                     if retries > self.max_retries:
                         self.logger.warning(
-                            "Maximum retries (%s) exceeded for concurrency error: %s",  self.max_retries, e
+                            "Maximum retries (%s) exceeded for concurrency error: %s",
+                            self.max_retries,
+                            e,
                         )
                         raise
 
                     self.logger.debug(
-                        "Concurrency error detected, retrying (%s/%s): %s", retries, self.max_retries, e
+                        "Concurrency error detected, retrying (%s/%s): %s",
+                        retries,
+                        self.max_retries,
+                        e,
                     )
                     time.sleep(self.retry_delay)
 

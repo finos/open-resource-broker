@@ -178,7 +178,8 @@ class CircuitBreakerStrategy(RetryStrategy):
         state = self._get_current_state(current_time)
 
         logger.warning(
-            "Retrying %s operation (attempt %s/%s) ", self.service_name, attempt + 1, self.max_attempts
+            "Retrying %s operation (attempt %s/%s) ", self.service_name, attempt + \
+                                    1, self.max_attempts
             f"with circuit breaker in {state.value} state",
             extra={
                 "service_name": self.service_name,
@@ -228,7 +229,8 @@ class CircuitBreakerStrategy(RetryStrategy):
             circuit_state["state"] = CircuitState.OPEN
 
             logger.error(
-                "Circuit breaker OPENED for %s after %s failures",  self.service_name,  circuit_state['failure_count'],
+                "Circuit breaker OPENED for %s after %s failures",  self.service_name,  circuit_state[
+                    'failure_count'],
                 extra={
                     "service_name": self.service_name,
                     "state": CircuitState.OPEN.value,

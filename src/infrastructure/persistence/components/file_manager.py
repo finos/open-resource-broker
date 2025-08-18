@@ -190,7 +190,9 @@ class FileManager:
 
             if not is_valid:
                 self.logger.warning(
-                    "File integrity check failed. Expected: %s, Actual: %s", expected_checksum, actual_checksum
+                    "File integrity check failed. Expected: %s, Actual: %s",
+                    expected_checksum,
+                    actual_checksum,
                 )
 
             return is_valid

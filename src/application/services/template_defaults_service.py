@@ -63,7 +63,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             Template dictionary with defaults applied
         """
         self.logger.debug(
-            "Resolving defaults for template %s",  template_dict.get( 'template_id', 'unknown')
+            "Resolving defaults for template %s", template_dict.get("template_id", "unknown")
         )
 
         # Start with empty defaults
@@ -81,7 +81,9 @@ class TemplateDefaultsService(TemplateDefaultsPort):
                 provider_type_defaults = self._get_provider_type_defaults(provider_type)
                 resolved_defaults.update(provider_type_defaults)
                 self.logger.debug(
-                    "Applied %s provider type defaults for %s",  len(provider_type_defaults), provider_type
+                    "Applied %s provider type defaults for %s",
+                    len(provider_type_defaults),
+                    provider_type,
                 )
 
                 # 3. Apply provider instance defaults
@@ -90,7 +92,9 @@ class TemplateDefaultsService(TemplateDefaultsPort):
                 )
                 resolved_defaults.update(provider_instance_defaults)
                 self.logger.debug(
-                    "Applied %s provider instance defaults for %s",  len(provider_instance_defaults), provider_instance_name
+                    "Applied %s provider instance defaults for %s",
+                    len(provider_instance_defaults),
+                    provider_instance_name,
                 )
 
         # 4. Apply template values (highest priority - only for missing fields)
@@ -316,7 +320,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
                             )
 
             self.logger.info(
-                "Template defaults validation completed for %s",  provider_instance_name or 'global'
+                "Template defaults validation completed for %s", provider_instance_name or "global"
             )
 
         except Exception as e:
@@ -345,7 +349,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             Domain template object with extensions applied
         """
         self.logger.debug(
-            "Resolving template with extensions: %s",  template_dict.get( 'template_id', 'unknown')
+            "Resolving template with extensions: %s", template_dict.get("template_id", "unknown")
         )
 
         # 1. Apply hierarchical defaults (existing logic)
@@ -362,7 +366,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             # Extension defaults have lower priority than hierarchical defaults
             resolved_dict = {**extension_defaults, **resolved_dict}
             self.logger.debug(
-                "Applied %s extension defaults for %s",  len(extension_defaults), provider_type
+                "Applied %s extension defaults for %s", len(extension_defaults), provider_type
             )
 
         # 4. Create appropriate template type via factory
@@ -406,7 +410,9 @@ class TemplateDefaultsService(TemplateDefaultsPort):
                     provider_type
                 )
                 extension_defaults.update(type_extension_defaults)
-                self.logger.debug("Applied %s type extension defaults", len(type_extension_defaults))
+                self.logger.debug(
+                    "Applied %s type extension defaults", len(type_extension_defaults)
+                )
 
             # 2. Get provider instance extension overrides
             if provider_instance_name:
@@ -415,7 +421,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
                 )
                 extension_defaults.update(instance_extension_defaults)
                 self.logger.debug(
-                    "Applied %s instance extension defaults",  len(instance_extension_defaults)
+                    "Applied %s instance extension defaults", len(instance_extension_defaults)
                 )
 
         except Exception as e:

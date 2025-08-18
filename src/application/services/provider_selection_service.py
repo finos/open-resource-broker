@@ -176,7 +176,9 @@ class ProviderSelectionService:
         # Validate provider instance exists and is enabled
         provider_instance = self._get_provider_instance_config(provider_name)
         if not provider_instance:
-            raise ValueError(f"Provider instance '{provider_name}' not found in configuration") from e
+            raise ValueError(
+                f"Provider instance '{provider_name}' not found in configuration"
+            ) from e
 
         if not provider_instance.enabled:
             raise ValueError(f"Provider instance '{provider_name}' is disabled") from e
@@ -197,7 +199,9 @@ class ProviderSelectionService:
         # Get all enabled instances of the provider type
         instances = self._get_enabled_instances_by_type(provider_type)
         if not instances:
-            raise ValueError(f"No enabled instances found for provider type '{provider_type}'") from e
+            raise ValueError(
+                f"No enabled instances found for provider type '{provider_type}'"
+            ) from e
 
         # Apply load balancing strategy
         selected_instance = self._apply_load_balancing_strategy(instances)
@@ -227,7 +231,9 @@ class ProviderSelectionService:
         selected_instance = self._select_best_compatible_instance(compatible_instances)
 
         self._logger.info(
-            "Selected capability-based provider: %s for API: %s", selected_instance.name, provider_api
+            "Selected capability-based provider: %s for API: %s",
+            selected_instance.name,
+            provider_api,
         )
 
         return ProviderSelectionResult(
@@ -317,7 +323,10 @@ class ProviderSelectionService:
         if len(highest_priority_instances) == 1:
             selected = highest_priority_instances[0]
             self._logger.debug(
-                "Selected provider %s (priority %s, weight %s)",  selected.name, selected.priority,  selected.weight
+                "Selected provider %s (priority %s, weight %s)",
+                selected.name,
+                selected.priority,
+                selected.weight,
             )
             return selected
 
@@ -328,7 +337,11 @@ class ProviderSelectionService:
         # In production, this would maintain round-robin state
         selected = max(highest_priority_instances, key=lambda x: x.weight)
         self._logger.debug(
-            "Selected provider %s (priority %s, weight %s) from %s candidates",  selected.name, selected.priority, selected.weight,  len(highest_priority_instances)
+            "Selected provider %s (priority %s, weight %s) from %s candidates",
+            selected.name,
+            selected.priority,
+            selected.weight,
+            len(highest_priority_instances),
         )
         return selected
 

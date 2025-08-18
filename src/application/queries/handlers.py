@@ -72,13 +72,16 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             # Get machines from storage
             machines = await self._get_machines_from_storage(query.request_id)
             self.logger.info(
-                "DEBUG: Found %s machines in storage for request %s", len(machines), query.request_id
+                "DEBUG: Found %s machines in storage for request %s",
+                len(machines),
+                query.request_id,
             )
 
             # Update machine status if needed
             if not machines and request.resource_ids:
                 self.logger.info(
-                    "DEBUG: No machines in storage but have resource IDs %s, checking provider", request.resource_ids
+                    "DEBUG: No machines in storage but have resource IDs %s, checking provider",
+                    request.resource_ids,
                 )
                 # No machines in storage but we have resource IDs - check provider and
                 # create machines
@@ -192,14 +195,18 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             # Execute operation using provider context with correct strategy identifier
             strategy_identifier = f"{request.provider_type}-{request.provider_type}-{request.provider_instance or 'default'}"
             self.logger.info(
-                "Using provider strategy: %s for request %s", strategy_identifier, request.request_id
+                "Using provider strategy: %s for request %s",
+                strategy_identifier,
+                request.request_id,
             )
             self.logger.info("Operation parameters: %s", operation.parameters)
 
             result = await provider_context.execute_with_strategy(strategy_identifier, operation)
 
             self.logger.info(
-                "Provider strategy result: success=%s, data_keys=%s", result.success, list(result.data.keys()) if result.data else 'None'
+                "Provider strategy result: success=%s, data_keys=%s",
+                result.success,
+                list(result.data.keys()) if result.data else "None",
             )
 
             if not result.success:
@@ -235,7 +242,9 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                         machine.clear_domain_events()
 
                 self.logger.info(
-                    "Created and saved %s machines for request %s", len(machines), request.request_id
+                    "Created and saved %s machines for request %s",
+                    len(machines),
+                    request.request_id,
                 )
 
             return machines

@@ -62,7 +62,7 @@ def register_all_storage_types() -> None:
 
     # Log summary
     if registered_types:
-        logger.info("Successfully registered storage types: %s", ', '.join(registered_types))
+        logger.info("Successfully registered storage types: %s", ", ".join(registered_types))
 
     if failed_types:
         failed_summary = ", ".join([f"{name} ({error})" for name, error in failed_types])

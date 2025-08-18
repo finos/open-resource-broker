@@ -89,9 +89,11 @@ class AWSClient:
 
             # Single comprehensive INFO log with all important details
             self._logger.info(
-                "AWS client initialized with region: %s, profile: %s, ", self.region_name, self.profile_name
+                "AWS client initialized with region: %s, profile: %s, ",
+                self.region_name,
+                self.profile_name
                 + f"retries: {self.boto_config.retries['max_attempts']}, "
-                + f"timeouts: connect={self.boto_config.connect_timeout}s, read={self.boto_config.read_timeout}s"
+                + f"timeouts: connect={self.boto_config.connect_timeout}s, read={self.boto_config.read_timeout}s",
             )
 
         except ClientError as e:
@@ -103,7 +105,9 @@ class AWSClient:
             elif error_code == "RequestTimeout":
                 raise NetworkError(f"AWS connection failed: {error_message}") from e
             else:
-                raise AWSConfigurationError(f"AWS client initialization failed: {error_message}") from e
+                raise AWSConfigurationError(
+                    f"AWS client initialization failed: {error_message}"
+                ) from e
 
     def _get_region_from_config_manager(self, config_manager) -> Optional[str]:
         """
@@ -150,7 +154,9 @@ class AWSClient:
             selection_result = selection_service.select_active_provider()
 
             self._logger.debug(
-                "Provider selection result: %s, %s", selection_result.provider_type, selection_result.provider_instance
+                "Provider selection result: %s, %s",
+                selection_result.provider_type,
+                selection_result.provider_instance,
             )
 
             # Ensure we have an AWS provider
@@ -183,7 +189,9 @@ class AWSClient:
 
                         if profile:
                             self._logger.debug(
-                                "Using profile from selected provider %s: %s", provider.name, profile
+                                "Using profile from selected provider %s: %s",
+                                provider.name,
+                                profile,
                             )
                             return profile
                         else:

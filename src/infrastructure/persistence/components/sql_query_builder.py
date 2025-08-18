@@ -365,6 +365,6 @@ class SQLQueryBuilder(QueryManager):
             filtered_data_list.append(filtered_data)
 
         self.logger.debug(
-            "Built batch INSERT query for %s with %s items",  self.table_name,  len(data_list)
+            "Built batch INSERT query for %s with %s items", self.table_name, len(data_list)
         )
         return query, filtered_data_list

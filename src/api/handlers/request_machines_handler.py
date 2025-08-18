@@ -68,7 +68,9 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
         except ValidationException as e:
             if self.logger:
                 self.logger.warning(
-                    "Request validation failed: %s - Correlation ID: %s", str(e), context.correlation_id
+                    "Request validation failed: %s - Correlation ID: %s",
+                    str(e),
+                    context.correlation_id,
                 )
             raise
 
@@ -88,8 +90,10 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
         """
         if self.logger:
             self.logger.info(
-                "Processing request machines - Template: %s, ", request.template_id
-                f"Count: {request.max_number} - Correlation ID: {context.correlation_id}"
+                "Processing request machines - Template: %s, Count: %s - Correlation ID: %s",
+                request.template_id,
+                request.max_number,
+                context.correlation_id,
             )
 
         try:
@@ -120,7 +124,9 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
 
             if self.logger:
                 self.logger.info(
-                    "Successfully submitted machine request: %s - Correlation ID: %s", request_id, context.correlation_id
+                    "Successfully submitted machine request: %s - Correlation ID: %s",
+                    request_id,
+                    context.correlation_id,
                 )
 
             # Record metrics if available
@@ -132,7 +138,9 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
         except Exception as e:
             if self.logger:
                 self.logger.error(
-                    "Failed to request machines: %s - Correlation ID: %s", str(e), context.correlation_id
+                    "Failed to request machines: %s - Correlation ID: %s",
+                    str(e),
+                    context.correlation_id,
                 )
 
             # Record metrics if available

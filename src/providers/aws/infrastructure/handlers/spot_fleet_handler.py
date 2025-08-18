@@ -166,7 +166,8 @@ class SpotFleetHandler(AWSHandler):
 
         # Log the validation start
         self._logger.debug(
-            "Starting Spot Fleet prerequisites validation for template: %s", aws_template.template_id
+            "Starting Spot Fleet prerequisites validation for template: %s",
+            aws_template.template_id,
         )
 
         # First validate common prerequisites

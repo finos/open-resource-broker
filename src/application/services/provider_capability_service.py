@@ -64,7 +64,9 @@ class ProviderCapabilityService:
     - Provide detailed validation results with actionable feedback
     """
 
-    def __init__(self, logger: LoggingPort, provider_registry: Optional[ProviderRegistry] = None) -> None:
+    def __init__(
+        self, logger: LoggingPort, provider_registry: Optional[ProviderRegistry] = None
+    ) -> None:
         """
         Initialize provider capability service.
 
@@ -96,7 +98,7 @@ class ProviderCapabilityService:
             ValidationResult with detailed validation information
         """
         self._logger.info(
-            "Validating template %s against provider %s",  template.template_id, provider_instance
+            "Validating template %s against provider %s", template.template_id, provider_instance
         )
 
         result = ValidationResult(
@@ -138,7 +140,9 @@ class ProviderCapabilityService:
             result.is_valid = len(result.errors) == 0
 
             self._logger.info(
-                "Validation result for %s: %s",  template.template_id,  'VALID' if result.is_valid else 'INVALID'
+                "Validation result for %s: %s",
+                template.template_id,
+                "VALID" if result.is_valid else "INVALID",
             )
 
         except Exception as e:

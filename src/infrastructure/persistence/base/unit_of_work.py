@@ -28,7 +28,8 @@ class BaseUnitOfWork(UnitOfWork, ABC):
         """Exit context manager."""
         if exc_type is not None:
             self.logger.debug(
-                "Rolling back transaction due to exception: %s", exc_val,
+                "Rolling back transaction due to exception: %s",
+                exc_val,
                 exc_info=(exc_type, exc_val, exc_tb),
             )
             self.rollback()

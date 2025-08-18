@@ -38,7 +38,9 @@ class ResourceId(ResourceId):
 
         # Fall back to class pattern if not in config
         if not pattern:
-            raise ValueError(f"Pattern for {cls.resource_type} not found in AWS configuration") from e
+            raise ValueError(
+                f"Pattern for {cls.resource_type} not found in AWS configuration"
+            ) from e
 
         if not re.match(pattern, v):
             raise ValueError(f"Invalid AWS {cls.resource_type} ID format: {v}") from e

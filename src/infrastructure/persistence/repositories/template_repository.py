@@ -219,7 +219,7 @@ class TemplateRepositoryImpl(TemplateRepositoryInterface):
             template.clear_domain_events()
 
             self.logger.debug(
-                "Saved template %s and extracted %s events",  template.template_id,  len(events)
+                "Saved template %s and extracted %s events", template.template_id, len(events)
             )
             return events
 

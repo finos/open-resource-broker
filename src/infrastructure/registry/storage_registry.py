@@ -98,7 +98,7 @@ class StorageRegistry(BaseRegistry):
                 unit_of_work_factory=unit_of_work_factory,
             )
         except ValueError as e:
-            raise ConfigurationError(str(e) from e) from e
+            raise ConfigurationError(str(e)) from e
 
     def create_strategy(self, storage_type: str, config: Any) -> Any:
         """
@@ -117,7 +117,7 @@ class StorageRegistry(BaseRegistry):
         try:
             return self.create_strategy_by_type(storage_type, config)
         except ValueError as e:
-            raise UnsupportedStorageError(str(e) from e) from e
+            raise UnsupportedStorageError(str(e)) from e
 
     def create_config(self, storage_type: str, data: Dict[str, Any]) -> Any:
         """
@@ -139,7 +139,7 @@ class StorageRegistry(BaseRegistry):
             self.logger.debug("Created config for storage type: %s", storage_type)
             return config
         except ValueError as e:
-            raise UnsupportedStorageError(str(e) from e) from e
+            raise UnsupportedStorageError(str(e)) from e
         except Exception as e:
             error_msg = f"Failed to create config for storage type '{storage_type}': {str(e)}"
             self.logger.error(error_msg)

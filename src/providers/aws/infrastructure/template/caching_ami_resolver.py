@@ -23,7 +23,9 @@ class CachingAMIResolver(TemplateResolverPort):
     cache settings and path resolution.
     """
 
-    def __init__(self, aws_client: AWSClient, config: ConfigurationPort, logger: LoggingPort) -> None:
+    def __init__(
+        self, aws_client: AWSClient, config: ConfigurationPort, logger: LoggingPort
+    ) -> None:
         """
         Initialize AMI resolver.
 
@@ -122,13 +124,16 @@ class CachingAMIResolver(TemplateResolverPort):
             # Return cached result if available
             cached_ami = self._cache.get(ami_id_or_parameter)
             if cached_ami:
-                self._logger.info("AMI served from cache: %s -> %s", ami_id_or_parameter, cached_ami)
+                self._logger.info(
+                    "AMI served from cache: %s -> %s", ami_id_or_parameter, cached_ami
+                )
                 return cached_ami
 
             # Skip if previously failed
             if self._cache.is_failed(ami_id_or_parameter):
                 self._logger.debug(
-                    "Previously failed parameter found in cache, clearing and retrying: %s", ami_id_or_parameter
+                    "Previously failed parameter found in cache, clearing and retrying: %s",
+                    ami_id_or_parameter,
                 )
                 # Clear the failed entry and retry
                 self._cache._failed.discard(ami_id_or_parameter)
@@ -152,7 +157,9 @@ class CachingAMIResolver(TemplateResolverPort):
             return ami_id
 
         except Exception as e:
-            self._logger.warning("Failed to resolve SSM parameter %s: %s", ami_id_or_parameter, str(e))
+            self._logger.warning(
+                "Failed to resolve SSM parameter %s: %s", ami_id_or_parameter, str(e)
+            )
             self._logger.debug("Exception details: %s: %s", type(e).__name__, str(e))
 
             # Mark as failed in cache
@@ -207,7 +214,9 @@ class CachingAMIResolver(TemplateResolverPort):
             return ami_id
 
         except Exception as e:
-            self._logger.debug("Exception in _resolve_ssm_parameter: %s: %s", type(e).__name__, str(e))
+            self._logger.debug(
+                "Exception in _resolve_ssm_parameter: %s: %s", type(e).__name__, str(e)
+            )
             raise
             # Re-raise with more context
             raise Exception(f"SSM parameter resolution failed: {str(e)}")

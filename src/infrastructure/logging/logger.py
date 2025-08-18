@@ -148,12 +148,14 @@ def setup_logging(config: LoggingConfig) -> None:
 
     try:
         config_manager = get_config_manager()
-        console_enabled = config_manager.get("logging.console_enabled", config.console_enabled)
+        console_enabled = config_manager.get(
+            "logging.console_enabled", config.console_enabled)
         if isinstance(console_enabled, str):
             console_enabled = console_enabled.lower() in ("true", "1", "yes")
     except Exception as e:
         # Fallback to config if ConfigurationManager fails
-        logger.debug("Could not get console_enabled from ConfigurationManager: %s", str(e))
+        logger.debug(
+            "Could not get console_enabled from ConfigurationManager: %s", str(e))
         console_enabled = config.console_enabled
 
     if console_enabled:

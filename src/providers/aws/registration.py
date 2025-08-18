@@ -296,7 +296,9 @@ def _register_aws_components_with_di(container, aws_config, instance_name: str) 
         aws_client = AWSClient(config=config_port, logger=logger_port)
 
         # Log the client creation for this specific instance
-        logger_port.info("AWS client initialized for %s: region=%s", instance_name, aws_config.region)
+        logger_port.info(
+            "AWS client initialized for %s: region=%s", instance_name, aws_config.region
+        )
 
         return aws_client
 

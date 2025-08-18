@@ -71,30 +71,47 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         client_ip = request.client.host if request.client else "unknown"
 
         self.logger.info(
-            "Request %s: %s %s ", request_id, request.method, request.url.path
-            f"from {client_ip} (user: {user_id})"
+            "Request %s: %s %s from %s (user: %s)",
+            request_id,
+            request.method,
+            request.url.path,
+            client_ip,
+            user_id,
         )
 
         # Log query parameters if present
         if request.query_params:
             self.logger.debug("Request %s query params: %s", request_id, dict(request.query_params))
 
-    def _log_response(self, request: Request, response: Response, request_id: str, duration: float) -> None:
+    def _log_response(
+        self, request: Request, response: Response, request_id: str, duration: float
+    ) -> None:
         """Log outgoing response."""
         user_id = getattr(request.state, "user_id", "anonymous")
 
         self.logger.info(
-            "Response %s: %s ", request_id, response.status_code
-            f"for {request.method} {request.url.path} "
-            f"(user: {user_id}, duration: {duration:.3f}s)"
+            "Response %s: %s for %s %s (user: %s, duration: %.3fs)",
+            request_id,
+            response.status_code,
+            request.method,
+            request.url.path,
+            user_id,
+            duration,
         )
 
-    def _log_error(self, request: Request, error: Exception, request_id: str, duration: float) -> None:
+    def _log_error(
+        self, request: Request, error: Exception, request_id: str, duration: float
+    ) -> None:
         """Log request error."""
         user_id = getattr(request.state, "user_id", "anonymous")
 
         self.logger.error(
-            "Error %s: %s: %s ", request_id, type(error).__name__, str(error)
-            f"for {request.method} {request.url.path} "
-            f"(user: {user_id}, duration: {duration:.3f}s)"
+            "Error %s: %s: %s for %s %s (user: %s, duration: %.3fs)",
+            request_id,
+            type(error).__name__,
+            str(error),
+            request.method,
+            request.url.path,
+            user_id,
+            duration,
         )

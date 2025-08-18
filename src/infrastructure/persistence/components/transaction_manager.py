@@ -113,7 +113,8 @@ class MemoryTransactionManager(TransactionManager):
 
             self.state = TransactionState.ROLLED_BACK
             self.logger.debug(
-                "Memory transaction rolled back with %s rollback operations", len(self.rollback_operations)
+                "Memory transaction rolled back with %s rollback operations",
+                len(self.rollback_operations),
             )
         except Exception as e:
             self.state = TransactionState.FAILED

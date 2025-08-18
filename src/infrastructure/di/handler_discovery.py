@@ -141,7 +141,8 @@ class HandlerDiscoveryService:
                     importlib.import_module(module_info.name)
                     logger.debug("Imported module: %s", module_info.name)
                 except Exception as e:
-                    logger.warning("Failed to import module %s: %s", module_info.name, e)
+                    logger.warning("Failed to import module %s: %s",
+                                   module_info.name, e)
                     continue
 
         except Exception as e:
@@ -168,7 +169,8 @@ class HandlerDiscoveryService:
                     "Registered query handler: %s for %s",  handler_class.__name__,  query_type.__name__
                 )
             except Exception as e:
-                logger.error("Failed to register query handler %s: %s", handler_class.__name__, e)
+                logger.error("Failed to register query handler %s: %s",
+                             handler_class.__name__, e)
 
         # Register command handlers
         command_handlers = get_registered_command_handlers()
@@ -181,10 +183,12 @@ class HandlerDiscoveryService:
                     "Registered command handler: %s for %s",  handler_class.__name__,  command_type.__name__
                 )
             except Exception as e:
-                logger.error("Failed to register command handler %s: %s", handler_class.__name__, e)
+                logger.error("Failed to register command handler %s: %s",
+                             handler_class.__name__, e)
 
         total_registered = len(query_handlers) + len(command_handlers)
-        logger.info("Handler registration complete. Registered %s handlers", total_registered)
+        logger.info("Handler registration complete. Registered %s handlers",
+                    total_registered)
 
     def _try_load_from_cache(self, base_package: str) -> Optional[Dict[str, Any]]:
         """Try to load handler discovery results from cache if valid."""
@@ -250,7 +254,8 @@ class HandlerDiscoveryService:
             os.rename(temp_file, self.cache_file)
 
             logger.debug(
-                "Cached handler discovery results (%s handlers)",  stats.get( 'total_handlers', 0)
+                "Cached handler discovery results (%s handlers)",  stats.get(
+                    'total_handlers', 0)
             )
 
         except Exception as e:
@@ -271,11 +276,13 @@ class HandlerDiscoveryService:
 
                     # Register with DI container
                     self.container.register_singleton(handler_class)
-                    logger.debug("Registered cached query handler: %s", handler_class.__name__)
+                    logger.debug("Registered cached query handler: %s",
+                                 handler_class.__name__)
 
                 except Exception as e:
                     logger.warning(
-                        "Failed to register cached query handler %s: %s",  handler_info.get( 'class_name', 'unknown'), e
+                        "Failed to register cached query handler %s: %s",  handler_info.get(
+                            'class_name', 'unknown'), e
                     )
                     # Fall back to full discovery if cache loading fails
                     self._fallback_to_full_discovery()
@@ -292,11 +299,13 @@ class HandlerDiscoveryService:
 
                     # Register with DI container
                     self.container.register_singleton(handler_class)
-                    logger.debug("Registered cached command handler: %s", handler_class.__name__)
+                    logger.debug("Registered cached command handler: %s",
+                                 handler_class.__name__)
 
                 except Exception as e:
                     logger.warning(
-                        "Failed to register cached command handler %s: %s",  handler_info.get( 'class_name', 'unknown'), e
+                        "Failed to register cached command handler %s: %s",  handler_info.get(
+                            'class_name', 'unknown'), e
                     )
                     # Fall back to full discovery if cache loading fails
                     self._fallback_to_full_discovery()

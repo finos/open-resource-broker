@@ -38,7 +38,9 @@ class TemplateExtensionRegistry:
             extension_class: The Pydantic model class for the extension configuration
         """
         if not issubclass(extension_class, BaseModel):
-            raise ValueError(f"Extension class must be a Pydantic BaseModel, got {extension_class}") from e
+            raise ValueError(
+                f"Extension class must be a Pydantic BaseModel, got {extension_class}"
+            ) from e
 
         cls._extensions[provider_type] = extension_class
 

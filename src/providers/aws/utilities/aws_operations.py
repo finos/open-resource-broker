@@ -61,28 +61,34 @@ class AWSOperations:
             Termination result
         """
         if not instance_ids:
-            self._logger.warning("No instance IDs provided for %s termination", operation_context)
+            self._logger.warning(
+                "No instance IDs provided for %s termination", operation_context)
             return {"terminated_instances": []}
 
-        self._logger.info("Terminating %s %s: %s", len(instance_ids), operation_context, instance_ids)
+        self._logger.info("Terminating %s %s: %s", len(
+            instance_ids), operation_context, instance_ids)
 
         try:
             if request_adapter:
-                self._logger.info("Using request adapter for %s termination", operation_context)
+                self._logger.info(
+                    "Using request adapter for %s termination", operation_context)
                 result = request_adapter.terminate_instances(instance_ids)
                 self._logger.info("Request adapter termination result: %s", result)
                 return result
             else:
-                self._logger.info("Using EC2 client directly for %s termination", operation_context)
+                self._logger.info(
+                    "Using EC2 client directly for %s termination", operation_context)
                 if not self._retry_with_backoff:
-                    raise ValueError("Retry method not set. Call set_retry_method first.") from e
+                    raise ValueError(
+                        "Retry method not set. Call set_retry_method first.") from e
 
                 result = self._retry_with_backoff(
                     self.aws_client.ec2_client.terminate_instances,
                     operation_type="critical",
                     InstanceIds=instance_ids,
                 )
-                self._logger.info("Successfully terminated %s: %s", operation_context, instance_ids)
+                self._logger.info("Successfully terminated %s: %s",
+                                  operation_context, instance_ids)
                 return result
 
         except Exception as e:
@@ -119,12 +125,15 @@ class AWSOperations:
             AWSInfrastructureError: For AWS operation failures
         """
         try:
-            self._logger.debug("Executing %s with operation_type=%s", operation_name, operation_type)
+            self._logger.debug("Executing %s with operation_type=%s",
+                               operation_name, operation_type)
 
             if not self._retry_with_backoff:
-                raise ValueError("Retry method not set. Call set_retry_method first.") from e
+                raise ValueError(
+                    "Retry method not set. Call set_retry_method first.") from e
 
-            result = self._retry_with_backoff(operation, operation_type=operation_type, **kwargs)
+            result = self._retry_with_backoff(
+                operation, operation_type=operation_type, **kwargs)
 
             if success_message:
                 self._logger.info(success_message)
@@ -168,7 +177,8 @@ class AWSOperations:
 
         try:
             if not self._retry_with_backoff:
-                raise ValueError("Retry method not set. Call set_retry_method first.") from e
+                raise ValueError(
+                    "Retry method not set. Call set_retry_method first.") from e
 
             # Use the handler's existing _paginate method through retry
             result = self._retry_with_backoff(
@@ -208,7 +218,8 @@ class AWSOperations:
     ) -> None:
         """Standardized operation start logging."""
         if resource_id:
-            self._logger.info("Starting %s for %s: %s", operation, resource_type, resource_id)
+            self._logger.info("Starting %s for %s: %s", operation,
+                              resource_type, resource_id)
         else:
             self._logger.info("Starting %s for %s", operation, resource_type)
 
@@ -219,7 +230,8 @@ class AWSOperations:
         self, operation: str, resource_type: str, resource_id: str, **context
     ) -> None:
         """Standardized operation success logging."""
-        self._logger.info("Successfully completed %s for %s: %s", operation, resource_type, resource_id)
+        self._logger.info("Successfully completed %s for %s: %s",
+                          operation, resource_type, resource_id)
 
         if context:
             self._logger.debug("%s success context: %s", operation, context)
@@ -234,10 +246,12 @@ class AWSOperations:
         """Standardized operation failure logging."""
         if resource_id:
             self._logger.error(
-                "Failed %s for %s %s: %s", operation, resource_type, resource_id, str(error)
+                "Failed %s for %s %s: %s", operation, resource_type, resource_id, str(
+                    error)
             )
         else:
-            self._logger.error("Failed %s for %s: %s", operation, resource_type, str(error))
+            self._logger.error("Failed %s for %s: %s", operation,
+                               resource_type, str(error))
 
     def check_resource_status(
         self,
@@ -266,7 +280,8 @@ class AWSOperations:
             self._logger.debug("Checking status for %s: %s", resource_type, resource_id)
 
             if not self._retry_with_backoff:
-                raise ValueError("Retry method not set. Call set_retry_method first.") from e
+                raise ValueError(
+                    "Retry method not set. Call set_retry_method first.") from e
 
             response = self._retry_with_backoff(
                 describe_method, operation_type="read_only", **describe_params
@@ -279,7 +294,8 @@ class AWSOperations:
                     current_status = current_status[0]  # Take first item for lists
                 current_status = current_status.get(path_part, "unknown")
 
-            self._logger.debug("%s %s status: %s", resource_type, resource_id, current_status)
+            self._logger.debug("%s %s status: %s", resource_type,
+                               resource_id, current_status)
 
             if expected_status and current_status != expected_status:
                 self._logger.warning(
@@ -290,7 +306,8 @@ class AWSOperations:
             return str(current_status)
 
         except Exception as e:
-            self._logger.error("Failed to check %s %s status: %s", resource_type, resource_id, str(e))
+            self._logger.error("Failed to check %s %s status: %s",
+                               resource_type, resource_id, str(e))
             return "unknown"
 
     def get_resource_instances(
@@ -315,10 +332,12 @@ class AWSOperations:
             List of instance IDs
         """
         try:
-            self._logger.debug("Getting instances for %s: %s", resource_type, resource_id)
+            self._logger.debug("Getting instances for %s: %s",
+                               resource_type, resource_id)
 
             if not self._retry_with_backoff:
-                raise ValueError("Retry method not set. Call set_retry_method first.") from e
+                raise ValueError(
+                    "Retry method not set. Call set_retry_method first.") from e
 
             response = self._retry_with_backoff(
                 describe_instances_method, operation_type="read_only", **describe_params
@@ -336,13 +355,15 @@ class AWSOperations:
                     instance_ids.append(instance)
 
             self._logger.debug(
-                "Found %s instances for %s %s", len(instance_ids), resource_type, resource_id
+                "Found %s instances for %s %s", len(
+                    instance_ids), resource_type, resource_id
             )
             return instance_ids
 
         except Exception as e:
             self._logger.error(
-                "Failed to get instances for %s %s: %s", resource_type, resource_id, str(e)
+                "Failed to get instances for %s %s: %s", resource_type, resource_id, str(
+                    e)
             )
             return []
 
