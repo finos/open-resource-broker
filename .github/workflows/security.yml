@@ -31,6 +31,7 @@ on:
 
 jobs:
   check-security-comment:
+    name: Check Security Triggers
     runs-on: ubuntu-latest
     outputs:
       triggered: ${{ steps.check.outputs.triggered }}

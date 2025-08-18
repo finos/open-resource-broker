@@ -32,6 +32,7 @@ on:
 
 jobs:
   check-build-comment:
+    name: Check Build Triggers
     runs-on: ubuntu-latest
     outputs:
       triggered: ${{ steps.check.outputs.triggered }}

@@ -37,6 +37,7 @@ on:
 
 jobs:
   check-container-comment:
+    name: Check Container Triggers
     runs-on: ubuntu-latest
     outputs:
       triggered: ${{ steps.check.outputs.triggered }}
