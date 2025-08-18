@@ -48,7 +48,7 @@ class ConfigPathResolver:
         try:
             os.makedirs(abs_path, exist_ok=True)
         except OSError as e:
-            logger.warning(f"Could not create directory {abs_path}: {e}")
+            logger.warning("Could not create directory %s: %s", abs_path, e)
 
         return abs_path
 

@@ -28,13 +28,13 @@ class ReaderWriterLock:
             while self._writers > 0:
                 self._read_ready.wait()
             self._readers += 1
-            self.logger.debug(f"Read lock acquired. Active readers: {self._readers}")
+            self.logger.debug("Read lock acquired. Active readers: %s", self._readers)
 
     def release_read(self):
         """Release read lock."""
         with self._read_ready:
             self._readers -= 1
-            self.logger.debug(f"Read lock released. Active readers: {self._readers}")
+            self.logger.debug("Read lock released. Active readers: %s", self._readers)
             if self._readers == 0:
                 self._read_ready.notifyAll()
 

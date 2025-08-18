@@ -80,7 +80,7 @@ class BaseInfrastructureHandler(
         try:
             # Log request processing start
             if self.logger:
-                self.logger.info(f"Processing infrastructure request: {request_type}")
+                self.logger.info("Processing infrastructure request: %s", request_type)
 
             # Validate request
             await self.validate_request(request, context)
@@ -94,7 +94,7 @@ class BaseInfrastructureHandler(
 
             if self.logger:
                 self.logger.info(
-                    f"Infrastructure request processed successfully: {request_type} ({ duration:.3f}s)"
+                    "Infrastructure request processed successfully: %s (%ss)", request_type,  duration:.3f
                 )
 
             return response
@@ -118,7 +118,7 @@ class BaseInfrastructureHandler(
 
             if self.logger:
                 self.logger.error(
-                    f"Infrastructure request processing failed: {request_type} - {str(e)}"
+                    "Infrastructure request processing failed: %s - %s", request_type, str(e)
                 )
 
             # Re-raise for upstream handling

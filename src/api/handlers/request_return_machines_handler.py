@@ -146,7 +146,7 @@ class RequestReturnMachinesRESTHandler(
 
                 if self.logger:
                     self.logger.info(
-                        f"Created return request for all machines with ID: {request_id}",
+                        "Created return request for all machines with ID: %s", request_id,
                         extra={
                             "request_id": request_id,
                             "correlation_id": correlation_id,

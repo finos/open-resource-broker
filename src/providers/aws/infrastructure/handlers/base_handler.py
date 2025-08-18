@@ -199,7 +199,7 @@ class AWSHandler(ABC):
             if hasattr(e, "__class__") and "CircuitBreakerOpenError" in str(type(e)):
                 # Log circuit breaker state and re-raise
                 self._logger.error(
-                    f"Circuit breaker OPEN for {service_name}.{operation_name}",
+                    "Circuit breaker OPEN for %s.%s", service_name, operation_name,
                     extra={
                         "service": service_name,
                         "operation": operation_name,
@@ -253,7 +253,7 @@ class AWSHandler(ABC):
             and operation_name in critical_operations
         ):
             operation_type = "critical"
-            self.logger.debug(f"Auto-detected critical operation: {operation_name}")
+            self.logger.debug("Auto-detected critical operation: %s", operation_name)
 
         if operation_type == "critical":
             # Use circuit breaker for critical operations
@@ -364,10 +364,10 @@ class AWSHandler(ABC):
 
         except ClientError as e:
             error = self._convert_client_error(e)
-            self._logger.error(f"Failed to get instance details: {str(error)}")
+            self._logger.error("Failed to get instance details: %s", str(error))
             raise error
         except Exception as e:
-            self._logger.error(f"Unexpected error getting instance details: {str(e)}")
+            self._logger.error("Unexpected error getting instance details: %s", str(e))
             raise InfrastructureError(f"Failed to get instance details: {str(e)}")
 
     def _validate_prerequisites(self, template: AWSTemplate) -> None:

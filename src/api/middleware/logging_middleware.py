@@ -71,20 +71,20 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         client_ip = request.client.host if request.client else "unknown"
 
         self.logger.info(
-            f"Request {request_id}: {request.method} {request.url.path} "
+            "Request %s: %s %s ", request_id, request.method, request.url.path
             f"from {client_ip} (user: {user_id})"
         )
 
         # Log query parameters if present
         if request.query_params:
-            self.logger.debug(f"Request {request_id} query params: {dict(request.query_params)}")
+            self.logger.debug("Request %s query params: %s", request_id, dict(request.query_params))
 
     def _log_response(self, request: Request, response: Response, request_id: str, duration: float):
         """Log outgoing response."""
         user_id = getattr(request.state, "user_id", "anonymous")
 
         self.logger.info(
-            f"Response {request_id}: {response.status_code} "
+            "Response %s: %s ", request_id, response.status_code
             f"for {request.method} {request.url.path} "
             f"(user: {user_id}, duration: {duration:.3f}s)"
         )
@@ -94,7 +94,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         user_id = getattr(request.state, "user_id", "anonymous")
 
         self.logger.error(
-            f"Error {request_id}: {type(error).__name__}: {str(error)} "
+            "Error %s: %s: %s ", request_id, type(error).__name__, str(error)
             f"for {request.method} {request.url.path} "
             f"(user: {user_id}, duration: {duration:.3f}s)"
         )

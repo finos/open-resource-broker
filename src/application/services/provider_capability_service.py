@@ -96,7 +96,7 @@ class ProviderCapabilityService:
             ValidationResult with detailed validation information
         """
         self._logger.info(
-            f"Validating template { template.template_id} against provider {provider_instance}"
+            "Validating template %s against provider %s",  template.template_id, provider_instance
         )
 
         result = ValidationResult(
@@ -138,11 +138,11 @@ class ProviderCapabilityService:
             result.is_valid = len(result.errors) == 0
 
             self._logger.info(
-                f"Validation result for { template.template_id}: { 'VALID' if result.is_valid else 'INVALID'}"
+                "Validation result for %s: %s",  template.template_id,  'VALID' if result.is_valid else 'INVALID'
             )
 
         except Exception as e:
-            self._logger.error(f"Validation failed with exception: {str(e)}")
+            self._logger.error("Validation failed with exception: %s", str(e))
             result.is_valid = False
             result.errors.append(f"Validation error: {str(e)}")
 
@@ -159,7 +159,7 @@ class ProviderCapabilityService:
             strategy = self._provider_registry.create_strategy_from_instance(provider_instance, {})
             return strategy.get_capabilities()
         except Exception as e:
-            self._logger.warning(f"Failed to get capabilities for {provider_instance}: {str(e)}")
+            self._logger.warning("Failed to get capabilities for %s: %s", provider_instance, str(e))
             return None
 
     def _get_default_capabilities(self, provider_instance: str) -> ProviderCapabilities:

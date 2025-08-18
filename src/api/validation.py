@@ -52,7 +52,7 @@ def validate_request_body(model_class: Type[T], request_body: Union[str, Dict[st
             try:
                 data = json.loads(request_body)
             except json.JSONDecodeError as e:
-                logger.error(f"Invalid JSON in request body: {e}")
+                logger.error("Invalid JSON in request body: %s", e)
                 raise ValidationException(f"Invalid JSON in request body: {e}")
         else:
             data = request_body
@@ -71,7 +71,7 @@ def validate_request_body(model_class: Type[T], request_body: Union[str, Dict[st
                 }
             )
 
-        logger.error(f"Validation error: {e}")
+        logger.error("Validation error: %s", e)
         raise ValidationException(f"Validation error: {e}", error_details)
 
 

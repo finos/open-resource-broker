@@ -61,7 +61,7 @@ def create_fastapi_app(server_config: ServerConfig) -> FastAPI:
         if auth_strategy:
             app.add_middleware(AuthMiddleware, auth_port=auth_strategy, require_auth=True)
             logger.info(
-                f"Authentication middleware enabled with strategy: {auth_strategy.get_strategy_name()}"
+                "Authentication middleware enabled with strategy: %s", auth_strategy.get_strategy_name()
             )
         else:
             logger.warning("Authentication enabled but strategy creation failed")
@@ -94,7 +94,7 @@ def create_fastapi_app(server_config: ServerConfig) -> FastAPI:
             )
         except Exception as handler_error:
             # Fallback error response
-            logger.error(f"Exception handler failed: {handler_error}")
+            logger.error("Exception handler failed: %s", handler_error)
             return JSONResponse(
                 status_code=500,
                 content={
@@ -134,7 +134,7 @@ def create_fastapi_app(server_config: ServerConfig) -> FastAPI:
     # Configure OpenAPI documentation
     configure_openapi(app, server_config)
 
-    logger.info(f"FastAPI application created with {len(app.routes)} routes")
+    logger.info("FastAPI application created with %s routes", len(app.routes))
     return app
 
 
@@ -206,11 +206,11 @@ def _create_auth_strategy(auth_config):
             )
 
         else:
-            logger.error(f"Unknown authentication strategy: {strategy_name}")
+            logger.error("Unknown authentication strategy: %s", strategy_name)
             return None
 
     except Exception as e:
-        logger.error(f"Failed to create auth strategy: {e}")
+        logger.error("Failed to create auth strategy: %s", e)
         return None
 
 
@@ -230,5 +230,5 @@ def _register_routers(app: FastAPI):
 
     except ImportError as e:
         logger = get_logger(__name__)
-        logger.error(f"Failed to import routers: {e}")
+        logger.error("Failed to import routers: %s", e)
         # Continue without routers - they might not be fully implemented yet

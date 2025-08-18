@@ -47,7 +47,7 @@ class JSONStorageStrategy(BaseStorageStrategy):
         self._data_cache: Optional[Dict[str, Dict[str, Any]]] = None
         self._cache_valid = False
 
-        self.logger.debug(f"Initialized JSON storage strategy for {entity_type} at {file_path}")
+        self.logger.debug("Initialized JSON storage strategy for %s at %s", entity_type, file_path)
 
     def save(self, entity_id: str, data: Dict[str, Any]) -> None:
         """
@@ -71,10 +71,10 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 # Invalidate cache
                 self._cache_valid = False
 
-                self.logger.debug(f"Saved {self.entity_type} entity: {entity_id}")
+                self.logger.debug("Saved %s entity: %s", self.entity_type, entity_id)
 
             except Exception as e:
-                self.logger.error(f"Failed to save {self.entity_type} entity {entity_id}: {e}")
+                self.logger.error("Failed to save %s entity %s: %s", self.entity_type, entity_id, e)
                 raise PersistenceError(f"Failed to save entity {entity_id}: {e}")
 
     def find_by_id(self, entity_id: str) -> Optional[Dict[str, Any]]:
@@ -93,14 +93,14 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 entity_data = all_data.get(entity_id)
 
                 if entity_data:
-                    self.logger.debug(f"Found {self.entity_type} entity: {entity_id}")
+                    self.logger.debug("Found %s entity: %s", self.entity_type, entity_id)
                 else:
-                    self.logger.debug(f"{self.entity_type} entity not found: {entity_id}")
+                    self.logger.debug("%s entity not found: %s", self.entity_type, entity_id)
 
                 return entity_data
 
             except Exception as e:
-                self.logger.error(f"Failed to find {self.entity_type} entity {entity_id}: {e}")
+                self.logger.error("Failed to find %s entity %s: %s", self.entity_type, entity_id, e)
                 raise PersistenceError(f"Failed to find entity {entity_id}: {e}")
 
     def find_all(self) -> Dict[str, Dict[str, Any]]:
@@ -113,11 +113,11 @@ class JSONStorageStrategy(BaseStorageStrategy):
         with self.lock_manager.read_lock():
             try:
                 all_data = self._load_data()
-                self.logger.debug(f"Loaded {len(all_data)} {self.entity_type} entities")
+                self.logger.debug("Loaded %s %s entities", len(all_data), self.entity_type)
                 return all_data.copy()
 
             except Exception as e:
-                self.logger.error(f"Failed to load all {self.entity_type} entities: {e}")
+                self.logger.error("Failed to load all %s entities: %s", self.entity_type, e)
                 raise PersistenceError(f"Failed to load all entities: {e}")
 
     def delete(self, entity_id: str) -> None:
@@ -133,7 +133,7 @@ class JSONStorageStrategy(BaseStorageStrategy):
 
                 if entity_id not in all_data:
                     self.logger.warning(
-                        f"{self.entity_type} entity not found for deletion: {entity_id}"
+                        "%s entity not found for deletion: %s", self.entity_type, entity_id
                     )
                     return
 
@@ -146,10 +146,10 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 # Invalidate cache
                 self._cache_valid = False
 
-                self.logger.debug(f"Deleted {self.entity_type} entity: {entity_id}")
+                self.logger.debug("Deleted %s entity: %s", self.entity_type, entity_id)
 
             except Exception as e:
-                self.logger.error(f"Failed to delete {self.entity_type} entity {entity_id}: {e}")
+                self.logger.error("Failed to delete %s entity %s: %s", self.entity_type, entity_id, e)
                 raise PersistenceError(f"Failed to delete entity {entity_id}: {e}")
 
     def exists(self, entity_id: str) -> bool:
@@ -166,12 +166,12 @@ class JSONStorageStrategy(BaseStorageStrategy):
             try:
                 all_data = self._load_data()
                 exists = entity_id in all_data
-                self.logger.debug(f"{self.entity_type} entity {entity_id} exists: {exists}")
+                self.logger.debug("%s entity %s exists: %s", self.entity_type, entity_id, exists)
                 return exists
 
             except Exception as e:
                 self.logger.error(
-                    f"Failed to check existence of { self.entity_type} entity {entity_id}: {e}"
+                    "Failed to check existence of %s entity %s: %s",  self.entity_type, entity_id, e
                 )
                 return False
 
@@ -195,12 +195,12 @@ class JSONStorageStrategy(BaseStorageStrategy):
                         matching_entities.append(entity_data)
 
                 self.logger.debug(
-                    f"Found { len(matching_entities)} { self.entity_type} entities matching criteria"
+                    "Found %s %s entities matching criteria",  len(matching_entities),  self.entity_type
                 )
                 return matching_entities
 
             except Exception as e:
-                self.logger.error(f"Failed to search {self.entity_type} entities: {e}")
+                self.logger.error("Failed to search %s entities: %s", self.entity_type, e)
                 raise PersistenceError(f"Failed to search entities: {e}")
 
     def save_batch(self, entities: Dict[str, Dict[str, Any]]) -> None:
@@ -217,10 +217,10 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 self._save_data(all_data)
                 self._cache_valid = False
 
-                self.logger.debug(f"Saved batch of {len(entities)} {self.entity_type} entities")
+                self.logger.debug("Saved batch of %s %s entities", len(entities), self.entity_type)
 
             except Exception as e:
-                self.logger.error(f"Failed to save batch of {self.entity_type} entities: {e}")
+                self.logger.error("Failed to save batch of %s entities: %s", self.entity_type, e)
                 raise PersistenceError(f"Failed to save batch: {e}")
 
     def delete_batch(self, entity_ids: List[str]) -> None:
@@ -240,10 +240,10 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 self._save_data(all_data)
                 self._cache_valid = False
 
-                self.logger.debug(f"Deleted batch of {len(entity_ids)} {self.entity_type} entities")
+                self.logger.debug("Deleted batch of %s %s entities", len(entity_ids), self.entity_type)
 
             except Exception as e:
-                self.logger.error(f"Failed to delete batch of {self.entity_type} entities: {e}")
+                self.logger.error("Failed to delete batch of %s entities: %s", self.entity_type, e)
                 raise PersistenceError(f"Failed to delete batch: {e}")
 
     def begin_transaction(self) -> None:
@@ -262,7 +262,7 @@ class JSONStorageStrategy(BaseStorageStrategy):
         """Clean up resources."""
         self._data_cache = None
         self._cache_valid = False
-        self.logger.debug(f"Cleaned up JSON storage strategy for {self.entity_type}")
+        self.logger.debug("Cleaned up JSON storage strategy for %s", self.entity_type)
 
     def _load_data(self) -> Dict[str, Dict[str, Any]]:
         """Load data from file with caching."""
@@ -287,7 +287,7 @@ class JSONStorageStrategy(BaseStorageStrategy):
             return data
 
         except Exception as e:
-            self.logger.error(f"Failed to load data: {e}")
+            self.logger.error("Failed to load data: %s", e)
             # Try to recover from backup
             if self.file_manager.recover_from_backup():
                 self.logger.info("Recovered data from backup")
@@ -311,7 +311,7 @@ class JSONStorageStrategy(BaseStorageStrategy):
             self._cache_valid = True
 
         except Exception as e:
-            self.logger.error(f"Failed to save data: {e}")
+            self.logger.error("Failed to save data: %s", e)
             raise
 
     def _matches_criteria(self, entity_data: Dict[str, Any], criteria: Dict[str, Any]) -> bool:

@@ -68,7 +68,7 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
         except ValidationException as e:
             if self.logger:
                 self.logger.warning(
-                    f"Request validation failed: {str(e)} - Correlation ID: {context.correlation_id}"
+                    "Request validation failed: %s - Correlation ID: %s", str(e), context.correlation_id
                 )
             raise
 
@@ -88,7 +88,7 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
         """
         if self.logger:
             self.logger.info(
-                f"Processing request machines - Template: {request.template_id}, "
+                "Processing request machines - Template: %s, ", request.template_id
                 f"Count: {request.max_number} - Correlation ID: {context.correlation_id}"
             )
 
@@ -120,7 +120,7 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
 
             if self.logger:
                 self.logger.info(
-                    f"Successfully submitted machine request: {request_id} - Correlation ID: {context.correlation_id}"
+                    "Successfully submitted machine request: %s - Correlation ID: %s", request_id, context.correlation_id
                 )
 
             # Record metrics if available
@@ -132,7 +132,7 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
         except Exception as e:
             if self.logger:
                 self.logger.error(
-                    f"Failed to request machines: {str(e)} - Correlation ID: {context.correlation_id}"
+                    "Failed to request machines: %s - Correlation ID: %s", str(e), context.correlation_id
                 )
 
             # Record metrics if available

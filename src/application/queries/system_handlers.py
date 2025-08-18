@@ -165,7 +165,7 @@ class GetProviderConfigHandler(BaseQueryHandler[GetProviderConfigQuery, Provider
                 }
 
         except Exception as e:
-            self.logger.error(f"Failed to get provider configuration: {e}")
+            self.logger.error("Failed to get provider configuration: %s", e)
             raise
 
 
@@ -239,7 +239,7 @@ class ValidateProviderConfigHandler(
             }
 
         except Exception as e:
-            self.logger.error(f"Failed to validate provider configuration: {e}")
+            self.logger.error("Failed to validate provider configuration: %s", e)
             raise
 
 
@@ -313,7 +313,7 @@ class GetSystemStatusHandler(BaseQueryHandler[GetSystemStatusQuery, SystemStatus
             return system_status
 
         except Exception as e:
-            self.logger.error(f"Failed to get system status: {e}")
+            self.logger.error("Failed to get system status: %s", e)
             raise
 
 
@@ -340,7 +340,7 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Provid
 
     async def execute_query(self, query: GetProviderMetricsQuery) -> Dict[str, Any]:
         """Execute provider metrics query."""
-        self.logger.info(f"Getting provider metrics for timeframe: {query.timeframe}")
+        self.logger.info("Getting provider metrics for timeframe: %s", query.timeframe)
 
         try:
             from datetime import datetime, timedelta
@@ -390,7 +390,7 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Provid
                                 "avg_response_time": 0.0,
                             }
             except Exception as provider_error:
-                self.logger.warning(f"Could not get provider-specific metrics: {provider_error}")
+                self.logger.warning("Could not get provider-specific metrics: %s", provider_error)
                 metrics["providers"]["default"] = {
                     "status": "unknown",
                     "type": "unknown",
@@ -402,5 +402,5 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Provid
             return metrics
 
         except Exception as e:
-            self.logger.error(f"Failed to get provider metrics: {e}")
+            self.logger.error("Failed to get provider metrics: %s", e)
             raise

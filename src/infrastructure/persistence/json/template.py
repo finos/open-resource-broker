@@ -45,15 +45,15 @@ class TemplateJSONStorageStrategy(JSONStorageStrategy):
             and os.path.exists(self.legacy_file_path)
         ):
             self.logger.info("Found both template files, will merge contents")
-            self.logger.debug(f"Templates file: {self.file_path}")
-            self.logger.debug(f"Legacy templates file: {self.legacy_file_path}")
+            self.logger.debug("Templates file: %s", self.file_path)
+            self.logger.debug("Legacy templates file: %s", self.legacy_file_path)
         elif self.legacy_file_path and os.path.exists(self.legacy_file_path):
-            self.logger.info(f"Found only legacy templates file: {self.legacy_file_path}")
+            self.logger.info("Found only legacy templates file: %s", self.legacy_file_path)
         elif os.path.exists(self.file_path):
-            self.logger.info(f"Found only templates.json: {self.file_path}")
+            self.logger.info("Found only templates.json: %s", self.file_path)
         else:
             self.logger.warning(
-                f"No template files found at { self.file_path} or { self.legacy_file_path}"
+                "No template files found at %s or %s",  self.file_path,  self.legacy_file_path
             )
 
     def find_by_id(self, entity_id: str) -> Optional[Dict[str, Any]]:
@@ -86,7 +86,7 @@ class TemplateJSONStorageStrategy(JSONStorageStrategy):
 
             except Exception as e:
                 self.logger.error(
-                    f"Error reading legacy templates file {self.legacy_file_path}: {e}"
+                    "Error reading legacy templates file %s: %s", self.legacy_file_path, e
                 )
 
         return None
@@ -118,7 +118,7 @@ class TemplateJSONStorageStrategy(JSONStorageStrategy):
 
             except Exception as e:
                 self.logger.error(
-                    f"Error reading legacy templates file {self.legacy_file_path}: {e}"
+                    "Error reading legacy templates file %s: %s", self.legacy_file_path, e
                 )
 
         # Load from main file (higher priority, will override legacy)
@@ -183,7 +183,7 @@ class TemplateJSONRepository(StrategyBasedRepository, TemplateRepository):
                 return self._data_to_aggregate(template_data)
             except Exception as e:
                 self.logger.error(
-                    f"Error converting template data to aggregate for '{template_id}': {e}"
+                    "Error converting template data to aggregate for '%s': %s", template_id, e
                 )
                 return None
         return None
@@ -205,7 +205,7 @@ class TemplateJSONRepository(StrategyBasedRepository, TemplateRepository):
             except Exception as e:
                 template_id = template_data.get("template_id", "unknown")
                 self.logger.error(
-                    f"Error converting template data to aggregate for '{template_id}': {e}"
+                    "Error converting template data to aggregate for '%s': %s", template_id, e
                 )
                 continue
 

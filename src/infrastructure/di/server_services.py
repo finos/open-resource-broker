@@ -33,7 +33,7 @@ def register_server_services(container: DIContainer) -> None:
             logger.debug("Server disabled - skipping FastAPI service registration")
 
     except Exception as e:
-        logger.warning(f"Failed to register server services: {e}")
+        logger.warning("Failed to register server services: %s", e)
         # Don't raise - server services are optional
 
 

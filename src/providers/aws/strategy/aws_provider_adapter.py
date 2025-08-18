@@ -139,7 +139,7 @@ class AWSProviderAdapter:
     ) -> ProviderResourceIdentifier:
         """Create an AWS resource identifier."""
         if not self._resource_validator.validate_resource_identifier(identifier, resource_type):
-            self._logger.warning(f"Invalid AWS {resource_type} identifier: {identifier}")
+            self._logger.warning("Invalid AWS %s identifier: %s", resource_type, identifier)
             raise ValueError(f"Invalid AWS {resource_type} identifier: {identifier}")
 
         return ProviderResourceIdentifier(
@@ -156,7 +156,7 @@ class AWSProviderAdapter:
         template = ProviderLaunchTemplate(template_id=template_id, version=version)
 
         if not self._resource_validator.validate_launch_template(template):
-            self._logger.warning(f"Invalid AWS launch template: {template_id}")
+            self._logger.warning("Invalid AWS launch template: %s", template_id)
             raise ValueError(f"Invalid AWS launch template: {template_id}")
 
         return template

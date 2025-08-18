@@ -245,7 +245,7 @@ class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
             # Rollback transaction if an exception occurred
             if exc_type is not None and self._in_transaction:
                 self.logger.warning(
-                    f"Exception in context manager, rolling back transaction: {exc_val}"
+                    "Exception in context manager, rolling back transaction: %s", exc_val
                 )
                 self.rollback_transaction()
 
@@ -255,7 +255,7 @@ class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
             # Don't suppress exceptions
             return False
         except Exception as e:
-            self.logger.error(f"Error in context manager exit: {str(e)}")
+            self.logger.error("Error in context manager exit: %s", str(e))
             # Don't suppress the original exception
             return False
 

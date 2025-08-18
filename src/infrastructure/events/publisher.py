@@ -37,7 +37,7 @@ class ConfigurableEventPublisher(EventPublisher):
             elif self.mode == "async":
                 self._publish_to_queue(event)
         except Exception as e:
-            self._logger.error(f"Failed to publish event {event.event_type}: {e}")
+            self._logger.error("Failed to publish event %s: %s", event.event_type, e)
             # Don't re-raise - event publishing failure shouldn't break business
             # operations
 
@@ -46,12 +46,12 @@ class ConfigurableEventPublisher(EventPublisher):
         if event_type not in self._handlers:
             self._handlers[event_type] = []
         self._handlers[event_type].append(handler)
-        self._logger.debug(f"Registered handler for {event_type}")
+        self._logger.debug("Registered handler for %s", event_type)
 
     def _log_event(self, event: DomainEvent) -> None:
         """Log event for audit trail (Script mode)."""
         self._logger.info(
-            f"Event: {event.event_type} | "
+            "Event: %s | ", event.event_type
             f"Aggregate: {event.aggregate_type}:{event.aggregate_id} | "
             f"Time: {event.occurred_at.isoformat()}"
         )
@@ -61,20 +61,20 @@ class ConfigurableEventPublisher(EventPublisher):
         handlers = self._handlers.get(event.event_type, [])
 
         if not handlers:
-            self._logger.debug(f"No handlers registered for {event.event_type}")
+            self._logger.debug("No handlers registered for %s", event.event_type)
             return
 
         for handler in handlers:
             try:
                 handler(event)
             except Exception as e:
-                self._logger.error(f"Event handler failed for {event.event_type}: {e}")
+                self._logger.error("Event handler failed for %s: %s", event.event_type, e)
                 # Continue with other handlers
 
     def _publish_to_queue(self, event: DomainEvent) -> None:
         """Publish to message queue (EDA mode - future implementation)."""
         # Future implementation for message queue publishing
-        self._logger.info(f"Would publish to queue: {event.event_type}")
+        self._logger.info("Would publish to queue: %s", event.event_type)
 
     def get_registered_handlers(self) -> Dict[str, int]:
         """Get count of registered handlers by event type (for debugging)."""

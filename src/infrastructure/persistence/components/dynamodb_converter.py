@@ -75,11 +75,11 @@ class DynamoDBConverter(DataConverter):
                 item["created_at"] = now
             item["updated_at"] = now
 
-            self.logger.debug(f"Converted domain data to DynamoDB item: {entity_id}")
+            self.logger.debug("Converted domain data to DynamoDB item: %s", entity_id)
             return item
 
         except Exception as e:
-            self.logger.error(f"Failed to convert to DynamoDB item: {e}")
+            self.logger.error("Failed to convert to DynamoDB item: %s", e)
             raise
 
     def from_dynamodb_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
@@ -105,7 +105,7 @@ class DynamoDBConverter(DataConverter):
             return domain_data
 
         except Exception as e:
-            self.logger.error(f"Failed to convert from DynamoDB item: {e}")
+            self.logger.error("Failed to convert from DynamoDB item: %s", e)
             raise
 
     def from_dynamodb_items(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -121,7 +121,7 @@ class DynamoDBConverter(DataConverter):
         try:
             return [self.from_dynamodb_item(item) for item in items]
         except Exception as e:
-            self.logger.error(f"Failed to convert DynamoDB items: {e}")
+            self.logger.error("Failed to convert DynamoDB items: %s", e)
             raise
 
     def _convert_to_dynamodb_type(self, value: Any) -> Any:
@@ -304,11 +304,11 @@ class DynamoDBConverter(DataConverter):
                 item = self.to_dynamodb_item(entity_id, data)
                 items.append(item)
 
-            self.logger.debug(f"Prepared {len(entities)} items for batch operation")
+            self.logger.debug("Prepared %s items for batch operation", len(entities))
             return items
 
         except Exception as e:
-            self.logger.error(f"Failed to prepare batch items: {e}")
+            self.logger.error("Failed to prepare batch items: %s", e)
             raise
 
     def extract_entity_id(self, item: Dict[str, Any]) -> Optional[str]:

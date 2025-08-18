@@ -18,7 +18,7 @@ def _get_from_project_yml() -> Optional[dict]:
             with open(project_file) as f:
                 return yaml.safe_load(f)
     except Exception as e:
-        logger.debug(f"Failed to read project.yml: {e}")
+        logger.debug("Failed to read project.yml: %s", e)
     return None
 
 
@@ -37,7 +37,7 @@ def _get_from_package_metadata() -> Optional[dict]:
             "repository": {"org": "awslabs", "name": "open-hostfactory-plugin"},
         }
     except Exception as e:
-        logger.debug(f"Failed to read package metadata: {e}")
+        logger.debug("Failed to read package metadata: %s", e)
     return None
 
 

@@ -165,7 +165,7 @@ def register_aws_provider(
 
     except Exception as e:
         if logger:
-            logger.error(f"Failed to register AWS provider: {str(e)}")
+            logger.error("Failed to register AWS provider: %s", str(e))
         raise
 
 
@@ -214,7 +214,7 @@ def _register_aws_template_adapter(logger: "LoggingPort" = None) -> None:
 
     except Exception as e:
         if logger:
-            logger.warning(f"Failed to register AWS template adapter: {e}")
+            logger.warning("Failed to register AWS template adapter: %s", e)
 
 
 def register_aws_provider_with_di(provider_instance, container) -> bool:
@@ -224,7 +224,7 @@ def register_aws_provider_with_di(provider_instance, container) -> bool:
     logger = container.get(LoggingPort)
 
     try:
-        logger.debug(f"Registering AWS provider instance: {provider_instance.name}")
+        logger.debug("Registering AWS provider instance: %s", provider_instance.name)
 
         # Create AWS provider configuration
         aws_config = create_aws_config(provider_instance.config)
@@ -250,12 +250,12 @@ def register_aws_provider_with_di(provider_instance, container) -> bool:
             config_factory=lambda: aws_config,
         )
 
-        logger.debug(f"Successfully registered AWS provider instance: {provider_instance.name}")
+        logger.debug("Successfully registered AWS provider instance: %s", provider_instance.name)
         return True
 
     except Exception as e:
         logger.error(
-            f"Failed to register AWS provider instance '{provider_instance.name}': {str(e)}"
+            "Failed to register AWS provider instance '%s': %s", provider_instance.name, str(e)
         )
         return False
 
@@ -296,7 +296,7 @@ def _register_aws_components_with_di(container, aws_config, instance_name: str) 
         aws_client = AWSClient(config=config_port, logger=logger_port)
 
         # Log the client creation for this specific instance
-        logger_port.info(f"AWS client initialized for {instance_name}: region={aws_config.region}")
+        logger_port.info("AWS client initialized for %s: region=%s", instance_name, aws_config.region)
 
         return aws_client
 
@@ -454,7 +454,7 @@ def register_aws_services_with_di(container) -> None:
         logger.debug("AWS services registered with DI container")
 
     except Exception as e:
-        logger.warning(f"Failed to register AWS services with DI container: {e}")
+        logger.warning("Failed to register AWS services with DI container: %s", e)
 
 
 # Auto-register AWS extensions when module is imported

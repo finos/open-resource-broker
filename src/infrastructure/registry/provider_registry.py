@@ -206,7 +206,7 @@ class ProviderRegistry(BaseRegistry):
         try:
             registration = self._get_type_registration(provider_type)
             config = registration.config_factory(data)
-            self.logger.debug(f"Created config for provider: {provider_type}")
+            self.logger.debug("Created config for provider: %s", provider_type)
             return config
         except ValueError as e:
             available_providers = ", ".join(self.get_registered_types())

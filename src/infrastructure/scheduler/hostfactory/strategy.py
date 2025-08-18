@@ -51,7 +51,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
 
             return self.config_manager.resolve_file("template", templates_file)
         except Exception as e:
-            self._logger.error(f"Failed to determine templates file path: {e}")
+            self._logger.error("Failed to determine templates file path: %s", e)
             # Fallback to aws for backward compatibility
             return self.config_manager.resolve_file("template", "awsprov_templates.json")
 
@@ -87,7 +87,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
                 except Exception as e:
                     # Skip invalid templates but log the issue
                     self._logger.warning(
-                        f"Skipping invalid template { template.get( 'id', 'unknown')}: {e}"
+                        "Skipping invalid template %s: %s",  template.get( 'id', 'unknown'), e
                     )
                     continue
 
@@ -172,7 +172,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         mapped["version"] = template.get("version")
 
         self._logger.debug(
-            f"Mapped template fields: { len(field_mappings)} HostFactory mappings applied for {provider_type} provider"
+            "Mapped template fields: %s HostFactory mappings applied for %s provider",  len(field_mappings), provider_type
         )
 
         return mapped
@@ -183,10 +183,10 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             # Use provider selection service for provider selection
             selection_result = self._provider_selection_service.select_active_provider()
             provider_type = selection_result.provider_type
-            self._logger.debug(f"Active provider type: {provider_type}")
+            self._logger.debug("Active provider type: %s", provider_type)
             return provider_type
         except Exception as e:
-            self._logger.warning(f"Failed to get active provider type, defaulting to 'aws': {e}")
+            self._logger.warning("Failed to get active provider type, defaulting to 'aws': %s", e)
             return "aws"  # Default fallback
 
     def convert_cli_args_to_hostfactory_input(self, operation: str, args: Any) -> Dict[str, Any]:

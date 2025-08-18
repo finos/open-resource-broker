@@ -101,7 +101,7 @@ class SQLQueryBuilder(QueryManager):
         query += ",\n".join(f"    {col_def}" for col_def in column_definitions)
         query += "\n)"
 
-        self.logger.debug(f"Built CREATE TABLE query for {self.table_name}")
+        self.logger.debug("Built CREATE TABLE query for %s", self.table_name)
         return query
 
     def build_insert(self, data: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
@@ -136,7 +136,7 @@ class SQLQueryBuilder(QueryManager):
             f"({', '.join(columns)}) VALUES ({', '.join(placeholders)})"  # nosec B608
         )
 
-        self.logger.debug(f"Built INSERT query for {self.table_name}")
+        self.logger.debug("Built INSERT query for %s", self.table_name)
         return query, filtered_data
 
     def build_select_by_id(self, id_column: str) -> Tuple[str, str]:
@@ -158,7 +158,7 @@ class SQLQueryBuilder(QueryManager):
             f"WHERE {id_column} = :{id_column}"  # nosec B608
         )
 
-        self.logger.debug(f"Built SELECT by ID query for {self.table_name}")
+        self.logger.debug("Built SELECT by ID query for %s", self.table_name)
         return query, id_column
 
     def build_select_all(self) -> str:
@@ -171,7 +171,7 @@ class SQLQueryBuilder(QueryManager):
         # Table name already validated in constructor
         query = f"SELECT * FROM {self.table_name}  # nosec B608"  # nosec B608
 
-        self.logger.debug(f"Built SELECT all query for {self.table_name}")
+        self.logger.debug("Built SELECT all query for %s", self.table_name)
         return query
 
     def build_update(
@@ -212,7 +212,7 @@ class SQLQueryBuilder(QueryManager):
         parameters = filtered_data.copy()
         parameters["entity_id"] = entity_id
 
-        self.logger.debug(f"Built UPDATE query for {self.table_name}")
+        self.logger.debug("Built UPDATE query for %s", self.table_name)
         return query, parameters
 
     def build_delete(self, id_column: str) -> Tuple[str, str]:
@@ -234,7 +234,7 @@ class SQLQueryBuilder(QueryManager):
             f"WHERE {id_column} = :{id_column}"  # nosec B608
         )
 
-        self.logger.debug(f"Built DELETE query for {self.table_name}")
+        self.logger.debug("Built DELETE query for %s", self.table_name)
         return query, id_column
 
     def build_exists(self, id_column: str) -> Tuple[str, str]:
@@ -249,7 +249,7 @@ class SQLQueryBuilder(QueryManager):
         """
         query = f"SELECT 1 FROM { self.table_name} WHERE {id_column} = :{id_column} LIMIT 1"  # nosec B608
 
-        self.logger.debug(f"Built EXISTS query for {self.table_name}")
+        self.logger.debug("Built EXISTS query for %s", self.table_name)
         return query, id_column
 
     def build_select_by_criteria(self, criteria: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
@@ -309,7 +309,7 @@ class SQLQueryBuilder(QueryManager):
             f"WHERE {' AND '.join(where_clauses)}"  # nosec B608
         )
 
-        self.logger.debug(f"Built SELECT with criteria query for {self.table_name}")
+        self.logger.debug("Built SELECT with criteria query for %s", self.table_name)
         return query, parameters
 
     def build_count(self) -> str:
@@ -322,7 +322,7 @@ class SQLQueryBuilder(QueryManager):
         # Table name already validated in constructor
         query = f"SELECT COUNT(*) FROM {self.table_name}"  # nosec B608
 
-        self.logger.debug(f"Built COUNT query for {self.table_name}")
+        self.logger.debug("Built COUNT query for %s", self.table_name)
         return query
 
     def build_batch_insert(
@@ -365,6 +365,6 @@ class SQLQueryBuilder(QueryManager):
             filtered_data_list.append(filtered_data)
 
         self.logger.debug(
-            f"Built batch INSERT query for { self.table_name} with { len(data_list)} items"
+            "Built batch INSERT query for %s with %s items",  self.table_name,  len(data_list)
         )
         return query, filtered_data_list

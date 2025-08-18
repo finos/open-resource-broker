@@ -77,7 +77,7 @@ class SQLEngineFactory:
                     Path(db_dir).mkdir(parents=True, exist_ok=True)
 
             connection_string = f"sqlite:///{db_path}"
-            logger.debug(f"Creating SQLite engine with connection string: {connection_string}")
+            logger.debug("Creating SQLite engine with connection string: %s", connection_string)
 
             # SQLite-specific settings
             engine_kwargs["connect_args"] = {
@@ -94,7 +94,7 @@ class SQLEngineFactory:
 
             # Build connection string
             connection_string = f"postgresql://{username}:{password}@{host}:{port}/{database}"
-            logger.debug(f"Creating PostgreSQL engine with connection to {host}:{port}/{database}")
+            logger.debug("Creating PostgreSQL engine with connection to %s:%s/%s", host, port, database)
 
             # Add pooling configuration
             engine_kwargs.update(
@@ -116,7 +116,7 @@ class SQLEngineFactory:
 
             # Build connection string
             connection_string = f"mysql+pymysql://{username}:{password}@{host}:{port}/{database}"
-            logger.debug(f"Creating MySQL engine with connection to {host}:{port}/{database}")
+            logger.debug("Creating MySQL engine with connection to %s:%s/%s", host, port, database)
 
             # Add pooling configuration
             engine_kwargs.update(
@@ -139,7 +139,7 @@ class SQLEngineFactory:
 
             # Build connection string
             connection_string = f"mysql+pymysql://{username}:{password}@{host}:{port}/{database}"
-            logger.debug(f"Creating Aurora engine with connection to {host}:{port}/{database}")
+            logger.debug("Creating Aurora engine with connection to %s:%s/%s", host, port, database)
 
             # Add pooling configuration
             engine_kwargs.update(
@@ -157,7 +157,7 @@ class SQLEngineFactory:
                 engine_kwargs["connect_args"] = {
                     "ssl": {"ca": config.ssl_ca, "check_hostname": config.ssl_verify}
                 }
-                logger.debug(f"Using SSL with CA certificate: {config.ssl_ca}")
+                logger.debug("Using SSL with CA certificate: %s", config.ssl_ca)
 
         else:
             error_msg = f"Unsupported database type: {db_type}"

@@ -77,7 +77,7 @@ class EventHandler(ABC):
             duration = time.time() - start_time
             if self.logger:
                 self.logger.debug(
-                    f"Event processed successfully: {event.event_type} "
+                    "Event processed successfully: %s ", event.event_type
                     f"(ID: {event_id}) in {duration:.3f}s"
                 )
 
@@ -109,7 +109,7 @@ class EventHandler(ABC):
             event: The domain event to pre-process
         """
         if self.logger:
-            self.logger.debug(f"Processing event: {event.event_type}")
+            self.logger.debug("Processing event: %s", event.event_type)
 
     @abstractmethod
     async def _post_process(self, event: DomainEvent) -> None:
@@ -146,7 +146,7 @@ class EventHandler(ABC):
                     # Not the last attempt, wait and retry
                     if self.logger:
                         self.logger.warning(
-                            f"Event processing failed (attempt {attempt + 1}/{self.retry_count}): "
+                            "Event processing failed (attempt %s/%s): ", attempt + 1, self.retry_count
                             f"{event.event_type} - {str(e)}"
                         )
                     await asyncio.sleep(self.retry_delay * (attempt + 1))
@@ -173,7 +173,7 @@ class EventHandler(ABC):
 
         if self.logger:
             self.logger.error(
-                f"Event processing failed: {event.event_type} "
+                "Event processing failed: %s ", event.event_type
                 f"(ID: {event_id}) after {duration:.3f}s - {str(error)}"
             )
 
@@ -191,7 +191,7 @@ class EventHandler(ABC):
             error: The exception that occurred
         """
         if self.logger:
-            self.logger.error(f"Event sent to dead letter queue: {event.event_type} - {str(error)}")
+            self.logger.error("Event sent to dead letter queue: %s - %s", event.event_type, str(error))
         # Future: Implement actual dead letter queue integration
 
     def extract_fields(self, event: DomainEvent, field_mapping: Dict[str, Any]) -> Dict[str, Any]:

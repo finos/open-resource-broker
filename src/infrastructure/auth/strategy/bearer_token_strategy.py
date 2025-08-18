@@ -88,7 +88,7 @@ class BearerTokenStrategy(AuthPort):
             if not user_id:
                 return AuthResult(status=AuthStatus.INVALID, error_message="Token missing user ID")
 
-            self.logger.debug(f"Token validated for user: {user_id}")
+            self.logger.debug("Token validated for user: %s", user_id)
 
             return AuthResult(
                 status=AuthStatus.SUCCESS,
@@ -110,7 +110,7 @@ class BearerTokenStrategy(AuthPort):
         except jwt.InvalidTokenError as e:
             return AuthResult(status=AuthStatus.INVALID, error_message=f"Invalid token: {str(e)}")
         except Exception as e:
-            self.logger.error(f"Token validation error: {e}")
+            self.logger.error("Token validation error: %s", e)
             return AuthResult(status=AuthStatus.FAILED, error_message="Token validation failed")
 
     async def refresh_token(self, refresh_token: str) -> AuthResult:
@@ -157,7 +157,7 @@ class BearerTokenStrategy(AuthPort):
                 error_message=f"Invalid refresh token: {str(e)}",
             )
         except Exception as e:
-            self.logger.error(f"Token refresh error: {e}")
+            self.logger.error("Token refresh error: %s", e)
             return AuthResult(status=AuthStatus.FAILED, error_message="Token refresh failed")
 
     async def revoke_token(self, token: str) -> bool:

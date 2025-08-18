@@ -172,12 +172,12 @@ class EC2FleetHandler(AWSHandler):
                 **fleet_config,
             )
         except CircuitBreakerOpenError as e:
-            self._logger.error(f"Circuit breaker OPEN for EC2 Fleet creation: {str(e)}")
+            self._logger.error("Circuit breaker OPEN for EC2 Fleet creation: %s", str(e))
             # Re-raise to allow upper layers to handle graceful degradation
             raise e
 
         fleet_id = response["FleetId"]
-        self._logger.info(f"Successfully created EC2 Fleet: {fleet_id}")
+        self._logger.info("Successfully created EC2 Fleet: %s", fleet_id)
 
         # For instant fleets, store instance IDs in request metadata
         if fleet_type == AWSFleetType.INSTANT:
@@ -190,11 +190,11 @@ class EC2FleetHandler(AWSHandler):
             # Log the response structure at debug level if no instances were found
             if not instance_ids:
                 self._logger.debug(
-                    f"No instance IDs found in response. Response structure: {response}"
+                    "No instance IDs found in response. Response structure: %s", response
                 )
 
             request.metadata["instance_ids"] = instance_ids
-            self._logger.debug(f"Stored instance IDs in request metadata: {instance_ids}")
+            self._logger.debug("Stored instance IDs in request metadata: %s", instance_ids)
 
         return fleet_id
 
@@ -433,7 +433,7 @@ class EC2FleetHandler(AWSHandler):
 
             # Log fleet status
             self._logger.debug(
-                f"Fleet status: {fleet.get('Status')}, "
+                "Fleet status: %s, ", fleet.get('Status')
                 f"Target capacity: {fleet.get('TargetCapacitySpecification', {}).get('TotalTargetCapacity')}, "
                 f"Fulfilled capacity: {fleet.get('FulfilledCapacity', 0)}"
             )
@@ -457,7 +457,7 @@ class EC2FleetHandler(AWSHandler):
                 instance_ids = [instance["InstanceId"] for instance in active_instances]
 
             if not instance_ids:
-                self._logger.info(f"No active instances found in fleet {fleet_id}")
+                self._logger.info("No active instances found in fleet %s", fleet_id)
                 return []
 
             # Get detailed instance information
@@ -465,10 +465,10 @@ class EC2FleetHandler(AWSHandler):
 
         except ClientError as e:
             error = self._convert_client_error(e)
-            self._logger.error(f"Failed to check EC2 Fleet status: {str(error)}")
+            self._logger.error("Failed to check EC2 Fleet status: %s", str(error))
             raise error
         except Exception as e:
-            self._logger.error(f"Unexpected error checking EC2 Fleet status: {str(e)}")
+            self._logger.error("Unexpected error checking EC2 Fleet status: %s", str(e))
             raise AWSInfrastructureError(f"Failed to check EC2 Fleet status: {str(e)}")
 
     def release_hosts(self, request: Request) -> None:
@@ -518,7 +518,7 @@ class EC2FleetHandler(AWSHandler):
                         TargetCapacitySpecification={"TotalTargetCapacity": new_capacity},
                     )
                     self._logger.info(
-                        f"Reduced maintain fleet {fleet_id} capacity to {new_capacity}"
+                        "Reduced maintain fleet %s capacity to %s", fleet_id, new_capacity
                     )
 
                 # Use consolidated AWS operations utility for instance termination
@@ -533,9 +533,9 @@ class EC2FleetHandler(AWSHandler):
                     FleetIds=[fleet_id],
                     TerminateInstances=True,
                 )
-                self._logger.info(f"Deleted EC2 Fleet: {fleet_id}")
+                self._logger.info("Deleted EC2 Fleet: %s", fleet_id)
 
         except ClientError as e:
             error = self._convert_client_error(e)
-            self._logger.error(f"Failed to release EC2 Fleet resources: {str(error)}")
+            self._logger.error("Failed to release EC2 Fleet resources: %s", str(error))
             raise error

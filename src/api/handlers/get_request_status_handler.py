@@ -148,7 +148,7 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[Dict[str, Any], RequestStatusRe
 
                         if self.logger:
                             self.logger.info(
-                                f"Retrieved status for request {request_id}",
+                                "Retrieved status for request %s", request_id,
                                 extra={
                                     "request_id": request_id,
                                     "correlation_id": correlation_id,
@@ -174,7 +174,7 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[Dict[str, Any], RequestStatusRe
                     except Exception as e:
                         if self.logger:
                             self.logger.error(
-                                f"Failed to get status for request {request_id}",
+                                "Failed to get status for request %s", request_id,
                                 extra={
                                     "request_id": request_id,
                                     "correlation_id": correlation_id,
@@ -282,7 +282,7 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[Dict[str, Any], RequestStatusRe
                 if attempt < self._max_retries - 1:
                     if self.logger:
                         self.logger.warning(
-                            f"Retry {attempt + 1}/{self._max_retries} for request {request_id}"
+                            "Retry %s/%s for request %s", attempt + 1, self._max_retries, request_id
                         )
                     continue
 

@@ -34,7 +34,7 @@ def register_all_storage_types() -> None:
         logger.debug("JSON storage registered successfully")
     except Exception as e:
         failed_types.append(("json", str(e)))
-        logger.warning(f"Failed to register JSON storage: {e}")
+        logger.warning("Failed to register JSON storage: %s", e)
 
     # Register SQL storage
     try:
@@ -45,7 +45,7 @@ def register_all_storage_types() -> None:
         logger.debug("SQL storage registered successfully")
     except Exception as e:
         failed_types.append(("sql", str(e)))
-        logger.warning(f"Failed to register SQL storage: {e}")
+        logger.warning("Failed to register SQL storage: %s", e)
 
     # Register DynamoDB storage
     try:
@@ -58,15 +58,15 @@ def register_all_storage_types() -> None:
         logger.debug("DynamoDB storage registered successfully")
     except Exception as e:
         failed_types.append(("dynamodb", str(e)))
-        logger.warning(f"Failed to register DynamoDB storage: {e}")
+        logger.warning("Failed to register DynamoDB storage: %s", e)
 
     # Log summary
     if registered_types:
-        logger.info(f"Successfully registered storage types: {', '.join(registered_types)}")
+        logger.info("Successfully registered storage types: %s", ', '.join(registered_types))
 
     if failed_types:
         failed_summary = ", ".join([f"{name} ({error})" for name, error in failed_types])
-        logger.warning(f"Failed to register storage types: {failed_summary}")
+        logger.warning("Failed to register storage types: %s", failed_summary)
 
     if not registered_types:
         logger.error("No storage types were successfully registered!")
@@ -91,7 +91,7 @@ def register_storage_type_on_demand(storage_type: str) -> bool:
     registry = get_storage_registry()
 
     if hasattr(registry, "is_registered") and registry.is_registered(storage_type):
-        logger.debug(f"Storage type '{storage_type}' already registered")
+        logger.debug("Storage type '%s' already registered", storage_type)
         return True
 
     try:
@@ -112,14 +112,14 @@ def register_storage_type_on_demand(storage_type: str) -> bool:
 
             register_dynamodb_storage()
         else:
-            logger.error(f"Unknown storage type: {storage_type}")
+            logger.error("Unknown storage type: %s", storage_type)
             return False
 
-        logger.info(f"Successfully registered storage type on demand: {storage_type}")
+        logger.info("Successfully registered storage type on demand: %s", storage_type)
         return True
 
     except Exception as e:
-        logger.error(f"Failed to register storage type '{storage_type}' on demand: {e}")
+        logger.error("Failed to register storage type '%s' on demand: %s", storage_type, e)
         return False
 
 
@@ -138,7 +138,7 @@ def register_minimal_storage_types() -> None:
         register_json_storage()
         logger.info("Minimal storage registration complete: json")
     except Exception as e:
-        logger.error(f"Failed to register minimal storage types: {e}")
+        logger.error("Failed to register minimal storage types: %s", e)
         raise RuntimeError("Failed to register minimal storage types")
 
 
@@ -221,12 +221,12 @@ def register_storage_type(storage_type: str) -> bool:
 
             register_dynamodb_storage()
         else:
-            logger.error(f"Unknown storage type: {storage_type}")
+            logger.error("Unknown storage type: %s", storage_type)
             return False
 
-        logger.info(f"Successfully registered storage type: {storage_type}")
+        logger.info("Successfully registered storage type: %s", storage_type)
         return True
 
     except Exception as e:
-        logger.error(f"Failed to register storage type '{storage_type}': {e}")
+        logger.error("Failed to register storage type '%s': %s", storage_type, e)
         return False

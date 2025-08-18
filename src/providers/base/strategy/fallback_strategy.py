@@ -228,19 +228,19 @@ class FallbackProviderStrategy(ProviderStrategy):
                 if self._primary_strategy.initialize():
                     success_count += 1
                     self._self._logger.info(
-                        f"Primary strategy initialized: {self._primary_strategy.provider_type}"
+                        "Primary strategy initialized: %s", self._primary_strategy.provider_type
                     )
                 else:
                     self._self._logger.error(
-                        f"Failed to initialize primary strategy: {self._primary_strategy.provider_type}"
+                        "Failed to initialize primary strategy: %s", self._primary_strategy.provider_type
                     )
             else:
                 success_count += 1
                 self._self._logger.debug(
-                    f"Primary strategy already initialized: {self._primary_strategy.provider_type}"
+                    "Primary strategy already initialized: %s", self._primary_strategy.provider_type
                 )
         except Exception as e:
-            self._self._logger.error(f"Error initializing primary strategy: {e}")
+            self._self._logger.error("Error initializing primary strategy: %s", e)
 
         # Initialize fallback strategies
         for i, strategy in enumerate(self._fallback_strategies):
@@ -249,19 +249,19 @@ class FallbackProviderStrategy(ProviderStrategy):
                     if strategy.initialize():
                         success_count += 1
                         self._self._logger.info(
-                            f"Fallback strategy {i+1} initialized: {strategy.provider_type}"
+                            "Fallback strategy %s initialized: %s", i+1, strategy.provider_type
                         )
                     else:
                         self._self._logger.error(
-                            f"Failed to initialize fallback strategy {i+1}: {strategy.provider_type}"
+                            "Failed to initialize fallback strategy %s: %s", i+1, strategy.provider_type
                         )
                 else:
                     success_count += 1
                     self._self._logger.debug(
-                        f"Fallback strategy {i+1} already initialized: {strategy.provider_type}"
+                        "Fallback strategy %s already initialized: %s", i+1, strategy.provider_type
                     )
             except Exception as e:
-                self._self._logger.error(f"Error initializing fallback strategy {i+1}: {e}")
+                self._self._logger.error("Error initializing fallback strategy %s: %s", i+1, e)
 
         # Consider initialization successful if at least one strategy works
         self._initialized = success_count > 0
@@ -269,7 +269,7 @@ class FallbackProviderStrategy(ProviderStrategy):
         if self._initialized:
             total_strategies = 1 + len(self._fallback_strategies)
             self._self._logger.info(
-                f"Fallback strategy initialized: {success_count}/{total_strategies} strategies ready"
+                "Fallback strategy initialized: %s/%s strategies ready", success_count, total_strategies
             )
         else:
             self._self._logger.error(
@@ -324,7 +324,7 @@ class FallbackProviderStrategy(ProviderStrategy):
 
         except Exception as e:
             total_time_ms = (time.time() - start_time) * 1000
-            self._self._logger.error(f"Fallback operation {operation.operation_type} failed: {e}")
+            self._self._logger.error("Fallback operation %s failed: %s", operation.operation_type, e)
             return ProviderResult.error_result(
                 f"Fallback operation failed: {str(e)}",
                 "FALLBACK_EXECUTION_ERROR",
@@ -370,7 +370,7 @@ class FallbackProviderStrategy(ProviderStrategy):
                     if self._circuit_state.failure_count >= self._config.circuit_breaker_threshold:
                         self._circuit_state.state = CircuitState.OPEN
                         self._self._logger.warning(
-                            f"Circuit breaker opened after {self._circuit_state.failure_count} failures"
+                            "Circuit breaker opened after %s failures", self._circuit_state.failure_count
                         )
 
                     # Try fallback
@@ -381,7 +381,7 @@ class FallbackProviderStrategy(ProviderStrategy):
                 self._circuit_state.record_failure()
                 if self._circuit_state.failure_count >= self._config.circuit_breaker_threshold:
                     self._circuit_state.state = CircuitState.OPEN
-                    self._self._logger.warning(f"Circuit breaker opened after exception: {e}")
+                    self._self._logger.warning("Circuit breaker opened after exception: %s", e)
 
                 return await self._execute_fallback_chain(operation)
 
@@ -401,7 +401,7 @@ class FallbackProviderStrategy(ProviderStrategy):
                     last_error = result.error_message
                     if attempt < self._config.max_retries:
                         self._self._logger.debug(
-                            f"Primary strategy failed, retrying in {self._config.retry_delay_seconds}s (attempt {attempt + 1})"
+                            "Primary strategy failed, retrying in %ss (attempt %s)", self._config.retry_delay_seconds, attempt + 1
                         )
                         time.sleep(self._config.retry_delay_seconds)
 
@@ -409,13 +409,13 @@ class FallbackProviderStrategy(ProviderStrategy):
                 last_error = str(e)
                 if attempt < self._config.max_retries:
                     self._self._logger.debug(
-                        f"Primary strategy exception, retrying in {self._config.retry_delay_seconds}s: {e}"
+                        "Primary strategy exception, retrying in %ss: %s", self._config.retry_delay_seconds, e
                     )
                     time.sleep(self._config.retry_delay_seconds)
 
         # Primary failed after retries, try fallback
         self._self._logger.warning(
-            f"Primary strategy failed after {self._config.max_retries} retries: {last_error}"
+            "Primary strategy failed after %s retries: %s", self._config.max_retries, last_error
         )
         return await self._execute_fallback_chain(operation)
 
@@ -434,7 +434,7 @@ class FallbackProviderStrategy(ProviderStrategy):
                     return await self._execute_fallback_chain(operation)
             except Exception as e:
                 self._primary_healthy = False
-                self._self._logger.warning(f"Primary strategy failed, marking unhealthy: {e}")
+                self._self._logger.warning("Primary strategy failed, marking unhealthy: %s", e)
                 return await self._execute_fallback_chain(operation)
         else:
             # Primary is unhealthy, use fallback directly
@@ -450,7 +450,7 @@ class FallbackProviderStrategy(ProviderStrategy):
             else:
                 return await self._execute_fallback_chain(operation)
         except Exception as e:
-            self._self._logger.debug(f"Primary strategy failed, trying fallback: {e}")
+            self._self._logger.debug("Primary strategy failed, trying fallback: %s", e)
             return await self._execute_fallback_chain(operation)
 
     async def _execute_fallback_chain(self, operation: ProviderOperation) -> ProviderResult:
@@ -460,23 +460,23 @@ class FallbackProviderStrategy(ProviderStrategy):
         for i, fallback_strategy in enumerate(self._fallback_strategies):
             try:
                 self._self._logger.debug(
-                    f"Trying fallback strategy {i+1}: {fallback_strategy.provider_type}"
+                    "Trying fallback strategy %s: %s", i+1, fallback_strategy.provider_type
                 )
                 result = await fallback_strategy.execute_operation(operation)
 
                 if result.success:
                     self._current_strategy = fallback_strategy
                     self._self._logger.info(
-                        f"Fallback strategy {i+1} succeeded: {fallback_strategy.provider_type}"
+                        "Fallback strategy %s succeeded: %s", i+1, fallback_strategy.provider_type
                     )
                     return result
                 else:
                     last_error = result.error_message
-                    self._self._logger.debug(f"Fallback strategy {i+1} failed: {last_error}")
+                    self._self._logger.debug("Fallback strategy %s failed: %s", i+1, last_error)
 
             except Exception as e:
                 last_error = str(e)
-                self._self._logger.debug(f"Fallback strategy {i+1} exception: {e}")
+                self._self._logger.debug("Fallback strategy %s exception: %s", i+1, e)
 
         # All strategies failed
         if self._config.enable_graceful_degradation:
@@ -527,12 +527,12 @@ class FallbackProviderStrategy(ProviderStrategy):
                 self._last_health_check = current_time
 
                 if not self._primary_healthy:
-                    self._self._logger.debug(f"Primary strategy unhealthy: {health.status_message}")
+                    self._self._logger.debug("Primary strategy unhealthy: %s", health.status_message)
 
             except Exception as e:
                 self._primary_healthy = False
                 self._last_health_check = current_time
-                self._self._logger.debug(f"Primary strategy health check failed: {e}")
+                self._self._logger.debug("Primary strategy health check failed: %s", e)
 
     def get_capabilities(self) -> ProviderCapabilities:
         """
@@ -548,7 +548,7 @@ class FallbackProviderStrategy(ProviderStrategy):
             combined_features = primary_capabilities.features.copy()
             combined_limitations = primary_capabilities.limitations.copy()
         except Exception as e:
-            self._self._logger.warning(f"Error getting primary capabilities: {e}")
+            self._self._logger.warning("Error getting primary capabilities: %s", e)
             all_operations = set()
             combined_features = {}
             combined_limitations = {}
@@ -567,7 +567,7 @@ class FallbackProviderStrategy(ProviderStrategy):
                     }
                 )
             except Exception as e:
-                self._self._logger.warning(f"Error getting fallback {i+1} capabilities: {e}")
+                self._self._logger.warning("Error getting fallback %s capabilities: %s", i+1, e)
 
         # Add fallback-specific features
         combined_features.update(
@@ -659,7 +659,7 @@ class FallbackProviderStrategy(ProviderStrategy):
             # Clean up primary strategy
             self._primary_strategy.cleanup()
             self._self._logger.debug(
-                f"Cleaned up primary strategy: {self._primary_strategy.provider_type}"
+                "Cleaned up primary strategy: %s", self._primary_strategy.provider_type
             )
 
             # Clean up fallback strategies
@@ -667,15 +667,15 @@ class FallbackProviderStrategy(ProviderStrategy):
                 try:
                     strategy.cleanup()
                     self._self._logger.debug(
-                        f"Cleaned up fallback strategy {i+1}: {strategy.provider_type}"
+                        "Cleaned up fallback strategy %s: %s", i+1, strategy.provider_type
                     )
                 except Exception as e:
-                    self._self._logger.warning(f"Error cleaning up fallback strategy {i+1}: {e}")
+                    self._self._logger.warning("Error cleaning up fallback strategy %s: %s", i+1, e)
 
             self._initialized = False
 
         except Exception as e:
-            self._self._logger.warning(f"Error during fallback strategy cleanup: {e}")
+            self._self._logger.warning("Error during fallback strategy cleanup: %s", e)
 
     def __str__(self) -> str:
         """Return string representation for debugging."""

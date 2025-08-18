@@ -46,14 +46,14 @@ def injectable(cls: Type[T]) -> Type[T]:
     try:
         hints = get_type_hints(original_init)
     except Exception as e:
-        logger.warning(f"Could not get type hints for {cls.__name__}: {e}")
+        logger.warning("Could not get type hints for %s: %s", cls.__name__, e)
         hints = {}
 
     # Get constructor signature
     try:
         sig = inspect.signature(original_init)
     except Exception as e:
-        logger.warning(f"Could not get signature for {cls.__name__}: {e}")
+        logger.warning("Could not get signature for %s: %s", cls.__name__, e)
         return cls
 
     @wraps(original_init)
@@ -94,8 +94,8 @@ def injectable(cls: Type[T]) -> Type[T]:
         try:
             original_init(self, **resolved_kwargs)
         except Exception as e:
-            logger.error(f"Failed to initialize {cls.__name__} with resolved dependencies: {e}")
-            logger.debug(f"Resolved kwargs: {resolved_kwargs}")
+            logger.error("Failed to initialize %s with resolved dependencies: %s", cls.__name__, e)
+            logger.debug("Resolved kwargs: %s", resolved_kwargs)
             raise
 
     # Replace constructor
@@ -103,7 +103,7 @@ def injectable(cls: Type[T]) -> Type[T]:
     cls._injectable = True
     cls._original_init = original_init
 
-    logger.debug(f"Made {cls.__name__} injectable")
+    logger.debug("Made %s injectable", cls.__name__)
     return cls
 
 
@@ -155,7 +155,7 @@ def _resolve_dependency(
             # Don't try to resolve primitive types from DI container
             if _is_primitive_type(inner_type):
                 logger.debug(
-                    f"Skipping primitive type resolution for {param_name}: { inner_type.__name__} in {class_name}"
+                    "Skipping primitive type resolution for %s: %s in %s", param_name,  inner_type.__name__, class_name
                 )
                 return param.default if param.default != inspect.Parameter.empty else None
 
@@ -163,14 +163,14 @@ def _resolve_dependency(
                 return container.get(inner_type)
             except Exception as e:
                 logger.debug(
-                    f"Could not resolve optional dependency {param_name}: { inner_type.__name__} for {class_name}: {e}"
+                    "Could not resolve optional dependency %s: %s for %s: %s", param_name,  inner_type.__name__, class_name, e
                 )
                 return param.default if param.default != inspect.Parameter.empty else None
 
         # Don't try to resolve primitive types from DI container
         if _is_primitive_type(annotation):
             logger.debug(
-                f"Skipping primitive type resolution for {param_name}: { annotation.__name__} in {class_name}"
+                "Skipping primitive type resolution for %s: %s in %s", param_name,  annotation.__name__, class_name
             )
             return param.default if param.default != inspect.Parameter.empty else None
 
@@ -179,12 +179,12 @@ def _resolve_dependency(
             return container.get(annotation)
         except Exception as e:
             logger.debug(
-                f"Could not resolve dependency {param_name}: { annotation.__name__} for {class_name}: {e}"
+                "Could not resolve dependency %s: %s for %s: %s", param_name,  annotation.__name__, class_name, e
             )
             return None
 
     except Exception as e:
-        logger.warning(f"Error resolving dependency {param_name} for {class_name}: {e}")
+        logger.warning("Error resolving dependency %s for %s: %s", param_name, class_name, e)
         return None
 
 
@@ -240,5 +240,5 @@ def get_injectable_info(cls: Type) -> Dict[str, Any]:
             "total_dependencies": len(dependencies),
         }
     except Exception as e:
-        logger.warning(f"Could not get injectable info for {cls.__name__}: {e}")
+        logger.warning("Could not get injectable info for %s: %s", cls.__name__, e)
         return {"class_name": cls.__name__, "error": str(e)}

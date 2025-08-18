@@ -158,7 +158,7 @@ class SQLUnitOfWork(BaseUnitOfWork):
 
             self.logger.debug("SQL transaction begun on all repositories")
         except Exception as e:
-            self.logger.error(f"Failed to begin SQL transaction: {e}")
+            self.logger.error("Failed to begin SQL transaction: %s", e)
             if self.session:
                 self.session.close()
                 self.session = None
@@ -176,7 +176,7 @@ class SQLUnitOfWork(BaseUnitOfWork):
                 self.session.commit()
                 self.logger.debug("SQL transaction committed on all repositories")
         except Exception as e:
-            self.logger.error(f"Failed to commit SQL transaction: {e}")
+            self.logger.error("Failed to commit SQL transaction: %s", e)
             raise
         finally:
             if self.session:
@@ -195,7 +195,7 @@ class SQLUnitOfWork(BaseUnitOfWork):
                 self.session.rollback()
                 self.logger.debug("SQL transaction rolled back on all repositories")
         except Exception as e:
-            self.logger.error(f"Failed to rollback SQL transaction: {e}")
+            self.logger.error("Failed to rollback SQL transaction: %s", e)
             raise
         finally:
             if self.session:

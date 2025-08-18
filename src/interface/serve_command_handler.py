@@ -50,9 +50,9 @@ async def handle_serve_api(args) -> Dict[str, Any]:
         if log_level:
             server_config.log_level = log_level
 
-        logger.info(f"Starting REST API server on {server_config.host}:{server_config.port}")
+        logger.info("Starting REST API server on %s:%s", server_config.host, server_config.port)
         logger.info(
-            f"Workers: {server_config.workers}, Reload: {reload}, Log Level: {server_config.log_level}"
+            "Workers: %s, Reload: %s, Log Level: %s", server_config.workers, reload, server_config.log_level
         )
 
         # Create and configure the FastAPI app
@@ -78,7 +78,7 @@ async def handle_serve_api(args) -> Dict[str, Any]:
         # Setup signal handlers for graceful shutdown
         def signal_handler(signum, frame):
             """Handle shutdown signals gracefully."""
-            logger.info(f"Received signal {signum}, shutting down gracefully...")
+            logger.info("Received signal %s, shutting down gracefully...", signum)
             server.should_exit = True
 
         signal.signal(signal.SIGINT, signal_handler)
@@ -95,5 +95,5 @@ async def handle_serve_api(args) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        logger.error(f"Failed to start server: {e}")
+        logger.error("Failed to start server: %s", e)
         return {"error": str(e), "message": "Failed to start server"}

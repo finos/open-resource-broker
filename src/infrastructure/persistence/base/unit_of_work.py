@@ -28,7 +28,7 @@ class BaseUnitOfWork(UnitOfWork, ABC):
         """Exit context manager."""
         if exc_type is not None:
             self.logger.debug(
-                f"Rolling back transaction due to exception: {exc_val}",
+                "Rolling back transaction due to exception: %s", exc_val,
                 exc_info=(exc_type, exc_val, exc_tb),
             )
             self.rollback()
@@ -109,7 +109,7 @@ class StrategyUnitOfWork(BaseUnitOfWork):
                 if hasattr(repo, "storage_strategy"):
                     repo.storage_strategy.begin_transaction()
         except Exception as e:
-            self.logger.error(f"Error beginning transaction: {str(e)}")
+            self.logger.error("Error beginning transaction: %s", str(e))
             # Clean up any started transactions
             self._rollback_transaction()
             raise TransactionError(f"Error beginning transaction: {str(e)}") from e
@@ -125,7 +125,7 @@ class StrategyUnitOfWork(BaseUnitOfWork):
             # Clear snapshots
             self._snapshots.clear()
         except Exception as e:
-            self.logger.error(f"Error committing transaction: {str(e)}")
+            self.logger.error("Error committing transaction: %s", str(e))
             raise TransactionError(f"Error committing transaction: {str(e)}") from e
 
     def _rollback_transaction(self) -> None:
@@ -138,7 +138,7 @@ class StrategyUnitOfWork(BaseUnitOfWork):
                         repo.storage_strategy.rollback_transaction()
                     except Exception as e:
                         self.logger.warning(
-                            f"Error rolling back transaction for repository: {str(e)}"
+                            "Error rolling back transaction for repository: %s", str(e)
                         )
 
             # Fall back to snapshots for backward compatibility
@@ -152,5 +152,5 @@ class StrategyUnitOfWork(BaseUnitOfWork):
             # Clear snapshots
             self._snapshots.clear()
         except Exception as e:
-            self.logger.error(f"Error rolling back transaction: {str(e)}")
+            self.logger.error("Error rolling back transaction: %s", str(e))
             raise TransactionError(f"Error rolling back transaction: {str(e)}") from e

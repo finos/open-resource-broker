@@ -69,7 +69,7 @@ class BaseEventHandler(Generic[TEvent], EventHandler[TEvent], ABC):
         try:
             # Log event processing start
             if self.logger:
-                self.logger.info(f"Processing event: {event_type}")
+                self.logger.info("Processing event: %s", event_type)
 
             # Validate event
             await self.validate_event(event)
@@ -82,7 +82,7 @@ class BaseEventHandler(Generic[TEvent], EventHandler[TEvent], ABC):
             self._record_success_metrics(event_type, duration)
 
             if self.logger:
-                self.logger.info(f"Event processed successfully: {event_type} ({duration:.3f}s)")
+                self.logger.info("Event processed successfully: %s (%ss)", event_type, duration:.3f)
 
         except Exception as e:
             # Record failure metrics
@@ -101,7 +101,7 @@ class BaseEventHandler(Generic[TEvent], EventHandler[TEvent], ABC):
                 )
 
             if self.logger:
-                self.logger.error(f"Event processing failed: {event_type} - {str(e)}")
+                self.logger.error("Event processing failed: %s - %s", event_type, str(e))
 
             # Re-raise for upstream handling
             raise
@@ -156,11 +156,11 @@ class BaseEventHandler(Generic[TEvent], EventHandler[TEvent], ABC):
                     await self.event_publisher.publish(cascading_event)
                     if self.logger:
                         self.logger.debug(
-                            f"Published cascading event: { cascading_event.__class__.__name__}"
+                            "Published cascading event: %s",  cascading_event.__class__.__name__
                         )
                 except Exception as e:
                     if self.logger:
-                        self.logger.error(f"Failed to publish cascading event: {e}")
+                        self.logger.error("Failed to publish cascading event: %s", e)
 
     def _record_success_metrics(self, event_type: str, duration: float) -> None:
         """Record success metrics for monitoring."""

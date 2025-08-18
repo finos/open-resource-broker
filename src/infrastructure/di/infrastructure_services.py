@@ -138,12 +138,12 @@ def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
                                     lambda c: c.get(CachingAMIResolver),
                                 )
                                 logger.info(
-                                    f"AMI resolver registered - enabled in AWS provider instance: {provider.name}"
+                                    "AMI resolver registered - enabled in AWS provider instance: %s", provider.name
                                 )
                                 return
                         except Exception as e:
                             logger.debug(
-                                f"Could not parse extensions for provider { provider.name}: {e}"
+                                "Could not parse extensions for provider %s: %s",  provider.name, e
                             )
 
             # Default: register with default AWS extension config
@@ -163,7 +163,7 @@ def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
                 logger.debug("AMI resolution disabled in default AWS configuration")
 
         except Exception as e:
-            logger.warning(f"Could not determine AMI resolution configuration: {e}")
+            logger.warning("Could not determine AMI resolution configuration: %s", e)
             # Register with default configuration as fallback
             container.register_singleton(CachingAMIResolver)
             # Register interface to resolve to concrete implementation
@@ -174,7 +174,7 @@ def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
 
     except Exception as e:
         logger = get_logger(__name__)
-        logger.error(f"Failed to register AMI resolver: {e}")
+        logger.error("Failed to register AMI resolver: %s", e)
 
 
 def _register_repository_services(container: DIContainer) -> None:

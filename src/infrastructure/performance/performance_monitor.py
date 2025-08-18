@@ -47,7 +47,7 @@ class PerformanceMonitor:
         metric["avg_time"] = metric["total_time"] / metric["count"]
 
         if self.logger and duration > 1.0:  # Log slow operations (>1 second)
-            self.logger.warning(f"Slow operation detected: {operation_name} took {duration:.2f}s")
+            self.logger.warning("Slow operation detected: %s took %ss", operation_name, duration:.2f)
 
     def get_metrics(self) -> Dict[str, Dict[str, Any]]:
         """Get all recorded metrics."""
@@ -94,7 +94,7 @@ def performance_monitor(operation_name: Optional[str] = None):
                         global_monitor = get_global_monitor()
                         if global_monitor and global_monitor.logger:
                             global_monitor.logger.warning(
-                                f"Slow operation: {name} took {duration:.2f}s"
+                                "Slow operation: %s took %ss", name, duration:.2f
                             )
                         # If no logger available, we have to use print as last resort
                         # This should only happen during early bootstrap before DI is

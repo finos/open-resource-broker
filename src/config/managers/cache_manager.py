@@ -26,7 +26,7 @@ class ConfigCacheManager:
         """Cache configuration object."""
         with self._cache_lock:
             self._config_cache[config_type] = config_instance
-            logger.debug(f"Cached configuration for {config_type.__name__}")
+            logger.debug("Cached configuration for %s", config_type.__name__)
 
     def clear_cache(self) -> None:
         """Clear all cached configurations."""
@@ -39,7 +39,7 @@ class ConfigCacheManager:
         with self._cache_lock:
             if config_type in self._config_cache:
                 del self._config_cache[config_type]
-                logger.debug(f"Cleared cache for {config_type.__name__}")
+                logger.debug("Cleared cache for %s", config_type.__name__)
 
     def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics."""
@@ -54,7 +54,7 @@ class ConfigCacheManager:
         """Mark when configuration was last reloaded."""
         with self._cache_lock:
             self._last_reload_time = reload_time
-            logger.info(f"Configuration reload marked at {reload_time}")
+            logger.info("Configuration reload marked at %s", reload_time)
 
     def is_cache_valid(self, max_age_seconds: Optional[float] = None) -> bool:
         """Check if cache is still valid based on age."""

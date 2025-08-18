@@ -44,9 +44,9 @@ class SchedulerStrategyFactory:
             try:
                 strategy = self.scheduler_registry.create_strategy(scheduler_type, config)
                 self._strategy_cache[cache_key] = strategy
-                self.logger.debug(f"Created {scheduler_type} scheduler strategy")
+                self.logger.debug("Created %s scheduler strategy", scheduler_type)
             except Exception as e:
-                self.logger.error(f"Failed to create {scheduler_type} scheduler strategy: {e}")
+                self.logger.error("Failed to create %s scheduler strategy: %s", scheduler_type, e)
                 raise
 
         return self._strategy_cache[cache_key]

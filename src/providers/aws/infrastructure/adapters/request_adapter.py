@@ -100,7 +100,7 @@ class AWSRequestAdapter(RequestAdapterPort):
             }
 
         except Exception as e:
-            self._logger.error(f"Failed to create launch template: {str(e)}")
+            self._logger.error("Failed to create launch template: %s", str(e))
             raise ValueError(f"Failed to create launch template: {str(e)}")
 
     def get_request_status(self, request: Request) -> Dict[str, Any]:
@@ -128,7 +128,7 @@ class AWSRequestAdapter(RequestAdapterPort):
                 }
 
         except Exception as e:
-            self._logger.error(f"Failed to get request status: {str(e)}")
+            self._logger.error("Failed to get request status: %s", str(e))
             return {
                 "status": "error",
                 "message": f"Failed to get request status: {str(e)}",
@@ -203,7 +203,7 @@ class AWSRequestAdapter(RequestAdapterPort):
             }
 
         except Exception as e:
-            self._logger.error(f"Failed to get EC2 Fleet status: {str(e)}")
+            self._logger.error("Failed to get EC2 Fleet status: %s", str(e))
             return {
                 "status": "error",
                 "message": f"Failed to get EC2 Fleet status: {str(e)}",
@@ -254,7 +254,7 @@ class AWSRequestAdapter(RequestAdapterPort):
             }
 
         except Exception as e:
-            self._logger.error(f"Failed to get Spot Fleet status: {str(e)}")
+            self._logger.error("Failed to get Spot Fleet status: %s", str(e))
             return {
                 "status": "error",
                 "message": f"Failed to get Spot Fleet status: {str(e)}",
@@ -299,7 +299,7 @@ class AWSRequestAdapter(RequestAdapterPort):
             }
 
         except Exception as e:
-            self._logger.error(f"Failed to get ASG status: {str(e)}")
+            self._logger.error("Failed to get ASG status: %s", str(e))
             return {"status": "error", "message": f"Failed to get ASG status: {str(e)}"}
 
     def _get_run_instances_status(self, request: Request) -> Dict[str, Any]:
@@ -341,7 +341,7 @@ class AWSRequestAdapter(RequestAdapterPort):
             }
 
         except Exception as e:
-            self._logger.error(f"Failed to get RunInstances status: {str(e)}")
+            self._logger.error("Failed to get RunInstances status: %s", str(e))
             return {
                 "status": "error",
                 "message": f"Failed to get RunInstances status: {str(e)}",
@@ -387,7 +387,7 @@ class AWSRequestAdapter(RequestAdapterPort):
             }
 
         except Exception as e:
-            self._logger.error(f"Failed to get return request status: {str(e)}")
+            self._logger.error("Failed to get return request status: %s", str(e))
             return {
                 "status": "error",
                 "message": f"Failed to get return request status: {str(e)}",
@@ -419,7 +419,7 @@ class AWSRequestAdapter(RequestAdapterPort):
             }
 
         except Exception as e:
-            self._logger.error(f"Failed to terminate instances: {str(e)}")
+            self._logger.error("Failed to terminate instances: %s", str(e))
             return {
                 "status": "error",
                 "message": f"Failed to terminate instances: {str(e)}",
@@ -491,7 +491,7 @@ class AWSRequestAdapter(RequestAdapterPort):
                 }
 
         except Exception as e:
-            self._logger.error(f"Failed to cancel fleet request: {str(e)}")
+            self._logger.error("Failed to cancel fleet request: %s", str(e))
             return {
                 "status": "error",
                 "message": f"Failed to cancel fleet request: {str(e)}",

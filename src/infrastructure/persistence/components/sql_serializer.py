@@ -67,11 +67,11 @@ class SQLSerializer(DataConverter):
                 serialized["created_at"] = now
             serialized["updated_at"] = now
 
-            self.logger.debug(f"Serialized data for INSERT: {entity_id}")
+            self.logger.debug("Serialized data for INSERT: %s", entity_id)
             return serialized
 
         except Exception as e:
-            self.logger.error(f"Failed to serialize data for INSERT: {e}")
+            self.logger.error("Failed to serialize data for INSERT: %s", e)
             raise
 
     def serialize_for_update(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -100,7 +100,7 @@ class SQLSerializer(DataConverter):
             return serialized
 
         except Exception as e:
-            self.logger.error(f"Failed to serialize data for UPDATE: {e}")
+            self.logger.error("Failed to serialize data for UPDATE: %s", e)
             raise
 
     def deserialize_from_row(self, row: Dict[str, Any]) -> Dict[str, Any]:
@@ -126,7 +126,7 @@ class SQLSerializer(DataConverter):
             return deserialized
 
         except Exception as e:
-            self.logger.error(f"Failed to deserialize row data: {e}")
+            self.logger.error("Failed to deserialize row data: %s", e)
             raise
 
     def deserialize_from_rows(self, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -142,7 +142,7 @@ class SQLSerializer(DataConverter):
         try:
             return [self.deserialize_from_row(row) for row in rows]
         except Exception as e:
-            self.logger.error(f"Failed to deserialize rows: {e}")
+            self.logger.error("Failed to deserialize rows: %s", e)
             raise
 
     def _serialize_value(self, value: Any) -> Any:
@@ -271,9 +271,9 @@ class SQLSerializer(DataConverter):
                 serialized = self.serialize_for_insert(entity_id, data)
                 serialized_list.append(serialized)
 
-            self.logger.debug(f"Serialized {len(entities)} entities for batch operation")
+            self.logger.debug("Serialized %s entities for batch operation", len(entities))
             return serialized_list
 
         except Exception as e:
-            self.logger.error(f"Failed to serialize batch: {e}")
+            self.logger.error("Failed to serialize batch: %s", e)
             raise

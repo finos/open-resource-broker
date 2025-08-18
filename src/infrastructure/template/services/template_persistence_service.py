@@ -99,12 +99,12 @@ class TemplatePersistenceService:
                         configuration=template.configuration,
                     )
                 self.event_publisher.publish(event)
-                self.logger.debug(f"Published domain event for template {template.template_id}")
+                self.logger.debug("Published domain event for template %s", template.template_id)
 
-            self.logger.info(f"Saved template {template.template_id} to {target_file}")
+            self.logger.info("Saved template %s to %s", template.template_id, target_file)
 
         except Exception as e:
-            self.logger.error(f"Failed to save template {template.template_id}: {e}")
+            self.logger.error("Failed to save template %s: %s", template.template_id, e)
             raise
 
     async def delete_template(self, template_id: str, source_file: Optional[Path] = None) -> None:
@@ -152,12 +152,12 @@ class TemplatePersistenceService:
                     deletion_time=datetime.now(),
                 )
                 self.event_publisher.publish(event)
-                self.logger.debug(f"Published deletion event for template {template_id}")
+                self.logger.debug("Published deletion event for template %s", template_id)
 
-            self.logger.info(f"Deleted template {template_id} from {target_file}")
+            self.logger.info("Deleted template %s from %s", template_id, target_file)
 
         except Exception as e:
-            self.logger.error(f"Failed to delete template {template_id}: {e}")
+            self.logger.error("Failed to delete template %s: %s", template_id, e)
             raise
 
     async def _load_templates_from_file(self, file_path: Path) -> list[Dict[str, Any]]:
@@ -167,7 +167,7 @@ class TemplatePersistenceService:
             templates = self.scheduler_strategy.load_templates_from_path(str(file_path))
             return templates
         except Exception as e:
-            self.logger.error(f"Failed to load templates from {file_path}: {e}")
+            self.logger.error("Failed to load templates from %s: %s", file_path, e)
             return []
 
     async def _write_templates_to_file(
@@ -193,8 +193,8 @@ class TemplatePersistenceService:
                 with open(file_path, "w", encoding="utf-8") as f:
                     json.dump(data, f, indent=2, ensure_ascii=False)
 
-            self.logger.debug(f"Wrote {len(templates)} templates to {file_path}")
+            self.logger.debug("Wrote %s templates to %s", len(templates), file_path)
 
         except Exception as e:
-            self.logger.error(f"Failed to write templates to {file_path}: {e}")
+            self.logger.error("Failed to write templates to %s: %s", file_path, e)
             raise

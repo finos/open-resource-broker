@@ -58,7 +58,7 @@ class MachineSerializer:
                 "schema_version": "2.0.0",
             }
         except Exception as e:
-            self.logger.error(f"Failed to serialize machine {machine.instance_id}: {e}")
+            self.logger.error("Failed to serialize machine %s: %s", machine.instance_id, e)
             raise
 
     def from_dict(self, data: Dict[str, Any]) -> Machine:
@@ -122,7 +122,7 @@ class MachineSerializer:
             return machine
 
         except Exception as e:
-            self.logger.error(f"Failed to deserialize machine data: {e}")
+            self.logger.error("Failed to deserialize machine data: %s", e)
             raise
 
 
@@ -148,12 +148,12 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
             machine.clear_domain_events()
 
             self.logger.debug(
-                f"Saved machine { machine.instance_id} and extracted { len(events)} events"
+                "Saved machine %s and extracted %s events",  machine.instance_id,  len(events)
             )
             return events
 
         except Exception as e:
-            self.logger.error(f"Failed to save machine {machine.instance_id}: {e}")
+            self.logger.error("Failed to save machine %s: %s", machine.instance_id, e)
             raise
 
     @handle_infrastructure_exceptions(context="machine_repository_get_by_id")
@@ -165,7 +165,7 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
                 return self.serializer.from_dict(data)
             return None
         except Exception as e:
-            self.logger.error(f"Failed to get machine {machine_id}: {e}")
+            self.logger.error("Failed to get machine %s: %s", machine_id, e)
             raise
 
     @handle_infrastructure_exceptions(context="machine_repository_find_by_id")
@@ -183,7 +183,7 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
                 return self.serializer.from_dict(data_list[0])
             return None
         except Exception as e:
-            self.logger.error(f"Failed to find machine by instance_id {instance_id}: {e}")
+            self.logger.error("Failed to find machine by instance_id %s: %s", instance_id, e)
             raise
 
     @handle_infrastructure_exceptions(context="machine_repository_find_by_template_id")
@@ -194,7 +194,7 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
             data_list = self.storage_port.find_by_criteria(criteria)
             return [self.serializer.from_dict(data) for data in data_list]
         except Exception as e:
-            self.logger.error(f"Failed to find machines by template_id {template_id}: {e}")
+            self.logger.error("Failed to find machines by template_id %s: %s", template_id, e)
             raise
 
     @handle_infrastructure_exceptions(context="machine_repository_find_by_status")
@@ -205,7 +205,7 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
             data_list = self.storage_port.find_by_criteria(criteria)
             return [self.serializer.from_dict(data) for data in data_list]
         except Exception as e:
-            self.logger.error(f"Failed to find machines by status {status}: {e}")
+            self.logger.error("Failed to find machines by status %s: %s", status, e)
             raise
 
     @handle_infrastructure_exceptions(context="machine_repository_find_by_request_id")
@@ -220,7 +220,7 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
 
             return [self.serializer.from_dict(data) for data in machine_data_list]
         except Exception as e:
-            self.logger.error(f"Failed to find machines by request_id {request_id}: {e}")
+            self.logger.error("Failed to find machines by request_id %s: %s", request_id, e)
             raise
 
     @handle_infrastructure_exceptions(context="machine_repository_find_active_machines")
@@ -242,7 +242,7 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
 
             return all_machines
         except Exception as e:
-            self.logger.error(f"Failed to find active machines: {e}")
+            self.logger.error("Failed to find active machines: %s", e)
             raise
 
     @handle_infrastructure_exceptions(context="machine_repository_find_all")
@@ -252,7 +252,7 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
             all_data = self.storage_port.find_all()
             return [self.serializer.from_dict(data) for data in all_data.values()]
         except Exception as e:
-            self.logger.error(f"Failed to find all machines: {e}")
+            self.logger.error("Failed to find all machines: %s", e)
             raise
 
     @handle_infrastructure_exceptions(context="machine_repository_delete")
@@ -260,9 +260,9 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
         """Delete machine by ID."""
         try:
             self.storage_port.delete(str(machine_id.value))
-            self.logger.debug(f"Deleted machine {machine_id}")
+            self.logger.debug("Deleted machine %s", machine_id)
         except Exception as e:
-            self.logger.error(f"Failed to delete machine {machine_id}: {e}")
+            self.logger.error("Failed to delete machine %s: %s", machine_id, e)
             raise
 
     @handle_infrastructure_exceptions(context="machine_repository_exists")
@@ -271,5 +271,5 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
         try:
             return self.storage_port.exists(str(machine_id.value))
         except Exception as e:
-            self.logger.error(f"Failed to check if machine {machine_id} exists: {e}")
+            self.logger.error("Failed to check if machine %s exists: %s", machine_id, e)
             raise

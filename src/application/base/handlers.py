@@ -102,14 +102,14 @@ class BaseHandler(ABC):
                 operation_id = f"{self.__class__.__name__}.{operation}"
 
                 if self.logger:
-                    self.logger.info(f"Starting operation: {operation_id}")
+                    self.logger.info("Starting operation: %s", operation_id)
 
                 try:
                     result = await func(*args, **kwargs)
                     duration = time.time() - start_time
 
                     if self.logger:
-                        self.logger.info(f"Completed operation: {operation_id} in {duration:.3f}s")
+                        self.logger.info("Completed operation: %s in %ss", operation_id, duration:.3f)
 
                     self._metrics[operation_id] = {
                         "duration": duration,
@@ -124,7 +124,7 @@ class BaseHandler(ABC):
 
                     if self.logger:
                         self.logger.error(
-                            f"Failed operation: {operation_id} in {duration:.3f}s - {str(e)}"
+                            "Failed operation: %s in %ss - %s", operation_id, duration:.3f, str(e)
                         )
 
                     self._metrics[operation_id] = {
@@ -146,7 +146,7 @@ class BaseHandler(ABC):
                     operation_id = f"{self.__class__.__name__}.{operation}"
 
                     if self.logger:
-                        self.logger.info(f"Starting operation: {operation_id}")
+                        self.logger.info("Starting operation: %s", operation_id)
 
                     try:
                         result = func(*args, **kwargs)
@@ -154,7 +154,7 @@ class BaseHandler(ABC):
 
                         if self.logger:
                             self.logger.info(
-                                f"Completed operation: {operation_id} in { duration:.3f}s"
+                                "Completed operation: %s in %ss", operation_id,  duration:.3f
                             )
 
                         return result
@@ -164,7 +164,7 @@ class BaseHandler(ABC):
 
                         if self.logger:
                             self.logger.error(
-                                f"Failed operation: {operation_id} in {duration:.3f}s - {str(e)}"
+                                "Failed operation: %s in %ss - %s", operation_id, duration:.3f, str(e)
                             )
 
                         raise
@@ -184,7 +184,7 @@ class BaseHandler(ABC):
         Creates consistent error responses across all handler types.
         """
         if self.logger:
-            self.logger.error(f"Handler error in {context}: {str(error)}")
+            self.logger.error("Handler error in %s: %s", context, str(error))
 
         return InfrastructureErrorResponse.from_exception(error, context)
 
@@ -226,7 +226,7 @@ class BaseCommandHandler(BaseHandler, CommandHandler[TCommand, TResponse]):
         start_time = time.time()
 
         if self.logger:
-            self.logger.info(f"Starting command: {operation_id}")
+            self.logger.info("Starting command: %s", operation_id)
 
         # Validate command
         await self.validate_command(command)
@@ -241,7 +241,7 @@ class BaseCommandHandler(BaseHandler, CommandHandler[TCommand, TResponse]):
         # Log completion
         duration = time.time() - start_time
         if self.logger:
-            self.logger.info(f"Completed command: {operation_id} in {duration:.3f}s")
+            self.logger.info("Completed command: %s in %ss", operation_id, duration:.3f)
 
         return result
 
@@ -298,14 +298,14 @@ class BaseQueryHandler(BaseHandler, QueryHandler[TQuery, TResult]):
         start_time = time.time()
 
         if self.logger:
-            self.logger.info(f"Starting query: {operation_id}")
+            self.logger.info("Starting query: %s", operation_id)
 
         try:
             # Check cache if enabled
             cache_key = self.get_cache_key(query)
             if cache_key and cache_key in self._cache:
                 if self.logger:
-                    self.logger.debug(f"Cache hit for query: {cache_key}")
+                    self.logger.debug("Cache hit for query: %s", cache_key)
                 return self._cache[cache_key]
 
             # Execute query (now async)
@@ -317,14 +317,14 @@ class BaseQueryHandler(BaseHandler, QueryHandler[TQuery, TResult]):
 
             duration = time.time() - start_time
             if self.logger:
-                self.logger.info(f"Completed query: {operation_id} in {duration:.3f}s")
+                self.logger.info("Completed query: %s in %ss", operation_id, duration:.3f)
 
             return result
 
         except Exception as e:
             duration = time.time() - start_time
             if self.logger:
-                self.logger.error(f"Failed query: {operation_id} in {duration:.3f}s - {str(e)}")
+                self.logger.error("Failed query: %s in %ss - %s", operation_id, duration:.3f, str(e))
             raise
 
     def get_cache_key(self, query: TQuery) -> Optional[str]:
@@ -380,7 +380,7 @@ class BaseProviderHandler(BaseHandler):
         start_time = time.time()
 
         if self.logger:
-            self.logger.info(f"Starting provider operation: {operation_id}")
+            self.logger.info("Starting provider operation: %s", operation_id)
 
         for attempt in range(self.max_retries + 1):
             try:
@@ -389,7 +389,7 @@ class BaseProviderHandler(BaseHandler):
                 duration = time.time() - start_time
                 if self.logger:
                     self.logger.info(
-                        f"Completed provider operation: {operation_id} in { duration:.3f}s"
+                        "Completed provider operation: %s in %ss", operation_id,  duration:.3f
                     )
 
                 return result
@@ -399,13 +399,13 @@ class BaseProviderHandler(BaseHandler):
                     duration = time.time() - start_time
                     if self.logger:
                         self.logger.error(
-                            f"Failed provider operation: {operation_id} in {duration:.3f}s - {str(e)}"
+                            "Failed provider operation: %s in %ss - %s", operation_id, duration:.3f, str(e)
                         )
                     raise
                 else:
                     if self.logger:
                         self.logger.warning(
-                            f"Provider operation failed (attempt { attempt + 1}): { str(e)}"
+                            "Provider operation failed (attempt %s): %s",  attempt + 1,  str(e)
                         )
                     await asyncio.sleep(self.retry_delay * (attempt + 1))
 

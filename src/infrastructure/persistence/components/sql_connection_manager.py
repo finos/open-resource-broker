@@ -56,7 +56,7 @@ class SQLConnectionManager(ResourceManager):
                 conn.execute(text("SELECT 1"))
                 return True
         except Exception as e:
-            self.logger.error(f"Health check failed: {e}")
+            self.logger.error("Health check failed: %s", e)
             return False
 
     def get_connection_info(self) -> Dict[str, Any]:
@@ -139,10 +139,10 @@ class SQLConnectionManager(ResourceManager):
             # Create session factory
             self.session_factory = sessionmaker(bind=self.engine)
 
-            self.logger.info(f"Initialized {db_type} connection manager")
+            self.logger.info("Initialized %s connection manager", db_type)
 
         except Exception as e:
-            self.logger.error(f"Failed to initialize connection manager: {e}")
+            self.logger.error("Failed to initialize connection manager: %s", e)
             raise
 
     @contextmanager
@@ -161,7 +161,7 @@ class SQLConnectionManager(ResourceManager):
             yield session
         except Exception as e:
             session.rollback()
-            self.logger.error(f"Session error, rolling back: {e}")
+            self.logger.error("Session error, rolling back: %s", e)
             raise
         finally:
             session.close()
@@ -217,10 +217,10 @@ class SQLConnectionManager(ResourceManager):
             for table_name, create_sql in table_definitions.items():
                 try:
                     conn.execute(create_sql)
-                    self.logger.debug(f"Created table: {table_name}")
+                    self.logger.debug("Created table: %s", table_name)
                 except Exception as e:
                     self.logger.warning(
-                        f"Table {table_name} creation failed (may already exist): {e}"
+                        "Table %s creation failed (may already exist): %s", table_name, e
                     )
 
     def table_exists(self, table_name: str) -> bool:
@@ -265,7 +265,7 @@ class SQLConnectionManager(ResourceManager):
                 return result.fetchone() is not None
 
         except Exception as e:
-            self.logger.error(f"Failed to check table existence: {e}")
+            self.logger.error("Failed to check table existence: %s", e)
             return False
 
     def get_engine(self) -> Engine:

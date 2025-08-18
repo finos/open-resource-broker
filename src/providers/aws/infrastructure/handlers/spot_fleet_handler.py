@@ -156,7 +156,7 @@ class SpotFleetHandler(AWSHandler):
         )
 
         fleet_id = response["SpotFleetRequestId"]
-        self._logger.info(f"Successfully created Spot Fleet request: {fleet_id}")
+        self._logger.info("Successfully created Spot Fleet request: %s", fleet_id)
 
         return fleet_id
 
@@ -166,7 +166,7 @@ class SpotFleetHandler(AWSHandler):
 
         # Log the validation start
         self._logger.debug(
-            f"Starting Spot Fleet prerequisites validation for template: {aws_template.template_id}"
+            "Starting Spot Fleet prerequisites validation for template: %s", aws_template.template_id
         )
 
         # First validate common prerequisites
@@ -246,7 +246,7 @@ class SpotFleetHandler(AWSHandler):
                 errors.append("Invalid spot price format")
 
         if errors:
-            self._logger.error(f"Validation errors found: {errors}")
+            self._logger.error("Validation errors found: %s", errors)
             raise AWSValidationError("\n".join(errors))
         else:
             self._logger.debug("All Spot Fleet prerequisites validation passed")
@@ -269,7 +269,7 @@ class SpotFleetHandler(AWSHandler):
         )
 
         if re.match(pattern, role_arn):
-            self._logger.debug(f"Valid Spot Fleet service-linked role: {role_arn}")
+            self._logger.debug("Valid Spot Fleet service-linked role: %s", role_arn)
             return True
         return False
 
@@ -426,7 +426,7 @@ class SpotFleetHandler(AWSHandler):
 
                 # Log the combined overrides
                 self._logger.debug(
-                    f"Created combined overrides for heterogeneous fleet: "
+                    "Created combined overrides for heterogeneous fleet: "
                     f"{len(spot_overrides)} spot instance types, "
                     f"{len(ondemand_overrides)} on-demand instance types"
                 )
@@ -488,7 +488,7 @@ class SpotFleetHandler(AWSHandler):
 
                 # Log the combined overrides
                 self._logger.debug(
-                    f"Created combined overrides with subnets for heterogeneous fleet: "
+                    "Created combined overrides with subnets for heterogeneous fleet: "
                     f"{len(spot_overrides)} spot instance overrides, "
                     f"{len(ondemand_overrides)} on-demand instance overrides"
                 )
@@ -517,7 +517,7 @@ class SpotFleetHandler(AWSHandler):
             fleet_config["Context"] = template.context
 
         # Log the final configuration
-        self._logger.debug(f"Spot Fleet configuration: {json.dumps(fleet_config, indent=2)}")
+        self._logger.debug("Spot Fleet configuration: %s", json.dumps(fleet_config, indent=2))
 
         return fleet_config
 
@@ -568,7 +568,7 @@ class SpotFleetHandler(AWSHandler):
             return prices
 
         except Exception as e:
-            self._logger.warning(f"Failed to monitor spot prices: {str(e)}")
+            self._logger.warning("Failed to monitor spot prices: %s", str(e))
             return {}
 
     def check_hosts_status(self, request: Request) -> List[Dict[str, Any]]:
@@ -588,13 +588,13 @@ class SpotFleetHandler(AWSHandler):
                         formatted_instances = self._format_instance_data(fleet_instances, fleet_id)
                         all_instances.extend(formatted_instances)
                 except Exception as e:
-                    self._logger.error(f"Failed to get instances for spot fleet {fleet_id}: {e}")
+                    self._logger.error("Failed to get instances for spot fleet %s: %s", fleet_id, e)
                     continue
 
             return all_instances
 
         except Exception as e:
-            self._logger.error(f"Unexpected error checking Spot Fleet status: {str(e)}")
+            self._logger.error("Unexpected error checking Spot Fleet status: %s", str(e))
             raise AWSInfrastructureError(f"Failed to check Spot Fleet status: {str(e)}")
 
     def _get_spot_fleet_instances(self, fleet_id: str) -> List[Dict[str, Any]]:
@@ -609,7 +609,7 @@ class SpotFleetHandler(AWSHandler):
         )
 
         if not fleet_list:
-            self._logger.warning(f"Spot Fleet Request {fleet_id} not found")
+            self._logger.warning("Spot Fleet Request %s not found", fleet_id)
             return []
 
         # Get active instances
@@ -651,11 +651,11 @@ class SpotFleetHandler(AWSHandler):
                             ),
                             operation_type="critical",
                         )
-                        self._logger.info(f"Cancelled Spot Fleet: {fleet_id}")
+                        self._logger.info("Cancelled Spot Fleet: %s", fleet_id)
                 except Exception as e:
-                    self._logger.error(f"Failed to terminate spot fleet {fleet_id}: {e}")
+                    self._logger.error("Failed to terminate spot fleet %s: %s", fleet_id, e)
                     continue
 
         except Exception as e:
-            self._logger.error(f"Failed to release Spot Fleet hosts: {str(e)}")
+            self._logger.error("Failed to release Spot Fleet hosts: %s", str(e))
             raise AWSInfrastructureError(f"Failed to release Spot Fleet hosts: {str(e)}")

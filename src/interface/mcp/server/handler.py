@@ -42,7 +42,7 @@ async def handle_mcp_serve(args) -> Dict[str, Any]:
         return {"message": "MCP server started in stdio mode"}
     else:
         # Run as TCP server (for development/testing)
-        logger.info(f"Starting MCP server on {host}:{port}")
+        logger.info("Starting MCP server on %s:%s", host, port)
         await _run_tcp_server(mcp_server, host, port)
         return {"message": f"MCP server started on {host}:{port}"}
 
@@ -75,7 +75,7 @@ async def _run_stdio_server(mcp_server: OpenHFPluginMCPServer):
                 logger.info("MCP server interrupted by user")
                 break
             except Exception as e:
-                logger.error(f"Error in stdio server: {e}")
+                logger.error("Error in stdio server: %s", e)
                 # Send error response
                 error_response = {
                     "jsonrpc": "2.0",
@@ -84,7 +84,7 @@ async def _run_stdio_server(mcp_server: OpenHFPluginMCPServer):
                 print(error_response, flush=True)  # noqa: MCP protocol output
 
     except Exception as e:
-        logger.error(f"Fatal error in stdio server: {e}")
+        logger.error("Fatal error in stdio server: %s", e)
         raise
 
 
@@ -95,7 +95,7 @@ async def _run_tcp_server(mcp_server: OpenHFPluginMCPServer, host: str, port: in
     async def handle_client(reader, writer):
         """Handle individual client connection."""
         client_addr = writer.get_extra_info("peername")
-        logger.info(f"Client connected: {client_addr}")
+        logger.info("Client connected: %s", client_addr)
 
         try:
             while True:
@@ -108,7 +108,7 @@ async def _run_tcp_server(mcp_server: OpenHFPluginMCPServer, host: str, port: in
                 if not message:
                     continue
 
-                logger.debug(f"Received message: {message}")
+                logger.debug("Received message: %s", message)
 
                 # Process MCP message
                 response = await mcp_server.handle_message(message)
@@ -117,12 +117,12 @@ async def _run_tcp_server(mcp_server: OpenHFPluginMCPServer, host: str, port: in
                 writer.write((response + "\n").encode())
                 await writer.drain()
 
-                logger.debug(f"Sent response: {response}")
+                logger.debug("Sent response: %s", response)
 
         except Exception as e:
-            logger.error(f"Error handling client {client_addr}: {e}")
+            logger.error("Error handling client %s: %s", client_addr, e)
         finally:
-            logger.info(f"Client disconnected: {client_addr}")
+            logger.info("Client disconnected: %s", client_addr)
             writer.close()
             await writer.wait_closed()
 
@@ -130,7 +130,7 @@ async def _run_tcp_server(mcp_server: OpenHFPluginMCPServer, host: str, port: in
     server = await asyncio.start_server(handle_client, host, port)
 
     addr = server.sockets[0].getsockname()
-    logger.info(f"MCP server listening on {addr[0]}:{addr[1]}")
+    logger.info("MCP server listening on %s:%s", addr[0], addr[1])
 
     try:
         async with server:

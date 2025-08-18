@@ -165,7 +165,7 @@ class AWSTemplateAdapter(TemplateAdapterPort):
             resolved_ami = self.resolve_ami_id(template.image_id)
             if resolved_ami != template.image_id:
                 template.image_id = resolved_ami
-                self._logger.info(f"Resolved AMI ID: {template.image_id}")
+                self._logger.info("Resolved AMI ID: %s", template.image_id)
 
         return template
 
@@ -318,7 +318,7 @@ class AWSTemplateAdapter(TemplateAdapterPort):
                         f"SSM parameter {ami_id_or_alias} does not contain a valid AMI ID: {resolved_ami}"
                     )
             except Exception as e:
-                self._logger.error(f"Failed to resolve SSM parameter {ami_id_or_alias}: {e}")
+                self._logger.error("Failed to resolve SSM parameter %s: %s", ami_id_or_alias, e)
                 raise AWSValidationError(
                     f"Failed to resolve AMI ID from SSM parameter: {ami_id_or_alias}"
                 )
@@ -335,7 +335,7 @@ class AWSTemplateAdapter(TemplateAdapterPort):
             return self.resolve_ami_id(ssm_path)  # Recursive call with SSM path
 
         # If we can't resolve it, return as-is and let AWS validation handle it
-        self._logger.warning(f"Could not resolve AMI alias: {ami_id_or_alias}")
+        self._logger.warning("Could not resolve AMI alias: %s", ami_id_or_alias)
         return ami_id_or_alias
 
     def validate_ami_id(self, ami_id: str) -> bool:
@@ -359,7 +359,7 @@ class AWSTemplateAdapter(TemplateAdapterPort):
             return image.get("State") == "available"
 
         except Exception as e:
-            self._logger.error(f"Failed to validate AMI ID {ami_id}: {e}")
+            self._logger.error("Failed to validate AMI ID %s: %s", ami_id, e)
             return False
 
     # === PRIVATE HELPER METHODS ===
@@ -462,7 +462,7 @@ class AWSTemplateAdapter(TemplateAdapterPort):
             return parameter_value
 
         except Exception as e:
-            self._logger.error(f"Failed to resolve SSM parameter {parameter_path}: {e}")
+            self._logger.error("Failed to resolve SSM parameter %s: %s", parameter_path, e)
             raise
 
     def _is_valid_ami_format(self, ami_id: str) -> bool:

@@ -77,7 +77,7 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
 
         except Exception as e:
             # Don't fail validation if template validation fails
-            self._logger.warning(f"Template validation failed: {e}")
+            self._logger.warning("Template validation failed: %s", e)
             errors.append(f"Template validation error: {str(e)}")
 
         return errors

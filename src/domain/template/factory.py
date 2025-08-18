@@ -103,7 +103,7 @@ class TemplateFactory(BaseTemplateFactory):
         self._provider_template_classes[provider_type] = template_class
 
         if self._logger:
-            self._logger.debug(f"Registered template class for provider: {provider_type}")
+            self._logger.debug("Registered template class for provider: %s", provider_type)
 
     def create_template(
         self, template_data: Dict[str, Any], provider_type: Optional[str] = None
@@ -123,7 +123,7 @@ class TemplateFactory(BaseTemplateFactory):
 
         # Log template creation
         if self._logger:
-            self._logger.debug(f"Creating template for provider: {provider_type}")
+            self._logger.debug("Creating template for provider: %s", provider_type)
 
         # Create provider-specific template if available
         if provider_type and provider_type in self._provider_template_classes:
@@ -132,12 +132,12 @@ class TemplateFactory(BaseTemplateFactory):
                 template = template_class(**template_data)
 
                 if self._logger:
-                    self._logger.debug(f"Created {provider_type} template: {template.template_id}")
+                    self._logger.debug("Created %s template: %s", provider_type, template.template_id)
 
                 return template
             except Exception as e:
                 if self._logger:
-                    self._logger.error(f"Failed to create {provider_type} template: {e}")
+                    self._logger.error("Failed to create %s template: %s", provider_type, e)
                 # Fall back to core template
 
         # Fall back to core template
@@ -145,12 +145,12 @@ class TemplateFactory(BaseTemplateFactory):
             template = Template(**template_data)
 
             if self._logger:
-                self._logger.debug(f"Created core template: {template.template_id}")
+                self._logger.debug("Created core template: %s", template.template_id)
 
             return template
         except Exception as e:
             if self._logger:
-                self._logger.error(f"Failed to create core template: {e}")
+                self._logger.error("Failed to create core template: %s", e)
             raise
 
     def supports_provider(self, provider_type: str) -> bool:

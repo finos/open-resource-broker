@@ -74,7 +74,7 @@ class AWSResourceManagerAdapter(CloudResourceManagerPort):
             return quota_data
 
         except Exception as e:
-            self._logger.error(f"Failed to get resource quota: {str(e)}")
+            self._logger.error("Failed to get resource quota: %s", str(e))
             raise InfrastructureError(f"Failed to get resource quota: {str(e)}")
 
     def list_available_resources(
@@ -102,7 +102,7 @@ class AWSResourceManagerAdapter(CloudResourceManagerPort):
             return [self._allocation_to_legacy_format(allocation) for allocation in allocations]
 
         except Exception as e:
-            self._logger.error(f"Failed to list resources: {str(e)}")
+            self._logger.error("Failed to list resources: %s", str(e))
             raise InfrastructureError(f"Failed to list resources: {str(e)}")
 
     def create_resource(self, resource_config: Dict[str, Any]) -> str:
@@ -123,7 +123,7 @@ class AWSResourceManagerAdapter(CloudResourceManagerPort):
             return str(allocation.resource_id)
 
         except Exception as e:
-            self._logger.error(f"Failed to create resource: {str(e)}")
+            self._logger.error("Failed to create resource: %s", str(e))
             raise InfrastructureError(f"Failed to create resource: {str(e)}")
 
     def delete_resource(self, resource_id: str) -> bool:
@@ -146,7 +146,7 @@ class AWSResourceManagerAdapter(CloudResourceManagerPort):
             return True
 
         except Exception as e:
-            self._logger.error(f"Failed to delete resource: {str(e)}")
+            self._logger.error("Failed to delete resource: %s", str(e))
             return False
 
     def get_resource_status(self, resource_id: str) -> Dict[str, Any]:
@@ -167,7 +167,7 @@ class AWSResourceManagerAdapter(CloudResourceManagerPort):
             return self._allocation_to_legacy_format(allocation)
 
         except Exception as e:
-            self._logger.error(f"Failed to get resource status: {str(e)}")
+            self._logger.error("Failed to get resource status: %s", str(e))
             raise InfrastructureError(f"Failed to get resource status: {str(e)}")
 
     # Private helper methods for adaptation

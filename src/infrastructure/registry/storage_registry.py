@@ -136,7 +136,7 @@ class StorageRegistry(BaseRegistry):
         try:
             registration = self._get_type_registration(storage_type)
             config = registration.config_factory(data)
-            self.logger.debug(f"Created config for storage type: {storage_type}")
+            self.logger.debug("Created config for storage type: %s", storage_type)
             return config
         except ValueError as e:
             raise UnsupportedStorageError(str(e)) from e

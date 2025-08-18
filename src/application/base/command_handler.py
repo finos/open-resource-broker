@@ -136,10 +136,10 @@ class CLICommandHandler(CommandHandler[TCommand, TResponse]):
                 with open(command.file) as f:
                     input_data = json.load(f)
                 if self.logger:
-                    self.logger.debug(f"Loaded input from file: {command.file}")
+                    self.logger.debug("Loaded input from file: %s", command.file)
             except Exception as e:
                 if self.logger:
-                    self.logger.error(f"Failed to load input from file {command.file}: {e}")
+                    self.logger.error("Failed to load input from file %s: %s", command.file, e)
                 raise
         elif hasattr(command, "data") and command.data:
             try:
@@ -148,7 +148,7 @@ class CLICommandHandler(CommandHandler[TCommand, TResponse]):
                     self.logger.debug("Loaded input from data string")
             except json.JSONDecodeError as e:
                 if self.logger:
-                    self.logger.error(f"Failed to parse JSON data: {e}")
+                    self.logger.error("Failed to parse JSON data: %s", e)
                 raise
 
         return input_data

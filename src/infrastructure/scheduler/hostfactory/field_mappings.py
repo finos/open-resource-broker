@@ -74,7 +74,7 @@ class HostFactoryFieldMappings:
         # Log the mapping combination being used
         total_mappings = len(generic_mappings) + len(provider_mappings)
         logger.debug(
-            f"Using {total_mappings} HostFactory field mappings for {provider_type}: "
+            "Using %s HostFactory field mappings for %s: ", total_mappings, provider_type
             f"{len(generic_mappings)} generic + {len(provider_mappings)} provider-specific"
         )
 

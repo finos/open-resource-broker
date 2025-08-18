@@ -233,7 +233,7 @@ class AutoRefreshTemplateCacheService(TTLTemplateCacheService):
                         self._cache_time = datetime.now()
                 except Exception as e:
                     if self._logger:
-                        self._logger.error(f"Auto-refresh failed: {e}")
+                        self._logger.error("Auto-refresh failed: %s", e)
 
         # Schedule refresh at 80% of TTL to ensure fresh data
         refresh_delay = self._ttl_seconds * 0.8

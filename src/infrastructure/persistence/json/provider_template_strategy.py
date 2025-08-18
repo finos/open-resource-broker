@@ -49,10 +49,10 @@ class ProviderTemplateStrategy(JSONStorageStrategy):
         self._template_files = self._discover_template_files()
 
         self.logger.info(
-            f"Initialized provider template strategy with {len(self._template_files)} template files"
+            "Initialized provider template strategy with %s template files", len(self._template_files)
         )
         for file_path in self._template_files:
-            self.logger.debug(f"Template file: {file_path}")
+            self.logger.debug("Template file: %s", file_path)
 
     def _discover_template_files(self) -> List[str]:
         """
@@ -76,7 +76,7 @@ class ProviderTemplateStrategy(JSONStorageStrategy):
                     )
                     if os.path.exists(instance_file):
                         template_files.append(instance_file)
-                        self.logger.debug(f"Found provider instance template file: {instance_file}")
+                        self.logger.debug("Found provider instance template file: %s", instance_file)
 
             # 2. Provider type-specific files
             provider_types = set()
@@ -88,21 +88,21 @@ class ProviderTemplateStrategy(JSONStorageStrategy):
                 type_file = os.path.join(base_dir, f"{provider_type}prov_templates.json")
                 if os.path.exists(type_file):
                     template_files.append(type_file)
-                    self.logger.debug(f"Found provider type template file: {type_file}")
+                    self.logger.debug("Found provider type template file: %s", type_file)
 
             # 3. Main templates file
             if os.path.exists(self.file_manager.file_path):
                 template_files.append(str(self.file_manager.file_path))
-                self.logger.debug(f"Found main template file: {self.file_manager.file_path}")
+                self.logger.debug("Found main template file: %s", self.file_manager.file_path)
 
             # 4. Legacy templates file (lowest priority)
             legacy_file = os.path.join(base_dir, "awsprov_templates.json")
             if os.path.exists(legacy_file) and legacy_file not in template_files:
                 template_files.append(legacy_file)
-                self.logger.debug(f"Found legacy template file: {legacy_file}")
+                self.logger.debug("Found legacy template file: %s", legacy_file)
 
         except Exception as e:
-            self.logger.warning(f"Error discovering template files: {e}")
+            self.logger.warning("Error discovering template files: %s", e)
             # Fallback to main file only
             if os.path.exists(self.file_manager.file_path):
                 template_files = [str(self.file_manager.file_path)]
@@ -133,7 +133,7 @@ class ProviderTemplateStrategy(JSONStorageStrategy):
                                 template_id = template_data["template_id"]
                                 merged_templates[template_id] = template_data
                                 self.logger.debug(
-                                    f"Loaded template '{template_id}' from {file_path}"
+                                    "Loaded template '%s' from %s", template_id, file_path
                                 )
 
                     elif isinstance(file_data, dict):
@@ -144,19 +144,19 @@ class ProviderTemplateStrategy(JSONStorageStrategy):
                                 template_data["template_id"] = template_id
                                 merged_templates[template_id] = template_data
                                 self.logger.debug(
-                                    f"Loaded template '{template_id}' from {file_path}"
+                                    "Loaded template '%s' from %s", template_id, file_path
                                 )
 
                     self.logger.info(
-                        f"Loaded { len(file_data) if isinstance( file_data, (list, dict)) else 0} templates from {file_path}"
+                        "Loaded %s templates from %s",  len(file_data) if isinstance( file_data, (list, dict)) else 0, file_path
                     )
 
             except Exception as e:
-                self.logger.error(f"Error loading templates from {file_path}: {e}")
+                self.logger.error("Error loading templates from %s: %s", file_path, e)
                 continue
 
         self.logger.info(
-            f"Merged {len(merged_templates)} unique templates from {len(self._template_files)} files"
+            "Merged %s unique templates from %s files", len(merged_templates), len(self._template_files)
         )
         return merged_templates
 
@@ -246,10 +246,10 @@ class ProviderTemplateStrategy(JSONStorageStrategy):
             # Clear cache to force reload
             self._template_cache = None
 
-            self.logger.info(f"Saved template '{template_id}' to {target_file}")
+            self.logger.info("Saved template '%s' to %s", template_id, target_file)
 
         except Exception as e:
-            self.logger.error(f"Error saving template '{template_id}' to {target_file}: {e}")
+            self.logger.error("Error saving template '%s' to %s: %s", template_id, target_file, e)
             raise
 
     def _determine_target_file(self, entity_data: Dict[str, Any]) -> str:
@@ -307,7 +307,7 @@ class ProviderTemplateStrategy(JSONStorageStrategy):
                         with open(file_path, "w", encoding="utf-8") as f:
                             json.dump(file_data, f, indent=2, ensure_ascii=False)
                         deleted = True
-                        self.logger.info(f"Deleted template '{entity_id}' from {file_path}")
+                        self.logger.info("Deleted template '%s' from %s", entity_id, file_path)
 
                 elif isinstance(file_data, dict) and entity_id in file_data:
                     # Object format
@@ -315,10 +315,10 @@ class ProviderTemplateStrategy(JSONStorageStrategy):
                     with open(file_path, "w", encoding="utf-8") as f:
                         json.dump(file_data, f, indent=2, ensure_ascii=False)
                     deleted = True
-                    self.logger.info(f"Deleted template '{entity_id}' from {file_path}")
+                    self.logger.info("Deleted template '%s' from %s", entity_id, file_path)
 
             except Exception as e:
-                self.logger.error(f"Error deleting template '{entity_id}' from {file_path}: {e}")
+                self.logger.error("Error deleting template '%s' from %s: %s", entity_id, file_path, e)
                 continue
 
         if deleted:
@@ -360,7 +360,7 @@ class ProviderTemplateStrategy(JSONStorageStrategy):
                     }
 
             except Exception as e:
-                self.logger.error(f"Error checking template source in {file_path}: {e}")
+                self.logger.error("Error checking template source in %s: %s", file_path, e)
                 continue
 
         return None

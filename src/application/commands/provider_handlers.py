@@ -56,7 +56,7 @@ class SelectProviderStrategyHandler(
 
     async def execute_command(self, command: SelectProviderStrategyCommand) -> Dict[str, Any]:
         """Handle provider strategy selection command."""
-        self.logger.info(f"Selecting provider strategy for operation: {command.operation_type}")
+        self.logger.info("Selecting provider strategy for operation: %s", command.operation_type)
 
         try:
             # Use existing provider context to select strategy
@@ -88,7 +88,7 @@ class SelectProviderStrategyHandler(
             )
             self.event_publisher.publish(event)
 
-            self.logger.info(f"Selected strategy: {selection_result.selected_strategy.name}")
+            self.logger.info("Selected strategy: %s", selection_result.selected_strategy.name)
 
             return {
                 "selected_strategy": selection_result.selected_strategy.name,
@@ -98,7 +98,7 @@ class SelectProviderStrategyHandler(
             }
 
         except Exception as e:
-            self.logger.error(f"Failed to select provider strategy: {str(e)}")
+            self.logger.error("Failed to select provider strategy: %s", str(e))
             raise
 
 
@@ -127,7 +127,7 @@ class ExecuteProviderOperationHandler(
     async def execute_command(self, command: ExecuteProviderOperationCommand) -> ProviderResult:
         """Handle provider operation execution command."""
         operation = command.operation
-        self.logger.info(f"Executing provider operation: {operation.operation_type}")
+        self.logger.info("Executing provider operation: %s", operation.operation_type)
 
         start_time = time.time()
 
@@ -155,15 +155,15 @@ class ExecuteProviderOperationHandler(
             self.event_publisher.publish(event)
 
             if result.success:
-                self.logger.info(f"Operation completed successfully in {execution_time:.2f}ms")
+                self.logger.info("Operation completed successfully in %sms", execution_time:.2f)
             else:
-                self.logger.error(f"Operation failed: {result.error_message}")
+                self.logger.error("Operation failed: %s", result.error_message)
 
             return result
 
         except Exception as e:
             execution_time = (time.time() - start_time) * 1000
-            self.logger.error(f"Failed to execute provider operation: {str(e)}")
+            self.logger.error("Failed to execute provider operation: %s", str(e))
 
             # Publish failure event
             event = ProviderOperationExecutedEvent(
@@ -205,7 +205,7 @@ class RegisterProviderStrategyHandler(
 
     async def execute_command(self, command: RegisterProviderStrategyCommand) -> Dict[str, Any]:
         """Handle provider strategy registration command."""
-        self.logger.info(f"Registering provider strategy: {command.strategy_name}")
+        self.logger.info("Registering provider strategy: %s", command.strategy_name)
 
         try:
             # Use provider registry to create strategy
@@ -245,7 +245,7 @@ class RegisterProviderStrategyHandler(
             )
             self.event_publisher.publish(event)
 
-            self.logger.info(f"Successfully registered strategy: {command.strategy_name}")
+            self.logger.info("Successfully registered strategy: %s", command.strategy_name)
 
             return {
                 "strategy_name": command.strategy_name,
@@ -255,7 +255,7 @@ class RegisterProviderStrategyHandler(
             }
 
         except Exception as e:
-            self.logger.error(f"Failed to register provider strategy: {str(e)}")
+            self.logger.error("Failed to register provider strategy: %s", str(e))
             raise
 
 
@@ -283,7 +283,7 @@ class UpdateProviderHealthHandler(BaseCommandHandler[UpdateProviderHealthCommand
 
     async def execute_command(self, command: UpdateProviderHealthCommand) -> Dict[str, Any]:
         """Handle provider health status update command."""
-        self.logger.debug(f"Updating health for provider: {command.provider_name}")
+        self.logger.debug("Updating health for provider: %s", command.provider_name)
 
         try:
             # Get current health status for comparison
@@ -305,7 +305,7 @@ class UpdateProviderHealthHandler(BaseCommandHandler[UpdateProviderHealthCommand
                 self.event_publisher.publish(event)
 
                 status_change = "healthy" if command.health_status.is_healthy else "unhealthy"
-                self.logger.info(f"Provider {command.provider_name} is now {status_change}")
+                self.logger.info("Provider %s is now %s", command.provider_name, status_change)
 
             return {
                 "provider_name": command.provider_name,
@@ -314,7 +314,7 @@ class UpdateProviderHealthHandler(BaseCommandHandler[UpdateProviderHealthCommand
             }
 
         except Exception as e:
-            self.logger.error(f"Failed to update provider health: {str(e)}")
+            self.logger.error("Failed to update provider health: %s", str(e))
             raise
 
 
@@ -364,5 +364,5 @@ class ConfigureProviderStrategyHandler(
             }
 
         except Exception as e:
-            self.logger.error(f"Failed to configure provider strategy: {str(e)}")
+            self.logger.error("Failed to configure provider strategy: %s", str(e))
             raise

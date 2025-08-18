@@ -45,9 +45,9 @@ class StorageStrategyFactory:
             try:
                 strategy = self.storage_registry.create_strategy(storage_type, config)
                 self._strategy_cache[cache_key] = strategy
-                self.logger.debug(f"Created {storage_type} storage strategy")
+                self.logger.debug("Created %s storage strategy", storage_type)
             except Exception as e:
-                self.logger.error(f"Failed to create {storage_type} storage strategy: {e}")
+                self.logger.error("Failed to create %s storage strategy: %s", storage_type, e)
                 raise
 
         return self._strategy_cache[cache_key]

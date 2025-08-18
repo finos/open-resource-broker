@@ -140,7 +140,7 @@ class ProviderContext:
 
         with self._lock:
             if strategy_type in self._strategies:
-                self._logger.debug(f"Strategy {strategy_type} already registered, replacing")
+                self._logger.debug("Strategy %s already registered, replacing", strategy_type)
 
             self._strategies[strategy_type] = strategy
             self._strategy_metrics[strategy_type] = StrategyMetrics()
@@ -151,7 +151,7 @@ class ProviderContext:
                 self._current_strategy = strategy
 
             self._logger.debug(
-                f"Loaded strategy for provider instance: {base_type}:{instance_name or 'default'}"
+                "Loaded strategy for provider instance: %s:%s", base_type, instance_name or 'default'
             )
 
     def unregister_strategy(self, strategy_type: str) -> bool:
@@ -174,7 +174,7 @@ class ProviderContext:
             try:
                 strategy.cleanup()
             except Exception as e:
-                self._logger.warning(f"Error cleaning up strategy {strategy_type}: {e}")
+                self._logger.warning("Error cleaning up strategy %s: %s", strategy_type, e)
 
             # Remove from registry
             del self._strategies[strategy_type]
@@ -191,7 +191,7 @@ class ProviderContext:
                     self._default_strategy_type = new_default
                     self._current_strategy = self._strategies[new_default]
 
-            self._logger.info(f"Unregistered provider strategy: {strategy_type}")
+            self._logger.info("Unregistered provider strategy: %s", strategy_type)
             return True
 
     def set_strategy(self, strategy_type: str) -> bool:
@@ -206,7 +206,7 @@ class ProviderContext:
         """
         with self._lock:
             if strategy_type not in self._strategies:
-                self._logger.error(f"Strategy {strategy_type} not found")
+                self._logger.error("Strategy %s not found", strategy_type)
                 return False
 
             strategy = self._strategies[strategy_type]
@@ -215,14 +215,14 @@ class ProviderContext:
             if not strategy.is_initialized:
                 try:
                     if not strategy.initialize():
-                        self._logger.error(f"Failed to initialize strategy {strategy_type}")
+                        self._logger.error("Failed to initialize strategy %s", strategy_type)
                         return False
                 except Exception as e:
-                    self._logger.error(f"Error initializing strategy {strategy_type}: {e}")
+                    self._logger.error("Error initializing strategy %s: %s", strategy_type, e)
                     return False
 
             self._current_strategy = strategy
-            self._logger.info(f"Set active strategy to: {strategy_type}")
+            self._logger.info("Set active strategy to: %s", strategy_type)
             return True
 
     async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
@@ -276,7 +276,7 @@ class ProviderContext:
                 metrics.record_operation(result.success, response_time_ms)
 
             self._logger.debug(
-                f"Operation {operation.operation_type} executed by {strategy_type}: "
+                "Operation %s executed by %s: ", operation.operation_type, strategy_type
                 f"success={result.success}, time={response_time_ms:.2f}ms"
             )
 
@@ -290,7 +290,7 @@ class ProviderContext:
                 metrics.record_operation(False, response_time_ms)
 
             self._logger.error(
-                f"Error executing operation {operation.operation_type} with {strategy_type}: {e}"
+                "Error executing operation %s with %s: %s", operation.operation_type, strategy_type, e
             )
             return ProviderResult.error_result(
                 f"Operation execution failed: {str(e)}", "EXECUTION_ERROR"
@@ -356,7 +356,7 @@ class ProviderContext:
                 metrics.record_operation(result.success, response_time_ms)
 
             self._logger.debug(
-                f"Operation {operation.operation_type} executed by {strategy_type}: "
+                "Operation %s executed by %s: ", operation.operation_type, strategy_type
                 f"success={result.success}, time={response_time_ms:.2f}ms"
             )
 
@@ -370,7 +370,7 @@ class ProviderContext:
                 metrics.record_operation(False, response_time_ms)
 
             self._logger.error(
-                f"Error executing operation {operation.operation_type} with {strategy_type}: {e}"
+                "Error executing operation %s with %s: %s", operation.operation_type, strategy_type, e
             )
             return ProviderResult.error_result(
                 f"Operation execution failed: {str(e)}", "EXECUTION_ERROR"
@@ -434,7 +434,7 @@ class ProviderContext:
             return health_status
 
         except Exception as e:
-            self._logger.error(f"Error checking health of strategy {strategy_type}: {e}")
+            self._logger.error("Error checking health of strategy %s: %s", strategy_type, e)
             return ProviderHealthStatus.unhealthy(
                 f"Health check failed: {str(e)}", {"exception": str(e)}
             )
@@ -499,18 +499,18 @@ class ProviderContext:
                 try:
                     if strategy.initialize():
                         success_count += 1
-                        self._logger.debug(f"Initialized strategy: {strategy_type}")
+                        self._logger.debug("Initialized strategy: %s", strategy_type)
                     else:
-                        self._logger.error(f"Failed to initialize strategy: {strategy_type}")
+                        self._logger.error("Failed to initialize strategy: %s", strategy_type)
                 except Exception as e:
-                    self._logger.error(f"Error initializing strategy {strategy_type}: {e}")
+                    self._logger.error("Error initializing strategy %s: %s", strategy_type, e)
 
             # Consider initialization successful if at least one strategy works
             self._initialized = success_count > 0
 
             if self._initialized:
                 self._logger.info(
-                    f"Provider context initialized: {success_count}/{total_count} strategies ready"
+                    "Provider context initialized: %s/%s strategies ready", success_count, total_count
                 )
             else:
                 self._logger.error(
@@ -528,7 +528,7 @@ class ProviderContext:
                 # Remove the loader after use to prevent multiple calls
                 self._lazy_provider_loader = None
             except Exception as e:
-                self._logger.error(f"Failed to trigger lazy provider loading: {e}")
+                self._logger.error("Failed to trigger lazy provider loading: %s", e)
 
     def cleanup(self) -> None:
         """Clean up all registered strategies and resources."""
@@ -536,9 +536,9 @@ class ProviderContext:
             for strategy_type, strategy in self._strategies.items():
                 try:
                     strategy.cleanup()
-                    self._logger.debug(f"Cleaned up strategy: {strategy_type}")
+                    self._logger.debug("Cleaned up strategy: %s", strategy_type)
                 except Exception as e:
-                    self._logger.warning(f"Error cleaning up strategy {strategy_type}: {e}")
+                    self._logger.warning("Error cleaning up strategy %s: %s", strategy_type, e)
 
             self._strategies.clear()
             self._strategy_metrics.clear()

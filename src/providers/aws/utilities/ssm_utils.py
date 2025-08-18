@@ -96,7 +96,7 @@ def resolve_ssm_parameter(parameter_path: str, aws_client: Any = None) -> str:
         error_message = e.response.get("Error", {}).get("Message", str(e))
 
         logger.error(
-            f"Failed to resolve SSM parameter {path}: {error_code} - {error_message}",
+            "Failed to resolve SSM parameter %s: %s - %s", path, error_code, error_message,
             extra={
                 "parameter_path": path,
                 "error_code": error_code,
@@ -111,7 +111,7 @@ def resolve_ssm_parameter(parameter_path: str, aws_client: Any = None) -> str:
 
     except Exception as e:
         logger.error(
-            f"Unexpected error resolving SSM parameter {path}: {str(e)}",
+            "Unexpected error resolving SSM parameter %s: %s", path, str(e),
             extra={"parameter_path": path, "error": str(e)},
         )
 
@@ -253,7 +253,7 @@ def get_ssm_parameters_by_path(
         error_message = e.response.get("Error", {}).get("Message", str(e))
 
         logger.error(
-            f"Failed to get SSM parameters by path {path}: {error_code} - {error_message}",
+            "Failed to get SSM parameters by path %s: %s - %s", path, error_code, error_message,
             extra={
                 "path": path,
                 "error_code": error_code,

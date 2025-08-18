@@ -71,7 +71,7 @@ class RequestSerializer:
                 "schema_version": "2.0.0",
             }
         except Exception as e:
-            self.logger.error(f"Failed to serialize request {request.request_id}: {e}")
+            self.logger.error("Failed to serialize request %s: %s", request.request_id, e)
             raise
 
     def from_dict(self, data: Dict[str, Any]) -> Request:
@@ -127,7 +127,7 @@ class RequestSerializer:
             return request
 
         except Exception as e:
-            self.logger.error(f"Failed to deserialize request data: {e}")
+            self.logger.error("Failed to deserialize request data: %s", e)
             raise
 
 
@@ -148,7 +148,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
             try:
                 self.event_publisher.publish(event)
             except Exception as e:
-                self.logger.warning(f"Failed to publish persistence event: {e}")
+                self.logger.warning("Failed to publish persistence event: %s", e)
 
     @handle_infrastructure_exceptions(context="request_repository_save")
     def save(self, request: Request) -> List[Any]:
@@ -216,7 +216,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
                 )
 
             self.logger.debug(
-                f"Saved request {request.request_id} and extracted {len(events)} events"
+                "Saved request %s and extracted %s events", request.request_id, len(events)
             )
             return events
 
@@ -240,7 +240,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
                 )
             )
 
-            self.logger.error(f"Failed to save request {request.request_id}: {e}")
+            self.logger.error("Failed to save request %s: %s", request.request_id, e)
             raise
 
     @handle_infrastructure_exceptions(context="request_repository_get_by_id")
@@ -252,7 +252,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
                 return self.serializer.from_dict(data)
             return None
         except Exception as e:
-            self.logger.error(f"Failed to get request {request_id}: {e}")
+            self.logger.error("Failed to get request %s: %s", request_id, e)
             raise
 
     @handle_infrastructure_exceptions(context="request_repository_find_by_id")
@@ -266,7 +266,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
         try:
             return self.get_by_id(RequestId(value=request_id))
         except Exception as e:
-            self.logger.error(f"Failed to find request by request_id {request_id}: {e}")
+            self.logger.error("Failed to find request by request_id %s: %s", request_id, e)
             raise
 
     @handle_infrastructure_exceptions(context="request_repository_find_by_status")
@@ -277,7 +277,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
             data_list = self.storage_port.find_by_criteria(criteria)
             return [self.serializer.from_dict(data) for data in data_list]
         except Exception as e:
-            self.logger.error(f"Failed to find requests by status {status}: {e}")
+            self.logger.error("Failed to find requests by status %s: %s", status, e)
             raise
 
     @handle_infrastructure_exceptions(context="request_repository_find_by_template_id")
@@ -288,7 +288,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
             data_list = self.storage_port.find_by_criteria(criteria)
             return [self.serializer.from_dict(data) for data in data_list]
         except Exception as e:
-            self.logger.error(f"Failed to find requests by template_id {template_id}: {e}")
+            self.logger.error("Failed to find requests by template_id %s: %s", template_id, e)
             raise
 
     @handle_infrastructure_exceptions(context="request_repository_find_by_type")
@@ -299,7 +299,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
             data_list = self.storage_port.find_by_criteria(criteria)
             return [self.serializer.from_dict(data) for data in data_list]
         except Exception as e:
-            self.logger.error(f"Failed to find requests by type {request_type}: {e}")
+            self.logger.error("Failed to find requests by type %s: %s", request_type, e)
             raise
 
     @handle_infrastructure_exceptions(context="request_repository_find_pending_requests")
@@ -315,7 +315,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
             in_progress = self.find_by_status(RequestStatus.IN_PROGRESS)
             return pending + in_progress
         except Exception as e:
-            self.logger.error(f"Failed to find active requests: {e}")
+            self.logger.error("Failed to find active requests: %s", e)
             raise
 
     @handle_infrastructure_exceptions(context="request_repository_find_by_date_range")
@@ -331,7 +331,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
 
             return filtered_requests
         except Exception as e:
-            self.logger.error(f"Failed to find requests by date range: {e}")
+            self.logger.error("Failed to find requests by date range: %s", e)
             raise
 
     @handle_infrastructure_exceptions(context="request_repository_find_all")
@@ -341,7 +341,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
             all_data = self.storage_port.find_all()
             return [self.serializer.from_dict(data) for data in all_data.values()]
         except Exception as e:
-            self.logger.error(f"Failed to find all requests: {e}")
+            self.logger.error("Failed to find all requests: %s", e)
             raise
 
     @handle_infrastructure_exceptions(context="request_repository_delete")
@@ -349,9 +349,9 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
         """Delete request by ID."""
         try:
             self.storage_port.delete(str(request_id.value))
-            self.logger.debug(f"Deleted request {request_id}")
+            self.logger.debug("Deleted request %s", request_id)
         except Exception as e:
-            self.logger.error(f"Failed to delete request {request_id}: {e}")
+            self.logger.error("Failed to delete request %s: %s", request_id, e)
             raise
 
     @handle_infrastructure_exceptions(context="request_repository_exists")
@@ -360,5 +360,5 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
         try:
             return self.storage_port.exists(str(request_id.value))
         except Exception as e:
-            self.logger.error(f"Failed to check if request {request_id} exists: {e}")
+            self.logger.error("Failed to check if request %s exists: %s", request_id, e)
             raise

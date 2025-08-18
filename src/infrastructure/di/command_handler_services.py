@@ -165,14 +165,14 @@ def register_command_handlers_with_bus(container: DIContainer) -> None:
                     CleanupOldRequestsCommand, container.get(CleanupOldRequestsHandler)
                 )
             except (ImportError, Exception) as e:
-                logger.debug(f"CleanupOldRequestsHandler not available: {e}")
+                logger.debug("CleanupOldRequestsHandler not available: %s", e)
 
         except Exception as e:
-            logger.warning(f"Failed to register request command handlers with bus: {e}")
+            logger.warning("Failed to register request command handlers with bus: %s", e)
 
     except Exception as e:
         logger = container.get(LoggingPort)
-        logger.warning(f"Failed to register some command handlers: {e}")
+        logger.warning("Failed to register some command handlers: %s", e)
 
 
 def _register_cli_command_handlers(container: DIContainer) -> None:

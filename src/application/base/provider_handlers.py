@@ -89,7 +89,7 @@ class BaseProviderHandler(Generic[TRequest, TResponse], ProviderHandler[TRequest
             # Log request processing start
             if self.logger:
                 self.logger.info(
-                    f"Processing {self.provider_type} provider request: {request_type}"
+                    "Processing %s provider request: %s", self.provider_type, request_type
                 )
 
             # Validate request
@@ -104,7 +104,7 @@ class BaseProviderHandler(Generic[TRequest, TResponse], ProviderHandler[TRequest
 
             if self.logger:
                 self.logger.info(
-                    f"{self.provider_type.upper()} provider request processed successfully: {request_type} ({duration:.3f}s)"
+                    "%s provider request processed successfully: %s (%ss)", self.provider_type.upper(), request_type, duration:.3f
                 )
 
             return response
@@ -129,7 +129,7 @@ class BaseProviderHandler(Generic[TRequest, TResponse], ProviderHandler[TRequest
 
             if self.logger:
                 self.logger.error(
-                    f"{self.provider_type.upper()} provider request processing failed: {request_type} - {str(e)}"
+                    "%s provider request processing failed: %s - %s", self.provider_type.upper(), request_type, str(e)
                 )
 
             # Re-raise for upstream handling
@@ -307,7 +307,7 @@ class BaseAWSHandler(BaseProviderHandler[TRequest, TResponse]):
 
                     if self.logger:
                         self.logger.warning(
-                            f"AWS request failed (attempt {attempt + 1}/{self.max_retries + 1}), retrying in {delay}s: {str(e)}"
+                            "AWS request failed (attempt %s/%s), retrying in %ss: %s", attempt + 1, self.max_retries + 1, delay, str(e)
                         )
 
                     await asyncio.sleep(delay)

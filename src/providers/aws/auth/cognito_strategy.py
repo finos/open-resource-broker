@@ -58,7 +58,7 @@ class CognitoAuthStrategy(AuthPort):
         try:
             self.cognito_client = boto3.client("cognito-idp", region_name=region)
         except Exception as e:
-            self._logger.error(f"Failed to initialize Cognito client: {e}")
+            self._logger.error("Failed to initialize Cognito client: %s", e)
             self.enabled = False
 
     async def authenticate(self, context: AuthContext) -> AuthResult:
@@ -158,7 +158,7 @@ class CognitoAuthStrategy(AuthPort):
         except jwt.InvalidTokenError as e:
             return AuthResult(status=AuthStatus.INVALID, error_message=f"Invalid token: {str(e)}")
         except Exception as e:
-            self._logger.error(f"Cognito token validation error: {e}")
+            self._logger.error("Cognito token validation error: %s", e)
             return AuthResult(status=AuthStatus.FAILED, error_message="Token validation failed")
 
     async def refresh_token(self, refresh_token: str) -> AuthResult:
@@ -194,7 +194,7 @@ class CognitoAuthStrategy(AuthPort):
                 error_message=f"Cognito refresh error: {error_code}",
             )
         except Exception as e:
-            self._logger.error(f"Token refresh error: {e}")
+            self._logger.error("Token refresh error: %s", e)
             return AuthResult(status=AuthStatus.FAILED, error_message="Token refresh failed")
 
     async def revoke_token(self, token: str) -> bool:
@@ -217,7 +217,7 @@ class CognitoAuthStrategy(AuthPort):
             return True
 
         except Exception as e:
-            self._logger.error(f"Token revocation error: {e}")
+            self._logger.error("Token revocation error: %s", e)
             return False
 
     def get_strategy_name(self) -> str:
@@ -266,7 +266,7 @@ class CognitoAuthStrategy(AuthPort):
             return None
 
         except Exception as e:
-            self._logger.error(f"Failed to get public key: {e}")
+            self._logger.error("Failed to get public key: %s", e)
             return None
 
     def _map_groups_to_roles(self, groups: List[str]) -> List[str]:

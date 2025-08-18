@@ -63,7 +63,7 @@ class DynamoDBTransactionManager(TransactionManager):
             put_request["Put"]["ConditionExpression"] = condition_expression
 
         self.transaction_items.append(put_request)
-        self.logger.debug(f"Added put item to transaction for table {table_name}")
+        self.logger.debug("Added put item to transaction for table %s", table_name)
 
     def add_update_item(
         self,
@@ -102,7 +102,7 @@ class DynamoDBTransactionManager(TransactionManager):
             update_request["Update"]["ConditionExpression"] = condition_expression
 
         self.transaction_items.append(update_request)
-        self.logger.debug(f"Added update item to transaction for table {table_name}")
+        self.logger.debug("Added update item to transaction for table %s", table_name)
 
     def add_delete_item(
         self,
@@ -130,7 +130,7 @@ class DynamoDBTransactionManager(TransactionManager):
             delete_request["Delete"]["ConditionExpression"] = condition_expression
 
         self.transaction_items.append(delete_request)
-        self.logger.debug(f"Added delete item to transaction for table {table_name}")
+        self.logger.debug("Added delete item to transaction for table %s", table_name)
 
     def commit_transaction(self) -> None:
         """Commit the current DynamoDB transaction."""
@@ -152,13 +152,13 @@ class DynamoDBTransactionManager(TransactionManager):
             if response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 200:
                 self.state = TransactionState.COMMITTED
                 self.logger.debug(
-                    f"DynamoDB transaction committed successfully with {len(self.transaction_items)} operations",
+                    "DynamoDB transaction committed successfully with %s operations", len(self.transaction_items),
                     extra={"request_id": response.get("ResponseMetadata", {}).get("RequestId")},
                 )
             else:
                 self.state = TransactionState.FAILED
                 self.logger.error(
-                    f"DynamoDB transaction failed with status: {response.get('ResponseMetadata', {}).get('HTTPStatusCode')}",
+                    "DynamoDB transaction failed with status: %s).get('HTTPStatusCode')}", response.get('ResponseMetadata', {,
                     extra={"response": response},
                 )
 
@@ -169,16 +169,16 @@ class DynamoDBTransactionManager(TransactionManager):
             if error_code == "TransactionCanceledException":
                 # Handle transaction cancellation reasons
                 cancellation_reasons = e.response.get("CancellationReasons", [])
-                self.logger.error(f"DynamoDB transaction cancelled: {cancellation_reasons}")
+                self.logger.error("DynamoDB transaction cancelled: %s", cancellation_reasons)
             else:
                 self.logger.error(
-                    f"DynamoDB transaction failed: {error_code} - {e.response['Error']['Message']}"
+                    "DynamoDB transaction failed: %s - %s", error_code, e.response['Error']['Message']
                 )
 
             raise
         except Exception as e:
             self.state = TransactionState.FAILED
-            self.logger.error(f"DynamoDB transaction commit failed: {e}")
+            self.logger.error("DynamoDB transaction commit failed: %s", e)
             raise
         finally:
             self.transaction_items.clear()
@@ -222,14 +222,14 @@ class DynamoDBTransactionManager(TransactionManager):
                 if item:
                     results.append(item)
 
-            self.logger.debug(f"Executed read transaction with {len(read_items)} operations")
+            self.logger.debug("Executed read transaction with %s operations", len(read_items))
             return results
 
         except ClientError as e:
-            self.logger.error(f"DynamoDB read transaction failed: {e}")
+            self.logger.error("DynamoDB read transaction failed: %s", e)
             raise
         except Exception as e:
-            self.logger.error(f"Read transaction execution failed: {e}")
+            self.logger.error("Read transaction execution failed: %s", e)
             raise
 
     def execute_batch_operation(self, operation: Callable[[], Any]) -> Any:
@@ -245,7 +245,7 @@ class DynamoDBTransactionManager(TransactionManager):
         try:
             return operation()
         except Exception as e:
-            self.logger.error(f"Batch operation failed: {e}")
+            self.logger.error("Batch operation failed: %s", e)
             raise
 
     @contextmanager
@@ -261,7 +261,7 @@ class DynamoDBTransactionManager(TransactionManager):
             self.commit_transaction()
         except Exception as e:
             self.rollback_transaction()
-            self.logger.error(f"Atomic operation failed: {e}")
+            self.logger.error("Atomic operation failed: %s", e)
             raise
 
     def get_transaction_size(self) -> int:

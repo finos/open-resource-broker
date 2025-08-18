@@ -46,7 +46,7 @@ def get_instance_by_id(instance_id: str, aws_client: Any = None) -> Dict[str, An
         error_message = e.response.get("Error", {}).get("Message", str(e))
 
         logger.error(
-            f"Failed to get EC2 instance {instance_id}: {error_code} - {error_message}",
+            "Failed to get EC2 instance %s: %s - %s", instance_id, error_code, error_message,
             extra={
                 "instance_id": instance_id,
                 "error_code": error_code,
@@ -61,7 +61,7 @@ def get_instance_by_id(instance_id: str, aws_client: Any = None) -> Dict[str, An
 
     except Exception as e:
         logger.error(
-            f"Unexpected error getting EC2 instance {instance_id}: {str(e)}",
+            "Unexpected error getting EC2 instance %s: %s", instance_id, str(e),
             extra={"instance_id": instance_id, "error": str(e)},
         )
 
@@ -136,7 +136,7 @@ def create_instance(
             _create_tags(ec2_client, instance_id, tags)
 
         logger.info(
-            f"Created EC2 instance {instance_id}",
+            "Created EC2 instance %s", instance_id,
             extra={
                 "instance_id": instance_id,
                 "image_id": image_id,
@@ -151,7 +151,7 @@ def create_instance(
         error_message = e.response.get("Error", {}).get("Message", str(e))
 
         logger.error(
-            f"Failed to create EC2 instance: {error_code} - {error_message}",
+            "Failed to create EC2 instance: %s - %s", error_code, error_message,
             extra={
                 "image_id": image_id,
                 "instance_type": instance_type,
@@ -166,7 +166,7 @@ def create_instance(
 
     except Exception as e:
         logger.error(
-            f"Unexpected error creating EC2 instance: {str(e)}",
+            "Unexpected error creating EC2 instance: %s", str(e),
             extra={
                 "image_id": image_id,
                 "instance_type": instance_type,
@@ -200,7 +200,7 @@ def terminate_instance(instance_id: str, aws_client: Any = None) -> Dict[str, An
         # Terminate instance with retry built-in
         response = _terminate_instance(ec2_client, instance_id)
 
-        logger.info(f"Terminated EC2 instance {instance_id}", extra={"instance_id": instance_id})
+        logger.info("Terminated EC2 instance %s", instance_id, extra={"instance_id": instance_id})
 
         return response
 
@@ -209,7 +209,7 @@ def terminate_instance(instance_id: str, aws_client: Any = None) -> Dict[str, An
         error_message = e.response.get("Error", {}).get("Message", str(e))
 
         logger.error(
-            f"Failed to terminate EC2 instance {instance_id}: {error_code} - {error_message}",
+            "Failed to terminate EC2 instance %s: %s - %s", instance_id, error_code, error_message,
             extra={
                 "instance_id": instance_id,
                 "error_code": error_code,
@@ -224,7 +224,7 @@ def terminate_instance(instance_id: str, aws_client: Any = None) -> Dict[str, An
 
     except Exception as e:
         logger.error(
-            f"Unexpected error terminating EC2 instance {instance_id}: {str(e)}",
+            "Unexpected error terminating EC2 instance %s: %s", instance_id, str(e),
             extra={"instance_id": instance_id, "error": str(e)},
         )
 

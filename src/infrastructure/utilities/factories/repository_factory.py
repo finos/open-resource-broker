@@ -57,7 +57,7 @@ class RepositoryFactory:
             return MachineRepository(storage_port)
 
         except Exception as e:
-            self.logger.error(f"Failed to create machine repository: {e}")
+            self.logger.error("Failed to create machine repository: %s", e)
             raise
 
     def create_request_repository(self) -> RequestRepositoryInterface:
@@ -78,7 +78,7 @@ class RepositoryFactory:
             return RequestRepository(storage_port)
 
         except Exception as e:
-            self.logger.error(f"Failed to create request repository: {e}")
+            self.logger.error("Failed to create request repository: %s", e)
             raise
 
     def create_template_repository(self) -> TemplateRepositoryInterface:
@@ -98,7 +98,7 @@ class RepositoryFactory:
             return TemplateRepository(storage_strategy)
 
         except Exception as e:
-            self.logger.error(f"Failed to create template repository: {e}")
+            self.logger.error("Failed to create template repository: %s", e)
             raise
 
     def create_unit_of_work(self) -> UnitOfWork:
@@ -110,7 +110,7 @@ class RepositoryFactory:
             return self.storage_registry.create_unit_of_work(storage_type)
 
         except Exception as e:
-            self.logger.error(f"Failed to create unit of work: {e}")
+            self.logger.error("Failed to create unit of work: %s", e)
             raise
 
 

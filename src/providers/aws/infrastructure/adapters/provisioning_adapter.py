@@ -85,7 +85,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             InfrastructureError: For other infrastructure errors
         """
         self._logger.info(
-            f"Provisioning resources for request {request.request_id} using template {template.template_id}"
+            "Provisioning resources for request %s using template %s", request.request_id, template.template_id
         )
 
         # Check if dry-run mode is requested
@@ -132,11 +132,11 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             # Extract resource ID from result
             resource_id = result.data.get("instance_ids", ["dry-run-resource-id"])[0]
             self._logger.info(
-                f"Successfully provisioned resources via strategy with ID {resource_id}"
+                "Successfully provisioned resources via strategy with ID %s", resource_id
             )
             return resource_id
         else:
-            self._logger.error(f"Provider strategy operation failed: {result.error_message}")
+            self._logger.error("Provider strategy operation failed: %s", result.error_message)
             raise InfrastructureError(f"Failed to provision resources: {result.error_message}")
 
     def _provision_via_handlers(self, request: Request, template: Template) -> str:
@@ -156,16 +156,16 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         try:
             # Acquire hosts using the handler
             resource_id = handler.acquire_hosts(request, template)
-            self._logger.info(f"Successfully provisioned resources with ID {resource_id}")
+            self._logger.info("Successfully provisioned resources with ID %s", resource_id)
             return resource_id
         except AWSValidationError as e:
-            self._logger.error(f"Validation error during resource provisioning: {str(e)}")
+            self._logger.error("Validation error during resource provisioning: %s", str(e))
             raise
         except QuotaExceededError as e:
-            self._logger.error(f"Quota exceeded during resource provisioning: {str(e)}")
+            self._logger.error("Quota exceeded during resource provisioning: %s", str(e))
             raise
         except Exception as e:
-            self._logger.error(f"Error during resource provisioning: {str(e)}")
+            self._logger.error("Error during resource provisioning: %s", str(e))
             raise InfrastructureError(f"Failed to provision resources: {str(e)}")
 
     def check_resources_status(self, request: Request) -> List[Dict[str, Any]]:
@@ -182,10 +182,10 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             AWSEntityNotFoundError: If the resource is not found
             InfrastructureError: For other infrastructure errors
         """
-        self._logger.info(f"Checking status of resources for request {request.request_id}")
+        self._logger.info("Checking status of resources for request %s", request.request_id)
 
         if not request.resource_id:
-            self._logger.error(f"No resource ID found in request {request.request_id}")
+            self._logger.error("No resource ID found in request %s", request.request_id)
             raise AWSEntityNotFoundError(f"No resource ID found in request {request.request_id}")
 
         # Get the template to determine the handler type
@@ -214,14 +214,14 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             # Check hosts status using the handler
             status = handler.check_hosts_status(request)
             self._logger.info(
-                f"Successfully checked status of resources for request {request.request_id}"
+                "Successfully checked status of resources for request %s", request.request_id
             )
             return status
         except AWSEntityNotFoundError as e:
-            self._logger.error(f"Resource not found during status check: {str(e)}")
+            self._logger.error("Resource not found during status check: %s", str(e))
             raise
         except Exception as e:
-            self._logger.error(f"Error during resource status check: {str(e)}")
+            self._logger.error("Error during resource status check: %s", str(e))
             raise InfrastructureError(f"Failed to check resource status: {str(e)}")
 
     def release_resources(self, request: Request) -> None:
@@ -235,10 +235,10 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             AWSEntityNotFoundError: If the resource is not found
             InfrastructureError: For other infrastructure errors
         """
-        self._logger.info(f"Releasing resources for request {request.request_id}")
+        self._logger.info("Releasing resources for request %s", request.request_id)
 
         if not request.resource_id:
-            self._logger.error(f"No resource ID found in request {request.request_id}")
+            self._logger.error("No resource ID found in request %s", request.request_id)
             raise AWSEntityNotFoundError(f"No resource ID found in request {request.request_id}")
 
         # Get the template to determine the handler type
@@ -266,12 +266,12 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         try:
             # Release hosts using the handler
             handler.release_hosts(request)
-            self._logger.info(f"Successfully released resources for request {request.request_id}")
+            self._logger.info("Successfully released resources for request %s", request.request_id)
         except AWSEntityNotFoundError as e:
-            self._logger.error(f"Resource not found during release: {str(e)}")
+            self._logger.error("Resource not found during release: %s", str(e))
             raise
         except Exception as e:
-            self._logger.error(f"Error during resource release: {str(e)}")
+            self._logger.error("Error during resource release: %s", str(e))
             raise InfrastructureError(f"Failed to release resources: {str(e)}")
 
     def get_resource_health(self, resource_id: str) -> Dict[str, Any]:
@@ -288,7 +288,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             AWSEntityNotFoundError: If the resource is not found
             InfrastructureError: For other infrastructure errors
         """
-        self._logger.info(f"Getting health information for resource {resource_id}")
+        self._logger.info("Getting health information for resource %s", resource_id)
 
         try:
             # Determine the resource type from the ID format
@@ -365,7 +365,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
                         }
                 except Exception as e:
                     self._logger.warning(
-                        f"Failed to process auto scaling group details: {e}",
+                        "Failed to process auto scaling group details: %s", e,
                         extra={"resource_id": resource_id},
                     )
 
@@ -376,7 +376,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         except AWSEntityNotFoundError:
             raise
         except Exception as e:
-            self._logger.error(f"Error getting resource health: {str(e)}")
+            self._logger.error("Error getting resource health: %s", str(e))
             raise InfrastructureError(f"Failed to get resource health: {str(e)}")
 
     def _get_handler_for_template(self, template: Template) -> AWSHandler:

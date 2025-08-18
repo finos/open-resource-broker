@@ -41,7 +41,7 @@ class AWSRetryStrategy(RetryStrategy):
         self.jitter = config.get("jitter", True)
 
         self._logger.debug(
-            f"Initialized AWS retry strategy for {service}",
+            "Initialized AWS retry strategy for %s", service,
             extra={
                 "service": service,
                 "max_attempts": self.max_attempts,
@@ -69,7 +69,7 @@ class AWSRetryStrategy(RetryStrategy):
         if is_retryable_aws_error(exception, self.service):
             error_info = get_aws_error_info(exception)
             self._logger.info(
-                f"AWS {self.service} operation failed with retryable error: {error_info['code']}",
+                "AWS %s operation failed with retryable error: %s", self.service, error_info['code'],
                 extra={
                     "service": self.service,
                     "attempt": attempt + 1,
@@ -83,7 +83,7 @@ class AWSRetryStrategy(RetryStrategy):
         # Not a retryable error
         error_info = get_aws_error_info(exception)
         self._logger.debug(
-            f"AWS {self.service} operation failed with non-retryable error: {error_info['code']}",
+            "AWS %s operation failed with non-retryable error: %s", self.service, error_info['code'],
             extra={
                 "service": self.service,
                 "error_code": error_info["code"],
@@ -129,7 +129,7 @@ class AWSRetryStrategy(RetryStrategy):
         delay = self.calculate_delay(attempt)
 
         self._logger.warning(
-            f"Retrying AWS {self.service} operation (attempt {attempt + 1}/{self.max_attempts}) "
+            "Retrying AWS %s operation (attempt %s/%s) ", self.service, attempt + 1, self.max_attempts
             f"after {delay:.2f}s delay due to {error_info['code']}",
             extra={
                 "service": self.service,

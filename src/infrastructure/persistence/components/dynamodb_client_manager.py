@@ -67,7 +67,7 @@ class DynamoDBClientManager(ResourceManager):
             self.dynamodb.list_tables(Limit=1)
             return True
         except Exception as e:
-            self.logger.error(f"DynamoDB health check failed: {e}")
+            self.logger.error("DynamoDB health check failed: %s", e)
             return False
 
     def get_connection_info(self) -> Dict[str, Any]:
@@ -96,10 +96,10 @@ class DynamoDBClientManager(ResourceManager):
             self.dynamodb = session.client("dynamodb")
             self.dynamodb_resource = session.resource("dynamodb")
 
-            self.logger.info(f"Initialized DynamoDB clients for region {self.region}")
+            self.logger.info("Initialized DynamoDB clients for region %s", self.region)
 
         except Exception as e:
-            self.logger.error(f"Failed to initialize DynamoDB clients: {e}")
+            self.logger.error("Failed to initialize DynamoDB clients: %s", e)
             raise
 
     def get_table(self, table_name: str):
@@ -116,7 +116,7 @@ class DynamoDBClientManager(ResourceManager):
             table = self.dynamodb_resource.Table(table_name)
             return table
         except Exception as e:
-            self.logger.error(f"Failed to get table {table_name}: {e}")
+            self.logger.error("Failed to get table %s: %s", table_name, e)
             raise
 
     def table_exists(self, table_name: str) -> bool:
@@ -136,10 +136,10 @@ class DynamoDBClientManager(ResourceManager):
             if e.response["Error"]["Code"] == "ResourceNotFoundException":
                 return False
             else:
-                self.logger.error(f"Error checking table existence: {e}")
+                self.logger.error("Error checking table existence: %s", e)
                 raise
         except Exception as e:
-            self.logger.error(f"Unexpected error checking table existence: {e}")
+            self.logger.error("Unexpected error checking table existence: %s", e)
             return False
 
     def create_table(
@@ -163,7 +163,7 @@ class DynamoDBClientManager(ResourceManager):
         """
         try:
             if self.table_exists(table_name):
-                self.logger.info(f"Table {table_name} already exists")
+                self.logger.info("Table %s already exists", table_name)
                 return True
 
             create_params = {
@@ -185,14 +185,14 @@ class DynamoDBClientManager(ResourceManager):
             waiter = self.dynamodb.get_waiter("table_exists")
             waiter.wait(TableName=table_name)
 
-            self.logger.info(f"Created table: {table_name}")
+            self.logger.info("Created table: %s", table_name)
             return True
 
         except ClientError as e:
-            self.logger.error(f"Failed to create table {table_name}: {e}")
+            self.logger.error("Failed to create table %s: %s", table_name, e)
             return False
         except Exception as e:
-            self.logger.error(f"Unexpected error creating table {table_name}: {e}")
+            self.logger.error("Unexpected error creating table %s: %s", table_name, e)
             return False
 
     def put_item(self, table_name: str, item: Dict[str, Any]) -> bool:
@@ -211,7 +211,7 @@ class DynamoDBClientManager(ResourceManager):
             table.put_item(Item=item)
             return True
         except Exception as e:
-            self.logger.error(f"Failed to put item to {table_name}: {e}")
+            self.logger.error("Failed to put item to %s: %s", table_name, e)
             return False
 
     def get_item(self, table_name: str, key: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -230,7 +230,7 @@ class DynamoDBClientManager(ResourceManager):
             response = table.get_item(Key=key)
             return response.get("Item")
         except Exception as e:
-            self.logger.error(f"Failed to get item from {table_name}: {e}")
+            self.logger.error("Failed to get item from %s: %s", table_name, e)
             return None
 
     def delete_item(self, table_name: str, key: Dict[str, Any]) -> bool:
@@ -249,7 +249,7 @@ class DynamoDBClientManager(ResourceManager):
             table.delete_item(Key=key)
             return True
         except Exception as e:
-            self.logger.error(f"Failed to delete item from {table_name}: {e}")
+            self.logger.error("Failed to delete item from %s: %s", table_name, e)
             return False
 
     def scan_table(
@@ -290,7 +290,7 @@ class DynamoDBClientManager(ResourceManager):
             return items
 
         except Exception as e:
-            self.logger.error(f"Failed to scan table {table_name}: {e}")
+            self.logger.error("Failed to scan table %s: %s", table_name, e)
             return []
 
     def batch_write_items(self, table_name: str, items: list) -> bool:
@@ -315,7 +315,7 @@ class DynamoDBClientManager(ResourceManager):
             return True
 
         except Exception as e:
-            self.logger.error(f"Failed to batch write items to {table_name}: {e}")
+            self.logger.error("Failed to batch write items to %s: %s", table_name, e)
             return False
 
     def handle_client_error(self, error: ClientError, operation: str) -> None:
@@ -330,15 +330,15 @@ class DynamoDBClientManager(ResourceManager):
         error_message = error.response["Error"]["Message"]
 
         if error_code == "ResourceNotFoundException":
-            self.logger.error(f"{operation} failed: Table not found - {error_message}")
+            self.logger.error("%s failed: Table not found - %s", operation, error_message)
         elif error_code == "ValidationException":
-            self.logger.error(f"{operation} failed: Validation error - {error_message}")
+            self.logger.error("%s failed: Validation error - %s", operation, error_message)
         elif error_code == "ConditionalCheckFailedException":
-            self.logger.error(f"{operation} failed: Conditional check failed - {error_message}")
+            self.logger.error("%s failed: Conditional check failed - %s", operation, error_message)
         elif error_code == "ProvisionedThroughputExceededException":
-            self.logger.error(f"{operation} failed: Throughput exceeded - {error_message}")
+            self.logger.error("%s failed: Throughput exceeded - %s", operation, error_message)
         else:
-            self.logger.error(f"{operation} failed: {error_code} - {error_message}")
+            self.logger.error("%s failed: %s - %s", operation, error_code, error_message)
 
     def get_client(self):
         """Get DynamoDB client."""
