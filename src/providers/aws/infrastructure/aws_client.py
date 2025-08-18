@@ -34,7 +34,7 @@ class AWSClient:
             config: Configuration port for accessing configuration
             logger: Logger for logging messages
         """
-        self.config = {}
+        self.config: dict[str, Any] = {}
         self._config_manager = config
         self._logger = logger
 
@@ -58,11 +58,11 @@ class AWSClient:
         self.perf_config = self._load_performance_config(self._config_manager)
 
         # Initialize resource cache
-        self._resource_cache = {}
+        self._resource_cache: dict[str, Any] = {}
         self._cache_lock = threading.RLock()
 
         # Initialize adaptive batch sizing history
-        self._batch_history = {}
+        self._batch_history: dict[str, Any] = {}
         self._batch_sizes = self.perf_config.get("batch_sizes", {}).copy()
         self._batch_lock = threading.RLock()
 

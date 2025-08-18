@@ -233,9 +233,9 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
         Returns:
             Validation result with 'valid', 'errors', and 'warnings' keys
         """
-        errors = []
-        warnings = []
-        validated_fields = []
+        errors: list[str] = []
+        warnings: list[str] = []
+        validated_fields: list[str] = []
 
         try:
             # Validate provider API
