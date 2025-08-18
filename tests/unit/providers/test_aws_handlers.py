@@ -33,7 +33,7 @@ class TestContextFieldSupport:
         """Test that EC2 Fleet handler includes Context field when specified."""
         # Mock template with context
         template = Mock()
-        template.context = "production-workload"
+        template.context = "c-abc1234567890123"
         template.fleet_type = "instant"
         template.instance_types = None
         template.subnet_ids = None
@@ -63,7 +63,7 @@ class TestContextFieldSupport:
 
         # Assert Context field is included
         assert "Context" in config
-        assert config["Context"] == "production-workload"
+        assert config["Context"] == "c-abc1234567890123"
 
     def test_asg_context_field(self):
         """Test that ASG handler includes Context field when specified."""

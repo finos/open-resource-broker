@@ -2,13 +2,13 @@
 
 ## AWS Context Field Support
 
-The AWS provider supports an optional `context` field for EC2 Fleet, Auto Scaling Group, and Spot Fleet operations. This field maps directly to the AWS Context parameter in the respective APIs.
+The AWS provider supports an optional `context` field for EC2 Fleet, Auto Scaling Group, and Spot Fleet operations. This field maps directly to the AWS Context parameter (reserved parameter) in the respective APIs and should follow AWS Context format (e.g., "c-abc1234567890123").
 
 ### Template with Context Field
 ```json
 {
   "template_defaults": {
-    "context": "production-workload",
+    "context": "c-abc1234567890123",
     "provider_api": "EC2Fleet",
     "instance_type": "t3.medium"
   }

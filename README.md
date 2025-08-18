@@ -309,7 +309,7 @@ providers:
         auto_scaling_group:
           enabled: true
     template_defaults:
-      context: "production-workload"  # AWS Context field for fleet operations
+      context: "c-abc1234567890123"  # AWS Context field (reserved parameter) for fleet operations
 ```
 
 ## Development
