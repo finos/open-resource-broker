@@ -1,5 +1,4 @@
 # Development tools container with security hardening
-# Aligned with main Dockerfile patterns
 
 ARG PYTHON_VERSION=3.11
 ARG PACKAGE_NAME_SHORT=ohfp

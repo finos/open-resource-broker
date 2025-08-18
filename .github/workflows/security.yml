@@ -371,11 +371,25 @@ jobs:
         output-file: hadolint-dockerfile.sarif
         no-fail: true
 
+    - name: Dev-tools Dockerfile security scan with Hadolint
+      uses: hadolint/hadolint-action@v3.1.0
+      with:
+        dockerfile: dev-tools/docker/Dockerfile.dev-tools
+        format: sarif
+        output-file: hadolint-dev-tools.sarif
+        no-fail: true
+
     - name: Upload Hadolint results
       uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
         sarif_file: hadolint-dockerfile.sarif
+
+    - name: Upload Dev-tools Hadolint results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: hadolint-dev-tools.sarif
 
     - name: Upload container security reports
       uses: actions/upload-artifact@v4
@@ -386,4 +400,5 @@ jobs:
           trivy-results-py${{ matrix.python-version }}.sarif
           trivy-results-py${{ matrix.python-version }}.json
           hadolint-dockerfile.sarif
+          hadolint-dev-tools.sarif
         retention-days: 30
