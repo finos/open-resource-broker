@@ -57,11 +57,23 @@ You can trigger CI/CD actions by commenting on pull requests:
 
 **Security Note**: Comment triggers are restricted to repository members, owners, and collaborators.
 
+#### Trigger Word Configuration
+
+The trigger words are configurable via environment variables in each workflow:
+
+- **CI Pipeline**: `CI_TRIGGERS="/test,/build,/ci"`
+- **Publishing**: `PUBLISH_TRIGGERS="/package"`  
+- **Security Scans**: `SECURITY_TRIGGERS="/security"`
+- **Container Builds**: `CONTAINER_TRIGGERS="/container"`
+
+To modify trigger words, update the `env` section in the respective workflow files.
+
 #### Testing Commands (Members, Owners, Collaborators)
 - **`/test`** - Run full CI pipeline (tests, linting, type checking)
 - **`/build`** - Run CI pipeline including package build verification
 - **`/ci`** - Same as `/test` - run complete CI pipeline
 - **`/security`** - Run security scans
+- **`/container`** - Build container images (no registry push for security)
 
 #### Publishing Commands (Members, Owners only)
 - **`/package`** - Build and publish to TestPyPI only (never production PyPI)
@@ -71,10 +83,20 @@ You can trigger CI/CD actions by commenting on pull requests:
 
 **Security Note**: Comment triggers can never publish to production PyPI. Only GitHub releases publish to PyPI.
 
-#### Future Commands (planned)
-- **`/container`** - Build and test container images
-
 Commands must be exact matches (e.g., `/test` not `/test please`).
+
+### Version Alignment
+
+Package and container versions are aligned:
+
+- **Development**: `0.1.0.dev20250818125457+abc1234` (both PyPI package and container)
+- **Release**: `0.1.0` (both PyPI package and container)
+
+### Container Security
+
+- **Comment triggers** (`/container`) - Build only, no registry push
+- **Branch pushes** - Build and push with dev tags  
+- **Releases** - Build and push with release tags (`latest`, `v0.1.0`)
 
 ### Automated Publishing
 

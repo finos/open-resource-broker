@@ -36,9 +36,65 @@ on:
         type: boolean
 
 jobs:
+  check-container-comment:
+    if: github.event_name == 'issue_comment'
+    runs-on: ubuntu-latest
+    outputs:
+      triggered: ${{ steps.check.outputs.triggered }}
+      pr_ref: ${{ steps.check.outputs.pr_ref }}
+    steps:
+      - name: Check container comment
+        id: check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (!context.issue.pull_request) {
+              console.log('Not a PR comment, skipping');
+              return;
+            }
+            
+            // Security: Only allow authorized users
+            const allowedAssociations = ['MEMBER', 'OWNER', 'COLLABORATOR'];
+            const userAssociation = context.payload.comment.author_association;
+            
+            if (!allowedAssociations.includes(userAssociation)) {
+              console.log(`User ${context.payload.comment.user.login} not authorized (${userAssociation})`);
+              return;
+            }
+            
+            const comment = context.payload.comment.body.toLowerCase().trim();
+            const triggers = process.env.CONTAINER_TRIGGERS.split(',').map(t => t.trim());
+            const triggered = triggers.some(t => comment === t);
+            
+            console.log(`Comment: ${context.payload.comment.body}`);
+            console.log(`User: ${context.payload.comment.user.login} (${userAssociation})`);
+            console.log(`Container triggered: ${triggered}`);
+            
+            if (triggered) {
+              const pr = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number
+              });
+              core.setOutput('triggered', 'true');
+              core.setOutput('pr_ref', pr.data.head.sha);
+              
+              // Add reaction to confirm command received
+              await github.rest.reactions.createForIssueComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: context.payload.comment.id,
+                content: 'eyes'
+              });
+            }
+
   get-config:
     name: Get Configuration from Makefile
     runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'issue_comment' || 
+      needs.check-container-comment.outputs.triggered == 'true'
+    needs: [check-container-comment]
     outputs:
       python-versions: ${{ steps.config.outputs.python-versions }}
       default-python-version: ${{ steps.config.outputs.default-python-version }}
@@ -48,6 +104,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
+      with:
+        ref: ${{ needs.check-container-comment.outputs.pr_ref || github.sha }}
 
     - name: Install yq
       uses: mikefarah/yq@master
@@ -78,7 +136,10 @@ jobs:
   container-build:
     name: Build Container Images
     runs-on: ubuntu-latest
-    needs: get-config
+    needs: [get-config, check-container-comment]
+    if: |
+      github.event_name != 'issue_comment' || 
+      needs.check-container-comment.outputs.triggered == 'true'
 
     strategy:
       matrix:
@@ -90,6 +151,33 @@ jobs:
 
     steps:
     - name: Checkout code
+      uses: actions/checkout@v5
+      with:
+        ref: ${{ needs.check-container-comment.outputs.pr_ref || github.sha }}
+
+    - name: Determine container version and push policy
+      run: |
+        if [[ "${{ github.event_name }}" == "release" ]]; then
+          # Release: use release version and push to registry
+          echo "CONTAINER_VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+          echo "PUSH_IMAGES=true" >> $GITHUB_ENV
+          echo "CONTAINER_TAGS=latest,${{ github.ref_name }}" >> $GITHUB_ENV
+        elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+          # Main branch: use dev version and push
+          VERSION="0.1.0.dev$(date +%Y%m%d%H%M%S)+$(git rev-parse --short HEAD)"
+          echo "CONTAINER_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "PUSH_IMAGES=true" >> $GITHUB_ENV
+          echo "CONTAINER_TAGS=dev,$VERSION" >> $GITHUB_ENV
+        else
+          # PR/comment triggers: use dev version but don't push (security)
+          VERSION="0.1.0.dev$(date +%Y%m%d%H%M%S)+$(git rev-parse --short HEAD)"
+          echo "CONTAINER_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "PUSH_IMAGES=false" >> $GITHUB_ENV
+          echo "CONTAINER_TAGS=$VERSION" >> $GITHUB_ENV
+        fi
+        echo "Container version: $CONTAINER_VERSION"
+        echo "Push images: $PUSH_IMAGES"
+        echo "Tags: $CONTAINER_TAGS"
       uses: actions/checkout@v5
       with:
         fetch-depth: 0
