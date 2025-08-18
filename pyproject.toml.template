@@ -149,8 +149,8 @@ dev = [
 
 [project.optional-dependencies]
 [project.scripts]
-{{PACKAGE_NAME_SHORT}} = "open_hostfactory_plugin.run:cli_main"     # From src._package.PACKAGE_NAME_SHORT
-{{PACKAGE_NAME}} = "open_hostfactory_plugin.run:cli_main"           # From src._package.PACKAGE_NAME
+{{PACKAGE_NAME_SHORT}} = "run:cli_main"     # From src._package.PACKAGE_NAME_SHORT
+{{PACKAGE_NAME}} = "run:cli_main"           # From src._package.PACKAGE_NAME
 
 # URLs using centralized repository detection  
 [project.urls]
@@ -163,7 +163,7 @@ Repository = "{{REPO_URL}}"         # From src._package.REPO_URL
 where = ["src"]
 
 [tool.setuptools.package-dir]
-"open_hostfactory_plugin" = "src"
+"" = "src"
 
 [tool.setuptools]
 py-modules = ["run"]
