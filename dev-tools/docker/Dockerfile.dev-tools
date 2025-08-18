@@ -22,11 +22,11 @@ LABEL org.opencontainers.image.title="Open Host Factory Plugin Dev Tools" \
 
 # Install system dependencies and create user in single layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    ca-certificates \
-    build-essential \
-    git \
-    make \
+    curl=8.14.1-2 \
+    ca-certificates=20250419 \
+    build-essential=12.12 \
+    git=1:2.47.2-0.2 \
+    make=4.4.1-2 \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean \
     && groupadd -r "${PACKAGE_NAME_SHORT}" \

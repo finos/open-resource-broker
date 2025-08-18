@@ -13,11 +13,11 @@ ARG PACKAGE_NAME_SHORT
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
-        ca-certificates && \
+        ca-certificates=20250419 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     # Security: Upgrade setuptools to latest version
-    pip install --no-cache-dir --upgrade pip setuptools>=70.0.0
+    pip install --no-cache-dir --upgrade pip==25.2 setuptools==80.9.0
 ARG BUILD_DATE
 ARG VERSION=dev
 ARG VCS_REF
@@ -38,7 +38,7 @@ ENV BUILD_DATE="${BUILD_DATE}" \
 
 # Install runtime dependencies and create user in single layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
+    ca-certificates=20250419 \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean \
     && groupadd -r "${PACKAGE_NAME_SHORT}" \
