@@ -26,18 +26,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     build-essential \
     git \
+    make \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean \
     && groupadd -r "${PACKAGE_NAME_SHORT}" \
     && useradd -r -g "${PACKAGE_NAME_SHORT}" -s /bin/false "${PACKAGE_NAME_SHORT}"
-
-# Install development tools
-RUN curl -L https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64 \
-    -o /usr/local/bin/hadolint \
-    && chmod +x /usr/local/bin/hadolint \
-    && curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 \
-    -o /usr/local/bin/yq \
-    && chmod +x /usr/local/bin/yq
 
 # Install UV (pinned version for consistency)
 RUN pip install --no-cache-dir uv==0.8.11
@@ -46,8 +39,13 @@ RUN pip install --no-cache-dir uv==0.8.11
 WORKDIR /app
 RUN mkdir -p /app/logs /app/data /app/tmp
 
-# Copy project files needed for uv sync
+# Copy project files needed for dev tools installation
 COPY pyproject.toml ./
+COPY Makefile ./
+COPY dev-tools/ ./dev-tools/
+
+# Install development tools using makefile targets
+RUN make install-dev-tools-required
 COPY uv.lock ./
 COPY README.md ./
 COPY src/ ./src/
