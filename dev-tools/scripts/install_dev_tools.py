@@ -360,7 +360,7 @@ class DevToolsInstaller:
         """Install actionlint using official download script."""
         return self._run_command(
             "bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)",
-            shell=True
+            shell=True,
         )
 
     def _install_shellcheck_generic(self):

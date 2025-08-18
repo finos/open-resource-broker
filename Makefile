@@ -760,6 +760,7 @@ container-build-single: dev-install  ## Build container image for single Python 
 	VERSION=$(VERSION) \
 	IMAGE_NAME=$(CONTAINER_IMAGE) \
 	PYTHON_VERSION=$(PYTHON_VERSION) \
+	MULTI_PYTHON=true \
 	./dev-tools/scripts/container_build.sh
 
 container-push-multi: container-build-multi  ## Push all container images to registry
