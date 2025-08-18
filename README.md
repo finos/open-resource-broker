@@ -309,7 +309,6 @@ providers:
         auto_scaling_group:
           enabled: true
     template_defaults:
-      context: "c-abc1234567890123"  # AWS Context field (reserved parameter) for fleet operations
 ```
 
 ## Development
