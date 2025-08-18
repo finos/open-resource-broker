@@ -33,6 +33,7 @@ VCS_REF=$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')
 # Python version support (from Makefile environment variables)
 PYTHON_VERSION="${PYTHON_VERSION:-$(make -s print-DEFAULT_PYTHON_VERSION 2>/dev/null || echo '3.13')}"  # Dynamic from Makefile with fallback
 MULTI_PYTHON="${MULTI_PYTHON:-false}"     # Flag for multi-Python builds
+SKIP_BUILD="${SKIP_BUILD:-false}"          # Flag to skip package building
 
 # Build arguments
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
@@ -100,8 +101,14 @@ setup_builder() {
 build_image() {
     log_info "Building Docker image..."
 
-    # Build wheel first if it doesn't exist
-    if ! ls dist/*.whl 1> /dev/null 2>&1; then
+    # Build wheel first if it doesn't exist and not skipped
+    if [[ "${SKIP_BUILD}" == "true" ]]; then
+        log_info "Skipping package build (SKIP_BUILD=true)"
+        if ! ls dist/*.whl 1> /dev/null 2>&1; then
+            log_error "No wheel package found and SKIP_BUILD=true. Build package first."
+            exit 1
+        fi
+    elif ! ls dist/*.whl 1> /dev/null 2>&1; then
         log_info "Building wheel package..."
         make build || {
             log_error "Failed to build wheel package"
@@ -269,6 +276,7 @@ usage() {
     echo "  PLATFORMS           Target platforms"
     echo "  PUSH                Push to registry (true/false)"
     echo "  CACHE               Use build cache (true/false)"
+    echo "  SKIP_BUILD          Skip package building (true/false)"
     echo ""
     echo "Examples:"
     echo "  $0                                    # Build local image"

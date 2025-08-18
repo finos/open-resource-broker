@@ -233,6 +233,7 @@ jobs:
         PLATFORMS: linux/amd64,linux/arm64
         PUSH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'release' || github.event.inputs.push_images == 'true') }}
         CACHE: true
+        SKIP_BUILD: true
       run: |
         make container-build-single PYTHON_VERSION=${{ matrix.python-version }}
 
