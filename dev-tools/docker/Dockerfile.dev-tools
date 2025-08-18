@@ -1,28 +1,51 @@
-FROM python:3.11-slim
+# Development tools container with security hardening
 
-# Install system dependencies (no pinning - use latest available)
+ARG PYTHON_VERSION=3.13
+ARG PACKAGE_NAME_SHORT=ohfp
+
+FROM python:${PYTHON_VERSION}-slim
+
+# Re-declare build arguments for this stage
+ARG PACKAGE_NAME_SHORT
+ARG BUILD_DATE
+ARG VERSION=dev
+ARG VCS_REF
+
+# Add metadata labels
+LABEL org.opencontainers.image.title="Open Host Factory Plugin Dev Tools" \
+      org.opencontainers.image.description="Development and CI tools for Open Host Factory Plugin" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.vendor="Open Host Factory" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
+# Install system dependencies and create user in single layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    ca-certificates \
-    build-essential \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+    curl=8.14.1-2 \
+    ca-certificates=20250419 \
+    build-essential=12.12 \
+    git=1:2.47.2-0.2 \
+    make=4.4.1-2 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean \
+    && groupadd -r "${PACKAGE_NAME_SHORT}" \
+    && useradd -r -g "${PACKAGE_NAME_SHORT}" -s /bin/false "${PACKAGE_NAME_SHORT}"
 
-# Install hadolint (latest version)
-RUN curl -L https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64 \
-    -o /usr/local/bin/hadolint \
-    && chmod +x /usr/local/bin/hadolint
+# Install UV (pinned version for consistency)
+RUN pip install --no-cache-dir uv==0.8.11
 
-# Install yq (latest version)
-RUN curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 \
-    -o /usr/local/bin/yq \
-    && chmod +x /usr/local/bin/yq
+# Set working directory and create directories
+WORKDIR /app
+RUN mkdir -p /app/logs /app/data /app/tmp
 
-# Install UV (latest version)
-RUN pip install --no-cache-dir uv
-
-# Copy project files needed for uv sync
+# Copy project files needed for dev tools installation
 COPY pyproject.toml ./
+COPY Makefile ./
+COPY dev-tools/ ./dev-tools/
+
+# Install development tools using makefile targets
+RUN make install-dev-tools-required
 COPY uv.lock ./
 COPY README.md ./
 COPY src/ ./src/
@@ -30,7 +53,17 @@ COPY src/ ./src/
 # Install all dev and ci dependencies with uv (uses versions from uv.lock)
 RUN uv sync --group dev --group ci
 
-WORKDIR /app
+# Set permissions
+RUN chown -R "${PACKAGE_NAME_SHORT}":"${PACKAGE_NAME_SHORT}" /app
+
+# Set environment variables
+ENV PYTHONPATH=/app \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONIOENCODING=utf-8
+
+# Switch to non-root user
+USER "${PACKAGE_NAME_SHORT}"
 
 # Default command
 CMD ["bash"]

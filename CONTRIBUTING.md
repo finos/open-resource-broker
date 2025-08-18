@@ -1,296 +1,269 @@
-# Contributing to AWS Host Factory Plugin
+# Contributing to Open Host Factory Plugin
 
-First off, thank you for considering contributing to Open Host Factory Plugin! It's people like you in our community that make this project great.
+Thank you for your interest in contributing to the Open Host Factory Plugin! This guide will help you get started with development and testing.
 
-## Code of Conduct
+## Development Setup
 
-This project and everyone participating in it is governed by our [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
+### Prerequisites
 
-## How Can I Contribute?
+- Python 3.9+ (tested on 3.9, 3.10, 3.11, 3.12, 3.13)
+- Docker and Docker Compose
+- AWS CLI (for AWS provider testing)
 
-### Reporting Bugs
-
-Before creating bug reports, please check [the issue list](https://github.com/awslabs/open-hostfactory-plugin/issues) as you might find out that you don't need to create one. When you are creating a bug report, please include as many details as possible:
-
-* Use a clear and descriptive title
-* Describe the exact steps which reproduce the problem
-* Provide specific examples to demonstrate the steps
-* Describe the behavior you observed after following the steps
-* Explain which behavior you expected to see instead and why
-* Include screenshots and animated GIFs if possible
-* Include your environment details
-
-### Suggesting Enhancements
-
-Enhancement suggestions are tracked as GitHub issues. When creating an enhancement suggestion, please provide:
-
-* A clear and descriptive title
-* A detailed description of the proposed functionality
-* Explain why this enhancement would be useful
-* List any alternative solutions or features you've considered
-* Include screenshots or diagrams if applicable
-
-### Pull Requests
-
-* Fill in the required template
-* Follow the Python style guides
-* Include appropriate tests
-* Update documentation as needed
-* End all files with a newline
-
-## Getting Started
-
-1. Fork the repository
-2. Clone your fork:
-   ```bash
-   git clone https://github.com/your-username/awsome-hostfactory-plugin.git
-   cd awsome-hostfactory-plugin
-   ```
-
-3. Set up your development environment:
-   ```bash
-   # Create and activate virtual environment
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-   # Install dependencies
-   pip install -e ".[dev]"
-
-   # Set up pre-commit hooks
-   pre-commit install
-   ```
-
-4. Create a branch:
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-
-## Development Process
-
-1. Make your changes:
-   * Write your code
-   * Write/update tests
-   * Update documentation
-
-2. Run the test suite:
-   ```bash
-   # Run all tests
-   python dev-tools/testing/run_tests.py
-
-   # Run with coverage
-   python dev-tools/testing/run_tests.py --coverage
-
-   # Run specific test types
-   python dev-tools/testing/run_tests.py --unit
-   python dev-tools/testing/run_tests.py --integration
-   python dev-tools/testing/run_tests.py --e2e
-
-   # Run specific tests
-   python dev-tools/testing/run_tests.py --path tests/test_specific.py
-   ```
-
-3. Run linting:
-   ```bash
-   # Run all linting
-   make lint
-
-   # Run specific linters
-   black src tests
-   isort src tests
-   flake8 src tests
-   mypy src tests
-   ```
-
-4. Build and serve documentation:
-   ```bash
-   # Build documentation
-   make docs-build
-
-   # Serve documentation locally with live reload
-   make docs-serve
-
-   # Deploy to GitLab Pages (pushes to main branch)
-   make docs-deploy-gitlab
-
-   # Check GitLab Pages status
-   make docs-check-gitlab
-
-   # Clean documentation build files
-   make docs-clean
-   ```
-
-5. Use development tools:
-   ```bash
-   # Version management
-   ./dev-tools/package/version-bump.sh patch
-
-   # Build package
-   ./dev-tools/package/build.sh
-
-   # Install in development mode
-   ./dev-tools/package/install-dev.sh
-   ```
-
-5. Build documentation:
-   ```bash
-   make docs
-   ```
-
-## Style Guides
-
-### Git Commit Messages
-
-* Use the present tense ("Add feature" not "Added feature")
-* Use the imperative mood ("Move cursor to..." not "Moves cursor to...")
-* Limit the first line to 72 characters or less
-* Reference issues and pull requests liberally after the first line
-
-### Python Style Guide
-
-* Follow [PEP 8](https://www.python.org/dev/peps/pep-0008/)
-* Use [Black](https://github.com/psf/black) for code formatting
-* Use [isort](https://github.com/PyCQA/isort) for import sorting
-* Use [mypy](http://mypy-lang.org/) for type checking
-* Write docstrings in [Google style](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-
-### Documentation Style Guide
-
-* Use [Markdown](https://www.markdownguide.org/) for documentation
-* Follow [MkDocs](https://www.mkdocs.org/) conventions
-* Include code examples when relevant
-* Keep language clear and concise
-
-## Project Structure
-
-```
-open-hostfactory-plugin/
-├── src/                    # Source code
-│   ├── api/                # API handlers
-│   ├── application/        # Application services
-│   ├── domain/             # Domain model
-│   ├── infrastructure/     # Infrastructure components
-│   ├── providers/          # Cloud provider integrations
-│   └── interface/          # CLI interface
-├── tests/                  # Test files
-├── docs/                   # Documentation
-├── dev-tools/              # Development tools
-├── scripts/                # Host Factory integration scripts
-├── config/                 # Configuration files
-└── memory-bank/            # Development notes and plans
-```
-
-## Documentation
-
-* Write clear, concise documentation
-* Update documentation when adding features
-* Test documentation locally before submitting
-* Use MkDocs for documentation building
-
-### Documentation Workflow
-
-1. **Local Development**:
-   ```bash
-   # Start documentation server with live reload
-   make docs-serve
-   # Visit http://127.0.0.1:8000 to view docs
-   ```
-
-2. **Building Documentation**:
-   ```bash
-   # Build static documentation
-   make docs-build
-   # Output will be in docs/site/
-   ```
-
-3. **GitLab Pages Deployment**:
-   ```bash
-   # Deploy to GitLab Pages production (main branch)
-   make docs-deploy-gitlab
-
-   # Deploy to GitLab Pages staging (develop branch)
-   make docs-deploy-staging
-
-   # Check deployment status
-   make docs-check-gitlab
-   ```
-
-4. **Documentation Structure**:
-   - `docs/user-guide.md` - User-facing documentation
-   - `docs/configuration/` - Configuration examples and guides
-   - `docs/development/` - Development and testing guides
-   - `docs/api/` - API reference documentation
-
-### Completion Development
-
-The plugin includes shell completions for improved developer experience:
+### Quick Setup with UV (Recommended)
 
 ```bash
-# Test completion generation
-python src/run.py --completion bash
-python src/run.py --completion zsh
+# Clone repository
+git clone https://github.com/awslabs/open-hostfactory-plugin.git
+cd open-hostfactory-plugin
 
-# Generate completion files
-make generate-completions
+# Fast development setup with uv
+make dev-install-uv
 
-# Test completion functionality
-make test-completions
-
-# Install for testing
-make install-completions
+# Or manually with uv
+uv pip install -e ".[dev]"
 ```
 
-**Completion Features:**
-- Complete resource names (templates, machines, requests, etc.)
-- Complete action names based on selected resource
-- Complete global options (--config, --log-level, etc.)
-- Complete option values (--format json|yaml|table)
-- Complete file paths for --config, --output
+### Traditional Setup
+
+```bash
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate
+
+# Install development dependencies
+make dev-install-pip
+```
 
 ## Testing
 
-* Write tests for all new features
-* Maintain or improve test coverage
-* Use pytest fixtures appropriately
-* Mock external services
-* Test edge cases
+### Local Testing
+
+```bash
+# Run all tests
+make test
+
+# Run with coverage
+make test-coverage
+
+# Run specific test categories
+make test-unit
+make test-integration
+```
+
+### PR Comment Commands
+
+You can trigger CI/CD actions by commenting on pull requests:
+
+**Security Note**: Comment triggers are restricted to repository members, owners, and collaborators.
+
+#### Trigger Word Configuration
+
+The trigger words are configurable via environment variables in each workflow:
+
+- **CI Pipeline**: `CI_TRIGGERS="/test,/build,/ci"`
+- **Publishing**: `PUBLISH_TRIGGERS="/package"`  
+- **Security Scans**: `SECURITY_TRIGGERS="/security"`
+- **Container Builds**: `CONTAINER_TRIGGERS="/container"`
+
+To modify trigger words, update the `env` section in the respective workflow files.
+
+#### Testing Commands (Members, Owners, Collaborators)
+- **`/test`** - Run full CI pipeline (tests, linting, type checking)
+- **`/build`** - Run CI pipeline including package build verification
+- **`/ci`** - Same as `/test` - run complete CI pipeline
+- **`/security`** - Run security scans
+- **`/container`** - Build container images (no registry push for security)
+
+#### Publishing Commands (Members, Owners only)
+- **`/package`** - Build and publish to TestPyPI only (never production PyPI)
+  - Creates a dev version: `0.1.0.dev20250818125457+abc1234`
+  - Publishes to https://test.pypi.org for installation testing
+  - Use: `pip install --index-url https://test.pypi.org/simple/ open-hostfactory-plugin`
+
+**Security Note**: Comment triggers can never publish to production PyPI. Only GitHub releases publish to PyPI.
+
+Commands must be exact matches (e.g., `/test` not `/test please`).
+
+### Version Alignment
+
+Package and container versions are aligned:
+
+- **Development**: `0.1.0.dev20250818125457+abc1234` (both PyPI package and container)
+- **Release**: `0.1.0` (both PyPI package and container)
+
+### Container Security
+
+- **Comment triggers** (`/container`) - Build only, no registry push
+- **Branch pushes** - Build and push with dev tags  
+- **Releases** - Build and push with release tags (`latest`, `v0.1.0`)
+
+### Automated Publishing
+
+The project uses a secure three-tier publishing strategy:
+
+1. **PR Comments** (`/package`) → TestPyPI only with dev versions
+2. **Merge to main/develop** → TestPyPI with dev versions  
+3. **GitHub Releases** → Production PyPI with release versions
+
+**Security**: Comment triggers and branch pushes can never publish to production PyPI.
+
+## Code Quality
+
+### Formatting and Linting
+
+```bash
+# Format code
+make format
+
+# Run linting
+make lint
+
+# Type checking
+make type-check
+```
+
+### Pre-commit Hooks
+
+```bash
+# Install pre-commit hooks
+pre-commit install
+
+# Run on all files
+pre-commit run --all-files
+```
+
+## Architecture
+
+The plugin follows Clean Architecture principles:
+
+- **Domain Layer**: Core business logic (`src/domain/`)
+- **Application Layer**: Use cases and handlers (`src/application/`)
+- **Infrastructure Layer**: External integrations (`src/infrastructure/`)
+- **Interface Layer**: CLI and API (`src/interface/`, `src/api/`)
+
+### Key Patterns
+
+- **CQRS**: Command Query Responsibility Segregation
+- **DDD**: Domain-Driven Design with rich domain models
+- **Dependency Injection**: Comprehensive DI container
+- **Strategy Pattern**: Pluggable provider implementations
+
+## Pull Request Guidelines
+
+### Before Submitting
+
+1. **Run tests locally**: `make test`
+2. **Format code**: `make format`
+3. **Update documentation** if needed
+4. **Add tests** for new functionality
+
+### PR Description
+
+Please include:
+- **What**: Brief description of changes
+- **Why**: Motivation and context
+- **How**: Implementation approach
+- **Testing**: How you tested the changes
+
+### Testing Your PR
+
+Use comment commands to test your changes:
+
+```bash
+# Test the full CI pipeline
+/test
+
+# Build and test package installation
+/package
+```
+
+The bot will add a reaction to confirm the command was received.
+
+## Container Development
+
+### Building Containers
+
+```bash
+# Build container locally
+make container-build
+
+# Test container
+make container-test
+```
+
+### Container Commands
+
+The container supports multiple entry points:
+
+```bash
+# CLI usage
+docker run --rm image --version
+
+# API server
+docker run -p 8000:8000 image system serve
+
+# Health check
+docker run --rm image --health
+```
 
 ## Documentation
 
-* Update README.md with any needed changes
-* Update API documentation when changing interfaces
-* Add docstrings to all public methods
-* Include examples in documentation
-* Keep the wiki up to date
+### Building Docs
 
-## Community
+```bash
+# Build documentation
+make docs-build
 
-* Join our [Slack channel](#)
-* Follow our [Twitter](#)
-* Read our [blog](#)
-* Subscribe to our [newsletter](#)
+# Serve locally
+make docs-serve
+```
 
-## Additional Notes
+### Documentation Structure
 
-### Issue Labels
+- `README.md` - Main project documentation
+- `docs/` - Detailed documentation
+- `CONTRIBUTING.md` - This file
+- `docs/deployment/` - Deployment guides
 
-* `bug` - Something isn't working
-* `enhancement` - New feature or request
-* `documentation` - Documentation only changes
-* `good first issue` - Good for newcomers
-* `help wanted` - Extra attention is needed
+## Release Process
 
-### Support
+### Version Management
 
-If you need help with anything:
-* Check our [FAQ](docs/FAQ.md)
-* Ask in our [Discussions](https://github.com/awslabs/open-hostfactory-plugin/discussions)
-* Contact the maintainers
+- **Development**: `0.1.0.dev20250818125457+abc1234`
+- **Release Candidates**: `0.1.0rc1`
+- **Releases**: `0.1.0`
 
-## Recognition
+### Creating Releases
 
-Contributors will be recognized in:
-* The [CONTRIBUTORS.md](CONTRIBUTORS.md) file
-* Release notes
-* Project documentation
+1. **Update version** in `.project.yml`
+2. **Create GitHub release** with tag `v0.1.0`
+3. **Automatic publishing** to PyPI via trusted publishing
 
-Thank you for contributing to AWS Host Factory Plugin!
+## Security
+
+### Trusted Publishing
+
+The project uses PyPI Trusted Publishing (OIDC) instead of API tokens:
+
+- **No secrets to manage** - authentication via GitHub OIDC
+- **Automatic attestations** - digital signatures for packages
+- **Environment protection** - optional approval workflows
+
+### Reporting Security Issues
+
+Please see our [Security Policy](SECURITY.md) for responsible disclosure procedures.
+
+## Getting Help
+
+- **Documentation**: Comprehensive guides in `docs/`
+- **Issues**: GitHub Issues for bug reports and feature requests
+- **Discussions**: Community discussions and questions
+
+## Code of Conduct
+
+This project follows the [AWS Open Source Code of Conduct](https://aws.github.io/code-of-conduct).
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.

@@ -8,11 +8,21 @@ FROM python:${PYTHON_VERSION}-slim
 
 # Re-declare build arguments for this stage
 ARG PACKAGE_NAME_SHORT
+
+# Security: Update system packages and install security updates
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates=20250419 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    # Security: Upgrade setuptools to latest version
+    pip install --no-cache-dir --upgrade pip==25.2 setuptools==80.9.0
 ARG BUILD_DATE
 ARG VERSION=dev
 ARG VCS_REF
 
-# Add metadata labels in single layer
+# Add metadata labels and set environment variables in single layer
 LABEL org.opencontainers.image.title="Open Host Factory Plugin API" \
       org.opencontainers.image.description="REST API for Open Host Factory Plugin - Dynamic cloud resource provisioning" \
       org.opencontainers.image.version="${VERSION}" \
@@ -21,9 +31,14 @@ LABEL org.opencontainers.image.title="Open Host Factory Plugin API" \
       org.opencontainers.image.vendor="Open Host Factory" \
       org.opencontainers.image.licenses="Apache-2.0"
 
+# Set build info as environment variables for runtime access
+ENV BUILD_DATE="${BUILD_DATE}" \
+    VERSION="${VERSION}" \
+    VCS_REF="${VCS_REF}"
+
 # Install runtime dependencies and create user in single layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
+    ca-certificates=20250419 \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean \
     && groupadd -r "${PACKAGE_NAME_SHORT}" \

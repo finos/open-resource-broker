@@ -128,6 +128,7 @@
           "describe_request_interval": 0
         },
         "template_defaults": {
+          "context": "c-abc1234567890123",
           "provider_api": "SpotFleet",
           "instance_type": "t3.small"
         }

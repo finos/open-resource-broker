@@ -1,53 +1,100 @@
 # PyPI Publishing Setup Guide
 
-This guide explains how to configure PyPI publishing for the Open Host Factory Plugin.
+This guide explains how to configure PyPI publishing for the Open Host Factory Plugin using **Trusted Publishing** (OIDC-based authentication).
 
-## Required Secrets
+## Trusted Publishing Overview
 
-The following GitHub repository secrets must be configured:
+Trusted Publishing uses OpenID Connect (OIDC) to authenticate with PyPI without requiring API tokens. This is more secure and eliminates the need to manage secrets.
 
-### 1. Production PyPI Token
-- **Secret Name:** `PYPI_API_TOKEN`
-- **Description:** API token for publishing to production PyPI
-- **How to get:**
-  1. Go to [PyPI Account Settings](https://pypi.org/manage/account/)
-  2. Scroll to "API tokens" section
-  3. Click "Add API token"
-  4. Name: `open-hostfactory-plugin-github-actions`
-  5. Scope: Select "Entire account" or specific project
-  6. Copy the generated token (starts with `pypi-`)
+## Required Setup
 
-### 2. Test PyPI Token
-- **Secret Name:** `TEST_PYPI_API_TOKEN`
-- **Description:** API token for publishing to Test PyPI
-- **How to get:**
-  1. Go to [Test PyPI Account Settings](https://test.pypi.org/manage/account/)
-  2. Follow same steps as production PyPI
-  3. Copy the generated token
+### 1. Configure Trusted Publisher on PyPI
 
-## Setting Up GitHub Secrets
+1. Go to [PyPI Publishing Settings](https://pypi.org/manage/account/publishing/)
+2. Click "Add a new pending publisher"
+3. Fill in the details:
+   - **PyPI Project Name:** `open-hostfactory-plugin`
+   - **Owner:** `awslabs` (your GitHub organization/username)
+   - **Repository name:** `open-hostfactory-plugin`
+   - **Workflow name:** `publish.yml`
+   - **Environment name:** `pypi`
+4. Click "Add"
+
+### 2. Configure Trusted Publisher on Test PyPI
+
+1. Go to [Test PyPI Publishing Settings](https://test.pypi.org/manage/account/publishing/)
+2. Follow the same steps as above, but use:
+   - **Environment name:** `testpypi`
+
+### 3. GitHub Environment Setup
+
+The workflow uses GitHub environments for additional security:
 
 1. Go to your GitHub repository
-2. Navigate to **Settings** → **Secrets and variables** → **Actions**
-3. Click **New repository secret**
-4. Add both secrets:
-   - Name: `PYPI_API_TOKEN`, Value: `pypi-AgE...` (your production token)
-   - Name: `TEST_PYPI_API_TOKEN`, Value: `pypi-AgE...` (your test token)
+2. Navigate to **Settings** → **Environments**
+3. Create two environments:
+   - **Name:** `pypi` (for production)
+   - **Name:** `testpypi` (for testing)
+4. Optionally add protection rules (e.g., required reviewers for production)
 
 ## Publishing Workflow
 
 ### Automatic Publishing (Recommended)
 - **Trigger:** Creating a GitHub release with tag `v*.*.*`
 - **Target:** Production PyPI
-- **Process:** Fully automated via GitHub Actions
+- **Process:** Fully automated via GitHub Actions with trusted publishing
 
 ### Manual Publishing
 ```bash
 # Test PyPI
-gh workflow run publish.yml -f environment=test-pypi
+gh workflow run publish.yml -f environment=testpypi
 
 # Production PyPI  
 gh workflow run publish.yml -f environment=pypi
+```
+
+## Security Benefits
+
+**No API tokens to manage** - eliminates secret rotation concerns  
+**OIDC-based authentication** - more secure than static tokens  
+**Automatic attestations** - digital signatures for all packages  
+**Scoped permissions** - `id-token: write` only in publishing job  
+**Environment protection** - optional approval workflows  
+
+## Migration from API Tokens
+
+If migrating from API tokens:
+
+1. Set up trusted publishers (steps above)
+2. Test with TestPyPI first
+3. Remove old `PYPI_API_TOKEN` and `TEST_PYPI_API_TOKEN` secrets
+4. Update workflow (already done in this repository)
+
+## Troubleshooting
+
+### Common Issues
+
+**"Trusted publishing exchange failure"**
+- Verify publisher configuration matches exactly
+- Check environment names match workflow
+- Ensure `id-token: write` permission is set
+
+**"Environment not found"**
+- Create GitHub environments in repository settings
+- Verify environment names in workflow match PyPI configuration
+
+### Verification
+
+To verify trusted publishing is working:
+1. Check workflow logs for "Trusted publishing exchange successful"
+2. Look for attestation generation messages
+3. Verify packages appear with attestation badges on PyPI
+
+## References
+
+- [PyPI Trusted Publishing Guide](https://docs.pypi.org/trusted-publishers/)
+- [GitHub OIDC Documentation](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect)
+- [PyPA Publishing Action](https://github.com/pypa/gh-action-pypi-publish)
 ```
 
 ## Package Registration

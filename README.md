@@ -8,6 +8,7 @@ The Open Host Factory Plugin provides integration between IBM Spectrum Symphony 
 
 **Currently Supported Providers:**
 - **AWS** - Amazon Web Services (RunInstances, EC2Fleet, SpotFleet, Auto Scaling Groups)
+  - Context field support for EC2Fleet, SpotFleet, and Auto Scaling Groups
 
 ## Key Features
 
@@ -307,6 +308,7 @@ providers:
           enabled: true
         auto_scaling_group:
           enabled: true
+    template_defaults:
 ```
 
 ## Development

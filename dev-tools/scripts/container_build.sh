@@ -112,7 +112,6 @@ build_image() {
     fi
 
     # Get values from Makefile if not provided
-    local MAKEFILE_DEFAULT_PYTHON_VERSION="${PYTHON_VERSION:-$(make -s print-DEFAULT_PYTHON_VERSION 2>/dev/null || echo '3.13')}"
     local MAKEFILE_PACKAGE_SHORT="${PACKAGE_NAME_SHORT:-$(make -s print-PACKAGE_NAME_SHORT 2>/dev/null || echo 'ohfp')}"
 
     # Prepare tags with Python version support
@@ -120,8 +119,8 @@ build_image() {
     local version_tag="${VERSION}"
 
     # Add Python version to tag if specified
-    if [[ -n "${MAKEFILE_DEFAULT_PYTHON_VERSION}" && "${MULTI_PYTHON}" == "true" ]]; then
-        version_tag="${VERSION}-python${MAKEFILE_DEFAULT_PYTHON_VERSION}"
+    if [[ -n "${PYTHON_VERSION}" && "${MULTI_PYTHON}" == "true" ]]; then
+        version_tag="${VERSION}-python${PYTHON_VERSION}"
     fi
 
     if [[ -n "${REGISTRY}" ]]; then
@@ -207,10 +206,9 @@ test_image() {
     log_info "Testing built image..."
 
     # Use the same tagging logic as build_image function
-    local MAKEFILE_DEFAULT_PYTHON_VERSION="${PYTHON_VERSION:-$(make -s print-DEFAULT_PYTHON_VERSION 2>/dev/null || echo '3.13')}"
     local version_tag="${VERSION}"
-    if [[ -n "${MAKEFILE_DEFAULT_PYTHON_VERSION}" && "${MULTI_PYTHON}" == "true" ]]; then
-        version_tag="${VERSION}-python${MAKEFILE_DEFAULT_PYTHON_VERSION}"
+    if [[ -n "${PYTHON_VERSION}" && "${MULTI_PYTHON}" == "true" ]]; then
+        version_tag="${VERSION}-python${PYTHON_VERSION}"
     fi
 
     local test_image

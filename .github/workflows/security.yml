@@ -1,5 +1,11 @@
 name: Security Scan
 
+env:
+  # Comment trigger words for security scans
+  SECURITY_TRIGGERS: "/security"
+  REGISTRY: ghcr.io
+  IMAGE_NAME: awslabs/open-hostfactory-plugin
+
 on:
   push:
     branches: [ main, develop ]
@@ -17,24 +23,83 @@ on:
       - 'Dockerfile*'
       - 'docker-compose*.yml'
       - '.dockerignore'
+  issue_comment:
+    types: [created]
   schedule:
     # Run weekly security scan on Sundays at 3 AM UTC
     - cron: '0 3 * * 0'
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: awslabs/open-hostfactory-plugin
-
 jobs:
+  check-security-comment:
+    name: Check Security Triggers
+    runs-on: ubuntu-latest
+    outputs:
+      triggered: ${{ steps.check.outputs.triggered }}
+      pr_ref: ${{ steps.check.outputs.pr_ref }}
+    steps:
+      - name: Check security comment
+        id: check
+        if: github.event_name == 'issue_comment'
+        uses: actions/github-script@v7
+        env:
+          SECURITY_TRIGGERS: ${{ env.SECURITY_TRIGGERS }}
+        with:
+          script: |
+            if (!context.issue.pull_request) {
+              console.log('Not a PR comment, skipping');
+              return;
+            }
+            
+            // Security: Only allow authorized users
+            const allowedAssociations = ['MEMBER', 'OWNER', 'COLLABORATOR'];
+            const userAssociation = context.payload.comment.author_association;
+            
+            if (!allowedAssociations.includes(userAssociation)) {
+              console.log(`User ${context.payload.comment.user.login} not authorized (${userAssociation})`);
+              return;
+            }
+            
+            const comment = context.payload.comment.body.toLowerCase().trim();
+            const triggers = process.env.SECURITY_TRIGGERS.split(',').map(t => t.trim());
+            const triggered = triggers.some(t => comment === t);
+            
+            console.log(`Comment: ${context.payload.comment.body}`);
+            console.log(`User: ${context.payload.comment.user.login} (${userAssociation})`);
+            console.log(`Security triggered: ${triggered}`);
+            
+            if (triggered) {
+              const pr = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number
+              });
+              core.setOutput('triggered', 'true');
+              core.setOutput('pr_ref', pr.data.head.sha);
+              
+              // Add reaction to confirm command received
+              await github.rest.reactions.createForIssueComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: context.payload.comment.id,
+                content: 'eyes'
+              });
+            }
+
   get-config:
     name: Get Python Version from Makefile
     runs-on: ubuntu-latest
+    needs: [check-security-comment]
+    if: |
+      github.event_name != 'issue_comment' || 
+      needs.check-security-comment.outputs.triggered == 'true'
     outputs:
       python-versions: ${{ steps.config.outputs.python-versions }}
       default-python-version: ${{ steps.config.outputs.default-python-version }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
+      with:
+        ref: ${{ needs.check-security-comment.outputs.pr_ref || github.sha }}
 
     - name: Install yq
       uses: mikefarah/yq@master
@@ -327,6 +392,9 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
+    - name: Build package
+      run: make build
+
     - name: Build Docker image
       uses: docker/build-push-action@v6
       with:
@@ -368,11 +436,25 @@ jobs:
         output-file: hadolint-dockerfile.sarif
         no-fail: true
 
+    - name: Dev-tools Dockerfile security scan with Hadolint
+      uses: hadolint/hadolint-action@v3.1.0
+      with:
+        dockerfile: dev-tools/docker/Dockerfile.dev-tools
+        format: sarif
+        output-file: hadolint-dev-tools.sarif
+        no-fail: true
+
     - name: Upload Hadolint results
       uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
         sarif_file: hadolint-dockerfile.sarif
+
+    - name: Upload Dev-tools Hadolint results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: hadolint-dev-tools.sarif
 
     - name: Upload container security reports
       uses: actions/upload-artifact@v4
@@ -383,4 +465,5 @@ jobs:
           trivy-results-py${{ matrix.python-version }}.sarif
           trivy-results-py${{ matrix.python-version }}.json
           hadolint-dockerfile.sarif
+          hadolint-dev-tools.sarif
         retention-days: 30
