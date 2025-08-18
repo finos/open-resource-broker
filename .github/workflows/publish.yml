@@ -113,15 +113,8 @@ jobs:
       github.event_name != 'issue_comment' || 
       needs.check-build-comment.outputs.triggered == 'true'
     environment: 
-      name: ${{ 
-        github.event_name == 'release' && 'pypi' || 
-        github.event.inputs.environment || 'testpypi' 
-      }}
-      url: ${{ 
-        (github.event_name == 'release' || github.event.inputs.environment == 'pypi') && 
-        'https://pypi.org/p/open-hostfactory-plugin' || 
-        'https://test.pypi.org/p/open-hostfactory-plugin' 
-      }}
+      name: ${{ github.event_name == 'release' && 'pypi' || github.event.inputs.environment || 'testpypi' }}
+      url: ${{ (github.event_name == 'release' || github.event.inputs.environment == 'pypi') && 'https://pypi.org/p/open-hostfactory-plugin' || 'https://test.pypi.org/p/open-hostfactory-plugin' }}
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
       contents: read   # needed to checkout code
@@ -135,17 +128,17 @@ jobs:
     - name: Determine version and target
       run: |
         if [[ "${{ github.event_name }}" == "release" ]]; then
-          echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
-          echo "TARGET=pypi" >> $GITHUB_ENV
+          echo "VERSION=${{ github.ref_name }}" >> "$GITHUB_ENV"
+          echo "TARGET=pypi" >> "$GITHUB_ENV"
         elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.environment }}" == "pypi" ]]; then
-          echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
-          echo "TARGET=pypi" >> $GITHUB_ENV
+          echo "VERSION=${{ github.ref_name }}" >> "$GITHUB_ENV"
+          echo "TARGET=pypi" >> "$GITHUB_ENV"
         else
           # Dev version for TestPyPI (push to main/develop or comment trigger)
           # Comment triggers can ONLY publish to TestPyPI for security
           VERSION="0.1.0.dev$(date +%Y%m%d%H%M%S)+$(git rev-parse --short HEAD)"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "TARGET=testpypi" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "TARGET=testpypi" >> "$GITHUB_ENV"
         fi
         echo "Publishing to: $TARGET with version: $VERSION"
 
