@@ -1,7 +1,7 @@
 """Load balancing statistics tracking."""
 
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 
@@ -17,14 +17,9 @@ class StrategyStats:
     consecutive_successes: int = 0
     is_healthy: bool = True
     last_health_check: Optional[float] = None
-    response_times: deque = None  # Recent response times
+    response_times: deque = field(default_factory=lambda: deque(maxlen=10))  # Recent response times
     average_response_time: float = 0.0
     weight: float = 1.0
-
-    def __post_init__(self) -> None:
-        """Initialize response times deque."""
-        if self.response_times is None:
-            self.response_times = deque(maxlen=10)
 
     @property
     def success_rate(self) -> float:
