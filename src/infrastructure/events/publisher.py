@@ -52,9 +52,11 @@ class ConfigurableEventPublisher(EventPublisher):
     def _log_event(self, event: DomainEvent) -> None:
         """Log event for audit trail (Script mode)."""
         self._logger.info(
-            "Event: %s | ", event.event_type
-            f"Aggregate: {event.aggregate_type}:{event.aggregate_id} | "
-            f"Time: {event.occurred_at.isoformat()}"
+            "Event: %s | Aggregate: %s:%s | Time: %s",
+            event.event_type,
+            event.aggregate_type,
+            event.aggregate_id,
+            event.occurred_at.isoformat()
         )
 
     def _call_handlers_sync(self, event: DomainEvent) -> None:

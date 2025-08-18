@@ -312,7 +312,7 @@ class MetricsLogger:
             **tags: Additional metric tags
         """
         self.logger.info(
-            "%s took %sms", operation, duration_ms:.2f,
+            "%s took %.2fms", operation, duration_ms,
             extra={
                 "metric_type": "timing",
                 "operation": operation,

@@ -350,7 +350,7 @@ class BaseAPIHandler(BaseHandler, Generic[T, R]):
                 raise ValidationError(
                     domain="API",
                     message="Invalid input data",
-                    field=".".join(str(p) from e for p in e.path) if e.path else None,
+                    field=".".join(str(p) for p in e.path) if e.path else None,
                     details={
                         "error": str(e),
                         "path": list(e.path),

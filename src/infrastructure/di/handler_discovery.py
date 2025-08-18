@@ -120,7 +120,7 @@ class HandlerDiscoveryService:
         stats = get_handler_registry_stats()
         self._save_to_cache(base_package, stats, discovery_time)
 
-        logger.info("Handler discovery complete: %s (took %ss)", stats, discovery_time:.3f)
+        logger.info("Handler discovery complete: %s (took %.3fs)", stats, discovery_time)
 
     def _discover_handlers(self, base_package: str) -> None:
         """
