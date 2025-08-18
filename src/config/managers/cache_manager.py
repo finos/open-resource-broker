@@ -20,7 +20,8 @@ class ConfigCacheManager:
     def get_cached_config(self, config_type: Type[T]) -> Optional[T]:
         """Get cached configuration object."""
         with self._cache_lock:
-            return self._config_cache.get(config_type)
+            cached_value = self._config_cache.get(config_type)
+            return cached_value  # type: ignore
 
     def cache_config(self, config_type: Type[T], config_instance: T) -> None:
         """Cache configuration object."""

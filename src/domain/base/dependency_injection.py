@@ -390,7 +390,8 @@ def get_injectable_metadata(cls: Type) -> Optional[InjectableMetadata]:
         InjectableMetadata if class is injectable, None otherwise
     """
     if hasattr(cls, "_injectable_metadata"):
-        return cls._injectable_metadata
+        metadata: InjectableMetadata = cls._injectable_metadata
+        return metadata
     return None
 
 
@@ -431,7 +432,8 @@ def get_handler_type(cls: Type) -> Optional[str]:
         Handler type ('command', 'query', 'event') or None
     """
     if hasattr(cls, "_handler_type"):
-        return cls._handler_type
+        handler_type: str = cls._handler_type
+        return handler_type
     return None
 
 
@@ -446,7 +448,8 @@ def get_dependencies(cls: Type) -> List[Type]:
         List of dependency types
     """
     if hasattr(cls, "_dependencies"):
-        return cls._dependencies
+        dependencies: List[Type] = cls._dependencies
+        return dependencies
 
     # Try to get from metadata
     metadata = get_injectable_metadata(cls)

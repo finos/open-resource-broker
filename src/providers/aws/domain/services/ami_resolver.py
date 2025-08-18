@@ -83,7 +83,7 @@ class AWSAMIResolver(ImageResolver):
 
             ssm_client = boto3.client("ssm")
             response = ssm_client.get_parameter(Name=ssm_path)
-            ami_id = response["Parameter"]["Value"]
+            ami_id = str(response["Parameter"]["Value"])
 
             if not ami_id.startswith("ami-"):
                 raise ValueError(

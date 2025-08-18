@@ -89,7 +89,8 @@ def read_json_file(file_path: str, encoding: str = "utf-8") -> Dict[str, Any]:
         json.JSONDecodeError: If file is not valid JSON
     """
     with open(file_path, "r", encoding=encoding) as f:
-        return json.load(f)
+        result: Dict[str, Any] = json.load(f)
+        return result
 
 
 def write_json_file(
