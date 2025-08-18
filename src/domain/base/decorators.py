@@ -61,7 +61,7 @@ def get_error_handling_port() -> Optional["ErrorHandlingPort"]:
     return None
 
 
-def handle_domain_exceptions(context: str) -> None:
+def handle_domain_exceptions(context: str):
     """Domain decorator for exception handling using DI and ports pattern.
 
     This decorator maintains clean architecture by:

@@ -196,7 +196,7 @@ def handle_interface_exceptions(
     context: str,
     interface_type: str = "api",
     additional_context: Optional[Dict[str, Any]] = None,
-) -> None:
+):
     """
     Specialized decorator for interface layer exception handling.
 
@@ -297,7 +297,7 @@ def handle_rest_exceptions(
     endpoint: str,
     method: str = "GET",
     additional_context: Optional[Dict[str, Any]] = None,
-) -> None:
+):
     """
     Specialized decorator for REST API exception handling.
 
