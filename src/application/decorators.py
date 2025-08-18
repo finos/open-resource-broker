@@ -172,14 +172,14 @@ def get_registered_command_handlers() -> Dict[Type[Command], Type[CommandHandler
 def get_query_handler_for_type(query_type: Type[Query]) -> Type[QueryHandler]:
     """Get handler for specific query type."""
     if query_type not in _query_handler_registry:
-        raise KeyError(f"No handler registered for query type: {query_type.__name__}")
+        raise KeyError(f"No handler registered for query type: {query_type.__name__}") from e
     return _query_handler_registry[query_type]
 
 
 def get_command_handler_for_type(command_type: Type[Command]) -> Type[CommandHandler]:
     """Get handler for specific command type."""
     if command_type not in _command_handler_registry:
-        raise KeyError(f"No handler registered for command type: {command_type.__name__}")
+        raise KeyError(f"No handler registered for command type: {command_type.__name__}") from e
     return _command_handler_registry[command_type]
 
 

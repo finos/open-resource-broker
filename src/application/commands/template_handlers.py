@@ -49,11 +49,11 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, TemplateCo
         """Validate create template command."""
         await super().validate_command(command)
         if not command.template_id:
-            raise ValueError("template_id is required")
+            raise ValueError("template_id is required") from e
         if not command.provider_api:
-            raise ValueError("provider_api is required")
+            raise ValueError("provider_api is required") from e
         if not command.image_id:
-            raise ValueError("image_id is required")
+            raise ValueError("image_id is required") from e
 
     async def execute_command(self, command: CreateTemplateCommand) -> TemplateCommandResponse:
         """Create new template with validation and events."""
@@ -96,7 +96,7 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, TemplateCo
                 # Check if template already exists
                 existing_template = uow.templates.get_by_id(command.template_id)
                 if existing_template:
-                    raise BusinessRuleError(f"Template {command.template_id} already exists")
+                    raise BusinessRuleError(f"Template {command.template_id} already exists") from e
 
                 # Add new template
                 uow.templates.add(template)
@@ -147,7 +147,7 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, TemplateCo
         """Validate update template command."""
         await super().validate_command(command)
         if not command.template_id:
-            raise ValueError("template_id is required")
+            raise ValueError("template_id is required") from e
 
     async def execute_command(self, command: UpdateTemplateCommand) -> TemplateCommandResponse:
         """Update existing template with validation and events."""
@@ -179,7 +179,7 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, TemplateCo
                 # Get existing template
                 template = uow.templates.get_by_id(command.template_id)
                 if not template:
-                    raise EntityNotFoundError("Template", command.template_id)
+                    raise EntityNotFoundError("Template", command.template_id) from e
 
                 # Track changes for event
                 changes = {}
@@ -241,7 +241,7 @@ class DeleteTemplateHandler(BaseCommandHandler[DeleteTemplateCommand, TemplateCo
         """Validate delete template command."""
         await super().validate_command(command)
         if not command.template_id:
-            raise ValueError("template_id is required")
+            raise ValueError("template_id is required") from e
 
     async def execute_command(self, command: DeleteTemplateCommand) -> TemplateCommandResponse:
         """Delete template with validation and events."""
@@ -253,7 +253,7 @@ class DeleteTemplateHandler(BaseCommandHandler[DeleteTemplateCommand, TemplateCo
                 # Get existing template
                 template = uow.templates.get_by_id(command.template_id)
                 if not template:
-                    raise EntityNotFoundError("Template", command.template_id)
+                    raise EntityNotFoundError("Template", command.template_id) from e
 
                 # Check if template is in use (business rule)
                 # This could be expanded to check for active requests using this
@@ -310,9 +310,9 @@ class ValidateTemplateHandler(BaseCommandHandler[ValidateTemplateCommand, Templa
         """Validate template validation command."""
         await super().validate_command(command)
         if not command.template_id:
-            raise ValueError("template_id is required")
+            raise ValueError("template_id is required") from e
         if not command.configuration:
-            raise ValueError("configuration is required")
+            raise ValueError("configuration is required") from e
 
     async def execute_command(self, command: ValidateTemplateCommand) -> TemplateCommandResponse:
         """Validate template configuration with detailed results."""

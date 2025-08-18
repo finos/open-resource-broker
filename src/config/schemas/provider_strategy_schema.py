@@ -63,7 +63,7 @@ class HealthCheckConfig(BaseModel):
     def validate_interval(cls, v: int) -> int:
         """Validate health check interval."""
         if v <= 0:
-            raise ValueError("Health check interval must be positive")
+            raise ValueError("Health check interval must be positive") from e
         return v
 
     @field_validator("timeout")
@@ -71,7 +71,7 @@ class HealthCheckConfig(BaseModel):
     def validate_timeout(cls, v: int) -> int:
         """Validate health check timeout."""
         if v <= 0:
-            raise ValueError("Health check timeout must be positive")
+            raise ValueError("Health check timeout must be positive") from e
         return v
 
 
@@ -83,7 +83,7 @@ class CircuitBreakerConfig(BaseCircuitBreakerConfig):
     def validate_recovery_timeout(cls, v: int) -> int:
         """Validate recovery timeout."""
         if v <= 0:
-            raise ValueError("Recovery timeout must be positive")
+            raise ValueError("Recovery timeout must be positive") from e
         return v
 
 
@@ -161,7 +161,7 @@ class ProviderInstanceConfig(BaseModel):
     def validate_name(cls, v: str) -> str:
         """Validate provider name."""
         if not v or not v.strip():
-            raise ValueError("Provider name cannot be empty")
+            raise ValueError("Provider name cannot be empty") from e
         # Ensure name is valid for use as identifier
         if not v.replace("-", "").replace("_", "").isalnum():
             raise ValueError(
@@ -175,7 +175,7 @@ class ProviderInstanceConfig(BaseModel):
         """Validate provider type."""
         valid_types = ["aws", "provider1", "provider2"]  # Extensible list
         if v not in valid_types:
-            raise ValueError(f"Provider type must be one of {valid_types}")
+            raise ValueError(f"Provider type must be one of {valid_types}") from e
         return v
 
     @field_validator("weight")
@@ -183,7 +183,7 @@ class ProviderInstanceConfig(BaseModel):
     def validate_weight(cls, v: int) -> int:
         """Validate provider weight."""
         if v <= 0:
-            raise ValueError("Provider weight must be positive")
+            raise ValueError("Provider weight must be positive") from e
         return v
 
 
@@ -234,7 +234,7 @@ class ProviderConfig(BaseModel):
             "PERFORMANCE_BASED",
         ]
         if v not in valid_policies:
-            raise ValueError(f"Selection policy must be one of {valid_policies}")
+            raise ValueError(f"Selection policy must be one of {valid_policies}") from e
         return v
 
     @field_validator("health_check_interval")
@@ -242,7 +242,7 @@ class ProviderConfig(BaseModel):
     def validate_health_check_interval(cls, v: int) -> int:
         """Validate health check interval."""
         if v <= 0:
-            raise ValueError("Health check interval must be positive")
+            raise ValueError("Health check interval must be positive") from e
         return v
 
     @model_validator(mode="after")
@@ -259,11 +259,11 @@ class ProviderConfig(BaseModel):
         # Validate unique provider names
         provider_names = [p.name for p in self.providers]
         if len(provider_names) != len(set(provider_names)):
-            raise ValueError("Provider names must be unique")
+            raise ValueError("Provider names must be unique") from e
 
         # Validate at least one provider is configured
         if not self.providers:
-            raise ValueError("At least one provider must be configured")
+            raise ValueError("At least one provider must be configured") from e
 
         return self
 

@@ -274,4 +274,4 @@ def create_template_cache_service(
     elif cache_type == "auto_refresh":
         return AutoRefreshTemplateCacheService(logger=logger, **kwargs)
     else:
-        raise ValueError(f"Unsupported cache type: {cache_type}")
+        raise ValueError(f"Unsupported cache type: {cache_type}") from e

@@ -75,7 +75,7 @@ class AWSOperations:
             else:
                 self._logger.info("Using EC2 client directly for %s termination", operation_context)
                 if not self._retry_with_backoff:
-                    raise ValueError("Retry method not set. Call set_retry_method first.")
+                    raise ValueError("Retry method not set. Call set_retry_method first.") from e
 
                 result = self._retry_with_backoff(
                     self.aws_client.ec2_client.terminate_instances,
@@ -122,7 +122,7 @@ class AWSOperations:
             self._logger.debug("Executing %s with operation_type=%s", operation_name, operation_type)
 
             if not self._retry_with_backoff:
-                raise ValueError("Retry method not set. Call set_retry_method first.")
+                raise ValueError("Retry method not set. Call set_retry_method first.") from e
 
             result = self._retry_with_backoff(operation, operation_type=operation_type, **kwargs)
 
@@ -168,7 +168,7 @@ class AWSOperations:
 
         try:
             if not self._retry_with_backoff:
-                raise ValueError("Retry method not set. Call set_retry_method first.")
+                raise ValueError("Retry method not set. Call set_retry_method first.") from e
 
             # Use the handler's existing _paginate method through retry
             result = self._retry_with_backoff(
@@ -266,7 +266,7 @@ class AWSOperations:
             self._logger.debug("Checking status for %s: %s", resource_type, resource_id)
 
             if not self._retry_with_backoff:
-                raise ValueError("Retry method not set. Call set_retry_method first.")
+                raise ValueError("Retry method not set. Call set_retry_method first.") from e
 
             response = self._retry_with_backoff(
                 describe_method, operation_type="read_only", **describe_params
@@ -318,7 +318,7 @@ class AWSOperations:
             self._logger.debug("Getting instances for %s: %s", resource_type, resource_id)
 
             if not self._retry_with_backoff:
-                raise ValueError("Retry method not set. Call set_retry_method first.")
+                raise ValueError("Retry method not set. Call set_retry_method first.") from e
 
             response = self._retry_with_backoff(
                 describe_instances_method, operation_type="read_only", **describe_params

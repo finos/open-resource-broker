@@ -168,7 +168,7 @@ class AWSLaunchTemplateManager:
         """
         # This would be implemented for base template strategy
         # For now, not implemented as we're using per-request strategy
-        raise NotImplementedError("Base template strategy not yet implemented")
+        raise NotImplementedError("Base template strategy not yet implemented") from e
 
     def _use_existing_template_strategy(self, aws_template: AWSTemplate) -> LaunchTemplateResult:
         """
@@ -272,7 +272,7 @@ class AWSLaunchTemplateManager:
         if not image_id:
             error_msg = f"Template {aws_template.template_id} has no image_id specified"
             self._logger.error(error_msg)
-            raise AWSValidationError(error_msg)
+            raise AWSValidationError(error_msg) from e
 
         # Log the image_id being used
         self._logger.info("Creating launch template with resolved image_id: %s", image_id)

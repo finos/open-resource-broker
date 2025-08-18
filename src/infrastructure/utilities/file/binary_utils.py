@@ -19,7 +19,7 @@ def read_binary_file(file_path: str) -> bytes:
         with open(file_path, "rb") as f:
             return f.read()
     except FileNotFoundError:
-        raise FileNotFoundError(f"Binary file not found: {file_path}")
+        raise FileNotFoundError(f"Binary file not found: {file_path}") from e
     except OSError as e:
         raise OSError(f"Failed to read binary file {file_path}: {str(e)}")
 
@@ -95,7 +95,7 @@ def get_file_hash(file_path: str, algorithm: str = "sha256") -> str:
     try:
         hasher = hashlib.new(algorithm)
     except ValueError:
-        raise ValueError(f"Unsupported hash algorithm: {algorithm}")
+        raise ValueError(f"Unsupported hash algorithm: {algorithm}") from e
 
     try:
         with open(file_path, "rb") as f:
@@ -104,7 +104,7 @@ def get_file_hash(file_path: str, algorithm: str = "sha256") -> str:
                 hasher.update(chunk)
         return hasher.hexdigest()
     except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {file_path}")
+        raise FileNotFoundError(f"File not found: {file_path}") from e
     except OSError as e:
         raise OSError(f"Failed to read file for hashing {file_path}: {str(e)}")
 
@@ -126,7 +126,7 @@ def get_file_mime_type(file_path: str) -> str:
     import os
 
     if not os.path.exists(file_path):
-        raise FileNotFoundError(f"File not found: {file_path}")
+        raise FileNotFoundError(f"File not found: {file_path}") from e
 
     mime_type, _ = mimetypes.guess_type(file_path)
     return mime_type or "application/octet-stream"
@@ -156,7 +156,7 @@ def is_binary_file(file_path: str) -> bool:
             text_chars = bytearray({7, 8, 9, 10, 12, 13, 27} | set(range(0x20, 0x100)) - {0x7F})
             return bool(chunk.translate(None, text_chars))
     except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {file_path}")
+        raise FileNotFoundError(f"File not found: {file_path}") from e
     except OSError as e:
         raise OSError(f"Failed to read file {file_path}: {str(e)}")
 

@@ -655,12 +655,12 @@ async def execute_command(args, app) -> Dict[str, Any]:
 
         # All handlers are now async functions - no special handling needed
         if handler_key not in COMMAND_HANDLERS:
-            raise ValueError(f"Unknown command: {args.resource} {args.action}")
+            raise ValueError(f"Unknown command: {args.resource} {args.action}") from e
 
         handler_func = COMMAND_HANDLERS[handler_key]
 
         if handler_func is None:
-            raise NotImplementedError(f"Command not yet implemented: {args.resource} {args.action}")
+            raise NotImplementedError(f"Command not yet implemented: {args.resource} {args.action}") from e
 
         # All handlers are async functions with decorators
         result = await handler_func(args)
@@ -751,7 +751,7 @@ async def main() -> None:
 
             app = Application(args.config)
             if not await app.initialize(dry_run=args.dry_run):
-                raise RuntimeError("Failed to initialize application")
+                raise RuntimeError("Failed to initialize application") from e
         except Exception as e:
             logger.error("Failed to initialize application: %s", e)
             if args.verbose:

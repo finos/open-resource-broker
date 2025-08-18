@@ -451,7 +451,7 @@ def get_days_in_month(year: int, month: int) -> int:
         ValueError: If the month is invalid
     """
     if month < 1 or month > 12:
-        raise ValueError("Month must be between 1 and 12")
+        raise ValueError("Month must be between 1 and 12") from e
 
     if month == 2:
         return 29 if is_leap_year(year) else 28

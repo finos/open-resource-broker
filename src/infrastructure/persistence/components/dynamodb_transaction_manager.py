@@ -31,7 +31,7 @@ class DynamoDBTransactionManager(TransactionManager):
     def begin_transaction(self) -> None:
         """Begin a new DynamoDB transaction."""
         if self.state == TransactionState.ACTIVE:
-            raise RuntimeError("Transaction already active")
+            raise RuntimeError("Transaction already active") from e
 
         self.state = TransactionState.ACTIVE
         self.transaction_items.clear()
@@ -52,10 +52,10 @@ class DynamoDBTransactionManager(TransactionManager):
             condition_expression: Optional condition expression
         """
         if self.state != TransactionState.ACTIVE:
-            raise RuntimeError("No active transaction")
+            raise RuntimeError("No active transaction") from e
 
         if len(self.transaction_items) >= self.max_transaction_items:
-            raise RuntimeError(f"Transaction cannot exceed {self.max_transaction_items} items")
+            raise RuntimeError(f"Transaction cannot exceed {self.max_transaction_items} items") from e
 
         put_request = {"Put": {"TableName": table_name, "Item": item}}
 
@@ -84,10 +84,10 @@ class DynamoDBTransactionManager(TransactionManager):
             condition_expression: Optional condition expression
         """
         if self.state != TransactionState.ACTIVE:
-            raise RuntimeError("No active transaction")
+            raise RuntimeError("No active transaction") from e
 
         if len(self.transaction_items) >= self.max_transaction_items:
-            raise RuntimeError(f"Transaction cannot exceed {self.max_transaction_items} items")
+            raise RuntimeError(f"Transaction cannot exceed {self.max_transaction_items} items") from e
 
         update_request = {
             "Update": {
@@ -119,10 +119,10 @@ class DynamoDBTransactionManager(TransactionManager):
             condition_expression: Optional condition expression
         """
         if self.state != TransactionState.ACTIVE:
-            raise RuntimeError("No active transaction")
+            raise RuntimeError("No active transaction") from e
 
         if len(self.transaction_items) >= self.max_transaction_items:
-            raise RuntimeError(f"Transaction cannot exceed {self.max_transaction_items} items")
+            raise RuntimeError(f"Transaction cannot exceed {self.max_transaction_items} items") from e
 
         delete_request = {"Delete": {"TableName": table_name, "Key": key}}
 
@@ -135,7 +135,7 @@ class DynamoDBTransactionManager(TransactionManager):
     def commit_transaction(self) -> None:
         """Commit the current DynamoDB transaction."""
         if self.state != TransactionState.ACTIVE:
-            raise RuntimeError("No active transaction to commit")
+            raise RuntimeError("No active transaction to commit") from e
 
         if not self.transaction_items:
             self.state = TransactionState.COMMITTED

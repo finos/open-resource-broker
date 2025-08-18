@@ -85,7 +85,7 @@ def resolve_ssm_parameter(parameter_path: str, aws_client: Any = None) -> str:
     try:
         # Require AWSClient for consistent configuration
         if not aws_client:
-            raise ValueError("AWSClient is required for SSM operations")
+            raise ValueError("AWSClient is required for SSM operations") from e
         ssm_client = aws_client.ssm_client
 
         # Use retry-enabled helper function
@@ -107,7 +107,7 @@ def resolve_ssm_parameter(parameter_path: str, aws_client: Any = None) -> str:
         raise InfrastructureError(
             "AWS.SSM",
             f"Failed to resolve SSM parameter {path}: {error_code} - {error_message}",
-        )
+        ) from e
 
     except Exception as e:
         logger.error(
@@ -242,7 +242,7 @@ def get_ssm_parameters_by_path(
     try:
         # Require AWSClient for consistent configuration
         if not aws_client:
-            raise ValueError("AWSClient is required for SSM operations")
+            raise ValueError("AWSClient is required for SSM operations") from e
         ssm_client = aws_client.ssm_client
 
         # Use retry-enabled helper function

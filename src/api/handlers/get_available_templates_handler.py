@@ -61,7 +61,7 @@ class GetAvailableTemplatesRESTHandler(BaseAPIHandler[Dict[str, Any], Dict[str, 
         # Basic validation - templates endpoint doesn't require specific parameters
         # but we can validate optional query parameters if present
         if "format" in request and request["format"] not in ["json", "yaml", "table"]:
-            raise ValueError(f"Invalid format: {request['format']}")
+            raise ValueError(f"Invalid format: {request['format']}") from e
 
     @handle_interface_exceptions
     async def execute_api_request(self, request: Dict[str, Any], context) -> Dict[str, Any]:

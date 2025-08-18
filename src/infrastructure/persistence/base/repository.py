@@ -47,7 +47,7 @@ class StrategyBasedRepository(Repository[T], Generic[T]):
         elif hasattr(entity, "machine_id"):
             return str(entity.machine_id)
         else:
-            raise ValueError(f"Cannot determine ID for entity: {entity}")
+            raise ValueError(f"Cannot determine ID for entity: {entity}") from e
 
     def _to_dict(self, entity: Any) -> Dict[str, Any]:
         """
@@ -310,7 +310,7 @@ class StrategyBasedRepository(Repository[T], Generic[T]):
         elif "machine_id" in data:
             return str(data["machine_id"])
         else:
-            raise ValueError(f"Cannot determine ID for entity data: {data}")
+            raise ValueError(f"Cannot determine ID for entity data: {data}") from e
 
     def delete(self, entity_id: Any) -> None:
         """
@@ -326,7 +326,7 @@ class StrategyBasedRepository(Repository[T], Generic[T]):
 
         # Check if entity exists
         if not self.exists(entity_id_str):
-            raise EntityNotFoundError(self.entity_class.__name__, entity_id_str)
+            raise EntityNotFoundError(self.entity_class.__name__, entity_id_str) from e
 
         # Delete entity from storage
         self.storage_strategy.delete(entity_id_str)
@@ -473,7 +473,7 @@ class StrategyBasedRepository(Repository[T], Generic[T]):
         # Check if entities exist
         for entity_id_str in entity_id_strs:
             if not self.exists(entity_id_str):
-                raise EntityNotFoundError(self.entity_class.__name__, entity_id_str)
+                raise EntityNotFoundError(self.entity_class.__name__, entity_id_str) from e
 
         # Delete entities from storage
         self.storage_strategy.delete_batch(entity_id_strs)

@@ -79,7 +79,7 @@ def _build_connection_string(sql_config: Any) -> str:
             host = sql_config.host
         return f"mysql://{sql_config.username}:{sql_config.password}@{host}:{sql_config.port}/{sql_config.name}"
     else:
-        raise ValueError(f"Unsupported database type: {db_type}")
+        raise ValueError(f"Unsupported database type: {db_type}") from e
 
 
 def create_sql_unit_of_work(config: Any) -> Any:

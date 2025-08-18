@@ -23,7 +23,7 @@ class MachineTemplate(APIRequest):
     def validate_machine_count(cls, v: int) -> int:
         """Validate machine count."""
         if v <= 0:
-            raise ValueError("Machine count must be greater than 0")
+            raise ValueError("Machine count must be greater than 0") from e
         return v
 
 

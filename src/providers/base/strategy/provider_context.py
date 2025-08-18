@@ -129,7 +129,7 @@ class ProviderContext:
             ValueError: If strategy is invalid or already registered
         """
         if not isinstance(strategy, ProviderStrategy):
-            raise ValueError("Strategy must implement ProviderStrategy interface")
+            raise ValueError("Strategy must implement ProviderStrategy interface") from e
 
         # Create unique strategy identifier
         base_type = strategy.provider_type
@@ -549,7 +549,7 @@ class ProviderContext:
     def __enter__(self) -> "ProviderContext":
         """Context manager entry."""
         if not self._initialized and not self.initialize():
-            raise RuntimeError("Failed to initialize provider context")
+            raise RuntimeError("Failed to initialize provider context") from e
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:

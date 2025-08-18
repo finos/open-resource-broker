@@ -82,7 +82,7 @@ class AWSTemplateExtensionConfig(BaseModel):
     def validate_subnet_ids(cls, v: Optional[List[str]]) -> Optional[List[str]]:
         """Validate subnet IDs."""
         if v is not None and not v:
-            raise ValueError("If subnet_ids is provided, at least one subnet ID is required")
+            raise ValueError("If subnet_ids is provided, at least one subnet ID is required") from e
         return v
 
     @field_validator("security_group_ids")
@@ -100,7 +100,7 @@ class AWSTemplateExtensionConfig(BaseModel):
     def validate_spot_fleet_request_expiry(cls, v: int) -> int:
         """Validate spot fleet request expiry."""
         if v <= 0:
-            raise ValueError("Spot fleet request expiry must be positive")
+            raise ValueError("Spot fleet request expiry must be positive") from e
         return v
 
     @field_validator("percent_on_demand")
@@ -108,7 +108,7 @@ class AWSTemplateExtensionConfig(BaseModel):
     def validate_percent_on_demand(cls, v: int) -> int:
         """Validate percent on demand."""
         if not (0 <= v <= 100):
-            raise ValueError("Percent on demand must be between 0 and 100")
+            raise ValueError("Percent on demand must be between 0 and 100") from e
         return v
 
     def to_template_defaults(self) -> Dict[str, any]:

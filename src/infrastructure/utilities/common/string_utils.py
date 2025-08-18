@@ -153,7 +153,7 @@ def hash_string(value: str, algorithm: str = "sha256") -> str:
     elif algorithm == "sha512":
         return hashlib.sha512(value.encode()).hexdigest()
     else:
-        raise ValueError(f"Unsupported hash algorithm: {algorithm}")
+        raise ValueError(f"Unsupported hash algorithm: {algorithm}") from e
 
 
 def mask_sensitive_data(value: str, mask_char: str = "*", visible_chars: int = 4) -> str:
@@ -209,7 +209,7 @@ def convert_case(value: str, case_type: str) -> str:
     elif case_type == "kebab":
         return to_kebab_case(value)
     else:
-        raise ValueError(f"Unsupported case type: {case_type}")
+        raise ValueError(f"Unsupported case type: {case_type}") from e
 
 
 def convert_dict_keys(data: Dict[str, Any], case_type: str) -> Dict[str, Any]:

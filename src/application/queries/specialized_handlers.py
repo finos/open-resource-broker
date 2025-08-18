@@ -96,7 +96,7 @@ class GetRequestSummaryHandler(BaseQueryHandler[GetRequestSummaryQuery, RequestS
                 # Get request from repository
                 request = uow.requests.get_by_id(query.request_id)
                 if not request:
-                    raise EntityNotFoundError("Request", query.request_id)
+                    raise EntityNotFoundError("Request", query.request_id) from e
 
                 # Get associated machines
                 machines = uow.machines.find_by_request_id(query.request_id)
@@ -166,7 +166,7 @@ class GetMachineHealthHandler(BaseQueryHandler[GetMachineHealthQuery, MachineHea
                 # Get machine from repository
                 machine = uow.machines.get_by_id(query.machine_id)
                 if not machine:
-                    raise EntityNotFoundError("Machine", query.machine_id)
+                    raise EntityNotFoundError("Machine", query.machine_id) from e
 
                 # Get health information
                 health_status = "unknown"

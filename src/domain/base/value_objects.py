@@ -41,7 +41,7 @@ class ResourceId(ValueObject):
             ValueError: If resource ID is empty or whitespace only
         """
         if not v or not v.strip():
-            raise ValueError("Resource ID cannot be empty")
+            raise ValueError("Resource ID cannot be empty") from e
         return v.strip()
 
     def __str__(self) -> str:
@@ -135,10 +135,10 @@ class InstanceType(ValueObject):
     def validate_instance_type(cls, v: str) -> str:
         """Validate instance type format."""
         if not v or not isinstance(v, str):
-            raise ValueError("Instance type must be a non-empty string")
+            raise ValueError("Instance type must be a non-empty string") from e
         stripped = v.strip()
         if not stripped:
-            raise ValueError("Instance type must be a non-empty string")
+            raise ValueError("Instance type must be a non-empty string") from e
         return stripped
 
 
@@ -199,7 +199,7 @@ class ARN(ValueObject):
         # Basic resource identifier format validation
         # Provider-specific validation should be done in provider layers
         if not v or len(v.strip()) == 0:
-            raise ValueError("Resource ID cannot be empty")
+            raise ValueError("Resource ID cannot be empty") from e
         return v
 
 

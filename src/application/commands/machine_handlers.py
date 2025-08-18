@@ -66,16 +66,16 @@ class UpdateMachineStatusHandler(BaseCommandHandler[UpdateMachineStatusCommand, 
         """Validate machine status update command."""
         await super().validate_command(command)
         if not command.machine_id:
-            raise ValueError("machine_id is required")
+            raise ValueError("machine_id is required") from e
         if not command.status:
-            raise ValueError("status is required")
+            raise ValueError("status is required") from e
 
     async def execute_command(self, command: UpdateMachineStatusCommand) -> None:
         """Execute machine status update command - error handling via base handler."""
         # Get machine
         machine = await self._machine_repository.get_by_id(command.machine_id)
         if not machine:
-            raise ValueError(f"Machine not found: {command.machine_id}")
+            raise ValueError(f"Machine not found: {command.machine_id}") from e
 
         # Update status
         machine.update_status(command.status, command.metadata)
@@ -108,9 +108,9 @@ class ConvertMachineStatusCommandHandler(
         """Validate machine status conversion command."""
         await super().validate_command(command)
         if not command.provider_state:
-            raise ValueError("provider_state is required")
+            raise ValueError("provider_state is required") from e
         if not command.provider_type:
-            raise ValueError("provider_type is required")
+            raise ValueError("provider_type is required") from e
 
     async def execute_command(
         self, command: ConvertMachineStatusCommand
@@ -148,7 +148,7 @@ class ConvertMachineStatusCommandHandler(
         """Convert using provider strategy pattern."""
         # Set the appropriate provider strategy
         if not self._provider_context.set_strategy(provider_type):
-            raise ValueError(f"Unsupported provider type: {provider_type}")
+            raise ValueError(f"Unsupported provider type: {provider_type}") from e
 
         # Create provider operation for status conversion
         operation = ProviderOperation(
@@ -208,7 +208,7 @@ class ConvertBatchMachineStatusCommandHandler(
         """Validate batch conversion command."""
         await super().validate_command(command)
         if not command.provider_states:
-            raise ValueError("provider_states is required")
+            raise ValueError("provider_states is required") from e
 
     async def execute_command(
         self, command: ConvertBatchMachineStatusCommand
@@ -257,9 +257,9 @@ class ValidateProviderStateCommandHandler(
         """Validate provider state validation command."""
         await super().validate_command(command)
         if not command.provider_state:
-            raise ValueError("provider_state is required")
+            raise ValueError("provider_state is required") from e
         if not command.provider_type:
-            raise ValueError("provider_type is required")
+            raise ValueError("provider_type is required") from e
 
     async def execute_command(
         self, command: ValidateProviderStateCommand
@@ -321,7 +321,7 @@ class CleanupMachineResourcesHandler(BaseCommandHandler[CleanupMachineResourcesC
         """Validate cleanup command."""
         await super().validate_command(command)
         if not command.machine_id:
-            raise ValueError("machine_id is required")
+            raise ValueError("machine_id is required") from e
 
     async def execute_command(self, command: CleanupMachineResourcesCommand) -> None:
         """Execute machine cleanup command - error handling via base handler."""
@@ -359,16 +359,16 @@ class RegisterMachineHandler(BaseCommandHandler[RegisterMachineCommand, None]):
         """Validate machine registration command."""
         await super().validate_command(command)
         if not command.machine_id:
-            raise ValueError("machine_id is required")
+            raise ValueError("machine_id is required") from e
         if not command.template_id:
-            raise ValueError("template_id is required")
+            raise ValueError("template_id is required") from e
 
     async def execute_command(self, command: RegisterMachineCommand) -> None:
         """Execute machine registration command."""
         # Check if machine already exists
         existing_machine = await self._machine_repository.get_by_id(command.machine_id)
         if existing_machine:
-            raise ValueError(f"Machine already registered: {command.machine_id}")
+            raise ValueError(f"Machine already registered: {command.machine_id}") from e
 
         # Create new machine
         from domain.machine.aggregate import Machine
@@ -403,7 +403,7 @@ class DeregisterMachineHandler(BaseCommandHandler[DeregisterMachineCommand, None
         """Validate machine deregistration command."""
         await super().validate_command(command)
         if not command.machine_id:
-            raise ValueError("machine_id is required")
+            raise ValueError("machine_id is required") from e
 
     async def execute_command(self, command: DeregisterMachineCommand) -> None:
         """Execute machine deregistration command."""

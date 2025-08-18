@@ -188,7 +188,7 @@ class RequestConfig(BaseModel):
     def validate_max_machines(cls, v: int) -> int:
         """Validate max machines per request."""
         if v < 1:
-            raise ValueError("Maximum machines per request must be at least 1")
+            raise ValueError("Maximum machines per request must be at least 1") from e
         return v
 
 
@@ -204,7 +204,7 @@ class DatabaseConfig(BaseModel):
     def validate_timeouts(cls, v: int) -> int:
         """Validate timeout values."""
         if v < 1:
-            raise ValueError("Timeout must be at least 1 second")
+            raise ValueError("Timeout must be at least 1 second") from e
         return v
 
     @field_validator("max_connections")
@@ -212,7 +212,7 @@ class DatabaseConfig(BaseModel):
     def validate_max_connections(cls, v: int) -> int:
         """Validate max connections."""
         if v < 1:
-            raise ValueError("Maximum connections must be at least 1")
+            raise ValueError("Maximum connections must be at least 1") from e
         return v
 
 
@@ -228,7 +228,7 @@ class EventsConfig(BaseModel):
     def validate_max_events(cls, v: int) -> int:
         """Validate max events per request."""
         if v < 1:
-            raise ValueError("Maximum events per request must be at least 1")
+            raise ValueError("Maximum events per request must be at least 1") from e
         return v
 
     @field_validator("event_retention_days")
@@ -236,5 +236,5 @@ class EventsConfig(BaseModel):
     def validate_retention_days(cls, v: int) -> int:
         """Validate event retention days."""
         if v < 1:
-            raise ValueError("Event retention days must be at least 1")
+            raise ValueError("Event retention days must be at least 1") from e
         return v

@@ -27,7 +27,7 @@ class AWSAMIResolver(ImageResolver):
             ValueError: If AMI cannot be resolved
         """
         if not image_reference:
-            raise ValueError("Image reference cannot be empty")
+            raise ValueError("Image reference cannot be empty") from e
 
         # Direct AMI ID - return as-is
         if image_reference.startswith("ami-"):
@@ -143,4 +143,4 @@ class AWSAMIResolver(ImageResolver):
             # Recursively resolve the SSM parameter
             return self.resolve_image_id(alias_mappings[alias])
 
-        raise ValueError(f"Unknown AMI alias: {alias}")
+        raise ValueError(f"Unknown AMI alias: {alias}") from e

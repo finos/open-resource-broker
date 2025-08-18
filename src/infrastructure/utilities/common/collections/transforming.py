@@ -83,7 +83,7 @@ def chunk(collection: List[T], size: int) -> List[List[T]]:
         List of chunks
     """
     if size <= 0:
-        raise ValueError("Chunk size must be positive")
+        raise ValueError("Chunk size must be positive") from e
 
     return [collection[i : i + size] for i in range(0, len(collection), size)]
 

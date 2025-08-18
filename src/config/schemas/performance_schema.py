@@ -22,7 +22,7 @@ class BatchSizesConfig(BaseModel):
     def validate_batch_size(cls, v: int) -> int:
         """Validate batch size."""
         if v < 1:
-            raise ValueError("Batch size must be at least 1")
+            raise ValueError("Batch size must be at least 1") from e
         return v
 
 
@@ -45,7 +45,7 @@ class AdaptiveBatchSizingConfig(BaseModel):
     def validate_batch_sizes(cls, v: int) -> int:
         """Validate batch sizes."""
         if v < 1:
-            raise ValueError("Batch size must be at least 1")
+            raise ValueError("Batch size must be at least 1") from e
         return v
 
     @field_validator("increase_factor", "decrease_factor")
@@ -53,7 +53,7 @@ class AdaptiveBatchSizingConfig(BaseModel):
     def validate_factors(cls, v: float) -> float:
         """Validate increase/decrease factors."""
         if v <= 0:
-            raise ValueError("Factor must be positive")
+            raise ValueError("Factor must be positive") from e
         return v
 
     @field_validator("success_threshold", "failure_threshold")
@@ -61,7 +61,7 @@ class AdaptiveBatchSizingConfig(BaseModel):
     def validate_thresholds(cls, v: int) -> int:
         """Validate thresholds."""
         if v < 1:
-            raise ValueError("Threshold must be at least 1")
+            raise ValueError("Threshold must be at least 1") from e
         return v
 
     @field_validator("history_size")
@@ -69,20 +69,20 @@ class AdaptiveBatchSizingConfig(BaseModel):
     def validate_history_size(cls, v: int) -> int:
         """Validate history size."""
         if v < 1:
-            raise ValueError("History size must be at least 1")
+            raise ValueError("History size must be at least 1") from e
         return v
 
     @model_validator(mode="after")
     def validate_batch_size_relationships(self) -> "AdaptiveBatchSizingConfig":
         """Validate relationships between batch sizes."""
         if self.min_batch_size > self.max_batch_size:
-            raise ValueError("Minimum batch size cannot be greater than maximum batch size")
+            raise ValueError("Minimum batch size cannot be greater than maximum batch size") from e
 
         if (
             self.initial_batch_size < self.min_batch_size
             or self.initial_batch_size > self.max_batch_size
         ):
-            raise ValueError("Initial batch size must be between minimum and maximum batch sizes")
+            raise ValueError("Initial batch size must be between minimum and maximum batch sizes") from e
 
         return self
 
@@ -99,7 +99,7 @@ class AMIResolutionCacheConfig(BaseModel):
     def validate_ttl_seconds(cls, v: int) -> int:
         """Validate AMI cache TTL."""
         if v < 0:
-            raise ValueError("AMI cache TTL must be non-negative")
+            raise ValueError("AMI cache TTL must be non-negative") from e
         return v
 
 
@@ -121,7 +121,7 @@ class RequestStatusCacheConfig(BaseModel):
     def validate_ttl_seconds(cls, v: int) -> int:
         """Validate request status cache TTL."""
         if v < 0:
-            raise ValueError("Request status cache TTL must be non-negative")
+            raise ValueError("Request status cache TTL must be non-negative") from e
         return v
 
 
@@ -163,7 +163,7 @@ class PerformanceConfig(BaseModel):
     def validate_max_workers(cls, v: int) -> int:
         """Validate max workers."""
         if v < 1:
-            raise ValueError("Maximum workers must be at least 1")
+            raise ValueError("Maximum workers must be at least 1") from e
         return v
 
     @field_validator("cache_ttl")
@@ -171,7 +171,7 @@ class PerformanceConfig(BaseModel):
     def validate_cache_ttl(cls, v: int) -> int:
         """Validate cache TTL."""
         if v < 0:
-            raise ValueError("Cache TTL must be non-negative")
+            raise ValueError("Cache TTL must be non-negative") from e
         return v
 
 

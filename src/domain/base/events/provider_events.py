@@ -25,9 +25,9 @@ class ProviderOperationEvent(DomainEvent):
         object.__setattr__(self, "aggregate_type", f"{self.provider_type.value}_resource")
         super().__post_init__()
         if not self.operation_type:
-            raise ValueError("Operation type cannot be empty")
+            raise ValueError("Operation type cannot be empty") from e
         if not self.provider_resource_type:
-            raise ValueError("Resource type cannot be empty")
+            raise ValueError("Resource type cannot be empty") from e
 
 
 @dataclass(frozen=True)
@@ -44,9 +44,9 @@ class ProviderRateLimitEvent(DomainEvent):
         object.__setattr__(self, "aggregate_type", f"{self.provider_type.value}_service")
         super().__post_init__()
         if not self.service_name:
-            raise ValueError("Service name cannot be empty")
+            raise ValueError("Service name cannot be empty") from e
         if not self.operation_name:
-            raise ValueError("Operation name cannot be empty")
+            raise ValueError("Operation name cannot be empty") from e
 
 
 @dataclass(frozen=True)
@@ -64,11 +64,11 @@ class ProviderCredentialsEvent(DomainEvent):
         object.__setattr__(self, "aggregate_type", f"{self.provider_type.value}_auth")
         super().__post_init__()
         if not self.credential_type:
-            raise ValueError("Credential type cannot be empty")
+            raise ValueError("Credential type cannot be empty") from e
         if not self.operation:
-            raise ValueError("Operation cannot be empty")
+            raise ValueError("Operation cannot be empty") from e
         if not self.status:
-            raise ValueError("Status cannot be empty")
+            raise ValueError("Status cannot be empty") from e
 
 
 @dataclass(frozen=True)
@@ -89,9 +89,9 @@ class ProviderResourceStateChangedEvent(DomainEvent):
         )
         super().__post_init__()
         if not self.resource_type:
-            raise ValueError("Resource type cannot be empty")
+            raise ValueError("Resource type cannot be empty") from e
         if not self.resource_id:
-            raise ValueError("Resource ID cannot be empty")
+            raise ValueError("Resource ID cannot be empty") from e
 
 
 @dataclass(frozen=True)
@@ -109,7 +109,7 @@ class ProviderConfigurationEvent(DomainEvent):
         object.__setattr__(self, "aggregate_type", f"{self.provider_type.value}_configuration")
         super().__post_init__()
         if not self.configuration_type:
-            raise ValueError("Configuration type cannot be empty")
+            raise ValueError("Configuration type cannot be empty") from e
 
 
 @dataclass(frozen=True)
@@ -127,9 +127,9 @@ class ProviderHealthCheckEvent(DomainEvent):
         object.__setattr__(self, "aggregate_type", f"{self.provider_type.value}_health")
         super().__post_init__()
         if not self.service_name:
-            raise ValueError("Service name cannot be empty")
+            raise ValueError("Service name cannot be empty") from e
         if not self.health_status:
-            raise ValueError("Health status cannot be empty")
+            raise ValueError("Health status cannot be empty") from e
 
 
 class ProviderStrategySelectedEvent(DomainEvent):

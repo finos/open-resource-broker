@@ -23,12 +23,12 @@ class LoadBalancingConfig:
     def __post_init__(self):
         """Validate configuration after initialization."""
         if self.health_check_interval_seconds <= 0:
-            raise ValueError("health_check_interval_seconds must be positive")
+            raise ValueError("health_check_interval_seconds must be positive") from e
         if self.unhealthy_threshold < 1:
-            raise ValueError("unhealthy_threshold must be at least 1")
+            raise ValueError("unhealthy_threshold must be at least 1") from e
         if self.recovery_threshold < 1:
-            raise ValueError("recovery_threshold must be at least 1")
+            raise ValueError("recovery_threshold must be at least 1") from e
         if self.max_connections_per_strategy < 1:
-            raise ValueError("max_connections_per_strategy must be at least 1")
+            raise ValueError("max_connections_per_strategy must be at least 1") from e
         if not 0 < self.weight_adjustment_factor <= 1:
-            raise ValueError("weight_adjustment_factor must be between 0 and 1")
+            raise ValueError("weight_adjustment_factor must be between 0 and 1") from e

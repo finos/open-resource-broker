@@ -148,10 +148,10 @@ class RunInstancesHandler(AWSHandler):
         instance_ids = [instance["InstanceId"] for instance in response.get("Instances", [])]
 
         if not instance_ids:
-            raise AWSInfrastructureError("No instances were created by RunInstances")
+            raise AWSInfrastructureError("No instances were created by RunInstances") from e
 
         if not reservation_id:
-            raise AWSInfrastructureError("No reservation ID returned by RunInstances")
+            raise AWSInfrastructureError("No reservation ID returned by RunInstances") from e
 
         # Use the actual AWS reservation ID as the resource ID
         resource_id = reservation_id

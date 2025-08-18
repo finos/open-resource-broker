@@ -43,9 +43,9 @@ class ResourceSpecification:
     def __post_init__(self):
         """Validate resource specification."""
         if not self.name:
-            raise ValueError("Resource name cannot be empty")
+            raise ValueError("Resource name cannot be empty") from e
         if not self.configuration:
-            raise ValueError("Resource configuration cannot be empty")
+            raise ValueError("Resource configuration cannot be empty") from e
 
 
 @dataclass(frozen=True)

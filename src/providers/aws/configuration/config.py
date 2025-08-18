@@ -157,5 +157,5 @@ class AWSProviderConfig(BaseProviderConfig):
             ValueError: If proxy_host is specified but proxy_port is not
         """
         if self.proxy_host and self.proxy_port is None:
-            raise ValueError("proxy_port is required when proxy_host is specified")
+            raise ValueError("proxy_port is required when proxy_host is specified") from e
         return self

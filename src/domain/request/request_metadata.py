@@ -35,10 +35,10 @@ class RequestTimeout(ValueObject):
             ValueError: If timeout is invalid (not integer, not positive, or exceeds 1 day)
         """
         if not isinstance(v, int):
-            raise ValueError("Timeout must be an integer")
+            raise ValueError("Timeout must be an integer") from e
 
         if v <= 0:
-            raise ValueError("Timeout must be positive")
+            raise ValueError("Timeout must be positive") from e
 
         # Reasonable upper limit (1 day)
         if v > 86400:
@@ -107,10 +107,10 @@ class MachineCount(ValueObject):
             ValueError: If machine count is invalid or exceeds maximum allowed
         """
         if not isinstance(self.value, int):
-            raise ValueError("Machine count must be an integer")
+            raise ValueError("Machine count must be an integer") from e
 
         if self.value <= 0:
-            raise ValueError("Machine count must be positive")
+            raise ValueError("Machine count must be positive") from e
 
         # Get max allowed from configuration if not provided
         max_allowed = self.max_allowed
@@ -131,7 +131,7 @@ class MachineCount(ValueObject):
                 object.__setattr__(self, "max_allowed", max_allowed)
 
         if self.value > max_allowed:
-            raise ValueError(f"Machine count cannot exceed {max_allowed}")
+            raise ValueError(f"Machine count cannot exceed {max_allowed}") from e
 
         return self
 
@@ -184,11 +184,11 @@ class RequestTag(ValueObject):
             ValueError: If key is empty or invalid format
         """
         if not v or not isinstance(v, str):
-            raise ValueError("Tag key must be a non-empty string")
+            raise ValueError("Tag key must be a non-empty string") from e
 
         # AWS tag key restrictions
         if len(v) > 128:
-            raise ValueError("Tag key cannot exceed 128 characters")
+            raise ValueError("Tag key cannot exceed 128 characters") from e
 
         return v.strip()
 
@@ -207,11 +207,11 @@ class RequestTag(ValueObject):
             ValueError: If value exceeds maximum length
         """
         if not isinstance(v, str):
-            raise ValueError("Tag value must be a string")
+            raise ValueError("Tag value must be a string") from e
 
         # AWS tag value restrictions
         if len(v) > 256:
-            raise ValueError("Tag value cannot exceed 256 characters")
+            raise ValueError("Tag value cannot exceed 256 characters") from e
 
         return v.strip()
 
@@ -227,7 +227,7 @@ class RequestTag(ValueObject):
     def from_string(cls, tag_string: str) -> "RequestTag":
         """Create tag from key=value string."""
         if "=" not in tag_string:
-            raise ValueError("Tag string must be in format 'key=value'")
+            raise ValueError("Tag string must be in format 'key=value'") from e
 
         key, value = tag_string.split("=", 1)
         return cls(key=key.strip(), value=value.strip())
@@ -273,7 +273,7 @@ class RequestConfiguration(ValueObject):
             ValueError: If template ID is empty or invalid
         """
         if not v or not isinstance(v, str):
-            raise ValueError("Template ID must be a non-empty string")
+            raise ValueError("Template ID must be a non-empty string") from e
         return v.strip()
 
     @field_validator("machine_count")
@@ -291,11 +291,11 @@ class RequestConfiguration(ValueObject):
             ValueError: If machine count is invalid or exceeds limits
         """
         if not isinstance(v, int) or v <= 0:
-            raise ValueError("Machine count must be a positive integer")
+            raise ValueError("Machine count must be a positive integer") from e
 
         # Basic upper limit check
         if v > 1000:
-            raise ValueError("Machine count cannot exceed 1000")
+            raise ValueError("Machine count cannot exceed 1000") from e
 
         return v
 
@@ -314,7 +314,7 @@ class RequestConfiguration(ValueObject):
             ValueError: If timeout is invalid or exceeds maximum
         """
         if not isinstance(v, int) or v <= 0:
-            raise ValueError("Timeout must be a positive integer")
+            raise ValueError("Timeout must be a positive integer") from e
 
         # Upper limit check (1 day)
         if v > 86400:
@@ -386,7 +386,7 @@ class LaunchTemplateInfo(ValueObject):
     def validate_template_id(cls, v: str) -> str:
         """Validate template ID format."""
         if not v or not isinstance(v, str):
-            raise ValueError("Template ID must be a non-empty string")
+            raise ValueError("Template ID must be a non-empty string") from e
         return v.strip()
 
     @field_validator("version")
@@ -394,7 +394,7 @@ class LaunchTemplateInfo(ValueObject):
     def validate_version(cls, v: str) -> str:
         """Validate template version format."""
         if not v or not isinstance(v, str):
-            raise ValueError("Template version must be a non-empty string")
+            raise ValueError("Template version must be a non-empty string") from e
         return v.strip()
 
     def __str__(self) -> str:
@@ -436,7 +436,7 @@ class RequestHistoryEvent(ValueObject):
     def validate_event_type(cls, v: str) -> str:
         """Validate event type format."""
         if not v or not isinstance(v, str):
-            raise ValueError("Event type must be a non-empty string")
+            raise ValueError("Event type must be a non-empty string") from e
 
         # Normalize to lowercase with underscores
         normalized = v.lower().replace("-", "_").replace(" ", "_")
@@ -447,13 +447,13 @@ class RequestHistoryEvent(ValueObject):
     def validate_timestamp(cls, v: str) -> str:
         """Validate timestamp format."""
         if not v or not isinstance(v, str):
-            raise ValueError("Timestamp must be a non-empty string")
+            raise ValueError("Timestamp must be a non-empty string") from e
 
         # Basic ISO format validation
         try:
             datetime.fromisoformat(v.replace("Z", "+00:00"))
         except ValueError:
-            raise ValueError("Timestamp must be in ISO format")
+            raise ValueError("Timestamp must be in ISO format") from e
 
         return v
 
@@ -462,7 +462,7 @@ class RequestHistoryEvent(ValueObject):
     def validate_message(cls, v: str) -> str:
         """Validate event message format."""
         if not v or not isinstance(v, str):
-            raise ValueError("Event message must be a non-empty string")
+            raise ValueError("Event message must be a non-empty string") from e
         return v.strip()
 
     def __str__(self) -> str:

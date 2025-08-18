@@ -70,7 +70,7 @@ def register_all_storage_types() -> None:
 
     if not registered_types:
         logger.error("No storage types were successfully registered!")
-        raise RuntimeError("Failed to register any storage types")
+        raise RuntimeError("Failed to register any storage types") from e
 
 
 def register_storage_type_on_demand(storage_type: str) -> bool:

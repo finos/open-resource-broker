@@ -62,13 +62,13 @@ class CompositionConfig:
     def __post_init__(self):
         """Validate configuration after initialization."""
         if self.max_concurrent_operations < 1:
-            raise ValueError("max_concurrent_operations must be at least 1")
+            raise ValueError("max_concurrent_operations must be at least 1") from e
         if self.timeout_seconds <= 0:
-            raise ValueError("timeout_seconds must be positive")
+            raise ValueError("timeout_seconds must be positive") from e
         if self.min_success_count < 1:
-            raise ValueError("min_success_count must be at least 1")
+            raise ValueError("min_success_count must be at least 1") from e
         if not 0 <= self.failure_threshold <= 1:
-            raise ValueError("failure_threshold must be between 0 and 1")
+            raise ValueError("failure_threshold must be between 0 and 1") from e
 
 
 @dataclass
@@ -121,7 +121,7 @@ class CompositeProviderStrategy(ProviderStrategy):
             ValueError: If strategies list is empty or invalid
         """
         if not strategies:
-            raise ValueError("At least one strategy is required for composition")
+            raise ValueError("At least one strategy is required for composition") from e
 
         # Create a dummy config for the parent class
 
@@ -229,7 +229,7 @@ class CompositeProviderStrategy(ProviderStrategy):
             return False
 
         if not 0.0 <= weight <= 1.0:
-            raise ValueError("Weight must be between 0.0 and 1.0")
+            raise ValueError("Weight must be between 0.0 and 1.0") from e
 
         self._strategy_weights[strategy_type] = weight
         self._self._logger.debug("Set weight for %s: %s", strategy_type, weight)

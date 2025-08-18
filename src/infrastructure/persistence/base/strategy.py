@@ -219,7 +219,7 @@ class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
             Self for use in with statement
         """
         if self._is_closed:
-            raise PersistenceError("Cannot enter context with closed storage strategy")
+            raise PersistenceError("Cannot enter context with closed storage strategy") from e
         return self
 
     def __exit__(
@@ -267,7 +267,7 @@ class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
             PersistenceError: If there's an error beginning the transaction
         """
         if self._in_transaction:
-            raise PersistenceError("Transaction already in progress")
+            raise PersistenceError("Transaction already in progress") from e
 
         try:
             # Take a snapshot of the current state
@@ -293,7 +293,7 @@ class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
             PersistenceError: If there's an error committing the transaction
         """
         if not self._in_transaction:
-            raise PersistenceError("No transaction in progress")
+            raise PersistenceError("No transaction in progress") from e
 
         try:
             # Clear the snapshot
@@ -310,7 +310,7 @@ class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
             PersistenceError: If there's an error rolling back the transaction
         """
         if not self._in_transaction:
-            raise PersistenceError("No transaction in progress")
+            raise PersistenceError("No transaction in progress") from e
 
         try:
             # Restore from snapshot
@@ -380,7 +380,7 @@ class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
         elif "template_id" in data:
             return str(data["template_id"])
         else:
-            raise ValueError(f"Cannot determine ID for entity data: {data}")
+            raise ValueError(f"Cannot determine ID for entity data: {data}") from e
 
     def find_by_criteria(self, criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
         """

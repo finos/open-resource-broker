@@ -60,7 +60,7 @@ class TemplatePersistenceService:
             # Get template file paths from scheduler strategy
             template_paths = self.scheduler_strategy.get_template_paths()
             if not template_paths:
-                raise ValueError("No template paths available from scheduler strategy")
+                raise ValueError("No template paths available from scheduler strategy") from e
 
             # Use first path as primary target (scheduler strategy determines priority)
             target_file = Path(template_paths[0])
@@ -123,7 +123,7 @@ class TemplatePersistenceService:
                 # Use first template path as default
                 template_paths = self.scheduler_strategy.get_template_paths()
                 if not template_paths:
-                    raise ValueError("No template paths available from scheduler strategy")
+                    raise ValueError("No template paths available from scheduler strategy") from e
                 target_file = Path(template_paths[0])
 
             # Load existing templates from source file
@@ -138,7 +138,7 @@ class TemplatePersistenceService:
             ]
 
             if len(existing_templates) == original_count:
-                raise ValueError(f"Template {template_id} not found in source file")
+                raise ValueError(f"Template {template_id} not found in source file") from e
 
             # Write back to file
             await self._write_templates_to_file(target_file, existing_templates)

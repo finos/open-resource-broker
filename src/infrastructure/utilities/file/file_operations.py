@@ -36,7 +36,7 @@ def get_file_size(file_path: str) -> int:
     try:
         return os.path.getsize(file_path)
     except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {file_path}")
+        raise FileNotFoundError(f"File not found: {file_path}") from e
     except OSError as e:
         raise OSError(f"Failed to get file size for {file_path}: {str(e)}")
 
@@ -58,7 +58,7 @@ def get_file_modification_time(file_path: str) -> float:
     try:
         return os.path.getmtime(file_path)
     except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {file_path}")
+        raise FileNotFoundError(f"File not found: {file_path}") from e
     except OSError as e:
         raise OSError(f"Failed to get modification time for {file_path}: {str(e)}")
 
@@ -80,7 +80,7 @@ def get_file_creation_time(file_path: str) -> float:
     try:
         return os.path.getctime(file_path)
     except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {file_path}")
+        raise FileNotFoundError(f"File not found: {file_path}") from e
     except OSError as e:
         raise OSError(f"Failed to get creation time for {file_path}: {str(e)}")
 
@@ -102,7 +102,7 @@ def get_file_access_time(file_path: str) -> float:
     try:
         return os.path.getatime(file_path)
     except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {file_path}")
+        raise FileNotFoundError(f"File not found: {file_path}") from e
     except OSError as e:
         raise OSError(f"Failed to get access time for {file_path}: {str(e)}")
 
@@ -119,7 +119,7 @@ def delete_file(file_path: str) -> None:
         OSError: If file cannot be deleted
     """
     if not file_exists(file_path):
-        raise FileNotFoundError(f"File not found: {file_path}")
+        raise FileNotFoundError(f"File not found: {file_path}") from e
 
     try:
         os.remove(file_path)
@@ -142,7 +142,7 @@ def copy_file(source_path: str, destination_path: str) -> None:
     from .directory_utils import ensure_parent_directory_exists
 
     if not file_exists(source_path):
-        raise FileNotFoundError(f"Source file not found: {source_path}")
+        raise FileNotFoundError(f"Source file not found: {source_path}") from e
 
     try:
         ensure_parent_directory_exists(destination_path)
@@ -166,7 +166,7 @@ def move_file(source_path: str, destination_path: str) -> None:
     from .directory_utils import ensure_parent_directory_exists
 
     if not file_exists(source_path):
-        raise FileNotFoundError(f"Source file not found: {source_path}")
+        raise FileNotFoundError(f"Source file not found: {source_path}") from e
 
     try:
         ensure_parent_directory_exists(destination_path)
@@ -191,7 +191,7 @@ def rename_file(file_path: str, new_name: str) -> str:
         OSError: If file cannot be renamed
     """
     if not file_exists(file_path):
-        raise FileNotFoundError(f"File not found: {file_path}")
+        raise FileNotFoundError(f"File not found: {file_path}") from e
 
     directory = os.path.dirname(file_path)
     new_path = os.path.join(directory, new_name)
@@ -237,7 +237,7 @@ def is_file_empty(file_path: str) -> bool:
         FileNotFoundError: If file doesn't exist
     """
     if not file_exists(file_path):
-        raise FileNotFoundError(f"File not found: {file_path}")
+        raise FileNotFoundError(f"File not found: {file_path}") from e
 
     return get_file_size(file_path) == 0
 
@@ -421,7 +421,7 @@ def get_file_permissions(file_path: str) -> int:
     try:
         return os.stat(file_path).st_mode & 0o777
     except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {file_path}")
+        raise FileNotFoundError(f"File not found: {file_path}") from e
     except OSError as e:
         raise OSError(f"Failed to get permissions for {file_path}: {str(e)}")
 
@@ -439,7 +439,7 @@ def set_file_permissions(file_path: str, permissions: int) -> None:
         OSError: If permissions cannot be set
     """
     if not file_exists(file_path):
-        raise FileNotFoundError(f"File not found: {file_path}")
+        raise FileNotFoundError(f"File not found: {file_path}") from e
 
     try:
         os.chmod(file_path, permissions)
@@ -464,7 +464,7 @@ def get_file_owner(file_path: str) -> int:
     try:
         return os.stat(file_path).st_uid
     except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {file_path}")
+        raise FileNotFoundError(f"File not found: {file_path}") from e
     except OSError as e:
         raise OSError(f"Failed to get owner for {file_path}: {str(e)}")
 
@@ -486,7 +486,7 @@ def get_file_group(file_path: str) -> int:
     try:
         return os.stat(file_path).st_gid
     except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {file_path}")
+        raise FileNotFoundError(f"File not found: {file_path}") from e
     except OSError as e:
         raise OSError(f"Failed to get group for {file_path}: {str(e)}")
 
@@ -505,7 +505,7 @@ def set_file_owner_and_group(file_path: str, owner: int, group: int) -> None:
         OSError: If owner/group cannot be set
     """
     if not file_exists(file_path):
-        raise FileNotFoundError(f"File not found: {file_path}")
+        raise FileNotFoundError(f"File not found: {file_path}") from e
 
     try:
         os.chown(file_path, owner, group)

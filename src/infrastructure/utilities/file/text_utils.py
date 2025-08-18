@@ -22,7 +22,7 @@ def read_text_file(file_path: str, encoding: str = "utf-8") -> str:
         with open(file_path, "r", encoding=encoding) as f:
             return f.read()
     except FileNotFoundError:
-        raise FileNotFoundError(f"Text file not found: {file_path}")
+        raise FileNotFoundError(f"Text file not found: {file_path}") from e
     except UnicodeDecodeError as e:
         raise UnicodeDecodeError(
             e.encoding,
@@ -102,7 +102,7 @@ def read_text_lines(
                 lines = [line.strip() for line in lines]
             return lines
     except FileNotFoundError:
-        raise FileNotFoundError(f"Text file not found: {file_path}")
+        raise FileNotFoundError(f"Text file not found: {file_path}") from e
     except UnicodeDecodeError as e:
         raise UnicodeDecodeError(
             e.encoding,

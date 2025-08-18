@@ -115,7 +115,7 @@ class AppConfig(BaseModel):
         """
         valid_environments = ["development", "testing", "staging", "production"]
         if v not in valid_environments:
-            raise ValueError(f"Environment must be one of {valid_environments}")
+            raise ValueError(f"Environment must be one of {valid_environments}") from e
         return v
 
     @field_validator("request_timeout")
@@ -123,7 +123,7 @@ class AppConfig(BaseModel):
     def validate_request_timeout(cls, v: int) -> int:
         """Validate request timeout."""
         if v < 0:
-            raise ValueError("Request timeout must be positive")
+            raise ValueError("Request timeout must be positive") from e
         return v
 
     @field_validator("max_machines_per_request")
@@ -131,7 +131,7 @@ class AppConfig(BaseModel):
     def validate_max_machines(cls, v: int) -> int:
         """Validate max machines per request."""
         if v < 1:
-            raise ValueError("Maximum machines per request must be at least 1")
+            raise ValueError("Maximum machines per request must be at least 1") from e
         return v
 
 

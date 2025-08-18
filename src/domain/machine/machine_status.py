@@ -60,7 +60,7 @@ class MachineStatus(str, Enum):
         if normalized_value in status_map:
             return status_map[normalized_value]
 
-        raise ValueError(f"Invalid machine status: {value}")
+        raise ValueError(f"Invalid machine status: {value}") from e
 
     def can_transition_to(self, new_status: "MachineStatus") -> bool:
         """Validate state transition."""

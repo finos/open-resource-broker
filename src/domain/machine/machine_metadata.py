@@ -47,7 +47,7 @@ class PriceType(str, Enum):
             if price_type.value == normalized:
                 return price_type
 
-        raise ValueError(f"Invalid price type: {value}")
+        raise ValueError(f"Invalid price type: {value}") from e
 
 
 class MachineConfiguration(ValueObject):
@@ -65,11 +65,11 @@ class MachineConfiguration(ValueObject):
     def validate_configuration(self) -> "MachineConfiguration":
         """Validate machine configuration."""
         if not self.instance_type:
-            raise ValueError("Instance type is required")
+            raise ValueError("Instance type is required") from e
         if not self.provider_api:
-            raise ValueError("Provider API configuration is required")
+            raise ValueError("Provider API configuration is required") from e
         if not self.resource_id:
-            raise ValueError("Resource ID is required")
+            raise ValueError("Resource ID is required") from e
         return self
 
     def to_dict(self) -> Dict[str, Any]:
@@ -118,7 +118,7 @@ class MachineEvent(ValueObject):
     def validate_event(self) -> "MachineEvent":
         """Validate machine event."""
         if not self.event_type:
-            raise ValueError("Event type is required")
+            raise ValueError("Event type is required") from e
         return self
 
     def to_dict(self) -> Dict[str, Any]:
@@ -144,7 +144,7 @@ class HealthCheck(ValueObject):
     def validate_health_check(self) -> "HealthCheck":
         """Validate health check."""
         if not self.check_type:
-            raise ValueError("Health check type is required")
+            raise ValueError("Health check type is required") from e
         return self
 
     def to_dict(self) -> Dict[str, Any]:
@@ -173,7 +173,7 @@ class IPAddressRange(ValueObject):
         """Validate CIDR format."""
         # Validate CIDR format (e.g., 10.0.0.0/16)
         if not cls._is_valid_cidr(v):
-            raise ValueError(f"Invalid CIDR format: {v}")
+            raise ValueError(f"Invalid CIDR format: {v}") from e
         return v
 
     def __str__(self) -> str:
@@ -242,13 +242,13 @@ class MachineMetadata(ValueObject):
     def validate_metadata(self) -> "MachineMetadata":
         """Validate machine metadata."""
         if not self.availability_zone:
-            raise ValueError("Availability zone is required")
+            raise ValueError("Availability zone is required") from e
         if not self.subnet_id:
-            raise ValueError("Subnet ID is required")
+            raise ValueError("Subnet ID is required") from e
         if not self.vpc_id:
-            raise ValueError("VPC ID is required")
+            raise ValueError("VPC ID is required") from e
         if not self.ami_id:
-            raise ValueError("AMI ID is required")
+            raise ValueError("AMI ID is required") from e
         return self
 
     def to_dict(self) -> Dict[str, Any]:
@@ -340,15 +340,15 @@ class ResourceTag(ValueObject):
     def validate_tag(self) -> "ResourceTag":
         """Validate resource tag."""
         if not self.key:
-            raise ValueError("Tag key is required")
+            raise ValueError("Tag key is required") from e
 
         # Provider tag key validation
         if len(self.key) > 128:
-            raise ValueError("Tag key cannot exceed 128 characters")
+            raise ValueError("Tag key cannot exceed 128 characters") from e
 
         # Provider tag value validation
         if len(self.value) > 256:
-            raise ValueError("Tag value cannot exceed 256 characters")
+            raise ValueError("Tag value cannot exceed 256 characters") from e
         return self
 
     def to_dict(self) -> Dict[str, str]:

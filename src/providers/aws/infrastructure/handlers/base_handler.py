@@ -410,7 +410,7 @@ class AWSHandler(ABC):
                 error_details.append(f"{field}: {message}")
 
             detailed_message = f"Template validation failed - {'; '.join(error_details)}"
-            raise AWSValidationError(detailed_message, errors)
+            raise AWSValidationError(detailed_message, errors) from e
 
     # Performance monitoring methods
     def _record_success_metrics(self, request_type: str, duration: float) -> None:

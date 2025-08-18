@@ -194,4 +194,4 @@ class RepositoryFactoryWithStrategies:
         elif repository_interface == TemplateRepositoryInterface:
             return self.get_template_repository()
         else:
-            raise ValueError(f"Unknown repository interface: {repository_interface}")
+            raise ValueError(f"Unknown repository interface: {repository_interface}") from e

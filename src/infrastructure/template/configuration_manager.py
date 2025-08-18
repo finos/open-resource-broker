@@ -169,7 +169,7 @@ class TemplateConfigurationManager:
         template_id = template_dict.get("template_id", template_dict.get("templateId", ""))
 
         if not template_id:
-            raise ValueError("Template missing required template_id field")
+            raise ValueError("Template missing required template_id field") from e
 
         # Apply hierarchical defaults if service is available
         template_with_defaults = template_dict
@@ -380,7 +380,7 @@ class TemplateConfigurationManager:
         try:
             # Validate input
             if not template_id or not isinstance(template_id, str):
-                raise TemplateValidationError("Template ID must be a non-empty string")
+                raise TemplateValidationError("Template ID must be a non-empty string") from e
 
             # Load templates (uses cache)
             templates = await self.load_templates()

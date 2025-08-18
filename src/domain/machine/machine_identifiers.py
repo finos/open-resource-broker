@@ -32,11 +32,11 @@ class MachineId(ValueObject):
         # AWS: i-1234567890abcdef0 (i- followed by 8-17 hex chars)
         # Generic: any non-empty string for other providers
         if not v or not isinstance(v, str):
-            raise ValueError("Machine ID cannot be empty")
+            raise ValueError("Machine ID cannot be empty") from e
 
         # Allow flexible machine ID formats for different providers
         if len(v.strip()) == 0:
-            raise ValueError("Machine ID cannot be empty")
+            raise ValueError("Machine ID cannot be empty") from e
 
         return v.strip()
 
@@ -69,13 +69,13 @@ class MachineType(ValueObject):
             ValueError: If instance type format is invalid
         """
         if not v or not isinstance(v, str):
-            raise ValueError("Instance type cannot be empty")
+            raise ValueError("Instance type cannot be empty") from e
 
         # Basic validation for common instance type patterns
         # AWS: t2.micro, m5.large, etc. (family.size)
         # Allow flexible formats for different providers
         if not re.match(r"^[a-zA-Z0-9]+\.[a-zA-Z0-9]+$", v):
-            raise ValueError(f"Invalid instance type format: {v}")
+            raise ValueError(f"Invalid instance type format: {v}") from e
 
         return v
 

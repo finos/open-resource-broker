@@ -25,7 +25,7 @@ class ConfigurableEventPublisher(EventPublisher):
         # Validate mode
         valid_modes = ["logging", "sync", "async"]
         if mode not in valid_modes:
-            raise ValueError(f"Invalid mode '{mode}'. Must be one of: {valid_modes}")
+            raise ValueError(f"Invalid mode '{mode}'. Must be one of: {valid_modes}") from e
 
     def publish(self, event: DomainEvent) -> None:
         """Publish event based on configured mode."""

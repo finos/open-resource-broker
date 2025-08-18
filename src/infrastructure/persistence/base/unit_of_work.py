@@ -43,7 +43,7 @@ class BaseUnitOfWork(UnitOfWork, ABC):
     def begin(self) -> None:
         """Begin transaction."""
         if self._in_transaction:
-            raise TransactionError("Transaction already in progress")
+            raise TransactionError("Transaction already in progress") from e
 
         self._in_transaction = True
         self._begin_transaction()
@@ -53,7 +53,7 @@ class BaseUnitOfWork(UnitOfWork, ABC):
     def commit(self) -> None:
         """Commit transaction."""
         if not self._in_transaction:
-            raise TransactionError("No transaction in progress")
+            raise TransactionError("No transaction in progress") from e
 
         self._commit_transaction()
         self._in_transaction = False
@@ -63,7 +63,7 @@ class BaseUnitOfWork(UnitOfWork, ABC):
     def rollback(self) -> None:
         """Rollback transaction."""
         if not self._in_transaction:
-            raise TransactionError("No transaction in progress")
+            raise TransactionError("No transaction in progress") from e
 
         self._rollback_transaction()
         self._in_transaction = False

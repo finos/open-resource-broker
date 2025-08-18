@@ -22,9 +22,9 @@ class DomainError:
     def __post_init__(self):
         """Validate error data."""
         if not self.code:
-            raise ValueError("Error code cannot be empty")
+            raise ValueError("Error code cannot be empty") from e
         if not self.message:
-            raise ValueError("Error message cannot be empty")
+            raise ValueError("Error message cannot be empty") from e
 
     def with_detail(self, key: str, value: Any) -> "DomainError":
         """Create a new DomainError with additional detail."""

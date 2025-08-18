@@ -53,7 +53,7 @@ class SQLQueryBuilder(QueryManager):
             ValueError: If identifier contains invalid characters
         """
         if not re.match(r"^[a-zA-Z0-9_]+$", identifier):
-            raise ValueError(f"Invalid SQL identifier: {identifier}")
+            raise ValueError(f"Invalid SQL identifier: {identifier}") from e
 
     def build_create_query(self, **kwargs) -> str:
         """Build CREATE TABLE query (implements QueryManager interface)."""
@@ -118,7 +118,7 @@ class SQLQueryBuilder(QueryManager):
         filtered_data = {k: v for k, v in data.items() if k in self.columns}
 
         if not filtered_data:
-            raise ValueError("No valid columns found in data")
+            raise ValueError("No valid columns found in data") from e
 
         columns = list(filtered_data.keys())
         placeholders = [f":{col}" for col in columns]
@@ -195,7 +195,7 @@ class SQLQueryBuilder(QueryManager):
         filtered_data = {k: v for k, v in data.items() if k in self.columns and k != id_column}
 
         if not filtered_data:
-            raise ValueError("No valid columns found in data for update")
+            raise ValueError("No valid columns found in data for update") from e
 
         # Validate all column names
         for column in filtered_data.keys():
@@ -338,7 +338,7 @@ class SQLQueryBuilder(QueryManager):
             Tuple of (query, parameters_list)
         """
         if not data_list:
-            raise ValueError("No data provided for batch insert")
+            raise ValueError("No data provided for batch insert") from e
 
         # Use first item to determine columns
         first_item = data_list[0]
@@ -349,7 +349,7 @@ class SQLQueryBuilder(QueryManager):
             self._validate_identifier(column)
 
         if not filtered_columns:
-            raise ValueError("No valid columns found in data")
+            raise ValueError("No valid columns found in data") from e
 
         placeholders = [f":{col}" for col in filtered_columns]
         # nosec B608

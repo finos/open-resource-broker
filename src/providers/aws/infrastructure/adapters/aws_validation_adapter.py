@@ -122,7 +122,7 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
             ValueError: If API is not supported
         """
         if not self.validate_provider_api(api):
-            raise ValueError(f"Unsupported AWS provider API: {api}")
+            raise ValueError(f"Unsupported AWS provider API: {api}") from e
 
         try:
             # Get handler capabilities from configuration
@@ -157,7 +157,7 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
             ValueError: If API is not supported
         """
         if not self.validate_provider_api(api):
-            raise ValueError(f"Unsupported AWS provider API: {api}")
+            raise ValueError(f"Unsupported AWS provider API: {api}") from e
 
         try:
             # Get fleet types from configuration

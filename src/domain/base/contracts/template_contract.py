@@ -26,11 +26,11 @@ class TemplateContract:
     def __post_init__(self):
         """Validate required fields."""
         if not self.template_id:
-            raise ValueError("template_id is required")
+            raise ValueError("template_id is required") from e
         if not self.name:
-            raise ValueError("name is required")
+            raise ValueError("name is required") from e
         if not self.provider_api:
-            raise ValueError("provider_api is required")
+            raise ValueError("provider_api is required") from e
 
 
 @dataclass

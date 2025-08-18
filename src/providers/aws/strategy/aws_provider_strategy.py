@@ -64,7 +64,7 @@ class AWSProviderStrategy(ProviderStrategy):
             ValueError: If configuration is invalid
         """
         if not isinstance(config, AWSProviderConfig):
-            raise ValueError("AWSProviderStrategy requires AWSProviderConfig")
+            raise ValueError("AWSProviderStrategy requires AWSProviderConfig") from e
 
         super().__init__(config)
         self._logger = logger

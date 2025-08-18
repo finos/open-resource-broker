@@ -31,7 +31,7 @@ class JsonStrategyConfig(BaseModel):
         """Validate storage type."""
         valid_types = ["single_file", "split_files"]
         if v not in valid_types:
-            raise ValueError(f"Storage type must be one of {valid_types}")
+            raise ValueError(f"Storage type must be one of {valid_types}") from e
         return v
 
 
@@ -57,7 +57,7 @@ class SqlStrategyConfig(BaseModel):
         """Validate database type."""
         valid_types = ["sqlite", "postgresql", "mysql", "aurora"]
         if v not in valid_types:
-            raise ValueError(f"Database type must be one of {valid_types}")
+            raise ValueError(f"Database type must be one of {valid_types}") from e
         return v
 
     @model_validator(mode="after")
@@ -70,21 +70,21 @@ class SqlStrategyConfig(BaseModel):
 
         if db_type == "sqlite":
             if not name:
-                raise ValueError("Database name is required for SQLite")
+                raise ValueError("Database name is required for SQLite") from e
         elif db_type in ["postgresql", "mysql"]:
             if not host:
-                raise ValueError(f"Host is required for {db_type}")
+                raise ValueError(f"Host is required for {db_type}") from e
             if not port:
-                raise ValueError(f"Port is required for {db_type}")
+                raise ValueError(f"Port is required for {db_type}") from e
             if not name:
-                raise ValueError(f"Database name is required for {db_type}")
+                raise ValueError(f"Database name is required for {db_type}") from e
         elif db_type == "aurora":
             if not self.cluster_endpoint and not host:
-                raise ValueError("Either cluster_endpoint or host is required for Aurora")
+                raise ValueError("Either cluster_endpoint or host is required for Aurora") from e
             if not port:
-                raise ValueError("Port is required for Aurora")
+                raise ValueError("Port is required for Aurora") from e
             if not name:
-                raise ValueError("Database name is required for Aurora")
+                raise ValueError("Database name is required for Aurora") from e
 
         return self
 
@@ -116,7 +116,7 @@ class BackoffConfig(BaseModel):
         """Validate strategy type."""
         valid_types = ["constant", "exponential", "linear"]
         if v not in valid_types:
-            raise ValueError(f"Strategy type must be one of {valid_types}")
+            raise ValueError(f"Strategy type must be one of {valid_types}") from e
         return v
 
 
@@ -144,7 +144,7 @@ class RetryConfig(BaseModel):
     def validate_max_attempts(cls, v: int) -> int:
         """Validate max attempts."""
         if v < 0:
-            raise ValueError("Max attempts must be non-negative")
+            raise ValueError("Max attempts must be non-negative") from e
         return v
 
 
@@ -167,7 +167,7 @@ class StorageConfig(BaseModel):
         """Validate storage strategy."""
         valid_strategies = ["json", "sql", "dynamodb"]
         if v not in valid_strategies:
-            raise ValueError(f"Storage strategy must be one of {valid_strategies}")
+            raise ValueError(f"Storage strategy must be one of {valid_strategies}") from e
         return v
 
     @model_validator(mode="after")
@@ -178,14 +178,14 @@ class StorageConfig(BaseModel):
         if strategy == "json":
             json_strategy = self.json_strategy
             if not json_strategy.base_path:
-                raise ValueError("JSON strategy base path is required")
+                raise ValueError("JSON strategy base path is required") from e
         elif strategy == "sql":
             sql_strategy = self.sql_strategy
             if not sql_strategy.name:
-                raise ValueError("SQL strategy database name is required")
+                raise ValueError("SQL strategy database name is required") from e
         elif strategy == "dynamodb":
             dynamodb_strategy = self.dynamodb_strategy
             if not dynamodb_strategy.region:
-                raise ValueError("DynamoDB strategy region is required")
+                raise ValueError("DynamoDB strategy region is required") from e
 
         return self

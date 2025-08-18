@@ -46,7 +46,7 @@ class MCPToolDiscovery:
             Dict mapping tool names to MCP tool definitions
         """
         if not sdk.initialized:
-            raise ValueError("SDK must be initialized before discovering MCP tools")
+            raise ValueError("SDK must be initialized before discovering MCP tools") from e
 
         tools = {}
 

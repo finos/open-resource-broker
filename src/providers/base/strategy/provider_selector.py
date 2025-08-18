@@ -397,7 +397,7 @@ class SelectorFactory:
             ValueError: If policy is not supported
         """
         if policy not in cls._selectors:
-            raise ValueError(f"Unsupported selection policy: {policy}")
+            raise ValueError(f"Unsupported selection policy: {policy}") from e
 
         selector_class = cls._selectors[policy]
         return selector_class(logger)
@@ -406,7 +406,7 @@ class SelectorFactory:
     def register_selector(cls, policy: SelectionPolicy, selector_class: type):
         """Register a custom selector class."""
         if not issubclass(selector_class, ProviderSelector):
-            raise ValueError("Selector class must inherit from ProviderSelector")
+            raise ValueError("Selector class must inherit from ProviderSelector") from e
 
         cls._selectors[policy] = selector_class
 

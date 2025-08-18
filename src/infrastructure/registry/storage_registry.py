@@ -192,7 +192,7 @@ class StorageRegistry(BaseRegistry):
 
                 register_dynamodb_storage()
             else:
-                raise ValueError(f"Unknown storage type: {storage_type}")
+                raise ValueError(f"Unknown storage type: {storage_type}") from e
         except ImportError as e:
             from domain.base.exceptions import ConfigurationError
 

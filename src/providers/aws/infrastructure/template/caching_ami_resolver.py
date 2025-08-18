@@ -192,7 +192,7 @@ class CachingAMIResolver(TemplateResolverPort):
             self._logger.debug("SSM response received: %s", response)
 
             if "Parameter" not in response or "Value" not in response["Parameter"]:
-                raise ValueError(f"Invalid SSM parameter response for {parameter_path}")
+                raise ValueError(f"Invalid SSM parameter response for {parameter_path}") from e
 
             ami_id = response["Parameter"]["Value"]
             self._logger.debug("Extracted AMI ID from response: %s", ami_id)

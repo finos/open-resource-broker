@@ -58,7 +58,7 @@ class LoadBalancingProviderStrategy(ProviderStrategy):
             ValueError: If strategies list is empty or weights are invalid
         """
         if not strategies:
-            raise ValueError("At least one strategy is required for load balancing")
+            raise ValueError("At least one strategy is required for load balancing") from e
 
         # Create a dummy config for the parent class
         from infrastructure.interfaces.provider import BaseProviderConfig

@@ -125,7 +125,7 @@ class EC2FleetHandler(AWSHandler):
 
         # Validate fleet type
         if not aws_template.fleet_type:
-            raise AWSValidationError("Fleet type is required for EC2Fleet")
+            raise AWSValidationError("Fleet type is required for EC2Fleet") from e
 
         # Validate fleet type using existing validation system
         from providers.aws.infrastructure.adapters.aws_validation_adapter import (
@@ -394,7 +394,7 @@ class EC2FleetHandler(AWSHandler):
         """Check the status of instances in the fleet."""
         try:
             if not request.resource_ids:
-                raise AWSInfrastructureError("No Fleet ID found in request")
+                raise AWSInfrastructureError("No Fleet ID found in request") from e
 
             fleet_id = request.resource_ids[0]  # Use first resource ID as fleet ID
 
@@ -402,17 +402,17 @@ class EC2FleetHandler(AWSHandler):
             container = get_container()
             query_bus = container.get(QueryBus)
             if not query_bus:
-                raise AWSInfrastructureError("QueryBus not available")
+                raise AWSInfrastructureError("QueryBus not available") from e
 
             query = GetTemplateQuery(template_id=str(request.template_id))
             template = query_bus.execute(query)
             if not template:
-                raise AWSEntityNotFoundError(f"Template {request.template_id} not found")
+                raise AWSEntityNotFoundError(f"Template {request.template_id} not found") from e
 
             # Ensure fleet_type is not None
             fleet_type_value = template.metadata.get("aws", {}).get("fleet_type", "instant")
             if not fleet_type_value:
-                raise AWSValidationError("Fleet type is required")
+                raise AWSValidationError("Fleet type is required") from e
 
             fleet_type = AWSFleetType(fleet_type_value.lower())
 
@@ -427,7 +427,7 @@ class EC2FleetHandler(AWSHandler):
             )
 
             if not fleet_list:
-                raise AWSEntityNotFoundError(f"Fleet {fleet_id} not found")
+                raise AWSEntityNotFoundError(f"Fleet {fleet_id} not found") from e
 
             fleet = fleet_list[0]
 
@@ -480,7 +480,7 @@ class EC2FleetHandler(AWSHandler):
         """
         try:
             if not request.resource_ids:
-                raise AWSInfrastructureError("No EC2 Fleet ID found in request")
+                raise AWSInfrastructureError("No EC2 Fleet ID found in request") from e
 
             fleet_id = request.resource_ids[0]  # Use first resource ID as fleet ID
 
@@ -495,7 +495,7 @@ class EC2FleetHandler(AWSHandler):
             )
 
             if not fleet_list:
-                raise AWSEntityNotFoundError(f"EC2 Fleet {fleet_id} not found")
+                raise AWSEntityNotFoundError(f"EC2 Fleet {fleet_id} not found") from e
 
             fleet = fleet_list[0]
             fleet_type = fleet.get("Type", "maintain")

@@ -106,7 +106,7 @@ class OpenHFPluginSDK:
             self._command_bus = self._app.get_command_bus()
 
             if not self._query_bus or not self._command_bus:
-                raise ConfigurationError("CQRS buses not available")
+                raise ConfigurationError("CQRS buses not available") from e
 
             # Initialize method discovery
             self._discovery = SDKMethodDiscovery()

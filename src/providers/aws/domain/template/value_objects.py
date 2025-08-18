@@ -38,10 +38,10 @@ class ResourceId(ResourceId):
 
         # Fall back to class pattern if not in config
         if not pattern:
-            raise ValueError(f"Pattern for {cls.resource_type} not found in AWS configuration")
+            raise ValueError(f"Pattern for {cls.resource_type} not found in AWS configuration") from e
 
         if not re.match(pattern, v):
-            raise ValueError(f"Invalid AWS {cls.resource_type} ID format: {v}")
+            raise ValueError(f"Invalid AWS {cls.resource_type} ID format: {v}") from e
         return v
 
 
@@ -110,7 +110,7 @@ class AWSInstanceType(InstanceType):
         pattern = config.patterns["instance_type"]
 
         if not re.match(pattern, v):
-            raise ValueError(f"Invalid AWS instance type format: {v}")
+            raise ValueError(f"Invalid AWS instance type format: {v}") from e
         return v
 
     @property
@@ -139,7 +139,7 @@ class AWSTags(Tags):
 
         for key, value in v.items():
             if not isinstance(key, str) or not isinstance(value, str):
-                raise ValueError("AWS tags must be strings")
+                raise ValueError("AWS tags must be strings") from e
 
             # Use AWS limits from configuration
             if len(key) > config.limits.tag_key_length:
@@ -153,7 +153,7 @@ class AWSTags(Tags):
 
             # Use AWS pattern from configuration
             if not re.match(config.patterns["tag_key"], key):
-                raise ValueError(f"Invalid AWS tag key format: {key}")
+                raise ValueError(f"Invalid AWS tag key format: {key}") from e
         return v
 
     def to_aws_format(self) -> List[Dict[str, str]]:
@@ -182,7 +182,7 @@ class AWSARN(ARN):
         pattern = config.patterns["arn"]
 
         if not re.match(pattern, v):
-            raise ValueError(f"Invalid AWS ARN format: {v}")
+            raise ValueError(f"Invalid AWS ARN format: {v}") from e
         return v
 
     def model_post_init(self, __context: Any) -> None:

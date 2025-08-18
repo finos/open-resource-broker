@@ -78,7 +78,7 @@ class GetReturnRequestsRESTHandler(BaseAPIHandler[Dict[str, Any], ReturnRequestR
                     end_time = datetime.fromisoformat(filters["time_range"]["end"])
 
                     if start_time > end_time:
-                        raise ValueError("Start time must be before end time")
+                        raise ValueError("Start time must be before end time") from e
 
                 except (ValueError, KeyError) as e:
                     raise ValueError(f"Invalid time range format: {str(e)}")

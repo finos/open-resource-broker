@@ -59,7 +59,7 @@ class DependencyResolver:
         # Check for circular dependencies
         if cls in dependency_chain:
             chain_str = " -> ".join([c.__name__ for c in dependency_chain]) + f" -> {cls.__name__}"
-            raise CircularDependencyError(f"Circular dependency detected: {chain_str}")
+            raise CircularDependencyError(f"Circular dependency detected: {chain_str}") from e
 
         # Add current class to dependency chain
         new_chain = dependency_chain | {cls}
@@ -212,7 +212,7 @@ class DependencyResolver:
                         # Has default value, skip
                         continue
                     else:
-                        raise UntypedParameterError(cls, param_name)
+                        raise UntypedParameterError(cls, param_name) from e
 
                 # Handle string annotations
                 if isinstance(param_type, str):
@@ -320,7 +320,7 @@ class DependencyResolver:
             # Get the module where the context class is defined
             module = inspect.getmodule(context_class)
             if module is None:
-                raise ValueError(f"Could not get module for {context_class}")
+                raise ValueError(f"Could not get module for {context_class}") from e
 
             # Try to resolve the annotation in the module's namespace
             module_globals = getattr(module, "__dict__", {})
@@ -350,7 +350,7 @@ class DependencyResolver:
                                 break
                         if obj is not None:
                             return obj
-                    raise NameError(f"Cannot resolve annotation: {annotation}")
+                    raise NameError(f"Cannot resolve annotation: {annotation}") from e
             except Exception:
                 # Last resort: try to import from common locations
                 for module_name in [
@@ -366,7 +366,7 @@ class DependencyResolver:
                     except ImportError:
                         continue
 
-                raise ValueError(f"Could not resolve annotation: {annotation}")
+                raise ValueError(f"Could not resolve annotation: {annotation}") from e
 
         except Exception as e:
             raise DependencyResolutionError(

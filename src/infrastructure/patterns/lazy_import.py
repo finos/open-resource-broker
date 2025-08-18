@@ -42,7 +42,7 @@ class LazyImport:
             self._import()
         if callable(self._attribute):
             return self._attribute(*args, **kwargs)
-        raise TypeError(f"Attribute '{self.attribute_name}' is not callable")
+        raise TypeError(f"Attribute '{self.attribute_name}' is not callable") from e
 
     def _import(self):
         """Import the module and get the attribute."""

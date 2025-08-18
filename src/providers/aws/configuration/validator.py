@@ -126,7 +126,7 @@ class AWSConfigManager:
             if config_type == AWSProviderConfig:
                 # Return a default instance - in real usage this would be injected
                 return AWSProviderConfig()
-            raise ValueError(f"Unknown AWS config type: {config_type}")
+            raise ValueError(f"Unknown AWS config type: {config_type}") from e
 
 
 # Global AWS config manager instance

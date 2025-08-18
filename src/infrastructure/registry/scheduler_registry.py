@@ -73,7 +73,7 @@ class SchedulerRegistry(BaseRegistry):
 
                 register_default_scheduler()
             else:
-                raise ValueError(f"Unknown scheduler type: {scheduler_type}")
+                raise ValueError(f"Unknown scheduler type: {scheduler_type}") from e
         except ImportError as e:
             raise ConfigurationError(f"Scheduler type '{scheduler_type}' not available: {e}") from e
 

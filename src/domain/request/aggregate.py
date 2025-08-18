@@ -89,7 +89,7 @@ class Request(AggregateRoot):
     def start_processing(self) -> "Request":
         """Mark request as started processing."""
         if self.status != RequestStatus.PENDING:
-            raise ValueError(f"Cannot start processing request in status: {self.status}")
+            raise ValueError(f"Cannot start processing request in status: {self.status}") from e
 
         old_status = self.status
         data = self.model_dump()
@@ -161,7 +161,7 @@ class Request(AggregateRoot):
             RequestStatus.FAILED,
             RequestStatus.CANCELLED,
         ]:
-            raise ValueError(f"Cannot cancel request in status: {self.status}")
+            raise ValueError(f"Cannot cancel request in status: {self.status}") from e
 
         data = self.model_dump()
         data["status"] = RequestStatus.CANCELLED

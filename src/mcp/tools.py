@@ -109,14 +109,14 @@ class OpenHFPluginMCPTools:
 
         if name not in self.tools:
             available_tools = list(self.tools.keys())
-            raise ValueError(f"Unknown tool: {name}. Available tools: {available_tools}")
+            raise ValueError(f"Unknown tool: {name}. Available tools: {available_tools}") from e
 
         tool_def = self.tools[name]
 
         try:
             # Get the SDK method
             if not hasattr(self.sdk, tool_def.method_name):
-                raise ValueError(f"SDK method {tool_def.method_name} not found")
+                raise ValueError(f"SDK method {tool_def.method_name} not found") from e
 
             method = getattr(self.sdk, tool_def.method_name)
 

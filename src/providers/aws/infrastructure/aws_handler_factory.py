@@ -73,12 +73,12 @@ class AWSHandlerFactory:
             ProviderApi(handler_type)
         except ValueError:
             self._logger.error("Invalid AWS handler type: %s", handler_type)
-            raise AWSValidationError(f"Invalid AWS handler type: {handler_type}")
+            raise AWSValidationError(f"Invalid AWS handler type: {handler_type}") from e
 
         # Check if we have a registered handler class for this type
         if handler_type not in self._handler_classes:
             self._logger.error("No handler class registered for type: %s", handler_type)
-            raise AWSValidationError(f"No handler class registered for type: {handler_type}")
+            raise AWSValidationError(f"No handler class registered for type: {handler_type}") from e
 
         # Create the handler
         handler_class = self._handler_classes[handler_type]

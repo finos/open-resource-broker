@@ -16,7 +16,7 @@ class BaseCircuitBreakerConfig(BaseModel):
     def validate_failure_threshold(cls, v: int) -> int:
         """Validate failure threshold."""
         if v <= 0:
-            raise ValueError("Failure threshold must be positive")
+            raise ValueError("Failure threshold must be positive") from e
         return v
 
     @field_validator("recovery_timeout")
@@ -24,7 +24,7 @@ class BaseCircuitBreakerConfig(BaseModel):
     def validate_recovery_timeout(cls, v: int) -> int:
         """Validate recovery timeout."""
         if v <= 0:
-            raise ValueError("Recovery timeout must be positive")
+            raise ValueError("Recovery timeout must be positive") from e
         return v
 
     @field_validator("half_open_max_calls")
@@ -32,5 +32,5 @@ class BaseCircuitBreakerConfig(BaseModel):
     def validate_half_open_max_calls(cls, v: int) -> int:
         """Validate half open max calls."""
         if v <= 0:
-            raise ValueError("Half open max calls must be positive")
+            raise ValueError("Half open max calls must be positive") from e
         return v

@@ -61,7 +61,7 @@ class ProviderStrategyFactory:
             # Get integrated provider configuration
             provider_config = self._config_manager.get_provider_config()
             if not provider_config:
-                raise ConfigurationError("Provider configuration not found")
+                raise ConfigurationError("Provider configuration not found") from e
 
             mode = provider_config.get_mode()
 
@@ -72,7 +72,7 @@ class ProviderStrategyFactory:
             elif mode == ProviderMode.MULTI:
                 return self._create_multi_provider_context(provider_config)
             else:
-                raise ConfigurationError("Provider", "No valid provider configuration found")
+                raise ConfigurationError("Provider", "No valid provider configuration found") from e
 
         except Exception as e:
             self._logger.error("Failed to create provider context: %s", str(e))

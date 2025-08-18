@@ -101,10 +101,10 @@ class Template(BaseModel):
     def validate_template(self) -> "Template":
         """Validate template configuration - provider-agnostic validation only."""
         if not self.template_id:
-            raise ValueError("template_id is required")
+            raise ValueError("template_id is required") from e
 
         if self.max_instances <= 0:
-            raise ValueError("max_instances must be greater than 0")
+            raise ValueError("max_instances must be greater than 0") from e
 
         return self
 
@@ -136,7 +136,7 @@ class Template(BaseModel):
             import re
 
             if not re.match(r"^[a-z0-9]+$", self.provider_type):
-                raise ValueError("provider_type must be lowercase alphanumeric")
+                raise ValueError("provider_type must be lowercase alphanumeric") from e
 
         return self
 

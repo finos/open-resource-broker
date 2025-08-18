@@ -67,7 +67,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 request_id = RequestId(value=query.request_id)
                 request = uow.requests.get_by_id(request_id)
                 if not request:
-                    raise EntityNotFoundError("Request", query.request_id)
+                    raise EntityNotFoundError("Request", query.request_id) from e
 
             # Get machines from storage
             machines = await self._get_machines_from_storage(query.request_id)
@@ -520,7 +520,7 @@ class GetRequestStatusQueryHandler(BaseQueryHandler[GetRequestStatusQuery, str])
                 request_id = RequestId(value=query.request_id)
                 request = uow.requests.get_by_id(request_id)
                 if not request:
-                    raise EntityNotFoundError("Request", query.request_id)
+                    raise EntityNotFoundError("Request", query.request_id) from e
 
                 status = request.status.value
                 self.logger.info("Request %s status: %s", query.request_id, status)
@@ -661,7 +661,7 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, Template]):
             template_dto = await template_manager.get_template_by_id(query.template_id)
 
             if not template_dto:
-                raise EntityNotFoundError("Template", query.template_id)
+                raise EntityNotFoundError("Template", query.template_id) from e
 
             # Convert TemplateDTO to Template domain object (same logic as
             # ListTemplatesHandler)
@@ -849,7 +849,7 @@ class GetMachineHandler(BaseQueryHandler[GetMachineQuery, MachineDTO]):
             with self.uow_factory.create_unit_of_work() as uow:
                 machine = uow.machines.get_by_id(query.machine_id)
                 if not machine:
-                    raise EntityNotFoundError("Machine", query.machine_id)
+                    raise EntityNotFoundError("Machine", query.machine_id) from e
 
                 # Convert to DTO
                 machine_dto = MachineDTO(

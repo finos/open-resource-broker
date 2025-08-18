@@ -64,7 +64,7 @@ def delete_directory(directory_path: str, recursive: bool = False) -> None:
     import shutil
 
     if not directory_exists(directory_path):
-        raise FileNotFoundError(f"Directory not found: {directory_path}")
+        raise FileNotFoundError(f"Directory not found: {directory_path}") from e
 
     try:
         if recursive:
@@ -93,7 +93,7 @@ def list_files(
         FileNotFoundError: If directory doesn't exist
     """
     if not directory_exists(directory_path):
-        raise FileNotFoundError(f"Directory not found: {directory_path}")
+        raise FileNotFoundError(f"Directory not found: {directory_path}") from e
 
     if pattern:
         if recursive:
@@ -131,7 +131,7 @@ def list_directories(directory_path: str, recursive: bool = False) -> List[str]:
         FileNotFoundError: If directory doesn't exist
     """
     if not directory_exists(directory_path):
-        raise FileNotFoundError(f"Directory not found: {directory_path}")
+        raise FileNotFoundError(f"Directory not found: {directory_path}") from e
 
     directories = []
     if recursive:
@@ -168,7 +168,7 @@ def find_files(
         FileNotFoundError: If directory doesn't exist
     """
     if not directory_exists(directory_path):
-        raise FileNotFoundError(f"Directory not found: {directory_path}")
+        raise FileNotFoundError(f"Directory not found: {directory_path}") from e
 
     matching_files = []
 
@@ -219,7 +219,7 @@ def change_directory(directory_path: str) -> None:
         OSError: If directory cannot be changed to
     """
     if not directory_exists(directory_path):
-        raise FileNotFoundError(f"Directory not found: {directory_path}")
+        raise FileNotFoundError(f"Directory not found: {directory_path}") from e
 
     try:
         os.chdir(directory_path)

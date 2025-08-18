@@ -66,10 +66,10 @@ class AWSTemplate(CoreTemplate):
         """AWS-specific template validation."""
         # AWS-specific required fields
         if not self.image_id:
-            raise ValueError("image_id is required for AWS templates")
+            raise ValueError("image_id is required for AWS templates") from e
 
         if not self.subnet_ids:
-            raise ValueError("At least one subnet_id is required for AWS templates")
+            raise ValueError("At least one subnet_id is required for AWS templates") from e
 
         # Auto-assign default fleet_type if not provided
         if (
@@ -82,7 +82,7 @@ class AWSTemplate(CoreTemplate):
 
         # Validate spot configuration
         if self.percent_on_demand is not None and not (0 <= self.percent_on_demand <= 100):
-            raise ValueError("percent_on_demand must be between 0 and 100")
+            raise ValueError("percent_on_demand must be between 0 and 100") from e
 
         # Validate launch template version format
         if self.launch_template_version is not None:

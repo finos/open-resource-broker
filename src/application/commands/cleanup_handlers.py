@@ -39,7 +39,7 @@ class CleanupOldRequestsHandler(BaseCommandHandler[CleanupOldRequestsCommand, Di
         """Validate cleanup old requests command."""
         await super().validate_command(command)
         if command.older_than_days <= 0:
-            raise ValueError("older_than_days must be positive")
+            raise ValueError("older_than_days must be positive") from e
 
     async def execute_command(self, command: CleanupOldRequestsCommand) -> Dict[str, Any]:
         """Handle cleanup old requests command."""
@@ -120,7 +120,7 @@ class CleanupAllResourcesHandler(BaseCommandHandler[CleanupAllResourcesCommand, 
         """Validate cleanup all resources command."""
         await super().validate_command(command)
         if command.older_than_days <= 0:
-            raise ValueError("older_than_days must be positive")
+            raise ValueError("older_than_days must be positive") from e
 
     async def execute_command(self, command: CleanupAllResourcesCommand) -> Dict[str, Any]:
         """Handle cleanup all resources command."""

@@ -162,7 +162,7 @@ class SQLEngineFactory:
         else:
             error_msg = f"Unsupported database type: {db_type}"
             logger.error(error_msg)
-            raise ValueError(error_msg)
+            raise ValueError(error_msg) from e
 
         # Create engine
         engine = create_engine(connection_string, **engine_kwargs)

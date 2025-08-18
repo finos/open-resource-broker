@@ -112,7 +112,7 @@ class BaseRegistry(ABC):
         """
         with self._registry_lock:
             if type_name in self._type_registrations:
-                raise ValueError(f"Type '{type_name}' is already registered")
+                raise ValueError(f"Type '{type_name}' is already registered") from e
 
             registration = self._create_registration(
                 type_name, strategy_factory, config_factory, **additional_factories
@@ -142,11 +142,11 @@ class BaseRegistry(ABC):
             ValueError: If not in multi-choice mode or instance already registered
         """
         if self.mode != RegistryMode.MULTI_CHOICE:
-            raise ValueError("Instance registration only supported in MULTI_CHOICE mode")
+            raise ValueError("Instance registration only supported in MULTI_CHOICE mode") from e
 
         with self._registry_lock:
             if instance_name in self._instance_registrations:
-                raise ValueError(f"Instance '{instance_name}' is already registered")
+                raise ValueError(f"Instance '{instance_name}' is already registered") from e
 
             registration = self._create_registration(
                 type_name, strategy_factory, config_factory, **additional_factories
@@ -162,7 +162,7 @@ class BaseRegistry(ABC):
     def create_strategy_by_instance(self, instance_name: str, config: Any) -> Any:
         """Create strategy by instance name (multi-choice mode only)."""
         if self.mode != RegistryMode.MULTI_CHOICE:
-            raise ValueError("Instance-based creation only supported in MULTI_CHOICE mode")
+            raise ValueError("Instance-based creation only supported in MULTI_CHOICE mode") from e
 
         registration = self._get_instance_registration(instance_name)
         return self._create_strategy_from_registration(registration, config, instance_name)

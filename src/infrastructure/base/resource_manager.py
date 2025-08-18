@@ -205,9 +205,9 @@ class BaseResourceManager(ResourceManagerPort, ABC):
         Override in concrete implementations for provider-specific validation.
         """
         if not specification.name:
-            raise ValueError("Resource name is required")
+            raise ValueError("Resource name is required") from e
         if not specification.configuration:
-            raise ValueError("Resource configuration is required")
+            raise ValueError("Resource configuration is required") from e
 
     async def check_quota(self, specification: ResourceSpecification) -> None:
         """
@@ -219,7 +219,7 @@ class BaseResourceManager(ResourceManagerPort, ABC):
             quota = await self.get_resource_quota(specification.resource_type, specification.region)
             # Basic quota check - override for more sophisticated logic
             if quota.get("available", 0) <= 0:
-                raise ValueError(f"Insufficient quota for {specification.resource_type.value}")
+                raise ValueError(f"Insufficient quota for {specification.resource_type.value}") from e
         except Exception:
             # If quota check fails, log warning but don't block provisioning
             if self.logger:
@@ -234,9 +234,9 @@ class BaseResourceManager(ResourceManagerPort, ABC):
         Override in concrete implementations for provider-specific validation.
         """
         if not allocation.resource_id:
-            raise ValueError("Resource allocation must have a valid resource_id")
+            raise ValueError("Resource allocation must have a valid resource_id") from e
         if not allocation.is_active() and not allocation.is_provisioning():
-            raise ValueError(f"Resource allocation has invalid status: {allocation.status}")
+            raise ValueError(f"Resource allocation has invalid status: {allocation.status}") from e
 
     async def validate_deprovisioning(self, allocation: ResourceAllocation) -> None:
         """
@@ -245,7 +245,7 @@ class BaseResourceManager(ResourceManagerPort, ABC):
         Override in concrete implementations for provider-specific checks.
         """
         if not allocation.resource_id:
-            raise ValueError("Cannot deprovision resource without valid resource_id")
+            raise ValueError("Cannot deprovision resource without valid resource_id") from e
 
     async def cleanup_after_deprovisioning(self, allocation: ResourceAllocation) -> None:
         """

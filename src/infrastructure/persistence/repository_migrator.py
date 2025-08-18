@@ -334,7 +334,7 @@ class RepositoryMigrator:
                     try:
                         item_id = self._get_item_id(item, collection_name)
                         if not item_id:
-                            raise ValueError(f"Item without ID found in {collection_name}")
+                            raise ValueError(f"Item without ID found in {collection_name}") from e
 
                         # Check if the item is already an entity object
                         if (

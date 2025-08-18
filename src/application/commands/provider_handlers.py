@@ -52,7 +52,7 @@ class SelectProviderStrategyHandler(
         """Validate select provider strategy command."""
         await super().validate_command(command)
         if not command.operation_type:
-            raise ValueError("operation_type is required")
+            raise ValueError("operation_type is required") from e
 
     async def execute_command(self, command: SelectProviderStrategyCommand) -> Dict[str, Any]:
         """Handle provider strategy selection command."""
@@ -69,7 +69,7 @@ class SelectProviderStrategyHandler(
             available_strategies = self._provider_context.get_available_strategies()
 
             if not available_strategies:
-                raise ValueError("No provider strategies available")
+                raise ValueError("No provider strategies available") from e
 
             # Select optimal strategy based on criteria
             selection_result = selector.select(
@@ -77,7 +77,7 @@ class SelectProviderStrategyHandler(
             )
 
             if not selection_result.selected_strategy:
-                raise ValueError("No suitable provider strategy found")
+                raise ValueError("No suitable provider strategy found") from e
 
             # Publish strategy selection event
             event = ProviderStrategySelectedEvent(
@@ -122,7 +122,7 @@ class ExecuteProviderOperationHandler(
         """Validate execute provider operation command."""
         await super().validate_command(command)
         if not command.operation:
-            raise ValueError("operation is required")
+            raise ValueError("operation is required") from e
 
     async def execute_command(self, command: ExecuteProviderOperationCommand) -> ProviderResult:
         """Handle provider operation execution command."""
@@ -199,9 +199,9 @@ class RegisterProviderStrategyHandler(
         """Validate register provider strategy command."""
         await super().validate_command(command)
         if not command.strategy_name:
-            raise ValueError("strategy_name is required")
+            raise ValueError("strategy_name is required") from e
         if not command.provider_type:
-            raise ValueError("provider_type is required")
+            raise ValueError("provider_type is required") from e
 
     async def execute_command(self, command: RegisterProviderStrategyCommand) -> Dict[str, Any]:
         """Handle provider strategy registration command."""
@@ -277,9 +277,9 @@ class UpdateProviderHealthHandler(BaseCommandHandler[UpdateProviderHealthCommand
         """Validate update provider health command."""
         await super().validate_command(command)
         if not command.provider_name:
-            raise ValueError("provider_name is required")
+            raise ValueError("provider_name is required") from e
         if not command.health_status:
-            raise ValueError("health_status is required")
+            raise ValueError("health_status is required") from e
 
     async def execute_command(self, command: UpdateProviderHealthCommand) -> Dict[str, Any]:
         """Handle provider health status update command."""

@@ -104,7 +104,7 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
                 success = self.client_manager.put_item(self.table_name, item)
 
                 if not success:
-                    raise PersistenceError(f"Failed to save entity {entity_id}")
+                    raise PersistenceError(f"Failed to save entity {entity_id}") from e
 
                 self._self._logger.debug("Saved entity: %s", entity_id)
 
@@ -280,7 +280,7 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
                 success = self.client_manager.batch_write_items(self.table_name, items)
 
                 if not success:
-                    raise PersistenceError("Failed to save batch")
+                    raise PersistenceError("Failed to save batch") from e
 
                 self._self._logger.debug("Saved batch of %s entities", len(entities))
 

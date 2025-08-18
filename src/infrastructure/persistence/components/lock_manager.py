@@ -98,7 +98,7 @@ class LockManager:
         elif lock_type == "none":
             self._lock = None
         else:
-            raise ValueError(f"Unknown lock type: {lock_type}")
+            raise ValueError(f"Unknown lock type: {lock_type}") from e
 
     @contextmanager
     def read_lock(self):

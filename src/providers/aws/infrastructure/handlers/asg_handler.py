@@ -202,7 +202,7 @@ class ASGHandler(AWSHandler):
         """Release hosts across all ASGs in the request."""
         try:
             if not request.resource_ids:
-                raise AWSInfrastructureError("No ASG names found in request")
+                raise AWSInfrastructureError("No ASG names found in request") from e
 
             # Process all ASG names instead of just the first one
             for asg_name in request.resource_ids:
@@ -243,7 +243,7 @@ class ASGHandler(AWSHandler):
                 AutoScalingGroupNames=[request.resource_id],
             )
             if not asg_response["AutoScalingGroups"]:
-                raise AWSInfrastructureError(f"ASG {request.resource_id} not found")
+                raise AWSInfrastructureError(f"ASG {request.resource_id} not found") from e
 
             asg = asg_response["AutoScalingGroups"][0]
 

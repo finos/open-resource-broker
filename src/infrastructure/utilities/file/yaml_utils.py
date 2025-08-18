@@ -24,7 +24,7 @@ def read_yaml_file(file_path: str, encoding: str = "utf-8") -> Dict[str, Any]:
         with open(file_path, "r", encoding=encoding) as f:
             return yaml.safe_load(f) or {}
     except FileNotFoundError:
-        raise FileNotFoundError(f"YAML file not found: {file_path}")
+        raise FileNotFoundError(f"YAML file not found: {file_path}") from e
     except yaml.YAMLError as e:
         raise yaml.YAMLError(f"Failed to parse YAML file {file_path}: {str(e)}")
 
