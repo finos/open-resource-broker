@@ -13,7 +13,7 @@ RUN_TOOL="./dev-tools/scripts/run_tool.sh"
 
 # Clean previous builds
 echo "INFO: Cleaning previous builds..."
-rm -rf dist/ build/ *.egg-info/
+rm -rf dist/ build/ -- *.egg-info/
 
 # Install build dependencies if needed
 echo "INFO: Checking build dependencies..."
@@ -29,7 +29,12 @@ fi
 # Build package
 echo "INFO: Building package..."
 BUILD_ARGS="${BUILD_ARGS:-}"
-$RUN_TOOL python -m build $BUILD_ARGS
+if [ -n "$BUILD_ARGS" ]; then
+    # shellcheck disable=SC2086
+    $RUN_TOOL python -m build $BUILD_ARGS
+else
+    $RUN_TOOL python -m build
+fi
 
 echo "SUCCESS: Package built successfully!"
 echo "INFO: Files created:"

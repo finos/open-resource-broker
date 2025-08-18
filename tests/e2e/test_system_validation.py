@@ -5,11 +5,9 @@ import os
 import tempfile
 from unittest.mock import Mock
 
-from src.bootstrap import Application
-from src.config.manager import ConfigurationManager
-from src.infrastructure.factories.provider_strategy_factory import (
-    ProviderStrategyFactory,
-)
+from bootstrap import Application
+from config.manager import ConfigurationManager
+from infrastructure.factories.provider_strategy_factory import ProviderStrategyFactory
 
 
 class TestSystemValidation:

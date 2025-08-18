@@ -4,6 +4,40 @@ The provider layer contains cloud-specific implementations that extend the core 
 
 **File Count**: 48 files implementing comprehensive cloud provider support
 
+## Provider Extension Configuration
+
+### Canonical Pattern
+
+When accessing provider extension configurations, always use the `TemplateExtensionRegistry`:
+
+```python
+from src.domain.template.extensions import TemplateExtensionRegistry
+
+# Get extension config with schema defaults
+extension_config = TemplateExtensionRegistry.create_extension_config(
+    provider_type, config_data or {}
+)
+
+if extension_config:
+    # Access configuration with appropriate defaults
+    enabled = extension_config.some_feature.enabled
+```
+
+### Why Use the Registry?
+
+- **Schema Defaults**: Respects Pydantic field defaults (e.g., `enabled=True`)
+- **Provider Agnostic**: Works with any registered provider type
+- **Type Safety**: Returns properly typed configuration objects
+- **Consistency**: Single source of truth for extension config access
+
+### Anti-Pattern (Don't Do This)
+
+```python
+# DON'T: Raw dictionary access bypasses schema defaults
+config_dict = provider_config.extensions.get("some_feature", {})
+enabled = config_dict.get("enabled")  # May be None even if default is True
+```
+
 ## Architecture Overview
 
 ### Cloud-Agnostic Design Philosophy

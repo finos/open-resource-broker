@@ -5,9 +5,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.domain.request.aggregate import Request
-from src.domain.template.aggregate import Template
-from src.providers.aws.infrastructure.handlers.components import FleetTagBuilder
+from domain.request.aggregate import Request
+from domain.template.aggregate import Template
+from providers.aws.infrastructure.handlers.components import FleetTagBuilder
 
 
 @pytest.mark.unit
@@ -39,7 +39,7 @@ class TestFleetTagBuilder:
         } in tags
         assert {"Key": "CreatedBy", "Value": "HostFactory"} in tags
 
-        # Check CreatedAt tag exists and has proper format
+        # Check CreatedAt tag exists and has correct format
         created_at_tag = next(tag for tag in tags if tag["Key"] == "CreatedAt")
         assert created_at_tag is not None
         # Verify it's a valid ISO format timestamp

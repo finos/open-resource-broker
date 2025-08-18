@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.infrastructure.registry.storage_registry import (
+from infrastructure.registry.storage_registry import (
     get_storage_registry,
     reset_storage_registry,
 )
@@ -23,7 +23,7 @@ class TestStorageRegistryIntegration:
 
     def test_repository_factory_uses_storage_registry(self):
         """Test that repository factory uses storage registry."""
-        from src.infrastructure.utilities.factories.repository_factory import (
+        from infrastructure.utilities.factories.repository_factory import (
             RepositoryFactory,
         )
 
@@ -64,8 +64,8 @@ class TestStorageRegistryIntegration:
 
     def test_di_container_uses_repository_factory(self):
         """Test that DI container uses repository factory."""
-        from src.infrastructure.di.container import DIContainer
-        from src.infrastructure.di.infrastructure_services import (
+        from infrastructure.di.container import DIContainer
+        from infrastructure.di.infrastructure_services import (
             _register_repository_services,
         )
 
@@ -102,7 +102,7 @@ class TestStorageRegistryIntegration:
 
     def test_unit_of_work_creation_via_registry(self):
         """Test unit of work creation via storage registry."""
-        from src.infrastructure.utilities.factories.repository_factory import (
+        from infrastructure.utilities.factories.repository_factory import (
             RepositoryFactory,
         )
 
@@ -159,7 +159,7 @@ class TestStorageRegistryIntegration:
 
     def test_storage_registration_without_unit_of_work_factory(self):
         """Test storage registration without unit of work factory."""
-        from src.infrastructure.registry.storage_registry import UnsupportedStorageError
+        from infrastructure.registry.storage_registry import UnsupportedStorageError
 
         registry = get_storage_registry()
 
@@ -177,7 +177,7 @@ class TestStorageRegistryIntegration:
 
     def test_end_to_end_repository_creation(self):
         """Test end-to-end repository creation flow."""
-        from src.infrastructure.utilities.factories.repository_factory import (
+        from infrastructure.utilities.factories.repository_factory import (
             RepositoryFactory,
         )
 

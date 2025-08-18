@@ -8,7 +8,7 @@ def test_import_fixes():
     """Test that the import fixes are working."""
     try:
         # Check that ProviderApi exists in AWS value objects
-        from src.providers.aws.domain.template.value_objects import ProviderApi
+        from providers.aws.domain.template.value_objects import ProviderApi
 
         assert ProviderApi is not None
 

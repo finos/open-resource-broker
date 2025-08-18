@@ -4,20 +4,20 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.persistence.base.unit_of_work import BaseUnitOfWork
+from infrastructure.logging.logger import get_logger
+from infrastructure.persistence.base.unit_of_work import BaseUnitOfWork
 
 # Import JSON storage strategy
-from src.infrastructure.persistence.json.strategy import JSONStorageStrategy
+from infrastructure.persistence.json.strategy import JSONStorageStrategy
 
 # Import new simplified repositories
-from src.infrastructure.persistence.repositories.machine_repository import (
+from infrastructure.persistence.repositories.machine_repository import (
     MachineRepositoryImpl as MachineRepository,
 )
-from src.infrastructure.persistence.repositories.request_repository import (
+from infrastructure.persistence.repositories.request_repository import (
     RequestRepositoryImpl as RequestRepository,
 )
-from src.infrastructure.persistence.repositories.template_repository import (
+from infrastructure.persistence.repositories.template_repository import (
     TemplateRepositoryImpl as TemplateRepository,
 )
 

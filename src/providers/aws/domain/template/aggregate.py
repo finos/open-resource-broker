@@ -4,8 +4,8 @@ from typing import Any, Dict, Optional
 
 from pydantic import ConfigDict, model_validator
 
-from src.domain.template.aggregate import Template as CoreTemplate
-from src.providers.aws.domain.template.value_objects import (
+from domain.template.aggregate import Template as CoreTemplate
+from providers.aws.domain.template.value_objects import (
     AWSAllocationStrategy,
     AWSConfiguration,
     AWSFleetType,
@@ -206,7 +206,7 @@ class AWSTemplate(CoreTemplate):
             )
 
         if "price_type" in data:
-            from src.domain.base.value_objects import PriceType
+            from domain.base.value_objects import PriceType
 
             aws_data["price_type"] = PriceType.from_string(data["price_type"])
 

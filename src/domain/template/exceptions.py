@@ -1,10 +1,6 @@
 """Template domain exceptions."""
 
-from src.domain.base.exceptions import (
-    DomainException,
-    EntityNotFoundError,
-    ValidationError,
-)
+from domain.base.exceptions import DomainException, EntityNotFoundError, ValidationError
 
 
 class TemplateException(DomainException):

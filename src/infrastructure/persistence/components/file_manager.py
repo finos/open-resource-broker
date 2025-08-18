@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.logging.logger import get_logger
 
 
 class FileManager:

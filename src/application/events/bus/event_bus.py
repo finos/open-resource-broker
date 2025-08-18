@@ -2,7 +2,7 @@
 Event Bus - CQRS-aligned event dispatching system.
 
 This EventBus follows the same architectural patterns as CommandBus and QueryBus,
-providing consistent event handling with proper dependency injection, error handling,
+providing consistent event handling with dependency injection, error handling,
 and middleware support.
 """
 
@@ -12,10 +12,10 @@ from typing import Any, Dict, List, Optional, Type
 
 # Import types - using string imports to avoid circular dependencies
 try:
-    from src.application.events.base.event_handler import EventHandler
-    from src.application.events.decorators import EventHandlerRegistry
-    from src.domain.base.events import DomainEvent
-    from src.domain.base.ports import LoggingPort
+    from application.events.base.event_handler import EventHandler
+    from application.events.decorators import EventHandlerRegistry
+    from domain.base.events import DomainEvent
+    from domain.base.ports import LoggingPort
 except ImportError:
     # Fallback for testing or when dependencies aren't available
     DomainEvent = Any
@@ -32,7 +32,7 @@ class EventBus:
     - Dependency injection for handlers and logger
     - Consistent error handling and logging
     - Support for multiple handlers per event type
-    - Async processing with proper error isolation
+    - Async processing with appropriate error isolation
     - Metrics and monitoring integration points
     """
 

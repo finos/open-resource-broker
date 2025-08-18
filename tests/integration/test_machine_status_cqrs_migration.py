@@ -9,17 +9,17 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.application.commands.machine_handlers import (
+from application.commands.machine_handlers import (
     ConvertBatchMachineStatusCommandHandler,
     ConvertMachineStatusCommandHandler,
     ValidateProviderStateCommandHandler,
 )
-from src.application.machine.commands import (
+from application.machine.commands import (
     ConvertBatchMachineStatusCommand,
     ConvertMachineStatusCommand,
     ValidateProviderStateCommand,
 )
-from src.domain.machine.value_objects import MachineStatus
+from domain.machine.value_objects import MachineStatus
 
 
 @pytest.mark.integration

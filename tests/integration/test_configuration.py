@@ -164,7 +164,7 @@ def test_aws_provider_config_class():
         print("   Testing AWS provider configuration class...")
 
         # Import the configuration classes
-        from src.providers.aws.configuration.config import (
+        from providers.aws.configuration.config import (
             AWSProviderConfig,
             LaunchTemplateConfiguration,
         )
@@ -224,7 +224,7 @@ def test_configuration_loading():
         print("   Testing configuration loading...")
 
         # Test loading configuration through the system
-        from src.providers.aws.configuration.config import AWSProviderConfig
+        from providers.aws.configuration.config import AWSProviderConfig
 
         # Load from JSON file
         with open("config/default_config.json", "r") as f:

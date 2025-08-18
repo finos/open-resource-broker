@@ -7,12 +7,12 @@ It extracts AWS-specific logic from the domain layer.
 
 from typing import Any, Dict, List
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
-from src.domain.request.aggregate import Request
-from src.domain.request.value_objects import RequestType
-from src.infrastructure.ports.request_adapter_port import RequestAdapterPort
-from src.providers.aws.infrastructure.aws_client import AWSClient
+from domain.base.dependency_injection import injectable
+from domain.base.ports import LoggingPort
+from domain.request.aggregate import Request
+from domain.request.value_objects import RequestType
+from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
+from providers.aws.infrastructure.aws_client import AWSClient
 
 
 @injectable

@@ -29,7 +29,7 @@ echo "Verifying site directory exists..."
 if [ -d "docs/site" ]; then
     echo "Site directory created successfully"
     echo "Site contents:"
-    ls -la docs/site/ | head -10
+    find docs/site/ -maxdepth 1 -ls | head -10
 else
     echo "Error: site directory not found"
     exit 1

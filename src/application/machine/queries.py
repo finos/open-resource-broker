@@ -2,7 +2,7 @@
 
 from typing import List, Optional
 
-from src.application.dto.base import BaseQuery
+from application.dto.base import BaseQuery
 
 
 class GetMachineStatusQuery(BaseQuery):

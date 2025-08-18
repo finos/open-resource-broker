@@ -2,8 +2,8 @@
 
 from typing import Any, Type, TypeVar, cast
 
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.patterns.singleton_registry import SingletonRegistry
+from infrastructure.logging.logger import get_logger
+from infrastructure.patterns.singleton_registry import SingletonRegistry
 
 T = TypeVar("T")
 
@@ -26,7 +26,7 @@ def get_singleton(singleton_class: Type[T], *args: Any, **kwargs: Any) -> T:
     """
     # Try DI container first if available
     try:
-        from src.infrastructure.di.container import get_container
+        from infrastructure.di.container import get_container
 
         container = get_container()
         # Try to get the instance from the container

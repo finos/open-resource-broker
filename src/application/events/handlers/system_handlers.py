@@ -7,10 +7,10 @@ BaseQueryHandler, ensuring consistency across all handler types in the CQRS syst
 
 from typing import Optional
 
-from src.application.base.event_handlers import BaseLoggingEventHandler
-from src.application.events.decorators import event_handler
-from src.domain.base.events import DomainEvent
-from src.domain.base.ports import ErrorHandlingPort, EventPublisherPort, LoggingPort
+from application.base.event_handlers import BaseLoggingEventHandler
+from application.events.decorators import event_handler
+from domain.base.events import DomainEvent
+from domain.base.ports import ErrorHandlingPort, EventPublisherPort, LoggingPort
 
 
 @event_handler("SystemStartedEvent")

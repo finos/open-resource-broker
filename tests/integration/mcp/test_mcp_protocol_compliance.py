@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from src.interface.mcp.server.core import OpenHFPluginMCPServer
+from interface.mcp.server.core import OpenHFPluginMCPServer
 
 
 class TestMCPProtocolCompliance:

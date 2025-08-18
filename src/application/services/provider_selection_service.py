@@ -8,12 +8,12 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from src.config.managers.configuration_manager import ConfigurationManager
-from src.config.schemas.provider_strategy_schema import ProviderInstanceConfig
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
-from src.domain.template.aggregate import Template
-from src.infrastructure.registry.provider_registry import ProviderRegistry
+from config.schemas.provider_strategy_schema import ProviderInstanceConfig
+from domain.base.dependency_injection import injectable
+from domain.base.ports import LoggingPort
+from domain.base.ports.configuration_port import ConfigurationPort
+from domain.template.aggregate import Template
+from infrastructure.registry.provider_registry import ProviderRegistry
 
 
 @dataclass
@@ -57,7 +57,7 @@ class ProviderSelectionService:
 
     def __init__(
         self,
-        config_manager: ConfigurationManager,
+        config_manager: ConfigurationPort,
         logger: LoggingPort,
         provider_registry: Optional[ProviderRegistry] = None,
     ):
@@ -73,6 +73,9 @@ class ProviderSelectionService:
         self._logger = logger
         self._provider_registry = provider_registry
         self._provider_config = config_manager.get_provider_config()
+
+        # Cache for provider selection results
+        self._active_provider_cache: Optional[ProviderSelectionResult] = None
 
         if not self._provider_config:
             self._logger.warning(
@@ -114,6 +117,57 @@ class ProviderSelectionService:
 
         # Strategy 4: Fallback to default
         return self._select_default_provider(template)
+
+    def select_active_provider(self) -> ProviderSelectionResult:
+        """
+        Select active provider based on selection policy (non-template specific).
+
+        This method implements general provider selection for scenarios where
+        no template context is available (e.g., configuration loading, file paths).
+        Results are cached to avoid multiple selections.
+
+        Returns:
+            ProviderSelectionResult with selected provider and reasoning
+
+        Raises:
+            ValueError: If no suitable provider can be found
+        """
+        # Return cached result if available
+        if self._active_provider_cache is not None:
+            return self._active_provider_cache
+
+        self._logger.debug("Selecting active provider using selection policy")
+
+        # Get active providers based on selection policy
+        active_providers = self._provider_config.get_active_providers()
+        if not active_providers:
+            raise ValueError("No active providers found in configuration")
+
+        # Apply selection policy for multi-provider scenarios
+        if len(active_providers) == 1:
+            selected = active_providers[0]
+            reason = "single_active_provider"
+        else:
+            # Use load balancing strategy for multiple providers
+            selected = self._apply_load_balancing_strategy(
+                active_providers, self._provider_config.selection_policy
+            )
+            reason = f"load_balanced_{self._provider_config.selection_policy.lower()}"
+
+        result = ProviderSelectionResult(
+            provider_type=selected.type,
+            provider_instance=selected.name,
+            selection_reason=reason,
+            confidence=1.0,
+            alternatives=[p.name for p in active_providers if p.name != selected.name],
+        )
+
+        # Cache the result
+        self._active_provider_cache = result
+
+        self._logger.info(f"Selected active provider: {selected.name} ({reason})")
+
+        return result
 
     def _select_explicit_provider(self, template: Template) -> ProviderSelectionResult:
         """Select explicitly specified provider instance."""

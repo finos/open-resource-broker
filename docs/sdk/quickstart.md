@@ -6,7 +6,7 @@ The OpenHFPlugin SDK (ohfpsdk) provides a clean, async-first programmatic interf
 
 - **Automatic Method Discovery**: All CQRS handlers automatically exposed as SDK methods
 - **Zero Code Duplication**: Reuses existing DTOs, domain objects, and CQRS infrastructure
-- **Clean Architecture**: Maintains proper layer separation and dependency injection
+- **Clean Architecture**: Maintains correct layer separation and dependency injection
 - **Async/Await Support**: Full async support throughout
 - **Type Safety**: Complete type hints and validation
 

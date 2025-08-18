@@ -29,7 +29,7 @@ This change represents a significant architectural improvement that brings the c
 
 **Before:** The infrastructure layer was directly importing and depending on domain aggregates, which violates Clean Architecture dependency rules.
 
-**After:** The infrastructure layer now uses its own DTOs, maintaining proper layer separation and dependency direction.
+**After:** The infrastructure layer now uses its own DTOs, maintaining correct layer separation and dependency direction.
 
 ### 2. Dependency Inversion Principle (DIP)
 
@@ -240,7 +240,7 @@ This architectural foundation enables:
 The migration from direct domain imports to infrastructure DTOs in the `TemplateConfigurationManager` represents a significant architectural improvement that:
 
 1. **Ensures Clean Architecture compliance**
-2. **Implements proper dependency inversion**
+2. **Implements correct dependency inversion**
 3. **Maintains professional code standards**
 4. **Supports long-term maintainability**
 5. **Enables future architectural evolution**

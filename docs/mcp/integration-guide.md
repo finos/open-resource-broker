@@ -278,7 +278,7 @@ The MCP integration provides standardized error handling:
 ## Best Practices
 
 1. **Tool Discovery**: Always use tool discovery to get the latest available tools
-2. **Error Handling**: Implement proper error handling for all tool calls
+2. **Error Handling**: Implement appropriate error handling for all tool calls
 3. **Resource Access**: Use resource URIs for efficient data access
 4. **Caching**: Cache resource data when appropriate to reduce API calls
 5. **Validation**: Validate inputs before making tool calls

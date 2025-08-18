@@ -4,21 +4,21 @@ import time
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from src.application.base.infrastructure_handlers import BaseAPIHandler, RequestContext
-from src.application.dto.responses import ReturnRequestResponse
-from src.application.request.queries import ListRequestsQuery
-from src.config import RequestConfig
-from src.config.manager import get_config_manager
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import ErrorHandlingPort, LoggingPort
-from src.domain.base.ports.scheduler_port import SchedulerPort
+from application.base.infrastructure_handlers import BaseAPIHandler, RequestContext
+from application.dto.responses import ReturnRequestResponse
+from application.request.queries import ListRequestsQuery
+from config import RequestConfig
+from config.manager import get_config_manager
+from domain.base.dependency_injection import injectable
+from domain.base.ports import ErrorHandlingPort, LoggingPort
+from domain.base.ports.scheduler_port import SchedulerPort
 
 # Exception handling infrastructure
-from src.infrastructure.error.decorators import handle_interface_exceptions
-from src.monitoring.metrics import MetricsCollector
+from infrastructure.error.decorators import handle_interface_exceptions
+from monitoring.metrics import MetricsCollector
 
 if TYPE_CHECKING:
-    from src.infrastructure.di.buses import CommandBus, QueryBus
+    from infrastructure.di.buses import CommandBus, QueryBus
 
 
 @injectable
@@ -47,7 +47,7 @@ class GetReturnRequestsRESTHandler(BaseAPIHandler[Dict[str, Any], ReturnRequestR
             metrics: Optional metrics collector
             cache_duration: Cache duration in seconds
         """
-        # Initialize with proper dependencies
+        # Initialize with required dependencies
         super().__init__(logger, error_handler)
         self._query_bus = query_bus
         self._command_bus = command_bus

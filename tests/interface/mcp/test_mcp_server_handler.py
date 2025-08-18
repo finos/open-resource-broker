@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from src.interface.mcp.server.handler import handle_mcp_serve
+from interface.mcp.server.handler import handle_mcp_serve
 
 
 class TestMCPServerHandler:
@@ -54,8 +54,8 @@ class TestMCPServerHandler:
     @pytest.mark.asyncio
     async def test_stdio_server_message_handling(self, mock_app):
         """Test stdio server message handling."""
-        from src.interface.mcp.server.core import OpenHFPluginMCPServer
-        from src.interface.mcp.server.handler import _run_stdio_server
+        from interface.mcp.server.core import OpenHFPluginMCPServer
+        from interface.mcp.server.handler import _run_stdio_server
 
         mcp_server = OpenHFPluginMCPServer(app=mock_app)
 
@@ -81,7 +81,7 @@ class TestMCPServerHandler:
     @pytest.mark.asyncio
     async def test_tcp_server_client_handling(self, mock_app):
         """Test TCP server client handling."""
-        from src.interface.mcp.server.handler import _run_tcp_server
+        from interface.mcp.server.handler import _run_tcp_server
 
         # Mock asyncio.start_server
         with patch("asyncio.start_server") as mock_start_server:
@@ -97,7 +97,7 @@ class TestMCPServerHandler:
             mock_start_server.return_value = mock_server
 
             # Run TCP server (should exit on KeyboardInterrupt)
-            from src.interface.mcp.server.core import OpenHFPluginMCPServer
+            from interface.mcp.server.core import OpenHFPluginMCPServer
 
             mcp_server = OpenHFPluginMCPServer(app=mock_app)
 

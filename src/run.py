@@ -12,7 +12,12 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # Import CLI modules
-from src.cli.main import main
+try:
+    # Try wheel/installed package import first
+    from cli.main import main
+except ImportError:
+    # Fallback to development mode import
+    from cli.main import main
 
 # Import version for help text
 try:

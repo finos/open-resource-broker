@@ -15,7 +15,7 @@ import logging
 from contextlib import contextmanager
 from typing import Generator
 
-from src.infrastructure.mocking.dry_run_context import is_dry_run_active
+from infrastructure.mocking.dry_run_context import is_dry_run_active
 
 # Import moto for AWS mocking
 try:

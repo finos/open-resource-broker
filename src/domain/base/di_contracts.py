@@ -2,7 +2,7 @@
 Domain DI Contracts - Interfaces and contracts for dependency injection.
 
 This module defines the contracts and interfaces that infrastructure
-implementations must fulfill, ensuring proper separation of concerns
+implementations must fulfill, ensuring clear separation of concerns
 while maintaining the power and flexibility of dependency injection.
 """
 

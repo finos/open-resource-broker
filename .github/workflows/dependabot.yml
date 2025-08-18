@@ -13,16 +13,19 @@ jobs:
     name: Get Python Version from Makefile
     runs-on: ubuntu-latest
     outputs:
-      python-version: ${{ steps.version.outputs.default-python-version }}
+      default-python-version: ${{ steps.version.outputs.default-python-version }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
+
+    - name: Install yq
+      uses: mikefarah/yq@master
 
     - name: Get default Python version from project config
       id: version
       run: |
         DEFAULT_PYTHON_VERSION=$(yq '.python.default_version' .project.yml)
-        echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> $GITHUB_OUTPUT
+        echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> "$GITHUB_OUTPUT"
         echo "Using Python version: $DEFAULT_PYTHON_VERSION"
 
   update-uv-lock:
@@ -41,6 +44,9 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
+      - name: Install yq
+        uses: mikefarah/yq@master
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -55,9 +61,12 @@ jobs:
         run: make generate-pyproject
 
       - name: Update UV lock file
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           echo "Updating UV lock file after Dependabot changes..."
-          uv lock --upgrade-package $(echo "${{ github.event.pull_request.title }}" | grep -oP 'Bump \K[^\s]+')
+          PACKAGE_NAME=$(echo "$PR_TITLE" | grep -oP 'Bump \K[^\s]+')
+          uv lock --upgrade-package "$PACKAGE_NAME"
 
       - name: Commit updated lock file
         run: |
@@ -174,6 +183,7 @@ jobs:
     name: Monthly Maintenance
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    needs: get-config
     permissions:
       contents: write
       pull-requests: write
@@ -181,6 +191,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+
+      - name: Install yq
+        uses: mikefarah/yq@master
 
       - name: Set up Python
         uses: actions/setup-python@v5

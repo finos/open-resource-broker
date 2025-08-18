@@ -216,7 +216,7 @@ class TestHostFactoryLifecycle:
     def _create_app_service(self, provider_type: str):
         """Create application service with specified provider type."""
         # This would use real configuration for actual providers
-        from src.bootstrap import Application
+        from bootstrap import Application
 
         app = Application()
         app.initialize()
@@ -224,7 +224,7 @@ class TestHostFactoryLifecycle:
 
     def _create_app_service_with_provider(self, provider_type: str, provider):
         """Create application service with mock provider."""
-        from src.bootstrap import Application
+        from bootstrap import Application
 
         # Create mock application with provider
         app = Application()

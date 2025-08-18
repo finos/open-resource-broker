@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, Optional
 
-from src.domain.base.exceptions import InfrastructureError
+from domain.base.exceptions import InfrastructureError
 
 
 class PersistenceError(InfrastructureError):

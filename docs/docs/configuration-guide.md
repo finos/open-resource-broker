@@ -654,7 +654,7 @@ Optimize performance for your environment:
 1. **Credential Management**: Use IAM roles and profiles instead of hardcoded credentials
 2. **Network Security**: Configure appropriate security groups and network access
 3. **Audit Logging**: Enable comprehensive logging for audit trails
-4. **Access Control**: Implement proper access controls for configuration files
+4. **Access Control**: Implement appropriate access controls for configuration files
 5. **Regular Updates**: Keep provider configurations and credentials updated
 
 This guide provides comprehensive coverage of the configuration-driven provider strategy system. For additional examples and advanced configurations, see the examples directory.

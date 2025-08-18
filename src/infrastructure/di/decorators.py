@@ -144,7 +144,7 @@ def _resolve_dependency(
     """
     try:
         # Import here to avoid circular imports
-        from src.infrastructure.di.container import get_container
+        from infrastructure.di.container import get_container
 
         container = get_container()
 

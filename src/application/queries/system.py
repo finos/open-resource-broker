@@ -4,7 +4,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from src.application.interfaces.command_query import Query
+from application.interfaces.command_query import Query
 
 
 class GetSystemStatusQuery(Query, BaseModel):

@@ -38,18 +38,18 @@ import boto3
 
 # Import application components - with error handling
 try:
-    from src.config.manager import ConfigurationManager
-    from src.config.schemas.app_schema import AppConfig
-    from src.domain.base.value_objects import InstanceId, InstanceType, ResourceId
-    from src.domain.machine.aggregate import Machine
-    from src.domain.request.aggregate import Request
-    from src.domain.template.aggregate import Template
-    from src.infrastructure.di.buses import CommandBus, QueryBus
-    from src.infrastructure.di.container import DIContainer
-    from src.infrastructure.template.services.template_persistence_service import (
+    from config.manager import ConfigurationManager
+    from config.schemas.app_schema import AppConfig
+    from domain.base.value_objects import InstanceId, InstanceType, ResourceId
+    from domain.machine.aggregate import Machine
+    from domain.request.aggregate import Request
+    from domain.template.aggregate import Template
+    from infrastructure.di.buses import CommandBus, QueryBus
+    from infrastructure.di.container import DIContainer
+    from infrastructure.template.services.template_persistence_service import (
         TemplatePersistenceService,
     )
-    from src.providers.aws.configuration.config import AWSConfig
+    from providers.aws.configuration.config import AWSProviderConfig as AWSConfig
 
     IMPORTS_AVAILABLE = True
 except ImportError as e:

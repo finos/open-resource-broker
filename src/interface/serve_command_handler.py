@@ -3,8 +3,8 @@
 import signal
 from typing import Any, Dict
 
-from src.infrastructure.error.decorators import handle_interface_exceptions
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.error.decorators import handle_interface_exceptions
+from infrastructure.logging.logger import get_logger
 
 
 @handle_interface_exceptions(context="serve_api", interface_type="cli")
@@ -21,8 +21,8 @@ async def handle_serve_api(args) -> Dict[str, Any]:
     logger = get_logger(__name__)
 
     # Extract parameters from args
-    # nosec B104: Intentional binding for server deployment
-    host = getattr(args, "host", "0.0.0.0")
+    # Intentional binding for server deployment
+    host = getattr(args, "host", "0.0.0.0")  # nosec B104
     port = getattr(args, "port", 8000)
     workers = getattr(args, "workers", 1)
     reload = getattr(args, "reload", False)
@@ -30,12 +30,15 @@ async def handle_serve_api(args) -> Dict[str, Any]:
 
     try:
         # Import here to avoid circular dependencies
-        from src.config.manager import ConfigurationManager
-        from src.interface.rest.server import create_app
+        from api.server import create_fastapi_app
+        from config.schemas.server_schema import ServerConfig
+        from domain.base.ports.configuration_port import ConfigurationPort
+        from infrastructure.di.container import get_container
 
-        # Get server configuration
-        config_manager = ConfigurationManager()
-        server_config = config_manager.get_server_config()
+        # Get configuration through DI
+        container = get_container()
+        config_manager = container.get(ConfigurationPort)
+        server_config = config_manager.get_typed(ServerConfig)
 
         # Override with CLI arguments if provided
         if host:
@@ -53,7 +56,7 @@ async def handle_serve_api(args) -> Dict[str, Any]:
         )
 
         # Create and configure the FastAPI app
-        app = create_app()
+        app = create_fastapi_app(server_config)
 
         # Start the server
         import uvicorn

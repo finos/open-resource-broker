@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict
 
-from src.domain.base.value_objects import InstanceId, InstanceType, Tags
+from domain.base.value_objects import InstanceId, InstanceType, Tags
 
 
 class InstanceState(str, Enum):

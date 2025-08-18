@@ -5,8 +5,13 @@ from typing import List
 from fastapi import HTTPException, Request, Response, status
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.ports.auth import AuthContext, AuthPort, AuthResult, AuthStatus
+from infrastructure.adapters.ports.auth import (
+    AuthContext,
+    AuthPort,
+    AuthResult,
+    AuthStatus,
+)
+from infrastructure.logging.logger import get_logger
 
 
 class AuthMiddleware(BaseHTTPMiddleware):

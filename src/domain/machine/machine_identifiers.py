@@ -6,7 +6,7 @@ import re
 
 from pydantic import field_validator
 
-from src.domain.base.value_objects import ValueObject
+from domain.base.value_objects import ValueObject
 
 
 class MachineId(ValueObject):

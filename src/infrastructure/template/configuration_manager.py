@@ -13,28 +13,22 @@ Architecture Principles:
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from src.config.manager import ConfigurationManager
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.exceptions import (
-    DomainException,
-    EntityNotFoundError,
-    ValidationError,
-)
-from src.domain.base.ports.event_publisher_port import EventPublisherPort
-from src.domain.base.ports.logging_port import LoggingPort
-from src.domain.base.ports.scheduler_port import SchedulerPort
+from domain.base.dependency_injection import injectable
+from domain.base.exceptions import DomainException, EntityNotFoundError, ValidationError
+from domain.base.ports.configuration_port import ConfigurationPort
+from domain.base.ports.event_publisher_port import EventPublisherPort
+from domain.base.ports.logging_port import LoggingPort
+from domain.base.ports.scheduler_port import SchedulerPort
 
 from .dtos import TemplateDTO
 from .services.template_persistence_service import TemplatePersistenceService
 from .template_cache_service import TemplateCacheService, create_template_cache_service
 
 if TYPE_CHECKING:
-    from src.application.services.provider_capability_service import (
+    from application.services.provider_capability_service import (
         ProviderCapabilityService,
     )
-    from src.application.services.template_defaults_service import (
-        TemplateDefaultsService,
-    )
+    from application.services.template_defaults_service import TemplateDefaultsService
 
 
 class TemplateConfigurationError(DomainException):
@@ -69,7 +63,7 @@ class TemplateConfigurationManager:
 
     def __init__(
         self,
-        config_manager: ConfigurationManager,
+        config_manager: ConfigurationPort,
         scheduler_strategy: SchedulerPort,
         logger: LoggingPort,
         cache_service: Optional[TemplateCacheService] = None,
@@ -208,13 +202,29 @@ class TemplateConfigurationManager:
         if "provider_name" in template_dict:
             return template_dict["provider_name"]
 
-        # 2. Use active provider from configuration
+        # 2. Use active provider from configuration with appropriate selection logic
         try:
-            provider_config = self.config_manager.get_provider_config()
-            if hasattr(provider_config, "active_provider") and provider_config.active_provider:
-                return provider_config.active_provider
+            from application.services.provider_selection_service import (
+                ProviderSelectionService,
+            )
+            from infrastructure.di.container import get_container
+
+            container = get_container()
+            selection_service = container.get(ProviderSelectionService)
+            selection_result = selection_service.select_active_provider()
+            return selection_result.provider_instance
         except Exception as e:
-            self.logger.debug(f"Could not determine provider instance: {e}")
+            self.logger.debug(f"Could not determine provider instance via selection service: {e}")
+
+            # Fallback: try direct provider config access
+            try:
+                provider_config = self.config_manager.get_provider_config()
+                if provider_config:
+                    active_providers = provider_config.get_active_providers()
+                    if active_providers:
+                        return active_providers[0].name
+            except Exception as e2:
+                self.logger.debug(f"Could not determine provider instance via direct access: {e2}")
 
         # 3. Fallback to default
         return "aws"
@@ -264,10 +274,17 @@ class TemplateConfigurationManager:
                 and "aws" in provider_config.provider_defaults
             ):
                 aws_defaults = provider_config.provider_defaults["aws"]
-                if hasattr(aws_defaults, "extensions") and aws_defaults.extensions:
-                    ami_resolution = aws_defaults.extensions.get("ami_resolution", {})
-                    if isinstance(ami_resolution, dict) and ami_resolution.get("enabled"):
-                        return True
+                if hasattr(aws_defaults, "extensions"):
+                    from domain.template.extensions import TemplateExtensionRegistry
+
+                    aws_extension_config = TemplateExtensionRegistry.create_extension_config(
+                        "aws", aws_defaults.extensions or {}
+                    )
+                    return (
+                        aws_extension_config.ami_resolution.enabled
+                        if aws_extension_config
+                        else False
+                    )
 
             return False
 
@@ -278,14 +295,12 @@ class TemplateConfigurationManager:
     def _get_ami_resolver(self):
         """Get AMI resolver from DI container using port interface."""
         try:
-            from src.infrastructure.di.container import get_container
+            from infrastructure.di.container import get_container
 
             container = get_container()
 
             # Use port interface instead of concrete implementation
-            from src.domain.base.ports.template_resolver_port import (
-                TemplateResolverPort,
-            )
+            from domain.base.ports.template_resolver_port import TemplateResolverPort
 
             return container.get(TemplateResolverPort)
 
@@ -560,7 +575,7 @@ class TemplateConfigurationManager:
         """Validate template against provider capabilities."""
         try:
             # Convert TemplateDTO to Template domain object for capability service
-            from src.domain.template.aggregate import Template
+            from domain.template.aggregate import Template
 
             # Create minimal Template object for validation
             domain_template = Template(
@@ -571,9 +586,7 @@ class TemplateConfigurationManager:
             )
 
             # Use provider capability service for validation
-            from src.application.services.provider_capability_service import (
-                ValidationLevel,
-            )
+            from application.services.provider_capability_service import ValidationLevel
 
             capability_result = self.provider_capability_service.validate_template_requirements(
                 domain_template, provider_instance, ValidationLevel.STRICT
@@ -605,7 +618,7 @@ class TemplateConfigurationManager:
 
 # Factory function for dependency injection
 def create_template_configuration_manager(
-    config_manager: ConfigurationManager,
+    config_manager: ConfigurationPort,
     scheduler_strategy: SchedulerPort,
     logger: LoggingPort,
 ) -> TemplateConfigurationManager:
@@ -613,7 +626,7 @@ def create_template_configuration_manager(
     Create TemplateConfigurationManager.
 
     This function provides a clean way to create the manager with
-    proper dependency injection.
+    dependency injection.
     """
     return TemplateConfigurationManager(
         config_manager=config_manager,

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from src.domain.base.ports.scheduler_port import SchedulerPort
-from src.infrastructure.di.buses import QueryBus
-from src.infrastructure.di.container import get_container
-from src.infrastructure.error.decorators import handle_interface_exceptions
+from domain.base.ports.scheduler_port import SchedulerPort
+from infrastructure.di.buses import QueryBus
+from infrastructure.di.container import get_container
+from infrastructure.error.decorators import handle_interface_exceptions
 
 
 @handle_interface_exceptions(context="list_scheduler_strategies", interface_type="cli")
@@ -25,7 +25,7 @@ async def handle_list_scheduler_strategies(args) -> Dict[str, Any]:
     query_bus = container.get(QueryBus)
     container.get(SchedulerPort)
 
-    from src.application.queries.system import ListSchedulerStrategiesQuery
+    from application.queries.system import ListSchedulerStrategiesQuery
 
     query = ListSchedulerStrategiesQuery()
     strategies = await query_bus.execute(query)
@@ -51,7 +51,7 @@ async def handle_show_scheduler_config(args) -> Dict[str, Any]:
     container = get_container()
     query_bus = container.get(QueryBus)
 
-    from src.application.queries.system import GetSchedulerConfigurationQuery
+    from application.queries.system import GetSchedulerConfigurationQuery
 
     query = GetSchedulerConfigurationQuery()
     config = await query_bus.execute(query)
@@ -76,7 +76,7 @@ async def handle_validate_scheduler_config(args) -> Dict[str, Any]:
     container = get_container()
     query_bus = container.get(QueryBus)
 
-    from src.application.queries.system import ValidateSchedulerConfigurationQuery
+    from application.queries.system import ValidateSchedulerConfigurationQuery
 
     query = ValidateSchedulerConfigurationQuery()
     validation = await query_bus.execute(query)

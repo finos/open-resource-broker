@@ -492,7 +492,7 @@ The template system includes intelligent HostFactory attribute generation throug
 def _create_hf_attributes(self, template_data: Dict[str, Any]) -> Dict[str, Any]:
     """Create HF-compatible attributes object with CPU/RAM specs.
 
-    This method handles the creation of HostFactory attributes with proper
+    This method handles the creation of HostFactory attributes with appropriate
     CPU and RAM specifications based on instance type.
     """
     # Handle both snake_case and camelCase field names

@@ -1,12 +1,12 @@
 """Unit tests for provider strategy commands."""
 
-from src.application.provider.commands import (
+from application.provider.commands import (
     ExecuteProviderOperationCommand,
     RegisterProviderStrategyCommand,
     SelectProviderStrategyCommand,
     UpdateProviderHealthCommand,
 )
-from src.providers.base.strategy import (
+from providers.base.strategy import (
     ProviderHealthStatus,
     ProviderOperation,
     ProviderOperationType,

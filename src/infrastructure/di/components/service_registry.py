@@ -4,7 +4,7 @@ import logging
 import threading
 from typing import Any, Callable, Dict, Optional, Set, Type, TypeVar
 
-from src.domain.base.di_contracts import DependencyRegistration, DIScope
+from domain.base.di_contracts import DependencyRegistration, DIScope
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)

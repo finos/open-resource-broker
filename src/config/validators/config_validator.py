@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, List
 
-from src.config.schemas import AppConfig, validate_config
+from config.schemas import AppConfig, validate_config
 
 
 class ValidationResult:

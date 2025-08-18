@@ -2,15 +2,15 @@
 
 from typing import List
 
-from src.application.base.handlers import BaseQueryHandler
-from src.application.decorators import query_handler
-from src.application.dto.system import (
+from application.base.handlers import BaseQueryHandler
+from application.decorators import query_handler
+from application.dto.system import (
     SchedulerConfigurationResponse,
     SchedulerStrategyDTO,
     SchedulerStrategyListResponse,
     ValidationResultDTO,
 )
-from src.application.queries.scheduler import (
+from application.queries.scheduler import (
     GetSchedulerConfigurationQuery,
     ListSchedulerStrategiesQuery,
     ValidateSchedulerConfigurationQuery,
@@ -35,10 +35,8 @@ class ListSchedulerStrategiesHandler(
         Returns:
             Scheduler strategies list response
         """
-        from src.config.manager import ConfigurationManager
-        from src.infrastructure.registry.scheduler_registry import (
-            get_scheduler_registry,
-        )
+        from config.manager import ConfigurationManager
+        from infrastructure.registry.scheduler_registry import get_scheduler_registry
 
         registry = get_scheduler_registry()
         scheduler_types = registry.get_registered_types()
@@ -122,10 +120,8 @@ class GetSchedulerConfigurationHandler(
         Returns:
             Scheduler configuration response
         """
-        from src.config.manager import ConfigurationManager
-        from src.infrastructure.registry.scheduler_registry import (
-            get_scheduler_registry,
-        )
+        from config.manager import ConfigurationManager
+        from infrastructure.registry.scheduler_registry import get_scheduler_registry
 
         config_manager = ConfigurationManager()
         registry = get_scheduler_registry()
@@ -180,10 +176,8 @@ class ValidateSchedulerConfigurationHandler(
         Returns:
             Validation result
         """
-        from src.config.manager import ConfigurationManager
-        from src.infrastructure.registry.scheduler_registry import (
-            get_scheduler_registry,
-        )
+        from config.manager import ConfigurationManager
+        from infrastructure.registry.scheduler_registry import get_scheduler_registry
 
         config_manager = ConfigurationManager()
         registry = get_scheduler_registry()

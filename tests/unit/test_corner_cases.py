@@ -13,14 +13,14 @@ import pytest
 
 # Import components for testing
 try:
-    from src.domain.base.value_objects import InstanceId
-    from src.domain.request.aggregate import Request
-    from src.domain.request.exceptions import (
+    from domain.base.value_objects import InstanceId
+    from domain.request.aggregate import Request
+    from domain.request.exceptions import (
         InvalidRequestStateError,
         RequestValidationError,
     )
-    from src.domain.request.value_objects import RequestStatus
-    from src.infrastructure.persistence.repositories.request_repository import (
+    from domain.request.value_objects import RequestStatus
+    from infrastructure.persistence.repositories.request_repository import (
         RequestRepository,
     )
 

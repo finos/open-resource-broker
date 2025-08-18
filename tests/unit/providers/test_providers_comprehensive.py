@@ -101,7 +101,7 @@ class TestAWSProviderComprehensive:
     def test_aws_client_exists(self):
         """Test that AWS client exists."""
         try:
-            from src.providers.aws.infrastructure.aws_client import AWSClient
+            from providers.aws.infrastructure.aws_client import AWSClient
 
             assert AWSClient is not None
         except ImportError:
@@ -110,7 +110,7 @@ class TestAWSProviderComprehensive:
     def test_aws_client_initialization(self):
         """Test AWS client initialization."""
         try:
-            from src.providers.aws.infrastructure.aws_client import AWSClient
+            from providers.aws.infrastructure.aws_client import AWSClient
 
             # Try to create client
             try:
@@ -127,7 +127,7 @@ class TestAWSProviderComprehensive:
     def test_aws_configuration_exists(self):
         """Test that AWS configuration exists."""
         try:
-            from src.providers.aws.configuration.config import AWSConfig
+            from providers.aws.configuration.config import AWSConfig
 
             assert AWSConfig is not None
         except ImportError:
@@ -136,7 +136,7 @@ class TestAWSProviderComprehensive:
     def test_aws_configuration_initialization(self):
         """Test AWS configuration initialization."""
         try:
-            from src.providers.aws.configuration.config import AWSConfig
+            from providers.aws.configuration.config import AWSConfig
 
             try:
                 config = AWSConfig()
@@ -174,9 +174,7 @@ class TestAWSProviderComprehensive:
     def test_aws_strategy_exists(self):
         """Test that AWS strategy exists."""
         try:
-            from src.providers.aws.strategy.aws_provider_strategy import (
-                AWSProviderStrategy,
-            )
+            from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
             assert AWSProviderStrategy is not None
         except ImportError:
@@ -185,9 +183,7 @@ class TestAWSProviderComprehensive:
     def test_aws_strategy_initialization(self):
         """Test AWS strategy initialization."""
         try:
-            from src.providers.aws.strategy.aws_provider_strategy import (
-                AWSProviderStrategy,
-            )
+            from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
             # Try to create strategy with mocked dependencies
             mock_deps = [Mock() for _ in range(10)]
@@ -220,7 +216,7 @@ class TestAWSProviderComprehensive:
     def test_aws_exceptions_exist(self):
         """Test that AWS exceptions exist."""
         try:
-            import src.providers.aws.exceptions.aws_exceptions
+            pass
 
             assert src.providers.aws.exceptions.aws_exceptions is not None
         except ImportError:
@@ -263,7 +259,7 @@ class TestProviderStrategyPatternsComprehensive:
     def test_composite_strategy_exists(self):
         """Test that composite strategy exists."""
         try:
-            from src.providers.base.strategy.composite_strategy import CompositeStrategy
+            from providers.base.strategy.composite_strategy import CompositeStrategy
 
             assert CompositeStrategy is not None
         except ImportError:
@@ -272,7 +268,7 @@ class TestProviderStrategyPatternsComprehensive:
     def test_composite_strategy_initialization(self):
         """Test composite strategy initialization."""
         try:
-            from src.providers.base.strategy.composite_strategy import CompositeStrategy
+            from providers.base.strategy.composite_strategy import CompositeStrategy
 
             # Try to create strategy
             try:
@@ -289,7 +285,7 @@ class TestProviderStrategyPatternsComprehensive:
     def test_fallback_strategy_exists(self):
         """Test that fallback strategy exists."""
         try:
-            from src.providers.base.strategy.fallback_strategy import FallbackStrategy
+            from providers.base.strategy.fallback_strategy import FallbackStrategy
 
             assert FallbackStrategy is not None
         except ImportError:
@@ -298,7 +294,7 @@ class TestProviderStrategyPatternsComprehensive:
     def test_fallback_strategy_initialization(self):
         """Test fallback strategy initialization."""
         try:
-            from src.providers.base.strategy.fallback_strategy import FallbackStrategy
+            from providers.base.strategy.fallback_strategy import FallbackStrategy
 
             # Try to create strategy
             try:
@@ -315,7 +311,7 @@ class TestProviderStrategyPatternsComprehensive:
     def test_load_balancing_strategy_exists(self):
         """Test that load balancing strategy exists."""
         try:
-            from src.providers.base.strategy.load_balancing_strategy import (
+            from providers.base.strategy.load_balancing_strategy import (
                 LoadBalancingStrategy,
             )
 
@@ -326,7 +322,7 @@ class TestProviderStrategyPatternsComprehensive:
     def test_load_balancing_strategy_initialization(self):
         """Test load balancing strategy initialization."""
         try:
-            from src.providers.base.strategy.load_balancing_strategy import (
+            from providers.base.strategy.load_balancing_strategy import (
                 LoadBalancingStrategy,
             )
 
@@ -345,7 +341,7 @@ class TestProviderStrategyPatternsComprehensive:
     def test_provider_context_exists(self):
         """Test that provider context exists."""
         try:
-            from src.providers.base.strategy.provider_context import ProviderContext
+            from providers.base.strategy.provider_context import ProviderContext
 
             assert ProviderContext is not None
         except ImportError:
@@ -354,7 +350,7 @@ class TestProviderStrategyPatternsComprehensive:
     def test_provider_selector_exists(self):
         """Test that provider selector exists."""
         try:
-            from src.providers.base.strategy.provider_selector import ProviderSelector
+            from providers.base.strategy.provider_selector import ProviderSelector
 
             assert ProviderSelector is not None
         except ImportError:
@@ -363,7 +359,7 @@ class TestProviderStrategyPatternsComprehensive:
     def test_provider_strategy_base_exists(self):
         """Test that provider strategy base exists."""
         try:
-            from src.providers.base.strategy.provider_strategy import ProviderStrategy
+            from providers.base.strategy.provider_strategy import ProviderStrategy
 
             assert ProviderStrategy is not None
         except ImportError:
@@ -444,7 +440,7 @@ class TestAWSPersistenceComprehensive:
     def test_dynamodb_strategy_exists(self):
         """Test that DynamoDB strategy exists."""
         try:
-            from src.providers.aws.persistence.dynamodb.strategy import DynamoDBStrategy
+            from providers.aws.persistence.dynamodb.strategy import DynamoDBStrategy
 
             assert DynamoDBStrategy is not None
         except ImportError:
@@ -453,7 +449,7 @@ class TestAWSPersistenceComprehensive:
     def test_dynamodb_unit_of_work_exists(self):
         """Test that DynamoDB unit of work exists."""
         try:
-            from src.providers.aws.persistence.dynamodb.unit_of_work import (
+            from providers.aws.persistence.dynamodb.unit_of_work import (
                 DynamoDBUnitOfWork,
             )
 
@@ -464,7 +460,7 @@ class TestAWSPersistenceComprehensive:
     def test_dynamodb_registration_exists(self):
         """Test that DynamoDB registration exists."""
         try:
-            import src.providers.aws.persistence.dynamodb.registration
+            pass
 
             assert src.providers.aws.persistence.dynamodb.registration is not None
         except ImportError:
@@ -479,7 +475,7 @@ class TestAWSAuthenticationComprehensive:
     def test_cognito_strategy_exists(self):
         """Test that Cognito strategy exists."""
         try:
-            from src.providers.aws.auth.cognito_strategy import CognitoStrategy
+            from providers.aws.auth.cognito_strategy import CognitoStrategy
 
             assert CognitoStrategy is not None
         except ImportError:
@@ -488,7 +484,7 @@ class TestAWSAuthenticationComprehensive:
     def test_iam_strategy_exists(self):
         """Test that IAM strategy exists."""
         try:
-            from src.providers.aws.auth.iam_strategy import IAMStrategy
+            from providers.aws.auth.iam_strategy import IAMStrategy
 
             assert IAMStrategy is not None
         except ImportError:
@@ -528,7 +524,7 @@ class TestAWSResilienceComprehensive:
     def test_aws_retry_config_exists(self):
         """Test that AWS retry config exists."""
         try:
-            import src.providers.aws.resilience.aws_retry_config
+            pass
 
             assert src.providers.aws.resilience.aws_retry_config is not None
         except ImportError:
@@ -537,7 +533,7 @@ class TestAWSResilienceComprehensive:
     def test_aws_retry_strategy_exists(self):
         """Test that AWS retry strategy exists."""
         try:
-            from src.providers.aws.resilience.aws_retry_strategy import AWSRetryStrategy
+            from providers.aws.resilience.aws_retry_strategy import AWSRetryStrategy
 
             assert AWSRetryStrategy is not None
         except ImportError:
@@ -546,7 +542,7 @@ class TestAWSResilienceComprehensive:
     def test_aws_retry_errors_exist(self):
         """Test that AWS retry errors exist."""
         try:
-            import src.providers.aws.resilience.aws_retry_errors
+            pass
 
             assert src.providers.aws.resilience.aws_retry_errors is not None
         except ImportError:
@@ -561,7 +557,7 @@ class TestAWSTemplateInfrastructureComprehensive:
     def test_ami_cache_exists(self):
         """Test that AMI cache exists."""
         try:
-            from src.providers.aws.infrastructure.template.ami_cache import AMICache
+            from providers.aws.infrastructure.template.ami_cache import AMICache
 
             assert AMICache is not None
         except ImportError:
@@ -570,7 +566,7 @@ class TestAWSTemplateInfrastructureComprehensive:
     def test_caching_ami_resolver_exists(self):
         """Test that caching AMI resolver exists."""
         try:
-            from src.providers.aws.infrastructure.template.caching_ami_resolver import (
+            from providers.aws.infrastructure.template.caching_ami_resolver import (
                 CachingAMIResolver,
             )
 
@@ -581,7 +577,7 @@ class TestAWSTemplateInfrastructureComprehensive:
     def test_ssm_template_store_exists(self):
         """Test that SSM template store exists."""
         try:
-            from src.providers.aws.infrastructure.template.ssm_template_store import (
+            from providers.aws.infrastructure.template.ssm_template_store import (
                 SSMTemplateStore,
             )
 
@@ -634,7 +630,7 @@ class TestProviderRegistrationComprehensive:
     def test_aws_registration_exists(self):
         """Test that AWS registration exists."""
         try:
-            import src.providers.aws.registration
+            pass
 
             assert src.providers.aws.registration is not None
         except ImportError:
@@ -643,7 +639,7 @@ class TestProviderRegistrationComprehensive:
     def test_provider_registry_exists(self):
         """Test that provider registry exists."""
         try:
-            from src.infrastructure.registry.provider_registry import ProviderRegistry
+            from infrastructure.registry.provider_registry import ProviderRegistry
 
             assert ProviderRegistry is not None
         except ImportError:
@@ -652,7 +648,7 @@ class TestProviderRegistrationComprehensive:
     def test_provider_registry_initialization(self):
         """Test provider registry initialization."""
         try:
-            from src.infrastructure.registry.provider_registry import ProviderRegistry
+            from infrastructure.registry.provider_registry import ProviderRegistry
 
             try:
                 registry = ProviderRegistry()

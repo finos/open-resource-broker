@@ -337,7 +337,7 @@ def diagnose_memory():
 ```
 
 **Solutions**:
-- Implement proper cleanup in component destructors
+- Implement appropriate cleanup in component destructors
 - Use weak references for caches
 - Implement component unloading for unused services
 

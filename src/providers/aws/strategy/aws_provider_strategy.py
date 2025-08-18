@@ -8,26 +8,24 @@ maintaining all existing AWS functionality and adding new capabilities.
 import time
 from typing import Any, Dict, List, Optional
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
+from domain.base.dependency_injection import injectable
+from domain.base.ports import LoggingPort
 
 # Import AWS-specific components
-from src.providers.aws.configuration.config import AWSProviderConfig
-from src.providers.aws.infrastructure.aws_client import AWSClient
-from src.providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHandler
-from src.providers.aws.infrastructure.handlers.run_instances_handler import (
+from providers.aws.configuration.config import AWSProviderConfig
+from providers.aws.infrastructure.aws_client import AWSClient
+from providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHandler
+from providers.aws.infrastructure.handlers.run_instances_handler import (
     RunInstancesHandler,
 )
-from src.providers.aws.infrastructure.handlers.spot_fleet_handler import (
-    SpotFleetHandler,
-)
-from src.providers.aws.infrastructure.launch_template.manager import (
+from providers.aws.infrastructure.handlers.spot_fleet_handler import SpotFleetHandler
+from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
 )
-from src.providers.aws.managers.aws_resource_manager import AWSResourceManager
+from providers.aws.managers.aws_resource_manager import AWSResourceManager
 
 # Import strategy pattern interfaces
-from src.providers.base.strategy import (
+from providers.base.strategy import (
     ProviderCapabilities,
     ProviderHealthStatus,
     ProviderOperation,
@@ -131,7 +129,7 @@ class AWSProviderStrategy(ProviderStrategy):
             self._logger.debug("Creating AWS handlers on first access")
 
             # Initialize AWS operations utility
-            from src.providers.aws.utilities.aws_operations import AWSOperations
+            from providers.aws.utilities.aws_operations import AWSOperations
 
             aws_ops = AWSOperations(self.aws_client, self._logger)
 
@@ -183,7 +181,7 @@ class AWSProviderStrategy(ProviderStrategy):
             self._logger.error(f"Failed to initialize AWS provider strategy: {e}")
             return False
 
-    def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
+    async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
         """
         Execute a provider operation using AWS services.
 
@@ -205,16 +203,14 @@ class AWSProviderStrategy(ProviderStrategy):
 
         try:
             # Import dry-run context here to avoid circular imports
-            from src.providers.aws.infrastructure.dry_run_adapter import (
-                aws_dry_run_context,
-            )
+            from providers.aws.infrastructure.dry_run_adapter import aws_dry_run_context
 
             # Execute operation within appropriate context
             if is_dry_run:
                 with aws_dry_run_context():
-                    result = self._execute_operation_internal(operation)
+                    result = await self._execute_operation_internal(operation)
             else:
-                result = self._execute_operation_internal(operation)
+                result = await self._execute_operation_internal(operation)
 
             # Add execution metadata
             execution_time_ms = int((time.time() - start_time) * 1000)
@@ -247,7 +243,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 },
             )
 
-    def _execute_operation_internal(self, operation: ProviderOperation) -> ProviderResult:
+    async def _execute_operation_internal(self, operation: ProviderOperation) -> ProviderResult:
         """
         Execute operations - separated for dry-run context wrapping.
 
@@ -265,7 +261,7 @@ class AWSProviderStrategy(ProviderStrategy):
         elif operation.operation_type == ProviderOperationType.GET_INSTANCE_STATUS:
             return self._handle_get_instance_status(operation)
         elif operation.operation_type == ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES:
-            return self._handle_describe_resource_instances(operation)
+            return await self._handle_describe_resource_instances(operation)
         elif operation.operation_type == ProviderOperationType.VALIDATE_TEMPLATE:
             return self._handle_validate_template(operation)
         elif operation.operation_type == ProviderOperationType.GET_AVAILABLE_TEMPLATES:
@@ -279,7 +275,7 @@ class AWSProviderStrategy(ProviderStrategy):
             )
 
     def _handle_create_instances(self, operation: ProviderOperation) -> ProviderResult:
-        """Handle instance creation operation using proper handler system."""
+        """Handle instance creation operation using handler system."""
         try:
             template_config = operation.parameters.get("template_config", {})
             count = operation.parameters.get("count", 1)
@@ -308,7 +304,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             # Convert template_config to AWSTemplate domain object
-            from src.providers.aws.domain.template.aggregate import AWSTemplate
+            from providers.aws.domain.template.aggregate import AWSTemplate
 
             try:
                 aws_template = AWSTemplate.model_validate(template_config)
@@ -323,12 +319,11 @@ class AWSProviderStrategy(ProviderStrategy):
                     security_group_ids=template_config.get("security_group_ids", []),
                 )
 
-            # Create a minimal request object for handler using proper domain factory
-            from src.domain.request.aggregate import Request
-            from src.domain.request.value_objects import RequestType
+            # Create a minimal request object for handler using domain factory
+            from domain.request.aggregate import Request
+            from domain.request.value_objects import RequestType
 
-            # Use the domain aggregate's factory method - it handles RequestId
-            # generation properly
+            # Use the domain aggregate's factory method - it handles RequestId generation
             request = Request.create_new_request(
                 request_type=RequestType.ACQUIRE,
                 template_id=aws_template.template_id,
@@ -502,7 +497,9 @@ class AWSProviderStrategy(ProviderStrategy):
                 f"Failed to get available templates: {str(e)}", "GET_TEMPLATES_ERROR"
             )
 
-    def _handle_describe_resource_instances(self, operation: ProviderOperation) -> ProviderResult:
+    async def _handle_describe_resource_instances(
+        self, operation: ProviderOperation
+    ) -> ProviderResult:
         """Handle resource-to-instance discovery operation using appropriate handlers."""
         try:
             resource_ids = operation.parameters.get("resource_ids", [])
@@ -529,8 +526,8 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             # Create a minimal request object for the handler
-            from src.domain.request.aggregate import Request
-            from src.domain.request.value_objects import RequestType
+            from domain.request.aggregate import Request
+            from domain.request.value_objects import RequestType
 
             # Create request with the resource IDs
             request = Request.create_new_request(
@@ -546,7 +543,7 @@ class AWSProviderStrategy(ProviderStrategy):
 
             # Use the handler's check_hosts_status method for resource-to-instance
             # discovery
-            instance_details = handler.check_hosts_status(request)
+            instance_details = await handler.check_hosts_status(request)
 
             if not instance_details:
                 self._logger.info(f"No instances found for resources: {resource_ids}")
@@ -677,7 +674,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             # Check if we're in dry-run mode
-            from src.infrastructure.mocking.dry_run_context import is_dry_run_active
+            from infrastructure.mocking.dry_run_context import is_dry_run_active
 
             if is_dry_run_active():
                 # In dry-run mode, return a healthy status without making real AWS calls
@@ -691,7 +688,7 @@ class AWSProviderStrategy(ProviderStrategy):
             # This is a lightweight operation to verify AWS access
             try:
                 # Import dry-run context here to avoid circular imports
-                from src.providers.aws.infrastructure.dry_run_adapter import (
+                from providers.aws.infrastructure.dry_run_adapter import (
                     aws_dry_run_context,
                 )
 
@@ -761,7 +758,7 @@ class AWSProviderStrategy(ProviderStrategy):
         """Get available AWS templates using scheduler strategy."""
         try:
             # Use scheduler strategy to load templates from configuration
-            from src.infrastructure.registry.scheduler_registry import (
+            from infrastructure.registry.scheduler_registry import (
                 get_scheduler_registry,
             )
 
@@ -816,7 +813,7 @@ class AWSProviderStrategy(ProviderStrategy):
         This method translates AWS-specific field names and formats to domain entity format,
         ensuring the application layer only works with domain objects.
         """
-        from src.domain.machine.machine_status import MachineStatus
+        from domain.machine.machine_status import MachineStatus
 
         # Extract AWS state information
         aws_state = aws_instance.get("State", {})

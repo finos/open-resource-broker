@@ -2,10 +2,8 @@
 
 from unittest.mock import Mock
 
-from src.domain.template.aggregate import Template
-from src.infrastructure.scheduler.hostfactory.strategy import (
-    HostFactorySchedulerStrategy,
-)
+from domain.template.aggregate import Template
+from infrastructure.scheduler.hostfactory.strategy import HostFactorySchedulerStrategy
 
 
 class TestSymphonyHostFactorySchedulerStrategy:
@@ -19,7 +17,7 @@ class TestSymphonyHostFactorySchedulerStrategy:
             "provider": {"active_provider": "aws-default"},
         }
 
-        # Mock provider config to return proper values instead of Mock objects
+        # Mock provider config to return appropriate values instead of Mock objects
         mock_provider_config = Mock()
         mock_provider_config.active_provider = "aws-default"
         self.mock_config_manager.get_provider_config.return_value = mock_provider_config

@@ -1,123 +1,82 @@
-# Multi-stage Dockerfile for Open Host Factory Plugin REST API
-# Optimized for production deployment with UV-first architecture
+# Optimized single-stage Dockerfile using pre-built wheel
+# Multi-architecture compatible with minimal layers
 
-# Build arguments from Makefile (no defaults - must be provided)
-ARG PYTHON_VERSION
+ARG PYTHON_VERSION=3.13
+ARG PACKAGE_NAME_SHORT=ohfp
+
+FROM python:${PYTHON_VERSION}-slim
+
+# Re-declare build arguments for this stage
 ARG PACKAGE_NAME_SHORT
-
-# Build stage
-FROM python:${PYTHON_VERSION}-slim AS builder
-
-# Set build arguments
 ARG BUILD_DATE
-ARG VERSION=1.0.0
+ARG VERSION=dev
 ARG VCS_REF
 
-# Add metadata labels
-LABEL org.opencontainers.image.title="Open Host Factory Plugin API"
-LABEL org.opencontainers.image.description="REST API for Open Host Factory Plugin - Dynamic cloud resource provisioning"
-LABEL org.opencontainers.image.version="${VERSION}"
-LABEL org.opencontainers.image.created="${BUILD_DATE}"
-LABEL org.opencontainers.image.revision="${VCS_REF}"
-LABEL org.opencontainers.image.vendor="Open Host Factory"
-LABEL org.opencontainers.image.licenses="Apache-2.0"
+# Add metadata labels in single layer
+LABEL org.opencontainers.image.title="Open Host Factory Plugin API" \
+      org.opencontainers.image.description="REST API for Open Host Factory Plugin - Dynamic cloud resource provisioning" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.vendor="Open Host Factory" \
+      org.opencontainers.image.licenses="Apache-2.0"
 
-# Install system dependencies for building
+# Install runtime dependencies and create user in single layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential=12.9 \
-    curl=7.88.1-10+deb12u12 \
-    git=1:2.39.5-0+deb12u1 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set working directory
-WORKDIR /app
-
-# Install UV for fast dependency management
-RUN pip install --no-cache-dir uv==0.5.11
-
-# Copy pyproject.toml first for better caching
-COPY pyproject.toml ./
-
-# Copy all source code (needed for package installation)
-COPY src/ ./src/
-COPY config/ ./config/
-
-# Create virtual environment and install dependencies
-RUN uv venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-# Install the package and its dependencies
-RUN uv pip install --no-cache .
-
-# Production stage
-FROM python:${PYTHON_VERSION}-slim AS production
-
-# Install runtime system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl=7.88.1-10+deb12u12 \
-    ca-certificates=20230311 \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    && apt-get clean \
+    && groupadd -r "${PACKAGE_NAME_SHORT}" \
+    && useradd -r -g "${PACKAGE_NAME_SHORT}" -s /bin/false "${PACKAGE_NAME_SHORT}"
 
-# Create non-root user for security
-RUN groupadd -r "${PACKAGE_NAME_SHORT}" && useradd -r -g "${PACKAGE_NAME_SHORT}" -s /bin/false "${PACKAGE_NAME_SHORT}"
-
-# Set working directory
+# Set working directory and create directories
 WORKDIR /app
+RUN mkdir -p /app/logs /app/data /app/tmp
 
-# Copy virtual environment from builder stage
-COPY --from=builder /opt/venv /opt/venv
+# Install UV and create virtual environment in single layer
+RUN pip install --no-cache-dir uv==0.8.11 \
+    && uv venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy application code
-COPY src/ ./src/
+# Copy pre-built wheel and install dependencies
+COPY dist/*.whl /tmp/
+RUN uv pip install --no-cache /tmp/*.whl \
+    && rm -rf /tmp/*.whl
+
+# Copy only runtime files needed
 COPY config/ ./config/
 COPY scripts/ ./scripts/
+COPY deployment/docker/docker-entrypoint.sh ./docker-entrypoint.sh
 
-# Copy configuration files
-COPY pyproject.toml ./
+# Set permissions and environment in single layer
+RUN chmod +x ./docker-entrypoint.sh \
+    && chown -R "${PACKAGE_NAME_SHORT}":"${PACKAGE_NAME_SHORT}" /app
 
-# Copy and set up entrypoint script (before switching user)
-COPY deployment/docker/docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh
+# Set all environment variables in single layer
+ENV PYTHONPATH=/app \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONIOENCODING=utf-8 \
+    HF_SERVER_ENABLED=true \
+    HF_SERVER_HOST=0.0.0.0 \
+    HF_SERVER_PORT=8000 \
+    HF_SERVER_WORKERS=1 \
+    HF_SERVER_LOG_LEVEL=info \
+    HF_SERVER_DOCS_ENABLED=true \
+    HF_LOGGING_LEVEL=INFO \
+    HF_LOGGING_CONSOLE_ENABLED=true \
+    HF_STORAGE_STRATEGY=json \
+    HF_STORAGE_BASE_PATH=/app/data \
+    HF_PROVIDER_TYPE=aws \
+    HF_PROVIDER_AWS_REGION=us-east-1
 
-# Create necessary directories and set permissions
-RUN mkdir -p /app/logs /app/data /app/tmp && \
-    chown -R "${PACKAGE_NAME_SHORT}":"${PACKAGE_NAME_SHORT}" /app
-
-# Set environment variables
-ENV PYTHONPATH=/app
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONIOENCODING=utf-8
-
-# Default configuration environment variables
-ENV HF_SERVER_ENABLED=true
-ENV HF_SERVER_HOST=0.0.0.0
-ENV HF_SERVER_PORT=8000
-ENV HF_SERVER_WORKERS=1
-ENV HF_SERVER_LOG_LEVEL=info
-ENV HF_SERVER_DOCS_ENABLED=true
-
-# Authentication configuration (non-sensitive defaults)
-ENV HF_AUTH_ENABLED=false
-ENV HF_AUTH_STRATEGY=none
-
-# Logging configuration
-ENV HF_LOGGING_LEVEL=INFO
-ENV HF_LOGGING_CONSOLE_ENABLED=true
-
-# Storage configuration
-ENV HF_STORAGE_STRATEGY=json
-ENV HF_STORAGE_BASE_PATH=/app/data
-
-# Provider configuration
-ENV HF_PROVIDER_TYPE=aws
-ENV HF_PROVIDER_AWS_REGION=us-east-1
+# Auth configuration - these are public configuration settings, not secrets
+ENV HF_AUTH_ENABLED=false \
+    HF_AUTH_STRATEGY=none
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${HF_SERVER_PORT}/health || exit 1
+    CMD python -c "import requests; requests.get('http://localhost:${HF_SERVER_PORT}/health', timeout=5).raise_for_status()" || exit 1
 
 # Expose port
 EXPOSE 8000
@@ -126,7 +85,5 @@ EXPOSE 8000
 USER "${PACKAGE_NAME_SHORT}"
 
 # Set entrypoint
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
-
-# Default command
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["serve"]

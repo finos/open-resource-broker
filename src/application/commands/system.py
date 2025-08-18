@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from src.application.dto.base import BaseCommand
+from application.dto.base import BaseCommand
 
 # ============================================================================
 # Provider Configuration Management Commands

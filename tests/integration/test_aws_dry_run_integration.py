@@ -4,16 +4,13 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.infrastructure.mocking.dry_run_context import (
-    dry_run_context,
-    is_dry_run_active,
-)
-from src.providers.aws.infrastructure.dry_run_adapter import (
+from infrastructure.mocking.dry_run_context import dry_run_context, is_dry_run_active
+from providers.aws.infrastructure.dry_run_adapter import (
     aws_dry_run_context,
     get_aws_dry_run_status,
     is_aws_dry_run_active,
 )
-from src.providers.aws.managers.aws_instance_manager import AWSInstanceManager
+from providers.aws.managers.aws_instance_manager import AWSInstanceManager
 
 
 @pytest.mark.integration

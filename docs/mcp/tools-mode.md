@@ -4,7 +4,7 @@ MCP Tools Mode provides direct integration with AI assistants without requiring 
 
 ## Overview
 
-MCP Tools Mode automatically discovers all SDK methods and exposes them as MCP tools with proper JSON schemas for AI assistant consumption.
+MCP Tools Mode automatically discovers all SDK methods and exposes them as MCP tools with appropriate JSON schemas for AI assistant consumption.
 
 ## Key Features
 

@@ -10,9 +10,9 @@ import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Generic, Optional, TypeVar
 
-from src.application.interfaces.event_handler import EventHandler
-from src.domain.base.events import DomainEvent
-from src.domain.base.ports import ErrorHandlingPort, EventPublisherPort, LoggingPort
+from application.interfaces.event_handler import EventHandler
+from domain.base.events import DomainEvent
+from domain.base.ports import ErrorHandlingPort, EventPublisherPort, LoggingPort
 
 TEvent = TypeVar("TEvent", bound=DomainEvent)
 

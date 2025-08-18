@@ -7,6 +7,8 @@ project:
   short_name: ohfp  # CLI command name
   version: 0.1.0
   description: "Cloud provider integration plugin for IBM Spectrum Symphony Host Factory"
+  author: "AWS Professional Services"
+  email: "aws-proserve@amazon.com"
 
 python:
   versions: [3.9, 3.10, 3.11, 3.12, 3.13]  # Supported Python versions

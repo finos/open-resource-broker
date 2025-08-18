@@ -75,7 +75,7 @@ class BaseRegistry(ABC):
         )  # Instance-based registrations (multi-choice only)
         self._registry_lock = threading.RLock()  # Use RLock for nested locking
 
-        from src.infrastructure.logging.logger import get_logger
+        from infrastructure.logging.logger import get_logger
 
         self.logger = get_logger(__name__)
         self._initialized = True
@@ -268,7 +268,7 @@ class BaseRegistry(ABC):
             self.logger.debug(f"Created strategy for: {identifier}")
             return strategy
         except Exception as e:
-            from src.domain.base.exceptions import ConfigurationError
+            from domain.base.exceptions import ConfigurationError
 
             error_msg = f"Failed to create strategy for '{identifier}': {str(e)}"
             self.logger.error(error_msg)

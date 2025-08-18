@@ -9,9 +9,9 @@ from unittest.mock import patch
 
 import pytest
 
-from src.application.queries.handlers import ListTemplatesQuery
-from src.bootstrap import Application
-from src.infrastructure.di.container import get_container
+from application.queries.handlers import ListTemplatesQuery
+from bootstrap import Application
+from infrastructure.di.container import get_container
 
 
 class TestLazyLoadingIntegration:

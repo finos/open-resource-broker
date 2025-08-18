@@ -30,5 +30,3 @@ from .discovery import MCPToolDiscovery
 from .tools import OpenHFPluginMCPTools
 
 __all__ = ["OpenHFPluginMCPTools", "MCPToolDiscovery"]
-
-__version__ = "1.0.0"

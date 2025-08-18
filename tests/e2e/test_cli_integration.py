@@ -52,7 +52,7 @@ class TestCLIIntegration:
         mock_get_container.return_value = mock_container
 
         # Test async function-based handler
-        from src.interface.command_handlers import handle_provider_config
+        from interface.command_handlers import handle_provider_config
 
         mock_command = Mock()
         mock_command.file = None
@@ -92,7 +92,7 @@ class TestCLIIntegration:
         mock_get_config.return_value = mock_config_manager
 
         # Test async function-based handler
-        from src.interface.command_handlers import handle_validate_provider_config
+        from interface.command_handlers import handle_validate_provider_config
 
         mock_command = Mock()
         mock_command.file = None
@@ -132,7 +132,7 @@ class TestCLIIntegration:
         mock_get_config.return_value = mock_config_manager
 
         # Test async function-based handler
-        from src.interface.command_handlers import handle_reload_provider_config
+        from interface.command_handlers import handle_reload_provider_config
 
         mock_command = Mock()
         mock_command.config_path = self.config_path

@@ -2,10 +2,10 @@
 
 from typing import List
 
-from src.application.base.handlers import BaseCommandHandler
-from src.application.decorators import command_handler
-from src.application.dto.base import BaseResponse
-from src.application.machine.commands import (
+from application.base.handlers import BaseCommandHandler
+from application.decorators import command_handler
+from application.dto.base import BaseResponse
+from application.machine.commands import (
     CleanupMachineResourcesCommand,
     ConvertBatchMachineStatusCommand,
     ConvertMachineStatusCommand,
@@ -14,10 +14,10 @@ from src.application.machine.commands import (
     UpdateMachineStatusCommand,
     ValidateProviderStateCommand,
 )
-from src.domain.base.ports import ErrorHandlingPort, EventPublisherPort, LoggingPort
-from src.domain.machine.repository import MachineRepository
-from src.domain.machine.value_objects import MachineStatus
-from src.providers.base.strategy import (
+from domain.base.ports import ErrorHandlingPort, EventPublisherPort, LoggingPort
+from domain.machine.repository import MachineRepository
+from domain.machine.value_objects import MachineStatus
+from providers.base.strategy import (
     ProviderContext,
     ProviderOperation,
     ProviderOperationType,
@@ -158,7 +158,7 @@ class ConvertMachineStatusCommandHandler(
         )
 
         # Execute operation (this would be extended to support status conversion)
-        result = self._provider_context.execute_operation(operation)
+        result = await self._provider_context.execute_operation(operation)
 
         if result.success:
             # Extract status from result (implementation depends on provider strategy)
@@ -371,7 +371,7 @@ class RegisterMachineHandler(BaseCommandHandler[RegisterMachineCommand, None]):
             raise ValueError(f"Machine already registered: {command.machine_id}")
 
         # Create new machine
-        from src.domain.machine.aggregate import Machine
+        from domain.machine.aggregate import Machine
 
         machine = Machine.create(
             machine_id=command.machine_id,

@@ -4,14 +4,14 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from src.domain.request.aggregate import Request
-from src.domain.request.exceptions import (
+from domain.request.aggregate import Request
+from domain.request.exceptions import (
     InvalidRequestStateError,
     RequestNotFoundError,
     RequestProcessingError,
     RequestValidationError,
 )
-from src.domain.request.value_objects import (
+from domain.request.value_objects import (
     RequestConfiguration,
     RequestId,
     RequestStatus,
@@ -20,7 +20,7 @@ from src.domain.request.value_objects import (
 
 # Try to import optional classes - create mocks if not available
 try:
-    from src.domain.request.value_objects import Priority
+    from domain.request.value_objects import Priority
 
     PRIORITY_AVAILABLE = True
 except ImportError:
@@ -34,7 +34,7 @@ except ImportError:
 
 
 try:
-    from src.domain.request.request_metadata import MachineCount
+    from domain.request.request_metadata import MachineCount
 
     MACHINE_COUNT_AVAILABLE = True
 except ImportError:

@@ -4,9 +4,9 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.domain.base.ports import LoggingPort
-from src.providers.base.strategy.provider_context import ProviderContext
-from src.providers.base.strategy.provider_strategy import (
+from domain.base.ports import LoggingPort
+from providers.base.strategy.provider_context import ProviderContext
+from providers.base.strategy.provider_strategy import (
     ProviderOperation,
     ProviderOperationType,
 )
@@ -37,9 +37,7 @@ class TestProviderContextIntegration:
             mock_aws_strategy.is_initialized.return_value = True
 
             # Mock capabilities
-            from src.providers.base.strategy.provider_strategy import (
-                ProviderCapabilities,
-            )
+            from providers.base.strategy.provider_strategy import ProviderCapabilities
 
             mock_capabilities = ProviderCapabilities(
                 supported_operations=[
@@ -112,7 +110,7 @@ class TestProviderContextIntegration:
 
     def test_provider_context_with_health_monitoring(self, provider_context):
         """Test provider context with health monitoring."""
-        from src.providers.base.strategy.provider_strategy import ProviderHealthStatus
+        from providers.base.strategy.provider_strategy import ProviderHealthStatus
 
         # Create strategy with health status
         strategy = Mock()
@@ -136,7 +134,7 @@ class TestProviderContextIntegration:
 
     def test_provider_context_operation_routing(self, provider_context):
         """Test operation routing to specific providers."""
-        from src.providers.base.strategy.provider_strategy import (
+        from providers.base.strategy.provider_strategy import (
             ProviderCapabilities,
             ProviderResult,
         )
@@ -197,7 +195,7 @@ class TestProviderContextIntegration:
 
     def test_provider_context_metrics_aggregation(self, provider_context):
         """Test metrics aggregation across multiple providers."""
-        from src.providers.base.strategy.provider_strategy import (
+        from providers.base.strategy.provider_strategy import (
             ProviderCapabilities,
             ProviderResult,
         )
@@ -246,7 +244,7 @@ class TestProviderContextIntegration:
         """Test concurrent operations across multiple providers."""
         import threading
 
-        from src.providers.base.strategy.provider_strategy import (
+        from providers.base.strategy.provider_strategy import (
             ProviderCapabilities,
             ProviderResult,
         )
@@ -311,7 +309,7 @@ class TestProviderContextIntegration:
 
     def test_provider_context_failover_scenario(self, provider_context):
         """Test provider failover scenario."""
-        from src.providers.base.strategy.provider_strategy import (
+        from providers.base.strategy.provider_strategy import (
             ProviderCapabilities,
             ProviderHealthStatus,
             ProviderResult,

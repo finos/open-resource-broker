@@ -2,7 +2,7 @@
 System DTOs for system-related queries and responses.
 
 This module provides strongly-typed DTOs for system operations,
-replacing Dict[str, Any] returns with proper type safety.
+replacing Dict[str, Any] returns with appropriate type safety.
 """
 
 from datetime import datetime
@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import Field
 
-from src.application.dto.base import BaseDTO
+from application.dto.base import BaseDTO
 
 
 class ProviderConfigDTO(BaseDTO):

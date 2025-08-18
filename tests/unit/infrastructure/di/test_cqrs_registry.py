@@ -2,7 +2,7 @@
 
 import threading
 
-from src.infrastructure.di.components.cqrs_registry import CQRSHandlerRegistry
+from infrastructure.di.components.cqrs_registry import CQRSHandlerRegistry
 
 
 class TestCQRSHandlerRegistry:

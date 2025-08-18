@@ -36,7 +36,7 @@ class TestLoggingIntegration:
         return env
 
     def _run_cli_command(self, complete_test_environment, command=None):
-        """Run CLI command with proper test environment and dry-run mode."""
+        """Run CLI command with appropriate test environment and dry-run mode."""
         if command is None:
             command = ["templates", "list"]
 
@@ -182,7 +182,7 @@ class TestLoggingIntegration:
         assert isinstance(output_data["templates"], list), "Templates should be a list"
 
         assert "total_count" in output_data, "Missing 'total_count' field in output"
-        # With proper scheduler config, we should now have templates
+        # With appropriate scheduler config, we should now have templates
         assert output_data["total_count"] > 0, "Should have templates from test fixtures"
 
         # Verify template structure

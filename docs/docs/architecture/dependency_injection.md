@@ -122,7 +122,7 @@ class ApplicationService:
 
 ## Service Registration
 
-Services are registered in dedicated modules within `src/infrastructure/di/` following a specific dependency order to ensure proper initialization.
+Services are registered in dedicated modules within `src/infrastructure/di/` following a specific dependency order to ensure correct initialization.
 
 ### Service Registration Orchestration
 
@@ -587,7 +587,7 @@ This pattern provides several benefits:
 - **Configuration-Driven**: Scheduler strategy selected based on configuration
 - **Registry Integration**: Leverages the scheduler registry for strategy management
 - **Lazy Loading**: Strategy created only when needed
-- **Type Safety**: Maintains proper port/adapter abstraction
+- **Type Safety**: Maintains appropriate port/adapter abstraction
 - **Testability**: Easy to mock or substitute strategies for testing
 
 ### Registry Factory Pattern

@@ -2,9 +2,9 @@
 
 from typing import Any, Dict
 
-from src.config import NamingConfig, RequestConfig, TemplateConfig
-from src.config.manager import ConfigurationManager
-from src.domain.base.ports import ConfigurationPort
+from config import NamingConfig, RequestConfig, TemplateConfig
+from config.manager import ConfigurationManager
+from domain.base.ports import ConfigurationPort
 
 
 class ConfigurationAdapter(ConfigurationPort):
@@ -13,6 +13,10 @@ class ConfigurationAdapter(ConfigurationPort):
     def __init__(self, config_manager: ConfigurationManager):
         """Initialize with configuration manager."""
         self._config_manager = config_manager
+
+    def get_app_config(self) -> Dict[str, Any]:
+        """Get structured application configuration."""
+        return self._config_manager.get_app_config()
 
     def get_naming_config(self) -> Dict[str, Any]:
         """Get naming configuration for domain layer."""
@@ -73,24 +77,9 @@ class ConfigurationAdapter(ConfigurationPort):
                 "max_timeout": 3600,
             }
 
-    def get_provider_config(self, provider_type: str) -> Dict[str, Any]:
-        """Get provider-specific configuration for domain layer."""
-        try:
-            template_config = self._config_manager.get_typed(TemplateConfig)
-            return {
-                "default_instance_tags": getattr(template_config, "default_instance_tags", {}),
-                "default_image_id": getattr(template_config, "default_image_id", ""),
-                "default_instance_type": getattr(
-                    template_config, "default_instance_type", "t2.micro"
-                ),
-            }
-        except Exception:
-            # Fallback provider config
-            return {
-                "default_instance_tags": {},
-                "default_image_id": "",
-                "default_instance_type": "t2.micro",
-            }
+    def get_provider_config(self):
+        """Get provider configuration - delegate to ConfigurationManager."""
+        return self._config_manager.get_provider_config()
 
     def get_request_config(self) -> Dict[str, Any]:
         """Get request configuration for domain layer."""
@@ -171,3 +160,35 @@ class ConfigurationAdapter(ConfigurationPort):
                 "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
                 "file_enabled": True,
             }
+
+    def get_storage_strategy(self) -> str:
+        """Get storage strategy - delegate to ConfigurationManager."""
+        return self._config_manager.get_storage_strategy()
+
+    def get_scheduler_strategy(self) -> str:
+        """Get scheduler strategy - delegate to ConfigurationManager."""
+        return self._config_manager.get_scheduler_strategy()
+
+    def get_typed(self, config_type):
+        """Get typed configuration for compatibility with ConfigurationManager."""
+        return self._config_manager.get_typed(config_type)
+
+    def resolve_file(self, file_type: str, filename: str, explicit_path: str = None) -> str:
+        """Resolve file path for compatibility with ConfigurationManager."""
+        return self._config_manager.resolve_file(file_type, filename, explicit_path)
+
+    def get_provider_type(self) -> str:
+        """Get provider type - delegate to ConfigurationManager."""
+        return self._config_manager.get_provider_type()
+
+    def get_work_dir(self, default_path: str = None, config_path: str = None) -> str:
+        """Get work directory - delegate to ConfigurationManager."""
+        return self._config_manager.get_work_dir(default_path, config_path)
+
+    def get_conf_dir(self, default_path: str = None, config_path: str = None) -> str:
+        """Get config directory - delegate to ConfigurationManager."""
+        return self._config_manager.get_conf_dir(default_path, config_path)
+
+    def get_log_dir(self, default_path: str = None, config_path: str = None) -> str:
+        """Get log directory - delegate to ConfigurationManager."""
+        return self._config_manager.get_log_dir(default_path, config_path)

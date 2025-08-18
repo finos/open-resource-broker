@@ -24,22 +24,24 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       python-versions: ${{ steps.config.outputs.python-versions }}
-      python-version: ${{ steps.config.outputs.default-python-version }}
+      default-python-version: ${{ steps.config.outputs.default-python-version }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
 
+    - name: Install yq
+      uses: mikefarah/yq@master
+
     - name: Get configuration from project config
       id: config
       run: |
-        # Use consistent print-* and print-json-* targets
-        PYTHON_VERSIONS_JSON=$(make print-json-PYTHON_VERSIONS)
-        DEFAULT_PYTHON_VERSION=$(yq '.python.default_version' .project.yml)
-
-        echo "python-versions=$PYTHON_VERSIONS_JSON" >> $GITHUB_OUTPUT
-        echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> $GITHUB_OUTPUT
-
-        echo "Found Python versions: $(make print-PYTHON_VERSIONS)"
+        DEFAULT_PYTHON_VERSION=$(make print-DEFAULT_PYTHON_VERSION)
+        PYTHON_VERSIONS=$(make print-json-PYTHON_VERSIONS)
+        
+        echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> "$GITHUB_OUTPUT"
+        echo "python-versions=$PYTHON_VERSIONS" >> "$GITHUB_OUTPUT"
+        
+        echo "Found Python versions: $PYTHON_VERSIONS"
         echo "Default Python version: $DEFAULT_PYTHON_VERSION"
 
   unit-tests:
@@ -55,6 +57,7 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
+
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
@@ -95,7 +98,7 @@ jobs:
   integration-tests:
     name: Integration Tests
     runs-on: ${{ matrix.os }}
-    needs: [unit-tests]
+    needs: [get-config, unit-tests]
     strategy:
       fail-fast: false
       matrix:
@@ -105,6 +108,7 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
+
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
@@ -145,7 +149,7 @@ jobs:
   e2e-tests:
     name: End-to-End Tests
     runs-on: ${{ matrix.os }}
-    needs: [unit-tests, integration-tests]
+    needs: [get-config, unit-tests, integration-tests]
     strategy:
       fail-fast: false
       matrix:
@@ -155,6 +159,7 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
+
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
@@ -205,17 +210,16 @@ jobs:
 
     - name: Display test summary
       run: |
-        echo "## Test Matrix Results" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-
         # Count test result files
         UNIT_RESULTS=$(find test-results/ -name "*unit.xml" | wc -l)
         INTEGRATION_RESULTS=$(find test-results/ -name "*integration.xml" | wc -l)
 
-        echo "- Unit test configurations: $UNIT_RESULTS" >> $GITHUB_STEP_SUMMARY
-        echo "- Integration test configurations: $INTEGRATION_RESULTS" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-
-        # List all test result files
-        echo "### Test Result Files:" >> $GITHUB_STEP_SUMMARY
-        find test-results/ -name "*.xml" | sort >> $GITHUB_STEP_SUMMARY
+        {
+          echo "## Test Matrix Results"
+          echo ""
+          echo "- Unit test configurations: $UNIT_RESULTS"
+          echo "- Integration test configurations: $INTEGRATION_RESULTS"
+          echo ""
+          echo "### Test Result Files:"
+        } >> "$GITHUB_STEP_SUMMARY"
+        find test-results/ -name "*.xml" | sort >> "$GITHUB_STEP_SUMMARY"

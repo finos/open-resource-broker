@@ -4,13 +4,13 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
-    from src.config.schemas.provider_strategy_schema import (
+    from config.schemas.provider_strategy_schema import (
         ProviderConfig,
         ProviderInstanceConfig,
     )
 
-from src.config.schemas.provider_strategy_schema import ProviderMode
-from src.domain.base.exceptions import ConfigurationError
+from config.schemas.provider_strategy_schema import ProviderMode
+from domain.base.exceptions import ConfigurationError
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class ProviderConfigManager:
     def get_provider_config(self) -> Optional["ProviderConfig"]:
         """Get provider configuration."""
         try:
-            from src.config.schemas.provider_strategy_schema import ProviderConfig
+            from config.schemas.provider_strategy_schema import ProviderConfig
 
             provider_data = self._raw_config.get("provider", {})
             if not provider_data:

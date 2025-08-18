@@ -2,15 +2,13 @@
 
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from src.domain.base.ports.logging_port import LoggingPort
-from src.domain.base.ports.template_configuration_port import TemplateConfigurationPort
-from src.infrastructure.template.configuration_manager import (
-    TemplateConfigurationManager,
-)
+from domain.base.ports.logging_port import LoggingPort
+from domain.base.ports.template_configuration_port import TemplateConfigurationPort
+from infrastructure.template.configuration_manager import TemplateConfigurationManager
 
 # Use TYPE_CHECKING to avoid direct domain import
 if TYPE_CHECKING:
-    from src.domain.template.aggregate import Template
+    from domain.template.aggregate import Template
 
 
 class TemplateConfigurationAdapter(TemplateConfigurationPort):
@@ -59,7 +57,7 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         # Use template manager for validation
         try:
             # Create a temporary template for validation
-            from src.domain.template.aggregate import Template
+            from domain.template.aggregate import Template
 
             temp_template = Template(
                 template_id=config.get("template_id", "temp"),

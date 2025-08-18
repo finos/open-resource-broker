@@ -11,7 +11,7 @@ services:
       dockerfile: Dockerfile
       args:
         BUILD_DATE: ${BUILD_DATE:-}
-        VERSION: ${VERSION:-1.0.0}
+        VERSION: ${VERSION:-dev}
         VCS_REF: ${VCS_REF:-}
     image: ohfp-api:${VERSION:-latest}
     container_name: ohfp-api

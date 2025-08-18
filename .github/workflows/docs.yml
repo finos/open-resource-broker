@@ -28,17 +28,22 @@ jobs:
     name: Get Python Version from Makefile
     runs-on: ubuntu-latest
     outputs:
-      python-version: ${{ steps.version.outputs.default-python-version }}
+      default-python-version: ${{ steps.version.outputs.default-python-version }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
 
+    - name: Install yq
+      uses: mikefarah/yq@master
+
     - name: Get default Python version from project config
       id: version
       run: |
-        DEFAULT_PYTHON_VERSION=$(yq '.python.default_version' .project.yml)
-        echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> $GITHUB_OUTPUT
+        DEFAULT_PYTHON_VERSION=$(make print-DEFAULT_PYTHON_VERSION)
+        echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> "$GITHUB_OUTPUT"
         echo "Using Python version: $DEFAULT_PYTHON_VERSION"
+
+
 
   build:
     needs: get-config

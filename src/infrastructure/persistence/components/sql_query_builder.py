@@ -4,8 +4,8 @@ import re
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.persistence.components.resource_manager import QueryManager
+from infrastructure.logging.logger import get_logger
+from infrastructure.persistence.components.resource_manager import QueryManager
 
 
 class QueryType(str, Enum):
@@ -131,7 +131,10 @@ class SQLQueryBuilder(QueryManager):
         # 1. Validating table_name and column names against a whitelist pattern
         # 2. Using parameterized queries for all values with :param syntax
         # nosec B608
-        query = f"INSERT INTO {self.table_name} ({', '.join(columns)}) VALUES ({', '.join(placeholders)})"
+        query = (
+            f"INSERT INTO {self.table_name} "  # nosec B608
+            f"({', '.join(columns)}) VALUES ({', '.join(placeholders)})"  # nosec B608
+        )
 
         self.logger.debug(f"Built INSERT query for {self.table_name}")
         return query, filtered_data
@@ -150,7 +153,10 @@ class SQLQueryBuilder(QueryManager):
         self._validate_identifier(id_column)
 
         # nosec B608
-        query = f"SELECT * FROM {self.table_name} WHERE {id_column} = :{id_column}"
+        query = (
+            f"SELECT * FROM {self.table_name} "  # nosec B608
+            f"WHERE {id_column} = :{id_column}"  # nosec B608
+        )
 
         self.logger.debug(f"Built SELECT by ID query for {self.table_name}")
         return query, id_column
@@ -163,7 +169,7 @@ class SQLQueryBuilder(QueryManager):
             SELECT all SQL statement
         """
         # Table name already validated in constructor
-        query = f"SELECT * FROM {self.table_name}"  # nosec B608
+        query = f"SELECT * FROM {self.table_name}  # nosec B608"  # nosec B608
 
         self.logger.debug(f"Built SELECT all query for {self.table_name}")
         return query
@@ -198,7 +204,8 @@ class SQLQueryBuilder(QueryManager):
         set_clauses = [f"{col} = :{col}" for col in filtered_data.keys()]
         # nosec B608
         query = (
-            f"UPDATE {self.table_name} SET {', '.join(set_clauses)} WHERE {id_column} = :entity_id"
+            f"UPDATE {self.table_name} SET {', '.join(set_clauses)} "  # nosec B608
+            f"WHERE {id_column} = :entity_id"  # nosec B608
         )
 
         # Add entity_id to parameters
@@ -222,7 +229,10 @@ class SQLQueryBuilder(QueryManager):
         self._validate_identifier(id_column)
 
         # nosec B608
-        query = f"DELETE FROM { self.table_name} WHERE {id_column} = :{id_column}"
+        query = (
+            f"DELETE FROM {self.table_name} "  # nosec B608
+            f"WHERE {id_column} = :{id_column}"  # nosec B608
+        )
 
         self.logger.debug(f"Built DELETE query for {self.table_name}")
         return query, id_column
@@ -294,7 +304,10 @@ class SQLQueryBuilder(QueryManager):
                 parameters[param_name] = value
 
         # nosec B608
-        query = f"SELECT * FROM {self.table_name} WHERE {' AND '.join(where_clauses)}"
+        query = (
+            f"SELECT * FROM {self.table_name} "  # nosec B608
+            f"WHERE {' AND '.join(where_clauses)}"  # nosec B608
+        )
 
         self.logger.debug(f"Built SELECT with criteria query for {self.table_name}")
         return query, parameters
@@ -340,7 +353,10 @@ class SQLQueryBuilder(QueryManager):
 
         placeholders = [f":{col}" for col in filtered_columns]
         # nosec B608
-        query = f"INSERT INTO {self.table_name} ({', '.join(filtered_columns)}) VALUES ({', '.join(placeholders)})"
+        query = (
+            f"INSERT INTO {self.table_name} "  # nosec B608
+            f"({', '.join(filtered_columns)}) VALUES ({', '.join(placeholders)})"  # nosec B608
+        )
 
         # Filter all data items
         filtered_data_list = []

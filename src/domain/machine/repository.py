@@ -3,8 +3,8 @@
 from abc import abstractmethod
 from typing import List, Optional
 
-from src.domain.base.domain_interfaces import AggregateRepository
-from src.domain.base.value_objects import InstanceId
+from domain.base.domain_interfaces import AggregateRepository
+from domain.base.value_objects import InstanceId
 
 from .aggregate import Machine
 from .machine_status import MachineStatus

@@ -147,7 +147,7 @@ machines.json:
 ## Implementation Requirements
 
 ### Fix 1: Store Provider API in Request
-Store the provider API type during request creation to enable proper handler selection during status checks.
+Store the provider API type during request creation to enable appropriate handler selection during status checks.
 
 ### Fix 2: Implement Machine Discovery
 Replace the broken provider operation approach with direct handler method calls that already implement resource-to-instance discovery.

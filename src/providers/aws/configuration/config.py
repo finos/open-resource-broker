@@ -4,7 +4,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, model_validator
 
-from src.infrastructure.interfaces.provider import BaseProviderConfig
+from infrastructure.interfaces.provider import BaseProviderConfig
 
 
 class HandlerCapabilityConfig(BaseModel):

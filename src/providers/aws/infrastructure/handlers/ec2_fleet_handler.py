@@ -31,27 +31,27 @@ from typing import Any, Dict, List
 
 from botocore.exceptions import ClientError
 
-from src.application.dto.queries import GetTemplateQuery
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
-from src.domain.request.aggregate import Request
-from src.infrastructure.di.buses import QueryBus
-from src.infrastructure.di.container import get_container
-from src.infrastructure.error.decorators import handle_infrastructure_exceptions
-from src.infrastructure.ports.request_adapter_port import RequestAdapterPort
-from src.infrastructure.resilience import CircuitBreakerOpenError
-from src.providers.aws.domain.template.aggregate import AWSTemplate
-from src.providers.aws.domain.template.value_objects import AWSFleetType
-from src.providers.aws.exceptions.aws_exceptions import (
+from application.dto.queries import GetTemplateQuery
+from domain.base.dependency_injection import injectable
+from domain.base.ports import LoggingPort
+from domain.request.aggregate import Request
+from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
+from infrastructure.di.buses import QueryBus
+from infrastructure.di.container import get_container
+from infrastructure.error.decorators import handle_infrastructure_exceptions
+from infrastructure.resilience import CircuitBreakerOpenError
+from providers.aws.domain.template.aggregate import AWSTemplate
+from providers.aws.domain.template.value_objects import AWSFleetType
+from providers.aws.exceptions.aws_exceptions import (
     AWSEntityNotFoundError,
     AWSInfrastructureError,
     AWSValidationError,
 )
-from src.providers.aws.infrastructure.handlers.base_handler import AWSHandler
-from src.providers.aws.infrastructure.launch_template.manager import (
+from providers.aws.infrastructure.handlers.base_handler import AWSHandler
+from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
 )
-from src.providers.aws.utilities.aws_operations import AWSOperations
+from providers.aws.utilities.aws_operations import AWSOperations
 
 
 @injectable
@@ -128,7 +128,7 @@ class EC2FleetHandler(AWSHandler):
             raise AWSValidationError("Fleet type is required for EC2Fleet")
 
         # Validate fleet type using existing validation system
-        from src.providers.aws.infrastructure.adapters.aws_validation_adapter import (
+        from providers.aws.infrastructure.adapters.aws_validation_adapter import (
             create_aws_validation_adapter,
         )
 
@@ -389,8 +389,10 @@ class EC2FleetHandler(AWSHandler):
     def check_hosts_status(self, request: Request) -> List[Dict[str, Any]]:
         """Check the status of instances in the fleet."""
         try:
-            if not request.resource_id:
+            if not request.resource_ids:
                 raise AWSInfrastructureError("No Fleet ID found in request")
+
+            fleet_id = request.resource_ids[0]  # Use first resource ID as fleet ID
 
             # Get template using CQRS QueryBus
             container = get_container()
@@ -415,13 +417,13 @@ class EC2FleetHandler(AWSHandler):
                 lambda: self._paginate(
                     self.aws_client.ec2_client.describe_fleets,
                     "Fleets",
-                    FleetIds=[request.resource_id],
+                    FleetIds=[fleet_id],
                 ),
                 operation_type="read_only",
             )
 
             if not fleet_list:
-                raise AWSEntityNotFoundError(f"Fleet {request.resource_id} not found")
+                raise AWSEntityNotFoundError(f"Fleet {fleet_id} not found")
 
             fleet = fleet_list[0]
 
@@ -444,14 +446,14 @@ class EC2FleetHandler(AWSHandler):
                     lambda: self._paginate(
                         self.aws_client.ec2_client.describe_fleet_instances,
                         "ActiveInstances",
-                        FleetId=request.resource_id,
+                        FleetId=fleet_id,
                     ),
                     operation_type="read_only",
                 )
                 instance_ids = [instance["InstanceId"] for instance in active_instances]
 
             if not instance_ids:
-                self._logger.info(f"No active instances found in fleet {request.resource_id}")
+                self._logger.info(f"No active instances found in fleet {fleet_id}")
                 return []
 
             # Get detailed instance information
@@ -473,21 +475,23 @@ class EC2FleetHandler(AWSHandler):
             request: The request containing the fleet and machine information
         """
         try:
-            if not request.resource_id:
+            if not request.resource_ids:
                 raise AWSInfrastructureError("No EC2 Fleet ID found in request")
+
+            fleet_id = request.resource_ids[0]  # Use first resource ID as fleet ID
 
             # Get fleet configuration with pagination and retry
             fleet_list = self._retry_with_backoff(
                 lambda: self._paginate(
                     self.aws_client.ec2_client.describe_fleets,
                     "Fleets",
-                    FleetIds=[request.resource_id],
+                    FleetIds=[fleet_id],
                 ),
                 operation_type="read_only",
             )
 
             if not fleet_list:
-                raise AWSEntityNotFoundError(f"EC2 Fleet {request.resource_id} not found")
+                raise AWSEntityNotFoundError(f"EC2 Fleet {fleet_id} not found")
 
             fleet = fleet_list[0]
             fleet_type = fleet.get("Type", "maintain")
@@ -506,11 +510,11 @@ class EC2FleetHandler(AWSHandler):
                     self._retry_with_backoff(
                         self.aws_client.ec2_client.modify_fleet,
                         operation_type="critical",
-                        FleetId=request.resource_id,
+                        FleetId=fleet_id,
                         TargetCapacitySpecification={"TotalTargetCapacity": new_capacity},
                     )
                     self._logger.info(
-                        f"Reduced maintain fleet {request.resource_id} capacity to {new_capacity}"
+                        f"Reduced maintain fleet {fleet_id} capacity to {new_capacity}"
                     )
 
                 # Use consolidated AWS operations utility for instance termination
@@ -522,10 +526,10 @@ class EC2FleetHandler(AWSHandler):
                 self._retry_with_backoff(
                     self.aws_client.ec2_client.delete_fleets,
                     operation_type="critical",
-                    FleetIds=[request.resource_id],
+                    FleetIds=[fleet_id],
                     TerminateInstances=True,
                 )
-                self._logger.info(f"Deleted EC2 Fleet: {request.resource_id}")
+                self._logger.info(f"Deleted EC2 Fleet: {fleet_id}")
 
         except ClientError as e:
             error = self._convert_client_error(e)

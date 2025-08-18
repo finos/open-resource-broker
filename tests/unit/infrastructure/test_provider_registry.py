@@ -4,8 +4,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.domain.base.exceptions import ConfigurationError
-from src.infrastructure.registry.provider_registry import (
+from domain.base.exceptions import ConfigurationError
+from infrastructure.registry.provider_registry import (
     ProviderRegistry,
     UnsupportedProviderError,
     get_provider_registry,

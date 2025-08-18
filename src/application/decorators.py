@@ -56,7 +56,7 @@ from __future__ import annotations
 
 from typing import Dict, Type, TypeVar
 
-from src.application.interfaces.command_query import (
+from application.interfaces.command_query import (
     Command,
     CommandHandler,
     Query,

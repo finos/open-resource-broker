@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Protocol
 
-from src.domain.base.value_objects import ResourceId
+from domain.base.value_objects import ResourceId
 
 
 class ResourceType(Enum):

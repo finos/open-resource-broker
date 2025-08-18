@@ -1,11 +1,16 @@
-"""Open Host Factory Plugin - Root Package.
+"""Open Host Factory Plugin - Cloud provider integration for IBM Spectrum Symphony Host Factory.
 
-This package provides integration between IBM Spectrum Symphony Host Factory
-and cloud providers, enabling dynamic provisioning of compute resources.
+This plugin provides dynamic provisioning of compute resources with a REST API interface
+and structured architecture implementation supporting multiple cloud providers.
 
-The plugin implements a Domain-Driven Design (DDD) architecture with CQRS patterns
-and event-driven processing, supporting multiple cloud providers through a
-provider-agnostic interface.
+Key Features:
+- Multi-provider architecture (AWS supported)
+- REST API with OpenAPI documentation
+- Command-line interface
+- Clean Architecture with DDD patterns
+- CQRS for scalable operations
+- Event-driven architecture
+- Comprehensive configuration management
 
 Key Components:
     - api: API layer for external integrations
@@ -14,18 +19,6 @@ Key Components:
     - infrastructure: Technical infrastructure and persistence
     - providers: Cloud provider implementations
 
-Architecture:
-    The system follows Clean Architecture principles with clear separation
-    between domain logic, application services, and infrastructure concerns.
-"""
-
-from ._package import PACKAGE_NAME
-
-__author__ = "AWS Professional Services"
-__email__ = "aws-proserve@amazon.com"
-__package_name__ = PACKAGE_NAME
-
-"""
 Usage:
     The plugin is typically used through the command-line interface:
 
@@ -33,6 +26,6 @@ Usage:
     >>> python run.py requestMachines --data '{"template_id": "basic", "machine_count": 2}'
 
 Note:
-    This plugin requires proper configuration of cloud provider credentials
+    This plugin requires correct configuration of cloud provider credentials
     and Symphony Host Factory environment variables.
 """

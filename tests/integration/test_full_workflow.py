@@ -6,12 +6,12 @@ from unittest.mock import patch
 
 import pytest
 
-from src.application.dto.queries import ListTemplatesQuery
-from src.bootstrap import Application
-from src.config.manager import ConfigurationManager
-from src.domain.base.value_objects import InstanceType
-from src.domain.template.aggregate import Template
-from src.infrastructure.di.buses import CommandBus, QueryBus
+from application.dto.queries import ListTemplatesQuery
+from bootstrap import Application
+from config.manager import ConfigurationManager
+from domain.base.value_objects import InstanceType
+from domain.template.aggregate import Template
+from infrastructure.di.buses import CommandBus, QueryBus
 
 
 @pytest.mark.integration

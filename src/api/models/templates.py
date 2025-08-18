@@ -4,7 +4,7 @@ from typing import Dict, List, Optional
 
 from pydantic import Field
 
-from src.api.models.base import APIRequest, APIResponse
+from api.models.base import APIRequest, APIResponse
 
 
 class TemplateAttribute(APIRequest):

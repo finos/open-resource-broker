@@ -24,13 +24,13 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any, Dict, Optional, Type
 
-from src.application.decorators import (
+from application.decorators import (
     get_handler_registry_stats,
     get_registered_command_handlers,
     get_registered_query_handlers,
 )
-from src.infrastructure.di.container import DIContainer
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.di.container import DIContainer
+from infrastructure.logging.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -52,8 +52,8 @@ class HandlerDiscoveryService:
 
         # Get caching configuration from performance settings
         try:
-            from src.config.manager import get_config_manager
-            from src.config.schemas.performance_schema import PerformanceConfig
+            from config.manager import get_config_manager
+            from config.schemas.performance_schema import PerformanceConfig
 
             config_manager = get_config_manager()
             perf_config = config_manager.get_typed(PerformanceConfig)
@@ -162,7 +162,7 @@ class HandlerDiscoveryService:
         for query_type, handler_class in query_handlers.items():
             try:
                 # Register handler class for DI container to create instances with
-                # proper dependency injection
+                # dependency injection
                 self.container.register_singleton(handler_class)
                 logger.debug(
                     f"Registered query handler: { handler_class.__name__} for { query_type.__name__}"
@@ -175,7 +175,7 @@ class HandlerDiscoveryService:
         for command_type, handler_class in command_handlers.items():
             try:
                 # Register handler class for DI container to create instances with
-                # proper dependency injection
+                # dependency injection
                 self.container.register_singleton(handler_class)
                 logger.debug(
                     f"Registered command handler: { handler_class.__name__} for { command_type.__name__}"

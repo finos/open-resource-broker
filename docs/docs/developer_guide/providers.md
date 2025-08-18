@@ -616,7 +616,7 @@ ProviderFactory.register_provider("provider1", AzureProvider)
 2. **Interface Segregation**: Define focused interfaces for specific capabilities
 3. **Error Handling**: Implement comprehensive error handling and classification
 4. **Retry Logic**: Handle transient errors with appropriate retry strategies
-5. **Resource Cleanup**: Ensure proper cleanup of cloud resources
+5. **Resource Cleanup**: Ensure appropriate cleanup of cloud resources
 
 ### Implementation Guidelines
 

@@ -8,8 +8,8 @@ import time
 from typing import TYPE_CHECKING, Any, Dict, Optional, Type, TypeVar
 
 # Import config classes for runtime use
-from src.config.schemas import AppConfig
-from src.domain.base.exceptions import ConfigurationError
+from config.schemas import AppConfig
+from domain.base.exceptions import ConfigurationError
 
 from .cache_manager import ConfigCacheManager
 from .path_resolver import ConfigPathResolver
@@ -17,8 +17,8 @@ from .provider_manager import ProviderConfigManager
 from .type_converter import ConfigTypeConverter
 
 if TYPE_CHECKING:
-    from src.config.loader import ConfigurationLoader
-    from src.config.schemas.provider_strategy_schema import ProviderConfig
+    from config.loader import ConfigurationLoader
+    from config.schemas.provider_strategy_schema import ProviderConfig
 
 T = TypeVar("T")
 logger = logging.getLogger(__name__)
@@ -58,7 +58,7 @@ class ConfigurationManager:
     def loader(self) -> "ConfigurationLoader":
         """Lazy load configuration loader."""
         if self._loader is None:
-            from src.config.loader import ConfigurationLoader
+            from config.loader import ConfigurationLoader
 
             self._loader = ConfigurationLoader()
         return self._loader

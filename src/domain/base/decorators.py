@@ -1,15 +1,15 @@
-"""Pure domain decorators using proper DI and ports pattern.
+"""Pure domain decorators using DI and ports pattern.
 
 This module provides domain-layer decorators that maintain clean architecture
 by using domain ports for dependency injection, avoiding direct infrastructure
-dependencies and maintaining proper dependency direction.
+dependencies and maintaining correct dependency direction.
 """
 
 from functools import wraps
 from typing import TYPE_CHECKING, Callable, Optional, TypeVar
 
 if TYPE_CHECKING:
-    from src.domain.base.ports import ContainerPort, ErrorHandlingPort
+    from domain.base.ports import ContainerPort, ErrorHandlingPort
 
 T = TypeVar("T")
 
@@ -51,13 +51,13 @@ def get_error_handling_port() -> Optional["ErrorHandlingPort"]:
     if _domain_container:
         try:
             # Import at function level to avoid circular imports
-            from src.domain.base.ports import ErrorHandlingPort
+            from domain.base.ports import ErrorHandlingPort
 
             return _domain_container.get(ErrorHandlingPort)
         except Exception:
             # Graceful fallback if service not registered - no logging in domain layer
             # Domain layer should not have direct infrastructure dependencies
-            pass
+            return None
     return None
 
 
@@ -92,7 +92,7 @@ def handle_domain_exceptions(context: str):
             error_handler = get_error_handling_port()
 
             if error_handler:
-                # Use proper infrastructure error handling through domain ports
+                # Use infrastructure error handling through domain ports
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:

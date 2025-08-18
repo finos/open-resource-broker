@@ -95,7 +95,7 @@ def lazy_singleton(cls: Type[T]) -> Callable[[], T]:
         """Get or create the singleton instance."""
         if cls not in _lazy_singleton_cache:
             # Import the singleton registry only when needed
-            from src.infrastructure.patterns.singleton_registry import SingletonRegistry
+            from infrastructure.patterns.singleton_registry import SingletonRegistry
 
             registry = SingletonRegistry.get_instance()
 

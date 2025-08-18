@@ -6,8 +6,8 @@ strategy selection, operation execution, health updates, and configuration.
 
 from typing import Any, Dict, List, Optional
 
-from src.application.dto.base import BaseCommand
-from src.providers.base.strategy import (
+from application.dto.base import BaseCommand
+from providers.base.strategy import (
     ProviderHealthStatus,
     ProviderOperation,
     ProviderOperationType,

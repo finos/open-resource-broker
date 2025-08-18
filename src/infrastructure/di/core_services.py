@@ -1,11 +1,16 @@
 """Core service registrations for dependency injection."""
 
-from src.config.manager import ConfigurationManager
-from src.domain.base.ports import EventPublisherPort, LoggingPort, SchedulerPort
-from src.infrastructure.di.buses import CommandBus, QueryBus
-from src.infrastructure.di.container import DIContainer
-from src.infrastructure.registry.scheduler_registry import get_scheduler_registry
-from src.monitoring.metrics import MetricsCollector
+from domain.base.ports import (
+    ConfigurationPort,
+    EventPublisherPort,
+    LoggingPort,
+    ProviderPort,
+    SchedulerPort,
+    StoragePort,
+)
+from infrastructure.di.buses import CommandBus, QueryBus
+from infrastructure.di.container import DIContainer
+from monitoring.metrics import MetricsCollector
 
 
 def register_core_services(container: DIContainer) -> None:
@@ -19,8 +24,14 @@ def register_core_services(container: DIContainer) -> None:
     # Register scheduler strategy
     container.register_factory(SchedulerPort, lambda c: _create_scheduler_strategy(c))
 
+    # Register storage strategy
+    container.register_factory(StoragePort, lambda c: _create_storage_strategy(c))
+
+    # Register provider strategy
+    container.register_factory(ProviderPort, lambda c: _create_provider_strategy(c))
+
     # Register event publisher
-    from src.infrastructure.events.publisher import ConfigurableEventPublisher
+    from infrastructure.events.publisher import ConfigurableEventPublisher
 
     container.register_factory(
         EventPublisherPort,
@@ -36,8 +47,31 @@ def register_core_services(container: DIContainer) -> None:
 
 
 def _create_scheduler_strategy(container: DIContainer) -> SchedulerPort:
-    """Create scheduler strategy from registry."""
-    registry = get_scheduler_registry()
-    config_manager = container.get(ConfigurationManager)
-    scheduler_type = config_manager.get_scheduler_strategy()
-    return registry.create_strategy(scheduler_type, container)
+    """Create scheduler strategy using factory."""
+    from infrastructure.factories.scheduler_strategy_factory import (
+        SchedulerStrategyFactory,
+    )
+
+    factory = container.get(SchedulerStrategyFactory)
+    config = container.get(ConfigurationPort)
+    scheduler_type = config.get_scheduler_strategy()
+    return factory.create_strategy(scheduler_type, container)
+
+
+def _create_storage_strategy(container: DIContainer) -> StoragePort:
+    """Create storage strategy using factory."""
+    from infrastructure.factories.storage_strategy_factory import StorageStrategyFactory
+
+    factory = container.get(StorageStrategyFactory)
+    config = container.get(ConfigurationPort)
+    storage_type = config.get_storage_strategy()
+    return factory.create_strategy(storage_type, config)
+
+
+def _create_provider_strategy(container: DIContainer) -> ProviderPort:
+    """Create provider strategy using adapter pattern."""
+    from infrastructure.adapters.provider_context_adapter import ProviderContextAdapter
+    from providers.base.strategy.provider_context import ProviderContext
+
+    provider_context = container.get(ProviderContext)
+    return ProviderContextAdapter(provider_context)

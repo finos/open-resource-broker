@@ -4,7 +4,7 @@ from abc import abstractmethod
 from datetime import datetime
 from typing import List, Optional
 
-from src.domain.base.domain_interfaces import AggregateRepository
+from domain.base.domain_interfaces import AggregateRepository
 
 from .aggregate import Request, RequestStatus, RequestType
 

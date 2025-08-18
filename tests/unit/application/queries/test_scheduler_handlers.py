@@ -4,17 +4,17 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.application.dto.system import (
+from application.dto.system import (
     SchedulerConfigurationResponse,
     SchedulerStrategyListResponse,
     ValidationResultDTO,
 )
-from src.application.queries.scheduler import (
+from application.queries.scheduler import (
     GetSchedulerConfigurationQuery,
     ListSchedulerStrategiesQuery,
     ValidateSchedulerConfigurationQuery,
 )
-from src.application.queries.scheduler_handlers import (
+from application.queries.scheduler_handlers import (
     GetSchedulerConfigurationHandler,
     ListSchedulerStrategiesHandler,
     ValidateSchedulerConfigurationHandler,

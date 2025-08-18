@@ -6,19 +6,19 @@ from fastapi import APIRouter, Body, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.application.dto.queries import (
+from application.dto.queries import (
     GetTemplateQuery,
     ListTemplatesQuery,
     ValidateTemplateQuery,
 )
-from src.application.template.commands import (
+from application.template.commands import (
     CreateTemplateCommand,
     DeleteTemplateCommand,
     UpdateTemplateCommand,
 )
-from src.infrastructure.di.buses import CommandBus, QueryBus
-from src.infrastructure.di.container import get_container
-from src.infrastructure.error.decorators import handle_rest_exceptions
+from infrastructure.di.buses import CommandBus, QueryBus
+from infrastructure.di.container import get_container
+from infrastructure.error.decorators import handle_rest_exceptions
 
 router = APIRouter(prefix="/templates", tags=["Templates"])
 
@@ -84,7 +84,7 @@ async def list_templates(
             provider_api=provider_api, active_only=True, include_configuration=False
         )
 
-        templates = query_bus.execute(query)
+        templates = await query_bus.execute(query)
 
         return JSONResponse(
             status_code=200,
@@ -125,7 +125,7 @@ async def get_template(
 
         # Create and execute query through CQRS bus
         query = GetTemplateQuery(template_id=template_id)
-        template = query_bus.execute(query)
+        template = await query_bus.execute(query)
 
         if template:
             return JSONResponse(
@@ -316,7 +316,7 @@ async def validate_template(template_data: Dict[str, Any] = TEMPLATE_DATA_BODY) 
 
         # Create and execute validation query through CQRS bus
         query = ValidateTemplateQuery(template_config=template_data)
-        validation_result = query_bus.execute(query)
+        validation_result = await query_bus.execute(query)
 
         # Check if validation result has errors
         is_valid = not validation_result.errors if hasattr(validation_result, "errors") else True
@@ -359,7 +359,7 @@ async def refresh_templates() -> JSONResponse:
         # the query handler
         query = ListTemplatesQuery(provider_api=None, active_only=True, include_configuration=False)
 
-        templates = query_bus.execute(query)
+        templates = await query_bus.execute(query)
         template_count = len(templates) if templates else 0
 
         return JSONResponse(

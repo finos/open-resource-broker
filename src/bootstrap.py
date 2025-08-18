@@ -5,10 +5,10 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 # Import configuration
-from src.config import AppConfig
+from config import AppConfig
 
 # Import logging
-from src.infrastructure.logging.logger import get_logger, setup_logging
+from infrastructure.logging.logger import get_logger, setup_logging
 
 # Import DI container
 
@@ -34,13 +34,13 @@ class Application:
     def _ensure_container(self):
         """Ensure DI container is created (lazy initialization)."""
         if self._container is None:
-            from src.infrastructure.di.container import get_container
+            from infrastructure.di.container import get_container
 
             self._container = get_container()
 
             # Set up domain container for decorators
             if not self._domain_container_set:
-                from src.domain.base.decorators import set_domain_container
+                from domain.base.decorators import set_domain_container
 
                 set_domain_container(self._container)
                 self._domain_container_set = True
@@ -48,7 +48,7 @@ class Application:
     def _ensure_config_manager(self):
         """Ensure config manager is created (lazy initialization)."""
         if self._config_manager is None:
-            from src.config.manager import get_config_manager
+            from config.manager import get_config_manager
 
             self._config_manager = get_config_manager(self.config_path)
 
@@ -76,7 +76,7 @@ class Application:
 
             # Activate dry-run context if requested
             if dry_run:
-                from src.infrastructure.mocking.dry_run_context import dry_run_context
+                from infrastructure.mocking.dry_run_context import dry_run_context
 
                 self.logger.info("DRY-RUN mode activated during application initialization")
                 self._dry_run_context = dry_run_context(True)
@@ -87,12 +87,12 @@ class Application:
 
             # Register all services AFTER container creation but BEFORE service
             # resolution
-            from src.infrastructure.di.services import register_all_services
+            from infrastructure.di.services import register_all_services
 
             register_all_services(self._container)
 
             # Initialize provider context directly
-            from src.providers.base.strategy import ProviderContext
+            from providers.base.strategy import ProviderContext
 
             self._provider_context = self._container.get(ProviderContext)
 
@@ -110,7 +110,7 @@ class Application:
                 if hasattr(self._provider_context, "_initialized"):
                     self._provider_context._initialized = True
 
-            # Pre-load templates into cache properly during initialization
+            # Pre-load templates into cache during initialization
             await self._preload_templates()
 
             # Log final provider information
@@ -132,7 +132,7 @@ class Application:
             # Check if consolidated provider configuration is available
             if hasattr(config_manager, "get_provider_config"):
                 provider_config = config_manager.get_provider_config()
-                if provider_config:
+                if provider_config and hasattr(provider_config, "get_mode"):
                     mode = provider_config.get_mode()
                     active_providers = provider_config.get_active_providers()
 
@@ -189,7 +189,7 @@ class Application:
 
         # Cache the query bus after first lookup for performance
         if not hasattr(self, "_query_bus"):
-            from src.infrastructure.di.buses import QueryBus
+            from infrastructure.di.buses import QueryBus
 
             self._query_bus = self._container.get(QueryBus)
         return self._query_bus
@@ -201,7 +201,7 @@ class Application:
 
         # Cache the command bus after first lookup for performance
         if not hasattr(self, "_command_bus"):
-            from src.infrastructure.di.buses import CommandBus
+            from infrastructure.di.buses import CommandBus
 
             self._command_bus = self._container.get(CommandBus)
         return self._command_bus

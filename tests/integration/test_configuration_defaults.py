@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Test for Configuration Defaults Integration
-Tests that templates get proper defaults from configuration when fields are missing.
+Tests that templates get appropriate defaults from configuration when fields are missing.
 """
 
 import os
@@ -15,12 +15,12 @@ def test_template_defaults_integration():
     print("=== Configuration Defaults Integration Test ===")
 
     try:
-        from src.application.services.template_defaults_service import (
+        from application.services.template_defaults_service import (
             TemplateDefaultsService,
         )
-        from src.config.manager import ConfigurationManager
-        from src.infrastructure.logging.logger import get_logger
-        from src.infrastructure.persistence.repositories.template_repository import (
+        from config.manager import ConfigurationManager
+        from infrastructure.logging.logger import get_logger
+        from infrastructure.persistence.repositories.template_repository import (
             TemplateSerializer,
         )
 
@@ -72,16 +72,16 @@ def test_template_defaults_integration():
 
 
 def test_template_defaults_precedence():
-    """Test that template values override defaults (proper precedence)."""
+    """Test that template values override defaults (correct precedence)."""
     print("\n=== Template Defaults Precedence Test ===")
 
     try:
-        from src.application.services.template_defaults_service import (
+        from application.services.template_defaults_service import (
             TemplateDefaultsService,
         )
-        from src.config.manager import ConfigurationManager
-        from src.infrastructure.logging.logger import get_logger
-        from src.infrastructure.persistence.repositories.template_repository import (
+        from config.manager import ConfigurationManager
+        from infrastructure.logging.logger import get_logger
+        from infrastructure.persistence.repositories.template_repository import (
             TemplateSerializer,
         )
 
@@ -123,7 +123,7 @@ def test_template_defaults_precedence():
         ], "Explicit security_group_ids should be preserved"
         assert template.instance_type == "t3.large", "Explicit instance_type should be preserved"
 
-        print("PASS: Template values correctly override defaults (proper precedence)")
+        print("PASS: Template values correctly override defaults (correct precedence)")
 
         return True
 
@@ -140,11 +140,11 @@ def test_defaults_service_directly():
     print("\n=== Direct TemplateDefaultsService Test ===")
 
     try:
-        from src.application.services.template_defaults_service import (
+        from application.services.template_defaults_service import (
             TemplateDefaultsService,
         )
-        from src.config.manager import ConfigurationManager
-        from src.infrastructure.logging.logger import get_logger
+        from config.manager import ConfigurationManager
+        from infrastructure.logging.logger import get_logger
 
         # Create service
         config_manager = ConfigurationManager()

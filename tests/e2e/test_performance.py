@@ -9,10 +9,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.config.manager import ConfigurationManager
-from src.infrastructure.factories.provider_strategy_factory import (
-    ProviderStrategyFactory,
-)
+from config.manager import ConfigurationManager
+from infrastructure.factories.provider_strategy_factory import ProviderStrategyFactory
 
 
 class TestPerformance:

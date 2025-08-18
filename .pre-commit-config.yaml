@@ -175,6 +175,24 @@ repos:
         pass_filenames: false
         description: "Validate GitHub Actions workflow YAML files"
 
+      - id: validate-actionlint
+        name: Validate Workflows (actionlint)
+        entry: make validate-actionlint
+        language: system
+        files: \.github/workflows/.*\.(yml|yaml)$
+        pass_filenames: false
+        description: "Validate GitHub Actions workflows with actionlint"
+        warning_only: true  # Allow this to fail without blocking commit
+
+      - id: validate-shell-scripts
+        name: Validate Shell Scripts (shellcheck)
+        entry: make validate-shell-scripts
+        language: system
+        files: \.sh$
+        pass_filenames: false
+        description: "Validate shell scripts with shellcheck"
+        warning_only: true  # Allow this to fail without blocking commit
+
       - id: detect-secrets
         name: Detect Hardcoded Secrets
         entry: make detect-secrets

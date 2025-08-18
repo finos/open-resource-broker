@@ -8,8 +8,8 @@ CLEAN ARCHITECTURE: Only handles storage strategies, no repository knowledge.
 
 from typing import Any, Dict
 
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.registry.storage_registry import get_storage_registry
+from infrastructure.logging.logger import get_logger
+from infrastructure.registry.storage_registry import get_storage_registry
 
 
 def create_sql_strategy(config: Any) -> Any:
@@ -22,7 +22,7 @@ def create_sql_strategy(config: Any) -> Any:
     Returns:
         SQLStorageStrategy instance
     """
-    from src.infrastructure.persistence.sql.strategy import SQLStorageStrategy
+    from infrastructure.persistence.sql.strategy import SQLStorageStrategy
 
     # Extract configuration parameters
     if hasattr(config, "sql_strategy"):
@@ -49,7 +49,7 @@ def create_sql_config(data: Dict[str, Any]) -> Any:
     Returns:
         SQL configuration object
     """
-    from src.config.schemas.storage_schema import SqlStrategyConfig
+    from config.schemas.storage_schema import SqlStrategyConfig
 
     return SqlStrategyConfig(**data)
 
@@ -84,19 +84,19 @@ def _build_connection_string(sql_config: Any) -> str:
 
 def create_sql_unit_of_work(config: Any) -> Any:
     """
-    Create SQL unit of work with proper configuration extraction.
+    Create SQL unit of work with correct configuration extraction.
 
     Args:
         config: Configuration object (ConfigurationManager or dict)
 
     Returns:
-        SQLUnitOfWork instance with properly configured engine
+        SQLUnitOfWork instance with correctly configured engine
     """
     from sqlalchemy import create_engine
 
-    from src.config.manager import ConfigurationManager
-    from src.config.schemas.storage_schema import StorageConfig
-    from src.infrastructure.persistence.sql.unit_of_work import SQLUnitOfWork
+    from config.manager import ConfigurationManager
+    from config.schemas.storage_schema import StorageConfig
+    from infrastructure.persistence.sql.unit_of_work import SQLUnitOfWork
 
     # Handle different config types
     if isinstance(config, ConfigurationManager):

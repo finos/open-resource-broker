@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from src.application.dto.base import BaseQuery, BaseResponse
+from application.dto.base import BaseQuery, BaseResponse
 
 
 class QueryBus(Protocol):

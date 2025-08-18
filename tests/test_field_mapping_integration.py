@@ -8,17 +8,13 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.config.manager import ConfigurationManager
-from src.infrastructure.scheduler.hostfactory.field_mappings import (
-    HostFactoryFieldMappings,
-)
-from src.infrastructure.scheduler.hostfactory.strategy import (
-    HostFactorySchedulerStrategy,
-)
-from src.infrastructure.scheduler.hostfactory.transformations import (
+from config.manager import ConfigurationManager
+from infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings
+from infrastructure.scheduler.hostfactory.strategy import HostFactorySchedulerStrategy
+from infrastructure.scheduler.hostfactory.transformations import (
     HostFactoryTransformations,
 )
-from src.providers.aws.domain.template.aggregate import AWSTemplate
+from providers.aws.domain.template.aggregate import AWSTemplate
 
 
 class TestFieldMappingIntegration:

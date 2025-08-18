@@ -4,17 +4,13 @@ import time
 from functools import wraps
 from typing import Any, Callable, TypeVar
 
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.resilience.exceptions import (
+from infrastructure.logging.logger import get_logger
+from infrastructure.resilience.exceptions import (
     InvalidRetryStrategyError,
     MaxRetriesExceededError,
 )
-from src.infrastructure.resilience.strategies.circuit_breaker import (
-    CircuitBreakerStrategy,
-)
-from src.infrastructure.resilience.strategies.exponential import (
-    ExponentialBackoffStrategy,
-)
+from infrastructure.resilience.strategy.circuit_breaker import CircuitBreakerStrategy
+from infrastructure.resilience.strategy.exponential import ExponentialBackoffStrategy
 
 T = TypeVar("T")
 logger = get_logger(__name__)

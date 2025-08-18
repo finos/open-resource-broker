@@ -62,8 +62,8 @@ class AppConfig(BaseModel):
     def get_config_file_path(self) -> str:
         """Build full config file path using scheduler + provider type."""
         config_root = self.scheduler.get_config_root()
-        # Extract provider type from active_provider (e.g., "aws-default" -> "aws")
-        provider_type = self.provider.active_provider.split("-")[0]
+        # Get provider type using selection logic
+        provider_type = self._get_selected_provider_type()
         # Generate provider-specific config file name
         config_file = f"{provider_type}prov_config.json"
         return os.path.join(config_root, config_file)
@@ -71,11 +71,32 @@ class AppConfig(BaseModel):
     def get_templates_file_path(self) -> str:
         """Build full templates file path using scheduler + provider type."""
         config_root = self.scheduler.get_config_root()
-        # Extract provider type from active_provider (e.g., "aws-default" -> "aws")
-        provider_type = self.provider.active_provider.split("-")[0]
+        # Get provider type using selection logic
+        provider_type = self._get_selected_provider_type()
         # Generate provider-specific templates file name
         templates_file = f"{provider_type}prov_templates.json"
         return os.path.join(config_root, templates_file)
+
+    def _get_selected_provider_type(self) -> str:
+        """Get provider type using selection logic."""
+        try:
+            # Use provider selection service for provider selection
+            from application.services.provider_selection_service import (
+                ProviderSelectionService,
+            )
+            from infrastructure.di.container import get_container
+
+            container = get_container()
+            selection_service = container.get(ProviderSelectionService)
+
+            selection_result = selection_service.select_active_provider()
+            return selection_result.provider_type
+        except Exception:
+            # Fallback to first active provider for backward compatibility
+            active_providers = self.provider.get_active_providers()
+            if active_providers:
+                return active_providers[0].type
+            return "aws"  # Ultimate fallback
 
     @field_validator("environment")
     @classmethod

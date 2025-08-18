@@ -10,10 +10,10 @@ description = "{{DESCRIPTION}}"
 readme = "README.md"
 license = "Apache-2.0"
 authors = [
-    {name = "AWS Professional Services", email = "aws-proserve@amazon.com"}
+    {name = "{{AUTHOR}}", email = "{{EMAIL}}"}
 ]
 maintainers = [
-    {name = "AWS Professional Services", email = "aws-proserve@amazon.com"}
+    {name = "{{AUTHOR}}", email = "{{EMAIL}}"}
 ]
 keywords = [
     "aws",
@@ -56,6 +56,8 @@ dependencies = [
     "requests>=2.31.0",
     "PyYAML>=6.0.0",
     "click>=8.0.0",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
 ]
 
 [dependency-groups]
@@ -157,11 +159,11 @@ Documentation = "{{DOCS_URL}}"      # From src._package.DOCS_URL
 Repository = "{{REPO_URL}}"         # From src._package.REPO_URL
 "Bug Reports" = "{{REPO_ISSUES_URL}}"  # From src._package.REPO_ISSUES_URL
 
-[tool.setuptools]
-package-dir = {"" = "src"}
-
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
 
 
 
@@ -170,7 +172,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --cov=src --cov-report=term-missing --cov-report=html"
+addopts = "-v --cov=ohfp --cov-report=term-missing --cov-report=html"
 env = [
     "AWS_DEFAULT_REGION=us-east-1",
     "AWS_ACCESS_KEY_ID=testing",

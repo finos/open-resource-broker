@@ -1,16 +1,23 @@
-"""Repository migration utilities."""
+"""Repository migration utilities for data persistence strategies.
+
+This module provides utilities for migrating data between different repository
+implementations and storage strategies:
+- Template migration from legacy formats
+- Data backup and restore operations
+- Repository format conversion utilities
+- Migration validation and rollback support
+"""
 
 import json
 import os
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from src.domain.base.domain_interfaces import Repository
-from src.domain.template.repository import (
-    TemplateRepository as TemplateRepositoryInterface,
-)
-from src.infrastructure.di.container import DIContainer
-from src.infrastructure.logging.logger import get_logger
+from domain.base.domain_interfaces import Repository
+from domain.base.ports.configuration_port import ConfigurationPort
+from domain.template.repository import TemplateRepository as TemplateRepositoryInterface
+from infrastructure.di.container import DIContainer
+from infrastructure.logging.logger import get_logger
 
 logger = get_logger()
 
@@ -36,9 +43,8 @@ class RepositoryMigrator:
         self.collections = ["templates", "requests", "machines"]
 
         # Get configuration manager from container
-        from src.config.manager import ConfigurationManager
 
-        self.config_manager = self.container.get(ConfigurationManager)
+        self.config_manager = self.container.get(ConfigurationPort)
 
     def migrate(
         self,
@@ -131,8 +137,8 @@ class RepositoryMigrator:
 
             # If not registered, create a new JSON template repository
             if not template_repo:
-                from src.config.manager import get_config_manager
-                from src.infrastructure.persistence.json import JSONTemplateRepository
+                from config.manager import get_config_manager
+                from infrastructure.persistence.json import JSONTemplateRepository
 
                 # Get configuration manager
                 config_manager = get_config_manager()
@@ -158,7 +164,7 @@ class RepositoryMigrator:
 
             # For other repositories, create based on storage type
             if storage_type == "dynamodb":
-                from src.providers.aws.persistence.dynamodb import (
+                from providers.aws.persistence.dynamodb import (
                     DynamoDBMachineRepository,
                     DynamoDBRequestRepository,
                 )
@@ -184,7 +190,7 @@ class RepositoryMigrator:
                 from sqlalchemy import create_engine
                 from sqlalchemy.orm import sessionmaker
 
-                from src.infrastructure.persistence.sql import (
+                from infrastructure.persistence.sql import (
                     MachineModel,
                     RequestModel,
                     SQLMachineRepository,
@@ -201,8 +207,8 @@ class RepositoryMigrator:
                 session = Session()
 
                 # Import domain entities
-                from src.domain.machine.aggregate import Machine
-                from src.domain.request.aggregate import Request
+                from domain.machine.aggregate import Machine
+                from domain.request.aggregate import Request
 
                 machine_repo = SQLMachineRepository(
                     entity_class=Machine, model_class=MachineModel, session=session
@@ -213,7 +219,7 @@ class RepositoryMigrator:
                 )
 
             else:  # Default to JSON
-                from src.infrastructure.persistence.json import (
+                from infrastructure.persistence.json import (
                     JSONMachineRepository,
                     JSONRequestRepository,
                 )
@@ -253,7 +259,7 @@ class RepositoryMigrator:
         Returns:
             Path to backup directory
         """
-        from src.config.manager import get_config_manager
+        from config.manager import get_config_manager
 
         # Get work directory from config manager
         config_manager = get_config_manager()
@@ -343,7 +349,7 @@ class RepositoryMigrator:
                             # first
                             try:
                                 # Check if the repository is a StrategyBasedRepository
-                                from src.infrastructure.persistence.base.repository import (
+                                from infrastructure.persistence.base.repository import (
                                     StrategyBasedRepository,
                                 )
 

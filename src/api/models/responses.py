@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
-from src.infrastructure.error.exception_handler import InfrastructureErrorResponse
+from infrastructure.error.exception_handler import InfrastructureErrorResponse
 
 
 def format_error_for_api(error_response: InfrastructureErrorResponse) -> Dict[str, Any]:

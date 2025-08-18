@@ -2,8 +2,8 @@
 
 from typing import Optional
 
-from src.config import ResourceConfig
-from src.config.manager import get_config_manager
+from config import ResourceConfig
+from config.manager import get_config_manager
 
 
 def get_resource_prefix(resource_type: str, config: Optional[ResourceConfig] = None) -> str:

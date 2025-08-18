@@ -6,15 +6,15 @@ import pytest
 
 # Import domain events and aggregates
 try:
-    from src.domain.base.events import (
+    from domain.base.events import (
         RequestCompletedEvent,
         RequestCreatedEvent,
         RequestStatusChangedEvent,
     )
-    from src.domain.base.events.base_events import BaseEvent
-    from src.domain.base.events.domain_events import DomainEvent
-    from src.domain.request.aggregate import Request
-    from src.domain.request.value_objects import RequestStatus, RequestType
+    from domain.base.events.base_events import BaseEvent
+    from domain.base.events.domain_events import DomainEvent
+    from domain.request.aggregate import Request
+    from domain.request.value_objects import RequestStatus, RequestType
 
     IMPORTS_AVAILABLE = True
 except ImportError as e:
@@ -136,7 +136,7 @@ class TestDomainEventProperties:
             event.machine_count = 5
 
     def test_domain_events_have_timestamps(self):
-        """Test that domain events have proper timestamps."""
+        """Test that domain events have appropriate timestamps."""
         event = RequestCreatedEvent(
             request_id="test-request",
             template_id="test-template",

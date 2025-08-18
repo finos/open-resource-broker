@@ -4,18 +4,18 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.application.services.provider_selection_service import (
+from application.services.provider_selection_service import (
     ProviderSelectionResult,
     ProviderSelectionService,
     SelectionStrategy,
 )
-from src.config.managers.configuration_manager import ConfigurationManager
-from src.config.schemas.provider_strategy_schema import (
+from config.managers.configuration_manager import ConfigurationManager
+from config.schemas.provider_strategy_schema import (
     ProviderConfig,
     ProviderInstanceConfig,
 )
-from src.domain.base.ports import LoggingPort
-from src.domain.template.aggregate import Template
+from domain.base.ports import LoggingPort
+from domain.template.aggregate import Template
 
 
 class TestProviderSelectionService:

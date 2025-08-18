@@ -3,6 +3,9 @@
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 
+# Import AWSProviderConfig for compatibility
+from .config import AWSProviderConfig
+
 
 @dataclass
 class AWSLimits:
@@ -135,4 +138,10 @@ def get_aws_config_manager() -> AWSConfigManager:
     return _aws_config_manager
 
 
-# Import AWSProviderConfig for compatibility
+__all__ = [
+    "AWSLimits",
+    "AWSNamingConfig",
+    "AWSConfigManager",
+    "get_aws_config_manager",
+    "AWSProviderConfig",
+]

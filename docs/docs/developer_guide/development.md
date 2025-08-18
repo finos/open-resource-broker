@@ -532,7 +532,7 @@ def get_requests_by_status(status: str) -> List[Request]:
 - [ ] Input validation on all user inputs
 - [ ] Parameterized database queries
 - [ ] Secure credential storage
-- [ ] Proper error handling (don't leak sensitive info)
+- [ ] Appropriate error handling (don't leak sensitive info)
 - [ ] Access control and authorization
 - [ ] Secure communication (HTTPS, TLS)
 - [ ] Regular dependency updates

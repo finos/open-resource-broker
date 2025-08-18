@@ -6,7 +6,7 @@ A quality checker that enforces coding standards:
 - No emojis in code or comments
 - No unprofessional language
 - No hyperbolic marketing terms
-- Proper docstring coverage and format
+- Appropriate docstring coverage and format
 - Consistent naming conventions
 - No unused imports or commented code
 - README files are up-to-date
@@ -86,6 +86,9 @@ UNPROFESSIONAL_PATTERNS = {
 HYPERBOLIC_PATTERNS = {
     re.compile(r"\benhanced\b", re.IGNORECASE): 'Use "improved" only when factually accurate',
     re.compile(r"\bunified\b", re.IGNORECASE): 'Use "integrated" or "consolidated"',
+    re.compile(
+        r"\bproper\b(?!\s*(?:ty|ties))", re.IGNORECASE
+    ): 'Use specific terms: "correct", "appropriate", "compliant", "structured", "domain-driven"',
     re.compile(r"\bmodern\b", re.IGNORECASE): 'Use "current" or "updated"',
     re.compile(r"\bcutting-edge\b", re.IGNORECASE): 'Use "current industry standard"',
     re.compile(r"\brevolutionary\b", re.IGNORECASE): 'Use "significant improvement"',

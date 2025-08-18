@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import Field
 
-from src.application.dto.base import BaseCommand, BaseResponse
+from application.dto.base import BaseCommand, BaseResponse
 
 
 class CreateTemplateCommand(BaseCommand):

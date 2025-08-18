@@ -7,9 +7,9 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from fastapi.testclient import TestClient
 
-from src.api.server import create_fastapi_app
-from src.config.schemas.server_schema import AuthConfig, ServerConfig
-from src.infrastructure.auth.strategies import BearerTokenStrategy
+from api.server import create_fastapi_app
+from config.schemas.server_schema import AuthConfig, ServerConfig
+from infrastructure.auth.strategies import BearerTokenStrategy
 
 
 class TestAuthenticationPerformance:

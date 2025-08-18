@@ -5,8 +5,8 @@ from typing import Any, Dict, List, Optional, Type, TypeVar, Union
 
 from pydantic import BaseModel, ValidationError
 
-from src.infrastructure.error.decorators import handle_interface_exceptions
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.error.decorators import handle_interface_exceptions
+from infrastructure.logging.logger import get_logger
 
 # Type variable for Pydantic models
 T = TypeVar("T", bound=BaseModel)

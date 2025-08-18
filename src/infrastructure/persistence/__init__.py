@@ -1,7 +1,7 @@
 """Persistence package."""
 
 # Import only the base classes to avoid circular imports
-from src.infrastructure.persistence.base import (
+from infrastructure.persistence.base import (
     BaseUnitOfWork,
     StrategyBasedRepository,
     StrategyUnitOfWork,

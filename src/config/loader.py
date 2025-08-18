@@ -7,8 +7,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional, TypeVar
 
-from src.config.schemas import AppConfig, validate_config
-from src.domain.base.exceptions import ConfigurationError
+from config.schemas import AppConfig, validate_config
+from domain.base.exceptions import ConfigurationError
 
 T = TypeVar("T")
 
@@ -16,7 +16,7 @@ T = TypeVar("T")
 # Use lazy import to avoid circular dependency
 def _get_logger():
     """Lazy import of logger to avoid circular dependency."""
-    from src.infrastructure.logging.logger import get_logger
+    from infrastructure.logging.logger import get_logger
 
     return get_logger(__name__)
 
@@ -108,7 +108,7 @@ class ConfigurationLoader:
     @classmethod
     def load(cls, config_path: Optional[str] = None) -> Dict[str, Any]:
         """
-        Load configuration from multiple sources with proper precedence.
+        Load configuration from multiple sources with correct precedence.
 
         Precedence order (highest to lowest):
         1. Environment variables (highest precedence)
@@ -130,7 +130,7 @@ class ConfigurationLoader:
         # Start with default configuration (lowest precedence)
         config = cls._load_default_config()
 
-        # Load main config.json with proper precedence (HF_PROVIDER_CONFDIR first,
+        # Load main config.json with correct precedence (HF_PROVIDER_CONFDIR first,
         # then config/)
         main_config = cls._load_config_file("conf", "config.json", required=False)
         if main_config:
@@ -157,7 +157,7 @@ class ConfigurationLoader:
         cls._load_from_env(config)
 
         # Expand environment variables in the final configuration
-        from src.config.utils.env_expansion import expand_config_env_vars
+        from config.utils.env_expansion import expand_config_env_vars
 
         config = expand_config_env_vars(config)
 
@@ -240,9 +240,9 @@ class ConfigurationLoader:
                 return json.load(f)
 
         except json.JSONDecodeError as e:
-            raise ConfigurationError("File", f"Invalid JSON in configuration file: {str(e)}")
+            raise ConfigurationError(f"Invalid JSON in configuration file: {str(e)}")
         except Exception as e:
-            raise ConfigurationError("File", f"Failed to load configuration file: {str(e)}")
+            raise ConfigurationError(f"Failed to load configuration file: {str(e)}")
 
     @classmethod
     def _load_config_file(
@@ -555,14 +555,18 @@ class ConfigurationLoader:
         """
         Merge update configuration into base configuration.
 
+        Arrays are replaced entirely, not merged element by element.
+
         Args:
             base: Base configuration to update
             update: Update configuration
         """
         for key, value in update.items():
             if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+                # Deep merge for dictionaries
                 cls._merge_config(base[key], value)
             else:
+                # Replace for all other types (including arrays)
                 base[key] = value
 
     @classmethod

@@ -11,8 +11,8 @@ import uuid
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Generic, Optional, TypeVar
 
-from src.application.interfaces.infrastructure_handler import InfrastructureHandler
-from src.domain.base.ports import ErrorHandlingPort, LoggingPort
+from application.interfaces.infrastructure_handler import InfrastructureHandler
+from domain.base.ports import ErrorHandlingPort, LoggingPort
 
 TRequest = TypeVar("TRequest")
 TResponse = TypeVar("TResponse")

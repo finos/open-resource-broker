@@ -1,7 +1,7 @@
 """Template application context - template use cases."""
 
 # Import queries from the centralized dto.queries module
-from src.application.dto.queries import (
+from application.dto.queries import (
     GetTemplateQuery,
     ListTemplatesQuery,
     ValidateTemplateQuery,

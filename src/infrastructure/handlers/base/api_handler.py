@@ -6,13 +6,9 @@ import uuid
 from abc import abstractmethod
 from typing import Any, Callable, Dict, Generic, Optional, TypeVar
 
-from src.domain.base.exceptions import (
-    DomainException,
-    EntityNotFoundError,
-    ValidationError,
-)
-from src.infrastructure.handlers.base.base_handler import BaseHandler
-from src.infrastructure.resilience import retry
+from domain.base.exceptions import DomainException, EntityNotFoundError, ValidationError
+from infrastructure.handlers.base.base_handler import BaseHandler
+from infrastructure.resilience import retry
 
 T = TypeVar("T")  # Request type
 R = TypeVar("R")  # Response type
@@ -348,7 +344,7 @@ class BaseAPIHandler(BaseHandler, Generic[T, R]):
 
             except JsonSchemaValidationError as e:
                 # Convert to domain validation error
-                from src.domain.base.exceptions import ValidationError
+                from domain.base.exceptions import ValidationError
 
                 raise ValidationError(
                     domain="API",

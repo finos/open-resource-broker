@@ -5,8 +5,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.domain.base.exceptions import ConfigurationError
-from src.infrastructure.registry.storage_registry import (
+from domain.base.exceptions import ConfigurationError
+from infrastructure.registry.storage_registry import (
     StorageRegistration,
     StorageRegistry,
     UnsupportedStorageError,

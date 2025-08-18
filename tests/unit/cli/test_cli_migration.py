@@ -8,7 +8,7 @@ to modular CLI package is working correctly.
 import os
 import sys
 
-from src.cli.field_mapping import get_field_value, get_template_field_mapping
+from cli.field_mapping import get_field_value, get_template_field_mapping
 
 # Add project root to path
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -22,12 +22,7 @@ class TestCLIMigration:
     def test_cli_modules_can_be_imported(self):
         """Test that all CLI modules can be imported successfully."""
         # Test main CLI module
-        from src.cli.main import (
-            convert_to_legacy_args,
-            execute_command,
-            main,
-            parse_args,
-        )
+        from cli.main import convert_to_legacy_args, execute_command, main, parse_args
 
         assert callable(main)
         assert callable(parse_args)
@@ -35,7 +30,7 @@ class TestCLIMigration:
         assert callable(convert_to_legacy_args)
 
         # Test formatters module
-        from src.cli.formatters import (
+        from cli.formatters import (
             format_list_output,
             format_output,
             format_table_output,
@@ -46,7 +41,7 @@ class TestCLIMigration:
         assert callable(format_list_output)
 
         # Test completion module
-        from src.cli.completion import generate_bash_completion, generate_zsh_completion
+        from cli.completion import generate_bash_completion, generate_zsh_completion
 
         assert callable(generate_bash_completion)
         assert callable(generate_zsh_completion)
@@ -57,7 +52,7 @@ class TestCLIMigration:
 
     def test_shell_completion_generation(self):
         """Test that shell completions can be generated."""
-        from src.cli.completion import generate_bash_completion, generate_zsh_completion
+        from cli.completion import generate_bash_completion, generate_zsh_completion
 
         bash_completion = generate_bash_completion()
         assert isinstance(bash_completion, str)
@@ -71,7 +66,7 @@ class TestCLIMigration:
 
     def test_output_formatting(self):
         """Test that output formatting works correctly."""
-        from src.cli.formatters import format_output
+        from cli.formatters import format_output
 
         test_data = {"test": "data", "number": 42}
 
@@ -113,7 +108,7 @@ class TestCLIMigration:
         assert len(lines) < 30, f"run.py should be minimal, but has {len(lines)} lines"
 
         # Should import from CLI modules
-        assert "from src.cli.main import main" in content
+        assert "from cli.main import main" in content
 
         # Should delegate to main()
         assert "main()" in content

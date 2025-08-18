@@ -10,10 +10,10 @@ import pytest
 
 # Import components for security testing
 try:
-    from src.domain.request.aggregate import Request
-    from src.domain.request.exceptions import RequestValidationError
-    from src.domain.template.aggregate import Template
-    from src.domain.template.exceptions import TemplateValidationError
+    from domain.request.aggregate import Request
+    from domain.request.exceptions import RequestValidationError
+    from domain.template.aggregate import Template
+    from domain.template.exceptions import TemplateValidationError
 
     IMPORTS_AVAILABLE = True
 except ImportError as e:
@@ -203,7 +203,7 @@ class TestAuthenticationSecurity:
 
     def test_template_access_control(self):
         """Test template access control mechanisms."""
-        # Test template creation with proper validation
+        # Test template creation with appropriate validation
         template = Template(
             template_id="secure-template",
             name="Secure Template",
@@ -326,7 +326,7 @@ class TestDataProtectionSecurity:
         # Simulate data encryption
         sensitive_data = "This is sensitive request data"
 
-        # Simple encryption simulation (in practice, use proper encryption)
+        # Simple encryption simulation (in practice, use appropriate encryption)
         def encrypt_data(data: str, key: bytes) -> str:
             """Simple XOR encryption for testing."""
             encrypted = bytearray()

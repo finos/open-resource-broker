@@ -3,7 +3,7 @@
 # Import core domain value objects
 from typing import Any, Dict, List, Protocol
 
-from src.domain.base.value_objects import ResourceId
+from domain.base.value_objects import ResourceId
 
 # Export all public classes
 __all__ = ["TemplateId", "ProviderConfiguration"]

@@ -7,22 +7,21 @@ leveraging the existing provider strategy ecosystem through clean CQRS interface
 import time
 from typing import Any, Dict, List
 
-from src.application.base.handlers import BaseQueryHandler
-from src.application.decorators import query_handler
-from src.application.dto.system import (
+from application.base.handlers import BaseQueryHandler
+from application.decorators import query_handler
+from application.dto.system import (
     ProviderCapabilitiesDTO,
     ProviderHealthDTO,
     ProviderStrategyConfigDTO,
 )
-from src.application.provider.queries import (
+from application.provider.queries import (
     GetProviderCapabilitiesQuery,
     GetProviderHealthQuery,
     GetProviderMetricsQuery,
     GetProviderStrategyConfigQuery,
     ListAvailableProvidersQuery,
 )
-from src.domain.base.ports import ErrorHandlingPort, LoggingPort
-from src.providers.base.strategy import ProviderContext
+from domain.base.ports import ErrorHandlingPort, LoggingPort, ProviderPort
 
 
 @query_handler(GetProviderHealthQuery)
@@ -31,7 +30,7 @@ class GetProviderHealthHandler(BaseQueryHandler[GetProviderHealthQuery, Provider
 
     def __init__(
         self,
-        provider_context: ProviderContext,
+        provider_port: ProviderPort,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
     ):
@@ -39,12 +38,12 @@ class GetProviderHealthHandler(BaseQueryHandler[GetProviderHealthQuery, Provider
         Initialize provider health handler.
 
         Args:
-            provider_context: Provider context for accessing strategies
+            provider_port: Provider context for accessing strategies
             logger: Logging port for operation logging
             error_handler: Error handling port for exception management
         """
         super().__init__(logger, error_handler)
-        self.provider_context = provider_context
+        self.provider_port = provider_port
 
     async def execute_query(self, query: GetProviderHealthQuery) -> Dict[str, Any]:
         """Execute provider health query."""
@@ -52,7 +51,7 @@ class GetProviderHealthHandler(BaseQueryHandler[GetProviderHealthQuery, Provider
 
         try:
             # Get provider strategy
-            strategy = self.provider_context.get_strategy(query.provider_name)
+            strategy = self.provider_port.get_strategy(query.provider_name)
             if not strategy:
                 return {
                     "provider_name": query.provider_name,
@@ -96,7 +95,7 @@ class ListAvailableProvidersHandler(
 
     def __init__(
         self,
-        provider_context: ProviderContext,
+        provider_port: ProviderPort,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
     ):
@@ -104,12 +103,12 @@ class ListAvailableProvidersHandler(
         Initialize list providers handler.
 
         Args:
-            provider_context: Provider context for accessing strategies
+            provider_port: Provider context for accessing strategies
             logger: Logging port for operation logging
             error_handler: Error handling port for exception management
         """
         super().__init__(logger, error_handler)
-        self.provider_context = provider_context
+        self.provider_port = provider_port
 
     async def execute_query(self, query: ListAvailableProvidersQuery) -> List[Dict[str, Any]]:
         """Execute list available providers query."""
@@ -119,11 +118,11 @@ class ListAvailableProvidersHandler(
             available_providers = []
 
             # Get all available strategies
-            strategy_names = self.provider_context.get_available_strategies()
+            strategy_names = self.provider_port.get_available_strategies()
 
             for strategy_name in strategy_names:
                 try:
-                    strategy = self.provider_context.get_strategy(strategy_name)
+                    strategy = self.provider_port.get_strategy(strategy_name)
                     provider_info = {
                         "name": strategy_name,
                         "type": getattr(strategy, "provider_type", "unknown"),
@@ -158,7 +157,7 @@ class GetProviderCapabilitiesHandler(
 
     def __init__(
         self,
-        provider_context: ProviderContext,
+        provider_port: ProviderPort,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
     ):
@@ -166,12 +165,12 @@ class GetProviderCapabilitiesHandler(
         Initialize provider capabilities handler.
 
         Args:
-            provider_context: Provider context for accessing strategies
+            provider_port: Provider context for accessing strategies
             logger: Logging port for operation logging
             error_handler: Error handling port for exception management
         """
         super().__init__(logger, error_handler)
-        self.provider_context = provider_context
+        self.provider_port = provider_port
 
     async def execute_query(self, query: GetProviderCapabilitiesQuery) -> Dict[str, Any]:
         """Execute provider capabilities query."""
@@ -179,7 +178,7 @@ class GetProviderCapabilitiesHandler(
 
         try:
             # Get provider strategy
-            strategy = self.provider_context.get_strategy(query.provider_name)
+            strategy = self.provider_port.get_strategy(query.provider_name)
             if not strategy:
                 return {
                     "provider_name": query.provider_name,
@@ -213,7 +212,7 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Dict[s
 
     def __init__(
         self,
-        provider_context: ProviderContext,
+        provider_port: ProviderPort,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
     ):
@@ -221,12 +220,12 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Dict[s
         Initialize provider metrics handler.
 
         Args:
-            provider_context: Provider context for accessing strategies
+            provider_port: Provider context for accessing strategies
             logger: Logging port for operation logging
             error_handler: Error handling port for exception management
         """
         super().__init__(logger, error_handler)
-        self.provider_context = provider_context
+        self.provider_port = provider_port
 
     async def execute_query(self, query: GetProviderMetricsQuery) -> Dict[str, Any]:
         """Execute provider metrics query."""
@@ -234,7 +233,7 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Dict[s
 
         try:
             # Get provider strategy
-            strategy = self.provider_context.get_strategy(query.provider_name)
+            strategy = self.provider_port.get_strategy(query.provider_name)
             if not strategy:
                 return {
                     "provider_name": query.provider_name,
@@ -272,7 +271,7 @@ class GetProviderStrategyConfigHandler(
 
     def __init__(
         self,
-        provider_context: ProviderContext,
+        provider_port: ProviderPort,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
     ):
@@ -280,12 +279,12 @@ class GetProviderStrategyConfigHandler(
         Initialize provider strategy config handler.
 
         Args:
-            provider_context: Provider context for accessing strategies
+            provider_port: Provider context for accessing strategies
             logger: Logging port for operation logging
             error_handler: Error handling port for exception management
         """
         super().__init__(logger, error_handler)
-        self.provider_context = provider_context
+        self.provider_port = provider_port
 
     async def execute_query(self, query: GetProviderStrategyConfigQuery) -> Dict[str, Any]:
         """Execute provider strategy configuration query."""
@@ -293,7 +292,7 @@ class GetProviderStrategyConfigHandler(
 
         try:
             # Get provider strategy
-            strategy = self.provider_context.get_strategy(query.provider_name)
+            strategy = self.provider_port.get_strategy(query.provider_name)
             if not strategy:
                 return {
                     "provider_name": query.provider_name,

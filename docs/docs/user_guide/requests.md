@@ -578,7 +578,7 @@ def analyze_request_performance(time_period="24h"):
 - **Right-size requests**: Balance between too small (overhead) and too large (failure risk)
 - **Use appropriate timeouts**: Consider provisioning time and complexity
 - **Tag consistently**: Enable cost tracking and resource management
-- **Handle failures gracefully**: Implement proper error handling and recovery
+- **Handle failures gracefully**: Implement appropriate error handling and recovery
 
 ### Monitoring
 - **Monitor request queues**: Track pending request backlogs

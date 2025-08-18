@@ -5,7 +5,8 @@ from typing import Any, Dict
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
-from src.config.schemas.server_schema import ServerConfig
+from _package import __version__
+from config.schemas.server_schema import ServerConfig
 
 from .examples import get_api_examples
 from .security_schemes import get_security_schemes
@@ -28,7 +29,7 @@ def configure_openapi(app: FastAPI, server_config: ServerConfig) -> None:
         # Generate base OpenAPI schema
         openapi_schema = get_openapi(
             title="Open Host Factory Plugin API",
-            version="1.0.0",
+            version=__version__,
             description=_get_api_description(),
             routes=app.routes,
         )

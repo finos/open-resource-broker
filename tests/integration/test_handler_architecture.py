@@ -106,14 +106,14 @@ def test_constructor_consistency():
     """Test that all handlers have consistent constructor patterns."""
     try:
         # Import all handlers
-        from src.providers.aws.infrastructure.handlers.asg_handler import ASGHandler
-        from src.providers.aws.infrastructure.handlers.ec2_fleet_handler import (
+        from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
+        from providers.aws.infrastructure.handlers.ec2_fleet_handler import (
             EC2FleetHandler,
         )
-        from src.providers.aws.infrastructure.handlers.run_instances_handler import (
+        from providers.aws.infrastructure.handlers.run_instances_handler import (
             RunInstancesHandler,
         )
-        from src.providers.aws.infrastructure.handlers.spot_fleet_handler import (
+        from providers.aws.infrastructure.handlers.spot_fleet_handler import (
             SpotFleetHandler,
         )
 
@@ -167,16 +167,16 @@ def test_method_signatures():
     """Test that all handlers have consistent method signatures."""
     try:
         # Import all handlers
-        from src.domain.request.aggregate import Request
-        from src.providers.aws.domain.template.aggregate import AWSTemplate
-        from src.providers.aws.infrastructure.handlers.asg_handler import ASGHandler
-        from src.providers.aws.infrastructure.handlers.ec2_fleet_handler import (
+        from domain.request.aggregate import Request
+        from providers.aws.domain.template.aggregate import AWSTemplate
+        from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
+        from providers.aws.infrastructure.handlers.ec2_fleet_handler import (
             EC2FleetHandler,
         )
-        from src.providers.aws.infrastructure.handlers.run_instances_handler import (
+        from providers.aws.infrastructure.handlers.run_instances_handler import (
             RunInstancesHandler,
         )
-        from src.providers.aws.infrastructure.handlers.spot_fleet_handler import (
+        from providers.aws.infrastructure.handlers.spot_fleet_handler import (
             SpotFleetHandler,
         )
 
@@ -241,15 +241,15 @@ def test_base_class_inheritance():
     """Test that all handlers inherit from integrated AWSHandler base class."""
     try:
         # Import handlers and base class
-        from src.providers.aws.infrastructure.handlers.asg_handler import ASGHandler
-        from src.providers.aws.infrastructure.handlers.base_handler import AWSHandler
-        from src.providers.aws.infrastructure.handlers.ec2_fleet_handler import (
+        from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
+        from providers.aws.infrastructure.handlers.base_handler import AWSHandler
+        from providers.aws.infrastructure.handlers.ec2_fleet_handler import (
             EC2FleetHandler,
         )
-        from src.providers.aws.infrastructure.handlers.run_instances_handler import (
+        from providers.aws.infrastructure.handlers.run_instances_handler import (
             RunInstancesHandler,
         )
-        from src.providers.aws.infrastructure.handlers.spot_fleet_handler import (
+        from providers.aws.infrastructure.handlers.spot_fleet_handler import (
             SpotFleetHandler,
         )
 
@@ -302,14 +302,14 @@ def test_launch_template_integration():
     """Test that all handlers properly integrate with launch template manager."""
     try:
         # Import handlers
-        from src.providers.aws.infrastructure.handlers.asg_handler import ASGHandler
-        from src.providers.aws.infrastructure.handlers.ec2_fleet_handler import (
+        from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
+        from providers.aws.infrastructure.handlers.ec2_fleet_handler import (
             EC2FleetHandler,
         )
-        from src.providers.aws.infrastructure.handlers.run_instances_handler import (
+        from providers.aws.infrastructure.handlers.run_instances_handler import (
             RunInstancesHandler,
         )
-        from src.providers.aws.infrastructure.handlers.spot_fleet_handler import (
+        from providers.aws.infrastructure.handlers.spot_fleet_handler import (
             SpotFleetHandler,
         )
 
@@ -371,8 +371,8 @@ def test_error_handling_consistency():
     """Test that all handlers have consistent error handling."""
     try:
         # Import base handler to check error handling methods
-        from src.providers.aws.infrastructure.handlers.base_handler import AWSHandler
-        from src.providers.aws.infrastructure.handlers.spot_fleet_handler import (
+        from providers.aws.infrastructure.handlers.base_handler import AWSHandler
+        from providers.aws.infrastructure.handlers.spot_fleet_handler import (
             SpotFleetHandler,
         )
 
@@ -417,8 +417,8 @@ def test_error_handling_consistency():
 def test_performance_metrics():
     """Test that handlers support performance metrics."""
     try:
-        from src.providers.aws.infrastructure.handlers.base_handler import AWSHandler
-        from src.providers.aws.infrastructure.handlers.spot_fleet_handler import (
+        from providers.aws.infrastructure.handlers.base_handler import AWSHandler
+        from providers.aws.infrastructure.handlers.spot_fleet_handler import (
             SpotFleetHandler,
         )
 
@@ -495,19 +495,19 @@ def test_import_consistency():
                 content = f.read()
 
             # Check for AWSTemplate import (not Template)
-            if "from src.domain.template.aggregate import Template" in content:
+            if "from domain.template.aggregate import Template" in content:
                 print(
                     f"   FAIL: {handler_file}: Still importing generic Template instead of AWSTemplate"
                 )
                 return False
 
-            if "from src.providers.aws.domain.template.aggregate import AWSTemplate" not in content:
+            if "from providers.aws.domain.template.aggregate import AWSTemplate" not in content:
                 print(f"   FAIL: {handler_file}: Missing AWSTemplate import")
                 return False
 
             # Check for base handler import
             if (
-                "from src.providers.aws.infrastructure.handlers.base_handler import AWSHandler"
+                "from providers.aws.infrastructure.handlers.base_handler import AWSHandler"
                 not in content
             ):
                 print(f"   FAIL: {handler_file}: Missing AWSHandler import")

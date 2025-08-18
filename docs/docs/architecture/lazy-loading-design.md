@@ -315,7 +315,7 @@ logger.debug(f"Loading {component_name}...")
 
 #### 3. Memory Leaks
 **Symptoms**: Memory usage grows over time
-**Solution**: Ensure proper cleanup
+**Solution**: Ensure appropriate cleanup
 ```python
 def cleanup_component(self):
     if hasattr(self, '_cached_component'):

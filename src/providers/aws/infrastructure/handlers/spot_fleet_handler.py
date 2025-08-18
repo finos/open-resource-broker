@@ -30,26 +30,23 @@ import json
 from datetime import datetime
 from typing import Any, Dict, List
 
-from botocore.exceptions import ClientError
-
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
-from src.domain.request.aggregate import Request
-from src.infrastructure.error.decorators import handle_infrastructure_exceptions
-from src.infrastructure.ports.request_adapter_port import RequestAdapterPort
-from src.providers.aws.domain.template.aggregate import AWSTemplate
-from src.providers.aws.domain.template.value_objects import AWSFleetType
-from src.providers.aws.exceptions.aws_exceptions import (
-    AWSEntityNotFoundError,
+from domain.base.dependency_injection import injectable
+from domain.base.ports import LoggingPort
+from domain.request.aggregate import Request
+from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
+from infrastructure.error.decorators import handle_infrastructure_exceptions
+from providers.aws.domain.template.aggregate import AWSTemplate
+from providers.aws.domain.template.value_objects import AWSFleetType
+from providers.aws.exceptions.aws_exceptions import (
     AWSInfrastructureError,
     AWSValidationError,
     IAMError,
 )
-from src.providers.aws.infrastructure.handlers.base_handler import AWSHandler
-from src.providers.aws.infrastructure.launch_template.manager import (
+from providers.aws.infrastructure.handlers.base_handler import AWSHandler
+from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
 )
-from src.providers.aws.utilities.aws_operations import AWSOperations
+from providers.aws.utilities.aws_operations import AWSOperations
 
 
 @injectable
@@ -571,121 +568,90 @@ class SpotFleetHandler(AWSHandler):
             return {}
 
     def check_hosts_status(self, request: Request) -> List[Dict[str, Any]]:
-        """Check the status of instances in the spot fleet."""
+        """Check the status of instances across all spot fleets in the request."""
         try:
-            if not request.resource_id:
-                raise AWSInfrastructureError("No Spot Fleet Request ID found in request")
-
-            # Get fleet information with pagination and retry
-            fleet_list = self._retry_with_backoff(
-                lambda: self._paginate(
-                    self.aws_client.ec2_client.describe_spot_fleet_requests,
-                    "SpotFleetRequestConfigs",
-                    SpotFleetRequestIds=[request.resource_id],
-                )
-            )
-
-            if not fleet_list:
-                raise AWSEntityNotFoundError(f"Spot Fleet Request {request.resource_id} not found")
-
-            fleet = fleet_list[0]
-
-            # Log fleet status
-            self._logger.debug(
-                f"Fleet status: {fleet.get('SpotFleetRequestState')}, "
-                f"Target capacity: {fleet.get('SpotFleetRequestConfig', {}).get('TargetCapacity')}, "
-                f"Fulfilled capacity: {fleet.get('ActivityStatus')}"
-            )
-
-            # Get instance information with pagination and retry
-            active_instances = self._retry_with_backoff(
-                lambda: self._paginate(
-                    self.aws_client.ec2_client.describe_spot_fleet_instances,
-                    "ActiveInstances",
-                    SpotFleetRequestId=request.resource_id,
-                )
-            )
-
-            instance_ids = [instance["InstanceId"] for instance in active_instances]
-
-            if not instance_ids:
-                self._logger.info(f"No active instances found in Spot Fleet {request.resource_id}")
+            if not request.resource_ids:
+                self._logger.info("No Spot Fleet Request IDs found in request")
                 return []
 
-            # Get detailed instance information
-            return self._get_instance_details(instance_ids)
+            all_instances = []
 
-        except ClientError as e:
-            error = self._convert_client_error(e)
-            self._logger.error(f"Failed to check Spot Fleet status: {str(error)}")
-            raise error
+            # Process all fleet IDs instead of just the first one
+            for fleet_id in request.resource_ids:
+                try:
+                    fleet_instances = self._get_spot_fleet_instances(fleet_id)
+                    if fleet_instances:
+                        formatted_instances = self._format_instance_data(fleet_instances, fleet_id)
+                        all_instances.extend(formatted_instances)
+                except Exception as e:
+                    self._logger.error(f"Failed to get instances for spot fleet {fleet_id}: {e}")
+                    continue
+
+            return all_instances
+
         except Exception as e:
             self._logger.error(f"Unexpected error checking Spot Fleet status: {str(e)}")
             raise AWSInfrastructureError(f"Failed to check Spot Fleet status: {str(e)}")
 
-    def release_hosts(self, request: Request) -> None:
-        """
-        Release specific hosts or entire Spot Fleet.
-
-        Args:
-            request: The request containing the fleet and machine information
-        """
-        try:
-            if not request.resource_id:
-                raise AWSInfrastructureError("No Spot Fleet Request ID found in request")
-
-            # Get fleet configuration with pagination and retry
-            fleet_list = self._retry_with_backoff(
-                lambda: self._paginate(
-                    self.aws_client.ec2_client.describe_spot_fleet_requests,
-                    "SpotFleetRequestConfigs",
-                    SpotFleetRequestIds=[request.resource_id],
-                )
+    def _get_spot_fleet_instances(self, fleet_id: str) -> List[Dict[str, Any]]:
+        """Get instances for a specific spot fleet."""
+        # Get fleet information
+        fleet_list = self._retry_with_backoff(
+            lambda: self._paginate(
+                self.aws_client.ec2_client.describe_spot_fleet_requests,
+                "SpotFleetRequestConfigs",
+                SpotFleetRequestIds=[fleet_id],
             )
+        )
 
-            if not fleet_list:
-                raise AWSEntityNotFoundError(f"Spot Fleet {request.resource_id} not found")
+        if not fleet_list:
+            self._logger.warning(f"Spot Fleet Request {fleet_id} not found")
+            return []
 
-            fleet = fleet_list[0]
-            fleet_type = fleet["SpotFleetRequestConfig"].get("Type", "maintain")
+        # Get active instances
+        active_instances = self._retry_with_backoff(
+            lambda fid=fleet_id: self._paginate(
+                self.aws_client.ec2_client.describe_spot_fleet_instances,
+                "ActiveInstances",
+                SpotFleetRequestId=fid,
+            )
+        )
 
-            # Get instance IDs from machine references
-            instance_ids = []
-            if request.machine_references:
-                instance_ids = [m.machine_id for m in request.machine_references]
+        if not active_instances:
+            return []
 
-            if instance_ids:
-                if fleet_type == "maintain":
-                    # For maintain fleets, reduce capacity first
-                    current_capacity = fleet["SpotFleetRequestConfig"]["TargetCapacity"]
-                    new_capacity = max(0, current_capacity - len(instance_ids))
+        instance_ids = [instance["InstanceId"] for instance in active_instances]
+        return self._get_instance_details(instance_ids)
 
-                    self._retry_with_backoff(
-                        self.aws_client.ec2_client.modify_spot_fleet_request,
-                        operation_type="critical",
-                        SpotFleetRequestId=request.resource_id,
-                        TargetCapacity=new_capacity,
-                    )
-                    self._logger.info(
-                        f"Reduced maintain fleet {request.resource_id} capacity to {new_capacity}"
-                    )
+    def release_hosts(self, request: Request) -> None:
+        """Release hosts across all spot fleets in the request."""
+        try:
+            if not request.resource_ids:
+                raise AWSInfrastructureError("No Spot Fleet Request IDs found in request")
 
-                # Use consolidated AWS operations utility for instance termination
-                self.aws_ops.terminate_instances_with_fallback(
-                    instance_ids, self._request_adapter, "Spot Fleet instances"
-                )
-                self._logger.info(f"Terminated instances: {instance_ids}")
-            else:
-                # Release entire fleet
-                self._retry_with_backoff(
-                    self.aws_client.ec2_client.cancel_spot_fleet_requests,
-                    operation_type="critical",
-                    SpotFleetRequestIds=[request.resource_id],
-                    TerminateInstances=True,
-                )
-                self._logger.info(f"Cancelled entire Spot Fleet request: {request.resource_id}")
+            # Process all fleet IDs instead of just the first one
+            for fleet_id in request.resource_ids:
+                try:
+                    if request.machine_references:
+                        # Terminate specific instances using existing utility
+                        instance_ids = [m.machine_id for m in request.machine_references]
+                        self.aws_ops.terminate_instances_with_fallback(
+                            instance_ids=instance_ids,
+                            context=f"SpotFleet-{fleet_id}",
+                        )
+                    else:
+                        # Cancel entire spot fleet
+                        self._retry_with_backoff(
+                            lambda fid=fleet_id: self.aws_client.ec2_client.cancel_spot_fleet_requests(
+                                SpotFleetRequestIds=[fid], TerminateInstances=True
+                            ),
+                            operation_type="critical",
+                        )
+                        self._logger.info(f"Cancelled Spot Fleet: {fleet_id}")
+                except Exception as e:
+                    self._logger.error(f"Failed to terminate spot fleet {fleet_id}: {e}")
+                    continue
 
-        except ClientError as e:
-            error = self._convert_client_error(e)
-            self._logger.error(f"Failed to release Spot Fleet resources: {str(error)}")
-            raise error
+        except Exception as e:
+            self._logger.error(f"Failed to release Spot Fleet hosts: {str(e)}")
+            raise AWSInfrastructureError(f"Failed to release Spot Fleet hosts: {str(e)}")

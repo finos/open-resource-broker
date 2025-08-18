@@ -11,19 +11,19 @@ from typing import Any, Dict, List
 
 from botocore.exceptions import ClientError
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
-from src.domain.request.aggregate import Request
-from src.infrastructure.utilities.common.resource_naming import (
+from domain.base.dependency_injection import injectable
+from domain.base.ports import LoggingPort
+from domain.request.aggregate import Request
+from infrastructure.utilities.common.resource_naming import (
     get_instance_name,
     get_launch_template_name,
 )
-from src.providers.aws.domain.template.aggregate import AWSTemplate
-from src.providers.aws.exceptions.aws_exceptions import (
+from providers.aws.domain.template.aggregate import AWSTemplate
+from providers.aws.exceptions.aws_exceptions import (
     AWSValidationError,
     InfrastructureError,
 )
-from src.providers.aws.infrastructure.aws_client import AWSClient
+from providers.aws.infrastructure.aws_client import AWSClient
 
 
 @dataclass

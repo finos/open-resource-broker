@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Test for Integration Flow: Integration Flow Fix
-Tests that the AWS provider strategy now uses the proper handler system instead of bypassing it.
+Tests that the AWS provider strategy now uses the appropriate handler system instead of bypassing it.
 """
 
 import os
@@ -11,14 +11,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 
 def test_aws_provider_strategy_uses_handlers():
-    """Test that AWS provider strategy uses proper handler system."""
+    """Test that AWS provider strategy uses appropriate handler system."""
     print("=== Integration Flow Test ===")
 
     try:
-        from src.infrastructure.logging.logger import get_logger
-        from src.providers.aws.configuration.config import AWSProviderConfig
-        from src.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
-        from src.providers.base.strategy import ProviderOperation, ProviderOperationType
+        from infrastructure.logging.logger import get_logger
+        from providers.aws.configuration.config import AWSProviderConfig
+        from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
+        from providers.base.strategy import ProviderOperation, ProviderOperationType
 
         # Create AWS provider strategy
         config = AWSProviderConfig(region="us-west-2", profile="default")
@@ -110,9 +110,9 @@ def test_no_instance_manager_bypass():
     print("\n=== No Instance Manager Bypass Test ===")
 
     try:
-        from src.infrastructure.logging.logger import get_logger
-        from src.providers.aws.configuration.config import AWSProviderConfig
-        from src.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
+        from infrastructure.logging.logger import get_logger
+        from providers.aws.configuration.config import AWSProviderConfig
+        from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
         # Create AWS provider strategy
         config = AWSProviderConfig(region="us-west-2", profile="default")
@@ -159,7 +159,7 @@ if __name__ == "__main__":
 
     if test1_passed and test2_passed:
         print("\nALL INTEGRATION FLOW INTEGRATION FLOW TESTS PASSED")
-        print("PASS: AWS provider strategy now uses proper handler system")
+        print("PASS: AWS provider strategy now uses appropriate handler system")
         print("PASS: AWSInstanceManager bypass has been eliminated")
         print("PASS: Launch template flow is properly integrated")
         print("PASS: Handler routing works correctly")

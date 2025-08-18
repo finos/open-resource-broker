@@ -10,15 +10,15 @@ This module coordinates the registration of all services across different layers
 
 from typing import Any, Dict, Optional
 
-from src.infrastructure.di.container import DIContainer, get_container
+from infrastructure.di.container import DIContainer, get_container
 
 # Import focused service registration modules
-from src.infrastructure.di.core_services import register_core_services
-from src.infrastructure.di.infrastructure_services import (
-    register_infrastructure_services,
-)
-from src.infrastructure.di.provider_services import register_provider_services
-from src.infrastructure.di.server_services import register_server_services
+from infrastructure.di.core_services import register_core_services
+from infrastructure.di.infrastructure_services import register_infrastructure_services
+from infrastructure.di.provider_services import register_provider_services
+from infrastructure.di.scheduler_services import register_scheduler_services
+from infrastructure.di.server_services import register_server_services
+from infrastructure.di.storage_services import register_storage_services
 
 
 def register_all_services(container: Optional[DIContainer] = None) -> DIContainer:
@@ -44,49 +44,33 @@ def register_all_services(container: Optional[DIContainer] = None) -> DIContaine
 
 def _register_services_lazy(container: DIContainer) -> DIContainer:
     """Register services using lazy loading approach."""
-    from src.infrastructure.logging.logger import get_logger
+    from infrastructure.logging.logger import get_logger
 
     logger = get_logger(__name__)
 
     logger.info("Registering services with lazy loading enabled")
 
     # 1. Register only essential services immediately
-    from src.infrastructure.di.port_registrations import register_port_adapters
+    from infrastructure.di.port_registrations import register_port_adapters
 
     register_port_adapters(container)
 
     register_core_services(container)
 
-    # 2. Register minimal storage types (only JSON by default)
-    from src.infrastructure.persistence.registration import (
-        register_minimal_storage_types,
-    )
+    # 2. Register configured storage strategy only
+    register_storage_services(container)
 
-    register_minimal_storage_types()
-
-    # 3. Register active scheduler only
-    from src.infrastructure.scheduler.registration import register_active_scheduler_only
-
-    try:
-        from src.config.manager import get_config_manager
-
-        config_manager = get_config_manager()
-        scheduler_config = config_manager.get("scheduler", {"type": "default"})
-        scheduler_type = (
-            scheduler_config.get("type", "default")
-            if isinstance(scheduler_config, dict)
-            else str(scheduler_config)
-        )
-        register_active_scheduler_only(scheduler_type)
-    except Exception:
-        # Fallback to default scheduler
-        register_active_scheduler_only("default")
+    # 3. Register configured scheduler strategy only
+    register_scheduler_services(container)
 
     # 4. Register provider services immediately (fix for provider
     # context errors)
     register_provider_services(container)
 
-    # 5. Register lazy factories for non-essential services
+    # 5. Register infrastructure services immediately (needed for template system)
+    register_infrastructure_services(container)
+
+    # 6. Register lazy factories for non-essential services
     _register_lazy_service_factories(container)
 
     logger.info("Lazy service registration complete")
@@ -95,7 +79,7 @@ def _register_services_lazy(container: DIContainer) -> DIContainer:
 
 def _register_services_eager(container: DIContainer) -> DIContainer:
     """Register services using traditional eager loading approach."""
-    from src.infrastructure.logging.logger import get_logger
+    from infrastructure.logging.logger import get_logger
 
     logger = get_logger(__name__)
 
@@ -103,12 +87,12 @@ def _register_services_eager(container: DIContainer) -> DIContainer:
 
     # Register services in dependency order (original behavior)
     # 1. Register scheduler strategies first (needed by port adapters)
-    from src.infrastructure.scheduler.registration import register_all_scheduler_types
+    from infrastructure.scheduler.registration import register_all_scheduler_types
 
     register_all_scheduler_types()
 
     # 2. Register port adapters FIRST (provides LoggingPort, ConfigurationPort, etc.)
-    from src.infrastructure.di.port_registrations import register_port_adapters
+    from infrastructure.di.port_registrations import register_port_adapters
 
     register_port_adapters(container)
 
@@ -116,7 +100,7 @@ def _register_services_eager(container: DIContainer) -> DIContainer:
     register_core_services(container)
 
     # 4. Setup CQRS infrastructure (handlers and buses)
-    from src.infrastructure.di.container import _setup_cqrs_infrastructure
+    from infrastructure.di.container import _setup_cqrs_infrastructure
 
     _setup_cqrs_infrastructure(container)
 
@@ -137,18 +121,18 @@ def _register_services_eager(container: DIContainer) -> DIContainer:
 
 def _register_lazy_service_factories(container: DIContainer) -> None:
     """Register lazy factories for services that can be loaded on-demand."""
-    from src.infrastructure.logging.logger import get_logger
+    from infrastructure.logging.logger import get_logger
 
     logger = get_logger(__name__)
 
     # Register CQRS infrastructure as lazy - triggered by QueryBus or CommandBus access
     def setup_cqrs_lazy(c):
         """Setup CQRS infrastructure lazily when needed."""
-        from src.infrastructure.di.container import _setup_cqrs_infrastructure
+        from infrastructure.di.container import _setup_cqrs_infrastructure
 
         _setup_cqrs_infrastructure(c)
 
-    from src.infrastructure.di.buses import CommandBus, QueryBus
+    from infrastructure.di.buses import CommandBus, QueryBus
 
     container.register_on_demand(QueryBus, setup_cqrs_lazy)
     container.register_on_demand(CommandBus, setup_cqrs_lazy)
@@ -174,13 +158,11 @@ def _register_lazy_service_factories(container: DIContainer) -> None:
     # Register scheduler services as lazy
     def register_scheduler_lazy(c):
         """Register scheduler services lazily when needed."""
-        from src.infrastructure.scheduler.registration import (
-            register_active_scheduler_only,
-        )
+        from infrastructure.scheduler.registration import register_active_scheduler_only
 
         # Get scheduler type from config if available
         try:
-            from src.config.manager import get_config_manager
+            from config.manager import get_config_manager
 
             config_manager = get_config_manager()
             scheduler_config = config_manager.get("scheduler", {"type": "default"})
@@ -195,7 +177,7 @@ def _register_lazy_service_factories(container: DIContainer) -> None:
             register_active_scheduler_only("default")
 
     # Register scheduler on-demand when SchedulerPort is accessed
-    from src.domain.base.ports.scheduler_port import SchedulerPort
+    from domain.base.ports.scheduler_port import SchedulerPort
 
     container.register_on_demand(SchedulerPort, register_scheduler_lazy)
 
@@ -227,13 +209,13 @@ def create_handler(handler_class, config: Optional[Dict[str, Any]] = None) -> An
     # Register handler class if not already registered
     if handler_class not in container._factories:
         # Get logger
-        from src.infrastructure.logging.logger import get_logger
+        from infrastructure.logging.logger import get_logger
 
         logger = get_logger(__name__)
 
         # Register handler class directly if it uses @injectable
         try:
-            from src.infrastructure.di.decorators import is_injectable
+            from infrastructure.di.decorators import is_injectable
 
             if is_injectable(handler_class):
                 logger.info(f"Registering injectable handler class {handler_class.__name__}")
@@ -245,8 +227,8 @@ def create_handler(handler_class, config: Optional[Dict[str, Any]] = None) -> An
                 def handler_factory(c):
                     """Factory for legacy handler instances."""
                     # Get CQRS buses directly from container
-                    from src.infrastructure.di.buses import CommandBus, QueryBus
-                    from src.monitoring.metrics import MetricsCollector
+                    from infrastructure.di.buses import CommandBus, QueryBus
+                    from monitoring.metrics import MetricsCollector
 
                     query_bus = c.get(QueryBus)
                     command_bus = c.get(CommandBus)
@@ -265,8 +247,8 @@ def create_handler(handler_class, config: Optional[Dict[str, Any]] = None) -> An
             def handler_factory(c):
                 """Fallback factory for CQRS handler instances."""
                 # Get CQRS buses directly from container
-                from src.infrastructure.di.buses import CommandBus, QueryBus
-                from src.monitoring.metrics import MetricsCollector
+                from infrastructure.di.buses import CommandBus, QueryBus
+                from monitoring.metrics import MetricsCollector
 
                 query_bus = c.get(QueryBus)
                 command_bus = c.get(CommandBus)

@@ -5,8 +5,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import ConfigDict, Field
 
-from src.domain.base.entity import AggregateRoot
-from src.domain.base.value_objects import InstanceId, InstanceType, IPAddress, Tags
+from domain.base.entity import AggregateRoot
+from domain.base.value_objects import InstanceId, InstanceType, IPAddress, Tags
 
 from .machine_status import MachineStatus
 
@@ -89,7 +89,7 @@ class Machine(AggregateRoot):
 
         # Generate domain event for status change (only if status actually changed)
         if old_status != new_status:
-            from src.domain.base.events.domain_events import MachineStatusChangedEvent
+            from domain.base.events.domain_events import MachineStatusChangedEvent
 
             status_event = MachineStatusChangedEvent(
                 # DomainEvent required fields

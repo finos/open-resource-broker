@@ -2,11 +2,11 @@
 
 from typing import Any, Dict, List
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
-from src.providers.aws.configuration.config import AWSProviderConfig
-from src.providers.aws.infrastructure.aws_client import AWSClient
-from src.providers.aws.infrastructure.dry_run_adapter import aws_dry_run_context
+from domain.base.dependency_injection import injectable
+from domain.base.ports import LoggingPort
+from providers.aws.configuration.config import AWSProviderConfig
+from providers.aws.infrastructure.aws_client import AWSClient
+from providers.aws.infrastructure.dry_run_adapter import aws_dry_run_context
 
 
 @injectable

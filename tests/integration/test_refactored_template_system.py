@@ -12,24 +12,20 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from src.config.manager import ConfigurationManager
-from src.domain.base.ports.logging_port import LoggingPort
-from src.domain.base.ports.scheduler_port import SchedulerPort
-from src.infrastructure.template.configuration_manager import (
-    TemplateConfigurationManager,
-)
-from src.infrastructure.template.dtos import TemplateDTO
-from src.infrastructure.template.services.template_persistence_service import (
+from config.manager import ConfigurationManager
+from domain.base.ports.logging_port import LoggingPort
+from domain.base.ports.scheduler_port import SchedulerPort
+from infrastructure.template.configuration_manager import TemplateConfigurationManager
+from infrastructure.template.dtos import TemplateDTO
+from infrastructure.template.services.template_persistence_service import (
     TemplatePersistenceService,
 )
-from src.infrastructure.template.template_cache_service import (
+from infrastructure.template.template_cache_service import (
     NoOpTemplateCacheService,
     TTLTemplateCacheService,
     create_template_cache_service,
 )
-from src.providers.aws.infrastructure.adapters.template_adapter import (
-    AWSTemplateAdapter,
-)
+from providers.aws.infrastructure.adapters.template_adapter import AWSTemplateAdapter
 
 
 class TestRefactoredTemplateSystem:

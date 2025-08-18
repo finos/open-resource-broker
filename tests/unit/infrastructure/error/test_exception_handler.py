@@ -11,27 +11,27 @@ from unittest.mock import Mock, patch
 import pytest
 
 # Import all exception types for testing
-from src.domain.base.exceptions import (
+from domain.base.exceptions import (
     ConfigurationError,
     InfrastructureError,
     ValidationError,
 )
-from src.domain.request.exceptions import RequestValidationError
-from src.domain.template.exceptions import TemplateNotFoundError
-from src.infrastructure.error.decorators import (
+from domain.request.exceptions import RequestValidationError
+from domain.template.exceptions import TemplateNotFoundError
+from infrastructure.error.decorators import (
     handle_application_exceptions,
     handle_domain_exceptions,
     handle_exceptions,
     handle_infrastructure_exceptions,
     handle_provider_exceptions,
 )
-from src.infrastructure.error.exception_handler import (
+from infrastructure.error.exception_handler import (
     ExceptionContext,
     ExceptionHandler,
     get_exception_handler,
     reset_exception_handler,
 )
-from src.providers.aws.exceptions.aws_exceptions import LaunchError, NetworkError
+from providers.aws.exceptions.aws_exceptions import LaunchError, NetworkError
 
 
 class TestExceptionContext:
@@ -387,7 +387,7 @@ class TestHTTPErrorHandling:
         domain_exception = TemplateNotFoundError("test-123")
         error_response = handler.handle_error_for_http(domain_exception)
 
-        # Should create proper HTTP response
+        # Should create appropriate HTTP response
         assert error_response.error_code is not None
         assert error_response.message is not None
         assert error_response.http_status == 404  # Not Found

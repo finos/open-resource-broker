@@ -7,9 +7,9 @@ import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import ConfigurationPort, LoggingPort
-from src.providers.aws.exceptions.aws_exceptions import (
+from domain.base.dependency_injection import injectable
+from domain.base.ports import ConfigurationPort, LoggingPort
+from providers.aws.exceptions.aws_exceptions import (
     AuthorizationError,
     AWSConfigurationError,
     NetworkError,
@@ -117,7 +117,7 @@ class AWSClient:
         """
         try:
             # Try to get AWS config from ConfigurationManager
-            from src.providers.aws.configuration.config import AWSProviderConfig
+            from providers.aws.configuration.config import AWSProviderConfig
 
             aws_config = config_manager.get_typed(AWSProviderConfig)
             if aws_config and aws_config.region:
@@ -130,7 +130,7 @@ class AWSClient:
 
     def _get_profile_from_config_manager(self, config_manager) -> Optional[str]:
         """
-        Get AWS profile from ConfigurationManager.
+        Get AWS profile from ConfigurationManager using provider selection.
 
         Args:
             config_manager: ConfigurationManager instance
@@ -139,15 +139,81 @@ class AWSClient:
             AWS profile or None if not found
         """
         try:
-            # Try to get AWS config from ConfigurationManager
-            from src.providers.aws.configuration.config import AWSProviderConfig
+            # Use provider selection service from DI container
+            from application.services.provider_selection_service import (
+                ProviderSelectionService,
+            )
+            from infrastructure.di.container import get_container
+
+            container = get_container()
+            selection_service = container.get(ProviderSelectionService)
+            selection_result = selection_service.select_active_provider()
+
+            self._logger.debug(
+                f"Provider selection result: {selection_result.provider_type}, {selection_result.provider_instance}"
+            )
+
+            # Ensure we have an AWS provider
+            if selection_result.provider_type != "aws":
+                self._logger.debug(
+                    f"Selected provider is not AWS: {selection_result.provider_type}"
+                )
+                return None
+
+            # Get the provider instance configuration
+            provider_config = config_manager.get_provider_config()
+            if not provider_config:
+                self._logger.debug("No provider config found")
+                return None
+
+            # Find the selected provider instance
+            for provider in provider_config.providers:
+                if provider.name == selection_result.provider_instance:
+                    self._logger.debug(f"Found provider {provider.name}, checking config...")
+                    # Access profile from provider config dict
+                    if hasattr(provider, "config") and provider.config:
+                        self._logger.debug(f"Provider has config: {type(provider.config)}")
+
+                        # Handle both dict and object config
+                        if isinstance(provider.config, dict):
+                            self._logger.debug(f"Config dict contents: {provider.config}")
+                            profile = provider.config.get("profile")
+                        else:
+                            profile = getattr(provider.config, "profile", None)
+
+                        if profile:
+                            self._logger.debug(
+                                f"Using profile from selected provider {provider.name}: {profile}"
+                            )
+                            return profile
+                        else:
+                            self._logger.debug("No profile found in provider config")
+                    else:
+                        self._logger.debug("Provider has no config attribute")
+                    break
+            else:
+                self._logger.debug(
+                    f"Provider {selection_result.provider_instance} not found in config"
+                )
+
+        except Exception as e:
+            self._logger.debug(f"Could not get profile via provider selection: {str(e)}")
+            import traceback
+
+            self._logger.debug(f"Traceback: {traceback.format_exc()}")
+
+        # Fallback: try legacy AWSProviderConfig approach
+        try:
+            from providers.aws.configuration.config import AWSProviderConfig
 
             aws_config = config_manager.get_typed(AWSProviderConfig)
             if aws_config and aws_config.profile:
-                self._logger.debug(f"Using profile from ConfigurationManager: {aws_config.profile}")
+                self._logger.debug(
+                    f"Using profile from legacy AWSProviderConfig: {aws_config.profile}"
+                )
                 return aws_config.profile
         except Exception as e:
-            self._logger.debug(f"Could not get profile from ConfigurationManager: {str(e)}")
+            self._logger.debug(f"Could not get profile from legacy config: {str(e)}")
 
         return None
 
@@ -163,7 +229,7 @@ class AWSClient:
         """
         try:
             # Try to get performance config from ConfigurationManager
-            from src.config import PerformanceConfig
+            from config import PerformanceConfig
 
             perf_config = config_manager.get_typed(PerformanceConfig)
             if perf_config:

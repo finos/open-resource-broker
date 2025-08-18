@@ -6,20 +6,19 @@ from typing import TYPE_CHECKING, Any, Dict, List
 if TYPE_CHECKING:
     pass
 
-from src.config.manager import ConfigurationManager
-from src.domain.base.ports.logging_port import LoggingPort
-from src.domain.base.ports.scheduler_port import SchedulerPort
-from src.domain.exceptions import ConfigurationError
-from src.domain.machine.aggregate import Machine
-from src.domain.request.aggregate import Request
-from src.domain.template.aggregate import Template
-from src.infrastructure.utilities.common.serialization import serialize_enum
+from config.manager import ConfigurationManager
+from domain.base.ports.logging_port import LoggingPort
+from domain.machine.aggregate import Machine
+from domain.request.aggregate import Request
+from domain.template.aggregate import Template
+from infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
+from infrastructure.utilities.common.serialization import serialize_enum
 
 from .field_mappings import HostFactoryFieldMappings
 from .transformations import HostFactoryTransformations
 
 
-class HostFactorySchedulerStrategy(SchedulerPort):
+class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
     """HostFactory scheduler strategy for field mapping and response formatting."""
 
     def __init__(
@@ -33,17 +32,28 @@ class HostFactorySchedulerStrategy(SchedulerPort):
         self._logger = logger
         self.template_defaults_service = template_defaults_service
 
+        # Initialize provider selection service for provider selection
+        from application.services.provider_selection_service import (
+            ProviderSelectionService,
+        )
+        from infrastructure.di.container import get_container
+
+        container = get_container()
+        self._provider_selection_service = container.get(ProviderSelectionService)
+
     def get_templates_file_path(self) -> str:
         """Get the templates file path for HostFactory."""
-        provider_config = self.config_manager.get_provider_config()
-        if not provider_config or not hasattr(provider_config, "active_provider"):
-            raise ConfigurationError("Provider configuration or active_provider not found")
+        try:
+            # Use provider selection service for provider selection
+            selection_result = self._provider_selection_service.select_active_provider()
+            provider_type = selection_result.provider_type
+            templates_file = f"{provider_type}prov_templates.json"
 
-        active_provider = provider_config.active_provider
-        provider_type = active_provider.split("-")[0]
-        templates_file = f"{provider_type}prov_templates.json"
-
-        return self.config_manager.resolve_file("template", templates_file)
+            return self.config_manager.resolve_file("template", templates_file)
+        except Exception as e:
+            self._logger.error(f"Failed to determine templates file path: {e}")
+            # Fallback to aws for backward compatibility
+            return self.config_manager.resolve_file("template", "awsprov_templates.json")
 
     def get_template_paths(self) -> List[str]:
         """Get template file paths."""
@@ -170,12 +180,9 @@ class HostFactorySchedulerStrategy(SchedulerPort):
     def _get_active_provider_type(self) -> str:
         """Get the active provider type from configuration."""
         try:
-            provider_config = self.config_manager.get_provider_config()
-            if not provider_config or not hasattr(provider_config, "active_provider"):
-                raise ConfigurationError("Provider configuration or active_provider not found")
-
-            active_provider = provider_config.active_provider  # e.g., 'aws-default'
-            provider_type = active_provider.split("-")[0]  # Extract 'aws' from 'aws-default'
+            # Use provider selection service for provider selection
+            selection_result = self._provider_selection_service.select_active_provider()
+            provider_type = selection_result.provider_type
             self._logger.debug(f"Active provider type: {provider_type}")
             return provider_type
         except Exception as e:
@@ -213,6 +220,13 @@ class HostFactorySchedulerStrategy(SchedulerPort):
             }
         else:
             raise ValueError(f"Unsupported HostFactory operation: {operation}")
+
+    def format_request_response(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Format request creation response to HostFactory format."""
+        return {
+            "requestId": request_data.get("request_id", request_data.get("requestId")),
+            "message": request_data.get("message", "Request VM success from AWS."),
+        }
 
     def convert_domain_to_hostfactory_output(
         self, operation: str, data: Dict[str, Any]
@@ -260,6 +274,7 @@ class HostFactorySchedulerStrategy(SchedulerPort):
             base_message = "Request VM success from AWS."
             if resource_ids:
                 # Include the first resource ID in the message for user visibility
+                # Show first for brevity
                 resource_id_info = f" Resource ID: {resource_ids[0]}"
                 message = base_message + resource_id_info
             else:
@@ -324,7 +339,7 @@ class HostFactorySchedulerStrategy(SchedulerPort):
         else:
             template_dict = template
 
-        # Convert to HostFactory format with proper HF attributes
+        # Convert to HostFactory format with HF attributes
         hf_template = {
             "templateId": template_dict.get("template_id", template_dict.get("templateId", "")),
             "maxNumber": template_dict.get("max_instances", template_dict.get("maxNumber", 1)),
@@ -378,7 +393,7 @@ class HostFactorySchedulerStrategy(SchedulerPort):
     def _create_hf_attributes(self, template_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create HF-compatible attributes object with CPU/RAM specs.
 
-        This method handles the creation of HostFactory attributes with proper
+        This method handles the creation of HostFactory attributes with
         CPU and RAM specifications based on instance type.
         """
         # Handle both snake_case and camelCase field names
@@ -477,11 +492,25 @@ class HostFactorySchedulerStrategy(SchedulerPort):
         Parse HostFactory request data to domain-compatible format.
 
         This method handles the conversion from HostFactory request format to domain-compatible data.
+        Supports both nested format: {"template": {"templateId": ...}} and flat format: {"templateId": ...}
         """
+        # Handle nested HostFactory format: {"template": {"templateId": "...", "machineCount": ...}}
+        if "template" in raw_data:
+            template_data = raw_data["template"]
+            return {
+                "template_id": template_data.get("templateId"),
+                "requested_count": template_data.get("machineCount", 1),
+                "request_type": template_data.get("requestType", "provision"),
+                "metadata": raw_data.get("metadata", {}),
+            }
+
+        # Handle flat HostFactory format: {"templateId": ..., "maxNumber": ...}
+        # Also handle request status format: {"requestId": ...}
         return {
             "template_id": raw_data.get("templateId"),
-            "requested_count": raw_data.get("maxNumber", 1),
+            "requested_count": raw_data.get("maxNumber", raw_data.get("machineCount", 1)),
             "request_type": raw_data.get("requestType", "provision"),
+            "request_id": raw_data.get("requestId", raw_data.get("request_id")),
             "metadata": raw_data.get("metadata", {}),
         }
 

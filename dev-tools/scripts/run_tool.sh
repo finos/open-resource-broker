@@ -21,6 +21,7 @@ setup_environment() {
     # Fallback to .venv if it exists
     if [ -f ".venv/bin/activate" ]; then
         echo "Using existing .venv environment..."
+        # shellcheck disable=SC1091
         source .venv/bin/activate
         return 0
     fi
@@ -32,6 +33,7 @@ setup_environment() {
             uv venv
         else
             python3 -m venv .venv
+            # shellcheck disable=SC1091
             source .venv/bin/activate
         fi
         return 0
@@ -47,7 +49,7 @@ run_tool() {
     echo "Running ${TOOL_NAME}..."
 
     # Try different execution methods in order of preference
-    if command -v uv >/dev/null 2>&1 && ([ -f "pyproject.toml" ] || [ -f "uv.lock" ]); then
+    if command -v uv >/dev/null 2>&1 && { [ -f "pyproject.toml" ] || [ -f "uv.lock" ]; }; then
         echo "Executing with UV..."
         uv run "${TOOL_NAME}" "$@"
     elif [ -f ".venv/bin/${TOOL_NAME}" ]; then

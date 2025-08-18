@@ -2,13 +2,13 @@
 
 from typing import Any, Dict, Optional
 
-from src.config.manager import ConfigurationManager
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports.logging_port import LoggingPort
-from src.domain.template.aggregate import Template
-from src.domain.template.extensions import TemplateExtensionRegistry
-from src.domain.template.factory import TemplateFactoryPort
-from src.domain.template.ports.template_defaults_port import TemplateDefaultsPort
+from domain.base.dependency_injection import injectable
+from domain.base.ports.configuration_port import ConfigurationPort
+from domain.base.ports.logging_port import LoggingPort
+from domain.template.aggregate import Template
+from domain.template.extensions import TemplateExtensionRegistry
+from domain.template.factory import TemplateFactoryPort
+from domain.template.ports.template_defaults_port import TemplateDefaultsPort
 
 
 @injectable
@@ -22,13 +22,13 @@ class TemplateDefaultsService(TemplateDefaultsPort):
     3. Provider type defaults
     4. Global template defaults (lowest priority)
 
-    This service ensures that templates get proper defaults applied
+    This service ensures that templates get appropriate defaults applied
     while respecting the configuration hierarchy.
     """
 
     def __init__(
         self,
-        config_manager: ConfigurationManager,
+        config_manager: ConfigurationPort,
         logger: LoggingPort,
         template_factory: Optional[TemplateFactoryPort] = None,
         extension_registry: Optional[TemplateExtensionRegistry] = None,
@@ -37,7 +37,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         Initialize the template defaults service.
 
         Args:
-            config_manager: Configuration manager for accessing defaults
+            config_manager: Configuration port for accessing defaults
             logger: Logger for debugging and monitoring
             template_factory: Factory for creating domain templates
             extension_registry: Registry for provider extensions
@@ -292,7 +292,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         }
 
         try:
-            # Check if defaults are properly configured
+            # Check if defaults are correctly configured
             effective_defaults = self.get_effective_template_defaults(provider_instance_name)
 
             # Validate essential fields have defaults
@@ -335,7 +335,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         Resolve template with provider extensions using domain factory.
 
         This method integrates hierarchical defaults
-        with domain extensions and creates proper domain template objects.
+        with domain extensions and creates appropriate domain template objects.
 
         Args:
             template_dict: Raw template data from file

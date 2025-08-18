@@ -2,7 +2,7 @@
 Base Event Handler - Template Method Pattern for event processing.
 
 This follows the same architectural patterns as CommandHandler and QueryHandler
-in the CQRS system, providing consistent event handling with proper separation
+in the CQRS system, providing consistent event handling with clear separation
 of concerns and DRY compliance.
 """
 
@@ -13,8 +13,8 @@ from typing import Any, Dict, Optional
 
 # Import types - using string imports to avoid circular dependencies
 try:
-    from src.domain.base.events import DomainEvent
-    from src.domain.base.ports import LoggingPort
+    from domain.base.events import DomainEvent
+    from domain.base.ports import LoggingPort
 except ImportError:
     # Fallback for testing or when dependencies aren't available
     DomainEvent = Any

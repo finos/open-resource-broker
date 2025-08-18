@@ -2,15 +2,15 @@
 
 from typing import Any, Dict, List
 
-from src.config.manager import ConfigurationManager
-from src.domain.base.ports.logging_port import LoggingPort
-from src.domain.base.ports.scheduler_port import SchedulerPort
-from src.domain.machine.aggregate import Machine
-from src.domain.request.aggregate import Request
-from src.domain.template.aggregate import Template
+from config.manager import ConfigurationManager
+from domain.base.ports.logging_port import LoggingPort
+from domain.machine.aggregate import Machine
+from domain.request.aggregate import Request
+from domain.template.aggregate import Template
+from infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
 
 
-class DefaultSchedulerStrategy(SchedulerPort):
+class DefaultSchedulerStrategy(BaseSchedulerStrategy):
     """
     Default scheduler strategy using native domain fields.
 
@@ -85,6 +85,7 @@ class DefaultSchedulerStrategy(SchedulerPort):
             "template_id": raw_data.get("template_id"),
             "requested_count": raw_data.get("requested_count", raw_data.get("count", 1)),
             "request_type": raw_data.get("request_type", "provision"),
+            "request_id": raw_data.get("request_id"),
             "metadata": raw_data.get("metadata", {}),
         }
 
@@ -136,3 +137,12 @@ class DefaultSchedulerStrategy(SchedulerPort):
 
         workdir = self.get_working_directory()
         return os.path.join(workdir, "data")
+
+    def format_request_response(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Format request creation response to native domain format."""
+        return {
+            "requestId": request_data.get("request_id", request_data.get("requestId")),
+            "message": request_data.get("message", "Request submitted successfully"),
+            "template_id": request_data.get("template_id"),
+            "count": request_data.get("count"),
+        }

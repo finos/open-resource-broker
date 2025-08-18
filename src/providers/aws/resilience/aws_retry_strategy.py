@@ -2,11 +2,11 @@
 
 import secrets
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
-from src.infrastructure.resilience.strategies.base import RetryStrategy
-from src.providers.aws.resilience.aws_retry_config import DEFAULT_AWS_RETRY_CONFIG
-from src.providers.aws.resilience.aws_retry_errors import (
+from domain.base.dependency_injection import injectable
+from domain.base.ports import LoggingPort
+from infrastructure.resilience.strategy.base import RetryStrategy
+from providers.aws.resilience.aws_retry_config import DEFAULT_AWS_RETRY_CONFIG
+from providers.aws.resilience.aws_retry_errors import (
     get_aws_error_info,
     is_retryable_aws_error,
 )

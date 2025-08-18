@@ -2,8 +2,8 @@
 
 from typing import Protocol
 
-from src.application.dto.base import BaseCommand, BaseResponse
-from src.application.interfaces.command_handler import CommandHandler
+from application.dto.base import BaseCommand, BaseResponse
+from application.interfaces.command_handler import CommandHandler
 
 __all__ = ["CommandHandler", "CommandBus"]
 

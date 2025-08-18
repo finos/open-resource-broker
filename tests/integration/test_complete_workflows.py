@@ -11,9 +11,9 @@ import pytest
 
 # Import components for integration testing
 try:
-    from src.application.service import ApplicationService
-    from src.domain.request.aggregate import Request
-    from src.infrastructure.persistence.repositories.request_repository import (
+    from application.service import ApplicationService
+    from domain.request.aggregate import Request
+    from infrastructure.persistence.repositories.request_repository import (
         RequestRepository,
     )
 

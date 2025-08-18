@@ -387,7 +387,7 @@ class TestAPIValidationComprehensive:
     def test_validation_module_exists(self):
         """Test that validation module exists."""
         try:
-            import src.api.validation
+            pass
 
             assert src.api.validation is not None
         except ImportError:
@@ -396,7 +396,7 @@ class TestAPIValidationComprehensive:
     def test_validation_functions(self):
         """Test validation functions exist."""
         try:
-            import src.api.validation as validation_module
+            import api.validation as validation_module
 
             # Look for validation functions
             functions = [
@@ -414,7 +414,7 @@ class TestAPIValidationComprehensive:
     def test_validation_classes(self):
         """Test validation classes exist."""
         try:
-            import src.api.validation as validation_module
+            import api.validation as validation_module
 
             # Look for validation classes
             classes = [

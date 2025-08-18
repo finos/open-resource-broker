@@ -2,10 +2,10 @@
 
 from typing import Type, TypeVar
 
-from src.config.manager import ConfigurationManager
-from src.config.schemas.server_schema import ServerConfig
-from src.infrastructure.di.buses import CommandBus, QueryBus
-from src.infrastructure.di.container import get_container
+from config.schemas.server_schema import ServerConfig
+from domain.base.ports.configuration_port import ConfigurationPort
+from infrastructure.di.buses import CommandBus, QueryBus
+from infrastructure.di.container import get_container
 
 T = TypeVar("T")
 
@@ -45,10 +45,10 @@ def get_command_bus() -> CommandBus:
     return container.get(CommandBus)
 
 
-def get_config_manager() -> ConfigurationManager:
-    """Get ConfigurationManager from DI container."""
+def get_config_manager() -> ConfigurationPort:
+    """Get ConfigurationPort from DI container."""
     container = get_di_container()
-    return container.get(ConfigurationManager)
+    return container.get(ConfigurationPort)
 
 
 def get_server_config() -> ServerConfig:
@@ -63,7 +63,7 @@ def get_template_handler():
 
     def _get_handler():
         container = get_di_container()
-        from src.api.handlers.get_available_templates_handler import (
+        from api.handlers.get_available_templates_handler import (
             GetAvailableTemplatesRESTHandler,
         )
 
@@ -77,7 +77,7 @@ def get_request_machines_handler():
 
     def _get_handler():
         container = get_di_container()
-        from src.api.handlers.request_machines_handler import RequestMachinesRESTHandler
+        from api.handlers.request_machines_handler import RequestMachinesRESTHandler
 
         return container.get(RequestMachinesRESTHandler)
 
@@ -89,9 +89,7 @@ def get_request_status_handler():
 
     def _get_handler():
         container = get_di_container()
-        from src.api.handlers.get_request_status_handler import (
-            GetRequestStatusRESTHandler,
-        )
+        from api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
 
         return container.get(GetRequestStatusRESTHandler)
 
@@ -103,7 +101,7 @@ def get_return_requests_handler():
 
     def _get_handler():
         container = get_di_container()
-        from src.api.handlers.get_return_requests_handler import (
+        from api.handlers.get_return_requests_handler import (
             GetReturnRequestsRESTHandler,
         )
 
@@ -117,7 +115,7 @@ def get_return_machines_handler():
 
     def _get_handler():
         container = get_di_container()
-        from src.api.handlers.request_return_machines_handler import (
+        from api.handlers.request_return_machines_handler import (
             RequestReturnMachinesRESTHandler,
         )
 

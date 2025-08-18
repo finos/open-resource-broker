@@ -1,6 +1,6 @@
 """AWS provider exceptions."""
 
-from src.providers.aws.exceptions.aws_exceptions import *
+from providers.aws.exceptions.aws_exceptions import *
 
 __all__ = [
     "AWSError",

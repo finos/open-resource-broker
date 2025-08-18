@@ -9,23 +9,17 @@ maintaining clean separation of concerns:
 
 from typing import Any
 
-from src.config.manager import ConfigurationManager
-from src.domain.base import UnitOfWorkFactory as AbstractUnitOfWorkFactory
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.domain_interfaces import UnitOfWork
-from src.domain.base.ports import LoggingPort
+from config.manager import ConfigurationManager
+from domain.base import UnitOfWorkFactory as AbstractUnitOfWorkFactory
+from domain.base.dependency_injection import injectable
+from domain.base.domain_interfaces import UnitOfWork
+from domain.base.ports import LoggingPort
 
 # Import repository interfaces
-from src.domain.machine.repository import (
-    MachineRepository as MachineRepositoryInterface,
-)
-from src.domain.request.repository import (
-    RequestRepository as RequestRepositoryInterface,
-)
-from src.domain.template.repository import (
-    TemplateRepository as TemplateRepositoryInterface,
-)
-from src.infrastructure.registry.storage_registry import get_storage_registry
+from domain.machine.repository import MachineRepository as MachineRepositoryInterface
+from domain.request.repository import RequestRepository as RequestRepositoryInterface
+from domain.template.repository import TemplateRepository as TemplateRepositoryInterface
+from infrastructure.registry.storage_registry import get_storage_registry
 
 
 @injectable
@@ -46,40 +40,42 @@ class RepositoryFactory:
         return self._storage_registry
 
     def create_machine_repository(self) -> MachineRepositoryInterface:
-        """Create machine repository with injected storage strategy."""
-        from src.infrastructure.persistence.repositories.machine_repository import (
+        """Create machine repository with injected storage port."""
+        from infrastructure.persistence.repositories.machine_repository import (
             MachineRepositoryImpl as MachineRepository,
         )
 
-        storage_type = self.config_manager.get_storage_strategy()
-        config = self.config_manager.get_app_config()
-
         try:
-            # Get storage strategy from registry
-            storage_strategy = self.storage_registry.create_strategy(storage_type, config)
+            # Get storage port from DI container
+            from domain.base.ports.storage_port import StoragePort
+            from infrastructure.di.container import get_container
 
-            # Create repository with strategy injection
-            return MachineRepository(storage_strategy)
+            container = get_container()
+            storage_port = container.get(StoragePort)
+
+            # Create repository with storage port injection
+            return MachineRepository(storage_port)
 
         except Exception as e:
             self.logger.error(f"Failed to create machine repository: {e}")
             raise
 
     def create_request_repository(self) -> RequestRepositoryInterface:
-        """Create request repository with injected storage strategy."""
-        from src.infrastructure.persistence.repositories.request_repository import (
+        """Create request repository with injected storage port."""
+        from infrastructure.persistence.repositories.request_repository import (
             RequestRepositoryImpl as RequestRepository,
         )
 
-        storage_type = self.config_manager.get_storage_strategy()
-        config = self.config_manager.get_app_config()
-
         try:
-            # Get storage strategy from registry
-            storage_strategy = self.storage_registry.create_strategy(storage_type, config)
+            # Get storage port from DI container
+            from domain.base.ports.storage_port import StoragePort
+            from infrastructure.di.container import get_container
 
-            # Create repository with strategy injection
-            return RequestRepository(storage_strategy)
+            container = get_container()
+            storage_port = container.get(StoragePort)
+
+            # Create repository with storage port injection
+            return RequestRepository(storage_port)
 
         except Exception as e:
             self.logger.error(f"Failed to create request repository: {e}")
@@ -87,7 +83,7 @@ class RepositoryFactory:
 
     def create_template_repository(self) -> TemplateRepositoryInterface:
         """Create template repository with injected storage strategy."""
-        from src.infrastructure.persistence.repositories.template_repository import (
+        from infrastructure.persistence.repositories.template_repository import (
             TemplateRepositoryImpl as TemplateRepository,
         )
 
@@ -159,7 +155,7 @@ class RepositoryFactoryWithStrategies:
     def _get_config_manager(self):
         """Get configuration manager."""
         if self._config_manager is None:
-            from src.config.manager import get_config_manager
+            from config.manager import get_config_manager
 
             self._config_manager = get_config_manager()
         return self._config_manager

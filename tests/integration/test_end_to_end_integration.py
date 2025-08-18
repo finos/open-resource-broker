@@ -17,23 +17,21 @@ import pytest
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from src.domain.machine.aggregate import Machine
-from src.domain.request.aggregate import Request, RequestStatus
-from src.infrastructure.persistence.repositories.machine_repository import (
+from domain.machine.aggregate import Machine
+from domain.request.aggregate import Request, RequestStatus
+from infrastructure.persistence.repositories.machine_repository import (
     MachineRepositoryImpl,
 )
-from src.infrastructure.persistence.repositories.request_repository import (
+from infrastructure.persistence.repositories.request_repository import (
     RequestRepositoryImpl,
 )
-from src.infrastructure.persistence.repositories.template_repository import (
+from infrastructure.persistence.repositories.template_repository import (
     TemplateRepositoryImpl,
 )
-from src.providers.aws.domain.template.aggregate import AWSTemplate
-from src.providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHandler
-from src.providers.aws.infrastructure.handlers.spot_fleet_handler import (
-    SpotFleetHandler,
-)
-from src.providers.aws.infrastructure.launch_template.manager import (
+from providers.aws.domain.template.aggregate import AWSTemplate
+from providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHandler
+from providers.aws.infrastructure.handlers.spot_fleet_handler import SpotFleetHandler
+from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
     LaunchTemplateResult,
 )

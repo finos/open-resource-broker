@@ -2,9 +2,9 @@
 
 from typing import TYPE_CHECKING, Any, Dict
 
-from src.application.base.handlers import BaseQueryHandler
-from src.application.decorators import query_handler
-from src.application.dto.system import (
+from application.base.handlers import BaseQueryHandler
+from application.decorators import query_handler
+from application.dto.system import (
     ConfigurationSectionResponse,
     ConfigurationValueResponse,
     ProviderConfigDTO,
@@ -12,7 +12,7 @@ from src.application.dto.system import (
     SystemStatusDTO,
     ValidationResultDTO,
 )
-from src.application.queries.system import (
+from application.queries.system import (
     GetConfigurationQuery,
     GetConfigurationSectionQuery,
     GetProviderConfigQuery,
@@ -20,7 +20,7 @@ from src.application.queries.system import (
     GetSystemStatusQuery,
     ValidateProviderConfigQuery,
 )
-from src.domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
+from domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
 
 # Use TYPE_CHECKING to avoid direct infrastructure imports
 if TYPE_CHECKING:
@@ -42,7 +42,7 @@ class GetConfigurationHandler(BaseQueryHandler[GetConfigurationQuery, Configurat
             Configuration value response
         """
         # Access configuration through application layer
-        from src.config.manager import get_config_manager
+        from config.manager import get_config_manager
 
         config_manager = get_config_manager()
 
@@ -84,7 +84,7 @@ class GetConfigurationSectionHandler(
             Configuration section response
         """
         # Access configuration through application layer
-        from src.config.manager import get_config_manager
+        from config.manager import get_config_manager
 
         config_manager = get_config_manager()
         section_config = config_manager.get(query.section, {})
@@ -123,7 +123,7 @@ class GetProviderConfigHandler(BaseQueryHandler[GetProviderConfigQuery, Provider
 
         try:
             # Get configuration manager from container
-            from src.domain.base.ports import ConfigurationPort
+            from domain.base.ports import ConfigurationPort
 
             config_manager = self.container.get(ConfigurationPort)
 
@@ -198,7 +198,7 @@ class ValidateProviderConfigHandler(
 
         try:
             # Get configuration manager from container
-            from src.domain.base.ports import ConfigurationPort
+            from domain.base.ports import ConfigurationPort
 
             config_manager = self.container.get(ConfigurationPort)
 
@@ -282,7 +282,7 @@ class GetSystemStatusHandler(BaseQueryHandler[GetSystemStatusQuery, SystemStatus
 
             # Check provider status
             try:
-                from src.domain.base.ports import ConfigurationPort
+                from domain.base.ports import ConfigurationPort
 
                 self.container.get(ConfigurationPort)
                 system_status["components"]["configuration"] = {
@@ -372,7 +372,7 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Provid
 
             # Try to get actual provider metrics if available
             try:
-                from src.domain.base.ports import ConfigurationPort
+                from domain.base.ports import ConfigurationPort
 
                 config_manager = self.container.get(ConfigurationPort)
 

@@ -1,7 +1,7 @@
 """Provider strategy configuration schemas."""
 
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -217,9 +217,6 @@ class ProviderConfig(BaseModel):
         default_factory=list, description="List of provider instances"
     )
 
-    # Legacy support fields
-    type: Optional[str] = Field(None, description="Legacy provider type")
-
     @field_validator("selection_policy")
     @classmethod
     def validate_selection_policy(cls, v: str) -> str:
@@ -264,8 +261,8 @@ class ProviderConfig(BaseModel):
         if len(provider_names) != len(set(provider_names)):
             raise ValueError("Provider names must be unique")
 
-        # Validate at least one provider is configured (unless legacy mode)
-        if not self.providers and not self.type:
+        # Validate at least one provider is configured
+        if not self.providers:
             raise ValueError("At least one provider must be configured")
 
         return self
@@ -325,40 +322,3 @@ class ProviderConfig(BaseModel):
             if provider.name == name:
                 return provider
         return None
-
-
-# Backward compatibility - extend existing ProviderConfig
-class ExtendedProviderConfig(BaseModel):
-    """Extended provider configuration with integrated support."""
-
-    # Support both legacy and new formats
-    config: Union[ProviderConfig, Dict[str, Any]] = Field(..., description="Provider configuration")
-
-    @model_validator(mode="before")
-    def parse_provider_config(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        """Parse provider configuration from various formats."""
-        if isinstance(values, dict):
-            # If it's already a dict, wrap it in config
-            return {"config": values}
-        return values
-
-    @model_validator(mode="after")
-    def validate_and_convert_config(self) -> "ExtendedProviderConfig":
-        """Validate and convert configuration to integrated format."""
-        if isinstance(self.config, dict):
-            # Convert dict to ProviderConfig
-            try:
-                integrated_config = ProviderConfig(**self.config)
-                object.__setattr__(self, "config", integrated_config)
-            except Exception as e:
-                raise ValueError(f"Invalid provider configuration: {str(e)}")
-
-        return self
-
-    def get_integrated_config(self) -> ProviderConfig:
-        """Get integrated provider configuration."""
-        if isinstance(self.config, ProviderConfig):
-            return self.config
-        else:
-            # This shouldn't happen after validation, but handle gracefully
-            return ProviderConfig(**self.config)

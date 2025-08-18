@@ -2,24 +2,24 @@
 
 # Import common utilities
 # Export abstract interface from canonical location
-from src.domain.base import UnitOfWorkFactory
-from src.infrastructure.utilities.common.collections import (
+from domain.base import UnitOfWorkFactory
+from infrastructure.utilities.common.collections import (
     filter_dict,
     group_by,
     transform_list,
     validate_collection,
 )
-from src.infrastructure.utilities.common.date_utils import (
+from infrastructure.utilities.common.date_utils import (
     format_datetime,
     get_current_timestamp,
     parse_datetime,
 )
-from src.infrastructure.utilities.common.file_utils import (
+from infrastructure.utilities.common.file_utils import (
     ensure_directory_exists,
     read_json_file,
     write_json_file,
 )
-from src.infrastructure.utilities.common.resource_naming import (
+from infrastructure.utilities.common.resource_naming import (
     get_asg_name,
     get_fleet_name,
     get_instance_name,
@@ -27,26 +27,22 @@ from src.infrastructure.utilities.common.resource_naming import (
     get_resource_prefix,
     get_tag_name,
 )
-from src.infrastructure.utilities.common.serialization import (
+from infrastructure.utilities.common.serialization import (
     deserialize_enum,
     process_value_objects,
     serialize_enum,
 )
-from src.infrastructure.utilities.common.string_utils import (
+from infrastructure.utilities.common.string_utils import (
     mask_sensitive_data as sanitize_string,
 )
-from src.infrastructure.utilities.common.string_utils import (
-    to_camel_case as snake_to_camel,
-)
-from src.infrastructure.utilities.common.string_utils import (
-    to_snake_case as camel_to_snake,
-)
-from src.infrastructure.utilities.common.string_utils import truncate as truncate_string
-from src.infrastructure.utilities.factories.api_handler_factory import APIHandlerFactory
+from infrastructure.utilities.common.string_utils import to_camel_case as snake_to_camel
+from infrastructure.utilities.common.string_utils import to_snake_case as camel_to_snake
+from infrastructure.utilities.common.string_utils import truncate as truncate_string
+from infrastructure.utilities.factories.api_handler_factory import APIHandlerFactory
 
 # Import factories (removed legacy ProviderFactory)
-from src.infrastructure.utilities.factories.repository_factory import RepositoryFactory
-from src.infrastructure.utilities.factories.sql_engine_factory import SQLEngineFactory
+from infrastructure.utilities.factories.repository_factory import RepositoryFactory
+from infrastructure.utilities.factories.sql_engine_factory import SQLEngineFactory
 
 __all__ = [
     # String utilities

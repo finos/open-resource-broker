@@ -233,7 +233,7 @@ if aws_template.instance_type:  # Inherited from CoreTemplate
 1. **Single Source of Truth**: All field mappings are centralized in one registry
 2. **Provider Awareness**: Only maps provider-specific fields when the provider is active
 3. **Extensible**: Easy to add new schedulers (LSF, SLURM) and providers (Azure, GCP)
-4. **Type Safety**: Proper field inheritance ensures handlers can access required fields
+4. **Type Safety**: Appropriate field inheritance ensures handlers can access required fields
 5. **Maintainable**: Clear separation between scheduler-specific and provider-specific concerns
 
 ## Future Extensions
@@ -299,7 +299,7 @@ No changes required - the new field mapping is backward compatible.
 
 1. Use the field mapping registry for any new scheduler integrations
 2. Add provider-specific fields to the appropriate provider section
-3. Ensure proper field inheritance in provider-specific template classes
+3. Ensure appropriate field inheritance in provider-specific template classes
 4. Update handlers to use inherited field names
 
 ## Troubleshooting

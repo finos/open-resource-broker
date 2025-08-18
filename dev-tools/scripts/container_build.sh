@@ -8,7 +8,6 @@ set -e
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Logging functions
@@ -101,6 +100,17 @@ setup_builder() {
 build_image() {
     log_info "Building Docker image..."
 
+    # Build wheel first if it doesn't exist
+    if ! ls dist/*.whl 1> /dev/null 2>&1; then
+        log_info "Building wheel package..."
+        make build || {
+            log_error "Failed to build wheel package"
+            exit 1
+        }
+    else
+        log_info "Using existing wheel package"
+    fi
+
     # Get values from Makefile if not provided
     local MAKEFILE_DEFAULT_PYTHON_VERSION="${PYTHON_VERSION:-$(make -s print-DEFAULT_PYTHON_VERSION 2>/dev/null || echo '3.13')}"
     local MAKEFILE_PACKAGE_SHORT="${PACKAGE_NAME_SHORT:-$(make -s print-PACKAGE_NAME_SHORT 2>/dev/null || echo 'ohfp')}"
@@ -134,6 +144,8 @@ build_image() {
         "--build-arg" "VERSION=${VERSION}"
         "--build-arg" "VCS_REF=${VCS_REF}"
         "--build-arg" "PYTHON_VERSION=${PYTHON_VERSION}"
+        "--build-arg" "PACKAGE_NAME_SHORT=${MAKEFILE_PACKAGE_SHORT}"
+        "--build-arg" "BUILDKIT_DOCKERFILE_CHECK=skip=SecretsUsedInArgOrEnv"
     )
 
     # Prepare cache arguments
@@ -147,8 +159,16 @@ build_image() {
 
     # Prepare platform arguments
     local platform_args=()
-    if [[ -n "${PLATFORMS}" ]]; then
-        platform_args+=("--platform" "${PLATFORMS}")
+    if [[ "${PUSH}" == "true" ]]; then
+        # Multi-platform for registry pushes
+        if [[ -n "${PLATFORMS}" ]]; then
+            platform_args+=("--platform" "${PLATFORMS}")
+        fi
+    else
+        # Single platform for local builds (so we can use --load)
+        local_platform=$(docker info --format '{{.Architecture}}' 2>/dev/null || echo 'amd64')
+        platform_args+=("--platform" "linux/${local_platform}")
+        log_info "Using single platform linux/${local_platform} for local build"
     fi
 
     # Prepare push arguments
@@ -156,12 +176,8 @@ build_image() {
     if [[ "${PUSH}" == "true" ]]; then
         push_args+=("--push")
     else
-        # --load only works with single platform builds
-        if [[ "${PLATFORMS}" == *","* ]]; then
-            log_warn "Multi-platform build detected, skipping --load (cannot load multi-platform images)"
-        else
-            push_args+=("--load")
-        fi
+        # Always use --load for local builds (single platform)
+        push_args+=("--load")
     fi
 
     # Build command
@@ -190,9 +206,18 @@ test_image() {
 
     log_info "Testing built image..."
 
-    local test_image="${IMAGE_NAME}:${VERSION}"
+    # Use the same tagging logic as build_image function
+    local MAKEFILE_DEFAULT_PYTHON_VERSION="${PYTHON_VERSION:-$(make -s print-DEFAULT_PYTHON_VERSION 2>/dev/null || echo '3.13')}"
+    local version_tag="${VERSION}"
+    if [[ -n "${MAKEFILE_DEFAULT_PYTHON_VERSION}" && "${MULTI_PYTHON}" == "true" ]]; then
+        version_tag="${VERSION}-python${MAKEFILE_DEFAULT_PYTHON_VERSION}"
+    fi
+
+    local test_image
     if [[ -n "${REGISTRY}" ]]; then
-        test_image="${REGISTRY}/${IMAGE_NAME}:${VERSION}"
+        test_image="${REGISTRY}/${IMAGE_NAME}:${version_tag}"
+    else
+        test_image="${IMAGE_NAME}:${version_tag}"
     fi
 
     # Test image can start

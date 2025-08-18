@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional
 
-from src.domain.base.exceptions import ConfigurationError
+from domain.base.exceptions import ConfigurationError
 
 from .base_registry import BaseRegistration, BaseRegistry, RegistryMode
 

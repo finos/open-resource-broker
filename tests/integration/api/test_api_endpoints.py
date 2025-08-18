@@ -5,8 +5,8 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from src.api.server import create_fastapi_app
-from src.config.schemas.server_schema import AuthConfig, ServerConfig
+from api.server import create_fastapi_app
+from config.schemas.server_schema import AuthConfig, ServerConfig
 
 
 class TestAPIEndpoints:
@@ -140,7 +140,7 @@ class TestAPIEndpoints:
         # Exact headers depend on CORS configuration
 
     def test_content_type_headers(self, client):
-        """Test that proper content-type headers are set."""
+        """Test that appropriate content-type headers are set."""
         # JSON endpoints
         response = client.get("/health")
         assert response.status_code == 200

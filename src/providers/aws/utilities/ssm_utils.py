@@ -9,9 +9,9 @@ from typing import Any, Dict, List, Optional, Union
 
 from botocore.exceptions import ClientError
 
-from src.domain.base.exceptions import InfrastructureError
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.resilience import retry
+from domain.base.exceptions import InfrastructureError
+from infrastructure.logging.logger import get_logger
+from infrastructure.resilience import retry
 
 # Logger
 logger = get_logger(__name__)

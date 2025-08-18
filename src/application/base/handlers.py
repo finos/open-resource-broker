@@ -13,12 +13,12 @@ from datetime import datetime
 from functools import wraps
 from typing import Any, Callable, Dict, Optional, TypeVar
 
-from src.application.dto.base import BaseCommand, BaseResponse
-from src.application.interfaces.command_handler import CommandHandler
-from src.application.interfaces.command_query import QueryHandler
-from src.domain.base.events import DomainEvent
-from src.domain.base.ports import ErrorHandlingPort, EventPublisherPort, LoggingPort
-from src.infrastructure.error.exception_handler import InfrastructureErrorResponse
+from application.dto.base import BaseCommand, BaseResponse
+from application.interfaces.command_handler import CommandHandler
+from application.interfaces.command_query import QueryHandler
+from domain.base.events import DomainEvent
+from domain.base.ports import ErrorHandlingPort, EventPublisherPort, LoggingPort
+from infrastructure.error.exception_handler import InfrastructureErrorResponse
 
 TCommand = TypeVar("TCommand", bound=BaseCommand)
 TResponse = TypeVar("TResponse", bound=BaseResponse)
@@ -49,7 +49,7 @@ class BaseHandler(ABC):
         self, operation: Callable[[], Any], context: str = ""
     ) -> Any:
         """
-        Execute operation with proper error handling using ErrorHandlingPort.
+        Execute operation with structured error handling using ErrorHandlingPort.
 
         This method provides consistent error handling across all handlers
         using the injected ErrorHandlingPort, maintaining Clean Architecture

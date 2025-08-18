@@ -2,7 +2,7 @@
 
 from typing import Dict, Optional
 
-from src.domain.ports import ConfigurationPort
+from domain.ports import ConfigurationPort
 
 
 class DomainConfigurationService:

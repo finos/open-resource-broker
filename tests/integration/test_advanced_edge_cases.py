@@ -314,7 +314,7 @@ def test_concurrent_request_handling():
                     else:
                         actual_outcome = "conflicts_detected"
                 elif operation_type == "request_processing":
-                    # Check for proper processing
+                    # Check for correct processing
                     if len(results) == concurrent_ops:
                         actual_outcome = "proper_queuing"
                     else:

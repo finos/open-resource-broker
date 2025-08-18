@@ -5,15 +5,15 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import ConfigDict, Field
 
-from src.domain.base.entity import AggregateRoot
-from src.domain.base.events import (
+from domain.base.entity import AggregateRoot
+from domain.base.events import (
     RequestCompletedEvent,
     RequestCreatedEvent,
     RequestStatusChangedEvent,
 )
-from src.domain.base.value_objects import InstanceId
-from src.domain.request.request_types import RequestStatus
-from src.domain.request.value_objects import RequestId, RequestType
+from domain.base.value_objects import InstanceId
+from domain.request.request_types import RequestStatus
+from domain.request.value_objects import RequestId, RequestType
 
 
 class Request(AggregateRoot):
@@ -313,7 +313,7 @@ class Request(AggregateRoot):
         metadata: Optional[Dict[str, Any]] = None,
     ) -> "Request":
         """
-        Create a new request with proper domain event generation.
+        Create a new request with domain event generation.
 
         Args:
             request_type: Type of request (CREATE, TERMINATE, etc.)
@@ -326,7 +326,7 @@ class Request(AggregateRoot):
         Returns:
             New Request instance with creation event
         """
-        # Generate proper RequestId using the value object's generate method
+        # Generate appropriate RequestId using the value object's generate method
         request_id = RequestId.generate(request_type)
 
         # Create request

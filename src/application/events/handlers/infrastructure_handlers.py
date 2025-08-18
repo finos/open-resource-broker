@@ -6,13 +6,13 @@ with a clean, maintainable architecture following DDD/SOLID/DRY principles.
 """
 
 # Import the new base classes and decorator
-from src.application.base.event_handlers import BaseLoggingEventHandler
-from src.application.events.decorators import event_handler
+from application.base.event_handlers import BaseLoggingEventHandler
+from application.events.decorators import event_handler
 
 # Import types - using string imports to avoid circular dependencies
 try:
-    from src.domain.base.events import DomainEvent
-    from src.domain.base.ports import LoggingPort
+    from domain.base.events import DomainEvent
+    from domain.base.ports import LoggingPort
 except ImportError:
     # Fallback for testing or when dependencies aren't available
     DomainEvent = object

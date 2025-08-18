@@ -1,13 +1,13 @@
 """Storage query handlers for administrative operations."""
 
-from src.application.base.handlers import BaseQueryHandler
-from src.application.decorators import query_handler
-from src.application.dto.system import (
+from application.base.handlers import BaseQueryHandler
+from application.decorators import query_handler
+from application.dto.system import (
     StorageHealthResponse,
     StorageMetricsResponse,
     StorageStrategyListResponse,
 )
-from src.application.queries.storage import (
+from application.queries.storage import (
     GetStorageHealthQuery,
     GetStorageMetricsQuery,
     ListStorageStrategiesQuery,
@@ -31,8 +31,8 @@ class ListStorageStrategiesHandler(
             Storage strategies list response
         """
         # Access infrastructure through application layer
-        from src.config.manager import get_config_manager
-        from src.infrastructure.registry.storage_registry import get_storage_registry
+        from config.manager import get_config_manager
+        from infrastructure.registry.storage_registry import get_storage_registry
 
         registry = get_storage_registry()
         storage_types = registry.get_registered_types()

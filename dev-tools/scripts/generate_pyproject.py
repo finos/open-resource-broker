@@ -44,6 +44,8 @@ try:
     # Get Python version info from config
     python_versions = _get_config_value(".python.versions[]")
     min_python_version = _get_config_value(".python.min_version")
+    author = _get_config_value(".project.author")
+    email = _get_config_value(".project.email")
 
 except ImportError as e:
     logging.error(f"Error importing package configuration: {e}")
@@ -77,6 +79,8 @@ def generate_pyproject():
         "{{PACKAGE_NAME_SHORT}}": PACKAGE_NAME_SHORT,
         "{{VERSION}}": __version__,
         "{{DESCRIPTION}}": DESCRIPTION,
+        "{{AUTHOR}}": author,
+        "{{EMAIL}}": email,
         "{{REPO_URL}}": REPO_URL,
         "{{DOCS_URL}}": DOCS_URL,
         "{{REPO_ISSUES_URL}}": REPO_ISSUES_URL,

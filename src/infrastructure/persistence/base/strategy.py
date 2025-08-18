@@ -4,14 +4,15 @@ from abc import ABC, abstractmethod
 from types import TracebackType
 from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.persistence.exceptions import PersistenceError
+from domain.base.ports.storage_port import StoragePort
+from infrastructure.logging.logger import get_logger
+from infrastructure.persistence.exceptions import PersistenceError
 
 T = TypeVar("T")  # Entity type
 
 
-class StorageStrategy(ABC, Generic[T]):
-    """Interface for storage strategies."""
+class StorageStrategy(StoragePort[T], ABC, Generic[T]):
+    """Interface for storage strategies implementing StoragePort."""
 
     @abstractmethod
     def cleanup(self) -> None:
@@ -19,7 +20,7 @@ class StorageStrategy(ABC, Generic[T]):
         Clean up resources used by the storage strategy.
 
         This method should be called when the storage strategy is no longer needed
-        to ensure proper resource cleanup (connections, file handles, etc.).
+        to ensure resource cleanup (connections, file handles, etc.).
 
         Raises:
             PersistenceError: If there's an error cleaning up resources

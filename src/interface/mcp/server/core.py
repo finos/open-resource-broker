@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Dict, Optional, Union
 
-from src._package import PACKAGE_NAME, __version__
-from src.infrastructure.logging.logger import get_logger
+from _package import PACKAGE_NAME, __version__
+from infrastructure.logging.logger import get_logger
 
 
 class MCPMessageType(Enum):
@@ -54,19 +54,19 @@ class OpenHFPluginMCPServer:
 
     def _register_core_tools(self):
         """Register core MCP tools from CLI handlers."""
-        from src.interface.request_command_handlers import (
+        from interface.request_command_handlers import (
             handle_get_request_status,
             handle_get_return_requests,
             handle_request_machines,
             handle_request_return_machines,
         )
-        from src.interface.system_command_handlers import (
+        from interface.system_command_handlers import (
             handle_list_providers,
             handle_provider_config,
             handle_provider_health,
             handle_provider_metrics,
         )
-        from src.interface.template_command_handlers import (
+        from interface.template_command_handlers import (
             handle_get_template,
             handle_list_templates,
             handle_validate_template,

@@ -15,7 +15,7 @@ class TestDependencyInjectionComprehensive:
     def test_di_container_exists(self):
         """Test that DI container exists."""
         try:
-            from src.infrastructure.di.container import Container
+            from infrastructure.di.container import Container
 
             assert Container is not None
         except ImportError:
@@ -24,7 +24,7 @@ class TestDependencyInjectionComprehensive:
     def test_di_container_initialization(self):
         """Test DI container initialization."""
         try:
-            from src.infrastructure.di.container import Container
+            from infrastructure.di.container import Container
 
             container = Container()
             assert container is not None
@@ -40,7 +40,7 @@ class TestDependencyInjectionComprehensive:
     def test_di_container_registration(self):
         """Test DI container service registration."""
         try:
-            from src.infrastructure.di.container import Container
+            from infrastructure.di.container import Container
 
             container = Container()
 
@@ -66,7 +66,7 @@ class TestDependencyInjectionComprehensive:
     def test_di_container_resolution(self):
         """Test DI container service resolution."""
         try:
-            from src.infrastructure.di.container import Container
+            from infrastructure.di.container import Container
 
             container = Container()
             mock_service = Mock()
@@ -98,7 +98,7 @@ class TestDependencyInjectionComprehensive:
     def test_command_query_buses_exist(self):
         """Test that command and query buses exist."""
         try:
-            from src.infrastructure.di.buses import CommandBus, QueryBus
+            from infrastructure.di.buses import CommandBus, QueryBus
 
             assert CommandBus is not None
             assert QueryBus is not None
@@ -108,7 +108,7 @@ class TestDependencyInjectionComprehensive:
     def test_bus_initialization(self):
         """Test bus initialization."""
         try:
-            from src.infrastructure.di.buses import CommandBus, QueryBus
+            from infrastructure.di.buses import CommandBus, QueryBus
 
             # Test CommandBus
             try:
@@ -135,7 +135,7 @@ class TestDependencyInjectionComprehensive:
     async def test_bus_send_methods(self):
         """Test bus send methods."""
         try:
-            from src.infrastructure.di.buses import CommandBus, QueryBus
+            from infrastructure.di.buses import CommandBus, QueryBus
 
             # Test CommandBus send
             try:
@@ -345,7 +345,7 @@ class TestErrorHandlingComprehensive:
     def test_exception_handler_exists(self):
         """Test that exception handler exists."""
         try:
-            from src.infrastructure.error.exception_handler import ExceptionHandler
+            from infrastructure.error.exception_handler import ExceptionHandler
 
             assert ExceptionHandler is not None
         except ImportError:
@@ -354,7 +354,7 @@ class TestErrorHandlingComprehensive:
     def test_exception_handler_initialization(self):
         """Test exception handler initialization."""
         try:
-            from src.infrastructure.error.exception_handler import ExceptionHandler
+            from infrastructure.error.exception_handler import ExceptionHandler
 
             # Try to create instance
             try:
@@ -371,7 +371,7 @@ class TestErrorHandlingComprehensive:
     def test_error_decorators_exist(self):
         """Test that error decorators exist."""
         try:
-            from src.infrastructure.error.decorators import handle_interface_exceptions
+            from infrastructure.error.decorators import handle_interface_exceptions
 
             assert handle_interface_exceptions is not None
         except ImportError:
@@ -380,7 +380,7 @@ class TestErrorHandlingComprehensive:
     def test_error_middleware_exists(self):
         """Test that error middleware exists."""
         try:
-            import src.infrastructure.error.error_middleware
+            pass
 
             assert src.infrastructure.error.error_middleware is not None
         except ImportError:
@@ -395,7 +395,7 @@ class TestLoggingComprehensive:
     def test_logger_exists(self):
         """Test that logger exists."""
         try:
-            from src.infrastructure.logging.logger import Logger
+            from infrastructure.logging.logger import Logger
 
             assert Logger is not None
         except ImportError:
@@ -404,7 +404,7 @@ class TestLoggingComprehensive:
     def test_logger_initialization(self):
         """Test logger initialization."""
         try:
-            from src.infrastructure.logging.logger import Logger
+            from infrastructure.logging.logger import Logger
 
             try:
                 logger = Logger()
@@ -420,7 +420,7 @@ class TestLoggingComprehensive:
     def test_logger_singleton_exists(self):
         """Test that logger singleton exists."""
         try:
-            from src.infrastructure.logging.logger_singleton import LoggerSingleton
+            from infrastructure.logging.logger_singleton import LoggerSingleton
 
             assert LoggerSingleton is not None
         except ImportError:
@@ -435,7 +435,7 @@ class TestTemplateInfrastructureComprehensive:
     def test_template_loader_exists(self):
         """Test that template loader exists."""
         try:
-            from src.infrastructure.template.loader import TemplateLoader
+            from infrastructure.template.loader import TemplateLoader
 
             assert TemplateLoader is not None
         except ImportError:
@@ -444,7 +444,7 @@ class TestTemplateInfrastructureComprehensive:
     def test_template_configuration_store_exists(self):
         """Test that template configuration store exists."""
         try:
-            from src.infrastructure.template.configuration_store import (
+            from infrastructure.template.configuration_store import (
                 TemplateConfigurationStore,
             )
 
@@ -455,7 +455,7 @@ class TestTemplateInfrastructureComprehensive:
     def test_template_cache_service_exists(self):
         """Test that template cache service exists."""
         try:
-            from src.infrastructure.template.template_cache_service import (
+            from infrastructure.template.template_cache_service import (
                 TemplateCacheService,
             )
 
@@ -466,7 +466,7 @@ class TestTemplateInfrastructureComprehensive:
     def test_format_converter_exists(self):
         """Test that format converter exists."""
         try:
-            from src.infrastructure.template.format_converter import FormatConverter
+            from infrastructure.template.format_converter import FormatConverter
 
             assert FormatConverter is not None
         except ImportError:

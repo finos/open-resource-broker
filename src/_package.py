@@ -1,44 +1,74 @@
-"""Package metadata and naming constants - centralized from .project.yml."""
+"""Package metadata - works in both development and production."""
 
 import logging
-import subprocess
-import sys
 from pathlib import Path
+from typing import Optional
 
-# Setup logging
-logging.basicConfig(level=logging.ERROR, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
-def _get_config_value(key: str) -> str:
-    """Get value from .project.yml using yq."""
+def _get_from_project_yml() -> Optional[dict]:
+    """Try to read from .project.yml (development mode)."""
     try:
+        import yaml
+
         project_root = Path(__file__).parent.parent
-        result = subprocess.run(
-            ["yq", key, ".project.yml"],
-            cwd=project_root,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        return result.stdout.strip()
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        logger.error(f"Error reading config key '{key}': {e}")
-        logger.error("Make sure yq is installed and .project.yml exists")
-        sys.exit(1)
+        project_file = project_root / ".project.yml"
+        if project_file.exists():
+            with open(project_file) as f:
+                return yaml.safe_load(f)
+    except Exception as e:
+        logger.debug(f"Failed to read project.yml: {e}")
+    return None
 
 
-# Load all values from .project.yml (single source of truth)
-PACKAGE_NAME = _get_config_value(".project.name")
-PACKAGE_NAME_SHORT = _get_config_value(".project.short_name")
-__version__ = _get_config_value(".project.version")  # Version for imports
-VERSION = __version__  # Alias for compatibility
-DESCRIPTION = _get_config_value(".project.description")
+def _get_from_package_metadata() -> Optional[dict]:
+    """Try to read from package metadata (installed mode)."""
+    try:
+        from importlib.metadata import metadata, version
+
+        meta = metadata("open-hostfactory-plugin")
+        return {
+            "project": {
+                "name": meta["Name"],
+                "version": version("open-hostfactory-plugin"),
+                "description": meta["Summary"],
+            },
+            "repository": {"org": "awslabs", "name": "open-hostfactory-plugin"},
+        }
+    except Exception as e:
+        logger.debug(f"Failed to read package metadata: {e}")
+    return None
+
+
+# Try development first, then production
+config = _get_from_project_yml() or _get_from_package_metadata()
+
+if not config:
+    # Final fallback
+    config = {
+        "project": {
+            "name": "open-hostfactory-plugin",
+            "short_name": "ohfp",
+            "version": "0.1.0-dev",
+            "description": "Cloud provider integration plugin for IBM Spectrum Symphony Host Factory",
+        },
+        "repository": {"org": "awslabs", "name": "open-hostfactory-plugin", "registry": "ghcr.io"},
+    }
+
+# Export the same interface
+PACKAGE_NAME = config["project"]["name"]
+PACKAGE_NAME_SHORT = config["project"].get("short_name", "ohfp")
+__version__ = config["project"]["version"]
+VERSION = __version__
+DESCRIPTION = config["project"]["description"]
+AUTHOR = config["project"].get("author", "AWS Professional Services")
+EMAIL = config["project"].get("email", "aws-proserve@amazon.com")
 
 # Repository metadata
-REPO_ORG = _get_config_value(".repository.org")
-REPO_NAME = _get_config_value(".repository.name")
-CONTAINER_REGISTRY = _get_config_value(".repository.registry")
+REPO_ORG = config["repository"].get("org", "awslabs")
+REPO_NAME = config["repository"].get("name", "open-hostfactory-plugin")
+CONTAINER_REGISTRY = config["repository"].get("registry", "ghcr.io")
 
 # Derived values
 PACKAGE_NAME_PYTHON = PACKAGE_NAME.replace("-", "_")

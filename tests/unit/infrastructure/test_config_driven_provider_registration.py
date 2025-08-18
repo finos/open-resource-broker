@@ -2,7 +2,7 @@
 
 from unittest.mock import Mock, patch
 
-from src.config.schemas.provider_strategy_schema import (
+from config.schemas.provider_strategy_schema import (
     ProviderConfig,
     ProviderInstanceConfig,
 )
@@ -40,7 +40,7 @@ class TestConfigDrivenProviderRegistration:
             "src.infrastructure.di.provider_services.get_logger"
         ) as mock_logger:
 
-            from src.infrastructure.di.provider_services import _register_providers
+            from infrastructure.di.provider_services import _register_providers
 
             # Execute registration
             _register_providers()
@@ -66,7 +66,7 @@ class TestConfigDrivenProviderRegistration:
             "src.infrastructure.di.provider_services.get_logger"
         ) as mock_logger:
 
-            from src.infrastructure.di.provider_services import _register_providers
+            from infrastructure.di.provider_services import _register_providers
 
             # Execute registration
             _register_providers()
@@ -105,7 +105,7 @@ class TestConfigDrivenProviderRegistration:
             "src.infrastructure.di.provider_services.get_logger"
         ) as mock_logger:
 
-            from src.infrastructure.di.provider_services import _register_providers
+            from infrastructure.di.provider_services import _register_providers
 
             # Execute registration
             _register_providers()
@@ -147,7 +147,7 @@ class TestConfigDrivenProviderRegistration:
             "src.infrastructure.di.provider_services.get_logger"
         ) as mock_logger:
 
-            from src.infrastructure.di.provider_services import _register_providers
+            from infrastructure.di.provider_services import _register_providers
 
             # Execute registration
             _register_providers()
@@ -163,9 +163,7 @@ class TestConfigDrivenProviderRegistration:
         )
 
         with patch("src.infrastructure.di.provider_services.get_logger"):
-            from src.infrastructure.di.provider_services import (
-                _validate_provider_config,
-            )
+            from infrastructure.di.provider_services import _validate_provider_config
 
             result = _validate_provider_config(provider_config)
             assert result is True
@@ -177,9 +175,7 @@ class TestConfigDrivenProviderRegistration:
         )
 
         with patch("src.infrastructure.di.provider_services.get_logger"):
-            from src.infrastructure.di.provider_services import (
-                _validate_provider_config,
-            )
+            from infrastructure.di.provider_services import _validate_provider_config
 
             result = _validate_provider_config(provider_config)
             assert result is False

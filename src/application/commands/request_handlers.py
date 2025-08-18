@@ -2,32 +2,33 @@
 
 from typing import Any, Dict
 
-from src.application.base.handlers import BaseCommandHandler
-from src.application.decorators import command_handler
-from src.application.dto.commands import (
+from application.base.handlers import BaseCommandHandler
+from application.decorators import command_handler
+from application.dto.commands import (
     CancelRequestCommand,
     CompleteRequestCommand,
     CreateRequestCommand,
     CreateReturnRequestCommand,
     UpdateRequestStatusCommand,
 )
-from src.application.services.provider_capability_service import (
+from application.services.provider_capability_service import (
     ProviderCapabilityService,
     ValidationLevel,
 )
-from src.application.services.provider_selection_service import ProviderSelectionService
-from src.domain.base import UnitOfWorkFactory
-from src.domain.base.exceptions import EntityNotFoundError
-from src.domain.base.ports import (
+from application.services.provider_selection_service import ProviderSelectionService
+from domain.base import UnitOfWorkFactory
+from domain.base.exceptions import EntityNotFoundError
+from domain.base.ports import (
+    ConfigurationPort,
     ContainerPort,
     ErrorHandlingPort,
     EventPublisherPort,
     LoggingPort,
+    ProviderPort,
 )
-from src.domain.machine.repository import MachineRepository
-from src.domain.request.repository import RequestRepository
-from src.infrastructure.di.buses import QueryBus
-from src.providers.base.strategy import ProviderContext
+from domain.machine.repository import MachineRepository
+from domain.request.repository import RequestRepository
+from infrastructure.di.buses import QueryBus
 
 
 @command_handler(CreateRequestCommand)
@@ -44,7 +45,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
         query_bus: QueryBus,  # QueryBus is required for template lookup
         provider_selection_service: ProviderSelectionService,
         provider_capability_service: ProviderCapabilityService,
-        provider_context: ProviderContext,
+        provider_port: ProviderPort,
     ):
         """Initialize the instance."""
         super().__init__(logger, event_publisher, error_handler)
@@ -53,7 +54,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
         self._query_bus = query_bus
         self._provider_selection_service = provider_selection_service
         self._provider_capability_service = provider_capability_service
-        self._provider_context = provider_context
+        self._provider_context = provider_port
 
     async def validate_command(self, command: CreateRequestCommand) -> None:
         """Validate create request command."""
@@ -81,11 +82,11 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
         request = None
 
         try:
-            # Get template using CQRS QueryBus (proper architecture)
+            # Get template using CQRS QueryBus
             if not self._query_bus:
                 raise ValueError("QueryBus is required for template lookup")
 
-            from src.application.dto.queries import GetTemplateQuery
+            from application.dto.queries import GetTemplateQuery
 
             template_query = GetTemplateQuery(template_id=command.template_id)
             template = await self._query_bus.execute(template_query)
@@ -114,8 +115,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
             self.logger.info(f"Template validation passed: {validation_result.supported_features}")
 
             # Create request aggregate with selected provider
-            from src.domain.request.aggregate import Request
-            from src.domain.request.value_objects import RequestType
+            from domain.request.aggregate import Request
+            from domain.request.value_objects import RequestType
 
             request = Request.create_new_request(
                 request_type=RequestType.ACQUIRE,
@@ -139,7 +140,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                 self.logger.info(
                     f"Skipping actual provisioning for request { request.request_id} (dry-run mode)"
                 )
-                from src.domain.request.value_objects import RequestStatus
+                from domain.request.value_objects import RequestStatus
 
                 request = request.update_status(
                     RequestStatus.COMPLETED, "Request created successfully (dry-run)"
@@ -199,21 +200,21 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
 
                         # Update request status based on fulfillment
                         if len(instance_data_list) == command.requested_count:
-                            from src.domain.request.value_objects import RequestStatus
+                            from domain.request.value_objects import RequestStatus
 
                             request = request.update_status(
                                 RequestStatus.COMPLETED,
                                 "All instances provisioned successfully",
                             )
                         elif len(instance_data_list) > 0:
-                            from src.domain.request.value_objects import RequestStatus
+                            from domain.request.value_objects import RequestStatus
 
                             request = request.update_status(
                                 RequestStatus.PARTIAL,
                                 f"Partially fulfilled: {len(instance_data_list)}/{command.requested_count} instances",
                             )
                         else:
-                            from src.domain.request.value_objects import RequestStatus
+                            from domain.request.value_objects import RequestStatus
 
                             request = request.update_status(
                                 RequestStatus.IN_PROGRESS,
@@ -221,7 +222,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                             )
                     else:
                         # Handle provisioning failure
-                        from src.domain.request.value_objects import RequestStatus
+                        from domain.request.value_objects import RequestStatus
 
                         error_message = provisioning_result.get("error_message", "Unknown error")
                         request = request.update_status(
@@ -236,7 +237,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
 
                 except Exception as provisioning_error:
                     # Handle unexpected provisioning errors
-                    from src.domain.request.value_objects import RequestStatus
+                    from domain.request.value_objects import RequestStatus
 
                     error_message = str(provisioning_error)
                     request = request.update_status(
@@ -255,7 +256,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
         except Exception as provisioning_error:
             # Update request status to failed if request was created
             if request:
-                from src.domain.request.value_objects import RequestStatus
+                from domain.request.value_objects import RequestStatus
 
                 # CRITICAL FIX: Assign the returned updated request back to the variable
                 request = request.update_status(
@@ -298,9 +299,9 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
         """Create machine aggregate from instance data."""
         from datetime import datetime
 
-        from src.domain.base.value_objects import InstanceId, InstanceType
-        from src.domain.machine.aggregate import Machine
-        from src.domain.machine.machine_status import MachineStatus
+        from domain.base.value_objects import InstanceId, InstanceType
+        from domain.machine.aggregate import Machine
+        from domain.machine.machine_status import MachineStatus
 
         # Parse launch_time if it's a string
         launch_time = instance_data.get("launch_time")
@@ -328,10 +329,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
         """Execute actual provisioning via selected provider using existing ProviderContext."""
         try:
             # Import required types (using existing imports)
-            from src.providers.base.strategy import (
-                ProviderOperation,
-                ProviderOperationType,
-            )
+            from providers.base.strategy import ProviderOperation, ProviderOperationType
 
             # Create provider operation using existing pattern
             operation = ProviderOperation(
@@ -359,7 +357,9 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
             self.logger.debug(f"Available strategies: {available_strategies}")
             self.logger.debug(f"Attempting to use strategy: {strategy_identifier}")
 
-            result = self._provider_context.execute_with_strategy(strategy_identifier, operation)
+            result = await self._provider_context.execute_with_strategy(
+                strategy_identifier, operation
+            )
 
             # Process result using existing pattern
             if result.success:
@@ -443,14 +443,13 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         try:
             # Create return request aggregate
             # Get provider type from configuration using injected container
-            from src.config.manager import ConfigurationManager
-            from src.domain.request.aggregate import Request
-            from src.domain.request.value_objects import RequestType
+            from domain.request.aggregate import Request
+            from domain.request.value_objects import RequestType
 
-            config_manager = self._container.get(ConfigurationManager)
+            config_manager = self._container.get(ConfigurationPort)
             provider_type = config_manager.get("provider.type", "aws")
 
-            # Create return request with proper business logic
+            # Create return request with business logic
             # Use first machine's template if available, otherwise use generic return
             # template
             template_id = "return-machines"  # Business template for return operations

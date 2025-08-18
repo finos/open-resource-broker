@@ -5,8 +5,13 @@ from typing import List
 
 import jwt
 
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.ports.auth import AuthContext, AuthPort, AuthResult, AuthStatus
+from infrastructure.adapters.ports.auth import (
+    AuthContext,
+    AuthPort,
+    AuthResult,
+    AuthStatus,
+)
+from infrastructure.logging.logger import get_logger
 
 
 class BearerTokenStrategy(AuthPort):
@@ -125,8 +130,8 @@ class BearerTokenStrategy(AuthPort):
             # Check if it's actually a refresh token
             token_type = payload.get("type")
             if (
-                token_type != "refresh"
-            ):  # nosec B105 - This is a token type identifier, not a password
+                token_type != "refresh"  # nosec B105
+            ):  # This is a token type identifier, not a password
                 return AuthResult(status=AuthStatus.INVALID, error_message="Invalid refresh token")
 
             # Create new access token

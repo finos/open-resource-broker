@@ -15,13 +15,13 @@ import pytest
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../..")))
 
-from src.domain.request.aggregate import Request
-from src.providers.aws.configuration.config import (
+from domain.request.aggregate import Request
+from providers.aws.configuration.config import (
     AWSProviderConfig,
     LaunchTemplateConfiguration,
 )
-from src.providers.aws.domain.template.aggregate import AWSTemplate
-from src.providers.aws.infrastructure.launch_template.manager import (
+from providers.aws.domain.template.aggregate import AWSTemplate
+from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
     LaunchTemplateResult,
 )

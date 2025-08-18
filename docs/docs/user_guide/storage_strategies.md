@@ -379,7 +379,7 @@ DynamoDB strategy creates these tables:
 - **Table Name**: `hostfactory_requests`
 - **Partition Key**: `request_id` (String)
 - **Global Secondary Index**: `template_id-created_at-index`
-- **Attributes**: All request fields with proper typing
+- **Attributes**: All request fields with appropriate typing
 
 #### Machines Table
 - **Table Name**: `hostfactory_machines`

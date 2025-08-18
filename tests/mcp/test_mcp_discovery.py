@@ -4,9 +4,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.mcp.discovery import MCPToolDefinition, MCPToolDiscovery
-from src.sdk.client import OpenHFPluginSDK
-from src.sdk.discovery import MethodInfo
+from mcp.discovery import MCPToolDefinition, MCPToolDiscovery
+from sdk.client import OpenHFPluginSDK
+from sdk.discovery import MethodInfo
 
 
 class TestMCPToolDiscovery:

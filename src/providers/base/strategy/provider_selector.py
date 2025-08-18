@@ -12,10 +12,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, Dict, List, Optional
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
-from src.providers.base.strategy.provider_context import StrategyMetrics
-from src.providers.base.strategy.provider_strategy import (
+from domain.base.dependency_injection import injectable
+from domain.base.ports import LoggingPort
+from providers.base.strategy.provider_context import StrategyMetrics
+from providers.base.strategy.provider_strategy import (
     ProviderOperation,
     ProviderStrategy,
 )

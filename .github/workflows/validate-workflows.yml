@@ -9,21 +9,54 @@ on:
       - '.github/workflows/**'
 
 jobs:
-  validate-yaml:
-    name: Validate Workflow YAML
+  get-config:
+    name: Get Configuration
     runs-on: ubuntu-latest
+    outputs:
+      default-python-version: ${{ steps.config.outputs.default-python-version }}
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
 
-    - name: Validate workflow files
+    - name: Install yq
+      uses: mikefarah/yq@master
+
+    - name: Get configuration from project config
+      id: config
       run: |
-        echo "Validating GitHub Actions workflow YAML files..."
-        for file in .github/workflows/*.yml .github/workflows/*.yaml; do
-          if [ -f "$file" ]; then
-            echo "Validating $file..."
-            yq . "$file" > /dev/null && echo "VALID: $file" || (echo "INVALID: $file" && exit 1)
-          fi
-        done
-        echo "All workflow files are valid!"
+        DEFAULT_PYTHON_VERSION=$(make print-DEFAULT_PYTHON_VERSION)
+        echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> "$GITHUB_OUTPUT"
+
+  validate-workflows:
+    name: Validate Workflow Files
+    runs-on: ubuntu-latest
+    needs: get-config
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ needs.get-config.outputs.default-python-version }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+
+    - name: Validate workflow syntax and logic
+      run: |
+        make validate-workflow-syntax
+
+    - name: Validate workflows with actionlint
+      run: |
+        echo "::add-matcher::.github/actionlint-matcher.json"
+        bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+        ./actionlint -color
+      shell: bash
+
+    - name: Validate shell scripts with shellcheck
+      uses: ludeeus/action-shellcheck@master
+      with:
+        ignore_paths: '.venv .git __pycache__ node_modules'

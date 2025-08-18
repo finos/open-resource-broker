@@ -38,19 +38,19 @@ class TestDockerfile:
         ), "Should create non-root user"
         assert "USER ohfp" in content, "Should switch to non-root user"
 
-        # Check for proper copying
+        # Check for appropriate copying
         assert "COPY --from=builder /opt/venv /opt/venv" in content, "Should copy venv from builder"
-        assert "COPY --chown=ohfp:ohfp" in content, "Should set proper ownership"
+        assert "COPY --chown=ohfp:ohfp" in content, "Should set correct ownership"
 
         # Check for health check
         assert "HEALTHCHECK" in content, "Should include health check"
 
-        # Check for proper entrypoint
+        # Check for correct entrypoint
         assert "ENTRYPOINT" in content, "Should have entrypoint"
         assert "docker-entrypoint.sh" in content, "Should use entrypoint script"
 
     def test_dockerfile_labels(self, dockerfile_path):
-        """Test that Dockerfile includes proper labels."""
+        """Test that Dockerfile includes appropriate labels."""
         content = dockerfile_path.read_text()
 
         required_labels = [
@@ -64,7 +64,7 @@ class TestDockerfile:
             assert label in content, f"Dockerfile should include {label} label"
 
     def test_dockerfile_environment_variables(self, dockerfile_path):
-        """Test that Dockerfile sets proper environment variables."""
+        """Test that Dockerfile sets appropriate environment variables."""
         content = dockerfile_path.read_text()
 
         required_env_vars = [
@@ -241,8 +241,8 @@ class TestDockerfile:
         entrypoint_path = project_root / "docker-entrypoint.sh"
         content = entrypoint_path.read_text()
 
-        # Check for proper shebang
-        assert content.startswith("#!/bin/bash"), "Should have proper bash shebang"
+        # Check for correct shebang
+        assert content.startswith("#!/bin/bash"), "Should have appropriate bash shebang"
 
         # Check for error handling
         assert "set -e" in content, "Should set error handling"

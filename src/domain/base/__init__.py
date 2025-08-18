@@ -5,6 +5,7 @@ from .domain_interfaces import (
     Repository,
     RepositoryProtocol,
     UnitOfWork,
+    UnitOfWorkFactory,
 )
 from .entity import AggregateRoot, Entity
 from .events import (  # Request Events; Machine Events; Template Events; Infrastructure Events
@@ -81,6 +82,7 @@ __all__ = [
     "Repository",
     "AggregateRepository",
     "UnitOfWork",
+    "UnitOfWorkFactory",
     # Exceptions
     "DomainException",
     "ValidationError",

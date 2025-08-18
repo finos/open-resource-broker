@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from threading import RLock
 from typing import Dict, List, Optional, Type
 
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.logging.logger import get_logger
 
 
 class Lifecycle(ABC):
@@ -40,7 +40,7 @@ class LifecycleManager:
 
     This class provides centralized management of component initialization
     and cleanup. Components implementing the Lifecycle interface can be
-    registered with the manager, which will ensure they are properly
+    registered with the manager, which will ensure they are correctly
     initialized during application startup and cleaned up during shutdown.
 
     The manager maintains a list of registered components and initializes

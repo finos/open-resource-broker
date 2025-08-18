@@ -2,10 +2,10 @@
 
 from typing import TYPE_CHECKING, Any, Dict
 
-from src.domain.base.ports.scheduler_port import SchedulerPort
-from src.infrastructure.di.buses import CommandBus, QueryBus
-from src.infrastructure.di.container import get_container
-from src.infrastructure.error.decorators import handle_interface_exceptions
+from domain.base.ports.scheduler_port import SchedulerPort
+from infrastructure.di.buses import CommandBus, QueryBus
+from infrastructure.di.container import get_container
+from infrastructure.error.decorators import handle_interface_exceptions
 
 if TYPE_CHECKING:
     import argparse
@@ -26,31 +26,34 @@ async def handle_get_request_status(args: "argparse.Namespace") -> Dict[str, Any
     query_bus = container.get(QueryBus)
     scheduler_strategy = container.get(SchedulerPort)
 
-    # Extract request ID from args or input_data (HostFactory compatibility)
-    request_id = None
-
-    # Check for input data from -f/--data flags first (HostFactory style)
+    # Pass raw input data to scheduler strategy (scheduler-agnostic)
     if hasattr(args, "input_data") and args.input_data:
-        input_data = args.input_data
-        request_id = input_data.get("request_id") or input_data.get("requestId")
+        raw_request_data = args.input_data
     else:
-        # Use command line arguments
+        request_id_value = None
         if hasattr(args, "request_ids") and args.request_ids:
-            # Take the first request ID from the list
-            request_id = args.request_ids[0]
+            request_id_value = args.request_ids[0]
         elif hasattr(args, "request_id") and args.request_id:
-            request_id = args.request_id
+            request_id_value = args.request_id
+
+        raw_request_data = {
+            "request_id": request_id_value,
+        }
+
+    # Let scheduler strategy parse the raw data (each scheduler handles its own format)
+    parsed_data = scheduler_strategy.parse_request_data(raw_request_data)
+    request_id = parsed_data.get("request_id")
 
     if not request_id:
         return {"error": "No request ID provided", "message": "Request ID is required"}
 
-    from src.application.dto.queries import GetRequestQuery
+    from application.dto.queries import GetRequestQuery
 
     query = GetRequestQuery(request_id=request_id)
     request_dto = await query_bus.execute(query)
 
     # Pass domain DTO to scheduler strategy - NO formatting logic here
-    return scheduler_strategy.convert_domain_to_hostfactory_output("getRequestStatus", request_dto)
+    return scheduler_strategy.format_request_status_response([request_dto])
 
 
 @handle_interface_exceptions(context="request_machines", interface_type="cli")
@@ -68,31 +71,22 @@ async def handle_request_machines(args: "argparse.Namespace") -> Dict[str, Any]:
     command_bus = container.get(CommandBus)
     scheduler_strategy = container.get(SchedulerPort)
 
-    from src.application.dto.commands import CreateRequestCommand
-    from src.infrastructure.mocking.dry_run_context import is_dry_run_active
+    from application.dto.commands import CreateRequestCommand
+    from infrastructure.mocking.dry_run_context import is_dry_run_active
 
-    # Extract parameters from args or input_data (HostFactory compatibility)
-    template_id = None
-    machine_count = None
-
-    # Check for input data from -f/--data flags first (HostFactory style)
+    # Pass raw input data to scheduler strategy (scheduler-agnostic)
     if hasattr(args, "input_data") and args.input_data:
-        input_data = args.input_data
-        # Support both HostFactory format and direct format
-        if "template" in input_data:
-            # HostFactory nested format: {"template": {"templateId": "...",
-            # "machineCount": ...}}
-            template_data = input_data["template"]
-            template_id = template_data.get("templateId") or template_data.get("template_id")
-            machine_count = template_data.get("machineCount") or template_data.get("machine_count")
-        else:
-            # Direct format: {"template_id": "...", "machine_count": ...}
-            template_id = input_data.get("template_id") or input_data.get("templateId")
-            machine_count = input_data.get("machine_count") or input_data.get("machineCount")
+        raw_request_data = args.input_data
     else:
-        # Use command line arguments
-        template_id = getattr(args, "template_id", None)
-        machine_count = getattr(args, "machine_count", None)
+        raw_request_data = {
+            "template_id": getattr(args, "template_id", None),
+            "requested_count": getattr(args, "machine_count", None),
+        }
+
+    # Let scheduler strategy parse the raw data (each scheduler handles its own format)
+    parsed_data = scheduler_strategy.parse_request_data(raw_request_data)
+    template_id = parsed_data.get("template_id")
+    machine_count = parsed_data.get("requested_count", 1)
 
     if not template_id:
         return {
@@ -119,7 +113,7 @@ async def handle_request_machines(args: "argparse.Namespace") -> Dict[str, Any]:
 
     # Get the request details to include resource ID information
     try:
-        from src.application.dto.queries import GetRequestQuery
+        from application.dto.queries import GetRequestQuery
 
         query_bus = container.get(QueryBus)
         query = GetRequestQuery(request_id=request_id)
@@ -135,31 +129,26 @@ async def handle_request_machines(args: "argparse.Namespace") -> Dict[str, Any]:
             "template_id": template_id,
         }
 
-        # Return success response in HostFactory format with resource ID info
+        # Return success response using scheduler strategy formatting
         if scheduler_strategy:
-            return scheduler_strategy.convert_domain_to_hostfactory_output(
-                "requestMachines", request_data
-            )
+            return scheduler_strategy.format_request_response(request_data)
         else:
-            # Fallback to HostFactory format if no scheduler strategy
-            resource_id_msg = f" Resource ID: {resource_ids[0]}" if resource_ids else ""
+            # Fallback if no scheduler strategy (shouldn't happen)
             return {
-                "requestId": str(request_id),
-                "message": f"Request VM success from AWS.{resource_id_msg}",
+                "error": "No scheduler strategy available",
+                "message": "Unable to format response",
             }
     except Exception as e:
         # Fallback if we can't get request details
-        from src.domain.base.ports import LoggingPort
+        from domain.base.ports import LoggingPort
 
         container.get(LoggingPort).warning(f"Could not get request details for resource ID: {e}")
         if scheduler_strategy:
-            return scheduler_strategy.convert_domain_to_hostfactory_output(
-                "requestMachines", request_id
-            )
+            return scheduler_strategy.format_request_response({"request_id": request_id})
         else:
             return {
-                "requestId": str(request_id),
-                "message": "Request VM success from AWS.",
+                "error": "No scheduler strategy available",
+                "message": "Unable to format response",
             }
 
 
@@ -178,7 +167,7 @@ async def handle_get_return_requests(args: "argparse.Namespace") -> Dict[str, An
     query_bus = container.get(QueryBus)
     container.get(SchedulerPort)
 
-    from src.application.dto.queries import ListReturnRequestsQuery
+    from application.dto.queries import ListReturnRequestsQuery
 
     query = ListReturnRequestsQuery()
     requests = await query_bus.execute(query)
@@ -205,7 +194,7 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> Dict[str
     command_bus = container.get(CommandBus)
     container.get(SchedulerPort)
 
-    from src.application.dto.commands import CreateReturnRequestCommand
+    from application.dto.commands import CreateReturnRequestCommand
 
     command = CreateReturnRequestCommand(
         request_id=getattr(args, "request_id", None),

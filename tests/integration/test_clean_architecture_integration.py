@@ -4,15 +4,13 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.application.services.template_defaults_service import TemplateDefaultsService
-from src.config.manager import ConfigurationManager
-from src.domain.base.ports.logging_port import LoggingPort
-from src.domain.template.aggregate import Template
-from src.domain.template.extensions import TemplateExtensionRegistry
-from src.domain.template.factory import TemplateFactory
-from src.providers.aws.configuration.template_extension import (
-    AWSTemplateExtensionConfig,
-)
+from application.services.template_defaults_service import TemplateDefaultsService
+from config.manager import ConfigurationManager
+from domain.base.ports.logging_port import LoggingPort
+from domain.template.aggregate import Template
+from domain.template.extensions import TemplateExtensionRegistry
+from domain.template.factory import TemplateFactory
+from providers.aws.configuration.template_extension import AWSTemplateExtensionConfig
 
 
 class TestCleanArchitectureIntegration:
@@ -108,7 +106,7 @@ class TestCleanArchitectureIntegration:
 
     def test_clean_template_schema_validation(self):
         """Test that cleaned template schema works correctly."""
-        from src.config.schemas.template_schema import TemplateConfig
+        from config.schemas.template_schema import TemplateConfig
 
         # Test clean configuration (no AWS-specific fields)
         clean_config = {
@@ -259,7 +257,7 @@ class TestCleanArchitectureIntegration:
 
     def test_provider_strategy_schema_extensions(self):
         """Test provider strategy schema supports extensions."""
-        from src.config.schemas.provider_strategy_schema import (
+        from config.schemas.provider_strategy_schema import (
             ProviderDefaults,
             ProviderInstanceConfig,
         )

@@ -1,6 +1,6 @@
 """Base application layer - shared application concepts."""
 
-from src.application.dto.base import (
+from application.dto.base import (
     BaseCommand,
     BaseDTO,
     BaseQuery,

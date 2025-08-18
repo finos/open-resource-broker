@@ -9,7 +9,7 @@ from .exceptions import (
     RetryError,
 )
 from .retry_decorator import get_retry_config_for_service, retry
-from .strategies import (
+from .strategy import (
     CircuitBreakerStrategy,
     CircuitState,
     ExponentialBackoffStrategy,

@@ -3,9 +3,9 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List
 
-from src.domain.machine.aggregate import Machine
-from src.domain.request.aggregate import Request
-from src.domain.template.aggregate import Template
+from domain.machine.aggregate import Machine
+from domain.request.aggregate import Request
+from domain.template.aggregate import Template
 
 
 class SchedulerPort(ABC):
@@ -34,6 +34,10 @@ class SchedulerPort(ABC):
     @abstractmethod
     def format_request_status_response(self, requests: List[Request]) -> Dict[str, Any]:
         """Format domain Requests to scheduler response - uses domain.model_dump()."""
+
+    @abstractmethod
+    def format_request_response(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Format request creation response to scheduler format."""
 
     @abstractmethod
     def format_machine_status_response(self, machines: List[Machine]) -> Dict[str, Any]:

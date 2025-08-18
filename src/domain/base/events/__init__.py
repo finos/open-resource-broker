@@ -1,4 +1,4 @@
-"""Domain events package - Complete event system with proper domain separation."""
+"""Domain events package - Complete event system with domain separation."""
 
 # Base classes and protocols
 from .base_events import (

@@ -15,13 +15,13 @@ import importlib
 from typing import TYPE_CHECKING, Dict, Optional, Type
 
 # Domain imports (Clean Architecture compliant)
-from src.domain.base.dependency_injection import injectable
+from domain.base.dependency_injection import injectable
 
 # Infrastructure imports
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.logging.logger import get_logger
 
 if TYPE_CHECKING:
-    from src.application.service import ApplicationService
+    from application.service import ApplicationService
 
 logger = get_logger(__name__)
 

@@ -4,17 +4,14 @@ from datetime import datetime, timezone
 
 import pytest
 
-from src.domain.base.value_objects import InstanceType
-from src.domain.template.aggregate import Template
-from src.domain.template.exceptions import (
-    TemplateNotFoundError,
-    TemplateValidationError,
-)
-from src.domain.template.value_objects import TemplateId
+from domain.base.value_objects import InstanceType
+from domain.template.aggregate import Template
+from domain.template.exceptions import TemplateNotFoundError, TemplateValidationError
+from domain.template.value_objects import TemplateId
 
 # Try to import optional classes - create mocks if not available
 try:
-    from src.domain.template.value_objects import TemplateName
+    from domain.template.value_objects import TemplateName
 
     TEMPLATE_NAME_AVAILABLE = True
 except ImportError:

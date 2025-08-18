@@ -906,7 +906,7 @@ async def test_event_flow_integration():
 
 ### Event Handling
 - **Idempotent Handlers**: Handlers should be safe to run multiple times
-- **Error Recovery**: Implement proper error handling and recovery
+- **Error Recovery**: Implement appropriate error handling and recovery
 - **Performance**: Keep handlers lightweight and fast
 - **Monitoring**: Monitor handler performance and failures
 

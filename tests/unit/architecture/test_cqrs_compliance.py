@@ -14,13 +14,13 @@ import pytest
 
 # Import available components
 try:
-    from src.application.base.command_handler import ApplicationCommandHandler
-    from src.application.dto.commands import (
+    from application.base.command_handler import ApplicationCommandHandler
+    from application.dto.commands import (
         CreateRequestCommand,
         UpdateRequestStatusCommand,
     )
-    from src.application.dto.queries import GetTemplateQuery, ListTemplatesQuery
-    from src.infrastructure.di.container import DIContainer
+    from application.dto.queries import GetTemplateQuery, ListTemplatesQuery
+    from infrastructure.di.container import DIContainer
 
     COMPONENTS_AVAILABLE = True
 except ImportError as e:
@@ -37,13 +37,13 @@ class TestCQRSCompliance:
     def test_command_query_separation(self):
         """Ensure commands and queries are properly separated."""
         # Test that commands modify state and queries don't
-        command = CreateRequestCommand(template_id="test-template", machine_count=2)
+        command = CreateRequestCommand(template_id="test-template", requested_count=2)
 
         query = GetTemplateQuery(template_id="test-template")
 
         # Commands should have methods that modify state
         assert hasattr(command, "template_id")
-        assert hasattr(command, "machine_count")
+        assert hasattr(command, "requested_count")
 
         # Queries should be read-only
         assert hasattr(query, "template_id")
@@ -52,7 +52,7 @@ class TestCQRSCompliance:
         assert not isinstance(command, type(query)) and not isinstance(query, type(command))
 
     def test_command_handler_interface(self):
-        """Test that command handlers implement proper interface."""
+        """Test that command handlers implement correct interface."""
 
         # Mock a command handler
         class MockCommandHandler(ApplicationCommandHandler):
@@ -70,7 +70,7 @@ class TestCQRSCompliance:
         assert len(sig.parameters) >= 1
 
     def test_query_handler_interface(self):
-        """Test that query handlers implement proper interface."""
+        """Test that query handlers implement correct interface."""
         # Test query structure
         query = ListTemplatesQuery()
 
@@ -187,7 +187,7 @@ class TestCQRSCompliance:
     def test_event_driven_architecture_support(self):
         """Test that CQRS supports event-driven patterns."""
         # Commands should potentially trigger events
-        from src.domain.request.value_objects import RequestStatus
+        from domain.request.value_objects import RequestStatus
 
         command = UpdateRequestStatusCommand(
             request_id="test-request", status=RequestStatus.COMPLETED

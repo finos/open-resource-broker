@@ -24,7 +24,7 @@ After mastering DI basics:
 
 ### Clean Architecture Compliance
 
-The DI system follows proper dependency direction:
+The DI system follows correct dependency direction:
 
 ```python
 # [[]] Clean Architecture compliant
@@ -270,7 +270,7 @@ scheduler = container.get(SchedulerPort)  # Automatically resolves via registry
 
 - **Configuration-Driven**: Strategy selection based on configuration
 - **Lazy Loading**: Strategies created only when needed
-- **Type Safety**: Maintains proper port/adapter abstraction
+- **Type Safety**: Maintains appropriate port/adapter abstraction
 - **Testability**: Easy to mock or substitute strategies
 - **Separation of Concerns**: Registry handles strategy selection, DI handles dependency resolution
 
@@ -423,7 +423,7 @@ Use lazy loading or break the dependency cycle by introducing an interface.
 
 The DI architecture provides:
 
-[[]] **Clean Architecture Compliance** - Proper dependency direction  
+[[]] **Clean Architecture Compliance** - Correct dependency direction  
 [[]] **Improved DI Features** - Singleton, CQRS, optional dependencies  
 [[]] **Backward Compatibility** - All existing code continues to work  
 [[]] **Performance Optimized** - Minimal overhead with intelligent caching  

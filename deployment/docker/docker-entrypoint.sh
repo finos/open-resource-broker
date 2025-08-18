@@ -43,7 +43,7 @@ print_banner() {
 EOF
     echo ""
     log_info "Open Host Factory Plugin REST API"
-    log_info "Version: ${VERSION:-1.0.0}"
+    log_info "Version: ${VERSION:-dev}"
     log_info "Build: ${BUILD_DATE:-unknown}"
     echo ""
 }
@@ -198,13 +198,13 @@ start_application() {
     fi
 
     if [[ -n "${HF_SERVER_LOG_LEVEL}" ]]; then
-        cmd_args+=("--log-level" "${HF_SERVER_LOG_LEVEL}")
+        cmd_args+=("--server-log-level" "${HF_SERVER_LOG_LEVEL}")
     fi
 
-    log_info "Executing: python src/run.py ${cmd_args[*]}"
+    log_info "Executing: ohfp ${cmd_args[*]}"
 
     # Execute the application
-    exec python src/run.py "${cmd_args[@]}"
+    exec ohfp "${cmd_args[@]}"
 }
 
 # Handle different commands
@@ -221,7 +221,7 @@ handle_command() {
             # Run CLI commands
             shift
             log_info "Running CLI command: $*"
-            exec python src/run.py "$@"
+            exec ohfp "$@"
             ;;
         "bash"|"sh")
             # Start interactive shell
@@ -231,19 +231,19 @@ handle_command() {
         "health"|"healthcheck")
             # Health check
             log_info "Running health check"
-            curl -f "http://localhost:${HF_SERVER_PORT:-8000}/health" || exit 1
+            python -c "import requests; requests.get('http://localhost:${HF_SERVER_PORT:-8000}/health', timeout=5).raise_for_status()" || exit 1
             ;;
         "version")
             # Show version
             echo "Open Host Factory Plugin REST API"
-            echo "Version: ${VERSION:-1.0.0}"
+            echo "Version: ${VERSION:-dev}"
             echo "Build: ${BUILD_DATE:-unknown}"
             echo "Revision: ${VCS_REF:-unknown}"
             ;;
         *)
             # Unknown command - pass through to application
             log_info "Passing command to application: $*"
-            exec python src/run.py "$@"
+            exec ohfp "$@"
             ;;
     esac
 }

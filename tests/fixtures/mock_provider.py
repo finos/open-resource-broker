@@ -2,8 +2,8 @@
 
 from typing import Any, Dict, List, Optional
 
-from src.domain.base.value_objects import InstanceId
-from src.infrastructure.interfaces.provider import ProviderConfig, ProviderPort
+from domain.base.value_objects import InstanceId
+from infrastructure.interfaces.provider import ProviderConfig, ProviderPort
 
 
 class MockProviderConfig(ProviderConfig):

@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any, Dict, Optional, Type, TypeVar
 
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.logging.logger import get_logger
 
 E = TypeVar("E", bound=Enum)
 

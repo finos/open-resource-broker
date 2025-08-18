@@ -3,20 +3,17 @@
 import time
 from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from src.api.models import RequestStatusModel
-from src.api.validation import RequestValidator, ValidationException
-from src.application.base.infrastructure_handlers import BaseAPIHandler, RequestContext
-from src.application.request.dto import RequestStatusResponse
-from src.application.request.queries import (
-    GetActiveRequestsQuery,
-    GetRequestStatusQuery,
-)
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import ErrorHandlingPort, LoggingPort
-from src.domain.base.ports.scheduler_port import SchedulerPort
-from src.domain.request.exceptions import RequestNotFoundError
-from src.infrastructure.error.decorators import handle_interface_exceptions
-from src.monitoring.metrics import MetricsCollector
+from api.models import RequestStatusModel
+from api.validation import RequestValidator, ValidationException
+from application.base.infrastructure_handlers import BaseAPIHandler, RequestContext
+from application.request.dto import RequestStatusResponse
+from application.request.queries import GetActiveRequestsQuery, GetRequestStatusQuery
+from domain.base.dependency_injection import injectable
+from domain.base.ports import ErrorHandlingPort, LoggingPort
+from domain.base.ports.scheduler_port import SchedulerPort
+from domain.request.exceptions import RequestNotFoundError
+from infrastructure.error.decorators import handle_interface_exceptions
+from monitoring.metrics import MetricsCollector
 
 
 @injectable
@@ -45,7 +42,7 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[Dict[str, Any], RequestStatusRe
             metrics: Optional metrics collector
             max_retries: Maximum number of retries for failed requests
         """
-        # Initialize with proper dependencies
+        # Initialize with required dependencies
         super().__init__(logger, error_handler)
         self._query_bus = query_bus
         self._command_bus = command_bus
@@ -297,4 +294,4 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[Dict[str, Any], RequestStatusRe
 
 
 if TYPE_CHECKING:
-    from src.infrastructure.di.buses import CommandBus, QueryBus
+    from infrastructure.di.buses import CommandBus, QueryBus

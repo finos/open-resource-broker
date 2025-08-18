@@ -5,9 +5,9 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import Field
 
-from src.application.dto.base import BaseDTO
-from src.domain.machine.aggregate import Machine
-from src.domain.machine.value_objects import MachineStatus
+from application.dto.base import BaseDTO
+from domain.machine.aggregate import Machine
+from domain.machine.value_objects import MachineStatus
 
 
 class MachineDTO(BaseDTO):

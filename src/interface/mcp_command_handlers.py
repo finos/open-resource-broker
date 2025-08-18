@@ -9,8 +9,8 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
-from src.infrastructure.error.decorators import handle_interface_exceptions
-from src.mcp.tools import OpenHFPluginMCPTools
+from infrastructure.error.decorators import handle_interface_exceptions
+from mcp.tools import OpenHFPluginMCPTools
 
 
 @handle_interface_exceptions(context="mcp_tools_list", interface_type="cli")

@@ -1,6 +1,6 @@
 """AWS AMI Resolution service for AWS provider."""
 
-from src.domain.template.image_resolver import ImageResolver
+from domain.template.image_resolver import ImageResolver
 
 
 class AWSAMIResolver(ImageResolver):

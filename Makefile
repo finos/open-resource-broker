@@ -1,6 +1,6 @@
 # Makefile for Open Host Factory Plugin
 
-.PHONY: help install install-pip install-uv dev-install dev-install-pip dev-install-uv test test-unit test-integration test-e2e test-all test-cov test-html test-parallel test-quick test-performance test-aws test-report lint format security security-container security-full security-scan security-validate-sarif security-report sbom-generate clean clean-all build build-test docs docs-build docs-serve docs-deploy docs-clean docs-deploy-version docs-list-versions docs-delete-version ci-docs-build ci-docs-build-for-pages ci-docs-deploy run run-dev version-show version-bump version-bump-patch version-bump-minor version-bump-major generate-pyproject ci-quality ci-security ci-security-codeql ci-security-container ci-architecture ci-imports ci-tests-unit ci-tests-integration ci-tests-e2e ci-tests-matrix ci-tests-performance ci-check ci-check-quick ci-check-fix ci-check-verbose ci ci-quick workflow-ci workflow-test-matrix workflow-security architecture-check architecture-report quality-check quality-check-fix quality-check-files quality-gates quality-full generate-completions install-completions install-bash-completions install-zsh-completions uninstall-completions test-completions dev-setup install-package uninstall-package reinstall-package init-db create-config validate-config docker-build docker-run docker-compose-up docker-compose-down dev status uv-lock uv-sync uv-sync-dev uv-check uv-benchmark file-sizes file-sizes-report validate-workflows detect-secrets clean-whitespace hadolint-check install-dev-tools dev-checks-container dev-checks-container-required format-container hadolint-check-container pre-commit-check pre-commit-check-required
+.PHONY: help install install-pip dev-install dev-install-pip test test-unit test-integration test-e2e test-all test-cov test-html test-parallel test-quick test-performance test-aws test-report lint format security security-quick security-all security-with-container security-container security-full security-scan security-validate-sarif security-report sbom-generate clean clean-all build build-test docs docs-build docs-serve docs-deploy docs-clean docs-deploy-version docs-list-versions docs-delete-version ci-docs-build ci-docs-build-for-pages ci-docs-deploy run run-dev version-show version-bump version-bump-patch version-bump-minor version-bump-major generate-pyproject ci-quality ci-security ci-security-codeql ci-security-container ci-architecture ci-imports ci-tests-unit ci-tests-integration ci-tests-e2e ci-tests-matrix ci-tests-performance ci-check ci-check-quick ci-check-fix ci-check-verbose ci ci-quick workflow-ci workflow-test-matrix workflow-security architecture-check architecture-report quality-check quality-check-fix quality-check-files quality-gates quality-full generate-completions install-completions install-bash-completions install-zsh-completions uninstall-completions test-completions dev-setup install-package uninstall-package reinstall-package init-db create-config validate-config container-build container-run docker-compose-up docker-compose-down quick-start dev status uv-lock uv-sync uv-sync-dev uv-check uv-benchmark file-sizes file-sizes-report validate-workflows detect-secrets clean-whitespace hadolint-check install-dev-tools install-dev-tools-required install-dev-tools-dry-run dev-checks-container dev-checks-container-required format-container hadolint-check-container pre-commit-check pre-commit-check-required
 
 # Python settings
 PYTHON := python3
@@ -39,6 +39,10 @@ DOCS_URL := https://$(REPO_ORG).github.io/$(PACKAGE_NAME)
 PROJECT := $(PACKAGE_NAME)
 PACKAGE := src
 TESTS := tests
+TESTS_UNIT := $(TESTS)/unit
+TESTS_INTEGRATION := $(TESTS)/integration
+TESTS_E2E := $(TESTS)/e2e
+TESTS_PERFORMANCE := $(TESTS)/performance
 CONFIG := config/config.json
 
 # Coverage settings
@@ -64,10 +68,12 @@ endef
 help:  ## Show this help message
 	@echo 'Usage: make [target]'
 	@echo ''
-	@echo 'Targets:'
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*## "; section=""} \
+		/^# @SECTION / {if(section && length(buffer)>0) {print buffer | "sort"; close("sort"); buffer=""} section=substr($$0,12); print "\n" section ":"} \
+		/^[[:alnum:]_-]+:.*## / {if(section) buffer = buffer sprintf("  %-20s %s\n", $$1, $$2)} \
+		END {if(section && length(buffer)>0) {print buffer | "sort"; close("sort")}}' $(MAKEFILE_LIST)
 
-# Installation targets
+# @SECTION Setup & Installation
 install: $(VENV)/bin/activate  ## Install production dependencies (UV-first)
 	@echo "Installing production dependencies with UV..."
 	uv sync --no-dev
@@ -93,14 +99,6 @@ dev-install-pip: generate-pyproject $(VENV)/bin/activate  ## Install development
 ci-install: generate-pyproject  ## Install dependencies for CI (UV frozen)
 	@echo "Installing with UV (frozen mode - CI dependencies)..."
 	uv sync --frozen --group ci
-
-ci-install-pip: generate-pyproject  ## Install dependencies for CI (pip alternative)
-	@echo "Generating requirements from uv.lock..."
-	uv export --no-dev --no-header --output-file requirements.txt
-	uv export --group ci --no-header --output-file requirements-ci.txt
-	pip install -e ".[ci]"
-	@echo "Installing with pip..."
-	pip install -r requirements-dev.txt
 
 # Requirements generation
 requirements-generate:  ## Generate requirements files from uv.lock
@@ -143,6 +141,7 @@ $(VENV)/bin/activate: uv.lock
 	fi
 	touch $(VENV)/bin/activate
 
+# @SECTION Testing
 # Testing targets (using dev-tools)
 test: test-quick  ## Run quick test suite (alias for test-quick)
 
@@ -180,6 +179,7 @@ test-html: dev-install  ## Run tests with HTML coverage report
 test-report: dev-install  ## Generate comprehensive test report
 	./dev-tools/testing/run_tests.py --all --coverage --junit-xml=test-results-combined.xml --cov-xml=coverage-combined.xml --html-coverage --maxfail=1 --timeout=60
 
+# @SECTION Code Quality
 # Code quality targets
 quality-check: dev-install  ## Run professional quality checks on modified files
 	@echo "Running professional quality checks..."
@@ -201,17 +201,14 @@ quality-check-files: dev-install  ## Run quality checks on specific files (usage
 	@echo "Running professional quality checks on specified files..."
 	./dev-tools/scripts/quality_check.py --strict --files $(FILES)
 
-lint: dev-install quality-check  ## Run all linting checks including quality checks
-	@echo "Running Black (code formatting)..."
-	$(BIN)/black --check $(PACKAGE) $(TESTS)
-	@echo "Running isort (import sorting)..."
-	$(BIN)/isort --check-only $(PACKAGE) $(TESTS)
-	@echo "Running flake8 (style guide)..."
-	$(BIN)/flake8 $(PACKAGE) $(TESTS)
-	@echo "Running mypy (type checking)..."
-	$(BIN)/mypy $(PACKAGE)
-	@echo "Running pylint (code analysis)..."
-	$(BIN)/pylint $(PACKAGE)
+lint: dev-install  ## Run comprehensive linting (black, isort, flake8, mypy, pylint)
+	./dev-tools/scripts/ci_check.py
+
+lint-quick: dev-install  ## Run fast linting (skip slow mypy/pylint)
+	./dev-tools/scripts/ci_check.py --quick
+
+lint-fix: dev-install  ## Fix linting issues (black, isort auto-fix)
+	./dev-tools/scripts/ci_check.py --fix
 
 hadolint-check: ## Check Dockerfile with hadolint
 	@if command -v hadolint >/dev/null 2>&1; then \
@@ -234,14 +231,17 @@ format-container: ## Format code in container (no local tools needed)
 hadolint-check-container: ## Check Dockerfile with hadolint in container (no local install needed)
 	./dev-tools/scripts/run_dev_checks.sh all
 
-install-dev-tools: ## Install development tools (hadolint, etc.)
-	@echo "Installing development tools..."
-	@if command -v brew >/dev/null 2>&1; then \
-		brew install hadolint; \
-	else \
-		echo "Homebrew not found. Please install hadolint manually."; \
-		echo "See: https://github.com/hadolint/hadolint#install"; \
-	fi
+install-dev-tools: ## Install all development tools (yq, hadolint, trivy, syft, docker, uv, etc.)
+	@echo "Installing development tools for $(shell uname -s)..."
+	./dev-tools/scripts/install_dev_tools.py
+
+install-dev-tools-required: ## Install only required development tools (yq, uv, docker)
+	@echo "Installing required development tools..."
+	./dev-tools/scripts/install_dev_tools.py --required-only
+
+install-dev-tools-dry-run: ## Show what development tools would be installed
+	@echo "Checking what development tools would be installed..."
+	./dev-tools/scripts/install_dev_tools.py --dry-run
 
 clean-whitespace:  ## Clean whitespace in blank lines from all files
 	@echo "Cleaning whitespace in blank lines..."
@@ -250,46 +250,40 @@ clean-whitespace:  ## Clean whitespace in blank lines from all files
 format: dev-install clean-whitespace  ## Format code (Black + isort + autopep8 + autoflake + whitespace cleanup)
 	./dev-tools/scripts/format_code.py
 
-security: dev-install  ## Run security checks
-	@echo "Running bandit (security linter)..."
-	$(BIN)/bandit -r $(PACKAGE) -f json -o bandit-report.json || echo "Security issues found - check bandit-report.json"
-	$(BIN)/bandit -r $(PACKAGE) -f sarif -o bandit-results.sarif || echo "Security issues found - check bandit-results.sarif"
-	@echo "Running safety (dependency vulnerability check)..."
-	$(BIN)/safety check || echo "Vulnerable dependencies found"
+security: dev-install  ## Run security checks (bandit, safety)
+	./dev-tools/scripts/security_check.py
+
+security-quick: dev-install  ## Run quick security checks only
+	./dev-tools/scripts/security_check.py --quick
+
+security-all: dev-install  ## Run all available security tools
+	./dev-tools/scripts/security_check.py --all
 
 security-container: dev-install ## Run container security scans
 	@echo "Running container security scans..."
-	@if ! command -v trivy >/dev/null 2>&1; then \
-		echo "Installing Trivy..."; \
-		curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin; \
-	fi
+	@echo "Ensuring required tools are installed..."
+	./dev-tools/scripts/install_dev_tools.py --tool trivy --tool hadolint
 	@echo "Building Docker image for security scan..."
 	docker build -t $(PROJECT):security-scan .
 	@echo "Running Trivy vulnerability scan..."
 	trivy image --format sarif --output trivy-results.sarif $(PROJECT):security-scan
 	trivy image --format json --output trivy-results.json $(PROJECT):security-scan
 	@echo "Running Hadolint Dockerfile scan..."
-	@if ! command -v hadolint >/dev/null 2>&1; then \
-		echo "Installing Hadolint..."; \
-		wget -O hadolint https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64; \
-		chmod +x hadolint; \
-		sudo mv hadolint /usr/local/bin/; \
-	fi
 	hadolint Dockerfile --format sarif > hadolint-results.sarif || echo "Dockerfile issues found"
 
-security-full: security security-container  ## Run all security scans including container
+security-with-container: dev-install  ## Run security checks including container scans
+	./dev-tools/scripts/security_check.py --all --container
+
+security-full: security-with-container sbom-generate  ## Run all security scans including container and SBOM
 
 sbom-generate: dev-install ## Generate Software Bill of Materials (SBOM)
 	@echo "Generating SBOM files..."
-	@if ! command -v syft >/dev/null 2>&1; then \
-		echo "Installing Syft..."; \
-		curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin; \
-	fi
-	@echo "Installing pip-audit for Python SBOM..."
-	$(BIN)/pip install pip-audit
+	@echo "Ensuring required tools are installed..."
+	./dev-tools/scripts/install_dev_tools.py --tool syft
+	./dev-tools/scripts/install_dev_tools.py --tool pip-audit
 	@echo "Generating Python dependency SBOM..."
-	$(BIN)/pip-audit --format=cyclonedx-json --output=python-sbom-cyclonedx.json
-	$(BIN)/pip-audit --format=spdx-json --output=python-sbom-spdx.json
+	$(call run-tool,pip-audit,--format=cyclonedx-json --output=python-sbom-cyclonedx.json)
+	$(call run-tool,pip-audit,--format=spdx-json --output=python-sbom-spdx.json)
 	@echo "Generating project SBOM with Syft..."
 	syft . -o spdx-json=project-sbom-spdx.json
 	syft . -o cyclonedx-json=project-sbom-cyclonedx.json
@@ -364,6 +358,7 @@ test-completions:         ## Test completion generation
 	@echo "Testing zsh completion generation..."
 	@$(PYTHON) src/run.py --completion zsh > /dev/null && echo "SUCCESS: Zsh completion generation works"
 
+# @SECTION Documentation
 # Documentation targets
 docs: docs-build  ## Build documentation (main docs entry point)
 
@@ -446,6 +441,7 @@ version-bump:  ## Show version bump help
 	@echo ""
 	@echo "Current version: $(VERSION)"
 
+# @SECTION Build & Deploy
 # Build targets (using dev-tools)
 build: clean generate-pyproject dev-install  ## Build package
 	BUILD_ARGS="$(BUILD_ARGS)" ./dev-tools/package/build.sh
@@ -463,31 +459,32 @@ publish-test: build  ## Publish to test PyPI
 	./dev-tools/package/publish.sh testpypi
 
 # CI/CD targets
+# @SECTION CI Quality Checks
 # Individual code quality targets (with tool names)
 ci-quality-black:  ## Run Black code formatting check
 	@echo "Running Black formatting check..."
-	$(call run-tool,black,--check src/ tests/)
+	$(call run-tool,black,--check $(PACKAGE) $(TESTS))
 
 ci-quality-isort:  ## Run isort import sorting check
 	@echo "Running isort import check..."
-	$(call run-tool,isort,--check-only src/ tests/)
+	$(call run-tool,isort,--check-only $(PACKAGE) $(TESTS))
 
 ci-quality-flake8:  ## Run flake8 style guide check
 	@echo "Running flake8 style check..."
-	$(call run-tool,flake8,src/ tests/)
+	$(call run-tool,flake8,$(PACKAGE) $(TESTS))
 
 ci-quality-mypy:  ## Run mypy type checking
 	@echo "Running mypy type check..."
-	$(call run-tool,mypy,src/)
+	$(call run-tool,mypy,$(PACKAGE) $(TESTS))
 
 ci-quality-pylint:  ## Run pylint code analysis
 	@echo "Running pylint analysis..."
-	$(call run-tool,pylint,src/)
+	$(call run-tool,pylint,$(PACKAGE) $(TESTS))
 
 ci-quality-radon:  ## Run radon complexity analysis
 	@echo "Running radon complexity analysis..."
-	$(call run-tool,radon,cc src/ --min B --show-complexity)
-	$(call run-tool,radon,mi src/ --min B)
+	$(call run-tool,radon,cc $(PACKAGE) --min B --show-complexity)
+	$(call run-tool,radon,mi $(PACKAGE) --min B)
 
 # Composite target (for local convenience)
 ci-quality: ci-quality-black ci-quality-isort ci-quality-flake8 ci-quality-mypy ci-quality-pylint ci-quality-radon  ## Run all code quality checks
@@ -515,9 +512,29 @@ file-sizes: dev-install  ## Check file sizes (developer-friendly alias)
 file-sizes-report: dev-install  ## Generate detailed file size report
 	./dev-tools/scripts/check_file_sizes.py --report
 
-validate-workflows: dev-install  ## Validate GitHub Actions workflow YAML files
+validate-workflow-syntax: dev-install  ## Validate GitHub Actions workflow YAML syntax
 	@echo "Validating workflow files..."
-	./dev-tools/scripts/validate_workflows.py
+	# Use 'uv run' because this script imports PyYAML (third-party package)
+	# Other dev-tools scripts use only standard library so work with shebang
+	uv run ./dev-tools/scripts/validate_workflows.py
+
+validate-workflow-logic: dev-install  ## Validate GitHub Actions workflows with actionlint
+	@echo "Validating workflows with actionlint..."
+	@echo "Ensuring actionlint is installed..."
+	./dev-tools/scripts/install_dev_tools.py --tool actionlint
+	./dev-tools/scripts/validate_actionlint.py
+
+validate-shell-scripts: dev-install  ## Validate shell scripts with shellcheck
+	@echo "Validating shell scripts with shellcheck..."
+	@echo "Ensuring shellcheck is installed..."
+	./dev-tools/scripts/install_dev_tools.py --tool shellcheck
+	./dev-tools/scripts/validate_shell_scripts.py
+
+validate-shellcheck: validate-shell-scripts  ## Alias for pre-commit compatibility
+
+validate-all-workflows: validate-workflow-syntax validate-workflow-logic  ## Run all workflow validation checks
+
+validate-all-files: validate-all-workflows validate-shell-scripts  ## Run all validation checks
 
 detect-secrets: dev-install  ## Detect potential hardcoded secrets in source code
 	@echo "Detecting hardcoded secrets..."
@@ -537,7 +554,7 @@ ci-architecture: ci-arch-cqrs ci-arch-clean ci-arch-imports ci-arch-file-sizes  
 # Individual security targets (with tool names)
 ci-security-bandit:  ## Run Bandit security scan
 	@echo "Running Bandit security scan..."
-	$(call run-tool,bandit,-r src/)
+	$(call run-tool,bandit,-r $(PACKAGE))
 
 ci-security-safety:  ## Run Safety dependency scan
 	@echo "Running Safety dependency scan..."
@@ -564,7 +581,7 @@ ci-security-hadolint:  ## Run Hadolint Dockerfile scan
 ci-security-semgrep:  ## Run Semgrep static analysis
 	@echo "Running Semgrep static analysis..."
 	@if command -v semgrep >/dev/null 2>&1; then \
-		semgrep --config=auto --sarif --output=semgrep.sarif src/ || echo "Semgrep issues found"; \
+		semgrep --config=auto --sarif --output=semgrep.sarif $(PACKAGE) || echo "Semgrep issues found"; \
 	else \
 		echo "Semgrep not available - install with: pip install semgrep"; \
 	fi
@@ -595,23 +612,23 @@ ci-build-sbom:  ## Generate SBOM files (matches publish.yml workflow)
 
 ci-tests-unit:  ## Run unit tests only (matches ci.yml unit-tests job)
 	@echo "Running unit tests..."
-	$(call run-tool,pytest,tests/unit/ $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-unit.xml --junitxml=junit-unit.xml)
+	$(call run-tool,pytest,$(TESTS_UNIT) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-unit.xml --junitxml=junit-unit.xml)
 
 ci-tests-integration:  ## Run integration tests only (matches ci.yml integration-tests job)
 	@echo "Running integration tests..."
-	$(call run-tool,pytest,tests/integration/ $(PYTEST_ARGS) --junitxml=junit-integration.xml)
+	$(call run-tool,pytest,$(TESTS_INTEGRATION) $(PYTEST_ARGS) --junitxml=junit-integration.xml)
 
 ci-tests-e2e:  ## Run end-to-end tests only (matches ci.yml e2e-tests job)
 	@echo "Running end-to-end tests..."
-	$(call run-tool,pytest,tests/e2e/ $(PYTEST_ARGS) --junitxml=junit-e2e.xml)
+	$(call run-tool,pytest,$(TESTS_E2E) $(PYTEST_ARGS) --junitxml=junit-e2e.xml)
 
 ci-tests-matrix:  ## Run comprehensive test matrix (matches test-matrix.yml workflow)
 	@echo "Running comprehensive test matrix..."
-	$(call run-tool,pytest,tests/ $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-matrix.xml --junitxml=junit-matrix.xml)
+	$(call run-tool,pytest,$(TESTS) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-matrix.xml --junitxml=junit-matrix.xml)
 
 ci-tests-performance:  ## Run performance tests only (matches ci.yml performance-tests job)
 	@echo "Running performance tests..."
-	$(call run-tool,pytest,tests/performance/ $(PYTEST_ARGS) --junitxml=junit-performance.xml)
+	$(call run-tool,pytest,$(TESTS_PERFORMANCE) $(PYTEST_ARGS) --junitxml=junit-performance.xml)
 
 ci-check:  ## Run comprehensive CI checks (matches GitHub Actions exactly)
 	@echo "Running comprehensive CI checks that match GitHub Actions pipeline..."
@@ -680,10 +697,10 @@ dev-setup: dev-install  ## Set up development environment
 
 # Package management targets
 install-package: build  ## Install package locally
-	$(BIN)/pip install dist/*.whl
+	uv pip install dist/*.whl
 
 uninstall-package:  ## Uninstall package
-	$(BIN)/pip uninstall $(PROJECT) -y
+	uv pip uninstall $(PROJECT) -y
 
 reinstall-package: uninstall-package install-package  ## Reinstall package
 
@@ -704,14 +721,14 @@ create-config:  ## Create default config file
 validate-config: install  ## Validate configuration
 	$(PYTHON) src/run.py config validate
 
-# Docker targets
-docker-build:  ## Build Docker image
+# Container targets
+container-build:  ## Build Docker image
 	REGISTRY=$(CONTAINER_REGISTRY) \
 	VERSION=$(VERSION) \
 	IMAGE_NAME=$(CONTAINER_IMAGE) \
 	./dev-tools/scripts/container_build.sh
 
-docker-run:  ## Run Docker container
+container-run:  ## Run Docker container
 	docker run -p 8000:8000 $(PROJECT):latest
 
 docker-compose-up:  ## Start with docker-compose
@@ -778,7 +795,9 @@ show-package-info:  ## Show current package and version metadata
 	@echo "  Container Registry: $(CONTAINER_REGISTRY)"
 	@echo "  Documentation: $(DOCS_URL)"
 
-# Quick development workflow
+quick-start: ## Complete setup for new developers (install tools + dependencies + verify)
+	./dev-tools/scripts/quick_start.py
+
 dev: dev-install format lint test-quick  ## Quick development workflow (format, lint, test)
 	@echo "Development workflow completed successfully!"
 

@@ -239,7 +239,7 @@ RequestRepository(storage_strategy)
 ### 3. Consistent Registration
 - All storage types follow same registration pattern
 - Include unit of work factory
-- Proper error handling
+- Appropriate error handling
 
 ### 4. Configuration Validation
 - Validate storage configuration

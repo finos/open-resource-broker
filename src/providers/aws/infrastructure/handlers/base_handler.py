@@ -3,7 +3,7 @@ Integrated AWS Handler Base Class following Clean Architecture and CQRS patterns
 
 This module provides a integrated base handler that combines the best features of both
 AWSHandler and BaseAWSHandler patterns while maintaining clean architecture principles
-and proper integration with our DI/CQRS system.
+and clean integration with our DI/CQRS system.
 """
 
 from abc import ABC, abstractmethod
@@ -11,12 +11,12 @@ from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 from botocore.exceptions import ClientError
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import ErrorHandlingPort, LoggingPort
-from src.domain.request.aggregate import Request
-from src.infrastructure.resilience import retry
-from src.providers.aws.domain.template.aggregate import AWSTemplate
-from src.providers.aws.exceptions.aws_exceptions import (
+from domain.base.dependency_injection import injectable
+from domain.base.ports import ErrorHandlingPort, LoggingPort
+from domain.request.aggregate import Request
+from infrastructure.resilience import retry
+from providers.aws.domain.template.aggregate import AWSTemplate
+from providers.aws.exceptions.aws_exceptions import (
     AuthorizationError,
     AWSEntityNotFoundError,
     AWSValidationError,
@@ -26,7 +26,7 @@ from src.providers.aws.exceptions.aws_exceptions import (
     RateLimitError,
     ResourceInUseError,
 )
-from src.providers.aws.infrastructure.aws_client import AWSClient
+from providers.aws.infrastructure.aws_client import AWSClient
 
 T = TypeVar("T")
 
@@ -39,7 +39,7 @@ class AWSHandler(ABC):
     This class provides the foundation for all AWS handlers in the system,
     combining the best features of both synchronous and asynchronous patterns:
 
-    - Clean Architecture compliance with proper dependency injection
+    - Clean Architecture compliance with dependency injection
     - CQRS-aligned error handling and logging
     - Professional retry logic with circuit breaker support
     - Performance monitoring and metrics collection
@@ -49,7 +49,7 @@ class AWSHandler(ABC):
 
     Architecture Alignment:
     - Follows same patterns as other base handlers in the system
-    - Proper DI integration with standardized dependencies
+    - Appropriate DI integration with standardized dependencies
     - Clean separation of concerns
     - Professional error handling and logging
     """
@@ -323,7 +323,7 @@ class AWSHandler(ABC):
         Returns:
             Combined results from all pages
         """
-        from src.providers.aws.infrastructure.utils import paginate
+        from providers.aws.infrastructure.utils import paginate
 
         return paginate(client_method, result_key, **kwargs)
 

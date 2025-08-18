@@ -166,7 +166,7 @@ from src.domain.request.request_types import RequestStatus  # Use orchestrator i
 ### Module not found errors
 1. Ensure you're running from the project root
 2. Check that `src/` is in your Python path
-3. Verify the module file exists and has proper `__init__.py`
+3. Verify the module file exists and has appropriate `__init__.py`
 
 ##  Related Documentation
 

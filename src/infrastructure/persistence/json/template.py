@@ -4,17 +4,17 @@ import json
 import os
 from typing import Any, Dict, List, Optional
 
-from src.config.managers.configuration_manager import ConfigurationManager
-from src.domain.base.exceptions import ConfigurationError
-from src.domain.template.aggregate import Template
-from src.domain.template.repository import TemplateRepository
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.patterns.singleton_registry import SingletonRegistry
-from src.infrastructure.persistence.base import StrategyBasedRepository
-from src.infrastructure.persistence.json.provider_template_strategy import (
+from config.managers.configuration_manager import ConfigurationManager
+from domain.base.exceptions import ConfigurationError
+from domain.template.aggregate import Template
+from domain.template.repository import TemplateRepository
+from infrastructure.logging.logger import get_logger
+from infrastructure.patterns.singleton_registry import SingletonRegistry
+from infrastructure.persistence.base import StrategyBasedRepository
+from infrastructure.persistence.json.provider_template_strategy import (
     ProviderTemplateStrategy,
 )
-from src.infrastructure.persistence.json.strategy import JSONStorageStrategy
+from infrastructure.persistence.json.strategy import JSONStorageStrategy
 
 
 class TemplateJSONStorageStrategy(JSONStorageStrategy):

@@ -5,11 +5,11 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.application.dto.responses import RequestDTO
-from src.config.manager import ConfigurationManager
-from src.domain.base import UnitOfWorkFactory
-from src.domain.base.ports import LoggingPort
-from src.infrastructure.caching.request_cache_service import RequestCacheService
+from application.dto.responses import RequestDTO
+from config.manager import ConfigurationManager
+from domain.base import UnitOfWorkFactory
+from domain.base.ports import LoggingPort
+from infrastructure.caching.request_cache_service import RequestCacheService
 
 
 class TestRequestCacheService:

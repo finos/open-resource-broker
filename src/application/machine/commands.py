@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, List, Optional
 
-from src.application.dto.base import BaseCommand
+from application.dto.base import BaseCommand
 
 
 class UpdateMachineStatusCommand(BaseCommand):

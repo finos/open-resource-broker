@@ -60,7 +60,11 @@
           "subnet_ids": ["subnet-12345678"],
           "key_name": "",
           "provider_api": "EC2Fleet",
-          "price_type": "ondemand"
+          "price_type": "ondemand",
+          "tags": {
+            "Environment": "development",
+            "Project": "hostfactory"
+          }
         },
         "launch_template": {
           "create_per_request": true,
@@ -207,8 +211,6 @@
   },
   "environment": "development",
   "debug": false,
-  "request_timeout": 300,
-  "max_machines_per_request": 100,
   "performance": {
     "lazy_loading": {
       "enabled": true,

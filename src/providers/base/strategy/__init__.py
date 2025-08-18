@@ -14,7 +14,7 @@ Key Components:
 - Value Objects: Operation, Result, Capabilities, Health status
 
 Usage Example:
-    from src.providers.base.strategy import (
+    from providers.base.strategy import (
         ProviderContext,
         ProviderOperation,
         ProviderOperationType,
@@ -44,10 +44,11 @@ Usage Example:
         parameters={'count': 5, 'template_id': 'web-server'}
     )
 
-    result = context.execute_operation(operation)
+    result = await context.execute_operation(operation)
 """
 
 # Advanced strategy patterns
+from .base_provider_strategy import BaseProviderStrategy
 from .composite_strategy import (
     AggregationPolicy,
     CompositeProviderStrategy,
@@ -96,14 +97,10 @@ from .provider_strategy import (
     ProviderStrategy,
 )
 
-# Version and metadata
-__version__ = "1.0.0"
-__author__ = "Symphony Team"
-__description__ = "Provider Strategy Pattern Implementation"
-
 # Public API exports
 __all__ = [
     # Core interfaces
+    "BaseProviderStrategy",
     "ProviderStrategy",
     "ProviderOperation",
     "ProviderResult",
@@ -157,7 +154,7 @@ def create_provider_context(logger=None) -> ProviderContext:
 
     # Load strategies from the provider registry
     try:
-        from src.infrastructure.registry.provider_registry import get_provider_registry
+        from infrastructure.registry.provider_registry import get_provider_registry
 
         registry = get_provider_registry()
 
@@ -169,7 +166,7 @@ def create_provider_context(logger=None) -> ProviderContext:
                 registration = registry.get_provider_instance_registration(instance_name)
                 if registration:
                     # Get the actual provider config from configuration manager
-                    from src.config.manager import get_config_manager
+                    from config.manager import get_config_manager
 
                     config_manager = get_config_manager()
                     provider_config = config_manager.get_provider_config()

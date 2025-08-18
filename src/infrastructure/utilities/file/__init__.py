@@ -9,7 +9,7 @@ This package provides comprehensive file operations organized by functionality:
 - Directory operations: list_files, list_directories, ensure_directory_exists
 - File operations: copy_file, move_file, delete_file, file_exists
 
-All functions include proper error handling and type hints.
+All functions include structured error handling and type hints.
 """
 
 # Binary operations
@@ -149,6 +149,6 @@ __all__ = [
 
 def get_file_utils_logger():
     """Get logger for file utilities."""
-    from src.infrastructure.logging.logger import get_logger
+    from infrastructure.logging.logger import get_logger
 
     return get_logger(__name__)

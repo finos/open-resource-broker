@@ -10,8 +10,8 @@ import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Generic, Optional, TypeVar
 
-from src.application.interfaces.provider_handler import ProviderHandler
-from src.domain.base.ports import ErrorHandlingPort, LoggingPort
+from application.interfaces.provider_handler import ProviderHandler
+from domain.base.ports import ErrorHandlingPort, LoggingPort
 
 TRequest = TypeVar("TRequest")
 TResponse = TypeVar("TResponse")

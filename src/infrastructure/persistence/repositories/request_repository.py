@@ -5,22 +5,20 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from src.domain.base.events import (
+from domain.base.events import (
     DomainEvent,
     RepositoryOperationCompletedEvent,
     RepositoryOperationFailedEvent,
     RepositoryOperationStartedEvent,
     SlowQueryDetectedEvent,
 )
-from src.domain.base.value_objects import InstanceId  # Add InstanceId import
-from src.domain.request.aggregate import Request
-from src.domain.request.repository import (
-    RequestRepository as RequestRepositoryInterface,
-)
-from src.domain.request.value_objects import RequestId, RequestStatus, RequestType
-from src.infrastructure.error.decorators import handle_infrastructure_exceptions
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.persistence.base.strategy import BaseStorageStrategy
+from domain.base.ports.storage_port import StoragePort
+from domain.base.value_objects import InstanceId  # Add InstanceId import
+from domain.request.aggregate import Request
+from domain.request.repository import RequestRepository as RequestRepositoryInterface
+from domain.request.value_objects import RequestId, RequestStatus, RequestType
+from infrastructure.error.decorators import handle_infrastructure_exceptions
+from infrastructure.logging.logger import get_logger
 
 
 class RequestSerializer:
@@ -123,7 +121,7 @@ class RequestSerializer:
                 "version": data.get("version", 0),
             }
 
-            # Create request using model_validate to handle all fields properly
+            # Create request using model_validate to handle all fields correctly
             request = Request.model_validate(request_data)
 
             return request
@@ -136,9 +134,9 @@ class RequestSerializer:
 class RequestRepositoryImpl(RequestRepositoryInterface):
     """Single request repository implementation using storage strategy composition."""
 
-    def __init__(self, storage_strategy: BaseStorageStrategy, event_publisher=None):
-        """Initialize repository with storage strategy and optional event publisher."""
-        self.storage_strategy = storage_strategy
+    def __init__(self, storage_port: StoragePort, event_publisher=None):
+        """Initialize repository with storage port and optional event publisher."""
+        self.storage_port = storage_port
         self.serializer = RequestSerializer()
         self.logger = get_logger(__name__)
         self.event_publisher = event_publisher
@@ -167,7 +165,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
                 operation_id=operation_id,
                 entity_type="Request",
                 entity_id=entity_id,
-                storage_strategy=self.storage_strategy.__class__.__name__,
+                storage_strategy=self.storage_port.__class__.__name__,
                 operation_type="save",
             )
         )
@@ -175,7 +173,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
         try:
             # Save the request
             request_data = self.serializer.to_dict(request)
-            self.storage_strategy.save(entity_id, request_data)
+            self.storage_port.save(entity_id, request_data)
 
             # Calculate duration
             duration_ms = (time.time() - start_time) * 1000
@@ -192,7 +190,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
                     operation_id=operation_id,
                     entity_type="Request",
                     entity_id=entity_id,
-                    storage_strategy=self.storage_strategy.__class__.__name__,
+                    storage_strategy=self.storage_port.__class__.__name__,
                     operation_type="save",
                     duration_ms=duration_ms,
                     success=True,
@@ -209,7 +207,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
                         operation_id=operation_id,
                         entity_type="Request",
                         entity_id=entity_id,
-                        storage_strategy=self.storage_strategy.__class__.__name__,
+                        storage_strategy=self.storage_port.__class__.__name__,
                         operation_type="save",
                         duration_ms=duration_ms,
                         threshold_ms=self.slow_query_threshold_ms,
@@ -233,7 +231,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
                     operation_id=operation_id,
                     entity_type="Request",
                     entity_id=entity_id,
-                    storage_strategy=self.storage_strategy.__class__.__name__,
+                    storage_strategy=self.storage_port.__class__.__name__,
                     operation_type="save",
                     error_message=str(e),
                     error_code=type(e).__name__,
@@ -249,7 +247,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
     def get_by_id(self, request_id: RequestId) -> Optional[Request]:
         """Get request by ID using storage strategy."""
         try:
-            data = self.storage_strategy.find_by_id(str(request_id.value))
+            data = self.storage_port.find_by_id(str(request_id.value))
             if data:
                 return self.serializer.from_dict(data)
             return None
@@ -276,7 +274,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
         """Find requests by status."""
         try:
             criteria = {"status": status.value}
-            data_list = self.storage_strategy.find_by_criteria(criteria)
+            data_list = self.storage_port.find_by_criteria(criteria)
             return [self.serializer.from_dict(data) for data in data_list]
         except Exception as e:
             self.logger.error(f"Failed to find requests by status {status}: {e}")
@@ -287,7 +285,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
         """Find requests by template ID."""
         try:
             criteria = {"template_id": template_id}
-            data_list = self.storage_strategy.find_by_criteria(criteria)
+            data_list = self.storage_port.find_by_criteria(criteria)
             return [self.serializer.from_dict(data) for data in data_list]
         except Exception as e:
             self.logger.error(f"Failed to find requests by template_id {template_id}: {e}")
@@ -298,7 +296,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
         """Find requests by type."""
         try:
             criteria = {"request_type": request_type.value}
-            data_list = self.storage_strategy.find_by_criteria(criteria)
+            data_list = self.storage_port.find_by_criteria(criteria)
             return [self.serializer.from_dict(data) for data in data_list]
         except Exception as e:
             self.logger.error(f"Failed to find requests by type {request_type}: {e}")
@@ -340,7 +338,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
     def find_all(self) -> List[Request]:
         """Find all requests."""
         try:
-            all_data = self.storage_strategy.find_all()
+            all_data = self.storage_port.find_all()
             return [self.serializer.from_dict(data) for data in all_data.values()]
         except Exception as e:
             self.logger.error(f"Failed to find all requests: {e}")
@@ -350,7 +348,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
     def delete(self, request_id: RequestId) -> None:
         """Delete request by ID."""
         try:
-            self.storage_strategy.delete(str(request_id.value))
+            self.storage_port.delete(str(request_id.value))
             self.logger.debug(f"Deleted request {request_id}")
         except Exception as e:
             self.logger.error(f"Failed to delete request {request_id}: {e}")
@@ -360,7 +358,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
     def exists(self, request_id: RequestId) -> bool:
         """Check if request exists."""
         try:
-            return self.storage_strategy.exists(str(request_id.value))
+            return self.storage_port.exists(str(request_id.value))
         except Exception as e:
             self.logger.error(f"Failed to check if request {request_id} exists: {e}")
             raise

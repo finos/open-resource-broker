@@ -5,9 +5,9 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError as PydanticValidationError
 
-from src.domain.base.entity import Entity
-from src.domain.base.exceptions import DomainException, ValidationError
-from src.domain.base.value_objects import (
+from domain.base.entity import Entity
+from domain.base.exceptions import DomainException, ValidationError
+from domain.base.value_objects import (
     InstanceId,
     InstanceType,
     IPAddress,

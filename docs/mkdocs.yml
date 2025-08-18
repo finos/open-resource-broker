@@ -4,7 +4,7 @@ site_url: https://awslabs.github.io/open-hostfactory-plugin
 repo_url: https://github.com/awslabs/open-hostfactory-plugin
 repo_name: open-hostfactory-plugin
 
-# Proper docs structure: mkdocs.yml in docs/, markdown files in docs/docs/
+# Appropriate docs structure: mkdocs.yml in docs/, markdown files in docs/docs/
 docs_dir: docs
 site_dir: site
 

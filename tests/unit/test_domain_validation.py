@@ -75,8 +75,8 @@ def test_domain_validation():
 def test_aws_template_basic():
     """Test basic AWSTemplate creation."""
     try:
-        from src.providers.aws.domain.template.aggregate import AWSTemplate
-        from src.providers.aws.domain.template.value_objects import ProviderApi
+        from providers.aws.domain.template.aggregate import AWSTemplate
+        from providers.aws.domain.template.value_objects import ProviderApi
 
         print("   Testing basic AWSTemplate creation...")
 
@@ -115,8 +115,8 @@ def test_aws_template_basic():
 def test_aws_template_spot_fleet():
     """Test SpotFleet AWSTemplate creation."""
     try:
-        from src.providers.aws.domain.template.aggregate import AWSTemplate
-        from src.providers.aws.domain.template.value_objects import (
+        from providers.aws.domain.template.aggregate import AWSTemplate
+        from providers.aws.domain.template.value_objects import (
             AWSFleetType,
             ProviderApi,
         )
@@ -158,8 +158,8 @@ def test_aws_template_spot_fleet():
 def test_request_creation():
     """Test Request creation."""
     try:
-        from src.domain.request.aggregate import Request
-        from src.domain.request.value_objects import RequestType
+        from domain.request.aggregate import Request
+        from domain.request.value_objects import RequestType
 
         print("   Testing Request creation...")
 
@@ -197,8 +197,8 @@ def test_base_handler_validation():
     try:
         from unittest.mock import Mock
 
-        from src.providers.aws.domain.template.aggregate import AWSTemplate
-        from src.providers.aws.domain.template.value_objects import (
+        from providers.aws.domain.template.aggregate import AWSTemplate
+        from providers.aws.domain.template.value_objects import (
             AWSFleetType,
             ProviderApi,
         )
@@ -206,7 +206,7 @@ def test_base_handler_validation():
         print("   Testing base handler validation...")
 
         # Create a concrete handler for testing (using SpotFleetHandler)
-        from src.providers.aws.infrastructure.handlers.spot_fleet_handler import (
+        from providers.aws.infrastructure.handlers.spot_fleet_handler import (
             SpotFleetHandler,
         )
 

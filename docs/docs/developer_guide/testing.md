@@ -39,7 +39,7 @@ Test Docker containerization:
 pytest -m docker
 
 # Run Docker test script
-./scripts/test-docker.sh
+./dev-tools/scripts/test-docker.sh
 ```
 
 ### End-to-End Tests

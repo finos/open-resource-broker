@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 import pytest
 
-from src.config.manager import ConfigurationManager
-from src.config.schemas.app_schema import AppConfig
+from config.manager import ConfigurationManager
+from config.schemas.app_schema import AppConfig
 
 
 @pytest.mark.unit

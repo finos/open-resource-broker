@@ -5,22 +5,22 @@ from typing import Dict, Optional
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
-from src.infrastructure.logging.logger import get_logger
-from src.infrastructure.persistence.base.unit_of_work import BaseUnitOfWork
+from infrastructure.logging.logger import get_logger
+from infrastructure.persistence.base.unit_of_work import BaseUnitOfWork
 
 # Import new simplified repositories
-from src.infrastructure.persistence.repositories.machine_repository import (
+from infrastructure.persistence.repositories.machine_repository import (
     MachineRepositoryImpl as MachineRepository,
 )
-from src.infrastructure.persistence.repositories.request_repository import (
+from infrastructure.persistence.repositories.request_repository import (
     RequestRepositoryImpl as RequestRepository,
 )
-from src.infrastructure.persistence.repositories.template_repository import (
+from infrastructure.persistence.repositories.template_repository import (
     TemplateRepositoryImpl as TemplateRepository,
 )
 
 # Import SQL storage strategy
-from src.infrastructure.persistence.sql.strategy import SQLStorageStrategy
+from infrastructure.persistence.sql.strategy import SQLStorageStrategy
 
 
 class SQLUnitOfWork(BaseUnitOfWork):

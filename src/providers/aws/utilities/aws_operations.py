@@ -9,11 +9,11 @@ from typing import Any, Callable, Dict, List, Optional
 
 from botocore.exceptions import ClientError
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
-from src.infrastructure.resilience import CircuitBreakerOpenError
-from src.providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
-from src.providers.aws.infrastructure.aws_client import AWSClient
+from domain.base.dependency_injection import injectable
+from domain.base.ports import LoggingPort
+from infrastructure.resilience import CircuitBreakerOpenError
+from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
+from providers.aws.infrastructure.aws_client import AWSClient
 
 
 @injectable
@@ -404,7 +404,7 @@ class AWSOperations:
         error_message = error.response.get("Error", {}).get("Message", str(error))
 
         # Import here to avoid circular imports
-        from src.providers.aws.exceptions.aws_exceptions import (
+        from providers.aws.exceptions.aws_exceptions import (
             AWSEntityNotFoundError,
             AWSInfrastructureError,
             AWSPermissionError,

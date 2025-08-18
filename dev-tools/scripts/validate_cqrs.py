@@ -2,7 +2,7 @@
 """
 CQRS pattern validator for maintaining architectural consistency.
 
-This script validates that CQRS handlers follow proper patterns and inheritance.
+This script validates that CQRS handlers follow correct patterns and inheritance.
 """
 import argparse
 import ast
@@ -159,7 +159,7 @@ class CQRSValidator:
             else:
                 logger.info("Build continues with warnings.")
         else:
-            logger.info(f"All CQRS handlers follow proper patterns.")
+            logger.info(f"All CQRS handlers follow correct patterns.")
 
         # Summary statistics
         logger.info(f"\nCQRS Handler Summary:")

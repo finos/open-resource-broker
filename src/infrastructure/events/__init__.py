@@ -1,13 +1,13 @@
 """Infrastructure events package - CQRS-aligned event system."""
 
-from src.infrastructure.events.publisher import (
+from infrastructure.events.publisher import (
     ConfigurableEventPublisher,
     create_event_publisher,
 )
 
 # Import new EventBus system
 try:
-    from src.application.events import EventBus, create_event_bus
+    from application.events import EventBus, create_event_bus
 
     _NEW_EVENT_SYSTEM_AVAILABLE = True
 except ImportError:
@@ -18,7 +18,7 @@ except ImportError:
 
 def get_event_publisher() -> ConfigurableEventPublisher:
     """Get event publisher instance from DI container (legacy)."""
-    from src.infrastructure.di.container import get_container
+    from infrastructure.di.container import get_container
 
     container = get_container()
     return container.get(ConfigurableEventPublisher)
@@ -36,7 +36,7 @@ def get_event_bus():
         return get_event_publisher()
 
     try:
-        from src.infrastructure.di.container import get_container
+        from infrastructure.di.container import get_container
 
         container = get_container()
 
@@ -46,7 +46,7 @@ def get_event_bus():
             return event_bus
 
         # Create EventBus if not in container
-        from src.infrastructure.logging.logger import get_logger
+        from infrastructure.logging.logger import get_logger
 
         logger = get_logger(__name__)
         return create_event_bus(logger)

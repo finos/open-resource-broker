@@ -4,9 +4,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.domain.base.ports.logging_port import LoggingPort
-from src.providers.aws.configuration.validator import AWSProviderConfig
-from src.providers.aws.infrastructure.adapters.aws_validation_adapter import (
+from domain.base.ports.logging_port import LoggingPort
+from providers.aws.configuration.validator import AWSProviderConfig
+from providers.aws.infrastructure.adapters.aws_validation_adapter import (
     AWSValidationAdapter,
 )
 

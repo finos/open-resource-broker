@@ -4,9 +4,9 @@ import threading
 import time
 from typing import Any, Dict, List, Optional
 
-from src.domain.base.dependency_injection import injectable
-from src.domain.base.ports import LoggingPort
-from src.providers.base.strategy.provider_strategy import (
+from domain.base.dependency_injection import injectable
+from domain.base.ports import LoggingPort
+from providers.base.strategy.provider_strategy import (
     ProviderCapabilities,
     ProviderHealthStatus,
     ProviderOperation,
@@ -61,7 +61,7 @@ class LoadBalancingProviderStrategy(ProviderStrategy):
             raise ValueError("At least one strategy is required for load balancing")
 
         # Create a dummy config for the parent class
-        from src.infrastructure.interfaces.provider import BaseProviderConfig
+        from infrastructure.interfaces.provider import BaseProviderConfig
 
         dummy_config = BaseProviderConfig(provider_type="load_balancer")
         super().__init__(dummy_config)

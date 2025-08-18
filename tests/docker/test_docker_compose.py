@@ -232,7 +232,7 @@ class TestDockerCompose:
 
         services = compose_config["services"]
 
-        # Check if nginx service has proper dependencies
+        # Check if nginx service has appropriate dependencies
         if "nginx" in services:
             nginx_service = services["nginx"]
             assert "depends_on" in nginx_service, "Nginx should depend on ohfp-api"

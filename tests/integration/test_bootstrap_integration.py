@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.bootstrap import Application
+from bootstrap import Application
 
 
 class TestBootstrapIntegration:
@@ -29,7 +29,7 @@ class TestBootstrapIntegration:
         mock_get_config_manager.return_value = self.mock_config_manager
 
         # Mock integrated provider configuration
-        from src.config.schemas.provider_strategy_schema import (
+        from config.schemas.provider_strategy_schema import (
             ProviderConfig,
             ProviderInstanceConfig,
         )

@@ -6,7 +6,7 @@ import uuid
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from src.infrastructure.logging.logger import get_logger
+from infrastructure.logging.logger import get_logger
 
 
 class LoggingMiddleware(BaseHTTPMiddleware):

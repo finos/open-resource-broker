@@ -23,7 +23,7 @@ class _FallbackRegistry:
 
 # Import the singleton registry
 try:
-    from src.infrastructure.patterns.singleton_registry import SingletonRegistry
+    from infrastructure.patterns.singleton_registry import SingletonRegistry
 except ImportError:
     # If the singleton registry doesn't exist yet, use the fallback
     SingletonRegistry = _FallbackRegistry

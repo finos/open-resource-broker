@@ -2,10 +2,10 @@
 
 from typing import TYPE_CHECKING, Type, TypeVar
 
-from src.domain.base.ports.container_port import ContainerPort
+from domain.base.ports.container_port import ContainerPort
 
 if TYPE_CHECKING:
-    from src.infrastructure.di.container import DIContainer
+    from infrastructure.di.container import DIContainer
 
 T = TypeVar("T")
 

@@ -1,7 +1,8 @@
 #!/bin/bash
+# shellcheck disable=SC2207  # Bash completion uses array assignment patterns
 
 _ohfp_completion() {
-    local cur prev words cword
+    local cur prev words
     _init_completion || return
 
     local resources="templates machines requests providers storage system config"

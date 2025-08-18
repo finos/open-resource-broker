@@ -4,18 +4,18 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from src.domain.base.value_objects import InstanceId, InstanceType
-from src.domain.machine.aggregate import Machine
-from src.domain.machine.exceptions import (
+from domain.base.value_objects import InstanceId, InstanceType
+from domain.machine.aggregate import Machine
+from domain.machine.exceptions import (
     InvalidMachineStateError,
     MachineNotFoundError,
     MachineValidationError,
 )
-from src.domain.machine.value_objects import MachineId, MachineStatus
+from domain.machine.value_objects import MachineId, MachineStatus
 
 # Try to import optional classes - skip tests if not available
 try:
-    from src.domain.machine.value_objects import (
+    from domain.machine.value_objects import (
         HealthStatus,
         MachineOperationError,
         NetworkConfiguration,

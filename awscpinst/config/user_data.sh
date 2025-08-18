@@ -4,7 +4,7 @@
 set -e
 
 # Configure logging
-exec 1> >(logger -s -t $(basename $0)) 2>&1
+exec 1> >(logger -s -t "$(basename "$0")") 2>&1
 
 echo "[INFO] Starting instance configuration..."
 
@@ -110,9 +110,8 @@ systemctl start amazon-cloudwatch-agent
 echo "[INFO] Configuring instance..."
 
 # Set hostname
-INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 PRIVATE_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
-hostnamectl set-hostname ${PRIVATE_IP}
+hostnamectl set-hostname "${PRIVATE_IP}"
 
 # Configure system limits
 echo "[INFO] Configuring system limits..."

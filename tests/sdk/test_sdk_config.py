@@ -7,8 +7,8 @@ from unittest.mock import patch
 
 import pytest
 
-from src.sdk.config import SDKConfig
-from src.sdk.exceptions import ConfigurationError
+from sdk.config import SDKConfig
+from sdk.exceptions import ConfigurationError
 
 
 class TestSDKConfig:

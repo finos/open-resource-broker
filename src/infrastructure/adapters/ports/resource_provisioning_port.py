@@ -8,8 +8,8 @@ It follows the Port-Adapter pattern from Hexagonal Architecture (Ports and Adapt
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List
 
-from src.domain.request.aggregate import Request
-from src.domain.template.aggregate import Template
+from domain.request.aggregate import Request
+from domain.template.aggregate import Template
 
 
 class ResourceProvisioningPort(ABC):
@@ -21,7 +21,7 @@ class ResourceProvisioningPort(ABC):
     """
 
     @abstractmethod
-    def provision_resources(self, request: Request, template: Template) -> str:
+    async def provision_resources(self, request: Request, template: Template) -> str:
         """
         Provision resources based on the request and template.
 

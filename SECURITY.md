@@ -91,7 +91,7 @@ When using this plugin:
 5. Monitor AWS CloudTrail logs
 6. Enable AWS CloudWatch monitoring
 7. Use secure network configurations
-8. Implement proper access controls
+8. Implement appropriate access controls
 
 ### Scope
 
