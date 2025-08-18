@@ -166,7 +166,7 @@ where = ["src"]
 "" = "src"
 
 [tool.setuptools]
-py-modules = ["run"]
+py-modules = ["run", "_package", "bootstrap"]
 
 
 
