@@ -23,8 +23,9 @@ async def handle_list_storage_strategies(args) -> Dict[str, Any]:
     strategies = await query_bus.execute(query)
 
     return {
-        "strategies": strategies,
-        "count": len(strategies),
+        "strategies": strategies.strategies,
+        "count": strategies.total_count,
+        "current_strategy": strategies.current_strategy,
         "message": "Storage strategies retrieved successfully",
     }
 
