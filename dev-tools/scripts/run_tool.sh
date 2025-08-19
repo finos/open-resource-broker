@@ -60,7 +60,11 @@ run_tool() {
         "${TOOL_NAME}" "$@"
     else
         echo "Executing as Python module..."
-        python3 -m "${TOOL_NAME}" "$@"
+        if command -v uv >/dev/null 2>&1 && { [ -f "pyproject.toml" ] || [ -f "uv.lock" ]; }; then
+            uv run python -m "${TOOL_NAME}" "$@"
+        else
+            python3 -m "${TOOL_NAME}" "$@"
+        fi
     fi
 }
 

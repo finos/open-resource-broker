@@ -46,7 +46,7 @@ class ConfigTypeConverter:
         try:
             return int(value)
         except (ValueError, TypeError):
-            logger.warning("Could not convert config value '%s' to int: %s", key, value)
+            logger.warning("Could not convert config value '%s' to int", key)
             return default
 
     def get_float(self, key: str, default: float = 0.0) -> float:
@@ -55,7 +55,7 @@ class ConfigTypeConverter:
         try:
             return float(value)
         except (ValueError, TypeError):
-            logger.warning("Could not convert config value '%s' to float: %s", key, value)
+            logger.warning("Could not convert config value '%s' to float", key)
             return default
 
     def get_str(self, key: str, default: str = "") -> str:
