@@ -264,6 +264,20 @@ class JSONStorageStrategy(BaseStorageStrategy):
         self._cache_valid = False
         self.logger.debug(f"Cleaned up JSON storage strategy for {self.entity_type}")
 
+    def count(self) -> int:
+        """
+        Count total number of entities.
+        """
+        with self.lock_manager.read_lock():
+            try:
+                all_data = self._load_data()
+                count = len(all_data)
+                self.logger.debug(f"Counted {count} {self.entity_type} entities")
+                return count
+            except Exception as e:
+                self.logger.error(f"Failed to count {self.entity_type} entities: {e}")
+                return 0
+
     def _load_data(self) -> Dict[str, Dict[str, Any]]:
         """Load data from file with caching."""
         if self._cache_valid and self._data_cache is not None:

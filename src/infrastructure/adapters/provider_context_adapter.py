@@ -41,13 +41,20 @@ class ProviderContextAdapter(ProviderPort):
         # Implementation would delegate to ProviderContext
         return {}
 
+    def available_strategies(self) -> List[str]:
+        """Get available strategies from the wrapped ProviderContext."""
+        return self.provider_context.available_strategies
+
     def get_provider_info(self) -> Dict[str, Any]:
         """Get provider information using existing ProviderContext."""
         return {
             "type": "ProviderContextAdapter",
-            "strategies": (
-                list(self.provider_context.strategy.keys())
-                if hasattr(self.provider_context, "strategies")
-                else []
-            ),
+            "strategies": self.available_strategies,
         }
+
+    def execute_with_strategy(self, *args, **kwargs):
+        """Execute with strategy using provider context."""
+        if hasattr(self.provider_context, 'execute_with_strategy'):
+            return self.provider_context.execute_with_strategy(*args, **kwargs)
+        raise NotImplementedError("execute_with_strategy not available")
+

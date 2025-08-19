@@ -390,7 +390,7 @@ class EC2FleetHandler(AWSHandler):
 
         return strategy_map.get(strategy, "lowest-price")
 
-    def check_hosts_status(self, request: Request) -> List[Dict[str, Any]]:
+    async def check_hosts_status(self, request: Request) -> List[Dict[str, Any]]:
         """Check the status of instances in the fleet."""
         try:
             if not request.resource_ids:
@@ -405,7 +405,7 @@ class EC2FleetHandler(AWSHandler):
                 raise AWSInfrastructureError("QueryBus not available")
 
             query = GetTemplateQuery(template_id=str(request.template_id))
-            template = query_bus.execute(query)
+            template = await query_bus.execute(query)
             if not template:
                 raise AWSEntityNotFoundError(f"Template {request.template_id} not found")
 

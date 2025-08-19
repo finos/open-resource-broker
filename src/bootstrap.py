@@ -59,6 +59,11 @@ class Application:
             else:
                 self.provider_type = str(provider_config)
 
+    def config_manager(self):
+        """Get the configuration manager."""
+        self._ensure_config_manager()
+        return self._config_manager
+
     async def initialize(self, dry_run: bool = False) -> bool:
         """Initialize the application with DI container."""
         try:
