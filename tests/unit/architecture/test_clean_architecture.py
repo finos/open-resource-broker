@@ -187,9 +187,9 @@ class TestCleanArchitecture:
     def test_interface_segregation(self):
         """Test interface segregation principle compliance."""
         # Test that interfaces are focused and cohesive
-        from infrastructure.ports.auth.auth_port import AuthPort
-        from infrastructure.ports.auth.token_port import TokenPort
-        from infrastructure.ports.auth.user_port import UserPort
+        from infrastructure.adapters.ports.auth.auth_port import AuthPort
+        from infrastructure.adapters.ports.auth.token_port import TokenPort
+        from infrastructure.adapters.ports.auth.user_port import UserPort
 
         # Interfaces should be small and focused
         auth_methods = [method for method in dir(AuthPort) if not method.startswith("_")]
@@ -206,8 +206,8 @@ class TestCleanArchitecture:
     def test_dependency_inversion(self):
         """Validate dependency inversion implementation."""
         # Test that high-level modules don't depend on low-level modules
-        # Mock the ApplicationService since it requires many dependencies
-        with patch("src.application.service.ApplicationService") as MockAppService:
+        # Mock the ProviderCapabilityService since it requires many dependencies
+        with patch("application.services.provider_capability_service.ProviderCapabilityService") as MockAppService:
             mock_instance = Mock()
             MockAppService.return_value = mock_instance
 
@@ -228,7 +228,7 @@ class TestCleanArchitecture:
         # Ports should be abstract interfaces
         import inspect
 
-        from infrastructure.ports.cloud_resource_manager_port import (
+        from infrastructure.adapters.ports.cloud_resource_manager_port import (
             CloudResourceManagerPort,
         )
 
@@ -273,8 +273,8 @@ class TestCleanArchitecture:
 
     def test_application_service_layer(self):
         """Test application service layer compliance."""
-        # Mock the ApplicationService since it requires many dependencies
-        with patch("src.application.service.ApplicationService") as MockAppService:
+        # Mock the ProviderCapabilityService since it requires many dependencies
+        with patch("application.services.provider_capability_service.ProviderCapabilityService") as MockAppService:
             mock_instance = Mock()
             MockAppService.return_value = mock_instance
 
@@ -282,19 +282,19 @@ class TestCleanArchitecture:
             MockAppService()
 
             # Mock expected methods for coordinating use cases
-            mock_instance.get_templates = Mock(return_value={"templates": []})
-            mock_instance.create_request = Mock(return_value={"request_id": "test-123"})
-            mock_instance.get_request_status = Mock(return_value={"status": "PENDING"})
+            mock_instance.validate_template_requirements = Mock(return_value=Mock(is_valid=True))
+            mock_instance.list_supported_apis = Mock(return_value=["EC2Fleet", "SpotFleet"])
+            mock_instance.get_provider_api_capabilities = Mock(return_value={"max_instances": 1000})
 
             # Should have methods for coordinating use cases
-            templates = mock_instance.get_templates()
-            assert "templates" in templates
+            validation_result = mock_instance.validate_template_requirements(Mock(), "aws-test")
+            assert validation_result.is_valid is True
 
-            request = mock_instance.create_request({"template_id": "test"})
-            assert "request_id" in request
+            apis = mock_instance.list_supported_apis("aws-test")
+            assert "EC2Fleet" in apis
 
-            status = mock_instance.get_request_status("test-123")
-            assert "status" in status
+            capabilities = mock_instance.get_provider_api_capabilities("aws-test", "EC2Fleet")
+            assert "max_instances" in capabilities
 
     def test_infrastructure_layer_boundaries(self):
         """Test infrastructure layer boundaries and responsibilities."""

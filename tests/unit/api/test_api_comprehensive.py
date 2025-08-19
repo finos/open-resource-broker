@@ -387,9 +387,8 @@ class TestAPIValidationComprehensive:
     def test_validation_module_exists(self):
         """Test that validation module exists."""
         try:
-            pass
-
-            assert src.api.validation is not None
+            import src.api.validation as validation_module
+            assert validation_module is not None
         except ImportError:
             pytest.skip("API validation module not available")
 

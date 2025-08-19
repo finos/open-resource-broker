@@ -79,7 +79,7 @@ class TestCQRSCompliance:
 
     def test_command_immutability(self):
         """Test that commands are immutable after creation."""
-        command = CreateRequestCommand(template_id="test-template", machine_count=2)
+        command = CreateRequestCommand(template_id="test-template", requested_count=2)
 
         # Should not be able to modify command after creation
         # Pydantic frozen models raise ValidationError
@@ -102,9 +102,9 @@ class TestCQRSCompliance:
     def test_command_validation(self):
         """Test that commands validate their input."""
         # Valid command should work
-        command = CreateRequestCommand(template_id="test-template", machine_count=2)
+        command = CreateRequestCommand(template_id="test-template", requested_count=2)
         assert command.template_id == "test-template"
-        assert command.machine_count == 2
+        assert command.requested_count == 2
 
         # Test that command requires all mandatory fields
         from pydantic import ValidationError
@@ -112,7 +112,7 @@ class TestCQRSCompliance:
         with pytest.raises(ValidationError):
             CreateRequestCommand(
                 template_id="test-template"
-                # Missing required machine_count field
+                # Missing required requested_count field
             )
 
     def test_query_validation(self):
@@ -145,7 +145,7 @@ class TestCQRSCompliance:
             # Command bus should have send/execute method
             mock_instance.send = Mock(return_value={"status": "success"})
 
-            command = CreateRequestCommand(template_id="test-template", machine_count=2)
+            command = CreateRequestCommand(template_id="test-template", requested_count=2)
 
             # Should be able to send command through bus
             result = mock_instance.send(command)
@@ -172,11 +172,11 @@ class TestCQRSCompliance:
     def test_read_write_model_separation(self):
         """Test that read and write models are properly separated."""
         # Commands should work with write models
-        command = CreateRequestCommand(template_id="test-template", machine_count=2)
+        command = CreateRequestCommand(template_id="test-template", requested_count=2)
 
         # Command should contain data for write operations
         assert command.template_id is not None
-        assert command.machine_count > 0
+        assert command.requested_count > 0
 
         # Queries should work with read models
         query = GetTemplateQuery(template_id="test-template")
