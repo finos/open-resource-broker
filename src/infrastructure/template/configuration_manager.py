@@ -71,7 +71,7 @@ class TemplateConfigurationManager:
         event_publisher: Optional[EventPublisherPort] = None,
         provider_capability_service: Optional["ProviderCapabilityService"] = None,
         template_defaults_service: Optional["TemplateDefaultsService"] = None,
-    ):
+    ) -> None:
         """
         Initialize the template configuration manager.
 
@@ -118,7 +118,7 @@ class TemplateConfigurationManager:
             return self._load_templates_from_scheduler()
 
         templates = self.cache_service.get_or_load(loader_func)
-        self.logger.info(f"Loaded {len(templates)} templates")
+        self.logger.info("Loaded %s templates", len(templates))
         return templates
 
     def _load_templates_from_scheduler(self) -> List[TemplateDTO]:
@@ -140,7 +140,7 @@ class TemplateConfigurationManager:
                     all_template_dicts.extend(template_dicts)
 
                 except Exception as e:
-                    self.logger.error(f"Failed to load templates from {template_path}: {e}")
+                    self.logger.error("Failed to load templates from %s: %s", template_path, e)
                     continue
 
             # Apply batch AMI resolution BEFORE converting to DTOs
@@ -153,14 +153,14 @@ class TemplateConfigurationManager:
                     template_dto = self._convert_dict_to_template_dto(template_dict)
                     all_templates.append(template_dto)
                 except Exception as e:
-                    self.logger.warning(f"Failed to convert template dict to DTO: {e}")
+                    self.logger.warning("Failed to convert template dict to DTO: %s", e)
                     continue
 
-            self.logger.debug(f"Loaded {len(all_templates)} templates from scheduler strategy")
+            self.logger.debug("Loaded %s templates from scheduler strategy", len(all_templates))
             return all_templates
 
         except Exception as e:
-            self.logger.error(f"Failed to load templates from scheduler: {e}")
+            self.logger.error("Failed to load templates from scheduler: %s", e)
             return []
 
     def _convert_dict_to_template_dto(self, template_dict: Dict[str, Any]) -> TemplateDTO:
@@ -179,7 +179,7 @@ class TemplateConfigurationManager:
             template_with_defaults = self.template_defaults_service.resolve_template_defaults(
                 template_dict, provider_instance
             )
-            self.logger.debug(f"Applied defaults to template {template_id}")
+            self.logger.debug("Applied defaults to template %s", template_id)
 
         # AMI resolution is already done in _batch_resolve_amis, no need to do it again
 
@@ -214,7 +214,7 @@ class TemplateConfigurationManager:
             selection_result = selection_service.select_active_provider()
             return selection_result.provider_instance
         except Exception as e:
-            self.logger.debug(f"Could not determine provider instance via selection service: {e}")
+            self.logger.debug("Could not determine provider instance via selection service: %s", e)
 
             # Fallback: try direct provider config access
             try:
@@ -224,7 +224,7 @@ class TemplateConfigurationManager:
                     if active_providers:
                         return active_providers[0].name
             except Exception as e2:
-                self.logger.debug(f"Could not determine provider instance via direct access: {e2}")
+                self.logger.debug("Could not determine provider instance via direct access: %s", e2)
 
         # 3. Fallback to default
         return "aws"
@@ -253,14 +253,16 @@ class TemplateConfigurationManager:
                         resolved_template["image_id"] = resolved_ami
                         if "imageId" in resolved_template:
                             resolved_template["imageId"] = resolved_ami
-                        self.logger.info(f"Resolved SSM parameter {image_id} to AMI {resolved_ami}")
+                        self.logger.info(
+                            "Resolved SSM parameter %s to AMI %s", image_id, resolved_ami
+                        )
                 except Exception as e:
-                    self.logger.warning(f"Failed to resolve AMI parameter {image_id}: {e}")
+                    self.logger.warning("Failed to resolve AMI parameter %s: %s", image_id, e)
 
             return resolved_template
 
         except Exception as e:
-            self.logger.error(f"AMI resolution failed: {e}")
+            self.logger.error("AMI resolution failed: %s", e)
             return template_dict  # Return original on error
 
     def _is_ami_resolution_enabled(self) -> bool:
@@ -289,7 +291,7 @@ class TemplateConfigurationManager:
             return False
 
         except Exception as e:
-            self.logger.debug(f"Could not determine AMI resolution status: {e}")
+            self.logger.debug("Could not determine AMI resolution status: %s", e)
             return False
 
     def _get_ami_resolver(self):
@@ -305,7 +307,7 @@ class TemplateConfigurationManager:
             return container.get(TemplateResolverPort)
 
         except Exception as e:
-            self.logger.debug(f"Could not get template resolver: {e}")
+            self.logger.debug("Could not get template resolver: %s", e)
             return None
 
     def _batch_resolve_amis(self, template_dicts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -338,7 +340,7 @@ class TemplateConfigurationManager:
                     if resolved_ami != ssm_param:  # Only cache if resolution succeeded
                         resolved_amis[ssm_param] = resolved_ami
                 except Exception as e:
-                    self.logger.warning(f"Failed to resolve AMI parameter {ssm_param}: {e}")
+                    self.logger.warning("Failed to resolve AMI parameter %s: %s", ssm_param, e)
 
             # Apply resolved AMIs to templates
             resolved_templates = []
@@ -355,12 +357,14 @@ class TemplateConfigurationManager:
                 resolved_templates.append(resolved_template)
 
             self.logger.info(
-                f"Batch resolved { len(resolved_amis)} unique SSM parameters for { len(template_dicts)} templates"
+                "Batch resolved %s unique SSM parameters for %s templates",
+                len(resolved_amis),
+                len(template_dicts),
             )
             return resolved_templates
 
         except Exception as e:
-            self.logger.error(f"Batch AMI resolution failed: {e}")
+            self.logger.error("Batch AMI resolution failed: %s", e)
             return template_dicts  # Return original on error
 
     async def get_template_by_id(self, template_id: str) -> Optional[TemplateDTO]:
@@ -388,19 +392,17 @@ class TemplateConfigurationManager:
             # Find template by ID
             for template in templates:
                 if template.template_id == template_id:
-                    self.logger.debug(f"Retrieved template {template_id}")
+                    self.logger.debug("Retrieved template %s", template_id)
                     return template
 
-            self.logger.debug(f"Template {template_id} not found")
+            self.logger.debug("Template %s not found", template_id)
             return None
 
         except TemplateValidationError:
             raise
         except Exception as e:
-            self.logger.error(f"Failed to get template {template_id}: {e}")
-            raise TemplateConfigurationError(
-                f"Failed to retrieve template {template_id}: {str(e)}"
-            ) from e
+            self.logger.error("Failed to get template %s: %s", template_id, e)
+            raise TemplateConfigurationError(f"Failed to retrieve template {template_id}: {str(e)}")
 
     async def get_templates_by_provider(self, provider_api: str) -> List[TemplateDTO]:
         """
@@ -417,7 +419,9 @@ class TemplateConfigurationManager:
             t for t in templates if getattr(t, "provider_api", None) == provider_api
         ]
 
-        self.logger.debug(f"Found {len(filtered_templates)} templates for provider {provider_api}")
+        self.logger.debug(
+            "Found %s templates for provider %s", len(filtered_templates), provider_api
+        )
         return filtered_templates
 
     async def get_all_templates(self) -> List[TemplateDTO]:
@@ -454,10 +458,10 @@ class TemplateConfigurationManager:
             # Invalidate cache to ensure fresh data on next load
             self.cache_service.invalidate()
 
-            self.logger.info(f"Saved template {template.template_id}")
+            self.logger.info("Saved template %s", template.template_id)
 
         except Exception as e:
-            self.logger.error(f"Failed to save template {template.template_id}: {e}")
+            self.logger.error("Failed to save template %s: %s", template.template_id, e)
             raise
 
     async def delete_template(self, template_id: str) -> None:
@@ -473,10 +477,10 @@ class TemplateConfigurationManager:
             # Invalidate cache to ensure fresh data on next load
             self.cache_service.invalidate()
 
-            self.logger.info(f"Deleted template {template_id}")
+            self.logger.info("Deleted template %s", template_id)
 
         except Exception as e:
-            self.logger.error(f"Failed to delete template {template_id}: {e}")
+            self.logger.error("Failed to delete template %s: %s", template_id, e)
             raise
 
     def get_template(self, template_id: str) -> Optional[TemplateDTO]:
@@ -523,14 +527,15 @@ class TemplateConfigurationManager:
                 )
 
             self.logger.info(
-                f"Template validation completed for {template.template_id}: "
-                f"{'valid' if validation_result['is_valid'] else 'invalid'}"
+                "Template validation completed for %s: %s",
+                template.template_id,
+                "valid" if validation_result["is_valid"] else "invalid",
             )
 
             return validation_result
 
         except Exception as e:
-            self.logger.error(f"Template validation failed for {template.template_id}: {e}")
+            self.logger.error("Template validation failed for %s: %s", template.template_id, e)
             validation_result["is_valid"] = False
             validation_result["errors"].append(f"Validation error: {str(e)}")
             return validation_result
@@ -567,7 +572,7 @@ class TemplateConfigurationManager:
                     "Max instances is very high (>1000), consider if this is intentional"
                 )
 
-        self.logger.debug(f"Basic validation completed for template {template.template_id}")
+        self.logger.debug("Basic validation completed for template %s", template.template_id)
 
     async def _validate_with_provider_capabilities(
         self, template: TemplateDTO, provider_instance: str, result: Dict[str, Any]
@@ -601,12 +606,12 @@ class TemplateConfigurationManager:
             result["supported_features"].extend(capability_result.supported_features)
 
             self.logger.debug(
-                f"Provider capability validation completed for template { template.template_id}"
+                "Provider capability validation completed for template %s", template.template_id
             )
 
         except Exception as e:
             self.logger.warning(
-                f"Provider capability validation failed for template { template.template_id}: {e}"
+                "Provider capability validation failed for template %s: %s", template.template_id, e
             )
             result["warnings"].append(f"Could not validate provider capabilities: {str(e)}")
 

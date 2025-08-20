@@ -25,7 +25,7 @@ class SerializationManager(ABC):
 class JSONSerializer(SerializationManager):
     """JSON serialization manager with enum support."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the instance."""
         self.logger = get_logger(__name__)
 
@@ -44,7 +44,7 @@ class JSONSerializer(SerializationManager):
             serializable_data = self._prepare_for_serialization(data)
             return json.dumps(serializable_data, indent=2, default=str, ensure_ascii=False)
         except Exception as e:
-            self.logger.error(f"JSON serialization failed: {e}")
+            self.logger.error("JSON serialization failed: %s", e)
             raise
 
     def deserialize(self, data: str) -> Dict[str, Any]:
@@ -62,10 +62,10 @@ class JSONSerializer(SerializationManager):
                 return {}
             return json.loads(data)
         except json.JSONDecodeError as e:
-            self.logger.error(f"JSON deserialization failed: {e}")
+            self.logger.error("JSON deserialization failed: %s", e)
             raise
         except Exception as e:
-            self.logger.error(f"Unexpected deserialization error: {e}")
+            self.logger.error("Unexpected deserialization error: %s", e)
             raise
 
     def _prepare_for_serialization(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -120,7 +120,7 @@ class JSONSerializer(SerializationManager):
 class BinarySerializer(SerializationManager):
     """Binary serialization manager using pickle."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize binary serializer."""
         self.logger = get_logger(__name__)
 
@@ -131,7 +131,7 @@ class BinarySerializer(SerializationManager):
         try:
             return json.dumps(data, default=self._json_serializer).encode("utf-8")
         except Exception as e:
-            self.logger.error(f"Binary serialization failed: {e}")
+            self.logger.error("Binary serialization failed: %s", e)
             raise
 
     def deserialize(self, data: bytes) -> Dict[str, Any]:
@@ -143,7 +143,7 @@ class BinarySerializer(SerializationManager):
                 return {}
             return json.loads(data.decode("utf-8"))
         except Exception as e:
-            self.logger.error(f"Binary deserialization failed: {e}")
+            self.logger.error("Binary deserialization failed: %s", e)
             raise
 
     def _json_serializer(self, obj):

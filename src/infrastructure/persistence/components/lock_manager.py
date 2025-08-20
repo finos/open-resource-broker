@@ -14,7 +14,7 @@ class ReaderWriterLock:
     but only one writer at a time, with no readers present.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize reader-writer lock."""
         self._readers = 0
         self._writers = 0
@@ -22,23 +22,23 @@ class ReaderWriterLock:
         self._write_ready = threading.Condition(threading.RLock())
         self.logger = get_logger(__name__)
 
-    def acquire_read(self):
+    def acquire_read(self) -> None:
         """Acquire read lock."""
         with self._read_ready:
             while self._writers > 0:
                 self._read_ready.wait()
             self._readers += 1
-            self.logger.debug(f"Read lock acquired. Active readers: {self._readers}")
+            self.logger.debug("Read lock acquired. Active readers: %s", self._readers)
 
-    def release_read(self):
+    def release_read(self) -> None:
         """Release read lock."""
         with self._read_ready:
             self._readers -= 1
-            self.logger.debug(f"Read lock released. Active readers: {self._readers}")
+            self.logger.debug("Read lock released. Active readers: %s", self._readers)
             if self._readers == 0:
                 self._read_ready.notifyAll()
 
-    def acquire_write(self):
+    def acquire_write(self) -> None:
         """Acquire write lock."""
         with self._write_ready:
             while self._writers > 0 or self._readers > 0:
@@ -46,7 +46,7 @@ class ReaderWriterLock:
             self._writers += 1
             self.logger.debug("Write lock acquired")
 
-    def release_write(self):
+    def release_write(self) -> None:
         """Release write lock."""
         with self._write_ready:
             self._writers -= 1
@@ -56,7 +56,7 @@ class ReaderWriterLock:
                 self._read_ready.notifyAll()
 
     @contextmanager
-    def read_lock(self):
+    def read_lock(self) -> None:
         """Context manager for read lock."""
         self.acquire_read()
         try:
@@ -65,7 +65,7 @@ class ReaderWriterLock:
             self.release_read()
 
     @contextmanager
-    def write_lock(self):
+    def write_lock(self) -> None:
         """Context manager for write lock."""
         self.acquire_write()
         try:
@@ -81,7 +81,7 @@ class LockManager:
     Provides different locking strategies based on storage type and requirements.
     """
 
-    def __init__(self, lock_type: str = "reader_writer"):
+    def __init__(self, lock_type: str = "reader_writer") -> None:
         """
         Initialize lock manager.
 
@@ -101,7 +101,7 @@ class LockManager:
             raise ValueError(f"Unknown lock type: {lock_type}")
 
     @contextmanager
-    def read_lock(self):
+    def read_lock(self) -> None:
         """Acquire read lock for read operations."""
         if self.lock_type == "reader_writer":
             with self._lock.read_lock():
@@ -113,7 +113,7 @@ class LockManager:
             yield
 
     @contextmanager
-    def write_lock(self):
+    def write_lock(self) -> None:
         """Acquire write lock for write operations."""
         if self.lock_type == "reader_writer":
             with self._lock.write_lock():
@@ -125,7 +125,7 @@ class LockManager:
             yield
 
     @contextmanager
-    def exclusive_lock(self):
+    def exclusive_lock(self) -> None:
         """Acquire exclusive lock (alias for write_lock)."""
         with self.write_lock():
             yield

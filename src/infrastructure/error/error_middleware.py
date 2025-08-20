@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 class ErrorMiddleware:
     """Middleware for consistent error handling."""
 
-    def __init__(self, error_handler: Optional[ExceptionHandler] = None):
+    def __init__(self, error_handler: Optional[ExceptionHandler] = None) -> None:
         """Initialize the instance."""
         self._error_handler = error_handler or get_exception_handler()
 
@@ -116,7 +116,7 @@ class ErrorMiddleware:
         return wrapped_script_handler
 
 
-def with_error_handling(error_handler: Optional[ExceptionHandler] = None):
+def with_error_handling(error_handler: Optional[ExceptionHandler] = None) -> None:
     """
     Add error handling to functions.
 
@@ -146,7 +146,7 @@ def with_error_handling(error_handler: Optional[ExceptionHandler] = None):
     return decorator
 
 
-def with_api_error_handling(error_handler: Optional[ExceptionHandler] = None):
+def with_api_error_handling(error_handler: Optional[ExceptionHandler] = None) -> None:
     """
     Add API-specific error handling to functions.
 

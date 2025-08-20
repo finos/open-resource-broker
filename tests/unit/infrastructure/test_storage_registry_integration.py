@@ -40,11 +40,14 @@ class TestStorageRegistryIntegration:
         # Mock repository class
         mock_repository = Mock()
 
-        with patch(
-            "src.infrastructure.utilities.factories.repository_factory.get_storage_registry"
-        ) as mock_get_registry, patch(
-            "src.infrastructure.persistence.repositories.request_repository.RequestRepository"
-        ) as mock_repo_class:
+        with (
+            patch(
+                "src.infrastructure.utilities.factories.repository_factory.get_storage_registry"
+            ) as mock_get_registry,
+            patch(
+                "src.infrastructure.persistence.repositories.request_repository.RequestRepository"
+            ) as mock_repo_class,
+        ):
 
             mock_get_registry.return_value = mock_registry
             mock_repo_class.return_value = mock_repository
@@ -79,9 +82,12 @@ class TestStorageRegistryIntegration:
         mock_repository = Mock()
         mock_factory.create_request_repository.return_value = mock_repository
 
-        with patch("src.infrastructure.persistence.registration.register_all_storage_types"), patch(
-            "src.infrastructure.utilities.factories.repository_factory.RepositoryFactory"
-        ) as mock_factory_class:
+        with (
+            patch("src.infrastructure.persistence.registration.register_all_storage_types"),
+            patch(
+                "src.infrastructure.utilities.factories.repository_factory.RepositoryFactory"
+            ) as mock_factory_class,
+        ):
 
             mock_factory_class.return_value = mock_factory
 

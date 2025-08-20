@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class ProviderConfigManager:
     """Manages provider-specific configuration."""
 
-    def __init__(self, raw_config: Dict[str, Any]):
+    def __init__(self, raw_config: Dict[str, Any]) -> None:
         """Initialize the instance."""
         self._raw_config = raw_config
 
@@ -46,7 +46,7 @@ class ProviderConfigManager:
 
             return ProviderConfig(**provider_data)
         except Exception as e:
-            logger.error(f"Failed to load provider config: {e}")
+            logger.error("Failed to load provider config: %s", e)
             return None
 
     def is_provider_strategy_enabled(self) -> bool:
@@ -105,7 +105,7 @@ class ProviderConfigManager:
 
             logger.info("Provider configuration saved")
         except Exception as e:
-            logger.error(f"Failed to save provider config: {e}")
+            logger.error("Failed to save provider config: %s", e)
             raise ConfigurationError(f"Failed to save provider configuration: {e}")
 
     def _get_nested_value(self, key: str, default: Any = None) -> Any:

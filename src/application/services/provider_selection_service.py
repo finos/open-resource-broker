@@ -26,7 +26,7 @@ class ProviderSelectionResult:
     confidence: float = 1.0
     alternatives: List[str] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.alternatives is None:
             self.alternatives = []
 
@@ -60,7 +60,7 @@ class ProviderSelectionService:
         config_manager: ConfigurationPort,
         logger: LoggingPort,
         provider_registry: Optional[ProviderRegistry] = None,
-    ):
+    ) -> None:
         """
         Initialize provider selection service.
 
@@ -101,7 +101,7 @@ class ProviderSelectionService:
         Raises:
             ValueError: If no suitable provider can be found
         """
-        self._logger.info(f"Selecting provider for template: {template.template_id}")
+        self._logger.info("Selecting provider for template: %s", template.template_id)
 
         # Strategy 1: Explicit provider instance selection
         if template.provider_name:
@@ -165,7 +165,7 @@ class ProviderSelectionService:
         # Cache the result
         self._active_provider_cache = result
 
-        self._logger.info(f"Selected active provider: {selected.name} ({reason})")
+        self._logger.info("Selected active provider: %s (%s)", selected.name, reason)
 
         return result
 
@@ -181,7 +181,7 @@ class ProviderSelectionService:
         if not provider_instance.enabled:
             raise ValueError(f"Provider instance '{provider_name}' is disabled")
 
-        self._logger.info(f"Selected explicit provider: {provider_name}")
+        self._logger.info("Selected explicit provider: %s", provider_name)
 
         return ProviderSelectionResult(
             provider_type=provider_instance.type,
@@ -203,7 +203,7 @@ class ProviderSelectionService:
         selected_instance = self._apply_load_balancing_strategy(instances)
 
         self._logger.info(
-            f"Selected load-balanced provider: {selected_instance.name} (type: {provider_type})"
+            "Selected load-balanced provider: %s (type: %s)", selected_instance.name, provider_type
         )
 
         return ProviderSelectionResult(
@@ -227,7 +227,9 @@ class ProviderSelectionService:
         selected_instance = self._select_best_compatible_instance(compatible_instances)
 
         self._logger.info(
-            f"Selected capability-based provider: {selected_instance.name} for API: {provider_api}"
+            "Selected capability-based provider: %s for API: %s",
+            selected_instance.name,
+            provider_api,
         )
 
         return ProviderSelectionResult(
@@ -258,7 +260,7 @@ class ProviderSelectionService:
             default_provider_type = default_instance.type
             default_provider_instance = default_instance.name
 
-        self._logger.info(f"Selected default provider: {default_provider_instance}")
+        self._logger.info("Selected default provider: %s", default_provider_instance)
 
         return ProviderSelectionResult(
             provider_type=default_provider_type,
@@ -317,7 +319,10 @@ class ProviderSelectionService:
         if len(highest_priority_instances) == 1:
             selected = highest_priority_instances[0]
             self._logger.debug(
-                f"Selected provider { selected.name} (priority {selected.priority}, weight { selected.weight})"
+                "Selected provider %s (priority %s, weight %s)",
+                selected.name,
+                selected.priority,
+                selected.weight,
             )
             return selected
 
@@ -328,7 +333,11 @@ class ProviderSelectionService:
         # In production, this would maintain round-robin state
         selected = max(highest_priority_instances, key=lambda x: x.weight)
         self._logger.debug(
-            f"Selected provider { selected.name} (priority {selected.priority}, weight {selected.weight}) from { len(highest_priority_instances)} candidates"
+            "Selected provider %s (priority %s, weight %s) from %s candidates",
+            selected.name,
+            selected.priority,
+            selected.weight,
+            len(highest_priority_instances),
         )
         return selected
 

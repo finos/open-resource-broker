@@ -12,7 +12,7 @@ from infrastructure.logging.logger import get_logger
 class NoAuthStrategy(AuthPort):
     """Authentication strategy that allows all requests without authentication."""
 
-    def __init__(self, enabled: bool = False):
+    def __init__(self, enabled: bool = False) -> None:
         """
         Initialize no-auth strategy.
 
@@ -32,7 +32,7 @@ class NoAuthStrategy(AuthPort):
         Returns:
             Successful authentication result with anonymous user
         """
-        self.logger.debug(f"No-auth strategy: allowing request to {context.path}")
+        self.logger.debug("No-auth strategy: allowing request to %s", context.path)
 
         return AuthResult(
             status=AuthStatus.SUCCESS,

@@ -209,7 +209,7 @@ class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
         except Exception as e:
             error_msg = f"Error cleaning up storage strategy: {str(e)}"
             self.logger.error(error_msg)
-            raise PersistenceError(error_msg) from e
+            raise PersistenceError(error_msg)
 
     def __enter__(self) -> "StorageStrategy[T]":
         """
@@ -245,7 +245,7 @@ class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
             # Rollback transaction if an exception occurred
             if exc_type is not None and self._in_transaction:
                 self.logger.warning(
-                    f"Exception in context manager, rolling back transaction: {exc_val}"
+                    "Exception in context manager, rolling back transaction: %s", exc_val
                 )
                 self.rollback_transaction()
 
@@ -255,7 +255,7 @@ class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
             # Don't suppress exceptions
             return False
         except Exception as e:
-            self.logger.error(f"Error in context manager exit: {str(e)}")
+            self.logger.error("Error in context manager exit: %s", str(e))
             # Don't suppress the original exception
             return False
 
@@ -283,7 +283,7 @@ class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
 
             self._in_transaction = True
         except Exception as e:
-            raise PersistenceError(f"Error beginning transaction: {str(e)}") from e
+            raise PersistenceError(f"Error beginning transaction: {str(e)}")
 
     def commit_transaction(self) -> None:
         """
@@ -300,7 +300,7 @@ class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
             self._transaction_snapshot = None
             self._in_transaction = False
         except Exception as e:
-            raise PersistenceError(f"Error committing transaction: {str(e)}") from e
+            raise PersistenceError(f"Error committing transaction: {str(e)}")
 
     def rollback_transaction(self) -> None:
         """
@@ -322,7 +322,7 @@ class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
             self._transaction_snapshot = None
             self._in_transaction = False
         except Exception as e:
-            raise PersistenceError(f"Error rolling back transaction: {str(e)}") from e
+            raise PersistenceError(f"Error rolling back transaction: {str(e)}")
 
     def save_batch(self, entities: Dict[str, Dict[str, Any]]) -> None:
         """
@@ -339,7 +339,7 @@ class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
             for entity_id, entity_data in entities.items():
                 self.save(entity_id, entity_data)
         except Exception as e:
-            raise PersistenceError(f"Error saving batch: {str(e)}") from e
+            raise PersistenceError(f"Error saving batch: {str(e)}")
 
     def delete_batch(self, entity_ids: List[str]) -> None:
         """
@@ -356,7 +356,7 @@ class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
             for entity_id in entity_ids:
                 self.delete(entity_id)
         except Exception as e:
-            raise PersistenceError(f"Error deleting batch: {str(e)}") from e
+            raise PersistenceError(f"Error deleting batch: {str(e)}")
 
     def _get_entity_id_from_dict(self, data: Dict[str, Any]) -> str:
         """

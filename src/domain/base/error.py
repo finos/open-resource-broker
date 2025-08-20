@@ -19,7 +19,7 @@ class DomainError:
     details: Dict[str, Any]
     category: str = "domain"
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate error data."""
         if not self.code:
             raise ValueError("Error code cannot be empty")

@@ -10,7 +10,7 @@ from providers.aws.domain.template.value_objects import (
 )
 
 # Re-export all base machine value objects with AWS extensions
-__all__ = [
+__all__: list[str] = [
     # Base machine value objects
     "MachineId",
     "MachineStatus",

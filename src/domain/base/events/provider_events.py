@@ -1,29 +1,31 @@
 """Provider-agnostic domain events."""
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 from uuid import uuid4
+
+from pydantic import Field
 
 from domain.base.events.base_events import DomainEvent
 from domain.base.provider_interfaces import ProviderInstanceState, ProviderType
 
 
-@dataclass(frozen=True)
 class ProviderOperationEvent(DomainEvent):
     """Event raised for provider operations."""
 
     provider_type: ProviderType
     operation_type: str  # e.g., "create_instance", "terminate_instance"
     provider_resource_type: str  # e.g., "instance", "volume"
-    provider_resource_id: Optional[str] = field(default=None)
-    operation_status: str = field(default="started")  # started, completed, failed
-    error_message: Optional[str] = field(default=None)
+    provider_resource_id: Optional[str] = Field(default=None)
+    operation_status: str = Field(default="started")  # started, completed, failed
+    error_message: Optional[str] = Field(default=None)
 
-    def __post_init__(self):
+    def model_post_init(self, __context: Any) -> None:
+        """Initialize aggregate information after model creation."""
         # Set the base class fields
         object.__setattr__(self, "aggregate_id", self.provider_resource_id or str(uuid4()))
         object.__setattr__(self, "aggregate_type", f"{self.provider_type.value}_resource")
-        super().__post_init__()
+        super().model_post_init(__context)
         if not self.operation_type:
             raise ValueError("Operation type cannot be empty")
         if not self.provider_resource_type:
@@ -39,7 +41,7 @@ class ProviderRateLimitEvent(DomainEvent):
     operation_name: str
     retry_after: Optional[int] = field(default=None)  # seconds
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         object.__setattr__(self, "aggregate_id", f"{self.provider_type.value}_{self.service_name}")
         object.__setattr__(self, "aggregate_type", f"{self.provider_type.value}_service")
         super().__post_init__()
@@ -59,7 +61,7 @@ class ProviderCredentialsEvent(DomainEvent):
     status: str  # success, failure, warning
     message: Optional[str] = field(default=None)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         object.__setattr__(self, "aggregate_id", f"{self.provider_type.value}_credentials")
         object.__setattr__(self, "aggregate_type", f"{self.provider_type.value}_auth")
         super().__post_init__()
@@ -82,7 +84,7 @@ class ProviderResourceStateChangedEvent(DomainEvent):
     new_state: ProviderInstanceState
     state_reason: Optional[str] = field(default=None)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         object.__setattr__(self, "aggregate_id", self.resource_id)
         object.__setattr__(
             self, "aggregate_type", f"{self.provider_type.value}_{self.resource_type}"
@@ -104,7 +106,7 @@ class ProviderConfigurationEvent(DomainEvent):
     new_value: Optional[str] = field(default=None)
     operation: str = field(default="update")  # update, validate, reset
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         object.__setattr__(self, "aggregate_id", f"{self.provider_type.value}_config")
         object.__setattr__(self, "aggregate_type", f"{self.provider_type.value}_configuration")
         super().__post_init__()
@@ -122,7 +124,7 @@ class ProviderHealthCheckEvent(DomainEvent):
     response_time_ms: Optional[int] = field(default=None)
     error_message: Optional[str] = field(default=None)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         object.__setattr__(self, "aggregate_id", f"{self.provider_type.value}_{self.service_name}")
         object.__setattr__(self, "aggregate_type", f"{self.provider_type.value}_health")
         super().__post_init__()
@@ -212,7 +214,7 @@ class ProviderStrategyRegisteredEvent(DomainEvent):
 
 
 # Export all provider events
-__all__ = [
+__all__: list[str] = [
     "ProviderOperationEvent",
     "ProviderRateLimitEvent",
     "ProviderCredentialsEvent",

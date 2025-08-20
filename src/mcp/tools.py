@@ -20,7 +20,7 @@ class OpenHFPluginMCPTools:
     and structured error handling for AI assistant consumption.
     """
 
-    def __init__(self, sdk: Optional[OpenHFPluginSDK] = None, **sdk_kwargs):
+    def __init__(self, sdk: Optional[OpenHFPluginSDK] = None, **sdk_kwargs) -> None:
         """
         Initialize MCP tools.
 

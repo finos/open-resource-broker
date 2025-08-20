@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class DependencyResolver:
     """Handles dependency resolution and instance creation."""
 
-    def __init__(self, service_registry, cqrs_registry):
+    def __init__(self, service_registry, cqrs_registry) -> None:
         """Initialize the instance."""
         self._service_registry = service_registry
         self._cqrs_registry = cqrs_registry
@@ -147,7 +147,7 @@ class DependencyResolver:
             # Create instance
             instance = cls(**constructor_params)
 
-            logger.debug(f"Created instance of {cls.__name__}")
+            logger.debug("Created instance of %s", cls.__name__)
             return instance
 
         except Exception as e:
@@ -172,13 +172,13 @@ class DependencyResolver:
                     factory=metadata.factory,
                 )
                 self._service_registry.register(registration)
-                logger.debug(f"Auto-registered injectable class: {cls.__name__}")
+                logger.debug("Auto-registered injectable class: %s", cls.__name__)
             else:
                 # Fallback for old-style @injectable without metadata
                 self._service_registry.register_injectable_class(cls)
-                logger.debug(f"Auto-registered legacy injectable class: {cls.__name__}")
+                logger.debug("Auto-registered legacy injectable class: %s", cls.__name__)
         except Exception as e:
-            logger.warning(f"Failed to auto-register injectable class {cls.__name__}: {e}")
+            logger.warning("Failed to auto-register injectable class %s: %s", cls.__name__, e)
 
     def _resolve_constructor_parameters(
         self, cls: Type, dependency_chain: Set[Type]

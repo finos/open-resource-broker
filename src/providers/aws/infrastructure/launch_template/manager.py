@@ -41,7 +41,7 @@ class LaunchTemplateResult:
 class AWSLaunchTemplateManager:
     """Manages AWS launch template creation and updates."""
 
-    def __init__(self, aws_client: AWSClient, logger: LoggingPort):
+    def __init__(self, aws_client: AWSClient, logger: LoggingPort) -> None:
         """
         Initialize the launch template manager.
 
@@ -120,7 +120,9 @@ class AWSLaunchTemplateManager:
             # Template exists, create a new version
             template_id = existing_template["LaunchTemplates"][0]["LaunchTemplateId"]
             self._logger.info(
-                f"Launch template {launch_template_name} exists with ID {template_id}. Creating/reusing version."
+                "Launch template %s exists with ID %s. Creating/reusing version.",
+                launch_template_name,
+                template_id,
             )
 
             response = self.aws_client.ec2_client.create_launch_template_version(
@@ -131,7 +133,7 @@ class AWSLaunchTemplateManager:
             )
 
             version = str(response["LaunchTemplateVersion"]["VersionNumber"])
-            self._logger.info(f"Using version {version} of launch template {template_id}")
+            self._logger.info("Using version %s of launch template %s", version, template_id)
 
             return LaunchTemplateResult(
                 template_id=template_id,
@@ -153,7 +155,7 @@ class AWSLaunchTemplateManager:
                 )
             else:
                 # Some other error
-                raise e
+                raise
 
     def _create_or_reuse_base_template(self, aws_template: AWSTemplate) -> LaunchTemplateResult:
         """
@@ -191,7 +193,7 @@ class AWSLaunchTemplateManager:
 
             template_name = response["LaunchTemplates"][0]["LaunchTemplateName"]
 
-            self._logger.info(f"Using existing launch template {template_id} version {version}")
+            self._logger.info("Using existing launch template %s version %s", template_id, version)
 
             return LaunchTemplateResult(
                 template_id=template_id,
@@ -205,7 +207,7 @@ class AWSLaunchTemplateManager:
             if e.response["Error"]["Code"] == "InvalidLaunchTemplateId.NotFound":
                 raise AWSValidationError(f"Launch template {template_id} not found")
             else:
-                raise e
+                raise
 
     def _create_new_launch_template(
         self,
@@ -228,7 +230,9 @@ class AWSLaunchTemplateManager:
         Returns:
             LaunchTemplateResult with new template details
         """
-        self._logger.info(f"Launch template {template_name} does not exist. Creating new template.")
+        self._logger.info(
+            "Launch template %s does not exist. Creating new template.", template_name
+        )
 
         response = self.aws_client.ec2_client.create_launch_template(
             LaunchTemplateName=template_name,
@@ -244,7 +248,7 @@ class AWSLaunchTemplateManager:
         )
 
         launch_template = response["LaunchTemplate"]
-        self._logger.info(f"Created launch template {launch_template['LaunchTemplateId']}")
+        self._logger.info("Created launch template %s", launch_template["LaunchTemplateId"])
 
         return LaunchTemplateResult(
             template_id=launch_template["LaunchTemplateId"],
@@ -275,7 +279,7 @@ class AWSLaunchTemplateManager:
             raise AWSValidationError(error_msg)
 
         # Log the image_id being used
-        self._logger.info(f"Creating launch template with resolved image_id: {image_id}")
+        self._logger.info("Creating launch template with resolved image_id: %s", image_id)
 
         # Get instance name using the helper function
         get_instance_name(request.request_id)

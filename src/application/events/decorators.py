@@ -86,4 +86,4 @@ def event_handler(event_type: str):
 
 
 # Export for easy imports
-__all__ = ["event_handler", "EventHandlerRegistry"]
+__all__: list[str] = ["event_handler", "EventHandlerRegistry"]

@@ -50,14 +50,14 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
     async def execute_query(self, query: GetRequestQuery) -> RequestDTO:
         """Execute get request query with machine status checking and caching."""
-        self.logger.info(f"Getting request details for: {query.request_id}")
+        self.logger.info("Getting request details for: %s", query.request_id)
 
         try:
             # Check cache first if enabled
             if self._cache_service and self._cache_service.is_caching_enabled():
                 cached_result = self._cache_service.get_cached_request(query.request_id)
                 if cached_result:
-                    self.logger.info(f"Cache hit for request: {query.request_id}")
+                    self.logger.info("Cache hit for request: %s", query.request_id)
                     return cached_result
 
             # Cache miss - get request from storage
@@ -72,25 +72,28 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             # Get machines from storage
             machines = await self._get_machines_from_storage(query.request_id)
             self.logger.info(
-                f"DEBUG: Found {len(machines)} machines in storage for request {query.request_id}"
+                "DEBUG: Found %s machines in storage for request %s",
+                len(machines),
+                query.request_id,
             )
 
             # Update machine status if needed
             if not machines and request.resource_ids:
                 self.logger.info(
-                    f"DEBUG: No machines in storage but have resource IDs {request.resource_ids}, checking provider"
+                    "DEBUG: No machines in storage but have resource IDs %s, checking provider",
+                    request.resource_ids,
                 )
                 # No machines in storage but we have resource IDs - check provider and
                 # create machines
                 machines = await self._check_provider_and_create_machines(request)
-                self.logger.info(f"DEBUG: Provider check returned {len(machines)} machines")
+                self.logger.info("DEBUG: Provider check returned %s machines", len(machines))
             elif machines:
-                self.logger.info(f"DEBUG: Have {len(machines)} machines, updating status from AWS")
+                self.logger.info("DEBUG: Have %s machines, updating status from AWS", len(machines))
                 # We have machines - update their status from AWS
                 machines = await self._update_machine_status_from_aws(machines)
             else:
                 self.logger.info(
-                    f"DEBUG: No machines and no resource IDs for request {query.request_id}"
+                    "DEBUG: No machines and no resource IDs for request %s", query.request_id
                 )
 
             # Convert to DTO with machine data
@@ -140,15 +143,15 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 self._cache_service.cache_request(request_dto)
 
             self.logger.info(
-                f"Retrieved request with {len(machines_data)} machines: {query.request_id}"
+                "Retrieved request with %s machines: %s", len(machines_data), query.request_id
             )
             return request_dto
 
         except EntityNotFoundError:
-            self.logger.error(f"Request not found: {query.request_id}")
+            self.logger.error("Request not found: %s", query.request_id)
             raise
         except Exception as e:
-            self.logger.error(f"Failed to get request: {e}")
+            self.logger.error("Failed to get request: %s", e)
             raise
 
     async def _get_machines_from_storage(self, request_id: str) -> List:
@@ -159,7 +162,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 return machines
         except Exception as e:
             self.logger.warning(
-                f"Failed to get machines from storage for request {request_id}: {e}"
+                "Failed to get machines from storage for request %s: %s", request_id, e
             )
             return []
 
@@ -192,26 +195,30 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             # Execute operation using provider context with correct strategy identifier
             strategy_identifier = f"{request.provider_type}-{request.provider_type}-{request.provider_instance or 'default'}"
             self.logger.info(
-                f"Using provider strategy: {strategy_identifier} for request {request.request_id}"
+                "Using provider strategy: %s for request %s",
+                strategy_identifier,
+                request.request_id,
             )
-            self.logger.info(f"Operation parameters: {operation.parameters}")
+            self.logger.info("Operation parameters: %s", operation.parameters)
 
             result = await provider_context.execute_with_strategy(strategy_identifier, operation)
 
             self.logger.info(
-                f"Provider strategy result: success={result.success}, data_keys={list(result.data.keys()) if result.data else 'None'}"
+                "Provider strategy result: success=%s, data_keys=%s",
+                result.success,
+                list(result.data.keys()) if result.data else "None",
             )
 
             if not result.success:
                 self.logger.warning(
-                    f"Failed to discover instances from resources: {result.error_message}"
+                    "Failed to discover instances from resources: %s", result.error_message
                 )
                 return []
 
             # Get instance details from result
             instance_details = result.data.get("instances", [])
             if not instance_details:
-                self.logger.info(f"No instances found for request {request.request_id}")
+                self.logger.info("No instances found for request %s", request.request_id)
                 return []
 
             # Create machine aggregates from instance details
@@ -235,13 +242,15 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                         machine.clear_domain_events()
 
                 self.logger.info(
-                    f"Created and saved {len(machines)} machines for request {request.request_id}"
+                    "Created and saved %s machines for request %s",
+                    len(machines),
+                    request.request_id,
                 )
 
             return machines
 
         except Exception as e:
-            self.logger.error(f"Failed to check provider and create machines: {e}")
+            self.logger.error("Failed to check provider and create machines: %s", e)
             return []
 
     async def _update_machine_status_from_aws(self, machines: List) -> List:
@@ -285,7 +294,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             result = await provider_context.execute_with_strategy(strategy_identifier, operation)
 
             if not result.success:
-                self.logger.warning(f"Failed to check resource status: {result.error_message}")
+                self.logger.warning("Failed to check resource status: %s", result.error_message)
                 return machines
 
             # Extract domain machine entities from result (provider strategy already
@@ -348,7 +357,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             return updated_machines
 
         except Exception as e:
-            self.logger.warning(f"Failed to update machine status from AWS: {e}")
+            self.logger.warning("Failed to update machine status from AWS: %s", e)
             return machines
 
     def _get_provider_context(self):
@@ -367,7 +376,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
         class SimpleProviderContext:
             """Simple provider context for AWS operations."""
 
-            def __init__(self, container):
+            def __init__(self, container) -> None:
                 self.container = container
 
             async def check_resource_status(self, request) -> List[Dict[str, Any]]:
@@ -473,7 +482,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             )
             return cache_service
         except Exception as e:
-            self.logger.warning(f"Failed to initialize cache service: {e}")
+            self.logger.warning("Failed to initialize cache service: %s", e)
             return None
 
     def _get_event_publisher(self):
@@ -483,13 +492,13 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
             return self._container.get(EventPublisherPort)
         except Exception as e:
-            self.logger.warning(f"Failed to initialize event publisher: {e}")
+            self.logger.warning("Failed to initialize event publisher: %s", e)
 
             # Return a no-op event publisher
             class NoOpEventPublisher:
                 """No-operation event publisher that discards events."""
 
-                def publish(self, event):
+                def publish(self, event) -> None:
                     """Publish event (no-op implementation)."""
 
             return NoOpEventPublisher()
@@ -504,13 +513,13 @@ class GetRequestStatusQueryHandler(BaseQueryHandler[GetRequestStatusQuery, str])
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-    ):
+    ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
 
     async def execute_query(self, query: GetRequestStatusQuery) -> str:
         """Execute get request status query."""
-        self.logger.info(f"Getting status for request: {query.request_id}")
+        self.logger.info("Getting status for request: %s", query.request_id)
 
         try:
             with self.uow_factory.create_unit_of_work() as uow:
@@ -523,14 +532,14 @@ class GetRequestStatusQueryHandler(BaseQueryHandler[GetRequestStatusQuery, str])
                     raise EntityNotFoundError("Request", query.request_id)
 
                 status = request.status.value
-                self.logger.info(f"Request {query.request_id} status: {status}")
+                self.logger.info("Request %s status: %s", query.request_id, status)
                 return status
 
         except EntityNotFoundError:
-            self.logger.error(f"Request not found: {query.request_id}")
+            self.logger.error("Request not found: %s", query.request_id)
             raise
         except Exception as e:
-            self.logger.error(f"Failed to get request status: {e}")
+            self.logger.error("Failed to get request status: %s", e)
             raise
 
 
@@ -543,7 +552,7 @@ class ListActiveRequestsHandler(BaseQueryHandler[ListActiveRequestsQuery, List[R
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-    ):
+    ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
 
@@ -578,11 +587,11 @@ class ListActiveRequestsHandler(BaseQueryHandler[ListActiveRequestsQuery, List[R
                     )
                     request_dtos.append(request_dto)
 
-                self.logger.info(f"Found {len(request_dtos)} active requests")
+                self.logger.info("Found %s active requests", len(request_dtos))
                 return request_dtos
 
         except Exception as e:
-            self.logger.error(f"Failed to list active requests: {e}")
+            self.logger.error("Failed to list active requests: %s", e)
             raise
 
 
@@ -595,7 +604,7 @@ class ListReturnRequestsHandler(BaseQueryHandler[ListReturnRequestsQuery, List[R
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-    ):
+    ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
 
@@ -624,11 +633,11 @@ class ListReturnRequestsHandler(BaseQueryHandler[ListReturnRequestsQuery, List[R
                     )
                     request_dtos.append(request_dto)
 
-                self.logger.info(f"Found {len(request_dtos)} return requests")
+                self.logger.info("Found %s return requests", len(request_dtos))
                 return request_dtos
 
         except Exception as e:
-            self.logger.error(f"Failed to list return requests: {e}")
+            self.logger.error("Failed to list return requests: %s", e)
             raise
 
 
@@ -641,7 +650,7 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, Template]):
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
         container: ContainerPort,
-    ):
+    ) -> None:
         super().__init__(logger, error_handler)
         self._container = container
 
@@ -652,7 +661,7 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, Template]):
             TemplateConfigurationManager,
         )
 
-        self.logger.info(f"Getting template: {query.template_id}")
+        self.logger.info("Getting template: %s", query.template_id)
 
         try:
             template_manager = self._container.get(TemplateConfigurationManager)
@@ -687,14 +696,14 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, Template]):
 
             domain_template = Template(**template_data)
 
-            self.logger.info(f"Retrieved template: {query.template_id}")
+            self.logger.info("Retrieved template: %s", query.template_id)
             return domain_template
 
         except EntityNotFoundError:
-            self.logger.error(f"Template not found: {query.template_id}")
+            self.logger.error("Template not found: %s", query.template_id)
             raise
         except Exception as e:
-            self.logger.error(f"Failed to get template: {e}")
+            self.logger.error("Failed to get template: %s", e)
             raise
 
 
@@ -707,7 +716,7 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, List[Template]])
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
         container: ContainerPort,
-    ):
+    ) -> None:
         super().__init__(logger, error_handler)
         self._container = container
 
@@ -764,14 +773,14 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, List[Template]])
                         domain_templates.append(domain_template)
 
                     except Exception as e:
-                        self.logger.warning(f"Skipping invalid template {dto.template_id}: {e}")
+                        self.logger.warning("Skipping invalid template %s: %s", dto.template_id, e)
                         continue
 
-            self.logger.info(f"Found {len(domain_templates)} templates")
+            self.logger.info("Found %s templates", len(domain_templates))
             return domain_templates
 
         except Exception as e:
-            self.logger.error(f"Failed to list templates: {e}")
+            self.logger.error("Failed to list templates: %s", e)
             raise
 
 
@@ -784,13 +793,13 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
         logger: LoggingPort,
         container: ContainerPort,
         error_handler: ErrorHandlingPort,
-    ):
+    ) -> None:
         super().__init__(logger, error_handler)
         self.container = container
 
     async def execute_query(self, query: ValidateTemplateQuery) -> Dict[str, Any]:
         """Execute validate template query."""
-        self.logger.info(f"Validating template: {query.template_id}")
+        self.logger.info("Validating template: %s", query.template_id)
 
         try:
             # Get template configuration port for validation
@@ -806,10 +815,10 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
             # Log validation results
             if validation_errors:
                 self.logger.warning(
-                    f"Template validation failed for {query.template_id}: {validation_errors}"
+                    "Template validation failed for %s: %s", query.template_id, validation_errors
                 )
             else:
-                self.logger.info(f"Template validation passed for {query.template_id}")
+                self.logger.info("Template validation passed for %s", query.template_id)
 
             return {
                 "template_id": query.template_id,
@@ -819,7 +828,7 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
             }
 
         except Exception as e:
-            self.logger.error(f"Template validation failed for {query.template_id}: {e}")
+            self.logger.error("Template validation failed for %s: %s", query.template_id, e)
             return {
                 "template_id": query.template_id,
                 "is_valid": False,
@@ -837,13 +846,13 @@ class GetMachineHandler(BaseQueryHandler[GetMachineQuery, MachineDTO]):
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-    ):
+    ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
 
     async def execute_query(self, query: GetMachineQuery) -> MachineDTO:
         """Execute get machine query."""
-        self.logger.info(f"Getting machine: {query.machine_id}")
+        self.logger.info("Getting machine: %s", query.machine_id)
 
         try:
             with self.uow_factory.create_unit_of_work() as uow:
@@ -864,14 +873,14 @@ class GetMachineHandler(BaseQueryHandler[GetMachineQuery, MachineDTO]):
                     metadata=machine.metadata or {},
                 )
 
-                self.logger.info(f"Retrieved machine: {query.machine_id}")
+                self.logger.info("Retrieved machine: %s", query.machine_id)
                 return machine_dto
 
         except EntityNotFoundError:
-            self.logger.error(f"Machine not found: {query.machine_id}")
+            self.logger.error("Machine not found: %s", query.machine_id)
             raise
         except Exception as e:
-            self.logger.error(f"Failed to get machine: {e}")
+            self.logger.error("Failed to get machine: %s", e)
             raise
 
 
@@ -884,7 +893,7 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, List[MachineDTO]])
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-    ):
+    ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
 
@@ -921,9 +930,9 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, List[MachineDTO]])
                     )
                     machine_dtos.append(machine_dto)
 
-                self.logger.info(f"Found {len(machine_dtos)} machines")
+                self.logger.info("Found %s machines", len(machine_dtos))
                 return machine_dtos
 
         except Exception as e:
-            self.logger.error(f"Failed to list machines: {e}")
+            self.logger.error("Failed to list machines: %s", e)
             raise

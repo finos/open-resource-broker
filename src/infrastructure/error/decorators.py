@@ -22,7 +22,7 @@ def handle_exceptions(
     preserve_types: Optional[List[Type[Exception]]] = None,
     additional_context: Optional[Dict[str, Any]] = None,
     handler: Optional[ExceptionHandler] = None,
-):
+) -> None:
     """
     Provide consistent exception handling across all layers.
 
@@ -68,7 +68,7 @@ def handle_exceptions(
                     handled_exception = exception_handler.handle(e, exc_context)
 
                     # Re-raise with context chain
-                    raise handled_exception from e
+                    raise handled_exception
 
             return async_wrapper
         else:
@@ -92,7 +92,7 @@ def handle_exceptions(
                     handled_exception = exception_handler.handle(e, exc_context)
 
                     # Re-raise with context chain
-                    raise handled_exception from e
+                    raise handled_exception
 
             return sync_wrapper
 
@@ -133,7 +133,7 @@ def handle_application_exceptions(
 
     Example:
         @handle_application_exceptions(context="request_creation")
-        def request_machines(self, template_id: str, count: int):
+        def request_machines(self, template_id: str, count: int) -> None:
             # Application logic
     """
     return handle_exceptions(
@@ -156,7 +156,7 @@ def handle_infrastructure_exceptions(
 
     Example:
         @handle_infrastructure_exceptions(context="database_query")
-        def get_by_id(self, entity_id: str):
+        def get_by_id(self, entity_id: str) -> None:
             # Infrastructure logic
     """
     return handle_exceptions(
@@ -166,7 +166,7 @@ def handle_infrastructure_exceptions(
 
 def handle_provider_exceptions(
     context: str, provider: str, additional_context: Optional[Dict[str, Any]] = None
-):
+) -> None:
     """
     Specialized decorator for provider-specific exception handling.
 
@@ -180,7 +180,7 @@ def handle_provider_exceptions(
 
     Example:
         @handle_provider_exceptions(context="instance_launch", provider="aws")
-        def launch_instances(self, request: LaunchRequest):
+        def launch_instances(self, request: LaunchRequest) -> None:
             # Provider-specific logic
     """
     provider_context = {"provider": provider}
@@ -210,7 +210,7 @@ def handle_interface_exceptions(
 
     Example:
         @handle_interface_exceptions(context="get_templates", interface_type="api")
-        def get_available_templates(self):
+        def get_available_templates(self) -> None:
             # Interface logic
     """
     interface_context = {"interface_type": interface_type}

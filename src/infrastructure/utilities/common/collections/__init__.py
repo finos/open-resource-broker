@@ -1,5 +1,7 @@
 """Collection utility functions organized by responsibility."""
 
+from typing import Any, Callable
+
 # Import specific functions from submodules
 from infrastructure.utilities.common.collections.filtering import (
     contains,
@@ -52,23 +54,25 @@ from infrastructure.utilities.common.collections.validation import (
 
 
 # Utility aliases for backward compatibility
-def filter_dict(dictionary, predicate):
+def filter_dict(
+    dictionary: dict[Any, Any], predicate: Callable[[Any, Any], bool]
+) -> dict[Any, Any]:
     """Filter dictionary by predicate - alias for compatibility."""
     return {k: v for k, v in dictionary.items() if predicate(k, v)}
 
 
-def transform_list(collection, transform_func):
+def transform_list(collection: list[Any], transform_func: Callable[[Any], Any]) -> list[Any]:
     """Transform list elements - alias for compatibility."""
     return [transform_func(item) for item in collection]
 
 
-def validate_collection(collection, validator_func):
+def validate_collection(collection: list[Any], validator_func: Callable[[Any], bool]) -> bool:
     """Validate collection elements - alias for compatibility."""
     return all_match(collection, validator_func)
 
 
 # Export commonly used functions
-__all__ = [
+__all__: list[str] = [
     # Validation functions
     "is_empty",
     "is_not_empty",

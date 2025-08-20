@@ -11,7 +11,7 @@ from .exceptions import (
 )
 from .repository import RequestRepository
 
-__all__ = [
+__all__: list[str] = [
     "Request",
     "RequestStatus",
     "RequestType",

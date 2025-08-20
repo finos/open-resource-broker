@@ -220,6 +220,10 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Build package wheel
+      run: |
+        make build
+
     - name: Build container using dev-tools script
       env:
         REGISTRY: ${{ needs.get-config.outputs.container-registry }}
@@ -229,6 +233,7 @@ jobs:
         PLATFORMS: linux/amd64,linux/arm64
         PUSH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'release' || github.event.inputs.push_images == 'true') }}
         CACHE: true
+        SKIP_BUILD: true
       run: |
         make container-build-single PYTHON_VERSION=${{ matrix.python-version }}
 
@@ -257,7 +262,6 @@ jobs:
 
         # Stop test container
         docker stop test-container
-      continue-on-error: true
 
   container-manifest:
     name: Create Multi-Architecture Manifests

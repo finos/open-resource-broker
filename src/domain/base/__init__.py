@@ -60,7 +60,7 @@ from .value_objects import (
     ValueObject,
 )
 
-__all__ = [
+__all__: list[str] = [
     # Entities
     "Entity",
     "AggregateRoot",

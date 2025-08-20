@@ -1,7 +1,7 @@
 """Base event classes and protocols - foundation for event-driven architecture."""
 
 from datetime import datetime
-from typing import Any, Dict, Optional, Protocol
+from typing import Any, Callable, Dict, Optional, Protocol
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -20,7 +20,7 @@ class DomainEvent(BaseModel):
     version: int = 1
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
-    def model_post_init(self, __context) -> None:
+    def model_post_init(self, __context: Any) -> None:
         """Set event_type based on class name if not provided."""
         if not self.event_type:
             object.__setattr__(self, "event_type", self.__class__.__name__)
@@ -77,7 +77,7 @@ class EventPublisher(Protocol):
         """Publish a single domain event."""
         ...
 
-    def register_handler(self, event_type: str, handler) -> None:
+    def register_handler(self, event_type: str, handler: Callable[[DomainEvent], None]) -> None:
         """Register an event handler."""
         ...
 

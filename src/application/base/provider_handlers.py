@@ -20,7 +20,7 @@ TResponse = TypeVar("TResponse")
 class ProviderContext:
     """Context for provider operations."""
 
-    def __init__(self, provider_type: str, region: str = None):
+    def __init__(self, provider_type: str, region: str = None) -> None:
         """Initialize provider context."""
         self.provider_type = provider_type
         self.region = region
@@ -56,7 +56,7 @@ class BaseProviderHandler(Generic[TRequest, TResponse], ProviderHandler[TRequest
         provider_type: str,
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
-    ):
+    ) -> None:
         """
         Initialize base provider handler.
 
@@ -89,7 +89,7 @@ class BaseProviderHandler(Generic[TRequest, TResponse], ProviderHandler[TRequest
             # Log request processing start
             if self.logger:
                 self.logger.info(
-                    f"Processing {self.provider_type} provider request: {request_type}"
+                    "Processing %s provider request: %s", self.provider_type, request_type
                 )
 
             # Validate request
@@ -104,7 +104,10 @@ class BaseProviderHandler(Generic[TRequest, TResponse], ProviderHandler[TRequest
 
             if self.logger:
                 self.logger.info(
-                    f"{self.provider_type.upper()} provider request processed successfully: {request_type} ({duration:.3f}s)"
+                    "%s provider request processed successfully: %s (%.3fs)",
+                    self.provider_type.upper(),
+                    request_type,
+                    duration,
                 )
 
             return response
@@ -129,7 +132,10 @@ class BaseProviderHandler(Generic[TRequest, TResponse], ProviderHandler[TRequest
 
             if self.logger:
                 self.logger.error(
-                    f"{self.provider_type.upper()} provider request processing failed: {request_type} - {str(e)}"
+                    "%s provider request processing failed: %s - %s",
+                    self.provider_type.upper(),
+                    request_type,
+                    str(e),
                 )
 
             # Re-raise for upstream handling
@@ -232,7 +238,7 @@ class BaseAWSHandler(BaseProviderHandler[TRequest, TResponse]):
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
         region: str = None,
-    ):
+    ) -> None:
         """Initialize base AWS handler."""
         super().__init__("aws", logger, error_handler)
         self.aws_client = aws_client
@@ -307,7 +313,11 @@ class BaseAWSHandler(BaseProviderHandler[TRequest, TResponse]):
 
                     if self.logger:
                         self.logger.warning(
-                            f"AWS request failed (attempt {attempt + 1}/{self.max_retries + 1}), retrying in {delay}s: {str(e)}"
+                            "AWS request failed (attempt %s/%s), retrying in %ss: %s",
+                            attempt + 1,
+                            self.max_retries + 1,
+                            delay,
+                            str(e),
                         )
 
                     await asyncio.sleep(delay)

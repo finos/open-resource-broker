@@ -16,7 +16,7 @@ from .strategy import (
     RetryStrategy,
 )
 
-__all__ = [
+__all__: list[str] = [
     # Main retry decorator
     "retry",
     "get_retry_config_for_service",

@@ -92,14 +92,18 @@ class TestJSONStorageRegistration:
         registry = get_storage_registry()
 
         # Mock the imports to avoid dependency issues
-        with patch("src.infrastructure.persistence.json.registration.JSONStorageStrategy"), patch(
-            "src.infrastructure.persistence.repositories.request_repository.RequestRepository"
-        ), patch(
-            "src.infrastructure.persistence.repositories.machine_repository.MachineRepository"
-        ), patch(
-            "src.infrastructure.persistence.repositories.template_repository.TemplateRepository"
-        ), patch(
-            "src.infrastructure.persistence.json.registration.JSONUnitOfWork"
+        with (
+            patch("src.infrastructure.persistence.json.registration.JSONStorageStrategy"),
+            patch(
+                "src.infrastructure.persistence.repositories.request_repository.RequestRepository"
+            ),
+            patch(
+                "src.infrastructure.persistence.repositories.machine_repository.MachineRepository"
+            ),
+            patch(
+                "src.infrastructure.persistence.repositories.template_repository.TemplateRepository"
+            ),
+            patch("src.infrastructure.persistence.json.registration.JSONUnitOfWork"),
         ):
 
             register_json_storage()
@@ -194,14 +198,18 @@ class TestSQLStorageRegistration:
         registry = get_storage_registry()
 
         # Mock the imports to avoid dependency issues
-        with patch("src.infrastructure.persistence.sql.registration.SQLStorageStrategy"), patch(
-            "src.infrastructure.persistence.repositories.request_repository.RequestRepository"
-        ), patch(
-            "src.infrastructure.persistence.repositories.machine_repository.MachineRepository"
-        ), patch(
-            "src.infrastructure.persistence.repositories.template_repository.TemplateRepository"
-        ), patch(
-            "src.infrastructure.persistence.sql.registration.SQLUnitOfWork"
+        with (
+            patch("src.infrastructure.persistence.sql.registration.SQLStorageStrategy"),
+            patch(
+                "src.infrastructure.persistence.repositories.request_repository.RequestRepository"
+            ),
+            patch(
+                "src.infrastructure.persistence.repositories.machine_repository.MachineRepository"
+            ),
+            patch(
+                "src.infrastructure.persistence.repositories.template_repository.TemplateRepository"
+            ),
+            patch("src.infrastructure.persistence.sql.registration.SQLUnitOfWork"),
         ):
 
             register_sql_storage()
@@ -278,16 +286,18 @@ class TestDynamoDBStorageRegistration:
         registry = get_storage_registry()
 
         # Mock the imports to avoid dependency issues
-        with patch(
-            "src.providers.aws.persistence.dynamodb.registration.DynamoDBStorageStrategy"
-        ), patch(
-            "src.infrastructure.persistence.repositories.request_repository.RequestRepository"
-        ), patch(
-            "src.infrastructure.persistence.repositories.machine_repository.MachineRepository"
-        ), patch(
-            "src.infrastructure.persistence.repositories.template_repository.TemplateRepository"
-        ), patch(
-            "src.providers.aws.persistence.dynamodb.registration.DynamoDBUnitOfWork"
+        with (
+            patch("src.providers.aws.persistence.dynamodb.registration.DynamoDBStorageStrategy"),
+            patch(
+                "src.infrastructure.persistence.repositories.request_repository.RequestRepository"
+            ),
+            patch(
+                "src.infrastructure.persistence.repositories.machine_repository.MachineRepository"
+            ),
+            patch(
+                "src.infrastructure.persistence.repositories.template_repository.TemplateRepository"
+            ),
+            patch("src.providers.aws.persistence.dynamodb.registration.DynamoDBUnitOfWork"),
         ):
 
             register_dynamodb_storage()
@@ -373,9 +383,11 @@ class TestCentralStorageRegistration:
         from infrastructure.persistence.registration import get_available_storage_types
 
         # Mock successful imports
-        with patch("src.infrastructure.persistence.registration.JSONStorageStrategy"), patch(
-            "src.infrastructure.persistence.registration.SQLStorageStrategy"
-        ), patch("src.infrastructure.persistence.registration.DynamoDBStorageStrategy"):
+        with (
+            patch("src.infrastructure.persistence.registration.JSONStorageStrategy"),
+            patch("src.infrastructure.persistence.registration.SQLStorageStrategy"),
+            patch("src.infrastructure.persistence.registration.DynamoDBStorageStrategy"),
+        ):
 
             available_types = get_available_storage_types()
 

@@ -50,7 +50,7 @@ class ASGHandler(AWSHandler):
         aws_ops: AWSOperations,
         launch_template_manager,
         request_adapter: RequestAdapterPort = None,
-    ):
+    ) -> None:
         """
         Initialize the ASG handler with integrated dependencies.
 
@@ -126,7 +126,7 @@ class ASGHandler(AWSHandler):
             **asg_config,
         )
 
-        self._logger.info(f"Successfully created Auto Scaling Group: {asg_name}")
+        self._logger.info("Successfully created Auto Scaling Group: %s", asg_name)
 
         # Add ASG tags
         self._tag_asg(asg_name, aws_template, request)
@@ -187,7 +187,7 @@ class ASGHandler(AWSHandler):
         )
 
         if not asg_list:
-            self._logger.warning(f"ASG {asg_name} not found")
+            self._logger.warning("ASG %s not found", asg_name)
             return []
 
         asg = asg_list[0]
@@ -222,13 +222,13 @@ class ASGHandler(AWSHandler):
                             ),
                             operation_type="critical",
                         )
-                        self._logger.info(f"Deleted Auto Scaling Group: {asg_name}")
+                        self._logger.info("Deleted Auto Scaling Group: %s", asg_name)
                 except Exception as e:
-                    self._logger.error(f"Failed to terminate ASG {asg_name}: {e}")
+                    self._logger.error("Failed to terminate ASG %s: %s", asg_name, e)
                     continue
 
         except Exception as e:
-            self._logger.error(f"Failed to release ASG hosts: {str(e)}")
+            self._logger.error("Failed to release ASG hosts: %s", str(e))
             raise AWSInfrastructureError(f"Failed to release ASG hosts: {str(e)}")
 
         # Get instance IDs from machine references
@@ -258,7 +258,7 @@ class ASGHandler(AWSHandler):
                 DesiredCapacity=new_capacity,
                 MinSize=min(new_capacity, asg["MinSize"]),
             )
-            self._logger.info(f"Reduced ASG {request.resource_id} capacity to {new_capacity}")
+            self._logger.info("Reduced ASG %s capacity to %s", request.resource_id, new_capacity)
 
             # Detach instances from ASG
             self._retry_with_backoff(
@@ -268,13 +268,13 @@ class ASGHandler(AWSHandler):
                 InstanceIds=instance_ids,
                 ShouldDecrementDesiredCapacity=True,
             )
-            self._logger.info(f"Detached instances from ASG: {instance_ids}")
+            self._logger.info("Detached instances from ASG: %s", instance_ids)
 
             # Use consolidated AWS operations utility for instance termination
             self.aws_ops.terminate_instances_with_fallback(
                 instance_ids, self._request_adapter, "ASG instances"
             )
-            self._logger.info(f"Terminated instances: {instance_ids}")
+            self._logger.info("Terminated instances: %s", instance_ids)
         else:
             # Delete entire ASG
             self._retry_with_backoff(
@@ -283,7 +283,7 @@ class ASGHandler(AWSHandler):
                 AutoScalingGroupName=request.resource_id,
                 ForceDelete=True,
             )
-            self._logger.info(f"Deleted Auto Scaling Group: {request.resource_id}")
+            self._logger.info("Deleted Auto Scaling Group: %s", request.resource_id)
 
     def check_hosts_status(self, request: Request) -> List[Dict[str, Any]]:
         """Check the status of instances across all ASGs in the request."""
@@ -302,10 +302,10 @@ class ASGHandler(AWSHandler):
                         formatted_instances = self._format_instance_data(asg_instances, asg_name)
                         all_instances.extend(formatted_instances)
                 except Exception as e:
-                    self._logger.error(f"Failed to get instances for ASG {asg_name}: {e}")
+                    self._logger.error("Failed to get instances for ASG %s: %s", asg_name, e)
                     continue
 
             return all_instances
         except Exception as e:
-            self._logger.error(f"Unexpected error checking ASG status: {str(e)}")
+            self._logger.error("Unexpected error checking ASG status: %s", str(e))
             raise AWSInfrastructureError(f"Failed to check ASG status: {str(e)}")

@@ -52,7 +52,7 @@ class AWSProviderStrategy(ProviderStrategy):
     - AWS-specific optimizations and features
     """
 
-    def __init__(self, config: AWSProviderConfig, logger: LoggingPort):
+    def __init__(self, config: AWSProviderConfig, logger: LoggingPort) -> None:
         """
         Initialize AWS provider strategy.
 
@@ -89,7 +89,7 @@ class AWSProviderStrategy(ProviderStrategy):
             class AWSInstanceConfigPort:
                 """Configuration port that provides instance-specific AWS configuration."""
 
-                def __init__(self, aws_config: AWSProviderConfig):
+                def __init__(self, aws_config: AWSProviderConfig) -> None:
                     self._aws_config = aws_config
 
                 def get_typed(self, config_type):
@@ -166,7 +166,7 @@ class AWSProviderStrategy(ProviderStrategy):
             True if initialization successful, False otherwise
         """
         try:
-            self._logger.info(f"AWS provider strategy ready for region: {self._aws_config.region}")
+            self._logger.info("AWS provider strategy ready for region: %s", self._aws_config.region)
 
             # Don't create AWS client here - let it be lazy
             # Don't create managers here - they depend on AWS client
@@ -178,7 +178,7 @@ class AWSProviderStrategy(ProviderStrategy):
             return True
 
         except Exception as e:
-            self._logger.error(f"Failed to initialize AWS provider strategy: {e}")
+            self._logger.error("Failed to initialize AWS provider strategy: %s", e)
             return False
 
     async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
@@ -232,7 +232,7 @@ class AWSProviderStrategy(ProviderStrategy):
 
         except Exception as e:
             execution_time_ms = int((time.time() - start_time) * 1000)
-            self._logger.error(f"AWS operation failed: {e}")
+            self._logger.error("AWS operation failed: %s", e)
             return ProviderResult.error_result(
                 f"AWS operation failed: {str(e)}",
                 "OPERATION_FAILED",
@@ -300,7 +300,7 @@ class AWSProviderStrategy(ProviderStrategy):
                         "HANDLER_NOT_FOUND",
                     )
                 self._logger.warning(
-                    f"Handler for {provider_api} not found, using RunInstances fallback"
+                    "Handler for %s not found, using RunInstances fallback", provider_api
                 )
 
             # Convert template_config to AWSTemplate domain object
@@ -309,7 +309,7 @@ class AWSProviderStrategy(ProviderStrategy):
             try:
                 aws_template = AWSTemplate.model_validate(template_config)
             except Exception as e:
-                self._logger.error(f"Failed to create AWSTemplate from config: {e}")
+                self._logger.error("Failed to create AWSTemplate from config: %s", e)
                 # Fallback: create minimal AWSTemplate with required fields
                 aws_template = AWSTemplate(
                     template_id=template_config.get("template_id", "unknown"),
@@ -353,7 +353,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 instances = []
 
             self._logger.info(
-                f"Handler returned resource_ids: {resource_ids}, instances: {len(instances)}"
+                "Handler returned resource_ids: %s, instances: %s", resource_ids, len(instances)
             )
 
             return ProviderResult.success_result(
@@ -404,7 +404,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             except Exception as e:
-                self._logger.error(f"Failed to terminate instances: {e}")
+                self._logger.error("Failed to terminate instances: %s", e)
                 return ProviderResult.error_result(
                     f"Failed to terminate instances: {str(e)}", "AWS_API_ERROR"
                 )
@@ -447,7 +447,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             except Exception as e:
-                self._logger.error(f"Failed to get instance status: {e}")
+                self._logger.error("Failed to get instance status: %s", e)
                 return ProviderResult.error_result(
                     f"Failed to get instance status: {str(e)}", "AWS_API_ERROR"
                 )
@@ -522,7 +522,7 @@ class AWSProviderStrategy(ProviderStrategy):
                         "HANDLER_NOT_FOUND",
                     )
                 self._logger.warning(
-                    f"Handler for {provider_api} not found, using RunInstances fallback"
+                    "Handler for %s not found, using RunInstances fallback", provider_api
                 )
 
             # Create a minimal request object for the handler
@@ -546,7 +546,7 @@ class AWSProviderStrategy(ProviderStrategy):
             instance_details = await handler.check_hosts_status(request)
 
             if not instance_details:
-                self._logger.info(f"No instances found for resources: {resource_ids}")
+                self._logger.info("No instances found for resources: %s", resource_ids)
                 return ProviderResult.success_result(
                     {"instances": []},
                     {
@@ -776,7 +776,9 @@ class AWSProviderStrategy(ProviderStrategy):
                         template_data = scheduler_strategy.load_templates_from_path(template_path)
                         templates.extend(template_data)
                     except Exception as e:
-                        self._logger.warning(f"Failed to load templates from {template_path}: {e}")
+                        self._logger.warning(
+                            "Failed to load templates from %s: %s", template_path, e
+                        )
 
                 return templates
             else:
@@ -785,7 +787,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 return self._get_fallback_templates()
 
         except Exception as e:
-            self._logger.error(f"Failed to load templates via scheduler strategy: {e}")
+            self._logger.error("Failed to load templates via scheduler strategy: %s", e)
             return self._get_fallback_templates()
 
     def _get_fallback_templates(self) -> List[Dict[str, Any]]:
@@ -868,7 +870,7 @@ class AWSProviderStrategy(ProviderStrategy):
             self._initialized = False
 
         except Exception as e:
-            self._logger.warning(f"Error during AWS provider cleanup: {e}")
+            self._logger.warning("Error during AWS provider cleanup: %s", e)
 
     def __str__(self) -> str:
         """Return string representation for debugging."""

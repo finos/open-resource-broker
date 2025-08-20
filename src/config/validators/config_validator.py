@@ -8,7 +8,7 @@ from config.schemas import AppConfig, validate_config
 class ValidationResult:
     """Configuration validation result."""
 
-    def __init__(self, errors: List[str] = None, warnings: List[str] = None):
+    def __init__(self, errors: List[str] = None, warnings: List[str] = None) -> None:
         """Initialize the instance."""
         self.errors = errors or []
         self.warnings = warnings or []
@@ -27,7 +27,7 @@ class ValidationResult:
 class ConfigValidator:
     """Main configuration validator orchestrator."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the configuration validator."""
 
     def validate_config(self, config_data: Dict[str, Any]) -> ValidationResult:

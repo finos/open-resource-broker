@@ -9,7 +9,7 @@ from .exceptions import (
     TemplateValidationError,
 )
 
-__all__ = [
+__all__: list[str] = [
     "Template",
     "TemplateException",
     "TemplateNotFoundError",

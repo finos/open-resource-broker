@@ -23,7 +23,7 @@ class TemplateDTO:
     version: Optional[str] = None
     tags: Optional[Dict[str, str]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate required fields."""
         if not self.template_id:
             raise ValueError("template_id is required")

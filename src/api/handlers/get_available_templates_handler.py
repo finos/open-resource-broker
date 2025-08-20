@@ -27,7 +27,7 @@ class GetAvailableTemplatesRESTHandler(BaseAPIHandler[Dict[str, Any], Dict[str, 
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
         metrics: Optional[MetricsCollector] = None,
-    ):
+    ) -> None:
         """
         Initialize handler with injected CQRS dependencies.
 
@@ -77,7 +77,8 @@ class GetAvailableTemplatesRESTHandler(BaseAPIHandler[Dict[str, Any], Dict[str, 
         """
         if self.logger:
             self.logger.info(
-                f"Processing get available templates request - Correlation ID: {context.correlation_id}"
+                "Processing get available templates request - Correlation ID: %s",
+                context.correlation_id,
             )
 
         try:
@@ -97,8 +98,9 @@ class GetAvailableTemplatesRESTHandler(BaseAPIHandler[Dict[str, Any], Dict[str, 
 
             if self.logger:
                 self.logger.info(
-                    f"Successfully retrieved {len(templates)} templates - "
-                    f"Correlation ID: {context.correlation_id}"
+                    "Successfully retrieved %s templates - Correlation ID: %s",
+                    len(templates),
+                    context.correlation_id,
                 )
 
             # Record metrics if available
@@ -110,7 +112,9 @@ class GetAvailableTemplatesRESTHandler(BaseAPIHandler[Dict[str, Any], Dict[str, 
         except Exception as e:
             if self.logger:
                 self.logger.error(
-                    f"Failed to retrieve templates: {str(e)} - Correlation ID: {context.correlation_id}"
+                    "Failed to retrieve templates: %s - Correlation ID: %s",
+                    str(e),
+                    context.correlation_id,
                 )
 
             # Record metrics if available

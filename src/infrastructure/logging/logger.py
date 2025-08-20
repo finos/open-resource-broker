@@ -130,7 +130,7 @@ def setup_logging(config: LoggingConfig) -> None:
 
     # Log the level being set
     logger = get_logger(__name__)
-    logger.info(f"Setting root logger level to: {level_name}")
+    logger.info("Setting root logger level to: %s", level_name)
 
     # Remove any existing handlers to prevent duplicates
     for handler in list(root_logger.handlers):
@@ -153,7 +153,7 @@ def setup_logging(config: LoggingConfig) -> None:
             console_enabled = console_enabled.lower() in ("true", "1", "yes")
     except Exception as e:
         # Fallback to config if ConfigurationManager fails
-        logger.debug(f"Could not get console_enabled from ConfigurationManager: {str(e)}")
+        logger.debug("Could not get console_enabled from ConfigurationManager: %s", str(e))
         console_enabled = config.console_enabled
 
     if console_enabled:
@@ -278,7 +278,12 @@ class AuditLogger:
             details: Additional event details
         """
         self.logger.info(
-            f"{event_type}: {action} on {resource} by {user} - {status}",
+            "%s: %s on %s by %s - %s",
+            event_type,
+            action,
+            resource,
+            user,
+            status,
             extra={
                 "event_type": event_type,
                 "user": user,
@@ -310,7 +315,9 @@ class MetricsLogger:
             **tags: Additional metric tags
         """
         self.logger.info(
-            f"{operation} took {duration_ms:.2f}ms",
+            "%s took %.2fms",
+            operation,
+            duration_ms,
             extra={
                 "metric_type": "timing",
                 "operation": operation,
@@ -331,7 +338,9 @@ class MetricsLogger:
             **tags: Additional metric tags
         """
         self.logger.info(
-            f"{metric}: {value}",
+            "%s: %s",
+            metric,
+            value,
             extra={
                 "metric_type": "counter",
                 "metric": metric,
@@ -351,7 +360,9 @@ class MetricsLogger:
             **tags: Additional metric tags
         """
         self.logger.info(
-            f"{metric}: {value}",
+            "%s: %s",
+            metric,
+            value,
             extra={
                 "metric_type": "gauge",
                 "metric": metric,

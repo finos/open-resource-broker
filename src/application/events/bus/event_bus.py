@@ -36,7 +36,7 @@ class EventBus:
     - Metrics and monitoring integration points
     """
 
-    def __init__(self, logger: Optional[LoggingPort] = None):
+    def __init__(self, logger: Optional[LoggingPort] = None) -> None:
         """
         Initialize event bus.
 
@@ -69,7 +69,9 @@ class EventBus:
         self._handlers[event_type].append(handler)
 
         if self.logger:
-            self.logger.debug(f"Registered handler {handler.__class__.__name__} for {event_type}")
+            self.logger.debug(
+                "Registered handler %s for %s", handler.__class__.__name__, event_type
+            )
 
     def register_handler_class(
         self,
@@ -116,7 +118,7 @@ class EventBus:
             self.register_handler_class(event_type, handler_class, logger or self.logger)
 
         if self.logger:
-            self.logger.info(f"Auto-registered {len(registered_handlers)} event handlers")
+            self.logger.info("Auto-registered %s event handlers", len(registered_handlers))
 
     async def publish(self, event: DomainEvent) -> None:
         """
@@ -137,12 +139,12 @@ class EventBus:
 
         if not handlers:
             if self.logger:
-                self.logger.debug(f"No handlers registered for event: {event_type}")
+                self.logger.debug("No handlers registered for event: %s", event_type)
             return
 
         if self.logger:
             self.logger.debug(
-                f"Publishing event {event_type} (ID: {event_id}) to { len(handlers)} handlers"
+                "Publishing event %s (ID: %s) to %s handlers", event_type, event_id, len(handlers)
             )
 
         # Execute all handlers concurrently
@@ -164,7 +166,7 @@ class EventBus:
                 if self.logger:
                     handler_name = handlers[i].__class__.__name__
                     self.logger.error(
-                        f"Handler {handler_name} failed for event {event_type}: { str(result)}"
+                        "Handler %s failed for event %s: %s", handler_name, event_type, str(result)
                     )
             else:
                 success_count += 1
@@ -179,8 +181,11 @@ class EventBus:
 
         if self.logger:
             self.logger.debug(
-                f"Event {event_type} processed: {success_count} succeeded, "
-                f"{error_count} failed in {duration:.3f}s"
+                "Event %s processed: %s succeeded, %s failed in %.3fs",
+                event_type,
+                success_count,
+                error_count,
+                duration,
             )
 
     async def _handle_with_error_isolation(self, handler: EventHandler, event: DomainEvent) -> None:
@@ -195,10 +200,10 @@ class EventBus:
         """
         try:
             await handler.handle(event)
-        except Exception as e:
+        except Exception:
             # Error is logged by the handler itself, we just need to isolate it
             # The exception will be caught by asyncio.gather() above
-            raise e
+            raise
 
     def get_handlers_for_event(self, event_type: str) -> List[EventHandler]:
         """

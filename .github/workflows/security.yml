@@ -149,7 +149,6 @@ jobs:
 
     - name: Run Bandit security scan
       run: make ci-security-bandit
-      continue-on-error: true
 
   security-safety:
     name: Safety (Dependency Scan)
@@ -183,7 +182,6 @@ jobs:
 
     - name: Run Safety dependency scan
       run: make ci-security-safety
-      continue-on-error: true
   security-hadolint:
     name: Hadolint (Dockerfile Scan)
     runs-on: ubuntu-latest

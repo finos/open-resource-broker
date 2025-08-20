@@ -8,7 +8,7 @@ from .template_cache_service import (
 )
 from .template_repository_impl import TemplateRepositoryImpl
 
-__all__ = [
+__all__: list[str] = [
     # Core template system
     "TemplateConfigurationManager",
     # Repository implementation

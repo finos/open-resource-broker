@@ -55,7 +55,7 @@ class AWSTemplate(CoreTemplate):
     # Note: instance_type and instance_types are inherited from CoreTemplate
     # No need to redefine them here - this was causing the field access issues
 
-    def __init__(self, **data):
+    def __init__(self, **data) -> None:
         """Initialize the instance."""
         # Set provider_type to AWS
         data["provider_type"] = "aws"

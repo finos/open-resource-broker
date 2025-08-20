@@ -35,7 +35,7 @@ class ProviderResourceTag:
     key: str
     value: str
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate tag key and value."""
         if not self.key or len(self.key) > 128:
             raise ValueError("Tag key must be 1-128 characters")
@@ -56,7 +56,7 @@ class ProviderResourceIdentifier:
     identifier: str  # Provider-specific ID
     region: Optional[str] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate resource identifier."""
         if not self.identifier:
             raise ValueError("Resource identifier cannot be empty")
@@ -71,7 +71,7 @@ class ProviderLaunchTemplate:
     template_id: str
     version: Optional[str] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate launch template."""
         if not self.template_id:
             raise ValueError("Template ID cannot be empty")

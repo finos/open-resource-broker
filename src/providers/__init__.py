@@ -1,3 +1,3 @@
 """Provider implementations package."""
 
-__all__ = []
+__all__: list[str] = []

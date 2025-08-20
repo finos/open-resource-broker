@@ -56,7 +56,7 @@ class GetReturnRequestsRESTHandler(BaseAPIHandler[Dict[str, Any], ReturnRequestR
         self._cache_duration = cache_duration
         self._cache = {}
 
-    async def validate_api_request(self, request: Dict[str, Any], context: RequestContext) -> None:
+    async def validate_api_request(self, request: Dict[str, Any], context: RequestContext):
         """
         Validate API request for getting return requests.
 

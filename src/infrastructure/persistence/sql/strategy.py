@@ -26,7 +26,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
     serialization, and locking. Reduced from 769 lines to ~200 lines.
     """
 
-    def __init__(self, config: Dict[str, Any], table_name: str, columns: Dict[str, str]):
+    def __init__(self, config: Dict[str, Any], table_name: str, columns: Dict[str, str]) -> None:
         """
         Initialize SQL storage strategy with components.
 
@@ -50,7 +50,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
         # Initialize database table
         self._initialize_table()
 
-        self.logger.debug(f"Initialized SQL storage strategy for table {table_name}")
+        self.logger.debug("Initialized SQL storage strategy for table %s", table_name)
 
     def _get_id_column(self) -> str:
         """Get the primary key column name."""
@@ -65,9 +65,9 @@ class SQLStorageStrategy(BaseStorageStrategy):
             if not self.connection_manager.table_exists(self.table_name):
                 create_table_sql = self.query_builder.build_create_table()
                 self.connection_manager.execute_query(create_table_sql)
-                self.logger.info(f"Created table: {self.table_name}")
+                self.logger.info("Created table: %s", self.table_name)
         except Exception as e:
-            self.logger.error(f"Failed to initialize table {self.table_name}: {e}")
+            self.logger.error("Failed to initialize table %s: %s", self.table_name, e)
             raise
 
     def save(self, entity_id: str, data: Dict[str, Any]) -> None:
@@ -98,10 +98,10 @@ class SQLStorageStrategy(BaseStorageStrategy):
                     session.execute(text(query), params)
                     session.commit()
 
-                self.logger.debug(f"Saved entity: {entity_id}")
+                self.logger.debug("Saved entity: %s", entity_id)
 
             except Exception as e:
-                self.logger.error(f"Failed to save entity {entity_id}: {e}")
+                self.logger.error("Failed to save entity %s: %s", entity_id, e)
                 raise PersistenceError(f"Failed to save entity {entity_id}: {e}")
 
     def find_by_id(self, entity_id: str) -> Optional[Dict[str, Any]]:
@@ -127,14 +127,14 @@ class SQLStorageStrategy(BaseStorageStrategy):
                     # Convert row to dictionary
                     row_dict = dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
                     entity_data = self.serializer.deserialize_from_row(row_dict)
-                    self.logger.debug(f"Found entity: {entity_id}")
+                    self.logger.debug("Found entity: %s", entity_id)
                     return entity_data
                 else:
-                    self.logger.debug(f"Entity not found: {entity_id}")
+                    self.logger.debug("Entity not found: %s", entity_id)
                     return None
 
             except Exception as e:
-                self.logger.error(f"Failed to find entity {entity_id}: {e}")
+                self.logger.error("Failed to find entity %s: %s", entity_id, e)
                 raise PersistenceError(f"Failed to find entity {entity_id}: {e}")
 
     def find_all(self) -> Dict[str, Dict[str, Any]]:
@@ -162,11 +162,11 @@ class SQLStorageStrategy(BaseStorageStrategy):
                     if entity_id:
                         entities[str(entity_id)] = entity_data
 
-                self.logger.debug(f"Loaded {len(entities)} entities")
+                self.logger.debug("Loaded %s entities", len(entities))
                 return entities
 
             except Exception as e:
-                self.logger.error(f"Failed to load all entities: {e}")
+                self.logger.error("Failed to load all entities: %s", e)
                 raise PersistenceError(f"Failed to load all entities: {e}")
 
     def delete(self, entity_id: str) -> None:
@@ -186,12 +186,12 @@ class SQLStorageStrategy(BaseStorageStrategy):
                     session.commit()
 
                     if result.rowcount == 0:
-                        self.logger.warning(f"Entity not found for deletion: {entity_id}")
+                        self.logger.warning("Entity not found for deletion: %s", entity_id)
                     else:
-                        self.logger.debug(f"Deleted entity: {entity_id}")
+                        self.logger.debug("Deleted entity: %s", entity_id)
 
             except Exception as e:
-                self.logger.error(f"Failed to delete entity {entity_id}: {e}")
+                self.logger.error("Failed to delete entity %s: %s", entity_id, e)
                 raise PersistenceError(f"Failed to delete entity {entity_id}: {e}")
 
     def exists(self, entity_id: str) -> bool:
@@ -212,11 +212,11 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 result = session.execute(text(query), params)
                 exists = result.fetchone() is not None
 
-            self.logger.debug(f"Entity {entity_id} exists: {exists}")
+            self.logger.debug("Entity %s exists: %s", entity_id, exists)
             return exists
 
         except Exception as e:
-            self.logger.error(f"Failed to check existence of entity {entity_id}: {e}")
+            self.logger.error("Failed to check existence of entity %s: %s", entity_id, e)
             return False
 
     def find_by_criteria(self, criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -244,11 +244,11 @@ class SQLStorageStrategy(BaseStorageStrategy):
                     entity_data = self.serializer.deserialize_from_row(row_dict)
                     entities.append(entity_data)
 
-                self.logger.debug(f"Found {len(entities)} entities matching criteria")
+                self.logger.debug("Found %s entities matching criteria", len(entities))
                 return entities
 
             except Exception as e:
-                self.logger.error(f"Failed to search entities: {e}")
+                self.logger.error("Failed to search entities: %s", e)
                 raise PersistenceError(f"Failed to search entities: {e}")
 
     def save_batch(self, entities: Dict[str, Dict[str, Any]]) -> None:
@@ -268,10 +268,10 @@ class SQLStorageStrategy(BaseStorageStrategy):
                         session.execute(query, serialized_data)
                     session.commit()
 
-                self.logger.debug(f"Saved batch of {len(entities)} entities")
+                self.logger.debug("Saved batch of %s entities", len(entities))
 
             except Exception as e:
-                self.logger.error(f"Failed to save batch: {e}")
+                self.logger.error("Failed to save batch: %s", e)
                 raise PersistenceError(f"Failed to save batch: {e}")
 
     def delete_batch(self, entity_ids: List[str]) -> None:
@@ -291,10 +291,10 @@ class SQLStorageStrategy(BaseStorageStrategy):
                         session.execute(text(query), params)
                     session.commit()
 
-                self.logger.debug(f"Deleted batch of {len(entity_ids)} entities")
+                self.logger.debug("Deleted batch of %s entities", len(entity_ids))
 
             except Exception as e:
-                self.logger.error(f"Failed to delete batch: {e}")
+                self.logger.error("Failed to delete batch: %s", e)
                 raise PersistenceError(f"Failed to delete batch: {e}")
 
     def begin_transaction(self) -> None:
@@ -310,7 +310,7 @@ class SQLStorageStrategy(BaseStorageStrategy):
         self.logger.debug("Transaction rollback (handled by session)")
 
     @contextmanager
-    def transaction(self):
+    def transaction(self) -> None:
         """Context manager for database transactions."""
         with self.connection_manager.get_session() as session:
             try:
@@ -318,10 +318,10 @@ class SQLStorageStrategy(BaseStorageStrategy):
                 session.commit()
             except Exception as e:
                 session.rollback()
-                self.logger.error(f"Transaction failed: {e}")
+                self.logger.error("Transaction failed: %s", e)
                 raise
 
     def cleanup(self) -> None:
         """Clean up resources."""
         self.connection_manager.close()
-        self.logger.debug(f"Cleaned up SQL storage strategy for {self.table_name}")
+        self.logger.debug("Cleaned up SQL storage strategy for %s", self.table_name)

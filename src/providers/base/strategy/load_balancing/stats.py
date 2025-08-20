@@ -1,7 +1,7 @@
 """Load balancing statistics tracking."""
 
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 
@@ -17,14 +17,9 @@ class StrategyStats:
     consecutive_successes: int = 0
     is_healthy: bool = True
     last_health_check: Optional[float] = None
-    response_times: deque = None  # Recent response times
+    response_times: deque = field(default_factory=lambda: deque(maxlen=10))  # Recent response times
     average_response_time: float = 0.0
     weight: float = 1.0
-
-    def __post_init__(self):
-        """Initialize response times deque."""
-        if self.response_times is None:
-            self.response_times = deque(maxlen=10)
 
     @property
     def success_rate(self) -> float:
@@ -38,12 +33,12 @@ class StrategyStats:
         """Calculate failure rate percentage."""
         return 100.0 - self.success_rate
 
-    def record_request_start(self):
+    def record_request_start(self) -> None:
         """Record the start of a request."""
         self.active_connections += 1
         self.total_requests += 1
 
-    def record_request_end(self, success: bool, response_time_ms: float):
+    def record_request_end(self, success: bool, response_time_ms: float) -> None:
         """Record the end of a request."""
         self.active_connections = max(0, self.active_connections - 1)
 
@@ -61,7 +56,7 @@ class StrategyStats:
         if self.response_times:
             self.average_response_time = sum(self.response_times) / len(self.response_times)
 
-    def reset_stats(self):
+    def reset_stats(self) -> None:
         """Reset all statistics."""
         self.active_connections = 0
         self.total_requests = 0

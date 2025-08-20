@@ -80,13 +80,13 @@ class LifecycleManager:
 
         # Check if component type is already registered
         if component_type in self._component_types:
-            self._logger.debug(f"Component type {component_type.__name__} already registered")
+            self._logger.debug("Component type %s already registered", component_type.__name__)
             return
 
         self._components.append(component)
         self._component_types[component_type] = component
         self._logger.debug(
-            f"Registered component for lifecycle management: {component_type.__name__}"
+            "Registered component for lifecycle management: %s", component_type.__name__
         )
 
     def initialize_all(self) -> None:
@@ -96,18 +96,18 @@ class LifecycleManager:
         This method is called during application startup to initialize
         all registered components in the order they were registered.
         """
-        self._logger.info(f"Initializing {len(self._components)} components")
+        self._logger.info("Initializing %s components", len(self._components))
         for component in self._components:
             try:
                 component.initialize()
-                self._logger.debug(f"Initialized component: {component.__class__.__name__}")
+                self._logger.debug("Initialized component: %s", component.__class__.__name__)
             except Exception as e:
                 self._logger.error(
-                    f"Error initializing component { component.__class__.__name__}: { str(e)}"
+                    "Error initializing component %s: %s", component.__class__.__name__, str(e)
                 )
                 import traceback
 
-                self._logger.error(f"Initialization error details: {traceback.format_exc()}")
+                self._logger.error("Initialization error details: %s", traceback.format_exc())
 
     def shutdown_all(self) -> None:
         """
@@ -116,18 +116,18 @@ class LifecycleManager:
         This method is called during application shutdown to clean up
         all registered components in the reverse order they were registered.
         """
-        self._logger.info(f"Shutting down {len(self._components)} components")
+        self._logger.info("Shutting down %s components", len(self._components))
         for component in reversed(self._components):
             try:
                 component.shutdown()
-                self._logger.debug(f"Shut down component: {component.__class__.__name__}")
+                self._logger.debug("Shut down component: %s", component.__class__.__name__)
             except Exception as e:
                 self._logger.error(
-                    f"Error shutting down component { component.__class__.__name__}: { str(e)}"
+                    "Error shutting down component %s: %s", component.__class__.__name__, str(e)
                 )
                 import traceback
 
-                self._logger.error(f"Shutdown error details: {traceback.format_exc()}")
+                self._logger.error("Shutdown error details: %s", traceback.format_exc())
 
     def get_component(self, component_type: Type[Lifecycle]) -> Optional[Lifecycle]:
         """

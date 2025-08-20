@@ -200,7 +200,7 @@ class ProviderApi(str, Enum):
     """AWS-specific provider API types - dynamically loaded from configuration."""
 
     @classmethod
-    def _missing_(cls, value):
+    def _missing_(cls, value) -> None:
         """Handle missing enum values by checking configuration."""
         # Get valid APIs from configuration
         try:
@@ -254,7 +254,7 @@ class AWSFleetType(str, Enum):
     """AWS Fleet type - dynamically loaded from configuration."""
 
     @classmethod
-    def _missing_(cls, value):
+    def _missing_(cls, value) -> None:
         """Handle missing enum values by checking configuration."""
         # Get valid fleet types from configuration
         try:
@@ -311,7 +311,7 @@ class AWSFleetType(str, Enum):
 class AWSAllocationStrategy:
     """AWS-specific allocation strategy wrapper with AWS API formatting."""
 
-    def __init__(self, strategy: AllocationStrategy):
+    def __init__(self, strategy: AllocationStrategy) -> None:
         """Initialize the instance."""
         self._strategy = strategy
 

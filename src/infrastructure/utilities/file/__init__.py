@@ -84,7 +84,7 @@ from .text_utils import (
 from .yaml_utils import read_yaml_file, write_yaml_file
 
 # Backward compatibility - commonly used functions
-__all__ = [
+__all__: list[str] = [
     # YAML
     "read_yaml_file",
     "write_yaml_file",

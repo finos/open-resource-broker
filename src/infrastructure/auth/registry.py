@@ -10,7 +10,7 @@ from infrastructure.logging.logger import get_logger
 class AuthRegistry:
     """Registry for authentication strategies."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize authentication registry."""
         self._strategies: Dict[str, Callable[..., AuthPort]] = {}
         self._lock = threading.Lock()
@@ -28,10 +28,10 @@ class AuthRegistry:
         """
         with self._lock:
             if strategy_name in self._strategies:
-                self.logger.warning(f"Overriding existing auth strategy: {strategy_name}")
+                self.logger.warning("Overriding existing auth strategy: %s", strategy_name)
 
             self._strategies[strategy_name] = strategy_factory
-            self.logger.info(f"Registered auth strategy: {strategy_name}")
+            self.logger.info("Registered auth strategy: %s", strategy_name)
 
     def get_strategy(self, strategy_name: str, **kwargs) -> AuthPort:
         """

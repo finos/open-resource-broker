@@ -40,7 +40,7 @@ class ResourceSpecification:
     tags: Dict[str, str]
     region: Optional[str] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate resource specification."""
         if not self.name:
             raise ValueError("Resource name cannot be empty")
@@ -164,7 +164,7 @@ class ResourceManagerDomainService(ABC):
     multiple resources or complex business logic.
     """
 
-    def __init__(self, resource_manager: ResourceManagerPort):
+    def __init__(self, resource_manager: ResourceManagerPort) -> None:
         """Initialize the instance."""
         self.resource_manager = resource_manager
 

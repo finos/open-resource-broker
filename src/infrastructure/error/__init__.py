@@ -13,7 +13,7 @@ from infrastructure.error.exception_handler import (
     get_exception_handler,
 )
 
-__all__ = [
+__all__: list[str] = [
     "ExceptionHandler",
     "ErrorResponse",
     "ErrorCategory",

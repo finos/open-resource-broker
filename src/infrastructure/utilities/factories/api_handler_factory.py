@@ -48,10 +48,10 @@ class APIHandlerFactory:
             handler_class: Handler class to register
         """
         cls._handlers[name] = handler_class
-        logger.debug(f"Registered API handler: {name} -> {handler_class.__name__}")
+        logger.debug("Registered API handler: %s -> %s", name, handler_class.__name__)
 
     @classmethod
-    def create_handler(cls, name: str, app_service: Optional["ApplicationService"] = None):
+    def create_handler(cls, name: str, app_service: Optional["ApplicationService"] = None) -> None:
         """
         Create a handler instance.
 
@@ -87,8 +87,8 @@ class APIHandlerFactory:
                 # Create with default constructor
                 return handler_class()
         except Exception as e:
-            logger.error(f"Failed to create handler {name}: {e}")
-            raise ValueError(f"Failed to create handler {name}: {e}") from e
+            logger.error("Failed to create handler %s: %s", name, e)
+            raise ValueError(f"Failed to create handler {name}: {e}")
 
     @classmethod
     def _try_dynamic_load(cls, name: str) -> None:
@@ -130,10 +130,10 @@ class APIHandlerFactory:
 
                 # Register the dynamically loaded handler
                 cls.register_handler(name, handler_class)
-                logger.debug(f"Dynamically loaded handler: {name}")
+                logger.debug("Dynamically loaded handler: %s", name)
 
             except (ImportError, AttributeError) as e:
-                logger.warning(f"Failed to dynamically load handler {name}: {e}")
+                logger.warning("Failed to dynamically load handler %s: %s", name, e)
 
     @classmethod
     def get_registered_handlers(cls) -> Dict[str, Type]:
@@ -171,7 +171,7 @@ class APIHandlerFactory:
         """
         if name in cls._handlers:
             del cls._handlers[name]
-            logger.debug(f"Unregistered API handler: {name}")
+            logger.debug("Unregistered API handler: %s", name)
             return True
         return False
 

@@ -17,7 +17,7 @@ from .config import LoadBalancingConfig
 from .stats import StrategyStats
 from .strategy import LoadBalancingProviderStrategy
 
-__all__ = [
+__all__: list[str] = [
     "LoadBalancingAlgorithm",
     "HealthCheckMode",
     "LoadBalancingConfig",

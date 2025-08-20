@@ -46,7 +46,7 @@ class DependencyRegistration:
         lifecycle: DILifecycle = DILifecycle.EAGER,
         dependencies: Optional[List[Type]] = None,
         metadata: Optional[Dict[str, Any]] = None,
-    ):
+    ) -> None:
         """Initialize the instance."""
         self.dependency_type = dependency_type
         self.implementation_type = implementation_type or dependency_type
@@ -434,7 +434,7 @@ class CQRSHandlerRegistrationPort(ABC):
 class DependencyResolutionError(Exception):
     """Raised when dependency cannot be resolved."""
 
-    def __init__(self, dependency_type: Type, message: str = None):
+    def __init__(self, dependency_type: Type, message: str = None) -> None:
         """Initialize dependency resolution error."""
         self.dependency_type = dependency_type
         self.message = message or f"Cannot resolve dependency: {dependency_type}"
@@ -444,7 +444,7 @@ class DependencyResolutionError(Exception):
 class CircularDependencyError(DependencyResolutionError):
     """Raised when circular dependency is detected."""
 
-    def __init__(self, dependency_chain: List[Type]):
+    def __init__(self, dependency_chain: List[Type]) -> None:
         """Initialize circular dependency error with dependency chain."""
         self.dependency_chain = dependency_chain
         chain_str = " -> ".join(str(t) for t in dependency_chain)
@@ -455,7 +455,7 @@ class CircularDependencyError(DependencyResolutionError):
 class DependencyRegistrationError(Exception):
     """Raised when dependency registration fails."""
 
-    def __init__(self, dependency_type: Type, message: str):
+    def __init__(self, dependency_type: Type, message: str) -> None:
         self.dependency_type = dependency_type
         self.message = message
         super().__init__(f"Registration failed for {dependency_type}: {message}")

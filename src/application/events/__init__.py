@@ -39,7 +39,7 @@ from .handlers import (
     template_handlers,
 )
 
-__all__ = [
+__all__: list[str] = [
     # Core components
     "EventBus",
     "event_handler",

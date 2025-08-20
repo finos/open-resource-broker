@@ -94,7 +94,7 @@ def retry(
                     # Log successful retry if this wasn't the first attempt
                     if attempt > 0:
                         logger.info(
-                            f"Operation succeeded after { attempt + 1} attempts: { func.__name__}"
+                            "Operation succeeded after %s attempts: %s", attempt + 1, func.__name__
                         )
 
                     return result
@@ -106,12 +106,15 @@ def retry(
                     if not retry_strategy.should_retry(attempt, e):
                         if attempt >= max_attempts:
                             logger.error(
-                                f"Max retry attempts ({max_attempts}) exceeded for { func.__name__}: {e}"
+                                "Max retry attempts (%s) exceeded for %s: %s",
+                                max_attempts,
+                                func.__name__,
+                                e,
                             )
                             raise MaxRetriesExceededError(attempt + 1, e)
                         else:
-                            logger.error(f"Non-retryable error in {func.__name__}: {e}")
-                            raise e
+                            logger.error("Non-retryable error in %s: %s", func.__name__, e)
+                            raise
 
                     # Calculate delay
                     delay = retry_strategy.get_delay(attempt)
@@ -121,8 +124,12 @@ def retry(
 
                     # Log retry attempt
                     logger.warning(
-                        f"Retry attempt {attempt + 1}/{max_attempts} for {func.__name__} "
-                        f"after {delay:.2f}s delay. Error: {e}"
+                        "Retry attempt %s/%s for %s after %.2fs delay. Error: %s",
+                        attempt + 1,
+                        max_attempts,
+                        func.__name__,
+                        delay,
+                        e,
                     )
 
                     # Wait before retry

@@ -21,7 +21,7 @@ TResponse = TypeVar("TResponse")
 class RequestContext:
     """Request context for storing request-specific data."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize request context."""
         self.correlation_id = str(uuid.uuid4())
         self.start_time = time.time()
@@ -54,7 +54,7 @@ class BaseInfrastructureHandler(
         self,
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
-    ):
+    ) -> None:
         """
         Initialize base infrastructure handler.
 
@@ -80,7 +80,7 @@ class BaseInfrastructureHandler(
         try:
             # Log request processing start
             if self.logger:
-                self.logger.info(f"Processing infrastructure request: {request_type}")
+                self.logger.info("Processing infrastructure request: %s", request_type)
 
             # Validate request
             await self.validate_request(request, context)
@@ -94,7 +94,9 @@ class BaseInfrastructureHandler(
 
             if self.logger:
                 self.logger.info(
-                    f"Infrastructure request processed successfully: {request_type} ({ duration:.3f}s)"
+                    "Infrastructure request processed successfully: %s (%.3fs)",
+                    request_type,
+                    duration,
                 )
 
             return response
@@ -118,7 +120,7 @@ class BaseInfrastructureHandler(
 
             if self.logger:
                 self.logger.error(
-                    f"Infrastructure request processing failed: {request_type} - {str(e)}"
+                    "Infrastructure request processing failed: %s - %s", request_type, str(e)
                 )
 
             # Re-raise for upstream handling
@@ -215,7 +217,7 @@ class BaseAPIHandler(BaseInfrastructureHandler[TRequest, TResponse]):
         self,
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
-    ):
+    ) -> None:
         """Initialize base API handler."""
         super().__init__(logger, error_handler)
         self.middleware_stack: list[Callable] = []

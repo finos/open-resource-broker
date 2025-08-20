@@ -15,7 +15,7 @@ from .path_resolver import ConfigPathResolver
 from .provider_manager import ProviderConfigManager
 from .type_converter import ConfigTypeConverter
 
-__all__ = [
+__all__: list[str] = [
     "ConfigurationManager",
     "ConfigTypeConverter",
     "ConfigPathResolver",

@@ -3,4 +3,4 @@
 from .cognito_strategy import CognitoAuthStrategy
 from .iam_strategy import IAMAuthStrategy
 
-__all__ = ["IAMAuthStrategy", "CognitoAuthStrategy"]
+__all__: list[str] = ["IAMAuthStrategy", "CognitoAuthStrategy"]

@@ -5,7 +5,7 @@ from typing import Protocol
 from application.dto.base import BaseCommand, BaseResponse
 from application.interfaces.command_handler import CommandHandler
 
-__all__ = ["CommandHandler", "CommandBus"]
+__all__: list[str] = ["CommandHandler", "CommandBus"]
 
 
 class CommandBus(Protocol):

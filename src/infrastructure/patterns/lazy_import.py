@@ -14,7 +14,7 @@ class LazyImport:
     only when needed, which helps break circular dependencies.
     """
 
-    def __init__(self, module_name: str, attribute_name: Optional[str] = None):
+    def __init__(self, module_name: str, attribute_name: Optional[str] = None) -> None:
         """
         Initialize lazy import.
 
@@ -27,7 +27,7 @@ class LazyImport:
         self._module = None
         self._attribute = None
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """
         Call the lazily imported attribute.
 
@@ -44,7 +44,7 @@ class LazyImport:
             return self._attribute(*args, **kwargs)
         raise TypeError(f"Attribute '{self.attribute_name}' is not callable")
 
-    def _import(self):
+    def _import(self) -> None:
         """Import the module and get the attribute."""
         if self._module is None:
             self._module = importlib.import_module(self.module_name)

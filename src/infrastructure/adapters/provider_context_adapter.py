@@ -12,7 +12,7 @@ from providers.base.strategy.provider_context import ProviderContext
 class ProviderContextAdapter(ProviderPort):
     """Adapter that wraps ProviderContext to implement ProviderPort interface."""
 
-    def __init__(self, provider_context: ProviderContext):
+    def __init__(self, provider_context: ProviderContext) -> None:
         """Initialize adapter with existing ProviderContext."""
         self.provider_context = provider_context
 

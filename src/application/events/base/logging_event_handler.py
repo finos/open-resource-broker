@@ -34,7 +34,7 @@ class LoggingEventHandler(EventHandler):
     but different message formats.
     """
 
-    def __init__(self, logger: Optional[LoggingPort] = None):
+    def __init__(self, logger: Optional[LoggingPort] = None) -> None:
         """
         Initialize logging event handler.
 

@@ -2,6 +2,6 @@
 
 from .config_validator import ConfigValidator
 
-__all__ = [
+__all__: list[str] = [
     "ConfigValidator",
 ]

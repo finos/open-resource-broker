@@ -1,7 +1,7 @@
 """User management port interface."""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -24,21 +24,13 @@ class User:
     username: Optional[str] = None
     email: Optional[str] = None
     full_name: Optional[str] = None
-    roles: List[UserRole] = None
-    permissions: List[str] = None
+    roles: List[UserRole] = field(default_factory=list)
+    permissions: List[str] = field(default_factory=list)
     is_active: bool = True
     is_service_account: bool = False
     created_at: Optional[int] = None  # Unix timestamp
     last_login: Optional[int] = None  # Unix timestamp
-    metadata: Dict[str, Any] = None
-
-    def __post_init__(self):
-        if self.roles is None:
-            self.roles = []
-        if self.permissions is None:
-            self.permissions = []
-        if self.metadata is None:
-            self.metadata = {}
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def has_role(self, role: UserRole) -> bool:
         """Check if user has specific role."""
@@ -133,7 +125,7 @@ class UserPort(ABC):
         self,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
-        filters: Dict[str, Any] = None,
+        filters: Optional[Dict[str, Any]] = None,
     ) -> List[User]:
         """
         List users with optional filtering and pagination.

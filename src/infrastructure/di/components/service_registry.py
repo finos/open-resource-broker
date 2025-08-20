@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class ServiceRegistry:
     """Manages service registration for dependency injection."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the instance."""
         self._registrations: Dict[Type, DependencyRegistration] = {}
         self._singletons: Dict[Type, Any] = {}
@@ -57,7 +57,7 @@ class ServiceRegistry:
                 self._singletons[cls] = instance_or_factory
 
             self._registrations[cls] = registration
-            logger.debug(f"Registered singleton: {cls.__name__}")
+            logger.debug("Registered singleton: %s", cls.__name__)
 
     def register_factory(self, cls: Type[T], factory: Callable[..., T]) -> None:
         """Register a factory for creating instances."""
@@ -66,7 +66,7 @@ class ServiceRegistry:
                 dependency_type=cls, scope=DIScope.TRANSIENT, factory=factory
             )
             self._registrations[cls] = registration
-            logger.debug(f"Registered factory for: {cls.__name__}")
+            logger.debug("Registered factory for: %s", cls.__name__)
 
     def register_instance(self, cls: Type[T], instance: T) -> None:
         """Register a specific instance."""
@@ -76,7 +76,7 @@ class ServiceRegistry:
             )
             self._registrations[cls] = registration
             self._singletons[cls] = instance
-            logger.debug(f"Registered instance: {cls.__name__}")
+            logger.debug("Registered instance: %s", cls.__name__)
 
     def register(self, registration: DependencyRegistration) -> None:
         """Register a dependency registration."""
@@ -87,7 +87,7 @@ class ServiceRegistry:
             if registration.scope == DIScope.SINGLETON and registration.instance:
                 self._singletons[registration.dependency_type] = registration.instance
 
-            logger.debug(f"Registered: {registration.dependency_type.__name__}")
+            logger.debug("Registered: %s", registration.dependency_type.__name__)
 
     def register_type(
         self,
@@ -104,7 +104,9 @@ class ServiceRegistry:
             )
             self._registrations[interface_type] = registration
             logger.debug(
-                f"Registered type mapping: {interface_type.__name__} -> {implementation_type.__name__}"
+                "Registered type mapping: %s -> %s",
+                interface_type.__name__,
+                implementation_type.__name__,
             )
 
     def register_injectable_class(self, cls: Type[T]) -> None:
@@ -121,7 +123,7 @@ class ServiceRegistry:
                 )
                 self._registrations[cls] = registration
 
-            logger.debug(f"Registered injectable class: {cls.__name__}")
+            logger.debug("Registered injectable class: %s", cls.__name__)
 
     def get_registration(self, dependency_type: Type[T]) -> Optional[DependencyRegistration]:
         """Get registration for a dependency type."""
@@ -151,7 +153,7 @@ class ServiceRegistry:
                 # Also remove singleton instance if exists
                 if dependency_type in self._singletons:
                     del self._singletons[dependency_type]
-                logger.debug(f"Unregistered: {dependency_type.__name__}")
+                logger.debug("Unregistered: %s", dependency_type.__name__)
                 return True
             return False
 

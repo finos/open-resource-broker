@@ -23,7 +23,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         auth_port: AuthPort,
         excluded_paths: List[str] = None,
         require_auth: bool = True,
-    ):
+    ) -> None:
         """
         Initialize authentication middleware.
 
@@ -58,7 +58,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         """
         # Skip authentication for excluded paths
         if self._is_excluded_path(request.url.path):
-            self.logger.debug(f"Skipping auth for excluded path: {request.url.path}")
+            self.logger.debug("Skipping auth for excluded path: %s", request.url.path)
             return await call_next(request)
 
         # Skip authentication if not required and auth is disabled
@@ -83,7 +83,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             request.state.user_roles = auth_result.user_roles
             request.state.permissions = auth_result.permissions
 
-            self.logger.debug(f"Authentication successful for user: {auth_result.user_id}")
+            self.logger.debug("Authentication successful for user: %s", auth_result.user_id)
 
             # Continue to next middleware/handler
             response = await call_next(request)
@@ -95,7 +95,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return response
 
         except Exception as e:
-            self.logger.error(f"Authentication middleware error: {e}")
+            self.logger.error("Authentication middleware error: %s", e)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Authentication service error",
@@ -172,7 +172,7 @@ class AuthDependency:
         required_permissions: List[str] = None,
         required_roles: List[str] = None,
         allow_service_accounts: bool = True,
-    ):
+    ) -> None:
         """
         Initialize auth dependency.
 
@@ -216,7 +216,9 @@ class AuthDependency:
         # Check required permissions
         for permission in self.required_permissions:
             if not auth_result.has_permission(permission):
-                self.logger.warning(f"User {auth_result.user_id} missing permission: {permission}")
+                self.logger.warning(
+                    "User %s missing permission: %s", auth_result.user_id, permission
+                )
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"Missing required permission: {permission}",
@@ -225,7 +227,7 @@ class AuthDependency:
         # Check required roles
         for role in self.required_roles:
             if not auth_result.has_role(role):
-                self.logger.warning(f"User {auth_result.user_id} missing role: {role}")
+                self.logger.warning("User %s missing role: %s", auth_result.user_id, role)
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"Missing required role: {role}",

@@ -11,7 +11,7 @@ from .request_adapter import AWSRequestAdapter
 from .resource_manager_adapter import AWSResourceManagerAdapter
 from .template_adapter import AWSTemplateAdapter
 
-__all__ = [
+__all__: list[str] = [
     "AWSResourceManagerAdapter",
     "AWSProvisioningAdapter",
     "AWSRequestAdapter",

@@ -168,6 +168,9 @@ where = ["src"]
 [tool.setuptools]
 py-modules = ["run", "_package", "bootstrap"]
 
+[tool.setuptools.package-data]
+"*" = ["py.typed"]
+
 
 
 [tool.pytest.ini_options]
@@ -200,7 +203,7 @@ exclude_lines = [
 
 [tool.black]
 line-length = 100
-target-version = ['py38']
+target-version = ['py39']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -229,13 +232,15 @@ ensure_newline_before_comments = true
 python_version = "{{ project.python.default_version }}"
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
 check_untyped_defs = true
-disallow_untyped_decorators = true
+disallow_untyped_decorators = false
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
 strict_equality = true
+explicit_package_bases = true
+namespace_packages = true

@@ -47,7 +47,7 @@ from interface.template_command_handlers import (
     handle_validate_template,
 )
 
-__all__ = [
+__all__: list[str] = [
     # Base handler
     "CLICommandHandler",
     # Template handlers (function-based)

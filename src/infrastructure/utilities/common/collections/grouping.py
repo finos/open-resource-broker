@@ -1,7 +1,7 @@
 """Collection grouping utility functions."""
 
 from collections import Counter, defaultdict
-from typing import Callable, Dict, Iterable, List, Optional, Tuple, TypeVar
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, TypeVar
 
 T = TypeVar("T")
 K = TypeVar("K")
@@ -59,7 +59,7 @@ def count_by(collection: Iterable[T], key_func: Callable[[T], K]) -> Dict[K, int
     Returns:
         Dictionary mapping keys to counts
     """
-    counts = defaultdict(int)
+    counts: dict[Any, int] = defaultdict(int)
     for item in collection:
         key = key_func(item)
         counts[key] += 1

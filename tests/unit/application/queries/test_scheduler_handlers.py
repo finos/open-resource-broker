@@ -48,10 +48,13 @@ class TestListSchedulerStrategiesHandler:
         """Test basic strategy listing."""
         query = ListSchedulerStrategiesQuery(include_current=True, include_details=False)
 
-        with patch(
-            "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
-            return_value=mock_registry,
-        ), patch("src.config.manager.ConfigurationManager", return_value=mock_config_manager):
+        with (
+            patch(
+                "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
+                return_value=mock_registry,
+            ),
+            patch("src.config.manager.ConfigurationManager", return_value=mock_config_manager),
+        ):
 
             response = await handler.execute_query(query)
 
@@ -70,10 +73,13 @@ class TestListSchedulerStrategiesHandler:
         """Test strategy listing with details."""
         query = ListSchedulerStrategiesQuery(include_current=True, include_details=True)
 
-        with patch(
-            "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
-            return_value=mock_registry,
-        ), patch("src.config.manager.ConfigurationManager", return_value=mock_config_manager):
+        with (
+            patch(
+                "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
+                return_value=mock_registry,
+            ),
+            patch("src.config.manager.ConfigurationManager", return_value=mock_config_manager),
+        ):
 
             response = await handler.execute_query(query)
 
@@ -87,12 +93,15 @@ class TestListSchedulerStrategiesHandler:
         """Test strategy listing when config manager fails."""
         query = ListSchedulerStrategiesQuery(include_current=True, include_details=False)
 
-        with patch(
-            "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
-            return_value=mock_registry,
-        ), patch(
-            "src.config.manager.ConfigurationManager",
-            side_effect=Exception("Config error"),
+        with (
+            patch(
+                "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
+                return_value=mock_registry,
+            ),
+            patch(
+                "src.config.manager.ConfigurationManager",
+                side_effect=Exception("Config error"),
+            ),
         ):
 
             response = await handler.execute_query(query)
@@ -139,11 +148,12 @@ class TestGetSchedulerConfigurationHandler:
         """Test getting current scheduler configuration."""
         query = GetSchedulerConfigurationQuery()
 
-        with patch(
-            "src.config.manager.ConfigurationManager", return_value=mock_config_manager
-        ), patch(
-            "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
-            return_value=mock_registry,
+        with (
+            patch("src.config.manager.ConfigurationManager", return_value=mock_config_manager),
+            patch(
+                "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
+                return_value=mock_registry,
+            ),
         ):
 
             response = await handler.execute_query(query)
@@ -160,11 +170,12 @@ class TestGetSchedulerConfigurationHandler:
         """Test getting specific scheduler configuration."""
         query = GetSchedulerConfigurationQuery(scheduler_name="default")
 
-        with patch(
-            "src.config.manager.ConfigurationManager", return_value=mock_config_manager
-        ), patch(
-            "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
-            return_value=mock_registry,
+        with (
+            patch("src.config.manager.ConfigurationManager", return_value=mock_config_manager),
+            patch(
+                "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
+                return_value=mock_registry,
+            ),
         ):
 
             response = await handler.execute_query(query)
@@ -180,11 +191,12 @@ class TestGetSchedulerConfigurationHandler:
         """Test getting configuration for unregistered scheduler."""
         query = GetSchedulerConfigurationQuery(scheduler_name="unknown")
 
-        with patch(
-            "src.config.manager.ConfigurationManager", return_value=mock_config_manager
-        ), patch(
-            "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
-            return_value=mock_registry,
+        with (
+            patch("src.config.manager.ConfigurationManager", return_value=mock_config_manager),
+            patch(
+                "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
+                return_value=mock_registry,
+            ),
         ):
 
             response = await handler.execute_query(query)
@@ -229,11 +241,12 @@ class TestValidateSchedulerConfigurationHandler:
         """Test validating current scheduler configuration."""
         query = ValidateSchedulerConfigurationQuery()
 
-        with patch(
-            "src.config.manager.ConfigurationManager", return_value=mock_config_manager
-        ), patch(
-            "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
-            return_value=mock_registry,
+        with (
+            patch("src.config.manager.ConfigurationManager", return_value=mock_config_manager),
+            patch(
+                "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
+                return_value=mock_registry,
+            ),
         ):
 
             response = await handler.execute_query(query)
@@ -249,11 +262,12 @@ class TestValidateSchedulerConfigurationHandler:
         """Test validating unregistered scheduler."""
         query = ValidateSchedulerConfigurationQuery(scheduler_name="unknown")
 
-        with patch(
-            "src.config.manager.ConfigurationManager", return_value=mock_config_manager
-        ), patch(
-            "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
-            return_value=mock_registry,
+        with (
+            patch("src.config.manager.ConfigurationManager", return_value=mock_config_manager),
+            patch(
+                "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
+                return_value=mock_registry,
+            ),
         ):
 
             response = await handler.execute_query(query)
@@ -272,11 +286,12 @@ class TestValidateSchedulerConfigurationHandler:
         # Mock registry to raise exception on strategy creation
         mock_registry.create_strategy.side_effect = Exception("Creation failed")
 
-        with patch(
-            "src.config.manager.ConfigurationManager", return_value=mock_config_manager
-        ), patch(
-            "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
-            return_value=mock_registry,
+        with (
+            patch("src.config.manager.ConfigurationManager", return_value=mock_config_manager),
+            patch(
+                "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
+                return_value=mock_registry,
+            ),
         ):
 
             response = await handler.execute_query(query)

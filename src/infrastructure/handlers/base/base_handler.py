@@ -18,7 +18,7 @@ class BaseHandler:
     including logging, error handling, and metrics collection.
     """
 
-    def __init__(self, logger=None, metrics=None):
+    def __init__(self, logger=None, metrics=None) -> None:
         """
         Initialize the handler.
 
@@ -37,7 +37,7 @@ class BaseHandler:
             method_name: Name of the method being entered
             **kwargs: Additional logging context
         """
-        self.logger.debug(f"Entering {method_name}", extra=kwargs)
+        self.logger.debug("Entering %s", method_name, extra=kwargs)
 
     def log_exit(self, method_name: str, result=None, **kwargs) -> None:
         """
@@ -48,7 +48,7 @@ class BaseHandler:
             result: Optional result to log
             **kwargs: Additional logging context
         """
-        self.logger.debug(f"Exiting {method_name}", extra=kwargs)
+        self.logger.debug("Exiting %s", method_name, extra=kwargs)
 
     def log_error(self, method_name: str, error: Exception, **kwargs) -> None:
         """
@@ -59,7 +59,7 @@ class BaseHandler:
             error: Exception that was raised
             **kwargs: Additional logging context
         """
-        self.logger.error(f"Error in {method_name}: {str(error)}", exc_info=True, extra=kwargs)
+        self.logger.error("Error in %s: %s", method_name, str(error), exc_info=True, extra=kwargs)
 
     def with_logging(self, func: Callable[..., T]) -> Callable[..., T]:
         """

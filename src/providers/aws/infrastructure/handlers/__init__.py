@@ -2,7 +2,7 @@
 
 # Import handlers directly from their modules when needed
 
-__all__ = [
+__all__: list[str] = [
     "AWSHandler",
     "ASGHandler",
     "EC2FleetHandler",

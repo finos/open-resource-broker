@@ -16,7 +16,7 @@ body:
     attributes:
       label: Version
       description: What version of the plugin are you running?
-      placeholder: e.g., 1.0.0
+      placeholder: e.g., 0.1.0
     validations:
       required: true
 
@@ -26,10 +26,11 @@ body:
       label: Python Version
       description: What version of Python are you using?
       options:
-        - Python 3.8
         - Python 3.9
         - Python 3.10
         - Python 3.11
+        - Python 3.12
+        - Python 3.13
         - Other (specify in environment details)
     validations:
       required: true

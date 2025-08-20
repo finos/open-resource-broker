@@ -35,7 +35,7 @@ class ProviderOperation:
     parameters: Dict[str, Any]
     context: Optional[Dict[str, Any]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate operation parameters after initialization."""
         if not isinstance(self.parameters, dict):
             raise ValueError("Operation parameters must be a dictionary")
@@ -131,7 +131,7 @@ class ProviderStrategy(ABC):
     - Easy testing and mocking
     """
 
-    def __init__(self, config: BaseProviderConfig):
+    def __init__(self, config: BaseProviderConfig) -> None:
         """
         Initialize the provider strategy with configuration.
 

@@ -18,7 +18,7 @@ T = TypeVar("T")
 class ErrorHandlingAdapter(ErrorHandlingPort):
     """Adapter that implements ErrorHandlingPort using infrastructure error handling."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the error handling adapter."""
 
     def handle_exceptions(self, func: Callable[..., T]) -> Callable[..., T]:

@@ -31,7 +31,7 @@ class RepositoryMigrator:
     detailed statistics about the migration process.
     """
 
-    def __init__(self, container: DIContainer):
+    def __init__(self, container: DIContainer) -> None:
         """
         Initialize repository migrator.
 
@@ -91,7 +91,7 @@ class RepositoryMigrator:
             if create_backup:
                 backup_path = self._create_backup(target_repos)
                 stats["backup_created"] = backup_path
-                self.logger.info(f"Created backup at {backup_path}")
+                self.logger.info("Created backup at %s", backup_path)
 
             # Perform migration
             for collection in self.collections:
@@ -108,10 +108,10 @@ class RepositoryMigrator:
             stats["status"] = "success"
             stats["completed_at"] = datetime.utcnow().isoformat()
 
-            self.logger.info(f"Migration completed: {stats['total_migrated']} items migrated")
+            self.logger.info("Migration completed: %s items migrated", stats["total_migrated"])
 
         except Exception as e:
-            self.logger.error(f"Migration failed: {str(e)}")
+            self.logger.error("Migration failed: %s", str(e))
             stats["status"] = "error"
             stats["error"] = str(e)
             stats["completed_at"] = datetime.utcnow().isoformat()
@@ -153,8 +153,8 @@ class RepositoryMigrator:
                 get_logger().info(
                     "Repository migrator using centralized resolution for template files:"
                 )
-                get_logger().info(f"  templates.json: {templates_path}")
-                get_logger().info(f"  awsprov_templates.json: {legacy_templates_path}")
+                get_logger().info("  templates.json: %s", templates_path)
+                get_logger().info("  awsprov_templates.json: %s", legacy_templates_path)
 
                 # Create a new template repository
                 template_repo = JSONTemplateRepository(templates_path, legacy_templates_path)
@@ -284,10 +284,10 @@ class RepositoryMigrator:
                             indent=2,
                         )
                     self.logger.debug(
-                        f"Backed up { len(items)} items from {collection} to {backup_file}"
+                        "Backed up %s items from %s to %s", len(items), collection, backup_file
                     )
             except Exception as e:
-                self.logger.warning(f"Failed to backup {collection}: {str(e)}")
+                self.logger.warning("Failed to backup %s: %s", collection, str(e))
 
         return backup_dir
 
@@ -321,7 +321,7 @@ class RepositoryMigrator:
         try:
             items = source_repo.find_all()
             stats["total_items"] = len(items)
-            self.logger.info(f"Migrating {stats['total_items']} items from {collection_name}")
+            self.logger.info("Migrating %s items from %s", stats["total_items"], collection_name)
 
             # Process in batches
             for i in range(0, len(items), batch_size):
@@ -361,7 +361,9 @@ class RepositoryMigrator:
                                         target_repo.save(entity)
                                     except Exception as conversion_error:
                                         self.logger.error(
-                                            f"Failed to convert item {item_id} to entity: { str(conversion_error)}"
+                                            "Failed to convert item %s to entity: %s",
+                                            item_id,
+                                            str(conversion_error),
                                         )
                                         raise ValueError(
                                             f"Entity conversion failed: { str(conversion_error)}"
@@ -391,7 +393,9 @@ class RepositoryMigrator:
                                             target_repo.save(entity)
                                         except Exception as conversion_error:
                                             self.logger.error(
-                                                f"Failed to create entity from item {item_id}: { str(conversion_error)}"
+                                                "Failed to create entity from item %s: %s",
+                                                item_id,
+                                                str(conversion_error),
                                             )
                                             raise ValueError(
                                                 f"Entity creation failed: { str(conversion_error)}"
@@ -399,7 +403,8 @@ class RepositoryMigrator:
                                     else:
                                         # Fallback to direct save, which might fail
                                         self.logger.warning(
-                                            f"No entity class found for repository, attempting direct save for item {item_id}"
+                                            "No entity class found for repository, attempting direct save for item %s",
+                                            item_id,
                                         )
                                         target_repo.save(item)
                             except Exception as e:
@@ -410,16 +415,20 @@ class RepositoryMigrator:
                         stats["failed"] += 1
                         error_id = item_id if item_id else "unknown"
                         stats["errors"].append({"item_id": error_id, "error": str(e)})
-                        self.logger.warning(f"Failed to migrate item {error_id}: {str(e)}")
+                        self.logger.warning("Failed to migrate item %s: %s", error_id, str(e))
 
                 self.logger.debug(
-                    f"Migrated batch {stats['batches']} ({i+1}-{min(i+batch_size, len(items))}) of {collection_name}"
+                    "Migrated batch %s (%s-%s) of %s",
+                    stats["batches"],
+                    i + 1,
+                    min(i + batch_size, len(items)),
+                    collection_name,
                 )
 
         except Exception as e:
             stats["failed"] = stats["total_items"] - stats["migrated"]
             stats["errors"].append({"collection": collection_name, "error": str(e)})
-            self.logger.error(f"Failed to migrate collection {collection_name}: {str(e)}")
+            self.logger.error("Failed to migrate collection %s: %s", collection_name, str(e))
 
         return stats
 

@@ -5,7 +5,7 @@ from abc import ABC
 from enum import Enum
 from typing import ClassVar, Optional, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
 T = TypeVar("T", bound="ValueObject")
 
@@ -71,7 +71,7 @@ class ResourceQuota(ValueObject):
 
     @field_validator("available")
     @classmethod
-    def validate_available(cls, v: int, info) -> int:
+    def validate_available(cls, v: int, info: ValidationInfo) -> int:
         """Ensure available = limit - used."""
         if "limit" in info.data and "used" in info.data:
             expected_available = info.data["limit"] - info.data["used"]
@@ -115,8 +115,8 @@ class IPAddress(ValueObject):
         try:
             ipaddress.ip_address(v)
             return v
-        except ValueError as e:
-            raise ValueError(f"Invalid IP address: {v}") from e
+        except ValueError:
+            raise ValueError(f"Invalid IP address: {v}")
 
     def __str__(self) -> str:
         return self.value

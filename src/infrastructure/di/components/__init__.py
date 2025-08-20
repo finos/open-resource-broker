@@ -11,4 +11,4 @@ from .cqrs_registry import CQRSHandlerRegistry
 from .dependency_resolver import DependencyResolver
 from .service_registry import ServiceRegistry
 
-__all__ = ["ServiceRegistry", "CQRSHandlerRegistry", "DependencyResolver"]
+__all__: list[str] = ["ServiceRegistry", "CQRSHandlerRegistry", "DependencyResolver"]

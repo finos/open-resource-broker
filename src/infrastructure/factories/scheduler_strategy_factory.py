@@ -13,7 +13,7 @@ from infrastructure.registry.scheduler_registry import get_scheduler_registry
 class SchedulerStrategyFactory:
     """Factory for creating scheduler strategy components using scheduler registry."""
 
-    def __init__(self, config_manager: Optional[Any] = None):
+    def __init__(self, config_manager: Optional[Any] = None) -> None:
         """Initialize factory with optional configuration manager."""
         self.logger = get_logger(__name__)
         self.config_manager = config_manager
@@ -44,9 +44,9 @@ class SchedulerStrategyFactory:
             try:
                 strategy = self.scheduler_registry.create_strategy(scheduler_type, config)
                 self._strategy_cache[cache_key] = strategy
-                self.logger.debug(f"Created {scheduler_type} scheduler strategy")
+                self.logger.debug("Created %s scheduler strategy", scheduler_type)
             except Exception as e:
-                self.logger.error(f"Failed to create {scheduler_type} scheduler strategy: {e}")
+                self.logger.error("Failed to create %s scheduler strategy: %s", scheduler_type, e)
                 raise
 
         return self._strategy_cache[cache_key]

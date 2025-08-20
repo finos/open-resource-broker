@@ -72,7 +72,7 @@ class Timer:
 class MetricsCollector:
     """Collects and manages application metrics."""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any]) -> None:
         """Initialize metrics collector."""
         self.config = config
         self.metrics: Dict[str, Metric] = {}
@@ -169,7 +169,8 @@ class MetricsCollector:
 
         if metadata:
             logger.info(
-                f"{operation} completed successfully",
+                "%s completed successfully",
+                operation,
                 extra={"duration": duration, "metadata": metadata},
             )
 
@@ -186,7 +187,8 @@ class MetricsCollector:
 
         if metadata:
             logger.error(
-                f"{operation} failed",
+                "%s failed",
+                operation,
                 extra={"duration": duration, "metadata": metadata},
             )
 
@@ -219,7 +221,7 @@ class MetricsCollector:
                     time.sleep(self.config.get("METRICS_INTERVAL", 60))
 
                 except Exception as e:
-                    logger.error(f"Error writing metrics: {e}")
+                    logger.error("Error writing metrics: %s", e)
                     time.sleep(5)  # Shorter sleep on error
 
         thread = threading.Thread(target=write_metrics, daemon=True)
@@ -272,4 +274,4 @@ class MetricsCollector:
                     try:
                         file.unlink()
                     except Exception as e:
-                        logger.warning(f"Failed to delete old metrics file {file}: {e}")
+                        logger.warning("Failed to delete old metrics file %s: %s", file, e)

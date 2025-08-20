@@ -62,7 +62,7 @@ class AWSHandler(ABC):
         launch_template_manager,
         request_adapter=None,
         error_handler: Optional[ErrorHandlingPort] = None,
-    ):
+    ) -> None:
         """
         Initialize AWS handler with standardized dependencies.
 
@@ -87,7 +87,7 @@ class AWSHandler(ABC):
         self._setup_aws_operations(aws_ops)
         self._setup_dependencies(request_adapter)
 
-    def _setup_aws_operations(self, aws_ops):
+    def _setup_aws_operations(self, aws_ops) -> None:
         """Configure AWS operations utility - eliminates duplication across handlers."""
         self.aws_ops = aws_ops
         if hasattr(aws_ops, "set_retry_method"):
@@ -95,7 +95,7 @@ class AWSHandler(ABC):
         if hasattr(aws_ops, "set_pagination_method"):
             aws_ops.set_pagination_method(self._paginate)
 
-    def _setup_dependencies(self, request_adapter):
+    def _setup_dependencies(self, request_adapter) -> None:
         """Configure optional dependencies - eliminates duplication across handlers."""
         self._request_adapter = request_adapter
 
@@ -199,21 +199,23 @@ class AWSHandler(ABC):
             if hasattr(e, "__class__") and "CircuitBreakerOpenError" in str(type(e)):
                 # Log circuit breaker state and re-raise
                 self._logger.error(
-                    f"Circuit breaker OPEN for {service_name}.{operation_name}",
+                    "Circuit breaker OPEN for %s.%s",
+                    service_name,
+                    operation_name,
                     extra={
                         "service": service_name,
                         "operation": operation_name,
                         "operation_type": operation_type,
                     },
                 )
-                raise e
+                raise
 
             # Convert AWS ClientError to domain exception
             if isinstance(e, ClientError):
                 raise self._convert_client_error(e, operation_name)
 
             # Re-raise other exceptions as-is
-            raise e
+            raise
 
     def _get_service_name(self) -> str:
         """Get service name from handler class name."""
@@ -253,7 +255,7 @@ class AWSHandler(ABC):
             and operation_name in critical_operations
         ):
             operation_type = "critical"
-            self.logger.debug(f"Auto-detected critical operation: {operation_name}")
+            self.logger.debug("Auto-detected critical operation: %s", operation_name)
 
         if operation_type == "critical":
             # Use circuit breaker for critical operations
@@ -364,10 +366,10 @@ class AWSHandler(ABC):
 
         except ClientError as e:
             error = self._convert_client_error(e)
-            self._logger.error(f"Failed to get instance details: {str(error)}")
+            self._logger.error("Failed to get instance details: %s", str(error))
             raise error
         except Exception as e:
-            self._logger.error(f"Unexpected error getting instance details: {str(e)}")
+            self._logger.error("Unexpected error getting instance details: %s", str(e))
             raise InfrastructureError(f"Failed to get instance details: {str(e)}")
 
     def _validate_prerequisites(self, template: AWSTemplate) -> None:

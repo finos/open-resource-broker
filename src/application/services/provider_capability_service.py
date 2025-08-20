@@ -28,7 +28,7 @@ class ValidationResult:
     supported_features: List[str]
     unsupported_features: List[str]
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.errors is None:
             self.errors = []
         if self.warnings is None:
@@ -64,7 +64,9 @@ class ProviderCapabilityService:
     - Provide detailed validation results with actionable feedback
     """
 
-    def __init__(self, logger: LoggingPort, provider_registry: Optional[ProviderRegistry] = None):
+    def __init__(
+        self, logger: LoggingPort, provider_registry: Optional[ProviderRegistry] = None
+    ) -> None:
         """
         Initialize provider capability service.
 
@@ -96,7 +98,7 @@ class ProviderCapabilityService:
             ValidationResult with detailed validation information
         """
         self._logger.info(
-            f"Validating template { template.template_id} against provider {provider_instance}"
+            "Validating template %s against provider %s", template.template_id, provider_instance
         )
 
         result = ValidationResult(
@@ -138,11 +140,13 @@ class ProviderCapabilityService:
             result.is_valid = len(result.errors) == 0
 
             self._logger.info(
-                f"Validation result for { template.template_id}: { 'VALID' if result.is_valid else 'INVALID'}"
+                "Validation result for %s: %s",
+                template.template_id,
+                "VALID" if result.is_valid else "INVALID",
             )
 
         except Exception as e:
-            self._logger.error(f"Validation failed with exception: {str(e)}")
+            self._logger.error("Validation failed with exception: %s", str(e))
             result.is_valid = False
             result.errors.append(f"Validation error: {str(e)}")
 
@@ -159,7 +163,7 @@ class ProviderCapabilityService:
             strategy = self._provider_registry.create_strategy_from_instance(provider_instance, {})
             return strategy.get_capabilities()
         except Exception as e:
-            self._logger.warning(f"Failed to get capabilities for {provider_instance}: {str(e)}")
+            self._logger.warning("Failed to get capabilities for %s: %s", provider_instance, str(e))
             return None
 
     def _get_default_capabilities(self, provider_instance: str) -> ProviderCapabilities:
@@ -223,7 +227,7 @@ class ProviderCapabilityService:
         template: Template,
         capabilities: ProviderCapabilities,
         result: ValidationResult,
-    ):
+    ) -> None:
         """Validate that provider supports the required API."""
         if not template.provider_api:
             result.warnings.append("No provider API specified in template")
@@ -242,7 +246,7 @@ class ProviderCapabilityService:
         template: Template,
         capabilities: ProviderCapabilities,
         result: ValidationResult,
-    ):
+    ) -> None:
         """Validate pricing model support (spot/on-demand)."""
         if not template.provider_api:
             return
@@ -302,7 +306,7 @@ class ProviderCapabilityService:
         template: Template,
         capabilities: ProviderCapabilities,
         result: ValidationResult,
-    ):
+    ) -> None:
         """Validate instance count limits."""
         if not template.provider_api:
             return

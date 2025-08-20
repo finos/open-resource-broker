@@ -41,7 +41,9 @@ class HealthStatus:
 class HealthCheck:
     """Health check implementation."""
 
-    def __init__(self, config: ConfigurationManager, aws_client: Optional[AWSClient] = None):
+    def __init__(
+        self, config: ConfigurationManager, aws_client: Optional[AWSClient] = None
+    ) -> None:
         """Initialize health check."""
         self.config = config.get_config()
         self.aws_client = aws_client
@@ -97,7 +99,7 @@ class HealthCheck:
                     self.status_history[name].pop(0)
             return status
         except Exception as e:
-            logger.error(f"Health check {name} failed: {e}")
+            logger.error("Health check %s failed: %s", name, e)
             return HealthStatus(
                 name=name,
                 status="unhealthy",
@@ -154,7 +156,7 @@ class HealthCheck:
                     time.sleep(interval)
 
                 except Exception as e:
-                    logger.error(f"Health checker error: {e}")
+                    logger.error("Health checker error: %s", e)
                     time.sleep(5)  # Shorter sleep on error
 
         thread = threading.Thread(target=check_health, daemon=True)

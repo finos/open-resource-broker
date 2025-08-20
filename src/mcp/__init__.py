@@ -29,4 +29,4 @@ Usage:
 from .discovery import MCPToolDiscovery
 from .tools import OpenHFPluginMCPTools
 
-__all__ = ["OpenHFPluginMCPTools", "MCPToolDiscovery"]
+__all__: list[str] = ["OpenHFPluginMCPTools", "MCPToolDiscovery"]

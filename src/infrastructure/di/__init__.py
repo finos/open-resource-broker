@@ -3,7 +3,7 @@
 from .container import DIContainer, get_container, reset_container
 from .services import create_handler, register_all_services
 
-__all__ = [
+__all__: list[str] = [
     "DIContainer",
     "get_container",
     "reset_container",

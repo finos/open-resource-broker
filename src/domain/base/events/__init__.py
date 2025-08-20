@@ -89,7 +89,7 @@ from .system_events import (  # System base; Configuration events; Application l
 )
 
 # Export all events
-__all__ = [
+__all__: list[str] = [
     # Base classes and protocols
     "DomainEvent",
     "InfrastructureEvent",

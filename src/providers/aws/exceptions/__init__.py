@@ -2,7 +2,7 @@
 
 from providers.aws.exceptions.aws_exceptions import *
 
-__all__ = [
+__all__: list[str] = [
     "AWSError",
     "AWSConfigurationError",
     "AuthorizationError",

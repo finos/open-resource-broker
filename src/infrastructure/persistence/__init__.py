@@ -10,7 +10,7 @@ from infrastructure.persistence.base import (
 # Import factory functions but not classes to avoid circular imports
 # (No imports needed from repository_factory to avoid circular dependencies)
 
-__all__ = [
+__all__: list[str] = [
     # Base
     "StrategyBasedRepository",
     "BaseUnitOfWork",

@@ -6,7 +6,7 @@ from .factories.container_adapter_factory import ContainerAdapterFactory
 from .logging_adapter import LoggingAdapter
 from .template_configuration_adapter import TemplateConfigurationAdapter
 
-__all__ = [
+__all__: list[str] = [
     "LoggingAdapter",
     "ContainerAdapter",
     "ContainerAdapterFactory",

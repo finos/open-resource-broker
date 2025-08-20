@@ -17,7 +17,7 @@ class DependencyResolutionError(DIError):
         parent_type: Optional[Type] = None,
         parameter_name: Optional[str] = None,
         cause: Optional[Exception] = None,
-    ):
+    ) -> None:
         """
         Initialize dependency resolution error.
 
@@ -61,7 +61,7 @@ class UnregisteredDependencyError(DependencyResolutionError):
         dependency_type: Type,
         parent_type: Optional[Type] = None,
         parameter_name: Optional[str] = None,
-    ):
+    ) -> None:
         """
         Initialize unregistered dependency error.
 
@@ -77,7 +77,7 @@ class UnregisteredDependencyError(DependencyResolutionError):
 class UntypedParameterError(DependencyResolutionError):
     """Error raised when a parameter has no type annotation."""
 
-    def __init__(self, parent_type: Type, parameter_name: str):
+    def __init__(self, parent_type: Type, parameter_name: str) -> None:
         """
         Initialize untyped parameter error.
 
@@ -93,7 +93,7 @@ class UntypedParameterError(DependencyResolutionError):
 class CircularDependencyError(DependencyResolutionError):
     """Error raised when a circular dependency is detected."""
 
-    def __init__(self, dependency_chain: list[Type]):
+    def __init__(self, dependency_chain: list[Type]) -> None:
         """
         Initialize circular dependency error.
 
@@ -122,7 +122,7 @@ class InstantiationError(DependencyResolutionError):
         message: str,
         parent_type: Optional[Type] = None,
         cause: Optional[Exception] = None,
-    ):
+    ) -> None:
         """
         Initialize instantiation error.
 
@@ -138,7 +138,9 @@ class InstantiationError(DependencyResolutionError):
 class FactoryError(DependencyResolutionError):
     """Error raised when a factory function fails to create a dependency."""
 
-    def __init__(self, dependency_type: Type, message: str, cause: Optional[Exception] = None):
+    def __init__(
+        self, dependency_type: Type, message: str, cause: Optional[Exception] = None
+    ) -> None:
         """
         Initialize factory error.
 

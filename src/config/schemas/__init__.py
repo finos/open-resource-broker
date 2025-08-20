@@ -39,7 +39,7 @@ from .storage_schema import (
 )
 from .template_schema import TemplateConfig
 
-__all__ = [
+__all__: list[str] = [
     # Main configuration
     "AppConfig",
     "validate_config",

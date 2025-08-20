@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional
 class SDKError(Exception):
     """Base exception for all SDK-related errors."""
 
-    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None) -> None:
         """Initialize the instance."""
         super().__init__(message)
         self.message = message
@@ -31,7 +31,7 @@ class ConfigurationError(SDKError):
         message: str,
         config_key: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
-    ):
+    ) -> None:
         super().__init__(message, details)
         self.config_key = config_key
 
@@ -44,7 +44,7 @@ class ProviderError(SDKError):
         message: str,
         provider: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
-    ):
+    ) -> None:
         super().__init__(message, details)
         self.provider = provider
 
@@ -57,7 +57,7 @@ class HandlerDiscoveryError(SDKError):
         message: str,
         handler_type: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
-    ):
+    ) -> None:
         super().__init__(message, details)
         self.handler_type = handler_type
 
@@ -70,6 +70,6 @@ class MethodExecutionError(SDKError):
         message: str,
         method_name: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
-    ):
+    ) -> None:
         super().__init__(message, details)
         self.method_name = method_name

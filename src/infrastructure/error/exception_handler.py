@@ -273,7 +273,7 @@ ErrorResponse = InfrastructureErrorResponse
 class ExceptionContext:
     """Rich context information for exception handling."""
 
-    def __init__(self, operation: str, layer: str = "application", **additional_context):
+    def __init__(self, operation: str, layer: str = "application", **additional_context) -> None:
         """Initialize the instance."""
         self.operation = operation
         self.layer = layer
@@ -300,7 +300,7 @@ class ExceptionHandler:
     preserving domain semantics while adding consistent logging and context.
     """
 
-    def __init__(self, logger=None, metrics=None):
+    def __init__(self, logger=None, metrics=None) -> None:
         """Initialize exception handler with optional logger and metrics."""
         self.logger = logger or get_logger(__name__)
         self.metrics = metrics
@@ -362,7 +362,7 @@ class ExceptionHandler:
         # 3. Fall back to generic handler
         return self._handle_generic_exception
 
-    def _register_handlers(self):
+    def _register_handlers(self) -> None:
         """Register handlers for different exception types."""
 
         # DOMAIN EXCEPTIONS - Preserve with rich logging
@@ -409,7 +409,8 @@ class ExceptionHandler:
     ) -> DomainException:
         """Preserve domain exception with rich logging."""
         self.logger.error(
-            f"Domain error in {context.operation}",
+            "Domain error in %s",
+            context.operation,
             extra={
                 "error_code": exc.error_code,
                 "error_message": exc.message,
@@ -426,7 +427,8 @@ class ExceptionHandler:
     ) -> ValidationError:
         """Preserve validation error with validation-specific logging."""
         self.logger.warning(
-            f"Validation error in {context.operation}",
+            "Validation error in %s",
+            context.operation,
             extra={
                 "error_code": exc.error_code,
                 "validation_message": exc.message,
@@ -442,7 +444,8 @@ class ExceptionHandler:
     ) -> EntityNotFoundError:
         """Preserve entity not found with entity-specific logging."""
         self.logger.warning(
-            f"Entity not found in {context.operation}",
+            "Entity not found in %s",
+            context.operation,
             extra={
                 "error_code": exc.error_code,
                 "entity_type": exc.details.get("entity_type"),
@@ -458,7 +461,8 @@ class ExceptionHandler:
     ) -> BusinessRuleViolationError:
         """Preserve business rule violation with rule-specific logging."""
         self.logger.error(
-            f"Business rule violation in {context.operation}",
+            "Business rule violation in %s",
+            context.operation,
             extra={
                 "error_code": exc.error_code,
                 "rule_violation": exc.message,
@@ -476,7 +480,8 @@ class ExceptionHandler:
     ) -> TemplateException:
         """Preserve template exception with template context."""
         self.logger.error(
-            f"Template error in {context.operation}",
+            "Template error in %s",
+            context.operation,
             extra={
                 "error_code": exc.error_code,
                 "template_error": exc.message,
@@ -493,7 +498,8 @@ class ExceptionHandler:
     ) -> TemplateNotFoundError:
         """Preserve template not found with template-specific logging."""
         self.logger.warning(
-            f"Template not found in {context.operation}",
+            "Template not found in %s",
+            context.operation,
             extra={
                 "error_code": exc.error_code,
                 "template_id": exc.details.get("entity_id"),
@@ -509,7 +515,8 @@ class ExceptionHandler:
     ) -> TemplateValidationError:
         """Preserve template validation with validation context."""
         self.logger.warning(
-            f"Template validation error in {context.operation}",
+            "Template validation error in %s",
+            context.operation,
             extra={
                 "error_code": exc.error_code,
                 "validation_error": exc.message,
@@ -528,7 +535,8 @@ class ExceptionHandler:
     ) -> MachineException:
         """Preserve machine exception with machine context."""
         self.logger.error(
-            f"Machine error in {context.operation}",
+            "Machine error in %s",
+            context.operation,
             extra={
                 "error_code": exc.error_code,
                 "machine_error": exc.message,
@@ -545,7 +553,8 @@ class ExceptionHandler:
     ) -> MachineNotFoundError:
         """Preserve machine not found with machine-specific logging."""
         self.logger.warning(
-            f"Machine not found in {context.operation}",
+            "Machine not found in %s",
+            context.operation,
             extra={
                 "error_code": exc.error_code,
                 "machine_id": exc.details.get("entity_id"),
@@ -561,7 +570,8 @@ class ExceptionHandler:
     ) -> MachineValidationError:
         """Preserve machine validation with validation context."""
         self.logger.warning(
-            f"Machine validation error in {context.operation}",
+            "Machine validation error in %s",
+            context.operation,
             extra={
                 "error_code": exc.error_code,
                 "validation_error": exc.message,
@@ -580,7 +590,8 @@ class ExceptionHandler:
     ) -> RequestException:
         """Preserve request exception with request context."""
         self.logger.error(
-            f"Request error in {context.operation}",
+            "Request error in %s",
+            context.operation,
             extra={
                 "error_code": exc.error_code,
                 "request_error": exc.message,
@@ -597,7 +608,8 @@ class ExceptionHandler:
     ) -> RequestNotFoundError:
         """Preserve request not found with request-specific logging."""
         self.logger.warning(
-            f"Request not found in {context.operation}",
+            "Request not found in %s",
+            context.operation,
             extra={
                 "error_code": exc.error_code,
                 "request_id": exc.details.get("entity_id"),
@@ -613,7 +625,8 @@ class ExceptionHandler:
     ) -> RequestValidationError:
         """Preserve request validation with validation context."""
         self.logger.warning(
-            f"Request validation error in {context.operation}",
+            "Request validation error in %s",
+            context.operation,
             extra={
                 "error_code": exc.error_code,
                 "validation_error": exc.message,
@@ -630,7 +643,8 @@ class ExceptionHandler:
     ) -> InfrastructureError:
         """Preserve infrastructure exception with context."""
         self.logger.error(
-            f"Infrastructure error in {context.operation}",
+            "Infrastructure error in %s",
+            context.operation,
             extra={
                 "error_code": getattr(exc, "error_code", "INFRASTRUCTURE_ERROR"),
                 "infrastructure_error": str(exc),
@@ -646,7 +660,8 @@ class ExceptionHandler:
     ) -> ConfigurationError:
         """Preserve configuration exception with context."""
         self.logger.error(
-            f"Configuration error in {context.operation}",
+            "Configuration error in %s",
+            context.operation,
             extra={
                 "error_code": getattr(exc, "error_code", "CONFIGURATION_ERROR"),
                 "configuration_error": str(exc),
@@ -854,7 +869,7 @@ class ExceptionHandler:
             handler = self._get_http_handler(type(exception))
             return handler(exception)
         except Exception as e:
-            self.logger.error(f"Error in HTTP error handler: {str(e)}")
+            self.logger.error("Error in HTTP error handler: %s", str(e))
             return self._handle_unexpected_error_http(exception)
 
     def _get_http_handler(
@@ -1039,7 +1054,7 @@ def get_exception_handler() -> ExceptionHandler:
     return _exception_handler_instance
 
 
-def reset_exception_handler():
+def reset_exception_handler() -> None:
     """Reset the global exception handler (for testing)."""
     global _exception_handler_instance
     with _exception_handler_lock:

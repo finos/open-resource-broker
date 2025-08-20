@@ -19,7 +19,7 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
     Inherits from SchedulerPort which defines all the required abstract methods.
     """
 
-    def __init__(self, config_manager: Any, logger: Any):
+    def __init__(self, config_manager: Any, logger: Any) -> None:
         """Initialize base scheduler strategy.
 
         Args:

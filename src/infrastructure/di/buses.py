@@ -40,7 +40,7 @@ class QueryBus:
     Handlers own their cross-cutting concerns (logging, validation, caching).
     """
 
-    def __init__(self, container: DIContainer, logger: LoggingPort):
+    def __init__(self, container: DIContainer, logger: LoggingPort) -> None:
         """Initialize the instance."""
         self.container = container
         self.logger = logger
@@ -71,7 +71,8 @@ class QueryBus:
             # Try lazy CQRS setup if handler not found and lazy loading is enabled
             if self.container.is_lazy_loading_enabled():
                 self.logger.debug(
-                    f"Handler not found for query { type(query).__name__}, triggering lazy CQRS setup"
+                    "Handler not found for query %s, triggering lazy CQRS setup",
+                    type(query).__name__,
                 )
                 self._trigger_lazy_cqrs_setup()
 
@@ -82,17 +83,18 @@ class QueryBus:
                     return await handler.handle(query)
                 except KeyError:
                     self.logger.error(
-                        f"No handler registered for query: { type(query).__name__} (even after lazy setup)"
+                        "No handler registered for query: %s (even after lazy setup)",
+                        type(query).__name__,
                     )
                     raise
             else:
-                self.logger.error(f"No handler registered for query: {type(query).__name__}")
+                self.logger.error("No handler registered for query: %s", type(query).__name__)
                 raise
         except Exception as e:
-            self.logger.error(f"Query execution failed: {str(e)}")
+            self.logger.error("Query execution failed: %s", str(e))
             raise
 
-    def _trigger_lazy_cqrs_setup(self):
+    def _trigger_lazy_cqrs_setup(self) -> None:
         """Trigger lazy CQRS infrastructure setup."""
         try:
             from infrastructure.di.container import _setup_cqrs_infrastructure
@@ -100,7 +102,7 @@ class QueryBus:
             self.logger.info("Triggering lazy CQRS infrastructure setup")
             _setup_cqrs_infrastructure(self.container)
         except Exception as e:
-            self.logger.error(f"Failed to trigger lazy CQRS setup: {e}")
+            self.logger.error("Failed to trigger lazy CQRS setup: %s", e)
 
 
 class CommandBus:
@@ -115,7 +117,7 @@ class CommandBus:
     Handlers own their cross-cutting concerns (logging, validation, events).
     """
 
-    def __init__(self, container: DIContainer, logger: LoggingPort):
+    def __init__(self, container: DIContainer, logger: LoggingPort) -> None:
         self.container = container
         self.logger = logger
 
@@ -145,7 +147,8 @@ class CommandBus:
             # Try lazy CQRS setup if handler not found and lazy loading is enabled
             if self.container.is_lazy_loading_enabled():
                 self.logger.debug(
-                    f"Handler not found for command { type(command).__name__}, triggering lazy CQRS setup"
+                    "Handler not found for command %s, triggering lazy CQRS setup",
+                    type(command).__name__,
                 )
                 self._trigger_lazy_cqrs_setup()
 
@@ -156,17 +159,18 @@ class CommandBus:
                     return await handler.handle(command)
                 except KeyError:
                     self.logger.error(
-                        f"No handler registered for command: { type(command).__name__} (even after lazy setup)"
+                        "No handler registered for command: %s (even after lazy setup)",
+                        type(command).__name__,
                     )
                     raise
             else:
-                self.logger.error(f"No handler registered for command: {type(command).__name__}")
+                self.logger.error("No handler registered for command: %s", type(command).__name__)
                 raise
         except Exception as e:
-            self.logger.error(f"Command execution failed: {str(e)}")
+            self.logger.error("Command execution failed: %s", str(e))
             raise
 
-    def _trigger_lazy_cqrs_setup(self):
+    def _trigger_lazy_cqrs_setup(self) -> None:
         """Trigger lazy CQRS infrastructure setup."""
         try:
             from infrastructure.di.container import _setup_cqrs_infrastructure
@@ -174,7 +178,7 @@ class CommandBus:
             self.logger.info("Triggering lazy CQRS infrastructure setup")
             _setup_cqrs_infrastructure(self.container)
         except Exception as e:
-            self.logger.error(f"Failed to trigger lazy CQRS setup: {e}")
+            self.logger.error("Failed to trigger lazy CQRS setup: %s", e)
 
 
 class BusFactory:

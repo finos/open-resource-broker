@@ -21,7 +21,7 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
     - Simple integration for systems using domain format directly
     """
 
-    def __init__(self, config_manager: ConfigurationManager, logger: "LoggingPort"):
+    def __init__(self, config_manager: ConfigurationManager, logger: "LoggingPort") -> None:
         """Initialize the instance."""
         self.config_manager = config_manager
         self._logger = logger

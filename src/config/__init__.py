@@ -28,7 +28,7 @@ from .schemas import (
 # Validation
 from .validators import ConfigValidator
 
-__all__ = [
+__all__: list[str] = [
     # Main configuration
     "AppConfig",
     "validate_config",

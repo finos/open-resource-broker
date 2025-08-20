@@ -13,7 +13,7 @@ T = TypeVar("T")
 class ContainerAdapter(ContainerPort):
     """Adapter that implements ContainerPort using infrastructure DI container."""
 
-    def __init__(self, container: "DIContainer"):
+    def __init__(self, container: "DIContainer") -> None:
         """Initialize with DI container instance.
 
         Args:

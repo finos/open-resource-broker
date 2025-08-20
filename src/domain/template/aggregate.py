@@ -74,7 +74,7 @@ class Template(BaseModel):
     # Active status flag
     is_active: bool = True
 
-    def __init__(self, **data):
+    def __init__(self, **data: Any) -> None:
         """Initialize template with default values and validation.
 
         Args:

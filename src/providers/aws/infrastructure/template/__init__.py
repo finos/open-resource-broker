@@ -4,4 +4,4 @@
 # TemplateConfigurationManager. Provider-specific template logic is now
 # handled by the scheduler strategy pattern.
 
-__all__ = []
+__all__: list[str] = []

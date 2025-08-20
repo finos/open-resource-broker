@@ -49,7 +49,7 @@ class SelectionCriteria:
     prefer_strategies: List[str] = None
     custom_filter: Optional[Callable[[ProviderStrategy, StrategyMetrics], bool]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize default values."""
         if self.required_capabilities is None:
             self.required_capabilities = []
@@ -68,7 +68,7 @@ class SelectionResult:
     alternatives: List[ProviderStrategy] = None
     selection_time_ms: float = 0.0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize default values."""
         if self.alternatives is None:
             self.alternatives = []
@@ -89,7 +89,7 @@ class ProviderSelector(ABC):
     strategy for a given operation.
     """
 
-    def __init__(self, logger: LoggingPort):
+    def __init__(self, logger: LoggingPort) -> None:
         """Initialize the selector."""
         self._logger = logger
 
@@ -194,7 +194,7 @@ class FirstAvailableSelector(ProviderSelector):
 class RoundRobinSelector(ProviderSelector):
     """Selects strategies in round-robin fashion."""
 
-    def __init__(self, logger: LoggingPort):
+    def __init__(self, logger: LoggingPort) -> None:
         """Initialize round-robin selector."""
         super().__init__(logger)
         self._last_selected_index = -1
@@ -403,7 +403,7 @@ class SelectorFactory:
         return selector_class(logger)
 
     @classmethod
-    def register_selector(cls, policy: SelectionPolicy, selector_class: type):
+    def register_selector(cls, policy: SelectionPolicy, selector_class: type) -> None:
         """Register a custom selector class."""
         if not issubclass(selector_class, ProviderSelector):
             raise ValueError("Selector class must inherit from ProviderSelector")

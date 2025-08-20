@@ -7,7 +7,7 @@ from .request_repository import RequestSerializer
 from .template_repository import TemplateRepositoryImpl as TemplateRepository
 from .template_repository import TemplateSerializer
 
-__all__ = [
+__all__: list[str] = [
     "MachineRepository",
     "MachineSerializer",
     "RequestRepository",

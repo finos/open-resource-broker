@@ -37,7 +37,7 @@ class OpenHFPluginSDK:
         config: Optional[Dict[str, Any]] = None,
         config_path: Optional[str] = None,
         **kwargs,
-    ):
+    ) -> None:
         """
         Initialize the Host Factory SDK.
 
@@ -126,7 +126,7 @@ class OpenHFPluginSDK:
         except Exception as e:
             if isinstance(e, (SDKError, ConfigurationError, ProviderError)):
                 raise
-            raise SDKError(f"SDK initialization failed: {str(e)}") from e
+            raise SDKError(f"SDK initialization failed: {str(e)}")
 
     async def cleanup(self) -> None:
         """Clean up resources and connections."""

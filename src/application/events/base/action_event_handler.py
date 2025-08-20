@@ -33,7 +33,7 @@ class ActionEventHandler(EventHandler):
     validates the event, executes the action, and handles results.
     """
 
-    def __init__(self, logger: Optional[LoggingPort] = None):
+    def __init__(self, logger: Optional[LoggingPort] = None) -> None:
         """
         Initialize action event handler.
 
@@ -57,7 +57,7 @@ class ActionEventHandler(EventHandler):
         # 1. Validate event (can be overridden)
         if not await self.can_handle_event(event):
             if self.logger:
-                self.logger.debug(f"Skipping event {event.event_type} - cannot handle")
+                self.logger.debug("Skipping event %s - cannot handle", event.event_type)
             return
 
         # 2. Execute the action (implemented by concrete handlers)
@@ -111,7 +111,7 @@ class ActionEventHandler(EventHandler):
         if self.logger:
             event_type = getattr(event, "event_type", "unknown")
             aggregate_id = getattr(event, "aggregate_id", "unknown")
-            self.logger.debug(f"Action completed for {event_type} ({aggregate_id})")
+            self.logger.debug("Action completed for %s (%s)", event_type, aggregate_id)
 
     async def _handle_error(self, event: DomainEvent, error: Exception, duration: float) -> None:
         """
@@ -146,7 +146,7 @@ class ActionEventHandler(EventHandler):
         if self.logger:
             event_type = getattr(event, "event_type", "unknown")
             aggregate_id = getattr(event, "aggregate_id", "unknown")
-            self.logger.error(f"Action failed for {event_type} ({aggregate_id}): {str(error)}")
+            self.logger.error("Action failed for %s (%s): %s", event_type, aggregate_id, str(error))
 
     def extract_action_data(self, event: DomainEvent) -> Dict[str, Any]:
         """

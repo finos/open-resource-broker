@@ -9,7 +9,7 @@ from infrastructure.logging.logger import get_logger
 class LoggingAdapter(LoggingPort):
     """Adapter that implements LoggingPort using infrastructure logger."""
 
-    def __init__(self, name: str = "application"):
+    def __init__(self, name: str = "application") -> None:
         """Initialize with logger name."""
         self._logger = get_logger(name)
 

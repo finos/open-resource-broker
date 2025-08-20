@@ -11,7 +11,7 @@ from .exceptions import (
 from .machine_status import MachineStatus
 from .repository import MachineRepository
 
-__all__ = [
+__all__: list[str] = [
     "Machine",
     "MachineStatus",
     "MachineRepository",

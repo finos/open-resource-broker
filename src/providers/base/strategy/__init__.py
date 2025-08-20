@@ -98,7 +98,7 @@ from .provider_strategy import (
 )
 
 # Public API exports
-__all__ = [
+__all__: list[str] = [
     # Core interfaces
     "BaseProviderStrategy",
     "ProviderStrategy",
@@ -188,17 +188,19 @@ def create_provider_context(logger=None) -> ProviderContext:
                             context.register_strategy(strategy, instance_name)
                         if logger:
                             logger.debug(
-                                f"Loaded strategy for provider instance: {registration.type_name}:{instance_name}"
+                                "Loaded strategy for provider instance: %s:%s",
+                                registration.type_name,
+                                instance_name,
                             )
             except Exception as e:
                 if logger:
                     logger.warning(
-                        f"Failed to load strategy for provider instance {instance_name}: {e}"
+                        "Failed to load strategy for provider instance %s: %s", instance_name, e
                     )
 
     except Exception as e:
         if logger:
-            logger.error(f"Failed to load strategies from provider registry: {e}")
+            logger.error("Failed to load strategies from provider registry: %s", e)
 
     return context
 

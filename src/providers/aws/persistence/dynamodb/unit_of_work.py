@@ -33,7 +33,7 @@ class DynamoDBUnitOfWork(BaseUnitOfWork):
         machine_table: str = "machines",
         request_table: str = "requests",
         template_table: str = "templates",
-    ):
+    ) -> None:
         """
         Initialize DynamoDB unit of work with simplified repositories.
 
@@ -80,7 +80,7 @@ class DynamoDBUnitOfWork(BaseUnitOfWork):
         self.template_repository = TemplateRepository(template_strategy)
 
         self._self._logger.debug(
-            f"Initialized DynamoDBUnitOfWork with simplified repositories in region: {region}"
+            "Initialized DynamoDBUnitOfWork with simplified repositories in region: %s", region
         )
 
     @property
@@ -109,7 +109,7 @@ class DynamoDBUnitOfWork(BaseUnitOfWork):
 
             self._self._logger.debug("DynamoDB transaction begun on all repositories")
         except Exception as e:
-            self._self._logger.error(f"Failed to begin DynamoDB transaction: {e}")
+            self._self._logger.error("Failed to begin DynamoDB transaction: %s", e)
             raise
 
     def _commit_transaction(self) -> None:
@@ -122,7 +122,7 @@ class DynamoDBUnitOfWork(BaseUnitOfWork):
 
             self._self._logger.debug("DynamoDB transaction committed on all repositories")
         except Exception as e:
-            self._self._logger.error(f"Failed to commit DynamoDB transaction: {e}")
+            self._self._logger.error("Failed to commit DynamoDB transaction: %s", e)
             raise
 
     def _rollback_transaction(self) -> None:
@@ -135,5 +135,5 @@ class DynamoDBUnitOfWork(BaseUnitOfWork):
 
             self._self._logger.debug("DynamoDB transaction rolled back on all repositories")
         except Exception as e:
-            self._self._logger.error(f"Failed to rollback DynamoDB transaction: {e}")
+            self._self._logger.error("Failed to rollback DynamoDB transaction: %s", e)
             raise

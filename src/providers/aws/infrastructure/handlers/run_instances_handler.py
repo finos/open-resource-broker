@@ -58,7 +58,7 @@ class RunInstancesHandler(AWSHandler):
         launch_template_manager: AWSLaunchTemplateManager,
         request_adapter: RequestAdapterPort = None,
         error_handler: ErrorHandlingPort = None,
-    ):
+    ) -> None:
         """
         Initialize RunInstances handler with integrated dependencies.
 
@@ -164,7 +164,10 @@ class RunInstancesHandler(AWSHandler):
         request.metadata["run_instances_resource_id"] = resource_id
 
         self._logger.info(
-            f"Successfully created {len(instance_ids)} instances via RunInstances with reservation ID {reservation_id}: {instance_ids}"
+            "Successfully created %s instances via RunInstances with reservation ID %s: %s",
+            len(instance_ids),
+            reservation_id,
+            instance_ids,
         )
 
         return resource_id
@@ -270,12 +273,13 @@ class RunInstancesHandler(AWSHandler):
                 # IDs (reservation IDs)
                 if hasattr(request, "resource_ids") and request.resource_ids:
                     self._logger.info(
-                        f"No instance IDs in metadata, searching by resource IDs: {request.resource_ids}"
+                        "No instance IDs in metadata, searching by resource IDs: %s",
+                        request.resource_ids,
                     )
                     return self._find_instances_by_resource_ids(request.resource_ids)
                 else:
                     self._logger.info(
-                        f"No instance IDs or resource IDs found in request {request.request_id}"
+                        "No instance IDs or resource IDs found in request %s", request.request_id
                     )
                     return []
 
@@ -283,7 +287,7 @@ class RunInstancesHandler(AWSHandler):
             return self._get_instance_details(instance_ids)
 
         except Exception as e:
-            self._logger.error(f"Unexpected error checking RunInstances status: {str(e)}")
+            self._logger.error("Unexpected error checking RunInstances status: %s", str(e))
             raise AWSInfrastructureError(f"Failed to check RunInstances status: {str(e)}")
 
     def _find_instances_by_resource_ids(self, resource_ids: List[str]) -> List[Dict[str, Any]]:
@@ -320,7 +324,7 @@ class RunInstancesHandler(AWSHandler):
 
                 except ClientError as e:
                     if e.response["Error"]["Code"] == "InvalidReservationID.NotFound":
-                        self._logger.warning(f"Reservation ID {resource_id} not found")
+                        self._logger.warning("Reservation ID %s not found", resource_id)
                         continue
                     elif "Filter dicts have not been implemented" in str(e):
                         # Moto doesn't support reservation-id filter, fall back to
@@ -343,19 +347,19 @@ class RunInstancesHandler(AWSHandler):
                         raise
 
             self._logger.info(
-                f"Found {len(all_instances)} instances for resource IDs: {resource_ids}"
+                "Found %s instances for resource IDs: %s", len(all_instances), resource_ids
             )
             return all_instances
 
         except Exception as e:
-            self._logger.error(f"Failed to find instances by resource IDs: {str(e)}")
+            self._logger.error("Failed to find instances by resource IDs: %s", str(e))
             raise AWSInfrastructureError(f"Failed to find instances by resource IDs: {str(e)}")
 
     def _find_instances_by_tags_fallback(self, resource_ids: List[str]) -> List[Dict[str, Any]]:
         """Fallback method to find instances by tags when reservation-id filter is not supported."""
         try:
             self._logger.info(
-                f"FALLBACK: Starting fallback method for resource IDs: {resource_ids}"
+                "FALLBACK: Starting fallback method for resource IDs: %s", resource_ids
             )
 
             # In mock mode (moto), we can't use reservation-id filter
@@ -365,20 +369,24 @@ class RunInstancesHandler(AWSHandler):
             # Get all instances and filter by tags
             response = self.aws_client.ec2_client.describe_instances()
             self._logger.info(
-                f"FALLBACK: Found {len(response.get('Reservations', []))} total reservations"
+                "FALLBACK: Found %s total reservations", len(response.get("Reservations", []))
             )
 
             matching_instances = []
             for reservation in response.get("Reservations", []):
                 reservation_id = reservation["ReservationId"]
                 self._logger.info(
-                    f"FALLBACK: Checking reservation {reservation_id} against targets {resource_ids}"
+                    "FALLBACK: Checking reservation %s against targets %s",
+                    reservation_id,
+                    resource_ids,
                 )
 
                 # Check if this reservation matches any of our resource IDs
                 if reservation_id in resource_ids:
                     self._logger.info(
-                        f"FALLBACK: MATCH! Reservation {reservation_id} found {len(reservation['Instances'])} instances"
+                        "FALLBACK: MATCH! Reservation %s found %s instances",
+                        reservation_id,
+                        len(reservation["Instances"]),
                     )
                     for instance in reservation["Instances"]:
                         instance_data = {
@@ -396,18 +404,22 @@ class RunInstancesHandler(AWSHandler):
                         }
                         matching_instances.append(instance_data)
                         self._logger.info(
-                            f"FALLBACK: Added instance {instance_data['InstanceId']} with IP {instance_data['PrivateIpAddress']}"
+                            "FALLBACK: Added instance %s with IP %s",
+                            instance_data["InstanceId"],
+                            instance_data["PrivateIpAddress"],
                         )
                 else:
-                    self._logger.info(f"FALLBACK: No match for reservation {reservation_id}")
+                    self._logger.info("FALLBACK: No match for reservation %s", reservation_id)
 
             self._logger.info(
-                f"FALLBACK: Returning {len(matching_instances)} instances for resource IDs: {resource_ids}"
+                "FALLBACK: Returning %s instances for resource IDs: %s",
+                len(matching_instances),
+                resource_ids,
             )
             return matching_instances
 
         except Exception as e:
-            self._logger.error(f"FALLBACK: Fallback method failed to find instances: {e}")
+            self._logger.error("FALLBACK: Fallback method failed to find instances: %s", e)
             # Return empty list rather than raising exception to allow graceful
             # degradation
             return []
@@ -429,19 +441,19 @@ class RunInstancesHandler(AWSHandler):
                 instance_ids = request.metadata["instance_ids"]
 
             if not instance_ids:
-                self._logger.warning(f"No instance IDs found for request {request.request_id}")
+                self._logger.warning("No instance IDs found for request %s", request.request_id)
                 return
 
             # Use consolidated AWS operations utility for instance termination
             self.aws_ops.terminate_instances_with_fallback(
                 instance_ids, self._request_adapter, "RunInstances instances"
             )
-            self._logger.info(f"Terminated RunInstances instances: {instance_ids}")
+            self._logger.info("Terminated RunInstances instances: %s", instance_ids)
 
         except ClientError as e:
             error = self._convert_client_error(e)
-            self._logger.error(f"Failed to release RunInstances resources: {str(error)}")
+            self._logger.error("Failed to release RunInstances resources: %s", str(error))
             raise error
         except Exception as e:
-            self._logger.error(f"Unexpected error releasing RunInstances resources: {str(e)}")
+            self._logger.error("Unexpected error releasing RunInstances resources: %s", str(e))
             raise AWSInfrastructureError(f"Failed to release RunInstances resources: {str(e)}")

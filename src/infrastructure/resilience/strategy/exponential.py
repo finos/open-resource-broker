@@ -18,7 +18,7 @@ class ExponentialBackoffStrategy:
         max_delay: float = 60.0,
         jitter: bool = True,
         service: str = "ec2",
-    ):
+    ) -> None:
         """
         Initialize exponential backoff strategy.
 

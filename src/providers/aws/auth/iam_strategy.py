@@ -26,7 +26,7 @@ class IAMAuthStrategy(AuthPort):
         profile: Optional[str] = None,
         required_actions: List[str] = None,
         enabled: bool = True,
-    ):
+    ) -> None:
         """
         Initialize IAM authentication strategy.
 
@@ -58,7 +58,7 @@ class IAMAuthStrategy(AuthPort):
             self.iam_client = self.session.client("iam")
 
         except Exception as e:
-            self._logger.error(f"Failed to initialize AWS session: {e}")
+            self._logger.error("Failed to initialize AWS session: %s", e)
             self.enabled = False
 
     async def authenticate(self, context: AuthContext) -> AuthResult:
@@ -112,7 +112,7 @@ class IAMAuthStrategy(AuthPort):
                 status=AuthStatus.FAILED, error_message=f"AWS IAM error: {error_code}"
             )
         except Exception as e:
-            self._logger.error(f"IAM authentication error: {e}")
+            self._logger.error("IAM authentication error: %s", e)
             return AuthResult(status=AuthStatus.FAILED, error_message="IAM authentication failed")
 
     async def validate_token(self, token: str) -> AuthResult:
@@ -192,7 +192,7 @@ class IAMAuthStrategy(AuthPort):
             response = self.sts_client.get_caller_identity()
             return response
         except Exception as e:
-            self._logger.error(f"Failed to get caller identity: {e}")
+            self._logger.error("Failed to get caller identity: %s", e)
             return None
 
     async def _check_permissions(self, identity: Dict[str, Any]) -> List[str]:
@@ -225,7 +225,7 @@ class IAMAuthStrategy(AuthPort):
             )
 
         except Exception as e:
-            self._logger.error(f"Failed to check permissions: {e}")
+            self._logger.error("Failed to check permissions: %s", e)
 
         return permissions
 
@@ -264,6 +264,6 @@ class IAMAuthStrategy(AuthPort):
                 roles.append("operator")
 
         except Exception as e:
-            self._logger.error(f"Failed to determine roles: {e}")
+            self._logger.error("Failed to determine roles: %s", e)
 
         return roles

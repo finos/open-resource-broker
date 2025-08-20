@@ -4,7 +4,7 @@ from .auth_port import AuthContext, AuthPort, AuthResult, AuthStatus
 from .token_port import TokenPort, TokenResult, TokenType, TokenValidationResult
 from .user_port import User, UserPort, UserRole
 
-__all__ = [
+__all__: list[str] = [
     "AuthPort",
     "AuthResult",
     "AuthContext",

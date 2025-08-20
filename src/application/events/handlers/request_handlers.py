@@ -22,7 +22,7 @@ class RequestCreatedHandler(BaseLoggingEventHandler[DomainEvent]):
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
         event_publisher: Optional[EventPublisherPort] = None,
-    ):
+    ) -> None:
         """Initialize request created handler."""
         super().__init__(logger, error_handler, event_publisher)
 
@@ -47,7 +47,7 @@ class RequestStatusUpdatedHandler(BaseLoggingEventHandler[DomainEvent]):
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
         event_publisher: Optional[EventPublisherPort] = None,
-    ):
+    ) -> None:
         """Initialize request status updated handler."""
         super().__init__(logger, error_handler, event_publisher)
 
@@ -71,7 +71,7 @@ class RequestCompletedHandler(BaseLoggingEventHandler[DomainEvent]):
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
         event_publisher: Optional[EventPublisherPort] = None,
-    ):
+    ) -> None:
         """Initialize request completed handler."""
         super().__init__(logger, error_handler, event_publisher)
 
@@ -96,7 +96,7 @@ class RequestFailedHandler(BaseLoggingEventHandler[DomainEvent]):
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
         event_publisher: Optional[EventPublisherPort] = None,
-    ):
+    ) -> None:
         """Initialize request failed handler."""
         super().__init__(logger, error_handler, event_publisher)
 
@@ -123,7 +123,7 @@ class RequestCancelledHandler(BaseLoggingEventHandler[DomainEvent]):
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
         event_publisher: Optional[EventPublisherPort] = None,
-    ):
+    ) -> None:
         """Initialize request cancelled handler."""
         super().__init__(logger, error_handler, event_publisher)
 
@@ -150,7 +150,7 @@ class RequestTimeoutHandler(BaseLoggingEventHandler[DomainEvent]):
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
         event_publisher: Optional[EventPublisherPort] = None,
-    ):
+    ) -> None:
         """Initialize request timeout handler."""
         super().__init__(logger, error_handler, event_publisher)
 

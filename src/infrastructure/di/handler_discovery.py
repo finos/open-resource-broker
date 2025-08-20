@@ -46,7 +46,7 @@ class HandlerDiscoveryService:
     repeated module scanning and handler discovery.
     """
 
-    def __init__(self, container: DIContainer):
+    def __init__(self, container: DIContainer) -> None:
         """Initialize the instance."""
         self.container = container
 
@@ -64,7 +64,7 @@ class HandlerDiscoveryService:
             )
 
         except Exception as e:
-            logger.warning(f"Failed to get caching configuration: {e}")
+            logger.warning("Failed to get caching configuration: %s", e)
             # Fallback to default behavior
             self.cache_enabled = True
             self.cache_file = self._resolve_cache_path_fallback()
@@ -94,13 +94,13 @@ class HandlerDiscoveryService:
         Args:
             base_package: Base package to scan for handlers
         """
-        logger.info(f"Starting handler discovery in package: {base_package}")
+        logger.info("Starting handler discovery in package: %s", base_package)
 
         # Try to load from cache first
         cached_result = self._try_load_from_cache(base_package)
         if cached_result:
             logger.info(
-                f"Using cached handler discovery ({ cached_result['total_handlers']} handlers)"
+                "Using cached handler discovery (%s handlers)", cached_result["total_handlers"]
             )
             self._register_handlers_from_cache(cached_result["handlers"])
             return
@@ -120,7 +120,7 @@ class HandlerDiscoveryService:
         stats = get_handler_registry_stats()
         self._save_to_cache(base_package, stats, discovery_time)
 
-        logger.info(f"Handler discovery complete: {stats} (took {discovery_time:.3f}s)")
+        logger.info("Handler discovery complete: %s (took %.3fs)", stats, discovery_time)
 
     def _discover_handlers(self, base_package: str) -> None:
         """
@@ -139,13 +139,13 @@ class HandlerDiscoveryService:
                 try:
                     # Import the module to trigger decorator registration
                     importlib.import_module(module_info.name)
-                    logger.debug(f"Imported module: {module_info.name}")
+                    logger.debug("Imported module: %s", module_info.name)
                 except Exception as e:
-                    logger.warning(f"Failed to import module {module_info.name}: {e}")
+                    logger.warning("Failed to import module %s: %s", module_info.name, e)
                     continue
 
         except Exception as e:
-            logger.error(f"Handler discovery failed: {e}")
+            logger.error("Handler discovery failed: %s", e)
             raise
 
     def _register_handlers(self) -> None:
@@ -165,10 +165,12 @@ class HandlerDiscoveryService:
                 # dependency injection
                 self.container.register_singleton(handler_class)
                 logger.debug(
-                    f"Registered query handler: { handler_class.__name__} for { query_type.__name__}"
+                    "Registered query handler: %s for %s",
+                    handler_class.__name__,
+                    query_type.__name__,
                 )
             except Exception as e:
-                logger.error(f"Failed to register query handler {handler_class.__name__}: {e}")
+                logger.error("Failed to register query handler %s: %s", handler_class.__name__, e)
 
         # Register command handlers
         command_handlers = get_registered_command_handlers()
@@ -178,13 +180,15 @@ class HandlerDiscoveryService:
                 # dependency injection
                 self.container.register_singleton(handler_class)
                 logger.debug(
-                    f"Registered command handler: { handler_class.__name__} for { command_type.__name__}"
+                    "Registered command handler: %s for %s",
+                    handler_class.__name__,
+                    command_type.__name__,
                 )
             except Exception as e:
-                logger.error(f"Failed to register command handler {handler_class.__name__}: {e}")
+                logger.error("Failed to register command handler %s: %s", handler_class.__name__, e)
 
         total_registered = len(query_handlers) + len(command_handlers)
-        logger.info(f"Handler registration complete. Registered {total_registered} handlers")
+        logger.info("Handler registration complete. Registered %s handlers", total_registered)
 
     def _try_load_from_cache(self, base_package: str) -> Optional[Dict[str, Any]]:
         """Try to load handler discovery results from cache if valid."""
@@ -211,7 +215,7 @@ class HandlerDiscoveryService:
             return cache_data
 
         except Exception as e:
-            logger.debug(f"Failed to load cache: {e}")
+            logger.debug("Failed to load cache: %s", e)
             return None
 
     def _save_to_cache(
@@ -250,11 +254,11 @@ class HandlerDiscoveryService:
             os.rename(temp_file, self.cache_file)
 
             logger.debug(
-                f"Cached handler discovery results ({ stats.get( 'total_handlers', 0)} handlers)"
+                "Cached handler discovery results (%s handlers)", stats.get("total_handlers", 0)
             )
 
         except Exception as e:
-            logger.debug(f"Failed to save cache: {e}")
+            logger.debug("Failed to save cache: %s", e)
             # Continue without caching - not critical for functionality
 
     def _register_handlers_from_cache(self, cached_handlers: Dict[str, Any]) -> None:
@@ -271,11 +275,13 @@ class HandlerDiscoveryService:
 
                     # Register with DI container
                     self.container.register_singleton(handler_class)
-                    logger.debug(f"Registered cached query handler: {handler_class.__name__}")
+                    logger.debug("Registered cached query handler: %s", handler_class.__name__)
 
                 except Exception as e:
                     logger.warning(
-                        f"Failed to register cached query handler { handler_info.get( 'class_name', 'unknown')}: {e}"
+                        "Failed to register cached query handler %s: %s",
+                        handler_info.get("class_name", "unknown"),
+                        e,
                     )
                     # Fall back to full discovery if cache loading fails
                     self._fallback_to_full_discovery()
@@ -292,11 +298,13 @@ class HandlerDiscoveryService:
 
                     # Register with DI container
                     self.container.register_singleton(handler_class)
-                    logger.debug(f"Registered cached command handler: {handler_class.__name__}")
+                    logger.debug("Registered cached command handler: %s", handler_class.__name__)
 
                 except Exception as e:
                     logger.warning(
-                        f"Failed to register cached command handler { handler_info.get( 'class_name', 'unknown')}: {e}"
+                        "Failed to register cached command handler %s: %s",
+                        handler_info.get("class_name", "unknown"),
+                        e,
                     )
                     # Fall back to full discovery if cache loading fails
                     self._fallback_to_full_discovery()
@@ -304,11 +312,11 @@ class HandlerDiscoveryService:
 
             total_registered = len(query_handlers_data) + len(command_handlers_data)
             logger.info(
-                f"Handler registration from cache complete. Registered {total_registered} handlers"
+                "Handler registration from cache complete. Registered %s handlers", total_registered
             )
 
         except Exception as e:
-            logger.warning(f"Failed to register handlers from cache: {e}")
+            logger.warning("Failed to register handlers from cache: %s", e)
             self._fallback_to_full_discovery()
 
     def _fallback_to_full_discovery(self) -> None:
@@ -333,7 +341,7 @@ class HandlerDiscoveryService:
                         with suppress(OSError):
                             mtimes[filepath] = os.path.getmtime(filepath)
         except Exception as e:
-            logger.debug(f"Failed to get source file modification times: {e}")
+            logger.debug("Failed to get source file modification times: %s", e)
 
         return mtimes
 
@@ -354,7 +362,7 @@ class HandlerDiscoveryService:
                     ),
                 }
             except Exception as e:
-                logger.debug(f"Failed to serialize handler {handler_class}: {e}")
+                logger.debug("Failed to serialize handler %s: %s", handler_class, e)
                 continue
 
         return serialized

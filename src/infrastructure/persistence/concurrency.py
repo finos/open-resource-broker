@@ -14,7 +14,7 @@ R = TypeVar("R")  # Return type
 class OptimisticConcurrencyControl:
     """Utilities for optimistic concurrency control."""
 
-    def __init__(self, max_retries: int = 3, retry_delay: float = 0.1):
+    def __init__(self, max_retries: int = 3, retry_delay: float = 0.1) -> None:
         """
         Initialize optimistic concurrency control.
 
@@ -48,12 +48,17 @@ class OptimisticConcurrencyControl:
                     retries += 1
                     if retries > self.max_retries:
                         self.logger.warning(
-                            f"Maximum retries ({ self.max_retries}) exceeded for concurrency error: {e}"
+                            "Maximum retries (%s) exceeded for concurrency error: %s",
+                            self.max_retries,
+                            e,
                         )
                         raise
 
                     self.logger.debug(
-                        f"Concurrency error detected, retrying ({retries}/{self.max_retries}): {e}"
+                        "Concurrency error detected, retrying (%s/%s): %s",
+                        retries,
+                        self.max_retries,
+                        e,
                     )
                     time.sleep(self.retry_delay)
 

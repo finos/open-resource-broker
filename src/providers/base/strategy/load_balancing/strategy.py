@@ -44,7 +44,7 @@ class LoadBalancingProviderStrategy(ProviderStrategy):
         strategies: List[ProviderStrategy],
         weights: Optional[Dict[str, float]] = None,
         config: LoadBalancingConfig = None,
-    ):
+    ) -> None:
         """
         Initialize load balancing provider strategy.
 
@@ -310,7 +310,7 @@ class LoadBalancingProviderStrategy(ProviderStrategy):
         # For now, use least response time as adaptive metric
         return self._least_response_time_selection(strategies)
 
-    def _update_health_status(self, strategy_type: str, success: bool):
+    def _update_health_status(self, strategy_type: str, success: bool) -> None:
         """Update health status based on operation result."""
         stats = self._stats[strategy_type]
 
@@ -354,13 +354,13 @@ class LoadBalancingProviderStrategy(ProviderStrategy):
                 for strategy_type, stats in self._stats.items()
             }
 
-    def reset_stats(self):
+    def reset_stats(self) -> None:
         """Reset all statistics."""
         with self._lock:
             for stats in self._stats.values():
                 stats.reset_stats()
 
-    def shutdown(self):
+    def shutdown(self) -> None:
         """Shutdown load balancer and cleanup resources."""
         self._shutdown_event.set()
         if self._health_check_thread and self._health_check_thread.is_alive():

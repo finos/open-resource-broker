@@ -21,7 +21,7 @@ class TransactionState(str, Enum):
 class TransactionManager(ABC):
     """Base interface for transaction managers."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the instance."""
         self.logger = get_logger(__name__)
         self.state = TransactionState.INACTIVE
@@ -39,14 +39,14 @@ class TransactionManager(ABC):
         """Rollback the current transaction."""
 
     @contextmanager
-    def transaction(self):
+    def transaction(self) -> None:
         """Context manager for transaction handling."""
         self.begin_transaction()
         try:
             yield
             self.commit_transaction()
         except Exception as e:
-            self.logger.error(f"Transaction failed: {e}")
+            self.logger.error("Transaction failed: %s", e)
             self.rollback_transaction()
             raise
 
@@ -59,7 +59,7 @@ class TransactionManager(ABC):
 class MemoryTransactionManager(TransactionManager):
     """In-memory transaction manager for testing and simple operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize in-memory transaction manager."""
         super().__init__()
         self.operations: List[Callable[[], None]] = []
@@ -87,11 +87,11 @@ class MemoryTransactionManager(TransactionManager):
 
             self.state = TransactionState.COMMITTED
             self.logger.debug(
-                f"Memory transaction committed with {len(self.operations)} operations"
+                "Memory transaction committed with %s operations", len(self.operations)
             )
         except Exception as e:
             self.state = TransactionState.FAILED
-            self.logger.error(f"Memory transaction commit failed: {e}")
+            self.logger.error("Memory transaction commit failed: %s", e)
             raise
         finally:
             self.operations.clear()
@@ -109,15 +109,16 @@ class MemoryTransactionManager(TransactionManager):
                 try:
                     rollback_op()
                 except Exception as e:
-                    self.logger.error(f"Rollback operation failed: {e}")
+                    self.logger.error("Rollback operation failed: %s", e)
 
             self.state = TransactionState.ROLLED_BACK
             self.logger.debug(
-                f"Memory transaction rolled back with {len(self.rollback_operations)} rollback operations"
+                "Memory transaction rolled back with %s rollback operations",
+                len(self.rollback_operations),
             )
         except Exception as e:
             self.state = TransactionState.FAILED
-            self.logger.error(f"Memory transaction rollback failed: {e}")
+            self.logger.error("Memory transaction rollback failed: %s", e)
         finally:
             self.operations.clear()
             self.rollback_operations.clear()
@@ -126,7 +127,7 @@ class MemoryTransactionManager(TransactionManager):
         self,
         operation: Callable[[], None],
         rollback_operation: Optional[Callable[[], None]] = None,
-    ):
+    ) -> None:
         """Add operation to transaction."""
         if self.state != TransactionState.ACTIVE:
             raise RuntimeError("No active transaction")

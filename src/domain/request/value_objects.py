@@ -19,7 +19,7 @@ from .request_metadata import (
 from .request_types import MachineResult, RequestStatus, RequestType
 
 # Export all value objects
-__all__ = [
+__all__: list[str] = [
     # Request types and statuses
     "RequestType",
     "RequestStatus",

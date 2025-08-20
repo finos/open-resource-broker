@@ -22,7 +22,7 @@ from .transaction_manager import (
     TransactionManager,
 )
 
-__all__ = [
+__all__: list[str] = [
     # Base interfaces
     "ResourceManager",
     "QueryManager",

@@ -33,7 +33,7 @@ class JSONUnitOfWork(BaseUnitOfWork):
         template_file: str = "templates.json",
         legacy_template_file: Optional[str] = None,
         create_dirs: bool = True,
-    ):
+    ) -> None:
         """
         Initialize JSON unit of work with simplified repositories.
 
@@ -53,7 +53,7 @@ class JSONUnitOfWork(BaseUnitOfWork):
         data_path = Path(data_dir)
         if create_dirs and not data_path.exists():
             data_path.mkdir(parents=True, exist_ok=True)
-            self.logger.info(f"Created data directory: {data_dir}")
+            self.logger.info("Created data directory: %s", data_dir)
 
         # Create storage strategies for each repository
         machine_strategy = JSONStorageStrategy(
@@ -80,7 +80,9 @@ class JSONUnitOfWork(BaseUnitOfWork):
         self.request_repository = RequestRepository(request_strategy)
         self.template_repository = TemplateRepository(template_strategy)
 
-        self.logger.debug(f"Initialized JSONUnitOfWork with simplified repositories in: {data_dir}")
+        self.logger.debug(
+            "Initialized JSONUnitOfWork with simplified repositories in: %s", data_dir
+        )
 
     @property
     def machines(self):
@@ -105,7 +107,7 @@ class JSONUnitOfWork(BaseUnitOfWork):
             self.template_repository.storage_strategy.begin_transaction()
             self.logger.debug("Transaction begun on all repositories")
         except Exception as e:
-            self.logger.error(f"Failed to begin transaction: {e}")
+            self.logger.error("Failed to begin transaction: %s", e)
             raise
 
     def _commit_transaction(self) -> None:
@@ -116,7 +118,7 @@ class JSONUnitOfWork(BaseUnitOfWork):
             self.template_repository.storage_strategy.commit_transaction()
             self.logger.debug("Transaction committed on all repositories")
         except Exception as e:
-            self.logger.error(f"Failed to commit transaction: {e}")
+            self.logger.error("Failed to commit transaction: %s", e)
             raise
 
     def _rollback_transaction(self) -> None:
@@ -127,5 +129,5 @@ class JSONUnitOfWork(BaseUnitOfWork):
             self.template_repository.storage_strategy.rollback_transaction()
             self.logger.debug("Transaction rolled back on all repositories")
         except Exception as e:
-            self.logger.error(f"Failed to rollback transaction: {e}")
+            self.logger.error("Failed to rollback transaction: %s", e)
             raise

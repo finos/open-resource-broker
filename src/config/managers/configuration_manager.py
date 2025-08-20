@@ -38,7 +38,7 @@ class ConfigurationManager:
     It uses ConfigurationLoader to load configuration from multiple sources.
     """
 
-    def __init__(self, config_file: Optional[str] = None):
+    def __init__(self, config_file: Optional[str] = None) -> None:
         """Initialize configuration manager with lazy loading."""
         self._config_file = config_file
         self._loader: Optional["ConfigurationLoader"] = None
@@ -76,7 +76,7 @@ class ConfigurationManager:
             raw_config = self.loader.load(self._config_file)
             return self.loader.create_app_config(raw_config)
         except Exception as e:
-            logger.error(f"Failed to load app config: {e}")
+            logger.error("Failed to load app config: %s", e)
             raise
 
     def _ensure_raw_config(self) -> Dict[str, Any]:
@@ -140,7 +140,7 @@ class ConfigurationManager:
 
             logger.info("Configuration reloaded successfully")
         except Exception as e:
-            logger.error(f"Failed to reload configuration: {e}")
+            logger.error("Failed to reload configuration: %s", e)
             raise ConfigurationError(f"Configuration reload failed: {e}")
 
     # Delegate type conversion methods
@@ -234,9 +234,9 @@ class ConfigurationManager:
             raw_config = self._ensure_raw_config()
             with open(config_path, "w") as f:
                 json.dump(raw_config, f, indent=2)
-            logger.info(f"Configuration saved to {config_path}")
+            logger.info("Configuration saved to %s", config_path)
         except Exception as e:
-            logger.error(f"Failed to save configuration: {e}")
+            logger.error("Failed to save configuration: %s", e)
             raise ConfigurationError(f"Failed to save configuration: {e}")
 
     def get_raw_config(self) -> Dict[str, Any]:

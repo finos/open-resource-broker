@@ -7,4 +7,4 @@ strategy interface while maintaining all AWS-specific capabilities.
 
 from .aws_provider_strategy import AWSProviderStrategy
 
-__all__ = ["AWSProviderStrategy"]
+__all__: list[str] = ["AWSProviderStrategy"]

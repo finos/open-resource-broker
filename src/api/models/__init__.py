@@ -25,7 +25,7 @@ from api.models.responses import (
     format_success_for_api,
 )
 
-__all__ = [
+__all__: list[str] = [
     # Base models
     "APIBaseModel",
     "APIRequest",

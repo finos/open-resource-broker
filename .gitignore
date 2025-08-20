@@ -12,12 +12,22 @@ requirements-dev.txt
 work/
 
 # Security and analysis reports
+*.sarif
+*-results.sarif
+*-report.json
+*-report.sarif
 bandit-report.json
 bandit-report.sarif
 bandit-results.sarif
 hadolint-results.sarif
 trivy-results.json
 trivy-results.sarif
+semgrep.sarif
+semgrep-results.sarif
+safety-report.*
+codeql-results/
+security-reports/
+vulnerability-reports/
 safety-report.json
 security-report.json
 security-report.md

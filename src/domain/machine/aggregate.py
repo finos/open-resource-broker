@@ -54,7 +54,7 @@ class Machine(AggregateRoot):
     # Versioning
     version: int = Field(default=0)
 
-    def __init__(self, **data):
+    def __init__(self, **data) -> None:
         """Initialize the instance."""
         # Set default ID if not provided
         if "id" not in data:

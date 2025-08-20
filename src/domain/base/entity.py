@@ -36,7 +36,7 @@ class Entity(BaseModel, ABC):
 class AggregateRoot(Entity):
     """Base class for aggregate roots."""
 
-    def __init__(self, **data):
+    def __init__(self, **data) -> None:
         """Initialize the instance."""
         super().__init__(**data)
         self._domain_events: List[Any] = []

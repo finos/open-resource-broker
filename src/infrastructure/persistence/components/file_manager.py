@@ -19,7 +19,7 @@ class FileManager:
     backup management, and integrity verification.
     """
 
-    def __init__(self, file_path: str, create_dirs: bool = True, backup_count: int = 5):
+    def __init__(self, file_path: str, create_dirs: bool = True, backup_count: int = 5) -> None:
         """
         Initialize file manager.
 
@@ -35,7 +35,7 @@ class FileManager:
         # Create parent directories if needed
         if create_dirs and not self.file_path.parent.exists():
             self.file_path.parent.mkdir(parents=True, exist_ok=True)
-            self.logger.info(f"Created directory: {self.file_path.parent}")
+            self.logger.info("Created directory: %s", self.file_path.parent)
 
     def read_file(self) -> str:
         """
@@ -46,17 +46,17 @@ class FileManager:
         """
         try:
             if not self.file_path.exists():
-                self.logger.debug(f"File does not exist: {self.file_path}")
+                self.logger.debug("File does not exist: %s", self.file_path)
                 return ""
 
             with open(self.file_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            self.logger.debug(f"Read {len(content)} characters from {self.file_path}")
+            self.logger.debug("Read %s characters from %s", len(content), self.file_path)
             return content
 
         except Exception as e:
-            self.logger.error(f"Failed to read file {self.file_path}: {e}")
+            self.logger.error("Failed to read file %s: %s", self.file_path, e)
             raise
 
     def write_file(self, content: str) -> None:
@@ -68,9 +68,9 @@ class FileManager:
         """
         try:
             self._atomic_write(content)
-            self.logger.debug(f"Wrote {len(content)} characters to {self.file_path}")
+            self.logger.debug("Wrote %s characters to %s", len(content), self.file_path)
         except Exception as e:
-            self.logger.error(f"Failed to write file {self.file_path}: {e}")
+            self.logger.error("Failed to write file %s: %s", self.file_path, e)
             raise
 
     def _atomic_write(self, content: str) -> None:
@@ -100,11 +100,11 @@ class FileManager:
                 self.file_path.unlink()
             temp_path.replace(self.file_path)
 
-        except Exception as e:
+        except Exception:
             # Clean up temp file on failure
             if temp_path.exists():
                 temp_path.unlink()
-            raise e
+            raise
 
     def create_backup(self) -> Optional[str]:
         """
@@ -121,7 +121,7 @@ class FileManager:
             backup_path = self.file_path.with_suffix(f".backup_{timestamp}{self.file_path.suffix}")
 
             shutil.copy2(self.file_path, backup_path)
-            self.logger.debug(f"Created backup: {backup_path}")
+            self.logger.debug("Created backup: %s", backup_path)
 
             # Clean up old backups
             self._cleanup_old_backups()
@@ -129,7 +129,7 @@ class FileManager:
             return str(backup_path)
 
         except Exception as e:
-            self.logger.error(f"Failed to create backup: {e}")
+            self.logger.error("Failed to create backup: %s", e)
             return None
 
     def _cleanup_old_backups(self) -> None:
@@ -146,12 +146,12 @@ class FileManager:
             for backup_file in backup_files[self.backup_count :]:
                 try:
                     backup_file.unlink()
-                    self.logger.debug(f"Removed old backup: {backup_file}")
+                    self.logger.debug("Removed old backup: %s", backup_file)
                 except Exception as e:
-                    self.logger.warning(f"Failed to remove old backup {backup_file}: {e}")
+                    self.logger.warning("Failed to remove old backup %s: %s", backup_file, e)
 
         except Exception as e:
-            self.logger.error(f"Failed to cleanup old backups: {e}")
+            self.logger.error("Failed to cleanup old backups: %s", e)
 
     def calculate_checksum(self, content: str) -> str:
         """
@@ -190,13 +190,15 @@ class FileManager:
 
             if not is_valid:
                 self.logger.warning(
-                    f"File integrity check failed. Expected: {expected_checksum}, Actual: {actual_checksum}"
+                    "File integrity check failed. Expected: %s, Actual: %s",
+                    expected_checksum,
+                    actual_checksum,
                 )
 
             return is_valid
 
         except Exception as e:
-            self.logger.error(f"File integrity verification failed: {e}")
+            self.logger.error("File integrity verification failed: %s", e)
             return False
 
     def recover_from_backup(self) -> bool:
@@ -221,12 +223,12 @@ class FileManager:
 
             # Copy backup to main file
             shutil.copy2(latest_backup, self.file_path)
-            self.logger.info(f"Recovered file from backup: {latest_backup}")
+            self.logger.info("Recovered file from backup: %s", latest_backup)
 
             return True
 
         except Exception as e:
-            self.logger.error(f"Failed to recover from backup: {e}")
+            self.logger.error("Failed to recover from backup: %s", e)
             return False
 
     def file_exists(self) -> bool:

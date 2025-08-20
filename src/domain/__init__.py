@@ -40,7 +40,7 @@ from .request import Request, RequestRepository, RequestStatus, RequestType
 # Export bounded context aggregates
 from .template import Template
 
-__all__ = [
+__all__: list[str] = [
     # Base primitives
     "Entity",
     "AggregateRoot",

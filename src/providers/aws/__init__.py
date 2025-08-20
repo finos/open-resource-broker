@@ -14,7 +14,7 @@ from providers.aws.registration import (
 )
 from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
-__all__ = [
+__all__: list[str] = [
     "AWSProviderStrategy",
     "AWSProviderConfig",
     "AWSTemplateExtensionConfig",

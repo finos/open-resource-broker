@@ -1,7 +1,7 @@
 """Container port for dependency injection concerns."""
 
 from abc import ABC, abstractmethod
-from typing import Type, TypeVar
+from typing import Callable, Type, TypeVar
 
 T = TypeVar("T")
 
@@ -18,11 +18,11 @@ class ContainerPort(ABC):
         """Register service instance in container."""
 
     @abstractmethod
-    def register_factory(self, service_type: Type[T], factory_func) -> None:
+    def register_factory(self, service_type: Type[T], factory_func: Callable[..., T]) -> None:
         """Register service factory in container."""
 
     @abstractmethod
-    def register_singleton(self, service_type: Type[T], factory_func) -> None:
+    def register_singleton(self, service_type: Type[T], factory_func: Callable[..., T]) -> None:
         """Register singleton service in container."""
 
     @abstractmethod

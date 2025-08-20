@@ -12,7 +12,7 @@ from .examples import get_api_examples
 from .security_schemes import get_security_schemes
 
 
-def configure_openapi(app: FastAPI, server_config: ServerConfig) -> None:
+def configure_openapi(app: FastAPI, server_config: ServerConfig):
     """
     Configure OpenAPI documentation for the FastAPI app.
 

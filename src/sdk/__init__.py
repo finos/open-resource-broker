@@ -27,7 +27,7 @@ from .exceptions import ConfigurationError, ProviderError, SDKError
 # Convenient alias
 OHFPSDK = OpenHFPluginSDK
 
-__all__ = [
+__all__: list[str] = [
     "OpenHFPluginSDK",
     "OHFPSDK",
     "SDKConfig",

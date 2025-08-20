@@ -34,14 +34,14 @@ class AWSClient:
             config: Configuration port for accessing configuration
             logger: Logger for logging messages
         """
-        self.config = {}
+        self.config: dict[str, Any] = {}
         self._config_manager = config
         self._logger = logger
 
         # Get region from configuration
         self.region_name = self._get_region_from_config_manager(self._config_manager) or "eu-west-1"
 
-        self._logger.debug(f"AWS client region determined: {self.region_name}")
+        self._logger.debug("AWS client region determined: %s", self.region_name)
 
         # Configure retry settings
         self.boto_config = Config(
@@ -58,18 +58,18 @@ class AWSClient:
         self.perf_config = self._load_performance_config(self._config_manager)
 
         # Initialize resource cache
-        self._resource_cache = {}
+        self._resource_cache: dict[str, Any] = {}
         self._cache_lock = threading.RLock()
 
         # Initialize adaptive batch sizing history
-        self._batch_history = {}
+        self._batch_history: dict[str, Any] = {}
         self._batch_sizes = self.perf_config.get("batch_sizes", {}).copy()
         self._batch_lock = threading.RLock()
 
         # Get profile from config manager
         self.profile_name = self._get_profile_from_config_manager(self._config_manager)
 
-        self._logger.debug(f"AWS client profile determined: {self.profile_name}")
+        self._logger.debug("AWS client profile determined: %s", self.profile_name)
 
         try:
             # Initialize session
@@ -89,9 +89,11 @@ class AWSClient:
 
             # Single comprehensive INFO log with all important details
             self._logger.info(
-                f"AWS client initialized with region: {self.region_name}, profile: {self.profile_name}, "
+                "AWS client initialized with region: %s, profile: %s, ",
+                self.region_name,
+                self.profile_name
                 + f"retries: {self.boto_config.retries['max_attempts']}, "
-                + f"timeouts: connect={self.boto_config.connect_timeout}s, read={self.boto_config.read_timeout}s"
+                + f"timeouts: connect={self.boto_config.connect_timeout}s, read={self.boto_config.read_timeout}s",
             )
 
         except ClientError as e:
@@ -121,10 +123,10 @@ class AWSClient:
 
             aws_config = config_manager.get_typed(AWSProviderConfig)
             if aws_config and aws_config.region:
-                self._logger.debug(f"Using region from ConfigurationManager: {aws_config.region}")
+                self._logger.debug("Using region from ConfigurationManager: %s", aws_config.region)
                 return aws_config.region
         except Exception as e:
-            self._logger.debug(f"Could not get region from ConfigurationManager: {str(e)}")
+            self._logger.debug("Could not get region from ConfigurationManager: %s", str(e))
 
         return None
 
@@ -150,13 +152,15 @@ class AWSClient:
             selection_result = selection_service.select_active_provider()
 
             self._logger.debug(
-                f"Provider selection result: {selection_result.provider_type}, {selection_result.provider_instance}"
+                "Provider selection result: %s, %s",
+                selection_result.provider_type,
+                selection_result.provider_instance,
             )
 
             # Ensure we have an AWS provider
             if selection_result.provider_type != "aws":
                 self._logger.debug(
-                    f"Selected provider is not AWS: {selection_result.provider_type}"
+                    "Selected provider is not AWS: %s", selection_result.provider_type
                 )
                 return None
 
@@ -169,21 +173,23 @@ class AWSClient:
             # Find the selected provider instance
             for provider in provider_config.providers:
                 if provider.name == selection_result.provider_instance:
-                    self._logger.debug(f"Found provider {provider.name}, checking config...")
+                    self._logger.debug("Found provider %s, checking config...", provider.name)
                     # Access profile from provider config dict
                     if hasattr(provider, "config") and provider.config:
-                        self._logger.debug(f"Provider has config: {type(provider.config)}")
+                        self._logger.debug("Provider has config: %s", type(provider.config))
 
                         # Handle both dict and object config
                         if isinstance(provider.config, dict):
-                            self._logger.debug(f"Config dict contents: {provider.config}")
+                            self._logger.debug("Config dict contents: %s", provider.config)
                             profile = provider.config.get("profile")
                         else:
                             profile = getattr(provider.config, "profile", None)
 
                         if profile:
                             self._logger.debug(
-                                f"Using profile from selected provider {provider.name}: {profile}"
+                                "Using profile from selected provider %s: %s",
+                                provider.name,
+                                profile,
                             )
                             return profile
                         else:
@@ -193,14 +199,14 @@ class AWSClient:
                     break
             else:
                 self._logger.debug(
-                    f"Provider {selection_result.provider_instance} not found in config"
+                    "Provider %s not found in config", selection_result.provider_instance
                 )
 
         except Exception as e:
-            self._logger.debug(f"Could not get profile via provider selection: {str(e)}")
+            self._logger.debug("Could not get profile via provider selection: %s", str(e))
             import traceback
 
-            self._logger.debug(f"Traceback: {traceback.format_exc()}")
+            self._logger.debug("Traceback: %s", traceback.format_exc())
 
         # Fallback: try legacy AWSProviderConfig approach
         try:
@@ -209,11 +215,11 @@ class AWSClient:
             aws_config = config_manager.get_typed(AWSProviderConfig)
             if aws_config and aws_config.profile:
                 self._logger.debug(
-                    f"Using profile from legacy AWSProviderConfig: {aws_config.profile}"
+                    "Using profile from legacy AWSProviderConfig: %s", aws_config.profile
                 )
                 return aws_config.profile
         except Exception as e:
-            self._logger.debug(f"Could not get profile from legacy config: {str(e)}")
+            self._logger.debug("Could not get profile from legacy config: %s", str(e))
 
         return None
 
@@ -249,7 +255,7 @@ class AWSClient:
                 }
         except Exception as e:
             self._logger.debug(
-                f"Could not load performance config from ConfigurationManager: {str(e)}"
+                "Could not load performance config from ConfigurationManager: %s", str(e)
             )
 
         # Default configuration

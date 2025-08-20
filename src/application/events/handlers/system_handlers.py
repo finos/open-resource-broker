@@ -22,7 +22,7 @@ class SystemStartedHandler(BaseLoggingEventHandler[DomainEvent]):
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
         event_publisher: Optional[EventPublisherPort] = None,
-    ):
+    ) -> None:
         """Initialize system started handler."""
         super().__init__(logger, error_handler, event_publisher)
 
@@ -51,7 +51,7 @@ class SystemShutdownHandler(BaseLoggingEventHandler[DomainEvent]):
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
         event_publisher: Optional[EventPublisherPort] = None,
-    ):
+    ) -> None:
         """Initialize system shutdown handler."""
         super().__init__(logger, error_handler, event_publisher)
 
@@ -79,7 +79,7 @@ class ConfigurationUpdatedHandler(BaseLoggingEventHandler[DomainEvent]):
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
         event_publisher: Optional[EventPublisherPort] = None,
-    ):
+    ) -> None:
         """Initialize configuration updated handler."""
         super().__init__(logger, error_handler, event_publisher)
 

@@ -17,7 +17,7 @@ class StorageResourceManager(ABC):
     This class handles storage/persistence infrastructure resources.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the instance."""
         self.logger = get_logger(__name__)
         self._initialized = False
@@ -82,7 +82,7 @@ class QueryManager(ABC):
     across different storage technologies.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = get_logger(__name__)
 
     @abstractmethod

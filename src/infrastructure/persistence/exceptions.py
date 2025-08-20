@@ -26,7 +26,7 @@ class PersistenceError(InfrastructureError):
         Returns:
             Dictionary representation of exception
         """
-        result = super().to_dict()
+        result: Dict[str, Any] = super().to_dict()
         if self.cause:
             result["cause"] = str(self.cause)
         return result

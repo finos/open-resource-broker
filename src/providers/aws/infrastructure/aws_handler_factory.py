@@ -25,7 +25,9 @@ class AWSHandlerFactory:
     ensuring that only one handler instance exists for each type.
     """
 
-    def __init__(self, aws_client: AWSClient, logger: LoggingPort, config: ConfigurationPort):
+    def __init__(
+        self, aws_client: AWSClient, logger: LoggingPort, config: ConfigurationPort
+    ) -> None:
         """
         Initialize the factory.
 
@@ -61,23 +63,23 @@ class AWSHandlerFactory:
         Raises:
             ValidationError: If the handler type is invalid
         """
-        self._logger.debug(f"Creating handler for type: {handler_type}")
+        self._logger.debug("Creating handler for type: %s", handler_type)
 
         # Check if we already have a cached handler for this type
         if handler_type in self._handlers:
-            self._logger.debug(f"Returning cached handler for type: {handler_type}")
+            self._logger.debug("Returning cached handler for type: %s", handler_type)
             return self._handlers[handler_type]
 
         # Validate handler type
         try:
             ProviderApi(handler_type)
         except ValueError:
-            self._logger.error(f"Invalid AWS handler type: {handler_type}")
+            self._logger.error("Invalid AWS handler type: %s", handler_type)
             raise AWSValidationError(f"Invalid AWS handler type: {handler_type}")
 
         # Check if we have a registered handler class for this type
         if handler_type not in self._handler_classes:
-            self._logger.error(f"No handler class registered for type: {handler_type}")
+            self._logger.error("No handler class registered for type: %s", handler_type)
             raise AWSValidationError(f"No handler class registered for type: {handler_type}")
 
         # Create the handler
@@ -92,7 +94,7 @@ class AWSHandlerFactory:
         # Cache the handler for future use
         self._handlers[handler_type] = handler
 
-        self._logger.debug(f"Created handler for type: {handler_type}")
+        self._logger.debug("Created handler for type: %s", handler_type)
         return handler
 
     def create_handler_for_template(self, template: Template) -> AWSHandler:
@@ -108,7 +110,7 @@ class AWSHandlerFactory:
         Raises:
             ValidationError: If the template has an invalid handler type
         """
-        self._logger.debug(f"Creating handler for template: {template.template_id}")
+        self._logger.debug("Creating handler for template: %s", template.template_id)
 
         # Get the handler type from the template
         handler_type = template.provider_api
@@ -138,4 +140,4 @@ class AWSHandlerFactory:
             ProviderApi.RUN_INSTANCES.value: RunInstancesHandler,
         }
 
-        self._logger.debug(f"Registered handler classes: {list(self._handler_classes.keys())}")
+        self._logger.debug("Registered handler classes: %s", list(self._handler_classes.keys()))

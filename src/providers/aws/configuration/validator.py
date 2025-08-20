@@ -111,7 +111,7 @@ _aws_naming_config = AWSNamingConfig()
 class AWSConfigManager:
     """Manager for AWS configuration."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the instance."""
         self._naming_config = _aws_naming_config
 
@@ -138,7 +138,7 @@ def get_aws_config_manager() -> AWSConfigManager:
     return _aws_config_manager
 
 
-__all__ = [
+__all__: list[str] = [
     "AWSLimits",
     "AWSNamingConfig",
     "AWSConfigManager",

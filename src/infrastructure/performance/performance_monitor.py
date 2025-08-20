@@ -12,13 +12,13 @@ if TYPE_CHECKING:
 class PerformanceMonitor:
     """Performance monitoring utility for tracking execution times and bottlenecks."""
 
-    def __init__(self, logger: Optional["LoggingPort"] = None):
+    def __init__(self, logger: Optional["LoggingPort"] = None) -> None:
         """Initialize performance monitor."""
         self.logger = logger
         self._metrics: Dict[str, Dict[str, Any]] = {}
 
     @contextmanager
-    def measure(self, operation_name: str):
+    def measure(self, operation_name: str) -> None:
         """Context manager for measuring operation performance."""
         start_time = time.perf_counter()
         try:
@@ -28,7 +28,7 @@ class PerformanceMonitor:
             duration = end_time - start_time
             self._record_metric(operation_name, duration)
 
-    def _record_metric(self, operation_name: str, duration: float):
+    def _record_metric(self, operation_name: str, duration: float) -> None:
         """Record performance metric."""
         if operation_name not in self._metrics:
             self._metrics[operation_name] = {
@@ -47,7 +47,7 @@ class PerformanceMonitor:
         metric["avg_time"] = metric["total_time"] / metric["count"]
 
         if self.logger and duration > 1.0:  # Log slow operations (>1 second)
-            self.logger.warning(f"Slow operation detected: {operation_name} took {duration:.2f}s")
+            self.logger.warning("Slow operation detected: %s took %.2fs", operation_name, duration)
 
     def get_metrics(self) -> Dict[str, Dict[str, Any]]:
         """Get all recorded metrics."""
@@ -58,7 +58,7 @@ class PerformanceMonitor:
         sorted_ops = sorted(self._metrics.items(), key=lambda x: x[1]["avg_time"], reverse=True)
         return dict(sorted_ops[:limit])
 
-    def reset_metrics(self):
+    def reset_metrics(self) -> None:
         """Reset all metrics."""
         self._metrics.clear()
 
@@ -94,7 +94,7 @@ def performance_monitor(operation_name: Optional[str] = None):
                         global_monitor = get_global_monitor()
                         if global_monitor and global_monitor.logger:
                             global_monitor.logger.warning(
-                                f"Slow operation: {name} took {duration:.2f}s"
+                                "Slow operation: %s took %.2fs", name, duration
                             )
                         # If no logger available, we have to use print as last resort
                         # This should only happen during early bootstrap before DI is

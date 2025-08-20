@@ -56,7 +56,7 @@ def _get_logger():
 
 
 # Re-export commonly used functions to maintain existing imports
-__all__ = [
+__all__: list[str] = [
     # YAML operations
     "read_yaml_file",
     "write_yaml_file",

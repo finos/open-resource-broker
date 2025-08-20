@@ -1,3 +1,3 @@
 """Monitoring and observability components."""
 
-__all__ = []
+__all__: list[str] = []

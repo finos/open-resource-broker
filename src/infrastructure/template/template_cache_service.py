@@ -46,7 +46,7 @@ class NoOpTemplateCacheService(TemplateCacheService):
     Useful for development or when caching is disabled.
     """
 
-    def __init__(self, logger: LoggingPort):
+    def __init__(self, logger: LoggingPort) -> None:
         """
         Initialize no-op cache service.
 
@@ -83,7 +83,7 @@ class TTLTemplateCacheService(TemplateCacheService):
     Follows SRP by focusing only on TTL caching logic.
     """
 
-    def __init__(self, ttl_seconds: int = 300, logger: LoggingPort = None):
+    def __init__(self, ttl_seconds: int = 300, logger: LoggingPort = None) -> None:
         """
         Initialize TTL cache service.
 
@@ -184,7 +184,7 @@ class AutoRefreshTemplateCacheService(TTLTemplateCacheService):
         ttl_seconds: int = 300,
         auto_refresh: bool = False,
         logger: LoggingPort = None,
-    ):
+    ) -> None:
         """
         Initialize auto-refresh cache service.
 
@@ -223,7 +223,7 @@ class AutoRefreshTemplateCacheService(TTLTemplateCacheService):
         if self._refresh_timer:
             self._refresh_timer.cancel()
 
-        def refresh():
+        def refresh() -> None:
             """Auto-refresh template cache using loader function."""
             if self._loader_func and self._logger:
                 self._logger.debug("Auto-refreshing template cache")
@@ -233,7 +233,7 @@ class AutoRefreshTemplateCacheService(TTLTemplateCacheService):
                         self._cache_time = datetime.now()
                 except Exception as e:
                     if self._logger:
-                        self._logger.error(f"Auto-refresh failed: {e}")
+                        self._logger.error("Auto-refresh failed: %s", e)
 
         # Schedule refresh at 80% of TTL to ensure fresh data
         refresh_delay = self._ttl_seconds * 0.8

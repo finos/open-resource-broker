@@ -34,7 +34,7 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
         region: str,
         table_name: str,
         profile: Optional[str] = None,
-    ):
+    ) -> None:
         """
         Initialize DynamoDB storage strategy with components.
 
@@ -60,7 +60,7 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
         # Initialize table
         self._initialize_table()
 
-        self._self._logger.debug(f"Initialized DynamoDB storage strategy for table {table_name}")
+        self._self._logger.debug("Initialized DynamoDB storage strategy for table %s", table_name)
 
     def _initialize_table(self) -> None:
         """Initialize DynamoDB table if it doesn't exist."""
@@ -77,14 +77,14 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
                 )
 
                 if success:
-                    self._self._logger.info(f"Created DynamoDB table: {self.table_name}")
+                    self._self._logger.info("Created DynamoDB table: %s", self.table_name)
                 else:
                     self._self._logger.warning(
-                        f"Failed to create DynamoDB table: {self.table_name}"
+                        "Failed to create DynamoDB table: %s", self.table_name
                     )
 
         except Exception as e:
-            self._self._logger.error(f"Failed to initialize table {self.table_name}: {e}")
+            self._self._logger.error("Failed to initialize table %s: %s", self.table_name, e)
             raise
 
     def save(self, entity_id: str, data: Dict[str, Any]) -> None:
@@ -106,13 +106,13 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
                 if not success:
                     raise PersistenceError(f"Failed to save entity {entity_id}")
 
-                self._self._logger.debug(f"Saved entity: {entity_id}")
+                self._self._logger.debug("Saved entity: %s", entity_id)
 
             except ClientError as e:
                 self.client_manager.handle_client_error(e, "Save")
                 raise PersistenceError(f"Failed to save entity {entity_id}: {e}")
             except Exception as e:
-                self._self._logger.error(f"Failed to save entity {entity_id}: {e}")
+                self._self._logger.error("Failed to save entity %s: %s", entity_id, e)
                 raise PersistenceError(f"Failed to save entity {entity_id}: {e}")
 
     def find_by_id(self, entity_id: str) -> Optional[Dict[str, Any]]:
@@ -135,17 +135,17 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
 
                 if item:
                     entity_data = self.converter.from_dynamodb_item(item)
-                    self._self._logger.debug(f"Found entity: {entity_id}")
+                    self._self._logger.debug("Found entity: %s", entity_id)
                     return entity_data
                 else:
-                    self._self._logger.debug(f"Entity not found: {entity_id}")
+                    self._self._logger.debug("Entity not found: %s", entity_id)
                     return None
 
             except ClientError as e:
                 self.client_manager.handle_client_error(e, "Find by ID")
                 return None
             except Exception as e:
-                self._self._logger.error(f"Failed to find entity {entity_id}: {e}")
+                self._self._logger.error("Failed to find entity %s: %s", entity_id, e)
                 return None
 
     def find_all(self) -> Dict[str, Dict[str, Any]]:
@@ -167,14 +167,14 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
                     if entity_id:
                         entities[entity_id] = entity_data
 
-                self._self._logger.debug(f"Loaded {len(entities)} entities")
+                self._self._logger.debug("Loaded %s entities", len(entities))
                 return entities
 
             except ClientError as e:
                 self.client_manager.handle_client_error(e, "Find all")
                 return {}
             except Exception as e:
-                self._self._logger.error(f"Failed to load all entities: {e}")
+                self._self._logger.error("Failed to load all entities: %s", e)
                 return {}
 
     def delete(self, entity_id: str) -> None:
@@ -193,15 +193,15 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
                 success = self.client_manager.delete_item(self.table_name, key)
 
                 if success:
-                    self._self._logger.debug(f"Deleted entity: {entity_id}")
+                    self._self._logger.debug("Deleted entity: %s", entity_id)
                 else:
-                    self._self._logger.warning(f"Entity not found for deletion: {entity_id}")
+                    self._self._logger.warning("Entity not found for deletion: %s", entity_id)
 
             except ClientError as e:
                 self.client_manager.handle_client_error(e, "Delete")
                 raise PersistenceError(f"Failed to delete entity {entity_id}: {e}")
             except Exception as e:
-                self._self._logger.error(f"Failed to delete entity {entity_id}: {e}")
+                self._self._logger.error("Failed to delete entity %s: %s", entity_id, e)
                 raise PersistenceError(f"Failed to delete entity {entity_id}: {e}")
 
     def exists(self, entity_id: str) -> bool:
@@ -222,11 +222,11 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
             item = self.client_manager.get_item(self.table_name, key)
             exists = item is not None
 
-            self._self._logger.debug(f"Entity {entity_id} exists: {exists}")
+            self._self._logger.debug("Entity %s exists: %s", entity_id, exists)
             return exists
 
         except Exception as e:
-            self._self._logger.error(f"Failed to check existence of entity {entity_id}: {e}")
+            self._self._logger.error("Failed to check existence of entity %s: %s", entity_id, e)
             return False
 
     def find_by_criteria(self, criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -254,14 +254,14 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
                 # Convert items to domain data
                 entities = self.converter.from_dynamodb_items(items)
 
-                self._self._logger.debug(f"Found {len(entities)} entities matching criteria")
+                self._self._logger.debug("Found %s entities matching criteria", len(entities))
                 return entities
 
             except ClientError as e:
                 self.client_manager.handle_client_error(e, "Find by criteria")
                 return []
             except Exception as e:
-                self._self._logger.error(f"Failed to search entities: {e}")
+                self._self._logger.error("Failed to search entities: %s", e)
                 return []
 
     def save_batch(self, entities: Dict[str, Dict[str, Any]]) -> None:
@@ -282,13 +282,13 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
                 if not success:
                     raise PersistenceError("Failed to save batch")
 
-                self._self._logger.debug(f"Saved batch of {len(entities)} entities")
+                self._self._logger.debug("Saved batch of %s entities", len(entities))
 
             except ClientError as e:
                 self.client_manager.handle_client_error(e, "Batch save")
                 raise PersistenceError(f"Failed to save batch: {e}")
             except Exception as e:
-                self._self._logger.error(f"Failed to save batch: {e}")
+                self._self._logger.error("Failed to save batch: %s", e)
                 raise PersistenceError(f"Failed to save batch: {e}")
 
     def delete_batch(self, entity_ids: List[str]) -> None:
@@ -306,13 +306,13 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
                         key = self.converter.get_key(entity_id)
                         self.transaction_manager.add_delete_item(self.table_name, key)
 
-                self._self._logger.debug(f"Deleted batch of {len(entity_ids)} entities")
+                self._self._logger.debug("Deleted batch of %s entities", len(entity_ids))
 
             except ClientError as e:
                 self.client_manager.handle_client_error(e, "Batch delete")
                 raise PersistenceError(f"Failed to delete batch: {e}")
             except Exception as e:
-                self._self._logger.error(f"Failed to delete batch: {e}")
+                self._self._logger.error("Failed to delete batch: %s", e)
                 raise PersistenceError(f"Failed to delete batch: {e}")
 
     def begin_transaction(self) -> None:
@@ -330,7 +330,7 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
     def cleanup(self) -> None:
         """Clean up resources."""
         # DynamoDB doesn't require explicit cleanup like file handles or connections
-        self._self._logger.debug(f"Cleaned up DynamoDB storage strategy for {self.table_name}")
+        self._self._logger.debug("Cleaned up DynamoDB storage strategy for %s", self.table_name)
 
     def get_table_name(self) -> str:
         """Get table name."""

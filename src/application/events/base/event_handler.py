@@ -36,7 +36,7 @@ class EventHandler(ABC):
     - Error Handling: Consistent error handling and retry logic
     """
 
-    def __init__(self, logger: Optional[LoggingPort] = None):
+    def __init__(self, logger: Optional[LoggingPort] = None) -> None:
         """
         Initialize event handler.
 
@@ -77,8 +77,10 @@ class EventHandler(ABC):
             duration = time.time() - start_time
             if self.logger:
                 self.logger.debug(
-                    f"Event processed successfully: {event.event_type} "
-                    f"(ID: {event_id}) in {duration:.3f}s"
+                    "Event processed successfully: %s (ID: %s) in %.3fs",
+                    event.event_type,
+                    event_id,
+                    duration,
                 )
 
         except Exception as e:
@@ -109,7 +111,7 @@ class EventHandler(ABC):
             event: The domain event to pre-process
         """
         if self.logger:
-            self.logger.debug(f"Processing event: {event.event_type}")
+            self.logger.debug("Processing event: %s", event.event_type)
 
     @abstractmethod
     async def _post_process(self, event: DomainEvent) -> None:
@@ -125,7 +127,7 @@ class EventHandler(ABC):
         """
         # Future: Add metrics collection, audit logging, etc.
 
-    async def _process_with_retry(self, event: DomainEvent) -> None:
+    async def _process_with_retry(self, event: DomainEvent):
         """
         Process event with retry logic.
 
@@ -146,8 +148,11 @@ class EventHandler(ABC):
                     # Not the last attempt, wait and retry
                     if self.logger:
                         self.logger.warning(
-                            f"Event processing failed (attempt {attempt + 1}/{self.retry_count}): "
-                            f"{event.event_type} - {str(e)}"
+                            "Event processing failed (attempt %s/%s): %s - %s",
+                            attempt + 1,
+                            self.retry_count,
+                            event.event_type,
+                            str(e),
                         )
                     await asyncio.sleep(self.retry_delay * (attempt + 1))
                 else:
@@ -173,8 +178,11 @@ class EventHandler(ABC):
 
         if self.logger:
             self.logger.error(
-                f"Event processing failed: {event.event_type} "
-                f"(ID: {event_id}) after {duration:.3f}s - {str(error)}"
+                "Event processing failed: %s (ID: %s) after %.3fs - %s",
+                event.event_type,
+                event_id,
+                duration,
+                str(error),
             )
 
         # Future: Send to dead letter queue, trigger alerts, etc.
@@ -191,7 +199,9 @@ class EventHandler(ABC):
             error: The exception that occurred
         """
         if self.logger:
-            self.logger.error(f"Event sent to dead letter queue: {event.event_type} - {str(error)}")
+            self.logger.error(
+                "Event sent to dead letter queue: %s - %s", event.event_type, str(error)
+            )
         # Future: Implement actual dead letter queue integration
 
     def extract_fields(self, event: DomainEvent, field_mapping: Dict[str, Any]) -> Dict[str, Any]:

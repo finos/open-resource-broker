@@ -16,4 +16,4 @@ Each context contains:
 
 from .dto.base import BaseCommand, BaseDTO, BaseQuery, BaseResponse
 
-__all__ = ["BaseDTO", "BaseCommand", "BaseQuery", "BaseResponse"]
+__all__: list[str] = ["BaseDTO", "BaseCommand", "BaseQuery", "BaseResponse"]

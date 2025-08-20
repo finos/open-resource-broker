@@ -8,7 +8,7 @@ from application.interfaces.command_handler import CommandHandler
 T = TypeVar("T")  # Query type
 R = TypeVar("R")  # Result type
 
-__all__ = ["Query", "QueryHandler", "Command", "CommandHandler"]
+__all__: list[str] = ["Query", "QueryHandler", "Command", "CommandHandler"]
 
 
 class Query(ABC):

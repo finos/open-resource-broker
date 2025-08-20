@@ -14,7 +14,7 @@ from infrastructure.registry.storage_registry import get_storage_registry
 class StorageStrategyFactory:
     """Factory for creating storage strategy components using storage registry."""
 
-    def __init__(self, config_manager: Optional[Any] = None):
+    def __init__(self, config_manager: Optional[Any] = None) -> None:
         """Initialize factory with optional configuration manager."""
         self.logger = get_logger(__name__)
         self.config_manager = config_manager
@@ -45,9 +45,9 @@ class StorageStrategyFactory:
             try:
                 strategy = self.storage_registry.create_strategy(storage_type, config)
                 self._strategy_cache[cache_key] = strategy
-                self.logger.debug(f"Created {storage_type} storage strategy")
+                self.logger.debug("Created %s storage strategy", storage_type)
             except Exception as e:
-                self.logger.error(f"Failed to create {storage_type} storage strategy: {e}")
+                self.logger.error("Failed to create %s storage strategy: %s", storage_type, e)
                 raise
 
         return self._strategy_cache[cache_key]

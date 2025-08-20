@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class CQRSHandlerRegistry:
     """Manages CQRS handler registration for dependency injection."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the instance."""
         self._command_handlers: Dict[Type, Type] = {}
         self._query_handlers: Dict[Type, Type] = {}
@@ -22,7 +22,7 @@ class CQRSHandlerRegistry:
         with self._lock:
             self._command_handlers[command_type] = handler_type
             logger.debug(
-                f"Registered command handler: {command_type.__name__} -> {handler_type.__name__}"
+                "Registered command handler: %s -> %s", command_type.__name__, handler_type.__name__
             )
 
     def register_query_handler(self, query_type: Type, handler_type: Type) -> None:
@@ -30,7 +30,7 @@ class CQRSHandlerRegistry:
         with self._lock:
             self._query_handlers[query_type] = handler_type
             logger.debug(
-                f"Registered query handler: {query_type.__name__} -> {handler_type.__name__}"
+                "Registered query handler: %s -> %s", query_type.__name__, handler_type.__name__
             )
 
     def register_event_handler(self, event_type: Type, handler_type: Type) -> None:
@@ -42,7 +42,7 @@ class CQRSHandlerRegistry:
             if handler_type not in self._event_handlers[event_type]:
                 self._event_handlers[event_type].append(handler_type)
                 logger.debug(
-                    f"Registered event handler: {event_type.__name__} -> {handler_type.__name__}"
+                    "Registered event handler: %s -> %s", event_type.__name__, handler_type.__name__
                 )
 
     def get_command_handler_type(self, command_type: Type) -> Optional[Type]:

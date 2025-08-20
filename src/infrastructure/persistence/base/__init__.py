@@ -10,7 +10,7 @@ from infrastructure.persistence.base.unit_of_work import (
     StrategyUnitOfWork,
 )
 
-__all__ = [
+__all__: list[str] = [
     "StrategyBasedRepository",
     "BaseUnitOfWork",
     "StrategyUnitOfWork",

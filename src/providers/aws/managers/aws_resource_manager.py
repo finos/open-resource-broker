@@ -20,7 +20,9 @@ from providers.aws.infrastructure.dry_run_adapter import aws_dry_run_context
 class AWSResourceManagerImpl(CloudProviderResourceManager[AWSClient]):
     """AWS implementation of integrated resource manager hierarchy."""
 
-    def __init__(self, aws_client: AWSClient, config: AWSProviderConfig, logger: LoggingPort):
+    def __init__(
+        self, aws_client: AWSClient, config: AWSProviderConfig, logger: LoggingPort
+    ) -> None:
         """Initialize AWS resource manager."""
         super().__init__(aws_client, logger)
         self._config = config
@@ -68,7 +70,7 @@ class AWSResourceManagerImpl(CloudProviderResourceManager[AWSClient]):
             )
 
         except Exception as e:
-            self.logger.error(f"Failed to fetch resource status: {str(e)}")
+            self.logger.error("Failed to fetch resource status: %s", str(e))
             raise
 
     async def fetch_resource_list(
@@ -89,7 +91,7 @@ class AWSResourceManagerImpl(CloudProviderResourceManager[AWSClient]):
             return resources
 
         except Exception as e:
-            self.logger.error(f"Failed to list resources: {str(e)}")
+            self.logger.error("Failed to list resources: %s", str(e))
             raise
 
     async def fetch_resource_quota(
@@ -105,7 +107,7 @@ class AWSResourceManagerImpl(CloudProviderResourceManager[AWSClient]):
                 return {"used": 0, "limit": 1000, "available": 1000}  # Default quota
 
         except Exception as e:
-            self.logger.error(f"Failed to fetch quota: {str(e)}")
+            self.logger.error("Failed to fetch quota: %s", str(e))
             raise
 
     # Private implementation methods
@@ -153,12 +155,12 @@ class AWSResourceManagerImpl(CloudProviderResourceManager[AWSClient]):
     async def _deprovision_compute_instance(self, allocation: ResourceAllocation) -> None:
         """Deprovision EC2 compute instance."""
         # Implementation would call AWS EC2 terminate APIs
-        self.logger.info(f"Terminating EC2 instance: {allocation.resource_id}")
+        self.logger.info("Terminating EC2 instance: %s", allocation.resource_id)
 
     async def _deprovision_storage_volume(self, allocation: ResourceAllocation) -> None:
         """Deprovision EBS storage volume."""
         # Implementation would call AWS EBS delete APIs
-        self.logger.info(f"Deleting EBS volume: {allocation.resource_id}")
+        self.logger.info("Deleting EBS volume: %s", allocation.resource_id)
 
     async def _list_compute_instances(self) -> List[ResourceAllocation]:
         """List EC2 compute instances."""

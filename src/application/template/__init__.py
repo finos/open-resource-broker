@@ -15,7 +15,7 @@ from .commands import (
     ValidateTemplateCommand,
 )
 
-__all__ = [
+__all__: list[str] = [
     # Commands
     "CreateTemplateCommand",
     "UpdateTemplateCommand",

@@ -33,7 +33,7 @@ class GetProviderHealthHandler(BaseQueryHandler[GetProviderHealthQuery, Provider
         provider_port: ProviderPort,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-    ):
+    ) -> None:
         """
         Initialize provider health handler.
 
@@ -47,7 +47,7 @@ class GetProviderHealthHandler(BaseQueryHandler[GetProviderHealthQuery, Provider
 
     async def execute_query(self, query: GetProviderHealthQuery) -> Dict[str, Any]:
         """Execute provider health query."""
-        self.logger.info(f"Getting health for provider: {query.provider_name}")
+        self.logger.info("Getting health for provider: %s", query.provider_name)
 
         try:
             # Get provider strategy
@@ -74,11 +74,11 @@ class GetProviderHealthHandler(BaseQueryHandler[GetProviderHealthQuery, Provider
                 detailed_health = strategy.get_health_status()
                 health_info.update(detailed_health)
 
-            self.logger.info(f"Provider {query.provider_name} health: {health_info['health']}")
+            self.logger.info("Provider %s health: %s", query.provider_name, health_info["health"])
             return health_info
 
         except Exception as e:
-            self.logger.error(f"Failed to get provider health: {e}")
+            self.logger.error("Failed to get provider health: %s", e)
             return {
                 "provider_name": query.provider_name,
                 "status": "error",
@@ -98,7 +98,7 @@ class ListAvailableProvidersHandler(
         provider_port: ProviderPort,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-    ):
+    ) -> None:
         """
         Initialize list providers handler.
 
@@ -131,7 +131,7 @@ class ListAvailableProvidersHandler(
                     }
                     available_providers.append(provider_info)
                 except Exception as e:
-                    self.logger.warning(f"Could not get info for provider {strategy_name}: {e}")
+                    self.logger.warning("Could not get info for provider %s: %s", strategy_name, e)
                     available_providers.append(
                         {
                             "name": strategy_name,
@@ -141,11 +141,11 @@ class ListAvailableProvidersHandler(
                         }
                     )
 
-            self.logger.info(f"Found {len(available_providers)} available providers")
+            self.logger.info("Found %s available providers", len(available_providers))
             return available_providers
 
         except Exception as e:
-            self.logger.error(f"Failed to list available providers: {e}")
+            self.logger.error("Failed to list available providers: %s", e)
             raise
 
 
@@ -160,7 +160,7 @@ class GetProviderCapabilitiesHandler(
         provider_port: ProviderPort,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-    ):
+    ) -> None:
         """
         Initialize provider capabilities handler.
 
@@ -174,7 +174,7 @@ class GetProviderCapabilitiesHandler(
 
     async def execute_query(self, query: GetProviderCapabilitiesQuery) -> Dict[str, Any]:
         """Execute provider capabilities query."""
-        self.logger.info(f"Getting capabilities for provider: {query.provider_name}")
+        self.logger.info("Getting capabilities for provider: %s", query.provider_name)
 
         try:
             # Get provider strategy
@@ -199,11 +199,11 @@ class GetProviderCapabilitiesHandler(
                 detailed_capabilities = strategy.get_capabilities()
                 capabilities.update(detailed_capabilities)
 
-            self.logger.info(f"Retrieved capabilities for provider: {query.provider_name}")
+            self.logger.info("Retrieved capabilities for provider: %s", query.provider_name)
             return capabilities
 
         except Exception as e:
-            self.logger.error(f"Failed to get provider capabilities: {e}")
+            self.logger.error("Failed to get provider capabilities: %s", e)
             raise
 
 
@@ -215,7 +215,7 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Dict[s
         provider_port: ProviderPort,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-    ):
+    ) -> None:
         """
         Initialize provider metrics handler.
 
@@ -229,7 +229,7 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Dict[s
 
     async def execute_query(self, query: GetProviderMetricsQuery) -> Dict[str, Any]:
         """Execute provider metrics query."""
-        self.logger.info(f"Getting metrics for provider: {query.provider_name}")
+        self.logger.info("Getting metrics for provider: %s", query.provider_name)
 
         try:
             # Get provider strategy
@@ -256,11 +256,11 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Dict[s
                 detailed_metrics = strategy.get_metrics()
                 metrics.update(detailed_metrics)
 
-            self.logger.info(f"Retrieved metrics for provider: {query.provider_name}")
+            self.logger.info("Retrieved metrics for provider: %s", query.provider_name)
             return metrics
 
         except Exception as e:
-            self.logger.error(f"Failed to get provider metrics: {e}")
+            self.logger.error("Failed to get provider metrics: %s", e)
             raise
 
 
@@ -274,7 +274,7 @@ class GetProviderStrategyConfigHandler(
         provider_port: ProviderPort,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-    ):
+    ) -> None:
         """
         Initialize provider strategy config handler.
 
@@ -288,7 +288,7 @@ class GetProviderStrategyConfigHandler(
 
     async def execute_query(self, query: GetProviderStrategyConfigQuery) -> Dict[str, Any]:
         """Execute provider strategy configuration query."""
-        self.logger.info(f"Getting strategy config for provider: {query.provider_name}")
+        self.logger.info("Getting strategy config for provider: %s", query.provider_name)
 
         try:
             # Get provider strategy
@@ -313,9 +313,9 @@ class GetProviderStrategyConfigHandler(
                 detailed_config = strategy.get_configuration()
                 config.update(detailed_config)
 
-            self.logger.info(f"Retrieved strategy config for provider: {query.provider_name}")
+            self.logger.info("Retrieved strategy config for provider: %s", query.provider_name)
             return config
 
         except Exception as e:
-            self.logger.error(f"Failed to get provider strategy config: {e}")
+            self.logger.error("Failed to get provider strategy config: %s", e)
             raise

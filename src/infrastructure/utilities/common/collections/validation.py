@@ -1,8 +1,19 @@
 """Collection validation utility functions."""
 
-from typing import Callable, Dict, Iterable, List, Set, Tuple, TypeVar, Union
+from typing import Callable, Dict, Iterable, List, Protocol, Set, Tuple, TypeVar, Union
+
+
+class Comparable(Protocol):
+    """Protocol for types that support comparison operators."""
+
+    def __lt__(self, other: "Comparable") -> bool: ...
+    def __le__(self, other: "Comparable") -> bool: ...
+    def __gt__(self, other: "Comparable") -> bool: ...
+    def __ge__(self, other: "Comparable") -> bool: ...
+
 
 T = TypeVar("T")
+C = TypeVar("C", bound=Comparable)
 
 
 def is_empty(collection: Union[List, Dict, Set, Tuple, str]) -> bool:
@@ -31,7 +42,7 @@ def is_not_empty(collection: Union[List, Dict, Set, Tuple, str]) -> bool:
     return not is_empty(collection)
 
 
-def is_sorted(collection: List[T], reverse: bool = False) -> bool:
+def is_sorted(collection: List[C], reverse: bool = False) -> bool:
     """
     Check if list is sorted.
 

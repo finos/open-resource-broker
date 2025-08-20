@@ -100,7 +100,7 @@ def handle_domain_exceptions(context: str):
                     error_msg = error_handler.handle_domain_exceptions(e)
                     if error_msg:
                         # Re-raise with additional context
-                        raise type(e)(f"{context}: {error_msg}") from e
+                        raise type(e)(f"{context}: {error_msg}")
                     raise
             else:
                 # Fallback for when DI is not available (testing, etc.)
@@ -108,7 +108,7 @@ def handle_domain_exceptions(context: str):
                     return func(*args, **kwargs)
                 except Exception as e:
                     # Simple re-raise with context
-                    raise type(e)(f"{context}: {str(e)}") from e
+                    raise type(e)(f"{context}: {str(e)}")
 
         return wrapper
 

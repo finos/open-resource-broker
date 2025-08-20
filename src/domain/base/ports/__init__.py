@@ -10,7 +10,7 @@ from .scheduler_port import SchedulerPort
 from .storage_port import StoragePort
 from .template_configuration_port import TemplateConfigurationPort
 
-__all__ = [
+__all__: list[str] = [
     "LoggingPort",
     "ContainerPort",
     "EventPublisherPort",

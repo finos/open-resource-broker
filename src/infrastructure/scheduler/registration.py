@@ -41,7 +41,7 @@ def create_hostfactory_config(data: Dict[str, Any]) -> Any:
     return data
 
 
-def register_symphony_hostfactory_scheduler(registry: "SchedulerRegistry" = None):
+def register_symphony_hostfactory_scheduler(registry: "SchedulerRegistry" = None) -> None:
     """Register Symphony HostFactory scheduler."""
     if registry is None:
         from infrastructure.registry.scheduler_registry import get_scheduler_registry
@@ -67,14 +67,14 @@ def register_symphony_hostfactory_scheduler(registry: "SchedulerRegistry" = None
             from infrastructure.logging.logger import get_logger
 
             logger = get_logger(__name__)
-            logger.debug(f"Scheduler types already registered: {str(e)}")
+            logger.debug("Scheduler types already registered: %s", str(e))
         else:
             raise
     except Exception as e:
         from infrastructure.logging.logger import get_logger
 
         logger = get_logger(__name__)
-        logger.error(f"Failed to register Symphony HostFactory scheduler: {str(e)}")
+        logger.error("Failed to register Symphony HostFactory scheduler: %s", str(e))
         raise
 
 
@@ -100,7 +100,7 @@ def create_default_config(data: Dict[str, Any]) -> Any:
     return data
 
 
-def register_default_scheduler(registry: "SchedulerRegistry" = None):
+def register_default_scheduler(registry: "SchedulerRegistry" = None) -> None:
     """Register default scheduler."""
     if registry is None:
         from infrastructure.registry.scheduler_registry import get_scheduler_registry
@@ -119,18 +119,18 @@ def register_default_scheduler(registry: "SchedulerRegistry" = None):
             from infrastructure.logging.logger import get_logger
 
             logger = get_logger(__name__)
-            logger.debug(f"Default scheduler already registered: {str(e)}")
+            logger.debug("Default scheduler already registered: %s", str(e))
         else:
             raise
     except Exception as e:
         from infrastructure.logging.logger import get_logger
 
         logger = get_logger(__name__)
-        logger.error(f"Failed to register default scheduler: {str(e)}")
+        logger.error("Failed to register default scheduler: %s", str(e))
         raise
 
 
-def register_all_scheduler_types():
+def register_all_scheduler_types() -> None:
     """Register all scheduler types - same pattern as storage/provider registration."""
     register_symphony_hostfactory_scheduler()
     register_default_scheduler()
@@ -153,19 +153,19 @@ def register_active_scheduler_only(scheduler_type: str = "default") -> bool:
     try:
         if scheduler_type in ["hostfactory", "hf"]:
             register_symphony_hostfactory_scheduler()
-            logger.info(f"Registered active scheduler: {scheduler_type}")
+            logger.info("Registered active scheduler: %s", scheduler_type)
         elif scheduler_type == "default":
             register_default_scheduler()
-            logger.info(f"Registered active scheduler: {scheduler_type}")
+            logger.info("Registered active scheduler: %s", scheduler_type)
         else:
-            logger.warning(f"Unknown scheduler type: {scheduler_type}, falling back to default")
+            logger.warning("Unknown scheduler type: %s, falling back to default", scheduler_type)
             register_default_scheduler()
             logger.info("Registered active scheduler: default (fallback)")
 
         return True
 
     except Exception as e:
-        logger.error(f"Failed to register active scheduler '{scheduler_type}': {e}")
+        logger.error("Failed to register active scheduler '%s': %s", scheduler_type, e)
         return False
 
 
@@ -189,12 +189,12 @@ def register_scheduler_on_demand(scheduler_type: str) -> bool:
         elif scheduler_type == "default":
             register_default_scheduler()
         else:
-            logger.error(f"Unknown scheduler type: {scheduler_type}")
+            logger.error("Unknown scheduler type: %s", scheduler_type)
             return False
 
-        logger.info(f"Successfully registered scheduler type on demand: {scheduler_type}")
+        logger.info("Successfully registered scheduler type on demand: %s", scheduler_type)
         return True
 
     except Exception as e:
-        logger.error(f"Failed to register scheduler type '{scheduler_type}' on demand: {e}")
+        logger.error("Failed to register scheduler type '%s' on demand: %s", scheduler_type, e)
         return False

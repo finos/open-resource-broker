@@ -17,7 +17,7 @@ R = TypeVar("R")  # Response type
 class RequestContext:
     """Request context for storing request-specific data."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize request context."""
         self.correlation_id = str(uuid.uuid4())
         self.start_time = time.time()
@@ -32,7 +32,7 @@ class BaseAPIHandler(BaseHandler, Generic[T, R]):
     including middleware, validation, and error handling.
     """
 
-    def __init__(self, logger=None, metrics=None):
+    def __init__(self, logger=None, metrics=None) -> None:
         """
         Initialize the API handler.
 
@@ -119,7 +119,8 @@ class BaseAPIHandler(BaseHandler, Generic[T, R]):
             try:
                 # Log request
                 self.logger.info(
-                    f"Processing request: {func.__name__}",
+                    "Processing request: %s",
+                    func.__name__,
                     extra={"correlation_id": correlation_id, "request": request},
                 )
 
@@ -142,7 +143,8 @@ class BaseAPIHandler(BaseHandler, Generic[T, R]):
 
                 # Log success
                 self.logger.info(
-                    f"Request completed: {func.__name__}",
+                    "Request completed: %s",
+                    func.__name__,
                     extra={
                         "correlation_id": correlation_id,
                         "duration": time.time() - context.start_time,
@@ -168,7 +170,8 @@ class BaseAPIHandler(BaseHandler, Generic[T, R]):
 
                 # Log error with stack trace
                 self.logger.error(
-                    f"Request failed: {func.__name__}",
+                    "Request failed: %s",
+                    func.__name__,
                     exc_info=True,
                     extra={
                         "correlation_id": correlation_id,
@@ -216,7 +219,7 @@ class BaseAPIHandler(BaseHandler, Generic[T, R]):
                 # Handle ValueError specifically for better error messages
                 error_message = str(e)
                 self.logger.error(
-                    f"Validation error: {error_message}", extra={"error": error_message}
+                    "Validation error: %s", error_message, extra={"error": error_message}
                 )
                 return {
                     "error": "ValidationError",
@@ -244,17 +247,20 @@ class BaseAPIHandler(BaseHandler, Generic[T, R]):
                 # Log the error with appropriate level based on error type
                 if isinstance(e, ValidationError):
                     self.logger.warning(
-                        f"Validation error: {str(e)}",
+                        "Validation error: %s",
+                        str(e),
                         extra={"error_details": error_dict},
                     )
                 elif isinstance(e, EntityNotFoundError):
                     self.logger.info(
-                        f"Not found error: {str(e)}",
+                        "Not found error: %s",
+                        str(e),
                         extra={"error_details": error_dict},
                     )
                 else:
                     self.logger.error(
-                        f"Application error: {str(e)}",
+                        "Application error: %s",
+                        str(e),
                         extra={"error_details": error_dict},
                     )
 

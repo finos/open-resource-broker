@@ -11,7 +11,7 @@ from infrastructure.template.configuration_manager import TemplateConfigurationM
 class TemplateRepositoryImpl(TemplateRepository):
     """Template repository implementation for configuration-based template management."""
 
-    def __init__(self, template_manager: TemplateConfigurationManager, logger: LoggingPort):
+    def __init__(self, template_manager: TemplateConfigurationManager, logger: LoggingPort) -> None:
         """Initialize repository with template configuration manager."""
         self._template_manager = template_manager
         self._logger = logger
@@ -19,17 +19,17 @@ class TemplateRepositoryImpl(TemplateRepository):
     # Abstract methods from AggregateRepository
     def save(self, aggregate: Template) -> None:
         """Save a template aggregate."""
-        self._logger.debug(f"Saving template: {aggregate.template_id}")
+        self._logger.debug("Saving template: %s", aggregate.template_id)
         self._template_manager.save_template(aggregate)
 
     def find_by_id(self, aggregate_id: str) -> Optional[Template]:
         """Find template by aggregate ID (required by AggregateRepository)."""
-        self._logger.debug(f"Finding template by ID: {aggregate_id}")
+        self._logger.debug("Finding template by ID: %s", aggregate_id)
         return self._template_manager.get_template(aggregate_id)
 
     def delete(self, aggregate_id: str) -> None:
         """Delete template by aggregate ID."""
-        self._logger.debug(f"Deleting template: {aggregate_id}")
+        self._logger.debug("Deleting template: %s", aggregate_id)
         self._template_manager.delete_template(aggregate_id)
 
     # Abstract methods from TemplateRepository
@@ -40,7 +40,7 @@ class TemplateRepositoryImpl(TemplateRepository):
 
     def find_by_provider_api(self, provider_api: str) -> List[Template]:
         """Find templates by provider API type."""
-        self._logger.debug(f"Finding templates by provider API: {provider_api}")
+        self._logger.debug("Finding templates by provider API: %s", provider_api)
         return self._template_manager.get_templates_by_provider(provider_api)
 
     def find_active_templates(self) -> List[Template]:
@@ -50,7 +50,7 @@ class TemplateRepositoryImpl(TemplateRepository):
 
     def search_templates(self, criteria: Dict[str, Any]) -> List[Template]:
         """Search templates by criteria."""
-        self._logger.debug(f"Searching templates with criteria: {criteria}")
+        self._logger.debug("Searching templates with criteria: %s", criteria)
 
         all_templates = self._template_manager.get_all_templates()
 

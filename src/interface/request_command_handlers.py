@@ -142,7 +142,7 @@ async def handle_request_machines(args: "argparse.Namespace") -> Dict[str, Any]:
         # Fallback if we can't get request details
         from domain.base.ports import LoggingPort
 
-        container.get(LoggingPort).warning(f"Could not get request details for resource ID: {e}")
+        container.get(LoggingPort).warning("Could not get request details for resource ID: %s", e)
         if scheduler_strategy:
             return scheduler_strategy.format_request_response({"request_id": request_id})
         else:

@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class ConfigPathResolver:
     """Handles path resolution for configuration directories and files."""
 
-    def __init__(self, base_config_path: Optional[str] = None):
+    def __init__(self, base_config_path: Optional[str] = None) -> None:
         """Initialize the instance."""
         self._base_config_path = base_config_path
 
@@ -48,7 +48,7 @@ class ConfigPathResolver:
         try:
             os.makedirs(abs_path, exist_ok=True)
         except OSError as e:
-            logger.warning(f"Could not create directory {abs_path}: {e}")
+            logger.warning("Could not create directory %s: %s", abs_path, e)
 
         return abs_path
 

@@ -11,7 +11,7 @@ class DomainException(Exception):
         message: str,
         error_code: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
-    ):
+    ) -> None:
         """Initialize domain exception with message, error code, and details."""
         super().__init__(message)
         self.message = message
@@ -34,7 +34,7 @@ BusinessRuleError = BusinessRuleViolationError
 class EntityNotFoundError(DomainException):
     """Raised when an entity is not found."""
 
-    def __init__(self, entity_type: str, entity_id: str):
+    def __init__(self, entity_type: str, entity_id: str) -> None:
         """Initialize entity not found error with type and ID."""
         message = f"{entity_type} with ID '{entity_id}' not found"
         super().__init__(

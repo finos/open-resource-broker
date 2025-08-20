@@ -3,4 +3,4 @@
 # Import from infrastructure layer (the working implementation)
 from infrastructure.di.buses import QueryBus
 
-__all__ = ["QueryBus"]
+__all__: list[str] = ["QueryBus"]

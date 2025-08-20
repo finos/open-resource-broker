@@ -30,7 +30,7 @@ class GetActiveMachineCountHandler(BaseQueryHandler[GetActiveMachineCountQuery, 
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-    ):
+    ) -> None:
         """
         Initialize get active machine count handler.
 
@@ -58,11 +58,11 @@ class GetActiveMachineCountHandler(BaseQueryHandler[GetActiveMachineCountQuery, 
                 active_machines = uow.machines.find_by_statuses(active_statuses)
                 count = len(active_machines)
 
-                self.logger.info(f"Found {count} active machines")
+                self.logger.info("Found %s active machines", count)
                 return count
 
         except Exception as e:
-            self.logger.error(f"Failed to get active machine count: {e}")
+            self.logger.error("Failed to get active machine count: %s", e)
             raise
 
 
@@ -75,7 +75,7 @@ class GetRequestSummaryHandler(BaseQueryHandler[GetRequestSummaryQuery, RequestS
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-    ):
+    ) -> None:
         """
         Initialize get request summary handler.
 
@@ -89,7 +89,7 @@ class GetRequestSummaryHandler(BaseQueryHandler[GetRequestSummaryQuery, RequestS
 
     async def execute_query(self, query: GetRequestSummaryQuery) -> RequestSummaryDTO:
         """Execute request summary query."""
-        self.logger.info(f"Getting request summary for request: {query.request_id}")
+        self.logger.info("Getting request summary for request: %s", query.request_id)
 
         try:
             with self.uow_factory.create_unit_of_work() as uow:
@@ -121,15 +121,17 @@ class GetRequestSummaryHandler(BaseQueryHandler[GetRequestSummaryQuery, RequestS
                 )
 
                 self.logger.info(
-                    f"Generated summary for request {query.request_id}: {total_machines} machines"
+                    "Generated summary for request %s: %s machines",
+                    query.request_id,
+                    total_machines,
                 )
                 return summary
 
         except EntityNotFoundError:
-            self.logger.error(f"Request not found: {query.request_id}")
+            self.logger.error("Request not found: %s", query.request_id)
             raise
         except Exception as e:
-            self.logger.error(f"Failed to get request summary: {e}")
+            self.logger.error("Failed to get request summary: %s", e)
             raise
 
 
@@ -143,7 +145,7 @@ class GetMachineHealthHandler(BaseQueryHandler[GetMachineHealthQuery, MachineHea
         provisioning_port: ResourceProvisioningPort,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
-    ):
+    ) -> None:
         """
         Initialize get machine health handler.
 
@@ -159,7 +161,7 @@ class GetMachineHealthHandler(BaseQueryHandler[GetMachineHealthQuery, MachineHea
 
     async def execute_query(self, query: GetMachineHealthQuery) -> MachineHealthDTO:
         """Execute machine health query."""
-        self.logger.info(f"Getting health information for machine: {query.machine_id}")
+        self.logger.info("Getting health information for machine: %s", query.machine_id)
 
         try:
             with self.uow_factory.create_unit_of_work() as uow:
@@ -199,7 +201,9 @@ class GetMachineHealthHandler(BaseQueryHandler[GetMachineHealthQuery, MachineHea
 
                 except Exception as health_error:
                     self.logger.warning(
-                        f"Could not get detailed health for machine {query.machine_id}: {health_error}"
+                        "Could not get detailed health for machine %s: %s",
+                        query.machine_id,
+                        health_error,
                     )
                     health_status = "unknown"
                     health_details = {"error": str(health_error)}
@@ -217,13 +221,13 @@ class GetMachineHealthHandler(BaseQueryHandler[GetMachineHealthQuery, MachineHea
                 )
 
                 self.logger.info(
-                    f"Retrieved health for machine {query.machine_id}: {health_status}"
+                    "Retrieved health for machine %s: %s", query.machine_id, health_status
                 )
                 return health_dto
 
         except EntityNotFoundError:
-            self.logger.error(f"Machine not found: {query.machine_id}")
+            self.logger.error("Machine not found: %s", query.machine_id)
             raise
         except Exception as e:
-            self.logger.error(f"Failed to get machine health: {e}")
+            self.logger.error("Failed to get machine health: %s", e)
             raise

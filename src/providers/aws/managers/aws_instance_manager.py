@@ -13,7 +13,9 @@ from providers.aws.infrastructure.dry_run_adapter import aws_dry_run_context
 class AWSInstanceManager:
     """AWS implementation of InstanceManagerPort."""
 
-    def __init__(self, aws_client: AWSClient, config: AWSProviderConfig, logger: LoggingPort):
+    def __init__(
+        self, aws_client: AWSClient, config: AWSProviderConfig, logger: LoggingPort
+    ) -> None:
         """Initialize AWS instance manager."""
         self._aws_client = aws_client
         self._config = config
@@ -76,7 +78,7 @@ class AWSInstanceManager:
                 return instance_ids
 
             except Exception as e:
-                self._logger.error(f"Failed to create instances: {e}")
+                self._logger.error("Failed to create instances: %s", e)
                 return []
 
     def terminate_instances(self, instance_ids: List[str]) -> bool:
@@ -92,7 +94,7 @@ class AWSInstanceManager:
                 return terminating_count == len(instance_ids)
 
             except Exception as e:
-                self._logger.error(f"Failed to terminate instances: {e}")
+                self._logger.error("Failed to terminate instances: %s", e)
                 return False
 
     def get_instance_status(self, instance_ids: List[str]) -> Dict[str, str]:
@@ -113,7 +115,7 @@ class AWSInstanceManager:
                 return status_map
 
             except Exception as e:
-                self._logger.error(f"Failed to get instance status: {e}")
+                self._logger.error("Failed to get instance status: %s", e)
                 return {instance_id: "error" for instance_id in instance_ids}
 
     def start_instances(self, instance_ids: List[str]) -> Dict[str, bool]:
@@ -131,7 +133,7 @@ class AWSInstanceManager:
             return results
 
         except Exception as e:
-            self._logger.error(f"Failed to start instances: {e}")
+            self._logger.error("Failed to start instances: %s", e)
             return {instance_id: False for instance_id in instance_ids}
 
     def stop_instances(self, instance_ids: List[str]) -> Dict[str, bool]:
@@ -149,7 +151,7 @@ class AWSInstanceManager:
             return results
 
         except Exception as e:
-            self._logger.error(f"Failed to stop instances: {e}")
+            self._logger.error("Failed to stop instances: %s", e)
             return {instance_id: False for instance_id in instance_ids}
 
     def get_instances_by_tags(self, tags: Dict[str, str]) -> List[str]:
@@ -173,5 +175,5 @@ class AWSInstanceManager:
                 return instance_ids
 
             except Exception as e:
-                self._logger.error(f"Failed to get instances by tags: {e}")
+                self._logger.error("Failed to get instances by tags: %s", e)
                 return []

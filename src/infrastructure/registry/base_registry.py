@@ -22,7 +22,7 @@ class BaseRegistration(ABC):
         strategy_factory: Callable,
         config_factory: Callable,
         **additional_factories,
-    ):
+    ) -> None:
         """
         Initialize base registration.
 
@@ -57,7 +57,7 @@ class BaseRegistry(ABC):
                     cls._instances[registry_name] = super().__new__(cls)
         return cls._instances[registry_name]
 
-    def __init__(self, mode: RegistryMode = RegistryMode.SINGLE_CHOICE):
+    def __init__(self, mode: RegistryMode = RegistryMode.SINGLE_CHOICE) -> None:
         """
         Initialize registry with specified mode.
 
@@ -87,7 +87,7 @@ class BaseRegistry(ABC):
         strategy_factory: Callable,
         config_factory: Callable,
         **kwargs,
-    ):
+    ) -> None:
         """Register a strategy factory."""
 
     @abstractmethod
@@ -118,7 +118,7 @@ class BaseRegistry(ABC):
                 type_name, strategy_factory, config_factory, **additional_factories
             )
             self._type_registrations[type_name] = registration
-            self.logger.info(f"Registered type: {type_name}")
+            self.logger.info("Registered type: %s", type_name)
 
     def register_instance(
         self,
@@ -152,7 +152,7 @@ class BaseRegistry(ABC):
                 type_name, strategy_factory, config_factory, **additional_factories
             )
             self._instance_registrations[instance_name] = registration
-            self.logger.info(f"Registered instance: {instance_name} (type: {type_name})")
+            self.logger.info("Registered instance: %s (type: %s)", instance_name, type_name)
 
     def create_strategy_by_type(self, type_name: str, config: Any) -> Any:
         """Create strategy by type name."""
@@ -192,7 +192,7 @@ class BaseRegistry(ABC):
         with self._registry_lock:
             if type_name in self._type_registrations:
                 del self._type_registrations[type_name]
-                self.logger.info(f"Unregistered type: {type_name}")
+                self.logger.info("Unregistered type: %s", type_name)
                 return True
             return False
 
@@ -201,7 +201,7 @@ class BaseRegistry(ABC):
         with self._registry_lock:
             if instance_name in self._instance_registrations:
                 del self._instance_registrations[instance_name]
-                self.logger.info(f"Unregistered instance: {instance_name}")
+                self.logger.info("Unregistered instance: %s", instance_name)
                 return True
             return False
 
@@ -214,10 +214,12 @@ class BaseRegistry(ABC):
 
         try:
             component = factory()
-            self.logger.debug(f"Created {factory_name} for type: {type_name}")
+            self.logger.debug("Created %s for type: %s", factory_name, type_name)
             return component
         except Exception as e:
-            self.logger.warning(f"Failed to create {factory_name} for type '{type_name}': {str(e)}")
+            self.logger.warning(
+                "Failed to create %s for type '%s': %s", factory_name, type_name, str(e)
+            )
             return None
 
     def clear_registrations(self) -> None:
@@ -265,11 +267,11 @@ class BaseRegistry(ABC):
         """Create strategy from registration with error handling."""
         try:
             strategy = registration.strategy_factory(config)
-            self.logger.debug(f"Created strategy for: {identifier}")
+            self.logger.debug("Created strategy for: %s", identifier)
             return strategy
         except Exception as e:
             from domain.base.exceptions import ConfigurationError
 
             error_msg = f"Failed to create strategy for '{identifier}': {str(e)}"
             self.logger.error(error_msg)
-            raise ConfigurationError(error_msg) from e
+            raise ConfigurationError(error_msg)

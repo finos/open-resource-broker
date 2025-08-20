@@ -10,7 +10,7 @@ class MachineException(DomainException):
 class MachineNotFoundError(EntityNotFoundError):
     """Raised when a machine is not found."""
 
-    def __init__(self, machine_id: str):
+    def __init__(self, machine_id: str) -> None:
         """Initialize the instance."""
         super().__init__("Machine", machine_id)
 
@@ -22,7 +22,7 @@ class MachineValidationError(ValidationError):
 class InvalidMachineStateError(MachineException):
     """Raised when attempting an invalid state transition."""
 
-    def __init__(self, current_state: str, attempted_state: str):
+    def __init__(self, current_state: str, attempted_state: str) -> None:
         """Initialize machine state transition error with states."""
         message = f"Cannot transition from {current_state} to {attempted_state}"
         super().__init__(

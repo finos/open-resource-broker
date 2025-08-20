@@ -20,7 +20,7 @@ class LoadBalancingConfig:
     sticky_sessions: bool = False
     session_timeout_seconds: float = 300.0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate configuration after initialization."""
         if self.health_check_interval_seconds <= 0:
             raise ValueError("health_check_interval_seconds must be positive")

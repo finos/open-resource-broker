@@ -3,7 +3,7 @@
 import os
 import shutil
 import tempfile
-from typing import ContextManager, Optional
+from typing import ContextManager, Generator, Optional
 
 
 def file_exists(file_path: str) -> bool:
@@ -285,7 +285,7 @@ def with_temp_file(suffix: str = "", prefix: str = "", dir: str = None) -> Conte
     import contextlib
 
     @contextlib.contextmanager
-    def temp_file_context():
+    def temp_file_context() -> Generator[str, None, None]:
         """Context manager for temporary file creation and cleanup."""
         temp_path = create_temp_file(suffix=suffix, prefix=prefix, dir=dir)
         try:

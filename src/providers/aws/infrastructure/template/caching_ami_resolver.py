@@ -23,7 +23,9 @@ class CachingAMIResolver(TemplateResolverPort):
     cache settings and path resolution.
     """
 
-    def __init__(self, aws_client: AWSClient, config: ConfigurationPort, logger: LoggingPort):
+    def __init__(
+        self, aws_client: AWSClient, config: ConfigurationPort, logger: LoggingPort
+    ) -> None:
         """
         Initialize AMI resolver.
 
@@ -39,7 +41,7 @@ class CachingAMIResolver(TemplateResolverPort):
         try:
             self._ami_config = config.get_typed(AMIResolutionConfig)
         except Exception as e:
-            self._logger.warning(f"Failed to get AMI resolution config: {str(e)}")
+            self._logger.warning("Failed to get AMI resolution config: %s", str(e))
             self._ami_config = AMIResolutionConfig(enabled=True, fallback_on_failure=True)
 
         # Get performance configuration for caching settings
@@ -48,7 +50,7 @@ class CachingAMIResolver(TemplateResolverPort):
             self._cache_enabled = perf_config.caching.ami_resolution.enabled
             cache_ttl_seconds = perf_config.caching.ami_resolution.ttl_seconds
         except Exception as e:
-            self._logger.warning(f"Failed to get performance config: {str(e)}")
+            self._logger.warning("Failed to get performance config: %s", str(e))
             self._cache_enabled = True
             cache_ttl_seconds = 3600
 
@@ -62,7 +64,7 @@ class CachingAMIResolver(TemplateResolverPort):
         )
 
         self._logger.debug(
-            f"AMI resolver initialized: "
+            "AMI resolver initialized: "
             f"enabled={self._ami_config.enabled}, "
             f"cache_enabled={self._cache_enabled}, "
             f"cache_file={cache_file}"
@@ -95,65 +97,70 @@ class CachingAMIResolver(TemplateResolverPort):
         Raises:
             InfrastructureError: If resolution fails and fallback disabled
         """
-        self._logger.debug(f"resolve_with_fallback called with: {ami_id_or_parameter}")
+        self._logger.debug("resolve_with_fallback called with: %s", ami_id_or_parameter)
 
         # Skip resolution if disabled
         if not self._ami_config.enabled:
             self._logger.debug(
-                f"AMI resolution disabled, returning original: {ami_id_or_parameter}"
+                "AMI resolution disabled, returning original: %s", ami_id_or_parameter
             )
             return ami_id_or_parameter
 
         # Return as-is if already an AMI ID
         if ami_id_or_parameter.startswith("ami-"):
-            self._logger.debug(f"Already AMI ID, returning: {ami_id_or_parameter}")
+            self._logger.debug("Already AMI ID, returning: %s", ami_id_or_parameter)
             return ami_id_or_parameter
 
         # Skip if not an SSM parameter
         if not ami_id_or_parameter.startswith("/aws/service/"):
-            self._logger.debug(f"Not SSM parameter, returning original: {ami_id_or_parameter}")
+            self._logger.debug("Not SSM parameter, returning original: %s", ami_id_or_parameter)
             return ami_id_or_parameter
 
         self._logger.debug("Passed all early checks, proceeding with resolution")
 
         # Check cache first if enabled
         if self._cache_enabled:
-            self._logger.debug(f"Cache enabled, checking cache for: {ami_id_or_parameter}")
+            self._logger.debug("Cache enabled, checking cache for: %s", ami_id_or_parameter)
             # Return cached result if available
             cached_ami = self._cache.get(ami_id_or_parameter)
             if cached_ami:
-                self._logger.info(f"AMI served from cache: {ami_id_or_parameter} -> {cached_ami}")
+                self._logger.info(
+                    "AMI served from cache: %s -> %s", ami_id_or_parameter, cached_ami
+                )
                 return cached_ami
 
             # Skip if previously failed
             if self._cache.is_failed(ami_id_or_parameter):
                 self._logger.debug(
-                    f"Previously failed parameter found in cache, clearing and retrying: {ami_id_or_parameter}"
+                    "Previously failed parameter found in cache, clearing and retrying: %s",
+                    ami_id_or_parameter,
                 )
                 # Clear the failed entry and retry
                 self._cache._failed.discard(ami_id_or_parameter)
         else:
             self._logger.debug("Cache disabled")
 
-        self._logger.debug(f"About to attempt resolution for: {ami_id_or_parameter}")
+        self._logger.debug("About to attempt resolution for: %s", ami_id_or_parameter)
 
         # Attempt resolution
-        self._logger.debug(f"Resolving SSM parameter: {ami_id_or_parameter}")
+        self._logger.debug("Resolving SSM parameter: %s", ami_id_or_parameter)
         try:
-            self._logger.debug(f"Calling _resolve_ssm_parameter for: {ami_id_or_parameter}")
+            self._logger.debug("Calling _resolve_ssm_parameter for: %s", ami_id_or_parameter)
             ami_id = self._resolve_ssm_parameter(ami_id_or_parameter)
-            self._logger.debug(f"_resolve_ssm_parameter returned: {ami_id}")
+            self._logger.debug("_resolve_ssm_parameter returned: %s", ami_id)
 
             # Cache successful resolution
             if self._cache_enabled:
                 self._cache.set(ami_id_or_parameter, ami_id)
 
-            self._logger.info(f"AMI resolved from SSM: {ami_id_or_parameter} -> {ami_id}")
+            self._logger.info("AMI resolved from SSM: %s -> %s", ami_id_or_parameter, ami_id)
             return ami_id
 
         except Exception as e:
-            self._logger.warning(f"Failed to resolve SSM parameter {ami_id_or_parameter}: {str(e)}")
-            self._logger.debug(f"Exception details: {type(e).__name__}: {str(e)}")
+            self._logger.warning(
+                "Failed to resolve SSM parameter %s: %s", ami_id_or_parameter, str(e)
+            )
+            self._logger.debug("Exception details: %s: %s", type(e).__name__, str(e))
 
             # Mark as failed in cache
             if self._cache_enabled:
@@ -162,11 +169,11 @@ class CachingAMIResolver(TemplateResolverPort):
             # Handle fallback
             if self._ami_config.fallback_on_failure:
                 self._logger.info(
-                    f"Fallback enabled, returning original parameter: {ami_id_or_parameter}"
+                    "Fallback enabled, returning original parameter: %s", ami_id_or_parameter
                 )
                 return ami_id_or_parameter
             else:
-                self._logger.error(f"Fallback disabled, raising error for {ami_id_or_parameter}")
+                self._logger.error("Fallback disabled, raising error for %s", ami_id_or_parameter)
                 raise InfrastructureError(
                     f"Failed to resolve AMI parameter {ami_id_or_parameter}: {str(e)}"
                 )
@@ -184,18 +191,18 @@ class CachingAMIResolver(TemplateResolverPort):
         Raises:
             Exception: If resolution fails
         """
-        self._logger.debug(f"_resolve_ssm_parameter: Starting resolution for {parameter_path}")
+        self._logger.debug("_resolve_ssm_parameter: Starting resolution for %s", parameter_path)
         try:
             # Use the AWS client's SSM client to get the parameter value
-            self._logger.debug(f"Calling SSM get_parameter for: {parameter_path}")
+            self._logger.debug("Calling SSM get_parameter for: %s", parameter_path)
             response = self._aws_client.ssm_client.get_parameter(Name=parameter_path)
-            self._logger.debug(f"SSM response received: {response}")
+            self._logger.debug("SSM response received: %s", response)
 
             if "Parameter" not in response or "Value" not in response["Parameter"]:
                 raise ValueError(f"Invalid SSM parameter response for {parameter_path}")
 
             ami_id = response["Parameter"]["Value"]
-            self._logger.debug(f"Extracted AMI ID from response: {ami_id}")
+            self._logger.debug("Extracted AMI ID from response: %s", ami_id)
 
             # Validate that we got a valid AMI ID
             if not ami_id.startswith("ami-"):
@@ -203,11 +210,13 @@ class CachingAMIResolver(TemplateResolverPort):
                     f"SSM parameter {parameter_path} resolved to invalid AMI ID: {ami_id}"
                 )
 
-            self._logger.debug(f"Successfully resolved {parameter_path} to {ami_id}")
+            self._logger.debug("Successfully resolved %s to %s", parameter_path, ami_id)
             return ami_id
 
         except Exception as e:
-            self._logger.debug(f"Exception in _resolve_ssm_parameter: {type(e).__name__}: {str(e)}")
+            self._logger.debug(
+                "Exception in _resolve_ssm_parameter: %s: %s", type(e).__name__, str(e)
+            )
             raise
             # Re-raise with more context
             raise Exception(f"SSM parameter resolution failed: {str(e)}")

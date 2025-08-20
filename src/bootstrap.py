@@ -31,7 +31,7 @@ class Application:
         # Only create logger immediately (lightweight)
         self.logger = get_logger(__name__)
 
-    def _ensure_container(self):
+    def _ensure_container(self) -> None:
         """Ensure DI container is created (lazy initialization)."""
         if self._container is None:
             from infrastructure.di.container import get_container
@@ -45,7 +45,7 @@ class Application:
                 set_domain_container(self._container)
                 self._domain_container_set = True
 
-    def _ensure_config_manager(self):
+    def _ensure_config_manager(self) -> None:
         """Ensure config manager is created (lazy initialization)."""
         if self._config_manager is None:
             from config.manager import get_config_manager
@@ -65,7 +65,7 @@ class Application:
             # Ensure config manager is available (lazy)
             self._ensure_config_manager()
 
-            self.logger.info(f"Initializing application with provider: {self.provider_type}")
+            self.logger.info("Initializing application with provider: %s", self.provider_type)
 
             # Log provider configuration information
             self._log_provider_configuration(self._config_manager)
@@ -118,12 +118,13 @@ class Application:
 
             self._initialized = True
             self.logger.info(
-                f"Open HostFactory Plugin initialized successfully with {self.provider_type} provider"
+                "Open HostFactory Plugin initialized successfully with %s provider",
+                self.provider_type,
             )
             return True
 
         except Exception as e:
-            self.logger.error(f"Failed to initialize application: {e}")
+            self.logger.error("Failed to initialize application: %s", e)
             return False
 
     def _log_provider_configuration(self, config_manager) -> None:
@@ -136,13 +137,13 @@ class Application:
                     mode = provider_config.get_mode()
                     active_providers = provider_config.get_active_providers()
 
-                    self.logger.info(f"Provider configuration mode: {mode.value}")
-                    self.logger.info(f"Active providers: {[p.name for p in active_providers]}")
+                    self.logger.info("Provider configuration mode: %s", mode.value)
+                    self.logger.info("Active providers: %s", [p.name for p in active_providers])
 
                     if mode.value == "multi":
-                        self.logger.info(f"Selection policy: {provider_config.selection_policy}")
+                        self.logger.info("Selection policy: %s", provider_config.selection_policy)
                         self.logger.info(
-                            f"Health check interval: {provider_config.health_check_interval}s"
+                            "Health check interval: %ss", provider_config.health_check_interval
                         )
                 else:
                     self.logger.info("Provider configuration not found")
@@ -156,7 +157,7 @@ class Application:
                 self.logger.info("Provider strategy configuration not available")
 
         except Exception as e:
-            self.logger.debug(f"Could not log provider configuration details: {str(e)}")
+            self.logger.debug("Could not log provider configuration details: %s", str(e))
 
     async def _preload_templates(self) -> None:
         """Pre-load templates into cache during initialization."""
@@ -165,7 +166,7 @@ class Application:
             # when first accessed through CQRS queries
             self.logger.debug("Template cache will be warmed up on first access")
         except Exception as e:
-            self.logger.debug(f"Could not pre-load templates: {str(e)}")
+            self.logger.debug("Could not pre-load templates: %s", str(e))
 
     def _log_final_provider_info(self) -> None:
         """Log final provider information after initialization."""
@@ -174,13 +175,13 @@ class Application:
                 available_strategies = self._provider_context.available_strategies
                 current_strategy = self._provider_context.current_strategy_type
 
-                self.logger.info(f"Provider strategies available: {available_strategies}")
-                self.logger.info(f"Current provider strategy: {current_strategy}")
+                self.logger.info("Provider strategies available: %s", available_strategies)
+                self.logger.info("Current provider strategy: %s", current_strategy)
             elif hasattr(self, "provider_type"):
-                self.logger.info(f"Provider type: {self.provider_type}")
+                self.logger.info("Provider type: %s", self.provider_type)
 
         except Exception as e:
-            self.logger.debug(f"Could not log final provider info: {str(e)}")
+            self.logger.debug("Could not log final provider info: %s", str(e))
 
     def get_query_bus(self):
         """Get the query bus for CQRS operations (cached after first access)."""
@@ -232,7 +233,7 @@ class Application:
                     "initialized": False,
                 }
         except Exception as e:
-            self.logger.error(f"Failed to get provider info: {e}")
+            self.logger.error("Failed to get provider info: %s", e)
             return {"status": "error", "error": str(e), "initialized": False}
 
     def health_check(self) -> Dict[str, Any]:
@@ -257,7 +258,7 @@ class Application:
                         if is_healthy:
                             healthy_providers += 1
                     except Exception as e:
-                        self.logger.warning(f"Health check failed for {strategy_name}: {e}")
+                        self.logger.warning("Health check failed for %s: %s", strategy_name, e)
                         provider_health[strategy_name] = False
 
                 total_providers = len(available_strategies)
@@ -292,7 +293,7 @@ class Application:
                 }
 
         except Exception as e:
-            self.logger.error(f"Health check failed: {e}")
+            self.logger.error("Health check failed: %s", e)
             return {
                 "status": "error",
                 "message": f"Health check failed: {str(e)}",
@@ -338,20 +339,20 @@ async def main() -> None:
         async with await create_application(config_path) as app:
             # Use existing app.logger - no need to create new logger
             app.logger.info(
-                f"Application started successfully with {app.provider_type.upper()} provider"
+                "Application started successfully with %s provider", app.provider_type.upper()
             )
 
             # Get provider info
             provider_info = app.get_provider_info()
             if "provider_names" in provider_info:
-                app.logger.info(f"Provider names: {provider_info['provider_names']}")
+                app.logger.info("Provider names: %s", provider_info["provider_names"])
             elif hasattr(app, "provider_type"):
-                app.logger.info(f"Provider type: {app.provider_type}")
-            app.logger.info(f"Status: {provider_info.get('initialized', False)}")
+                app.logger.info("Provider type: %s", app.provider_type)
+            app.logger.info("Status: %s", provider_info.get("initialized", False))
 
             # Health check
             health = app.health_check()
-            app.logger.info(f"Health check status: {health.get('status')}")
+            app.logger.info("Health check status: %s", health.get("status"))
 
             # Application is ready - in production this would start the API server
             app.logger.info("Application initialized and ready")

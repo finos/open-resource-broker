@@ -9,7 +9,7 @@ from domain.base.ports.provider_port import ProviderPort
 class BaseProviderStrategy(ProviderPort, ABC):
     """Base class for all provider strategies implementing ProviderPort."""
 
-    def __init__(self, config: Dict[str, Any], logger: Any):
+    def __init__(self, config: Dict[str, Any], logger: Any) -> None:
         """Initialize base provider strategy.
 
         Args:

@@ -10,7 +10,7 @@ from domain.base.ports import ConfigurationPort
 class ConfigurationAdapter(ConfigurationPort):
     """Infrastructure adapter implementing ConfigurationPort for domain layer."""
 
-    def __init__(self, config_manager: ConfigurationManager):
+    def __init__(self, config_manager: ConfigurationManager) -> None:
         """Initialize with configuration manager."""
         self._config_manager = config_manager
 

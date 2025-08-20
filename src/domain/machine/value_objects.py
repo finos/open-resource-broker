@@ -22,7 +22,7 @@ from .machine_metadata import (
 from .machine_status import MachineStatus
 
 # Export all value objects
-__all__ = [
+__all__: list[str] = [
     # Machine status
     "MachineStatus",
     # Machine identifiers and core types

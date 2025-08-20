@@ -36,11 +36,11 @@ def _register_configured_storage_strategy(container: DIContainer) -> None:
         registry = get_storage_registry()
         registry.ensure_type_registered(storage_type)
 
-        logger.info(f"Registered configured storage strategy: {storage_type}")
+        logger.info("Registered configured storage strategy: %s", storage_type)
 
     except Exception as e:
         logger = get_logger(__name__)
-        logger.error(f"Failed to register configured storage strategy: {e}")
+        logger.error("Failed to register configured storage strategy: %s", e)
         # Fallback to json
         from infrastructure.registry.storage_registry import get_storage_registry
 

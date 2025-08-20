@@ -2,4 +2,4 @@
 
 from .strategy import BaseSchedulerStrategy
 
-__all__ = ["BaseSchedulerStrategy"]
+__all__: list[str] = ["BaseSchedulerStrategy"]

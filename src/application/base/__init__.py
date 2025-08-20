@@ -11,7 +11,7 @@ from application.dto.base import (
 from .commands import CommandBus, CommandHandler
 from .queries import QueryBus
 
-__all__ = [
+__all__: list[str] = [
     "BaseDTO",
     "BaseCommand",
     "BaseQuery",

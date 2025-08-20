@@ -22,7 +22,7 @@ class MachineCreatedHandler(BaseLoggingEventHandler[DomainEvent]):
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
         event_publisher: Optional[EventPublisherPort] = None,
-    ):
+    ) -> None:
         """Initialize machine created handler."""
         super().__init__(logger, error_handler, event_publisher)
 
@@ -53,7 +53,7 @@ class MachineStatusUpdatedHandler(BaseLoggingEventHandler[DomainEvent]):
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
         event_publisher: Optional[EventPublisherPort] = None,
-    ):
+    ) -> None:
         """Initialize machine status updated handler."""
         super().__init__(logger, error_handler, event_publisher)
 
@@ -77,7 +77,7 @@ class MachineTerminatedHandler(BaseLoggingEventHandler[DomainEvent]):
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
         event_publisher: Optional[EventPublisherPort] = None,
-    ):
+    ) -> None:
         """Initialize machine terminated handler."""
         super().__init__(logger, error_handler, event_publisher)
 
@@ -108,7 +108,7 @@ class MachineHealthCheckHandler(BaseLoggingEventHandler[DomainEvent]):
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
         event_publisher: Optional[EventPublisherPort] = None,
-    ):
+    ) -> None:
         """Initialize machine health check handler."""
         super().__init__(logger, error_handler, event_publisher)
 
@@ -142,7 +142,7 @@ class MachineErrorHandler(BaseLoggingEventHandler[DomainEvent]):
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
         event_publisher: Optional[EventPublisherPort] = None,
-    ):
+    ) -> None:
         """Initialize machine error handler."""
         super().__init__(logger, error_handler, event_publisher)
 

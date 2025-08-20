@@ -516,7 +516,7 @@ async def execute_command(args, app) -> Dict[str, Any]:
             from infrastructure.logging.logger import get_logger
 
             logger = get_logger(__name__)
-            logger.error(f"Failed to load input file {args.file}: {e}")
+            logger.error("Failed to load input file %s: %s", args.file, e)
             raise DomainException(f"Failed to load input file: {e}")
     elif hasattr(args, "data") and args.data:
         try:
@@ -527,7 +527,7 @@ async def execute_command(args, app) -> Dict[str, Any]:
             from infrastructure.logging.logger import get_logger
 
             logger = get_logger(__name__)
-            logger.error(f"Failed to parse input data: {e}")
+            logger.error("Failed to parse input data: %s", e)
             raise DomainException(f"Failed to parse input data: {e}")
 
     # Add input_data to args for handlers to use
@@ -549,7 +549,7 @@ async def execute_command(args, app) -> Dict[str, Any]:
             from infrastructure.logging.logger import get_logger
 
             logger = get_logger(__name__)
-            logger.warning(f"Failed to override scheduler strategy: {e}")
+            logger.warning("Failed to override scheduler strategy: %s", e)
 
     try:
         # Import function handlers - all are now async functions with decorators
@@ -675,7 +675,7 @@ async def execute_command(args, app) -> Dict[str, Any]:
                 from infrastructure.logging.logger import get_logger
 
                 logger = get_logger(__name__)
-                logger.warning(f"Failed to restore scheduler strategy: {e}")
+                logger.warning("Failed to restore scheduler strategy: %s", e)
 
 
 async def main() -> None:
@@ -753,7 +753,7 @@ async def main() -> None:
             if not await app.initialize(dry_run=args.dry_run):
                 raise RuntimeError("Failed to initialize application")
         except Exception as e:
-            logger.error(f"Failed to initialize application: {e}")
+            logger.error("Failed to initialize application: %s", e)
             if args.verbose:
                 import traceback
 
@@ -786,12 +786,12 @@ async def main() -> None:
                 print(formatted_output)  # noqa: CLI output
 
         except DomainException as e:
-            logger.error(f"Domain error: {e}")
+            logger.error("Domain error: %s", e)
             if not args.quiet:
                 print(f"Error: {e}")  # noqa: CLI error
             sys.exit(1)
         except Exception as e:
-            logger.error(f"Unexpected error: {e}")
+            logger.error("Unexpected error: %s", e)
             if args.verbose:
                 import traceback
 

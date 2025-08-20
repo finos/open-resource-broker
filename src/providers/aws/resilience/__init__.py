@@ -12,7 +12,7 @@ from providers.aws.resilience.aws_retry_errors import (
 )
 from providers.aws.resilience.aws_retry_strategy import AWSRetryStrategy
 
-__all__ = [
+__all__: list[str] = [
     "AWSRetryStrategy",
     "AWS_RETRYABLE_ERRORS",
     "COMMON_AWS_THROTTLING_ERRORS",

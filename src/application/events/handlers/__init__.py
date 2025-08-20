@@ -18,7 +18,7 @@ from . import (
     template_handlers,
 )
 
-__all__ = [
+__all__: list[str] = [
     "machine_handlers",
     "request_handlers",
     "system_handlers",

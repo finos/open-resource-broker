@@ -34,7 +34,7 @@ logger = get_logger(__name__)
 class LazyLoadingConfig:
     """Configuration for lazy loading behavior."""
 
-    def __init__(self, config_dict: Optional[Dict[str, Any]] = None):
+    def __init__(self, config_dict: Optional[Dict[str, Any]] = None) -> None:
         """Initialize lazy loading configuration with provided settings."""
         if config_dict is None:
             config_dict = {}
@@ -73,9 +73,9 @@ def timed_operation(operation_name: str) -> Iterator[None]:
     finally:
         elapsed = time.time() - start_time
         if elapsed > 0.1:
-            logger.warning(f"Slow DI operation '{operation_name}': {elapsed:.3f}s")
+            logger.warning("Slow DI operation '%s': %.3fs", operation_name, elapsed)
         else:
-            logger.debug(f"DI operation '{operation_name}': {elapsed:.3f}s")
+            logger.debug("DI operation '%s': %.3fs", operation_name, elapsed)
 
 
 class DIContainer(DIContainerPort, CQRSHandlerRegistrationPort, ContainerPort):
@@ -84,7 +84,7 @@ class DIContainer(DIContainerPort, CQRSHandlerRegistrationPort, ContainerPort):
     Includes lazy loading capabilities for improved startup performance.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the DI container."""
         self._service_registry = ServiceRegistry()
         self._cqrs_registry = CQRSHandlerRegistry()
@@ -97,7 +97,8 @@ class DIContainer(DIContainerPort, CQRSHandlerRegistrationPort, ContainerPort):
         self._on_demand_registrations: Dict[Type, Any] = {}
 
         logger.info(
-            f"DI Container initialized (lazy_loading={ 'enabled' if self._lazy_config.enabled else 'disabled'})"
+            "DI Container initialized (lazy_loading=%s)",
+            "enabled" if self._lazy_config.enabled else "disabled",
         )
 
     def is_registered(self, cls: Type) -> bool:
@@ -244,7 +245,7 @@ class DIContainer(DIContainerPort, CQRSHandlerRegistrationPort, ContainerPort):
         if self._lazy_config.enabled:
             with self._lock:
                 self._lazy_factories[cls] = factory
-                logger.debug(f"Registered lazy factory for {cls.__name__}")
+                logger.debug("Registered lazy factory for %s", cls.__name__)
         else:
             # Fallback to immediate registration
             self.register_factory(cls, factory)
@@ -254,7 +255,7 @@ class DIContainer(DIContainerPort, CQRSHandlerRegistrationPort, ContainerPort):
         if self._lazy_config.enabled:
             with self._lock:
                 self._on_demand_registrations[cls] = registration_func
-                logger.debug(f"Registered on-demand registration for {cls.__name__}")
+                logger.debug("Registered on-demand registration for %s", cls.__name__)
         else:
             # Immediate registration
             registration_func(self)
@@ -269,20 +270,20 @@ class DIContainer(DIContainerPort, CQRSHandlerRegistrationPort, ContainerPort):
             if cls in self._lazy_factories:
                 factory = self._lazy_factories.pop(cls)
                 self.register_factory(cls, factory)
-                logger.debug(f"Lazy factory registered for {cls.__name__}")
+                logger.debug("Lazy factory registered for %s", cls.__name__)
                 return
 
             # Check if we have an on-demand registration
             if cls in self._on_demand_registrations:
                 registration_func = self._on_demand_registrations.pop(cls)
                 registration_func(self)
-                logger.debug(f"On-demand registration completed for {cls.__name__}")
+                logger.debug("On-demand registration completed for %s", cls.__name__)
                 return
 
             # Try to auto-register injectable classes
             if is_injectable(cls):
                 self.register_injectable_class(cls)
-                logger.debug(f"Auto-registered injectable class {cls.__name__}")
+                logger.debug("Auto-registered injectable class %s", cls.__name__)
                 return
 
     def _create_and_cache(self, cls: Type[T]) -> T:
@@ -366,7 +367,7 @@ def _setup_cqrs_infrastructure(container: DIContainer) -> None:
             from application.decorators import get_handler_registry_stats
 
             stats = get_handler_registry_stats()
-            logger.info(f"Handler discovery results: {stats}")
+            logger.info("Handler discovery results: %s", stats)
         except ImportError:
             logger.debug("Handler registry stats not available")
 
@@ -385,9 +386,9 @@ def _setup_cqrs_infrastructure(container: DIContainer) -> None:
 
     except ImportError as e:
         # Fallback if CQRS infrastructure is not available
-        logger.debug(f"CQRS infrastructure not available: {e}")
+        logger.debug("CQRS infrastructure not available: %s", e)
     except Exception as e:
-        logger.warning(f"Failed to setup CQRS infrastructure: {e}")
+        logger.warning("Failed to setup CQRS infrastructure: %s", e)
 
 
 def _ensure_infrastructure_services(container: DIContainer) -> None:
@@ -400,7 +401,7 @@ def _ensure_infrastructure_services(container: DIContainer) -> None:
         logger.debug("Registering infrastructure services for CQRS setup")
         register_infrastructure_services(container)
     except Exception as e:
-        logger.warning(f"Failed to ensure infrastructure services: {e}")
+        logger.warning("Failed to ensure infrastructure services: %s", e)
 
 
 def reset_container() -> None:
@@ -412,7 +413,7 @@ def reset_container() -> None:
         _container_instance = None
 
 
-__all__ = [
+__all__: list[str] = [
     "DIContainer",
     "get_container",
     "reset_container",

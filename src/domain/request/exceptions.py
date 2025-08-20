@@ -10,7 +10,7 @@ class RequestException(DomainException):
 class RequestNotFoundError(EntityNotFoundError):
     """Raised when a request is not found."""
 
-    def __init__(self, request_id: str):
+    def __init__(self, request_id: str) -> None:
         """Initialize the instance."""
         super().__init__("Request", request_id)
 
@@ -22,7 +22,7 @@ class RequestValidationError(ValidationError):
 class InvalidRequestStateError(RequestException):
     """Raised when attempting an invalid request state transition."""
 
-    def __init__(self, current_state: str, attempted_state: str):
+    def __init__(self, current_state: str, attempted_state: str) -> None:
         """Initialize request state transition error with states."""
         message = f"Cannot transition request from {current_state} to {attempted_state}"
         super().__init__(

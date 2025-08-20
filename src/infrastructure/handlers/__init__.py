@@ -7,4 +7,4 @@ from infrastructure.handlers.base import (
     RequestContext,
 )
 
-__all__ = ["BaseHandler", "BaseEventHandler", "BaseAPIHandler", "RequestContext"]
+__all__: list[str] = ["BaseHandler", "BaseEventHandler", "BaseAPIHandler", "RequestContext"]

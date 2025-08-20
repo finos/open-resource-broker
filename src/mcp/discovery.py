@@ -31,7 +31,7 @@ class MCPToolDiscovery:
     but creates MCP-compatible tool definitions with JSON schemas.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the instance."""
         self._tool_definitions: Dict[str, MCPToolDefinition] = {}
 
