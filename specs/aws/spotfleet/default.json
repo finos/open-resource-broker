@@ -1,0 +1,47 @@
+{
+  "SpotFleetRequestConfig": {
+    "IamFleetRole": "{{ fleet_role }}",
+    "AllocationStrategy": "{{ allocation_strategy }}",
+    "TargetCapacity": {{ target_capacity }}{% if is_heterogeneous %},
+    "OnDemandTargetCapacity": {{ on_demand_target_capacity }}{% endif %},
+    "SpotPrice": "{{ spot_price | default('0.10') }}",
+    "LaunchSpecifications": [
+      {% for spec in launch_specifications %}
+      {
+        {% if spec.launch_template_id %}
+        "LaunchTemplate": {
+          "LaunchTemplateId": "{{ launch_template_id }}",
+          "Version": "{{ launch_template_version }}"
+        },
+        {% endif %}
+        "ImageId": "{{ spec.image_id }}",
+        "InstanceType": "{{ spec.instance_type }}",
+        "WeightedCapacity": {{ spec.weighted_capacity }}{% if spec.subnet_id %},
+        "SubnetId": "{{ spec.subnet_id }}"{% endif %}{% if spec.security_groups %},
+        "SecurityGroups": [
+          {% for sg in spec.security_groups %}
+          {"GroupId": "{{ sg }}"}{% if not loop.last %},{% endif %}
+          {% endfor %}
+        ]{% endif %}
+      }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ],
+    "InstanceInterruptionBehavior": "{{ instance_interruption_behavior }}",
+    "ReplaceUnhealthyInstances": {{ replace_unhealthy_instances | tojson }},
+    "TagSpecifications": [
+      {
+        "ResourceType": "spot-fleet-request",
+        "Tags": [
+          {"Key": "Name", "Value": "{{ fleet_name }}"},
+          {"Key": "RequestId", "Value": "{{ request_id }}"},
+          {"Key": "TemplateId", "Value": "{{ template_id }}"},
+          {"Key": "CreatedBy", "Value": "{{ created_by }}"},
+          {"Key": "CreatedAt", "Value": "{{ timestamp }}"}{% if has_custom_tags %},
+          {% for tag in custom_tags %}
+          {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}{% if not loop.last %},{% endif %}
+          {% endfor %}{% endif %}
+        ]
+      }
+    ]
+  }
+}

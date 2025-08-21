@@ -1,0 +1,64 @@
+{
+  "LaunchTemplateName": "{{ template_name }}",
+  "LaunchTemplateData": {
+    "ImageId": "{{ image_id }}",
+    "InstanceType": "{{ instance_type }}",
+    {% if subnet_id %}
+    "NetworkInterfaces": [
+      {
+        "DeviceIndex": 0,
+        "SubnetId": "{{ subnet_id }}",
+        {% if security_group_ids %}
+        "Groups": {{ security_group_ids | tojson }},
+        {% endif %}
+        "AssociatePublicIpAddress": {{ associate_public_ip | default(true) | tojson }}
+      }
+    ],
+    {% else %}
+    {% if security_group_ids %}
+    "SecurityGroupIds": {{ security_group_ids | tojson }},
+    {% endif %}
+    {% endif %}
+    {% if key_name %}
+    "KeyName": "{{ key_name }}",
+    {% endif %}
+    {% if user_data %}
+    "UserData": "{{ user_data | b64encode }}",
+    {% endif %}
+    {% if instance_profile %}
+    "IamInstanceProfile": {
+      "Name": "{{ instance_profile }}"
+    },
+    {% endif %}
+    {% if ebs_optimized is not none %}
+    "EbsOptimized": {{ ebs_optimized | tojson }},
+    {% endif %}
+    {% if monitoring_enabled %}
+    "Monitoring": {
+      "Enabled": {{ monitoring_enabled | tojson }}
+    },
+    {% endif %}
+    {% if placement_group %}
+    "Placement": {
+      "GroupName": "{{ placement_group }}"
+    },
+    {% endif %}
+    {% if block_device_mappings %}
+    "BlockDeviceMappings": {{ block_device_mappings | tojson }},
+    {% endif %}
+    "TagSpecifications": [
+      {
+        "ResourceType": "instance",
+        "Tags": [
+          {"Key": "Name", "Value": "{{ instance_name }}"},
+          {"Key": "RequestId", "Value": "{{ request_id }}"},
+          {"Key": "TemplateId", "Value": "{{ template_id }}"},
+          {"Key": "CreatedBy", "Value": "{{ package_name }}"}{% if tags %},
+          {% for key, value in tags.items() %}
+          {"Key": "{{ key }}", "Value": "{{ value }}"}{% if not loop.last %},{% endif %}
+          {% endfor %}{% endif %}
+        ]
+      }
+    ]
+  }
+}

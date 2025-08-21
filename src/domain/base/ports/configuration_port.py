@@ -28,9 +28,17 @@ class ConfigurationPort(ABC):
         """Get storage configuration."""
 
     @abstractmethod
+    def get_package_info(self) -> Dict[str, Any]:
+        """Get package metadata information."""
+
+    @abstractmethod
     def get_events_config(self) -> Dict[str, Any]:
         """Get events configuration."""
 
     @abstractmethod
     def get_logging_config(self) -> Dict[str, Any]:
         """Get logging configuration."""
+
+    @abstractmethod
+    def get_native_spec_config(self) -> Dict[str, Any]:
+        """Get native spec configuration."""

@@ -1,0 +1,106 @@
+{
+  "LaunchTemplateName": "lt-userdata-{{ request_id }}",
+  "LaunchTemplateData": {
+    "ImageId": "{{ image_id }}",
+    "InstanceType": "{{ instance_type }}",
+    "KeyName": "{{ key_name | default('') }}",
+    "SecurityGroupIds": [
+      {% for sg_id in security_group_ids %}
+      "{{ sg_id }}"{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ],
+    "IamInstanceProfile": {
+      "Name": "{{ iam_instance_profile }}"
+    },
+    "UserData": "{{ user_data_script | b64encode }}",
+    "BlockDeviceMappings": [
+      {
+        "DeviceName": "/dev/xvda",
+        "Ebs": {
+          "VolumeSize": "{{ root_volume_size | default(20) }}",
+          "VolumeType": "{{ volume_type | default('gp3') }}",
+          "Iops": "{{ volume_iops | default(3000) }}",
+          "Throughput": "{{ volume_throughput | default(125) }}",
+          "DeleteOnTermination": true,
+          "Encrypted": "{{ encrypt_volumes | default(true) }}",
+          "KmsKeyId": "{{ kms_key_id | default('') }}"
+        }
+      }
+      {% if additional_volumes %}
+      {% for volume in additional_volumes %}
+      ,{
+        "DeviceName": "{{ volume.device_name }}",
+        "Ebs": {
+          "VolumeSize": "{{ volume.size }}",
+          "VolumeType": "{{ volume.type | default('gp3') }}",
+          "DeleteOnTermination": "{{ volume.delete_on_termination | default(true) }}",
+          "Encrypted": "{{ volume.encrypted | default(true) }}"
+        }
+      }
+      {% endfor %}
+      {% endif %}
+    ],
+    "NetworkInterfaces": [
+      {
+        "DeviceIndex": 0,
+        "AssociatePublicIpAddress": "{{ associate_public_ip | default(false) }}",
+        "DeleteOnTermination": true,
+        "Groups": [
+          {% for sg_id in security_group_ids %}
+          "{{ sg_id }}"{% if not loop.last %},{% endif %}
+          {% endfor %}
+        ]
+      }
+    ],
+    "Monitoring": {
+      "Enabled": "{{ detailed_monitoring | default(true) }}"
+    },
+    "Placement": {
+      "AvailabilityZone": "{{ placement_az | default('') }}",
+      "GroupName": "{{ placement_group | default('') }}",
+      "Tenancy": "{{ tenancy | default('default') }}"
+    },
+    "CreditSpecification": {
+      "CpuCredits": "{{ cpu_credits | default('standard') }}"
+    },
+    "MetadataOptions": {
+      "HttpEndpoint": "enabled",
+      "HttpTokens": "required",
+      "HttpPutResponseHopLimit": 2,
+      "InstanceMetadataTags": "enabled"
+    },
+    "TagSpecifications": [
+      {
+        "ResourceType": "instance",
+        "Tags": [
+          {"Key": "Name", "Value": "userdata-instance-{{ request_id }}"},
+          {"Key": "RequestId", "Value": "{{ request_id }}"},
+          {"Key": "TemplateId", "Value": "{{ template_id }}"},
+          {"Key": "CreatedBy", "Value": "{{ package_name | default('open-hostfactory-plugin') }}"},
+          {"Key": "UserDataEnabled", "Value": "true"},
+          {"Key": "Environment", "Value": "{{ environment | default('production') }}"},
+          {"Key": "Application", "Value": "{{ application | default('web-server') }}"}
+        ]
+      },
+      {
+        "ResourceType": "volume",
+        "Tags": [
+          {"Key": "Name", "Value": "userdata-volume-{{ request_id }}"},
+          {"Key": "RequestId", "Value": "{{ request_id }}"},
+          {"Key": "TemplateId", "Value": "{{ template_id }}"},
+          {"Key": "CreatedBy", "Value": "{{ package_name | default('open-hostfactory-plugin') }}"},
+          {"Key": "Encrypted", "Value": "{{ encrypt_volumes | default(true) }}"}
+        ]
+      },
+      {
+        "ResourceType": "network-interface",
+        "Tags": [
+          {"Key": "Name", "Value": "userdata-eni-{{ request_id }}"},
+          {"Key": "RequestId", "Value": "{{ request_id }}"},
+          {"Key": "TemplateId", "Value": "{{ template_id }}"},
+          {"Key": "CreatedBy", "Value": "{{ package_name | default('open-hostfactory-plugin') }}"}
+        ]
+      }
+    ]
+  }
+}

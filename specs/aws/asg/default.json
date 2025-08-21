@@ -1,0 +1,61 @@
+{
+  "AutoScalingGroupName": "{{ asg_name }}",
+  "LaunchTemplate": {
+    "LaunchTemplateId": "{{ launch_template_id }}",
+    "Version": "{{ launch_template_version }}"
+  },
+  "MinSize": {{ min_size }},
+  "MaxSize": {{ max_size }},
+  "DesiredCapacity": {{ desired_capacity }},
+  "DefaultCooldown": {{ default_cooldown }},
+  "HealthCheckType": "{{ health_check_type }}",
+  "HealthCheckGracePeriod": {{ health_check_grace_period }}{% if has_subnets %},
+  "VPCZoneIdentifier": "{{ vpc_zone_identifier }}"{% endif %}{% if has_context %},
+  "Context": "{{ context }}"{% endif %},
+  "Tags": [
+    {
+      "Key": "Name",
+      "Value": "{{ asg_name }}",
+      "PropagateAtLaunch": true,
+      "ResourceId": "{{ asg_name }}",
+      "ResourceType": "auto-scaling-group"
+    },
+    {
+      "Key": "RequestId",
+      "Value": "{{ request_id }}",
+      "PropagateAtLaunch": true,
+      "ResourceId": "{{ asg_name }}",
+      "ResourceType": "auto-scaling-group"
+    },
+    {
+      "Key": "TemplateId",
+      "Value": "{{ template_id }}",
+      "PropagateAtLaunch": true,
+      "ResourceId": "{{ asg_name }}",
+      "ResourceType": "auto-scaling-group"
+    },
+    {
+      "Key": "CreatedBy",
+      "Value": "{{ created_by }}",
+      "PropagateAtLaunch": true,
+      "ResourceId": "{{ asg_name }}",
+      "ResourceType": "auto-scaling-group"
+    },
+    {
+      "Key": "CreatedAt",
+      "Value": "{{ timestamp }}",
+      "PropagateAtLaunch": true,
+      "ResourceId": "{{ asg_name }}",
+      "ResourceType": "auto-scaling-group"
+    }{% if has_custom_tags %},
+    {% for tag in custom_tags %}
+    {
+      "Key": "{{ tag.key }}",
+      "Value": "{{ tag.value }}",
+      "PropagateAtLaunch": true,
+      "ResourceId": "{{ asg_name }}",
+      "ResourceType": "auto-scaling-group"
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}{% endif %}
+  ]
+}

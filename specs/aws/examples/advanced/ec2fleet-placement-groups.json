@@ -1,0 +1,54 @@
+{
+  "Type": "instant",
+  "TargetCapacitySpecification": {
+    "TotalTargetCapacity": "{{ requested_count }}",
+    "DefaultTargetCapacityType": "on-demand"
+  },
+  "LaunchTemplateConfigs": [
+    {
+      "LaunchTemplateSpecification": {
+        "LaunchTemplateId": "{{ launch_template_id }}",
+        "Version": "{{ launch_template_version }}"
+      },
+      "Overrides": [
+        {% for placement_config in placement_configurations %}
+        {
+          "InstanceType": "{{ placement_config.instance_type }}",
+          "SubnetId": "{{ placement_config.subnet_id }}",
+          "AvailabilityZone": "{{ placement_config.availability_zone }}",
+          "Placement": {
+            "GroupName": "{{ placement_config.placement_group }}",
+            "Tenancy": "{{ placement_config.tenancy | default('default') }}",
+            "SpreadDomain": "{{ placement_config.spread_domain | default('') }}",
+            "HostId": "{{ placement_config.host_id | default('') }}",
+            "Affinity": "{{ placement_config.affinity | default('') }}",
+            "HostResourceGroupArn": "{{ placement_config.host_resource_group_arn | default('') }}"
+          }
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+      ]
+    }
+  ],
+  "OnDemandOptions": {
+    "AllocationStrategy": "lowest-price",
+    "SingleInstanceType": "{{ single_instance_type | default(false) }}",
+    "SingleAvailabilityZone": "{{ single_az | default(false) }}",
+    "MinTargetCapacity": "{{ min_target_capacity | default(1) }}",
+    "MaxTotalPrice": "{{ max_total_price | default('') }}"
+  },
+  "ReplaceUnhealthyInstances": false,
+  "TagSpecifications": [
+    {
+      "ResourceType": "fleet",
+      "Tags": [
+        {"Key": "Name", "Value": "placement-fleet-{{ request_id }}"},
+        {"Key": "RequestId", "Value": "{{ request_id }}"},
+        {"Key": "TemplateId", "Value": "{{ template_id }}"},
+        {"Key": "CreatedBy", "Value": "{{ package_name | default('open-hostfactory-plugin') }}"},
+        {"Key": "PlacementStrategy", "Value": "{{ placement_strategy | default('cluster') }}"},
+        {"Key": "HighPerformanceComputing", "Value": "true"},
+        {"Key": "NetworkOptimized", "Value": "{{ network_optimized | default(true) }}"}
+      ]
+    }
+  ]
+}

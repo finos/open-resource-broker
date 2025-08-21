@@ -453,6 +453,26 @@ def register_aws_services_with_di(container) -> None:
             container.register_singleton(AWSLaunchTemplateManager)
             logger.debug("AWS Launch Template Manager registered with DI container")
 
+        # Register AWS Native Spec Service if not already registered
+        from providers.aws.infrastructure.services.aws_native_spec_service import (
+            AWSNativeSpecService,
+        )
+
+        if not container.is_registered(AWSNativeSpecService):
+
+            def create_aws_native_spec_service(c):
+                """Create AWS native spec service."""
+                from application.services.native_spec_service import NativeSpecService
+                from domain.base.ports.configuration_port import ConfigurationPort
+
+                return AWSNativeSpecService(
+                    native_spec_service=c.get(NativeSpecService),
+                    config_port=c.get(ConfigurationPort),
+                )
+
+            container.register_factory(AWSNativeSpecService, create_aws_native_spec_service)
+            logger.debug("AWS Native Spec Service registered with DI container")
+
         logger.debug("AWS services registered with DI container")
 
     except Exception as e:

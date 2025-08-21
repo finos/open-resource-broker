@@ -79,6 +79,23 @@ class EC2FleetHandler(AWSHandler):
         # Use base class initialization - eliminates duplication
         super().__init__(aws_client, logger, aws_ops, launch_template_manager, request_adapter)
 
+        # Get AWS native spec service from container
+        container = get_container()
+        try:
+            from providers.aws.infrastructure.services.aws_native_spec_service import (
+                AWSNativeSpecService,
+            )
+
+            self.aws_native_spec_service = container.get(AWSNativeSpecService)
+            # Get config port for package info
+            from domain.base.ports.configuration_port import ConfigurationPort
+
+            self.config_port = container.get(ConfigurationPort)
+        except Exception:
+            # Service not available, native specs disabled
+            self.aws_native_spec_service = None
+            self.config_port = None
+
     @handle_infrastructure_exceptions(context="ec2_fleet_creation")
     def acquire_hosts(self, request: Request, aws_template: AWSTemplate) -> Dict[str, Any]:
         """
@@ -214,6 +231,102 @@ class EC2FleetHandler(AWSHandler):
             for inst in instance_details
         ]
 
+    def _prepare_template_context(self, template: AWSTemplate, request: Request) -> Dict[str, Any]:
+        """Prepare context with all computed values for template rendering."""
+        
+        # Business logic: heterogeneous capacity calculations
+        if template.price_type == "heterogeneous":
+            percent_on_demand = template.percent_on_demand or 0
+            on_demand_count = int(request.requested_count * percent_on_demand / 100)
+            spot_count = request.requested_count - on_demand_count
+        else:
+            on_demand_count = 0
+            spot_count = 0
+        
+        # Instance overrides computation
+        instance_overrides = []
+        if template.instance_types and template.subnet_ids:
+            for subnet_id in template.subnet_ids:
+                for instance_type, weight in template.instance_types.items():
+                    instance_overrides.append({
+                        "instance_type": instance_type,
+                        "subnet_id": subnet_id,
+                        "weighted_capacity": weight
+                    })
+        elif template.instance_types:
+            for instance_type, weight in template.instance_types.items():
+                instance_overrides.append({
+                    "instance_type": instance_type,
+                    "weighted_capacity": weight
+                })
+        
+        # On-demand instance overrides for heterogeneous fleets
+        ondemand_overrides = []
+        if template.price_type == "heterogeneous" and hasattr(template, 'instance_types_ondemand') and template.instance_types_ondemand:
+            for instance_type, weight in template.instance_types_ondemand.items():
+                ondemand_overrides.append({
+                    "instance_type": instance_type,
+                    "weighted_capacity": weight
+                })
+        
+        # Get package name for CreatedBy tag
+        created_by = "open-hostfactory-plugin"
+        if hasattr(self, "config_port") and self.config_port:
+            try:
+                package_info = self.config_port.get_package_info()
+                created_by = package_info.get("name", "open-hostfactory-plugin")
+            except Exception:  # nosec B110
+                pass
+        
+        # Process custom tags
+        custom_tags = []
+        if template.tags:
+            custom_tags = [{"key": k, "value": v} for k, v in template.tags.items()]
+        
+        return {
+            # Basic values
+            "fleet_type": template.fleet_type,
+            "requested_count": request.requested_count,
+            "request_id": str(request.request_id),
+            "template_id": str(template.template_id),
+            
+            # Computed business logic
+            "on_demand_count": on_demand_count,
+            "spot_count": spot_count,
+            "instance_overrides": instance_overrides,
+            "ondemand_overrides": ondemand_overrides,
+            
+            # Conditional flags
+            "is_heterogeneous": template.price_type == "heterogeneous",
+            "is_maintain_fleet": template.fleet_type == AWSFleetType.MAINTAIN.value,
+            "replace_unhealthy": template.fleet_type == AWSFleetType.MAINTAIN.value,
+            "has_spot_options": bool(template.allocation_strategy or template.max_spot_price),
+            "has_ondemand_options": bool(template.allocation_strategy_on_demand),
+            "needs_overrides": bool(instance_overrides or ondemand_overrides),
+            
+            # Configuration values
+            "allocation_strategy": self._get_allocation_strategy(template.allocation_strategy) if template.allocation_strategy else None,
+            "allocation_strategy_on_demand": self._get_allocation_strategy_on_demand(template.allocation_strategy_on_demand) if template.allocation_strategy_on_demand else None,
+            "max_spot_price": str(template.max_spot_price) if template.max_spot_price is not None else None,
+            "default_capacity_type": self._get_default_capacity_type(template.price_type),
+            
+            # Dynamic values
+            "created_by": created_by,
+            "timestamp": datetime.utcnow().isoformat(),
+            "fleet_name": f"hf-fleet-{request.request_id}",
+            "custom_tags": custom_tags,
+            "has_custom_tags": bool(custom_tags)
+        }
+    
+    def _get_default_capacity_type(self, price_type: str) -> str:
+        """Get default target capacity type based on price type."""
+        if price_type == "spot":
+            return "spot"
+        elif price_type == "ondemand":
+            return "on-demand"
+        else:  # heterogeneous or None
+            return "on-demand"
+
     def _create_fleet_config(
         self,
         template: AWSTemplate,
@@ -221,7 +334,54 @@ class EC2FleetHandler(AWSHandler):
         launch_template_id: str,
         launch_template_version: str,
     ) -> Dict[str, Any]:
-        """Create EC2 Fleet configuration with additional options."""
+        """Create EC2 Fleet configuration with native spec support."""
+        # Try native spec processing first
+        if self.aws_native_spec_service:
+            native_spec = self.aws_native_spec_service.process_provider_api_spec(template, request)
+            if native_spec:
+                # Merge launch template info into native spec
+                if "LaunchTemplateConfigs" in native_spec:
+                    native_spec["LaunchTemplateConfigs"][0]["LaunchTemplateSpecification"] = {
+                        "LaunchTemplateId": launch_template_id,
+                        "Version": launch_template_version,
+                    }
+                self._logger.info(
+                    "Using native provider API spec for template %s", template.template_id
+                )
+                return native_spec
+
+            # Use template-driven approach with native spec service
+            context = self._prepare_template_context(template, request)
+            context.update({
+                "launch_template_id": launch_template_id,
+                "launch_template_version": launch_template_version
+            })
+            
+            return self.aws_native_spec_service.render_default_spec("ec2fleet", context)
+        
+        # Fallback to legacy logic when native spec service is not available
+        return self._create_fleet_config_legacy(
+            template, request, launch_template_id, launch_template_version
+        )
+
+    def _create_fleet_config_legacy(
+        self,
+        template: AWSTemplate,
+        request: Request,
+        launch_template_id: str,
+        launch_template_version: str,
+    ) -> Dict[str, Any]:
+        """Create EC2 Fleet configuration using legacy logic."""
+        # Get package name for CreatedBy tag
+        created_by = "open-hostfactory-plugin"  # fallback
+        if hasattr(self, "config_port") and self.config_port:
+            try:
+                package_info = self.config_port.get_package_info()
+                created_by = package_info.get("name", "open-hostfactory-plugin")
+            except Exception:  # nosec B110
+                # Intentionally silent fallback for package info retrieval
+                pass
+
         fleet_config = {
             "LaunchTemplateConfigs": [
                 {
@@ -240,7 +400,7 @@ class EC2FleetHandler(AWSHandler):
                         {"Key": "Name", "Value": f"hf-fleet-{request.request_id}"},
                         {"Key": "RequestId", "Value": str(request.request_id)},
                         {"Key": "TemplateId", "Value": str(template.template_id)},
-                        {"Key": "CreatedBy", "Value": "HostFactory"},
+                        {"Key": "CreatedBy", "Value": created_by},
                         {"Key": "CreatedAt", "Value": datetime.utcnow().isoformat()},
                     ],
                 }

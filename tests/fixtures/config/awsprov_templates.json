@@ -32,6 +32,150 @@
       "vmType": "t2.small",
       "keyName": "test-key",
       "securityGroupIds": ["sg-87654321"]
+    },
+    {
+      "templateId": "native-launch-template-spec",
+      "providerApi": "EC2Fleet",
+      "fleetType": "instant",
+      "maxNumber": 3,
+      "attributes": {
+        "type": ["String", "X86_64"],
+        "ncores": ["Numeric", "2"],
+        "ncpus": ["Numeric", "2"],
+        "nram": ["Numeric", "4096"]
+      },
+      "imageId": "ami-native123",
+      "subnetId": "subnet-native123",
+      "vmType": "t3.medium",
+      "keyName": "native-key",
+      "securityGroupIds": ["sg-native123"],
+      "launch_template_spec": {
+        "LaunchTemplateName": "custom-lt-{{ request_id }}",
+        "LaunchTemplateData": {
+          "ImageId": "{{ image_id }}",
+          "InstanceType": "{{ instance_type }}",
+          "UserData": "IyEvYmluL2Jhc2gKZWNobyAiQ3VzdG9tIHVzZXIgZGF0YSI=",
+          "TagSpecifications": [
+            {
+              "ResourceType": "instance",
+              "Tags": [
+                {"Key": "Name", "Value": "custom-instance-{{ request_id }}"},
+                {"Key": "Environment", "Value": "test"},
+                {"Key": "RequestId", "Value": "{{ request_id }}"}
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "templateId": "native-provider-api-spec",
+      "providerApi": "EC2Fleet",
+      "fleetType": "instant",
+      "maxNumber": 5,
+      "attributes": {
+        "type": ["String", "X86_64"],
+        "ncores": ["Numeric", "4"],
+        "ncpus": ["Numeric", "4"],
+        "nram": ["Numeric", "8192"]
+      },
+      "imageId": "ami-provider456",
+      "subnetId": "subnet-provider456",
+      "vmType": "t3.large",
+      "keyName": "provider-key",
+      "securityGroupIds": ["sg-provider456"],
+      "provider_api_spec": {
+        "Type": "maintain",
+        "TargetCapacitySpecification": {
+          "TotalTargetCapacity": "{{ requested_count }}",
+          "DefaultTargetCapacityType": "spot",
+          "SpotTargetCapacity": "{{ requested_count }}"
+        },
+        "SpotOptions": {
+          "AllocationStrategy": "capacity-optimized",
+          "InstanceInterruptionBehavior": "terminate"
+        },
+        "ReplaceUnhealthyInstances": true,
+        "TagSpecifications": [
+          {
+            "ResourceType": "fleet",
+            "Tags": [
+              {"Key": "Name", "Value": "custom-fleet-{{ request_id }}"},
+              {"Key": "FleetType", "Value": "spot-optimized"},
+              {"Key": "RequestId", "Value": "{{ request_id }}"}
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "templateId": "native-both-specs",
+      "providerApi": "EC2Fleet",
+      "fleetType": "instant",
+      "maxNumber": 2,
+      "attributes": {
+        "type": ["String", "X86_64"],
+        "ncores": ["Numeric", "8"],
+        "ncpus": ["Numeric", "8"],
+        "nram": ["Numeric", "16384"]
+      },
+      "imageId": "ami-both789",
+      "subnetId": "subnet-both789",
+      "vmType": "t3.xlarge",
+      "keyName": "both-key",
+      "securityGroupIds": ["sg-both789"],
+      "launch_template_spec": {
+        "LaunchTemplateName": "advanced-lt-{{ request_id }}",
+        "LaunchTemplateData": {
+          "ImageId": "{{ image_id }}",
+          "InstanceType": "{{ instance_type }}",
+          "EbsOptimized": true,
+          "Monitoring": {"Enabled": true},
+          "BlockDeviceMappings": [
+            {
+              "DeviceName": "/dev/xvda",
+              "Ebs": {
+                "VolumeSize": 20,
+                "VolumeType": "gp3",
+                "DeleteOnTermination": true
+              }
+            }
+          ],
+          "TagSpecifications": [
+            {
+              "ResourceType": "instance",
+              "Tags": [
+                {"Key": "Name", "Value": "advanced-instance-{{ request_id }}"},
+                {"Key": "Tier", "Value": "production"},
+                {"Key": "RequestId", "Value": "{{ request_id }}"}
+              ]
+            }
+          ]
+        }
+      },
+      "provider_api_spec": {
+        "Type": "instant",
+        "TargetCapacitySpecification": {
+          "TotalTargetCapacity": "{{ requested_count }}",
+          "DefaultTargetCapacityType": "on-demand",
+          "OnDemandTargetCapacity": "{{ requested_count }}"
+        },
+        "OnDemandOptions": {
+          "AllocationStrategy": "lowest-price"
+        },
+        "ExcessCapacityTerminationPolicy": "termination",
+        "TagSpecifications": [
+          {
+            "ResourceType": "fleet",
+            "Tags": [
+              {"Key": "Name", "Value": "advanced-fleet-{{ request_id }}"},
+              {"Key": "FleetType", "Value": "on-demand-optimized"},
+              {"Key": "Environment", "Value": "production"},
+              {"Key": "RequestId", "Value": "{{ request_id }}"}
+            ]
+          }
+        ]
+      }
     }
   ]
 }

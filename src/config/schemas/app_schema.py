@@ -13,6 +13,7 @@ from .common_schema import (
     ResourceConfig,
 )
 from .logging_schema import LoggingConfig
+from .native_spec_schema import NativeSpecConfig
 from .performance_schema import CircuitBreakerConfig, PerformanceConfig
 from .provider_strategy_schema import ProviderConfig
 from .scheduler_schema import SchedulerConfig
@@ -38,6 +39,7 @@ class AppConfig(BaseModel):
     circuit_breaker: CircuitBreakerConfig = Field(default_factory=lambda: CircuitBreakerConfig())
     performance: PerformanceConfig = Field(default_factory=lambda: PerformanceConfig())
     server: ServerConfig = Field(default_factory=lambda: ServerConfig())
+    native_spec: NativeSpecConfig = Field(default_factory=NativeSpecConfig)
     environment: str = Field("development", description="Environment")
     debug: bool = Field(False, description="Debug mode")
     request_timeout: int = Field(300, description="Request timeout in seconds")

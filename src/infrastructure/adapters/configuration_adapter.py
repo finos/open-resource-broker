@@ -192,3 +192,34 @@ class ConfigurationAdapter(ConfigurationPort):
     def get_log_dir(self, default_path: str = None, config_path: str = None) -> str:
         """Get log directory - delegate to ConfigurationManager."""
         return self._config_manager.get_log_dir(default_path, config_path)
+
+    def get_native_spec_config(self) -> Dict[str, Any]:
+        """Get native spec configuration."""
+        try:
+            from config.schemas.native_spec_schema import NativeSpecConfig
+
+            config = self._config_manager.get_typed(NativeSpecConfig)
+            return {"enabled": config.enabled, "merge_mode": config.merge_mode}
+        except Exception:
+            # Fallback configuration if config not available
+            return {"enabled": False, "merge_mode": "extend"}
+
+    def get_package_info(self) -> Dict[str, Any]:
+        """Get package metadata information."""
+        try:
+            from _package import AUTHOR, DESCRIPTION, PACKAGE_NAME, __version__
+
+            return {
+                "name": PACKAGE_NAME,
+                "version": __version__,
+                "description": DESCRIPTION,
+                "author": AUTHOR,
+            }
+        except ImportError:
+            # Fallback if package info not available
+            return {
+                "name": "open-hostfactory-plugin",
+                "version": "unknown",
+                "description": "Cloud provider integration plugin",
+                "author": "AWS Professional Services",
+            }

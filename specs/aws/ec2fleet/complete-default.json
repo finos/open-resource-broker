@@ -1,0 +1,56 @@
+{
+  "LaunchTemplateConfigs": [
+    {
+      "LaunchTemplateSpecification": {
+        "LaunchTemplateId": "{{ launch_template_id }}",
+        "Version": "{{ launch_template_version }}"
+      }{% if instance_types %},
+      "Overrides": [
+        {% for instance_type in instance_types %}
+        {
+          "InstanceType": "{{ instance_type }}"{% if subnet_ids %},
+          "SubnetId": "{{ subnet_ids[loop.index0 % subnet_ids|length] }}"
+          {% endif %}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+      ]{% endif %}
+    }
+  ],
+  "TargetCapacitySpecification": {
+    "TotalTargetCapacity": {{ requested_count }}{% if fleet_type == "maintain" %},
+    "DefaultTargetCapacityType": "{{ target_capacity_type | default('on-demand') }}"{% endif %}
+  },
+  "Type": "{{ fleet_type }}",
+  {% if fleet_type == "maintain" %}
+  "OnDemandOptions": {
+    {% if allocation_strategy_on_demand %}
+    "AllocationStrategy": "{{ allocation_strategy_on_demand }}"
+    {% else %}
+    "AllocationStrategy": "lowest-price"
+    {% endif %}
+  },
+  "SpotOptions": {
+    {% if allocation_strategy %}
+    "AllocationStrategy": "{{ allocation_strategy }}"
+    {% else %}
+    "AllocationStrategy": "capacity-optimized"
+    {% endif %}{% if max_spot_price %},
+    "MaxTotalPrice": "{{ max_spot_price }}"{% endif %}
+  },
+  {% endif %}
+  "TagSpecifications": [
+    {
+      "ResourceType": "fleet",
+      "Tags": [
+        {"Key": "Name", "Value": "hf-fleet-{{ request_id }}"},
+        {"Key": "RequestId", "Value": "{{ request_id }}"},
+        {"Key": "TemplateId", "Value": "{{ template_id }}"},
+        {"Key": "CreatedBy", "Value": "{{ package_name }}"},
+        {"Key": "CreatedAt", "Value": "{{ timestamp }}"}{% if tags %},
+        {% for key, value in tags.items() %}
+        {"Key": "{{ key }}", "Value": "{{ value }}"}{% if not loop.last %},{% endif %}
+        {% endfor %}{% endif %}
+      ]
+    }
+  ]
+}

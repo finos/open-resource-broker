@@ -49,6 +49,12 @@ class AWSTemplate(CoreTemplate):
     instance_types_ondemand: Optional[Dict[str, int]] = None
     instance_types_priority: Optional[Dict[str, int]] = None
 
+    # Native spec fields (flattened, no nesting)
+    launch_template_spec: Optional[Dict[str, Any]] = None
+    launch_template_spec_file: Optional[str] = None
+    provider_api_spec: Optional[Dict[str, Any]] = None
+    provider_api_spec_file: Optional[str] = None
+
     # AWS Context field for fleet operations
     context: Optional[str] = None
 
@@ -217,6 +223,17 @@ class AWSTemplate(CoreTemplate):
             aws_data["max_price"] = data["max_spot_price"]
 
         return cls.model_validate(aws_data)
+
+    @model_validator(mode="after")
+    def validate_native_spec_mutual_exclusion(self) -> "AWSTemplate":
+        """Validate mutual exclusion of spec and spec_file fields."""
+        if self.launch_template_spec and self.launch_template_spec_file:
+            raise ValueError(
+                "Cannot specify both launch_template_spec and launch_template_spec_file"
+            )
+        if self.provider_api_spec and self.provider_api_spec_file:
+            raise ValueError("Cannot specify both provider_api_spec and provider_api_spec_file")
+        return self
 
     def get_aws_configuration(self) -> AWSConfiguration:
         """Get AWS configuration object."""

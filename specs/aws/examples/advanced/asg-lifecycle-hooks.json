@@ -1,0 +1,104 @@
+{
+  "AutoScalingGroupName": "asg-lifecycle-{{ request_id }}",
+  "MinSize": "{{ min_size | default(1) }}",
+  "MaxSize": "{{ max_size | default(requested_count * 3) }}",
+  "DesiredCapacity": "{{ requested_count }}",
+  "DefaultCooldown": "{{ cooldown_seconds | default(300) }}",
+  "HealthCheckType": "{{ health_check_type | default('ELB') }}",
+  "HealthCheckGracePeriod": "{{ health_check_grace_period | default(300) }}",
+  "VPCZoneIdentifier": [
+    {% for subnet_id in subnet_ids %}
+    "{{ subnet_id }}"{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ],
+  "TargetGroupARNs": [
+    {% for tg_arn in target_group_arns %}
+    "{{ tg_arn }}"{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ],
+  "LaunchTemplate": {
+    "LaunchTemplateId": "{{ launch_template_id }}",
+    "Version": "{{ launch_template_version }}"
+  },
+  "MixedInstancesPolicy": {
+    "LaunchTemplate": {
+      "LaunchTemplateSpecification": {
+        "LaunchTemplateId": "{{ launch_template_id }}",
+        "Version": "{{ launch_template_version }}"
+      },
+      "Overrides": [
+        {% for instance_type in instance_types %}
+        {
+          "InstanceType": "{{ instance_type }}",
+          "WeightedCapacity": "{{ instance_weights.get(instance_type, 1) }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+      ]
+    },
+    "InstancesDistribution": {
+      "OnDemandAllocationStrategy": "prioritized",
+      "OnDemandBaseCapacity": "{{ on_demand_base | default(1) }}",
+      "OnDemandPercentageAboveBaseCapacity": "{{ on_demand_percentage | default(30) }}",
+      "SpotAllocationStrategy": "capacity-optimized",
+      "SpotInstancePools": "{{ spot_pools | default(4) }}",
+      "SpotMaxPrice": "{{ max_spot_price | default('') }}"
+    }
+  },
+  "TerminationPolicies": ["OldestInstance", "Default"],
+  "NewInstancesProtectedFromScaleIn": "{{ scale_in_protection | default(false) }}",
+  "LifecycleHookSpecificationList": [
+    {
+      "LifecycleHookName": "launch-hook-{{ request_id }}",
+      "LifecycleTransition": "autoscaling:EC2_INSTANCE_LAUNCHING",
+      "DefaultResult": "CONTINUE",
+      "HeartbeatTimeout": "{{ launch_timeout | default(600) }}",
+      "NotificationTargetARN": "{{ launch_notification_arn | default('') }}",
+      "RoleARN": "{{ lifecycle_role_arn | default('') }}"
+    },
+    {
+      "LifecycleHookName": "terminate-hook-{{ request_id }}",
+      "LifecycleTransition": "autoscaling:EC2_INSTANCE_TERMINATING",
+      "DefaultResult": "CONTINUE",
+      "HeartbeatTimeout": "{{ terminate_timeout | default(300) }}",
+      "NotificationTargetARN": "{{ terminate_notification_arn | default('') }}",
+      "RoleARN": "{{ lifecycle_role_arn | default('') }}"
+    }
+  ],
+  "Tags": [
+    {
+      "Key": "Name",
+      "Value": "asg-lifecycle-instance-{{ request_id }}",
+      "PropagateAtLaunch": true,
+      "ResourceId": "asg-lifecycle-{{ request_id }}",
+      "ResourceType": "auto-scaling-group"
+    },
+    {
+      "Key": "RequestId",
+      "Value": "{{ request_id }}",
+      "PropagateAtLaunch": true,
+      "ResourceId": "asg-lifecycle-{{ request_id }}",
+      "ResourceType": "auto-scaling-group"
+    },
+    {
+      "Key": "TemplateId",
+      "Value": "{{ template_id }}",
+      "PropagateAtLaunch": true,
+      "ResourceId": "asg-lifecycle-{{ request_id }}",
+      "ResourceType": "auto-scaling-group"
+    },
+    {
+      "Key": "CreatedBy",
+      "Value": "{{ package_name | default('open-hostfactory-plugin') }}",
+      "PropagateAtLaunch": true,
+      "ResourceId": "asg-lifecycle-{{ request_id }}",
+      "ResourceType": "auto-scaling-group"
+    },
+    {
+      "Key": "LifecycleManaged",
+      "Value": "true",
+      "PropagateAtLaunch": true,
+      "ResourceId": "asg-lifecycle-{{ request_id }}",
+      "ResourceType": "auto-scaling-group"
+    }
+  ]
+}

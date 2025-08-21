@@ -484,6 +484,11 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "vm_types": raw_data.get("vmTypes", {}),
             "key_name": raw_data.get("keyName"),
             "user_data": raw_data.get("userData"),
+            # Native spec fields
+            "launch_template_spec": raw_data.get("launch_template_spec"),
+            "launch_template_spec_file": raw_data.get("launch_template_spec_file"),
+            "provider_api_spec": raw_data.get("provider_api_spec"),
+            "provider_api_spec_file": raw_data.get("provider_api_spec_file"),
         }
 
         # Create domain Template object with validation

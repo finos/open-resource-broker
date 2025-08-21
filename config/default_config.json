@@ -80,6 +80,9 @@
             "fallback_on_failure": true,
             "ssm_parameter_prefix": "/hostfactory/templates/"
           },
+          "native_spec": {
+            "spec_file_base_path": "specs/aws"
+          },
           "allocation_strategy": "capacityOptimized",
           "allocation_strategy_on_demand": "lowestPrice",
           "volume_type": "gp3",
@@ -89,6 +92,10 @@
         }
       }
     }
+  },
+  "native_spec": {
+    "enabled": true,
+    "merge_mode": "extend"
   },
   "naming": {
     "collections": {

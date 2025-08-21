@@ -1,0 +1,40 @@
+{
+  "LaunchTemplateName": "lt-{{ request_id }}",
+  "LaunchTemplateData": {
+    "ImageId": "{{ image_id }}",
+    "InstanceType": "{{ instance_type }}",
+    "KeyName": "{{ key_name | default('') }}",
+    "SecurityGroupIds": [
+      {% for sg_id in security_group_ids %}
+      "{{ sg_id }}"{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ],
+    "IamInstanceProfile": {
+      "Name": "{{ iam_instance_profile | default('') }}"
+    },
+    "Monitoring": {
+      "Enabled": "{{ detailed_monitoring | default(false) }}"
+    },
+    "TagSpecifications": [
+      {
+        "ResourceType": "instance",
+        "Tags": [
+          {"Key": "Name", "Value": "instance-{{ request_id }}"},
+          {"Key": "RequestId", "Value": "{{ request_id }}"},
+          {"Key": "TemplateId", "Value": "{{ template_id }}"},
+          {"Key": "CreatedBy", "Value": "{{ package_name | default('open-hostfactory-plugin') }}"},
+          {"Key": "LaunchedFrom", "Value": "LaunchTemplate"}
+        ]
+      },
+      {
+        "ResourceType": "volume",
+        "Tags": [
+          {"Key": "Name", "Value": "volume-{{ request_id }}"},
+          {"Key": "RequestId", "Value": "{{ request_id }}"},
+          {"Key": "TemplateId", "Value": "{{ template_id }}"},
+          {"Key": "CreatedBy", "Value": "{{ package_name | default('open-hostfactory-plugin') }}"}
+        ]
+      }
+    ]
+  }
+}

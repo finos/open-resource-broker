@@ -1,0 +1,65 @@
+{
+  "IamFleetRole": "{{ iam_fleet_role }}",
+  "AllocationStrategy": "diversified",
+  "TargetCapacity": "{{ requested_count }}",
+  "SpotPrice": "{{ max_spot_price | default('1.00') }}",
+  "LaunchSpecifications": [
+    {% for az_config in availability_zones %}
+    {% for instance_type in instance_types %}
+    {
+      "ImageId": "{{ image_id }}",
+      "InstanceType": "{{ instance_type }}",
+      "KeyName": "{{ key_name | default('') }}",
+      "SecurityGroups": [
+        {% for sg_id in security_group_ids %}
+        {"GroupId": "{{ sg_id }}"}{% if not loop.last %},{% endif %}
+        {% endfor %}
+      ],
+      "SubnetId": "{{ az_config.subnet_id }}",
+      "AvailabilityZone": "{{ az_config.availability_zone }}",
+      "WeightedCapacity": "{{ instance_weights.get(instance_type, 1) }}",
+      "SpotPrice": "{{ spot_prices.get(instance_type, max_spot_price) }}",
+      "BlockDeviceMappings": [
+        {
+          "DeviceName": "/dev/xvda",
+          "Ebs": {
+            "VolumeSize": "{{ root_volume_size | default(20) }}",
+            "VolumeType": "{{ volume_type | default('gp3') }}",
+            "DeleteOnTermination": true,
+            "Encrypted": "{{ encrypt_volumes | default(true) }}"
+          }
+        }
+      ],
+      "UserData": "{{ user_data | default('') | b64encode }}"
+    }{% if not (loop.last and loop.outer.last) %},{% endif %}
+    {% endfor %}
+    {% endfor %}
+  ],
+  "TerminateInstancesWithExpiration": true,
+  "Type": "maintain",
+  "ReplaceUnhealthyInstances": true,
+  "InstanceInterruptionBehavior": "terminate",
+  "LoadBalancersConfig": {
+    "TargetGroupsConfig": {
+      "TargetGroups": [
+        {% for tg_arn in target_group_arns %}
+        {"Arn": "{{ tg_arn }}"}{% if not loop.last %},{% endif %}
+        {% endfor %}
+      ]
+    }
+  },
+  "TagSpecifications": [
+    {
+      "ResourceType": "spot-fleet-request",
+      "Tags": [
+        {"Key": "Name", "Value": "diversified-spotfleet-{{ request_id }}"},
+        {"Key": "RequestId", "Value": "{{ request_id }}"},
+        {"Key": "TemplateId", "Value": "{{ template_id }}"},
+        {"Key": "CreatedBy", "Value": "{{ package_name | default('open-hostfactory-plugin') }}"},
+        {"Key": "AllocationStrategy", "Value": "diversified"},
+        {"Key": "MultiAZ", "Value": "true"},
+        {"Key": "LoadBalanced", "Value": "{{ 'true' if target_group_arns else 'false' }}"}
+      ]
+    }
+  ]
+}

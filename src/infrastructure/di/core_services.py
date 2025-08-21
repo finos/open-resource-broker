@@ -45,6 +45,20 @@ def register_core_services(container: DIContainer) -> None:
 
     container.register_factory(QueryBus, lambda c: QueryBus(container=c, logger=c.get(LoggingPort)))
 
+    # Register native spec service
+    def create_native_spec_service(c):
+        """Create native spec service."""
+        from application.services.native_spec_service import NativeSpecService
+        from domain.base.ports.spec_rendering_port import SpecRenderingPort
+
+        return NativeSpecService(
+            config_port=c.get(ConfigurationPort), spec_renderer=c.get(SpecRenderingPort)
+        )
+
+    from application.services.native_spec_service import NativeSpecService
+
+    container.register_factory(NativeSpecService, create_native_spec_service)
+
 
 def _create_scheduler_strategy(container: DIContainer) -> SchedulerPort:
     """Create scheduler strategy using factory."""

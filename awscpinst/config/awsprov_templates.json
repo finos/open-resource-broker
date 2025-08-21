@@ -150,6 +150,74 @@
       "vmType": "t2.micro",
       "keyName": "HF_SSH_KEY",
       "securityGroupIds": ["sg-0528dfedb6d763b16"]
+    },
+    {
+      "templateId": "EC2FleetNativeSpec",
+      "providerApi": "EC2Fleet",
+      "maxNumber": 2,
+      "attributes": {
+        "type": ["String", "X86_64"],
+        "ncores": ["Numeric", "2"],
+        "ncpus": ["Numeric", "1"],
+        "nram": ["Numeric", "4096"]
+      },
+      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
+      "subnetId": "subnet-0f984e48e6e899311",
+      "vmType": "t2.micro",
+      "keyName": "HF_SSH_KEY",
+      "securityGroupIds": ["sg-0528dfedb6d763b16"],
+      "provider_api_spec_file": "examples/basic/ec2fleet-instant.json"
+    },
+    {
+      "templateId": "SpotFleetNativeSpec",
+      "providerApi": "SpotFleet",
+      "maxNumber": 2,
+      "attributes": {
+        "type": ["String", "X86_64"],
+        "ncores": ["Numeric", "2"],
+        "ncpus": ["Numeric", "1"],
+        "nram": ["Numeric", "4096"]
+      },
+      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
+      "subnetId": "subnet-0f984e48e6e899311",
+      "vmType": "t2.micro",
+      "keyName": "HF_SSH_KEY",
+      "securityGroupIds": ["sg-0528dfedb6d763b16"],
+      "provider_api_spec_file": "examples/basic/spotfleet-basic.json"
+    },
+    {
+      "templateId": "ASGNativeSpec",
+      "providerApi": "ASG",
+      "maxNumber": 2,
+      "attributes": {
+        "type": ["String", "X86_64"],
+        "ncores": ["Numeric", "2"],
+        "ncpus": ["Numeric", "1"],
+        "nram": ["Numeric", "4096"]
+      },
+      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
+      "subnetId": "subnet-0f984e48e6e899311",
+      "vmType": "t2.micro",
+      "keyName": "HF_SSH_KEY",
+      "securityGroupIds": ["sg-0528dfedb6d763b16"],
+      "provider_api_spec_file": "examples/basic/asg-simple.json"
+    },
+    {
+      "templateId": "RunInstancesNativeSpec",
+      "providerApi": "RunInstances",
+      "maxNumber": 2,
+      "attributes": {
+        "type": ["String", "X86_64"],
+        "ncores": ["Numeric", "2"],
+        "ncpus": ["Numeric", "1"],
+        "nram": ["Numeric", "4096"]
+      },
+      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
+      "subnetId": "subnet-0f984e48e6e899311",
+      "vmType": "t2.micro",
+      "keyName": "HF_SSH_KEY",
+      "securityGroupIds": ["sg-0528dfedb6d763b16"],
+      "launch_template_spec_file": "examples/basic/launch-template-minimal.json"
     }
   ]
 }

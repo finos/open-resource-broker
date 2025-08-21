@@ -1,0 +1,76 @@
+{
+  "Type": "maintain",
+  "TargetCapacitySpecification": {
+    "TotalTargetCapacity": "{{ requested_count }}",
+    "OnDemandTargetCapacity": "{{ (requested_count * on_demand_percentage / 100) | round | int }}",
+    "SpotTargetCapacity": "{{ (requested_count * spot_percentage / 100) | round | int }}",
+    "DefaultTargetCapacityType": "spot",
+    "TargetCapacityUnitType": "units"
+  },
+  "LaunchTemplateConfigs": [
+    {
+      "LaunchTemplateSpecification": {
+        "LaunchTemplateId": "{{ launch_template_id }}",
+        "Version": "{{ launch_template_version }}"
+      },
+      "Overrides": [
+        {% for instance_config in instance_configurations %}
+        {
+          "InstanceType": "{{ instance_config.instance_type }}",
+          "SubnetId": "{{ instance_config.subnet_id }}",
+          "AvailabilityZone": "{{ instance_config.availability_zone }}",
+          "WeightedCapacity": "{{ instance_config.weight }}",
+          "Priority": "{{ instance_config.priority }}",
+          "SpotPrice": "{{ instance_config.max_spot_price | default('') }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+      ]
+    }
+  ],
+  "OnDemandOptions": {
+    "AllocationStrategy": "{{ on_demand_allocation_strategy | default('lowest-price') }}",
+    "CapacityReservationOptions": {
+      "UsageStrategy": "{{ capacity_reservation_strategy | default('use-capacity-reservations-first') }}"
+    },
+    "SingleInstanceType": false,
+    "SingleAvailabilityZone": false,
+    "MinTargetCapacity": "{{ min_on_demand_capacity | default(1) }}"
+  },
+  "SpotOptions": {
+    "AllocationStrategy": "{{ spot_allocation_strategy | default('price-capacity-optimized') }}",
+    "InstanceInterruptionBehavior": "{{ interruption_behavior | default('terminate') }}",
+    "InstancePoolsToUseCount": "{{ spot_pools_count | default(10) }}",
+    "SingleInstanceType": false,
+    "SingleAvailabilityZone": false,
+    "MinTargetCapacity": "{{ min_spot_capacity | default(0) }}",
+    "MaxTotalPrice": "{{ max_spot_total_price | default('') }}",
+    "MaintenanceStrategies": {
+      "CapacityRebalance": {
+        "ReplacementStrategy": "{{ replacement_strategy | default('launch') }}",
+        "TerminationDelay": "{{ termination_delay_seconds | default(120) }}"
+      }
+    }
+  },
+  "ReplaceUnhealthyInstances": true,
+  "TerminateInstancesWithExpiration": false,
+  "Context": "{{ fleet_context | default('') }}",
+  "TagSpecifications": [
+    {
+      "ResourceType": "fleet",
+      "Tags": [
+        {"Key": "Name", "Value": "hybrid-fleet-{{ request_id }}"},
+        {"Key": "RequestId", "Value": "{{ request_id }}"},
+        {"Key": "TemplateId", "Value": "{{ template_id }}"},
+        {"Key": "CreatedBy", "Value": "{{ package_name | default('open-hostfactory-plugin') }}"},
+        {"Key": "PurchasingStrategy", "Value": "hybrid"},
+        {"Key": "OnDemandPercentage", "Value": "{{ on_demand_percentage }}"},
+        {"Key": "SpotPercentage", "Value": "{{ spot_percentage }}"},
+        {"Key": "CostOptimization", "Value": "aggressive"},
+        {"Key": "FaultTolerance", "Value": "high"},
+        {"Key": "WorkloadType", "Value": "{{ workload_type | default('batch') }}"},
+        {"Key": "SLA", "Value": "{{ sla_tier | default('standard') }}"},
+        {"Key": "AutoScaling", "Value": "enabled"}
+      ]
+    }
+  ]
+}

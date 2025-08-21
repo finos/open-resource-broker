@@ -1,0 +1,59 @@
+{
+  "Type": "maintain",
+  "TargetCapacitySpecification": {
+    "TotalTargetCapacity": "{{ requested_count }}",
+    "DefaultTargetCapacityType": "on-demand",
+    "TargetCapacityUnitType": "units"
+  },
+  "LaunchTemplateConfigs": [
+    {% for az_config in availability_zone_configs %}
+    {
+      "LaunchTemplateSpecification": {
+        "LaunchTemplateId": "{{ az_config.launch_template_id }}",
+        "Version": "{{ az_config.launch_template_version }}"
+      },
+      "Overrides": [
+        {% for instance_type in az_config.instance_types %}
+        {
+          "InstanceType": "{{ instance_type }}",
+          "SubnetId": "{{ az_config.subnet_id }}",
+          "AvailabilityZone": "{{ az_config.availability_zone }}",
+          "WeightedCapacity": "{{ az_config.capacity_weight }}",
+          "Priority": "{{ az_config.priority }}"
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+      ]
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ],
+  "OnDemandOptions": {
+    "AllocationStrategy": "prioritized",
+    "CapacityReservationOptions": {
+      "UsageStrategy": "use-capacity-reservations-first"
+    },
+    "SingleInstanceType": false,
+    "SingleAvailabilityZone": false,
+    "MinTargetCapacity": "{{ min_capacity_per_az * availability_zone_configs | length }}"
+  },
+  "ReplaceUnhealthyInstances": true,
+  "TerminateInstancesWithExpiration": false,
+  "TagSpecifications": [
+    {
+      "ResourceType": "fleet",
+      "Tags": [
+        {"Key": "Name", "Value": "cross-az-fleet-{{ request_id }}"},
+        {"Key": "RequestId", "Value": "{{ request_id }}"},
+        {"Key": "TemplateId", "Value": "{{ template_id }}"},
+        {"Key": "CreatedBy", "Value": "{{ package_name | default('open-hostfactory-plugin') }}"},
+        {"Key": "RedundancyStrategy", "Value": "cross-az"},
+        {"Key": "HighAvailability", "Value": "true"},
+        {"Key": "AvailabilityZones", "Value": "{{ availability_zone_configs | map(attribute='availability_zone') | join(',') }}"},
+        {"Key": "MinCapacityPerAZ", "Value": "{{ min_capacity_per_az }}"},
+        {"Key": "FaultTolerance", "Value": "zone-failure"},
+        {"Key": "DisasterRecovery", "Value": "enabled"},
+        {"Key": "LoadBalanced", "Value": "{{ load_balanced | default(true) }}"},
+        {"Key": "HealthCheckEnabled", "Value": "true"}
+      ]
+    }
+  ]
+}

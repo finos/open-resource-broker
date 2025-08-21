@@ -52,6 +52,31 @@ class AWSLaunchTemplateManager:
         self.aws_client = aws_client
         self._logger = logger
 
+        # Get configuration port from container for package info
+        from infrastructure.di.container import get_container
+
+        container = get_container()
+        try:
+            from domain.base.ports.configuration_port import ConfigurationPort
+
+            self.config_port = container.get(ConfigurationPort)
+        except Exception:
+            self.config_port = None
+
+        # Get AWS native spec service from container
+        from infrastructure.di.container import get_container
+
+        container = get_container()
+        try:
+            from providers.aws.infrastructure.services.aws_native_spec_service import (
+                AWSNativeSpecService,
+            )
+
+            self.aws_native_spec_service = container.get(AWSNativeSpecService)
+        except Exception:
+            # Service not available, native specs disabled
+            self.aws_native_spec_service = None
+
     def create_or_update_launch_template(
         self, aws_template: AWSTemplate, request: Request
     ) -> LaunchTemplateResult:
@@ -258,11 +283,97 @@ class AWSLaunchTemplateManager:
             is_new_version=True,
         )
 
+    def _prepare_template_context(self, template: AWSTemplate, request: Request) -> Dict[str, Any]:
+        """Prepare context with all computed values for template rendering."""
+        
+        # Get package name for CreatedBy tag
+        created_by = "open-hostfactory-plugin"
+        if self.config_port:
+            try:
+                package_info = self.config_port.get_package_info()
+                created_by = package_info.get("name", "open-hostfactory-plugin")
+            except Exception:  # nosec B110
+                pass
+        
+        # Process custom tags
+        custom_tags = []
+        if template.tags:
+            custom_tags = [{"key": k, "value": v} for k, v in template.tags.items()]
+        
+        # Get instance name
+        instance_name = get_instance_name(request.request_id)
+        
+        return {
+            # Basic values
+            "image_id": template.image_id,
+            "instance_type": template.instance_type if template.instance_type else list(template.instance_types.keys())[0],
+            "request_id": str(request.request_id),
+            "template_id": str(template.template_id),
+            "instance_name": instance_name,
+            
+            # Network configuration
+            "subnet_id": template.subnet_id if hasattr(template, 'subnet_id') and template.subnet_id else None,
+            "security_group_ids": template.security_group_ids or [],
+            "associate_public_ip": True,
+            
+            # Optional configurations
+            "key_name": template.key_name if hasattr(template, 'key_name') and template.key_name else None,
+            "user_data": template.user_data if hasattr(template, 'user_data') and template.user_data else None,
+            "instance_profile": template.instance_profile if hasattr(template, 'instance_profile') and template.instance_profile else None,
+            "ebs_optimized": template.ebs_optimized if hasattr(template, 'ebs_optimized') and template.ebs_optimized is not None else None,
+            "monitoring_enabled": template.monitoring_enabled if hasattr(template, 'monitoring_enabled') and template.monitoring_enabled is not None else None,
+            
+            # Conditional flags
+            "has_subnet": hasattr(template, 'subnet_id') and bool(template.subnet_id),
+            "has_security_groups": bool(template.security_group_ids),
+            "has_key_name": hasattr(template, 'key_name') and bool(template.key_name),
+            "has_user_data": hasattr(template, 'user_data') and bool(template.user_data),
+            "has_instance_profile": hasattr(template, 'instance_profile') and bool(template.instance_profile),
+            "has_ebs_optimized": hasattr(template, 'ebs_optimized') and template.ebs_optimized is not None,
+            "has_monitoring": hasattr(template, 'monitoring_enabled') and template.monitoring_enabled is not None,
+            "has_custom_tags": bool(custom_tags),
+            
+            # Dynamic values
+            "created_by": created_by,
+            "custom_tags": custom_tags
+        }
+
     def _create_launch_template_data(
         self, aws_template: AWSTemplate, request: Request
     ) -> Dict[str, Any]:
         """
-        Create launch template data from AWS template configuration.
+        Create launch template data from AWS template configuration with native spec support.
+
+        Args:
+            aws_template: The AWS template configuration
+            request: The associated request
+
+        Returns:
+            Dictionary containing launch template data
+        """
+        # Try native spec processing first
+        if self.aws_native_spec_service:
+            native_spec = self.aws_native_spec_service.process_launch_template_spec(
+                aws_template, request
+            )
+            if native_spec:
+                self._logger.info(
+                    "Using native launch template spec for template %s", aws_template.template_id
+                )
+                return native_spec
+
+            # Use template-driven approach with native spec service
+            context = self._prepare_template_context(aws_template, request)
+            return self.aws_native_spec_service.render_default_spec("launch-template", context)
+        
+        # Fallback to legacy logic when native spec service is not available
+        return self._create_launch_template_data_legacy(aws_template, request)
+
+    def _create_launch_template_data_legacy(
+        self, aws_template: AWSTemplate, request: Request
+    ) -> Dict[str, Any]:
+        """
+        Create launch template data using legacy logic.
 
         Args:
             aws_template: The AWS template configuration
@@ -347,11 +458,21 @@ class AWSLaunchTemplateManager:
         # Get instance name using the helper function
         instance_name = get_instance_name(request.request_id)
 
+        # Get package name for CreatedBy tag
+        created_by = "open-hostfactory-plugin"  # fallback
+        if self.config_port:
+            try:
+                package_info = self.config_port.get_package_info()
+                created_by = package_info.get("name", "open-hostfactory-plugin")
+            except Exception:  # nosec B110
+                # Intentionally silent fallback for package info retrieval
+                pass
+
         tags = [
             {"Key": "Name", "Value": instance_name},
             {"Key": "RequestId", "Value": str(request.request_id)},
             {"Key": "TemplateId", "Value": str(aws_template.template_id)},
-            {"Key": "CreatedBy", "Value": "HostFactory"},
+            {"Key": "CreatedBy", "Value": created_by},
         ]
 
         # Add template tags if any
@@ -376,11 +497,21 @@ class AWSLaunchTemplateManager:
         """
         template_name = get_launch_template_name(request.request_id)
 
+        # Get package name for CreatedBy tag
+        created_by = "open-hostfactory-plugin"  # fallback
+        if self.config_port:
+            try:
+                package_info = self.config_port.get_package_info()
+                created_by = package_info.get("name", "open-hostfactory-plugin")
+            except Exception:  # nosec B110
+                # Intentionally silent fallback for package info retrieval
+                pass
+
         return [
             {"Key": "Name", "Value": template_name},
             {"Key": "RequestId", "Value": str(request.request_id)},
             {"Key": "TemplateId", "Value": str(aws_template.template_id)},
-            {"Key": "CreatedBy", "Value": "HostFactory"},
+            {"Key": "CreatedBy", "Value": created_by},
         ]
 
     def _generate_client_token(self, request: Request, aws_template: AWSTemplate) -> str:

@@ -1,0 +1,124 @@
+{
+  "LaunchTemplateName": "lt-custom-networking-{{ request_id }}",
+  "LaunchTemplateData": {
+    "ImageId": "{{ image_id }}",
+    "InstanceType": "{{ instance_type }}",
+    "KeyName": "{{ key_name | default('') }}",
+    "IamInstanceProfile": {
+      "Name": "{{ iam_instance_profile }}"
+    },
+    "NetworkInterfaces": [
+      {
+        "DeviceIndex": 0,
+        "Description": "Primary network interface",
+        "DeleteOnTermination": true,
+        "AssociatePublicIpAddress": "{{ primary_interface.associate_public_ip | default(false) }}",
+        "Groups": [
+          {% for sg_id in primary_interface.security_group_ids %}
+          "{{ sg_id }}"{% if not loop.last %},{% endif %}
+          {% endfor %}
+        ],
+        "SubnetId": "{{ primary_interface.subnet_id }}",
+        "PrivateIpAddress": "{{ primary_interface.private_ip | default('') }}",
+        "SecondaryPrivateIpAddressCount": "{{ primary_interface.secondary_ip_count | default(0) }}",
+        "Ipv6AddressCount": "{{ primary_interface.ipv6_address_count | default(0) }}",
+        "InterfaceType": "{{ primary_interface.interface_type | default('interface') }}"
+      }
+      {% if secondary_interfaces %}
+      {% for interface in secondary_interfaces %}
+      ,{
+        "DeviceIndex": "{{ interface.device_index }}",
+        "Description": "{{ interface.description | default('Secondary network interface') }}",
+        "DeleteOnTermination": "{{ interface.delete_on_termination | default(true) }}",
+        "AssociatePublicIpAddress": "{{ interface.associate_public_ip | default(false) }}",
+        "Groups": [
+          {% for sg_id in interface.security_group_ids %}
+          "{{ sg_id }}"{% if not loop.last %},{% endif %}
+          {% endfor %}
+        ],
+        "SubnetId": "{{ interface.subnet_id }}",
+        "PrivateIpAddress": "{{ interface.private_ip | default('') }}",
+        "SecondaryPrivateIpAddressCount": "{{ interface.secondary_ip_count | default(0) }}",
+        "Ipv6AddressCount": "{{ interface.ipv6_address_count | default(0) }}",
+        "InterfaceType": "{{ interface.interface_type | default('interface') }}"
+      }
+      {% endfor %}
+      {% endif %}
+    ],
+    "BlockDeviceMappings": [
+      {
+        "DeviceName": "/dev/xvda",
+        "Ebs": {
+          "VolumeSize": "{{ root_volume_size | default(20) }}",
+          "VolumeType": "{{ volume_type | default('gp3') }}",
+          "Iops": "{{ volume_iops | default(3000) }}",
+          "Throughput": "{{ volume_throughput | default(125) }}",
+          "DeleteOnTermination": true,
+          "Encrypted": "{{ encrypt_volumes | default(true) }}",
+          "KmsKeyId": "{{ kms_key_id | default('') }}"
+        }
+      }
+    ],
+    "Monitoring": {
+      "Enabled": "{{ detailed_monitoring | default(true) }}"
+    },
+    "Placement": {
+      "AvailabilityZone": "{{ placement_az | default('') }}",
+      "GroupName": "{{ placement_group | default('') }}",
+      "Tenancy": "{{ tenancy | default('default') }}",
+      "SpreadDomain": "{{ spread_domain | default('') }}"
+    },
+    "CreditSpecification": {
+      "CpuCredits": "{{ cpu_credits | default('standard') }}"
+    },
+    "MetadataOptions": {
+      "HttpEndpoint": "enabled",
+      "HttpTokens": "required",
+      "HttpPutResponseHopLimit": "{{ metadata_hop_limit | default(2) }}",
+      "InstanceMetadataTags": "enabled"
+    },
+    "EnclaveOptions": {
+      "Enabled": "{{ nitro_enclaves_enabled | default(false) }}"
+    },
+    "HibernationOptions": {
+      "Configured": "{{ hibernation_enabled | default(false) }}"
+    },
+    "UserData": "{{ user_data_script | default('') | b64encode }}",
+    "TagSpecifications": [
+      {
+        "ResourceType": "instance",
+        "Tags": [
+          {"Key": "Name", "Value": "custom-network-instance-{{ request_id }}"},
+          {"Key": "RequestId", "Value": "{{ request_id }}"},
+          {"Key": "TemplateId", "Value": "{{ template_id }}"},
+          {"Key": "CreatedBy", "Value": "{{ package_name | default('open-hostfactory-plugin') }}"},
+          {"Key": "NetworkingType", "Value": "custom"},
+          {"Key": "MultiInterface", "Value": "{{ 'true' if secondary_interfaces else 'false' }}"},
+          {"Key": "SecurityCompliant", "Value": "{{ security_compliant | default(true) }}"},
+          {"Key": "Environment", "Value": "{{ environment }}"},
+          {"Key": "Application", "Value": "{{ application_name }}"}
+        ]
+      },
+      {
+        "ResourceType": "volume",
+        "Tags": [
+          {"Key": "Name", "Value": "custom-network-volume-{{ request_id }}"},
+          {"Key": "RequestId", "Value": "{{ request_id }}"},
+          {"Key": "TemplateId", "Value": "{{ template_id }}"},
+          {"Key": "CreatedBy", "Value": "{{ package_name | default('open-hostfactory-plugin') }}"},
+          {"Key": "Encrypted", "Value": "{{ encrypt_volumes | default(true) }}"}
+        ]
+      },
+      {
+        "ResourceType": "network-interface",
+        "Tags": [
+          {"Key": "Name", "Value": "custom-network-eni-{{ request_id }}"},
+          {"Key": "RequestId", "Value": "{{ request_id }}"},
+          {"Key": "TemplateId", "Value": "{{ template_id }}"},
+          {"Key": "CreatedBy", "Value": "{{ package_name | default('open-hostfactory-plugin') }}"},
+          {"Key": "InterfaceType", "Value": "custom"}
+        ]
+      }
+    ]
+  }
+}

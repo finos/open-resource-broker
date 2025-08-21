@@ -1,0 +1,37 @@
+{
+  "IamFleetRole": "{{ iam_fleet_role | default('arn:aws:iam::123456789012:role/aws-ec2-spot-fleet-tagging-role') }}",
+  "AllocationStrategy": "lowestPrice",
+  "TargetCapacity": "{{ requested_count }}",
+  "SpotPrice": "{{ spot_price | default('0.05') }}",
+  "LaunchSpecifications": [
+    {
+      "ImageId": "{{ image_id }}",
+      "InstanceType": "{{ instance_type }}",
+      "KeyName": "{{ key_name | default('') }}",
+      "SecurityGroups": [
+        {% for sg_id in security_group_ids %}
+        {"GroupId": "{{ sg_id }}"}{% if not loop.last %},{% endif %}
+        {% endfor %}
+      ],
+      "SubnetId": "{{ subnet_ids[0] if subnet_ids else '' }}",
+      "UserData": "{{ user_data | default('') | b64encode }}"
+    }
+  ],
+  "TerminateInstancesWithExpiration": true,
+  "Type": "maintain",
+  "ReplaceUnhealthyInstances": true,
+  "InstanceInterruptionBehavior": "terminate",
+  "TagSpecifications": [
+    {
+      "ResourceType": "spot-fleet-request",
+      "Tags": [
+        {"Key": "Name", "Value": "spotfleet-{{ request_id }}"},
+        {"Key": "RequestId", "Value": "{{ request_id }}"},
+        {"Key": "TemplateId", "Value": "{{ template_id }}"},
+        {"Key": "CreatedBy", "Value": "{{ package_name | default('open-hostfactory-plugin') }}"},
+        {"Key": "PurchasingOption", "Value": "spot"},
+        {"Key": "CostOptimized", "Value": "true"}
+      ]
+    }
+  ]
+}

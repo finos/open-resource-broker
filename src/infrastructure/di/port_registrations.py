@@ -11,6 +11,7 @@ from domain.base.ports import (
     SchedulerPort,
     TemplateConfigurationPort,
 )
+from domain.base.ports.spec_rendering_port import SpecRenderingPort
 from infrastructure.adapters.error_handling_adapter import ErrorHandlingAdapter
 from infrastructure.adapters.factories.container_adapter_factory import (
     ContainerAdapterFactory,
@@ -90,3 +91,12 @@ def register_port_adapters(container):
     container.register_singleton(
         TemplateConfigurationPort, lambda c: c.get(TemplateConfigurationAdapter)
     )
+
+    # Register spec rendering port
+    def create_spec_renderer(c):
+        """Create Jinja spec renderer."""
+        from infrastructure.template.jinja_spec_renderer import JinjaSpecRenderer
+
+        return JinjaSpecRenderer(logger=c.get(LoggingPort))
+
+    container.register_singleton(SpecRenderingPort, create_spec_renderer)

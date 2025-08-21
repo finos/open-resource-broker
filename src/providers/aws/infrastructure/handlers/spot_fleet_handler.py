@@ -74,6 +74,25 @@ class SpotFleetHandler(AWSHandler):
         # Use base class initialization - eliminates duplication
         super().__init__(aws_client, logger, aws_ops, launch_template_manager, request_adapter)
 
+        # Get AWS native spec service from container
+        from infrastructure.di.container import get_container
+
+        container = get_container()
+        try:
+            from providers.aws.infrastructure.services.aws_native_spec_service import (
+                AWSNativeSpecService,
+            )
+
+            self.aws_native_spec_service = container.get(AWSNativeSpecService)
+            # Get config port for package info
+            from domain.base.ports.configuration_port import ConfigurationPort
+
+            self.config_port = container.get(ConfigurationPort)
+        except Exception:
+            # Service not available, native specs disabled
+            self.aws_native_spec_service = None
+            self.config_port = None
+
     @handle_infrastructure_exceptions(context="spot_fleet_creation")
     def acquire_hosts(self, request: Request, aws_template: AWSTemplate) -> Dict[str, Any]:
         """
@@ -311,6 +330,95 @@ class SpotFleetHandler(AWSHandler):
         except Exception as e:
             raise IAMError(f"Failed to validate IAM permissions: {str(e)}")
 
+    def _prepare_template_context(self, template: AWSTemplate, request: Request) -> Dict[str, Any]:
+        """Prepare context with all computed values for template rendering."""
+        
+        # Business logic: heterogeneous capacity calculations
+        if template.price_type == "heterogeneous":
+            percent_on_demand = template.percent_on_demand or 0
+            on_demand_count = int(request.requested_count * percent_on_demand / 100)
+            spot_count = request.requested_count - on_demand_count
+        else:
+            on_demand_count = 0
+            spot_count = request.requested_count
+        
+        # Launch specifications computation
+        launch_specs = []
+        if template.instance_types and template.subnet_ids:
+            for subnet_id in template.subnet_ids:
+                for instance_type, weight in template.instance_types.items():
+                    launch_specs.append({
+                        "instance_type": instance_type,
+                        "subnet_id": subnet_id,
+                        "weighted_capacity": weight,
+                        "image_id": template.image_id,
+                        "security_groups": template.security_group_ids or []
+                    })
+        elif template.instance_types:
+            for instance_type, weight in template.instance_types.items():
+                launch_specs.append({
+                    "instance_type": instance_type,
+                    "weighted_capacity": weight,
+                    "image_id": template.image_id,
+                    "security_groups": template.security_group_ids or []
+                })
+        else:
+            # Single instance type
+            launch_specs.append({
+                "instance_type": template.instance_type,
+                "weighted_capacity": 1,
+                "image_id": template.image_id,
+                "security_groups": template.security_group_ids or [],
+                "subnet_id": template.subnet_ids[0] if template.subnet_ids else None
+            })
+        
+        # Get package name for CreatedBy tag
+        created_by = "open-hostfactory-plugin"
+        if hasattr(self, "config_port") and self.config_port:
+            try:
+                package_info = self.config_port.get_package_info()
+                created_by = package_info.get("name", "open-hostfactory-plugin")
+            except Exception:  # nosec B110
+                pass
+        
+        # Process custom tags
+        custom_tags = []
+        if template.tags:
+            custom_tags = [{"key": k, "value": v} for k, v in template.tags.items()]
+        
+        return {
+            # Basic values
+            "target_capacity": request.requested_count,
+            "request_id": str(request.request_id),
+            "template_id": str(template.template_id),
+            
+            # Computed business logic
+            "on_demand_target_capacity": on_demand_count,
+            "spot_target_capacity": spot_count,
+            "launch_specifications": launch_specs,
+            
+            # Fleet configuration
+            "fleet_role": template.fleet_role,
+            "allocation_strategy": template.allocation_strategy or "lowestPrice",
+            "instance_interruption_behavior": getattr(template, 'instance_interruption_behavior', 'terminate'),
+            "replace_unhealthy_instances": getattr(template, 'replace_unhealthy_instances', True),
+            
+            # Conditional flags
+            "is_heterogeneous": template.price_type == "heterogeneous",
+            "has_multiple_specs": len(launch_specs) > 1,
+            "has_spot_price": hasattr(template, 'max_price') and template.max_price is not None,
+            "has_custom_tags": bool(custom_tags),
+            
+            # Pricing
+            "spot_price": str(template.max_price) if hasattr(template, 'max_price') and template.max_price is not None else None,
+            
+            # Dynamic values
+            "created_by": created_by,
+            "timestamp": datetime.utcnow().isoformat(),
+            "fleet_name": f"hf-spotfleet-{request.request_id}",
+            "custom_tags": custom_tags
+        }
+
     def _create_spot_fleet_config(
         self,
         template: AWSTemplate,
@@ -318,7 +426,45 @@ class SpotFleetHandler(AWSHandler):
         launch_template_id: str,
         launch_template_version: str,
     ) -> Dict[str, Any]:
-        """Create Spot Fleet configuration with additional options."""
+        """Create Spot Fleet configuration with native spec support."""
+        # Try native spec processing first
+        if self.aws_native_spec_service:
+            native_spec = self.aws_native_spec_service.process_provider_api_spec(template, request)
+            if native_spec:
+                # Merge launch template info into native spec
+                if "LaunchSpecifications" in native_spec:
+                    for spec in native_spec["LaunchSpecifications"]:
+                        if "LaunchTemplate" not in spec:
+                            spec["LaunchTemplate"] = {}
+                        spec["LaunchTemplate"]["LaunchTemplateId"] = launch_template_id
+                        spec["LaunchTemplate"]["Version"] = launch_template_version
+                self._logger.info(
+                    "Using native provider API spec for SpotFleet template %s", template.template_id
+                )
+                return native_spec
+
+            # Use template-driven approach with native spec service
+            context = self._prepare_template_context(template, request)
+            context.update({
+                "launch_template_id": launch_template_id,
+                "launch_template_version": launch_template_version
+            })
+            
+            return self.aws_native_spec_service.render_default_spec("spotfleet", context)
+        
+        # Fallback to legacy logic when native spec service is not available
+        return self._create_spot_fleet_config_legacy(
+            template, request, launch_template_id, launch_template_version
+        )
+
+    def _create_spot_fleet_config_legacy(
+        self,
+        template: AWSTemplate,
+        request: Request,
+        launch_template_id: str,
+        launch_template_version: str,
+    ) -> Dict[str, Any]:
+        """Create Spot Fleet configuration using legacy logic."""
         # Strip the full ARN for service-linked role
         fleet_role = template.fleet_role
         if fleet_role == "AWSServiceRoleForEC2SpotFleet":
@@ -328,12 +474,22 @@ class SpotFleetHandler(AWSHandler):
                 f"spotfleet.amazonaws.com/AWSServiceRoleForEC2SpotFleet"
             )
 
+        # Get package name for CreatedBy tag
+        created_by = "open-hostfactory-plugin"  # fallback
+        if hasattr(self, "config_port") and self.config_port:
+            try:
+                package_info = self.config_port.get_package_info()
+                created_by = package_info.get("name", "open-hostfactory-plugin")
+            except Exception:  # nosec B110
+                # Intentionally silent fallback for package info retrieval
+                pass
+
         # Common tags for both fleet and instances
         common_tags = [
             {"Key": "Name", "Value": f"hf-{request.request_id}"},
             {"Key": "RequestId", "Value": str(request.request_id)},
             {"Key": "TemplateId", "Value": str(template.template_id)},
-            {"Key": "CreatedBy", "Value": "HostFactory"},
+            {"Key": "CreatedBy", "Value": created_by},
             {"Key": "CreatedAt", "Value": datetime.utcnow().isoformat()},
         ]
 

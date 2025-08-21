@@ -1,0 +1,50 @@
+{
+  "AutoScalingGroupName": "asg-{{ request_id }}",
+  "MinSize": 1,
+  "MaxSize": "{{ max_size | default(requested_count * 2) }}",
+  "DesiredCapacity": "{{ requested_count }}",
+  "DefaultCooldown": 300,
+  "HealthCheckType": "EC2",
+  "HealthCheckGracePeriod": 300,
+  "VPCZoneIdentifier": [
+    {% for subnet_id in subnet_ids %}
+    "{{ subnet_id }}"{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ],
+  "LaunchTemplate": {
+    "LaunchTemplateId": "{{ launch_template_id }}",
+    "Version": "{{ launch_template_version }}"
+  },
+  "TerminationPolicies": ["Default"],
+  "NewInstancesProtectedFromScaleIn": false,
+  "Tags": [
+    {
+      "Key": "Name",
+      "Value": "asg-instance-{{ request_id }}",
+      "PropagateAtLaunch": true,
+      "ResourceId": "asg-{{ request_id }}",
+      "ResourceType": "auto-scaling-group"
+    },
+    {
+      "Key": "RequestId",
+      "Value": "{{ request_id }}",
+      "PropagateAtLaunch": true,
+      "ResourceId": "asg-{{ request_id }}",
+      "ResourceType": "auto-scaling-group"
+    },
+    {
+      "Key": "TemplateId",
+      "Value": "{{ template_id }}",
+      "PropagateAtLaunch": true,
+      "ResourceId": "asg-{{ request_id }}",
+      "ResourceType": "auto-scaling-group"
+    },
+    {
+      "Key": "CreatedBy",
+      "Value": "{{ package_name | default('open-hostfactory-plugin') }}",
+      "PropagateAtLaunch": true,
+      "ResourceId": "asg-{{ request_id }}",
+      "ResourceType": "auto-scaling-group"
+    }
+  ]
+}

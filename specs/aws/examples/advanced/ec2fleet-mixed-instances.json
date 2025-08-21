@@ -1,0 +1,60 @@
+{
+  "Type": "maintain",
+  "TargetCapacitySpecification": {
+    "TotalTargetCapacity": "{{ requested_count }}",
+    "OnDemandTargetCapacity": "{{ on_demand_capacity | default((requested_count * 0.3) | round | int) }}",
+    "SpotTargetCapacity": "{{ spot_capacity | default((requested_count * 0.7) | round | int) }}",
+    "DefaultTargetCapacityType": "spot",
+    "TargetCapacityUnitType": "units"
+  },
+  "LaunchTemplateConfigs": [
+    {
+      "LaunchTemplateSpecification": {
+        "LaunchTemplateId": "{{ launch_template_id }}",
+        "Version": "{{ launch_template_version }}"
+      },
+      "Overrides": [
+        {% for subnet_id in subnet_ids %}
+        {% for instance_type in instance_types %}
+        {
+          "InstanceType": "{{ instance_type }}",
+          "SubnetId": "{{ subnet_id }}",
+          "WeightedCapacity": "{{ instance_weights.get(instance_type, 1) }}"
+        }{% if not (loop.last and loop.outer.last) %},{% endif %}
+        {% endfor %}
+        {% endfor %}
+      ]
+    }
+  ],
+  "OnDemandOptions": {
+    "AllocationStrategy": "prioritized",
+    "CapacityReservationOptions": {
+      "UsageStrategy": "use-capacity-reservations-first"
+    }
+  },
+  "SpotOptions": {
+    "AllocationStrategy": "diversified",
+    "InstanceInterruptionBehavior": "terminate",
+    "InstancePoolsToUseCount": "{{ spot_pools_count | default(4) }}",
+    "MaintenanceStrategies": {
+      "CapacityRebalance": {
+        "ReplacementStrategy": "launch"
+      }
+    }
+  },
+  "ReplaceUnhealthyInstances": true,
+  "TagSpecifications": [
+    {
+      "ResourceType": "fleet",
+      "Tags": [
+        {"Key": "Name", "Value": "mixed-fleet-{{ request_id }}"},
+        {"Key": "RequestId", "Value": "{{ request_id }}"},
+        {"Key": "TemplateId", "Value": "{{ template_id }}"},
+        {"Key": "CreatedBy", "Value": "{{ package_name | default('open-hostfactory-plugin') }}"},
+        {"Key": "PurchasingStrategy", "Value": "mixed"},
+        {"Key": "CostOptimization", "Value": "enabled"},
+        {"Key": "SpotPercentage", "Value": "{{ (spot_capacity / requested_count * 100) | round }}"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "Type": "maintain",
+  "TargetCapacitySpecification": {
+    "TotalTargetCapacity": "{{ requested_count }}",
+    "DefaultTargetCapacityType": "on-demand",
+    "TargetCapacityUnitType": "units"
+  },
+  "LaunchTemplateConfigs": [
+    {
+      "LaunchTemplateSpecification": {
+        "LaunchTemplateId": "{{ launch_template_id }}",
+        "Version": "{{ launch_template_version }}"
+      }
+    }
+  ],
+  "OnDemandOptions": {
+    "AllocationStrategy": "lowest-price"
+  },
+  "ReplaceUnhealthyInstances": true,
+  "TerminateInstancesWithExpiration": false,
+  "TagSpecifications": [
+    {
+      "ResourceType": "fleet",
+      "Tags": [
+        {"Key": "Name", "Value": "maintain-fleet-{{ request_id }}"},
+        {"Key": "RequestId", "Value": "{{ request_id }}"},
+        {"Key": "TemplateId", "Value": "{{ template_id }}"},
+        {"Key": "CreatedBy", "Value": "{{ package_name | default('open-hostfactory-plugin') }}"},
+        {"Key": "FleetType", "Value": "maintain"},
+        {"Key": "AutoScaling", "Value": "enabled"}
+      ]
+    }
+  ]
+}
