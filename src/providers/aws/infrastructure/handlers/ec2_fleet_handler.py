@@ -53,6 +53,7 @@ from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
 )
 from providers.aws.utilities.aws_operations import AWSOperations
+from infrastructure.utilities.common.resource_naming import get_resource_prefix
 
 
 @injectable
@@ -197,6 +198,11 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
         fleet_id = response["FleetId"]
         self._logger.info("Successfully created EC2 Fleet: %s", fleet_id)
 
+        # Apply post-creation tagging for fleet instances
+        # EC2Fleet maintain/request types can't tag instances at creation - need post-creation
+        if aws_template.fleet_type in ["maintain", "request"]:
+            self._tag_fleet_instances_if_needed(fleet_id, request, aws_template)
+
         # For instant fleets, store instance IDs in request metadata
         if fleet_type == AWSFleetType.INSTANT:
             instance_ids = []
@@ -291,7 +297,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
         return {
             # Fleet-specific values
             "fleet_type": template.fleet_type,
-            "fleet_name": f"hf-fleet-{request.request_id}",
+            "fleet_name": f"{get_resource_prefix('fleet')}{request.request_id}",
             # Computed overrides
             "instance_overrides": instance_overrides,
             "ondemand_overrides": ondemand_overrides,
@@ -399,7 +405,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 {
                     "ResourceType": "fleet",
                     "Tags": [
-                        {"Key": "Name", "Value": f"hf-fleet-{request.request_id}"},
+                        {"Key": "Name", "Value": f"{get_resource_prefix('fleet')}{request.request_id}"},
                         {"Key": "RequestId", "Value": str(request.request_id)},
                         {"Key": "TemplateId", "Value": str(template.template_id)},
                         {"Key": "CreatedBy", "Value": created_by},

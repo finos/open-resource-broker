@@ -48,6 +48,7 @@ from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
 )
 from providers.aws.utilities.aws_operations import AWSOperations
+from infrastructure.utilities.common.resource_naming import get_resource_prefix
 
 
 @injectable
@@ -177,6 +178,11 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin):
 
         fleet_id = response["SpotFleetRequestId"]
         self._logger.info("Successfully created Spot Fleet request: %s", fleet_id)
+
+        # Apply post-creation tagging for spot fleet instances as fallback
+        # SpotFleet instances should be tagged via LaunchSpecifications in template
+        # But add fallback post-creation tagging to ensure RequestId tracking
+        self._tag_fleet_instances_if_needed(fleet_id, request, aws_template)
 
         return fleet_id
 
@@ -392,7 +398,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin):
 
         return {
             # Fleet-specific values
-            "fleet_name": f"hf-spotfleet-{request.request_id}",
+            "fleet_name": f"{get_resource_prefix('spot_fleet')}{request.request_id}",
             # Template reference approach (fixes duplication)
             "base_launch_spec": base_launch_spec,
             "instance_overrides": instance_overrides,
