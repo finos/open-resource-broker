@@ -293,26 +293,14 @@ jobs:
         VERSION: ${{ needs.get-config.outputs.version }}
       run: |
         if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-          # Create manifest for latest
-          MANIFEST_IMAGES=()
-          for py_ver in $PYTHON_VERSIONS; do
-            MANIFEST_IMAGES+=("$REGISTRY/$IMAGE:$VERSION-python$py_ver")
-          done
-
-          echo "Creating manifest for latest with images: ${MANIFEST_IMAGES[*]}"
-          docker manifest create "$REGISTRY/$IMAGE:latest" "${MANIFEST_IMAGES[@]}"
-          docker manifest push "$REGISTRY/$IMAGE:latest"
+          # Create manifest for latest using default Python version
+          echo "Creating latest tag from default Python version: $DEFAULT_PYTHON_VERSION"
+          docker buildx imagetools create -t "$REGISTRY/$IMAGE:latest" "$REGISTRY/$IMAGE:$VERSION-python$DEFAULT_PYTHON_VERSION"
         fi
 
         if [ "${{ github.event_name }}" = "release" ]; then
-          # Create manifest for release version
+          # Create manifest for release version using default Python version
           RELEASE_VERSION=${GITHUB_REF#refs/tags/}
-          MANIFEST_IMAGES=()
-          for py_ver in $PYTHON_VERSIONS; do
-            MANIFEST_IMAGES+=("$REGISTRY/$IMAGE:$RELEASE_VERSION-python$py_ver")
-          done
-
-          echo "Creating manifest for $RELEASE_VERSION with images: ${MANIFEST_IMAGES[*]}"
-          docker manifest create "$REGISTRY/$IMAGE:$RELEASE_VERSION" "${MANIFEST_IMAGES[@]}"
-          docker manifest push "$REGISTRY/$IMAGE:$RELEASE_VERSION"
+          echo "Creating release tag $RELEASE_VERSION from default Python version: $DEFAULT_PYTHON_VERSION"
+          docker buildx imagetools create -t "$REGISTRY/$IMAGE:$RELEASE_VERSION" "$REGISTRY/$IMAGE:$RELEASE_VERSION-python$DEFAULT_PYTHON_VERSION"
         fi
