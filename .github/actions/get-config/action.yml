@@ -1,0 +1,47 @@
+name: 'Get Project Configuration'
+description: 'Get project configuration from Makefile'
+outputs:
+  python-versions:
+    description: 'JSON array of Python versions'
+    value: ${{ steps.config.outputs.python-versions }}
+  default-python-version:
+    description: 'Default Python version'
+    value: ${{ steps.config.outputs.default-python-version }}
+  container-registry:
+    description: 'Container registry'
+    value: ${{ steps.config.outputs.container-registry }}
+  container-image:
+    description: 'Container image name'
+    value: ${{ steps.config.outputs.container-image }}
+  version:
+    description: 'Project version'
+    value: ${{ steps.config.outputs.version }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Install yq
+      uses: mikefarah/yq@master
+
+    - name: Get configuration from project config
+      id: config
+      shell: bash
+      run: |
+        DEFAULT_PYTHON_VERSION=$(make print-DEFAULT_PYTHON_VERSION)
+        PYTHON_VERSIONS=$(make print-json-PYTHON_VERSIONS)
+        CONTAINER_REGISTRY=$(make print-CONTAINER_REGISTRY || echo "ghcr.io")
+        CONTAINER_IMAGE=$(make print-CONTAINER_IMAGE || echo "awslabs/open-hostfactory-plugin")
+        VERSION=$(make print-VERSION || echo "0.1.0")
+        
+        {
+          echo "default-python-version=$DEFAULT_PYTHON_VERSION"
+          echo "python-versions=$PYTHON_VERSIONS"
+          echo "container-registry=$CONTAINER_REGISTRY"
+          echo "container-image=$CONTAINER_IMAGE"
+          echo "version=$VERSION"
+        } >> "$GITHUB_OUTPUT"
+        
+        echo "Default Python version: $DEFAULT_PYTHON_VERSION"
+        echo "Python versions: $PYTHON_VERSIONS"
+        echo "Container registry: $CONTAINER_REGISTRY"
+        echo "Container image: $CONTAINER_IMAGE"
+        echo "Version: $VERSION"

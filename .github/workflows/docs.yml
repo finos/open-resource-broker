@@ -25,25 +25,17 @@ concurrency:
 
 jobs:
   get-config:
-    name: Get Python Version from Makefile
+    name: Get Configuration
     runs-on: ubuntu-latest
     outputs:
-      default-python-version: ${{ steps.version.outputs.default-python-version }}
+      default-python-version: ${{ steps.config.outputs.default-python-version }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
 
-    - name: Install yq
-      uses: mikefarah/yq@master
-
-    - name: Get default Python version from project config
-      id: version
-      run: |
-        DEFAULT_PYTHON_VERSION=$(make print-DEFAULT_PYTHON_VERSION)
-        echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> "$GITHUB_OUTPUT"
-        echo "Using Python version: $DEFAULT_PYTHON_VERSION"
-
-
+    - name: Get project configuration
+      id: config
+      uses: ./.github/actions/get-config
 
   build:
     needs: get-config
@@ -54,20 +46,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup Python and UV
+        uses: ./.github/actions/setup-python-uv
         with:
           python-version: ${{ needs.get-config.outputs.default-python-version }}
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
-        with:
-          enable-cache: true
-          cache-dependency-glob: "pyproject.toml.template"
-
-      - name: Install dependencies with uv
-        run: |
-          make ci-install
+          cache-key-suffix: docs
 
       - name: Configure Git for mike
         run: |

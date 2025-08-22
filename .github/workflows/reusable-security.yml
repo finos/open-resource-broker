@@ -1,0 +1,132 @@
+name: Reusable Security Workflow
+
+on:
+  workflow_call:
+    inputs:
+      scan-type:
+        description: 'Type of security scan (bandit, safety, semgrep, trivy-fs, hadolint, codeql)'
+        required: true
+        type: string
+      python-version:
+        description: 'Python version for scans that need it'
+        required: false
+        type: string
+
+jobs:
+  get-config:
+    name: Get Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      default-python-version: ${{ steps.config.outputs.default-python-version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Get project configuration
+        id: config
+        uses: ./.github/actions/get-config
+
+  security-scan:
+    name: ${{ inputs.scan-type }} Security Scan
+    runs-on: ubuntu-latest
+    needs: get-config
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: ${{ inputs.scan-type == 'codeql' && 0 || 1 }}
+
+      - name: Setup Python and UV
+        if: contains('bandit,safety,codeql', inputs.scan-type)
+        uses: ./.github/actions/setup-python-uv
+        with:
+          python-version: ${{ inputs.python-version || needs.get-config.outputs.default-python-version }}
+          cache-key-suffix: security-${{ inputs.scan-type }}
+
+      # Bandit Security Scan
+      - name: Run Bandit security scan
+        if: inputs.scan-type == 'bandit'
+        run: make ci-security-bandit
+
+      # Safety Dependency Scan
+      - name: Run Safety dependency scan
+        if: inputs.scan-type == 'safety'
+        run: make ci-security-safety
+
+      # Semgrep Static Analysis
+      - name: Run Semgrep security analysis
+        if: inputs.scan-type == 'semgrep'
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/python
+          generateSarif: "1"
+        continue-on-error: true
+
+      - name: Upload Semgrep SARIF results
+        if: inputs.scan-type == 'semgrep' && always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+
+      # Trivy Filesystem Scan
+      - name: Run Trivy filesystem vulnerability scanner
+        if: inputs.scan-type == 'trivy-fs'
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-fs-results.sarif'
+
+      - name: Upload Trivy filesystem scan results
+        if: inputs.scan-type == 'trivy-fs' && always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-fs-results.sarif'
+
+      # Hadolint Dockerfile Scan
+      - name: Run Hadolint Dockerfile scan
+        if: inputs.scan-type == 'hadolint'
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          format: sarif
+          output-file: hadolint-results.sarif
+          no-fail: true
+
+      - name: Upload Hadolint SARIF results
+        if: inputs.scan-type == 'hadolint' && always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: hadolint-results.sarif
+
+      # CodeQL Analysis
+      - name: Initialize CodeQL
+        if: inputs.scan-type == 'codeql'
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+          queries: security-extended,security-and-quality
+        continue-on-error: true
+        id: codeql-init-extended
+
+      - name: Initialize CodeQL (fallback)
+        if: inputs.scan-type == 'codeql' && steps.codeql-init-extended.outcome == 'failure'
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+          queries: security-and-quality
+
+      - name: Perform CodeQL Analysis
+        if: inputs.scan-type == 'codeql'
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"

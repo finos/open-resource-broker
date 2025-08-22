@@ -19,14 +19,9 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
 
-    - name: Install yq
-      uses: mikefarah/yq@master
-
-    - name: Get configuration from project config
+    - name: Get project configuration
       id: config
-      run: |
-        DEFAULT_PYTHON_VERSION=$(make print-DEFAULT_PYTHON_VERSION)
-        echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> "$GITHUB_OUTPUT"
+      uses: ./.github/actions/get-config
 
   validate-workflows:
     name: Validate Workflow Files
@@ -37,16 +32,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - name: Setup Python and UV
+      uses: ./.github/actions/setup-python-uv
       with:
         python-version: ${{ needs.get-config.outputs.default-python-version }}
-
-    - name: Install uv
-      uses: astral-sh/setup-uv@v6
-      with:
-        enable-cache: true
-        cache-dependency-glob: "pyproject.toml.template"
+        cache-key-suffix: validate-workflows
 
     - name: Validate workflow syntax and logic
       run: |

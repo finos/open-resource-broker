@@ -10,23 +10,17 @@ on:
 
 jobs:
   get-config:
-    name: Get Python Version from Makefile
+    name: Get Configuration
     runs-on: ubuntu-latest
     outputs:
-      default-python-version: ${{ steps.version.outputs.default-python-version }}
+      default-python-version: ${{ steps.config.outputs.default-python-version }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
 
-    - name: Install yq
-      uses: mikefarah/yq@master
-
-    - name: Get default Python version from project config
-      id: version
-      run: |
-        DEFAULT_PYTHON_VERSION=$(yq '.python.default_version' .project.yml)
-        echo "default-python-version=$DEFAULT_PYTHON_VERSION" >> "$GITHUB_OUTPUT"
-        echo "Using Python version: $DEFAULT_PYTHON_VERSION"
+    - name: Get project configuration
+      id: config
+      uses: ./.github/actions/get-config
 
   update-uv-lock:
     name: Update UV Lock File
@@ -44,21 +38,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Install yq
-        uses: mikefarah/yq@master
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Setup Python and UV
+        uses: ./.github/actions/setup-python-uv
         with:
           python-version: ${{ needs.get-config.outputs.default-python-version }}
-
-      - name: Install UV
-        uses: astral-sh/setup-uv@v6
-        with:
-          enable-cache: true
-        cache-dependency-glob: "pyproject.toml.template"
-      - name: Generate pyproject.toml
-        run: make generate-pyproject
+          cache-key-suffix: dependabot-update
+          install-deps: false
 
       - name: Update UV lock file
         env:
@@ -192,21 +177,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      - name: Install yq
-        uses: mikefarah/yq@master
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Setup Python and UV
+        uses: ./.github/actions/setup-python-uv
         with:
           python-version: ${{ needs.get-config.outputs.default-python-version }}
-
-      - name: Install UV
-        uses: astral-sh/setup-uv@v6
-        with:
-          enable-cache: true
-        cache-dependency-glob: "pyproject.toml.template"
-      - name: Generate pyproject.toml
-        run: make generate-pyproject
+          cache-key-suffix: dependabot-maintenance
+          install-deps: false
 
       - name: Update all dependencies
         run: |

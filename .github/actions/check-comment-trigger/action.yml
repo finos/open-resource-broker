@@ -1,0 +1,66 @@
+name: 'Check Comment Trigger'
+description: 'Check if PR comment contains trigger words and user is authorized'
+inputs:
+  triggers:
+    description: 'Comma-separated list of trigger words (e.g., "/test,/build")'
+    required: true
+  allowed-associations:
+    description: 'Comma-separated list of allowed user associations'
+    required: false
+    default: 'MEMBER,OWNER,COLLABORATOR'
+outputs:
+  triggered:
+    description: 'Whether the comment triggered the action'
+    value: ${{ steps.check.outputs.triggered }}
+  pr_ref:
+    description: 'PR head SHA if triggered'
+    value: ${{ steps.check.outputs.pr_ref }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Check comment trigger
+      id: check
+      if: github.event_name == 'issue_comment'
+      uses: actions/github-script@v7
+      env:
+        TRIGGERS: ${{ inputs.triggers }}
+        ALLOWED_ASSOCIATIONS: ${{ inputs.allowed-associations }}
+      with:
+        script: |
+          if (!context.issue.pull_request) {
+            console.log('Not a PR comment, skipping');
+            return;
+          }
+          
+          const allowedAssociations = process.env.ALLOWED_ASSOCIATIONS.split(',').map(a => a.trim());
+          const userAssociation = context.payload.comment.author_association;
+          
+          if (!allowedAssociations.includes(userAssociation)) {
+            console.log(`User ${context.payload.comment.user.login} not authorized (${userAssociation})`);
+            return;
+          }
+          
+          const comment = context.payload.comment.body.toLowerCase().trim();
+          const triggers = process.env.TRIGGERS.split(',').map(t => t.trim());
+          const triggered = triggers.some(t => comment === t);
+          
+          console.log(`Comment: ${context.payload.comment.body}`);
+          console.log(`User: ${context.payload.comment.user.login} (${userAssociation})`);
+          console.log(`Triggered: ${triggered}`);
+          
+          if (triggered) {
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            core.setOutput('triggered', 'true');
+            core.setOutput('pr_ref', pr.data.head.sha);
+            
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes'
+            });
+          }

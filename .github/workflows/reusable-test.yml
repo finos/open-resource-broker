@@ -1,0 +1,85 @@
+name: Reusable Test Workflow
+
+on:
+  workflow_call:
+    inputs:
+      test-type:
+        description: 'Type of tests to run (unit, integration, e2e, performance)'
+        required: true
+        type: string
+      python-version:
+        description: 'Python version to test with'
+        required: false
+        type: string
+      os:
+        description: 'Operating system to run on'
+        required: false
+        type: string
+        default: 'ubuntu-latest'
+      continue-on-error:
+        description: 'Whether to continue on test failures'
+        required: false
+        type: boolean
+        default: false
+      upload-coverage:
+        description: 'Whether to upload coverage reports'
+        required: false
+        type: boolean
+        default: true
+
+env:
+  AWS_DEFAULT_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: testing
+  AWS_SECRET_ACCESS_KEY: testing
+  ENVIRONMENT: testing
+  TESTING: true
+
+jobs:
+  get-config:
+    name: Get Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      default-python-version: ${{ steps.config.outputs.default-python-version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Get project configuration
+        id: config
+        uses: ./.github/actions/get-config
+
+  test:
+    name: ${{ inputs.test-type }} Tests
+    runs-on: ${{ inputs.os }}
+    needs: get-config
+    continue-on-error: ${{ inputs.continue-on-error }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Python and UV
+        uses: ./.github/actions/setup-python-uv
+        with:
+          python-version: ${{ inputs.python-version || needs.get-config.outputs.default-python-version }}
+          cache-key-suffix: ${{ inputs.test-type }}-${{ inputs.os }}
+
+      - name: Run tests
+        run: make ci-tests-${{ inputs.test-type }}
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ inputs.test-type }}-test-results-${{ inputs.os }}-${{ inputs.python-version || needs.get-config.outputs.default-python-version }}
+          path: |
+            junit-*.xml
+            coverage-*.xml
+
+      - name: Upload coverage to Codecov
+        if: inputs.upload-coverage && always()
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage-${{ inputs.test-type }}.xml
+          flags: ${{ inputs.test-type }}
+          name: ${{ inputs.test-type }}-tests
