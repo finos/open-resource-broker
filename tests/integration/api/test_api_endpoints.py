@@ -15,7 +15,9 @@ class TestAPIEndpoints:
     @pytest.fixture
     def client(self):
         """Create test client with no authentication."""
-        server_config = ServerConfig(enabled=True, auth=AuthConfig(enabled=False, strategy="replace"))
+        server_config = ServerConfig(
+            enabled=True, auth=AuthConfig(enabled=False, strategy="replace")
+        )
         app = create_fastapi_app(server_config)
         return TestClient(app)
 
