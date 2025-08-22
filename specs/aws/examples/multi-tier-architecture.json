@@ -13,10 +13,12 @@
         "Version": "{{ web_tier_launch_template_version | default('$Latest') }}"
       },
       "Overrides": [
-        {"InstanceType": "c6i.large", "SubnetId": "{{ public_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "c5.large", "SubnetId": "{{ public_subnet_ids[1] if public_subnet_ids|length > 1 else public_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "c6i.xlarge", "SubnetId": "{{ public_subnet_ids[0] }}", "WeightedCapacity": 2},
-        {"InstanceType": "c5.xlarge", "SubnetId": "{{ public_subnet_ids[1] if public_subnet_ids|length > 1 else public_subnet_ids[0] }}", "WeightedCapacity": 2}
+        {"InstanceType": "m6i.large", "SubnetId": "{{ public_subnet_ids[0] }}", "WeightedCapacity": 1},
+        {"InstanceType": "m6a.large", "SubnetId": "{{ public_subnet_ids[1] if public_subnet_ids|length > 1 else public_subnet_ids[0] }}", "WeightedCapacity": 1},
+        {"InstanceType": "m5.large", "SubnetId": "{{ public_subnet_ids[0] }}", "WeightedCapacity": 1},
+        {"InstanceType": "m5n.large", "SubnetId": "{{ public_subnet_ids[1] if public_subnet_ids|length > 1 else public_subnet_ids[0] }}", "WeightedCapacity": 1},
+        {"InstanceType": "m6i.xlarge", "SubnetId": "{{ public_subnet_ids[0] }}", "WeightedCapacity": 2},
+        {"InstanceType": "m5.xlarge", "SubnetId": "{{ public_subnet_ids[1] if public_subnet_ids|length > 1 else public_subnet_ids[0] }}", "WeightedCapacity": 2}
       ]
     },
     {
@@ -26,11 +28,13 @@
       },
       "Overrides": [
         {"InstanceType": "m6i.large", "SubnetId": "{{ private_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "m5.large", "SubnetId": "{{ private_subnet_ids[1] if private_subnet_ids|length > 1 else private_subnet_ids[0] }}", "WeightedCapacity": 1},
+        {"InstanceType": "m6a.large", "SubnetId": "{{ private_subnet_ids[1] if private_subnet_ids|length > 1 else private_subnet_ids[0] }}", "WeightedCapacity": 1},
+        {"InstanceType": "m5.large", "SubnetId": "{{ private_subnet_ids[0] }}", "WeightedCapacity": 1},
+        {"InstanceType": "m5a.large", "SubnetId": "{{ private_subnet_ids[1] if private_subnet_ids|length > 1 else private_subnet_ids[0] }}", "WeightedCapacity": 1},
         {"InstanceType": "m6i.xlarge", "SubnetId": "{{ private_subnet_ids[0] }}", "WeightedCapacity": 2},
         {"InstanceType": "m5.xlarge", "SubnetId": "{{ private_subnet_ids[1] if private_subnet_ids|length > 1 else private_subnet_ids[0] }}", "WeightedCapacity": 2},
-        {"InstanceType": "m6a.large", "SubnetId": "{{ private_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "m6a.xlarge", "SubnetId": "{{ private_subnet_ids[1] if private_subnet_ids|length > 1 else private_subnet_ids[0] }}", "WeightedCapacity": 2}
+        {"InstanceType": "m6i.2xlarge", "SubnetId": "{{ private_subnet_ids[0] }}", "WeightedCapacity": 4},
+        {"InstanceType": "m5.2xlarge", "SubnetId": "{{ private_subnet_ids[1] if private_subnet_ids|length > 1 else private_subnet_ids[0] }}", "WeightedCapacity": 4}
       ]
     },
     {
@@ -40,13 +44,14 @@
       },
       "Overrides": [
         {"InstanceType": "r6i.large", "SubnetId": "{{ db_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "r5.large", "SubnetId": "{{ db_subnet_ids[1] if db_subnet_ids|length > 1 else db_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "r6i.xlarge", "SubnetId": "{{ db_subnet_ids[0] }}", "WeightedCapacity": 2},
-        {"InstanceType": "r5.xlarge", "SubnetId": "{{ db_subnet_ids[1] if db_subnet_ids|length > 1 else db_subnet_ids[0] }}", "WeightedCapacity": 2},
+        {"InstanceType": "r6a.large", "SubnetId": "{{ db_subnet_ids[1] if db_subnet_ids|length > 1 else db_subnet_ids[0] }}", "WeightedCapacity": 1},
+        {"InstanceType": "r5.large", "SubnetId": "{{ db_subnet_ids[0] }}", "WeightedCapacity": 1},
+        {"InstanceType": "r5a.large", "SubnetId": "{{ db_subnet_ids[1] if db_subnet_ids|length > 1 else db_subnet_ids[0] }}", "WeightedCapacity": 1},
         {"InstanceType": "r5n.large", "SubnetId": "{{ db_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "r5n.xlarge", "SubnetId": "{{ db_subnet_ids[1] if db_subnet_ids|length > 1 else db_subnet_ids[0] }}", "WeightedCapacity": 2},
-        {"InstanceType": "i4i.large", "SubnetId": "{{ db_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "i3.large", "SubnetId": "{{ db_subnet_ids[1] if db_subnet_ids|length > 1 else db_subnet_ids[0] }}", "WeightedCapacity": 1}
+        {"InstanceType": "r6i.xlarge", "SubnetId": "{{ db_subnet_ids[1] if db_subnet_ids|length > 1 else db_subnet_ids[0] }}", "WeightedCapacity": 2},
+        {"InstanceType": "r5.xlarge", "SubnetId": "{{ db_subnet_ids[0] }}", "WeightedCapacity": 2},
+        {"InstanceType": "r6i.2xlarge", "SubnetId": "{{ db_subnet_ids[1] if db_subnet_ids|length > 1 else db_subnet_ids[0] }}", "WeightedCapacity": 4},
+        {"InstanceType": "r5.2xlarge", "SubnetId": "{{ db_subnet_ids[0] }}", "WeightedCapacity": 4}
       ]
     }
   ],

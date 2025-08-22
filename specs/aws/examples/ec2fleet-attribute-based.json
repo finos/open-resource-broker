@@ -1,0 +1,64 @@
+{
+  "Type": "instant",
+  "LaunchTemplateConfigs": [{
+    "LaunchTemplateSpecification": {
+      "LaunchTemplateId": "{{ launch_template_id }}",
+      "Version": "{{ launch_template_version | default('$Latest') }}"
+    },
+    "Overrides": [
+      {
+        "InstanceRequirements": {
+          "VCpuCount": {"Min": 2, "Max": 8},
+          "MemoryMiB": {"Min": 8192, "Max": 32768},
+          "InstanceGenerations": ["current", "previous"],
+          "BurstablePerformance": "excluded",
+          "RequireHibernateSupport": false,
+          "NetworkInterfaceCount": {"Min": 1, "Max": 4},
+          "LocalStorage": "excluded",
+          "LocalStorageTypes": [],
+          "BareMetal": "excluded",
+          "BurstablePerformance": "excluded",
+          "CpuManufacturers": ["intel", "amd"],
+          "ExcludedInstanceTypes": ["m4.*", "r4.*"],
+          "InstanceGenerations": ["current"],
+          "NetworkPerformance": ["up-to-10-gigabit", "10-gigabit", "25-gigabit"]
+        },
+        "SubnetId": "{{ subnet_ids[0] }}"
+      },
+      {
+        "InstanceRequirements": {
+          "VCpuCount": {"Min": 4, "Max": 16},
+          "MemoryMiB": {"Min": 16384, "Max": 65536},
+          "InstanceGenerations": ["current"],
+          "BurstablePerformance": "excluded",
+          "RequireHibernateSupport": false,
+          "NetworkInterfaceCount": {"Min": 2, "Max": 8},
+          "LocalStorage": "excluded",
+          "BareMetal": "excluded",
+          "CpuManufacturers": ["intel", "amd"],
+          "ExcludedInstanceTypes": ["m4.*", "r4.*", "*.nano", "*.micro", "*.small"],
+          "NetworkPerformance": ["10-gigabit", "25-gigabit", "50-gigabit"]
+        },
+        "SubnetId": "{{ subnet_ids[1] if subnet_ids|length > 1 else subnet_ids[0] }}"
+      }
+    ]
+  }],
+  "TargetCapacitySpecification": {
+    "TotalTargetCapacity": "{{ requested_count }}",
+    "DefaultTargetCapacityType": "spot",
+    "OnDemandTargetCapacity": "{{ on_demand_capacity | default(1) }}",
+    "OnDemandAllocationStrategy": "prioritized",
+    "SpotAllocationStrategy": "price-capacity-optimized"
+  },
+  "TagSpecifications": [{
+    "ResourceType": "fleet",
+    "Tags": [
+      {"Key": "Name", "Value": "attribute-based-fleet-{{ request_id }}"},
+      {"Key": "RequestId", "Value": "{{ request_id }}"},
+      {"Key": "TemplateId", "Value": "{{ template_id }}"},
+      {"Key": "CreatedBy", "Value": "{{ package_name }}"},
+      {"Key": "AllocationStrategy", "Value": "price-capacity-optimized"},
+      {"Key": "SelectionMethod", "Value": "attribute-based"}
+    ]
+  }]
+}
