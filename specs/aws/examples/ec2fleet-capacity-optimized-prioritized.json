@@ -6,10 +6,16 @@
       "Version": "{{ launch_template_version | default('$Latest') }}"
     },
     "Overrides": [
-      {"InstanceType": "m5.large", "SubnetId": "{{ subnet_ids[0] }}", "Priority": 1},
-      {"InstanceType": "c5.large", "SubnetId": "{{ subnet_ids[0] }}", "Priority": 2},
-      {"InstanceType": "m5.xlarge", "SubnetId": "{{ subnet_ids[1] if subnet_ids|length > 1 else subnet_ids[0] }}", "Priority": 3},
-      {"InstanceType": "c5.xlarge", "SubnetId": "{{ subnet_ids[1] if subnet_ids|length > 1 else subnet_ids[0] }}", "Priority": 4}
+      {"InstanceType": "m6i.large", "SubnetId": "{{ subnet_ids[0] }}", "Priority": 1},
+      {"InstanceType": "m5.large", "SubnetId": "{{ subnet_ids[0] }}", "Priority": 2},
+      {"InstanceType": "c6i.large", "SubnetId": "{{ subnet_ids[0] }}", "Priority": 3},
+      {"InstanceType": "c5.large", "SubnetId": "{{ subnet_ids[0] }}", "Priority": 4},
+      {"InstanceType": "r6i.large", "SubnetId": "{{ subnet_ids[1] if subnet_ids|length > 1 else subnet_ids[0] }}", "Priority": 5},
+      {"InstanceType": "r5.large", "SubnetId": "{{ subnet_ids[1] if subnet_ids|length > 1 else subnet_ids[0] }}", "Priority": 6},
+      {"InstanceType": "r5n.xlarge", "SubnetId": "{{ subnet_ids[0] }}", "Priority": 7},
+      {"InstanceType": "i4i.large", "SubnetId": "{{ subnet_ids[1] if subnet_ids|length > 1 else subnet_ids[0] }}", "Priority": 8},
+      {"InstanceType": "i3.large", "SubnetId": "{{ subnet_ids[0] }}", "Priority": 9},
+      {"InstanceType": "z1d.large", "SubnetId": "{{ subnet_ids[1] if subnet_ids|length > 1 else subnet_ids[0] }}", "Priority": 10}
     ]
   }],
   "TargetCapacitySpecification": {

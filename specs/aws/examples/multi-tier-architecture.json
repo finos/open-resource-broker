@@ -2,94 +2,76 @@
   "Type": "maintain",
   "TargetCapacitySpecification": {
     "TotalTargetCapacity": "{{ requested_count }}",
-    "OnDemandTargetCapacity": "{{ web_tier_capacity + app_tier_capacity }}",
-    "SpotTargetCapacity": "{{ db_tier_capacity }}",
+    "OnDemandTargetCapacity": "{{ on_demand_capacity | default((requested_count * 0.6) | round | int) }}",
+    "SpotTargetCapacity": "{{ spot_capacity | default((requested_count * 0.4) | round | int) }}",
     "DefaultTargetCapacityType": "on-demand"
   },
   "LaunchTemplateConfigs": [
     {
       "LaunchTemplateSpecification": {
         "LaunchTemplateId": "{{ web_tier_launch_template_id }}",
-        "Version": "{{ web_tier_launch_template_version }}"
+        "Version": "{{ web_tier_launch_template_version | default('$Latest') }}"
       },
       "Overrides": [
-        {% for subnet_id in public_subnet_ids %}
-        {
-          "InstanceType": "{{ web_tier_instance_type }}",
-          "SubnetId": "{{ subnet_id }}",
-          "WeightedCapacity": 1,
-          "Priority": 1.0
-        }{% if not loop.last %},{% endif %}
-        {% endfor %}
+        {"InstanceType": "c6i.large", "SubnetId": "{{ public_subnet_ids[0] }}", "WeightedCapacity": 1},
+        {"InstanceType": "c5.large", "SubnetId": "{{ public_subnet_ids[1] if public_subnet_ids|length > 1 else public_subnet_ids[0] }}", "WeightedCapacity": 1},
+        {"InstanceType": "c6i.xlarge", "SubnetId": "{{ public_subnet_ids[0] }}", "WeightedCapacity": 2},
+        {"InstanceType": "c5.xlarge", "SubnetId": "{{ public_subnet_ids[1] if public_subnet_ids|length > 1 else public_subnet_ids[0] }}", "WeightedCapacity": 2}
       ]
     },
     {
       "LaunchTemplateSpecification": {
         "LaunchTemplateId": "{{ app_tier_launch_template_id }}",
-        "Version": "{{ app_tier_launch_template_version }}"
+        "Version": "{{ app_tier_launch_template_version | default('$Latest') }}"
       },
       "Overrides": [
-        {% for subnet_id in private_subnet_ids %}
-        {
-          "InstanceType": "{{ app_tier_instance_type }}",
-          "SubnetId": "{{ subnet_id }}",
-          "WeightedCapacity": 1,
-          "Priority": 2.0
-        }{% if not loop.last %},{% endif %}
-        {% endfor %}
+        {"InstanceType": "m6i.large", "SubnetId": "{{ private_subnet_ids[0] }}", "WeightedCapacity": 1},
+        {"InstanceType": "m5.large", "SubnetId": "{{ private_subnet_ids[1] if private_subnet_ids|length > 1 else private_subnet_ids[0] }}", "WeightedCapacity": 1},
+        {"InstanceType": "m6i.xlarge", "SubnetId": "{{ private_subnet_ids[0] }}", "WeightedCapacity": 2},
+        {"InstanceType": "m5.xlarge", "SubnetId": "{{ private_subnet_ids[1] if private_subnet_ids|length > 1 else private_subnet_ids[0] }}", "WeightedCapacity": 2},
+        {"InstanceType": "m6a.large", "SubnetId": "{{ private_subnet_ids[0] }}", "WeightedCapacity": 1},
+        {"InstanceType": "m6a.xlarge", "SubnetId": "{{ private_subnet_ids[1] if private_subnet_ids|length > 1 else private_subnet_ids[0] }}", "WeightedCapacity": 2}
       ]
     },
     {
       "LaunchTemplateSpecification": {
         "LaunchTemplateId": "{{ db_tier_launch_template_id }}",
-        "Version": "{{ db_tier_launch_template_version }}"
+        "Version": "{{ db_tier_launch_template_version | default('$Latest') }}"
       },
       "Overrides": [
-        {% for subnet_id in database_subnet_ids %}
-        {
-          "InstanceType": "{{ db_tier_instance_type }}",
-          "SubnetId": "{{ subnet_id }}",
-          "WeightedCapacity": 1,
-          "Priority": 3.0
-        }{% if not loop.last %},{% endif %}
-        {% endfor %}
+        {"InstanceType": "r6i.large", "SubnetId": "{{ db_subnet_ids[0] }}", "WeightedCapacity": 1},
+        {"InstanceType": "r5.large", "SubnetId": "{{ db_subnet_ids[1] if db_subnet_ids|length > 1 else db_subnet_ids[0] }}", "WeightedCapacity": 1},
+        {"InstanceType": "r6i.xlarge", "SubnetId": "{{ db_subnet_ids[0] }}", "WeightedCapacity": 2},
+        {"InstanceType": "r5.xlarge", "SubnetId": "{{ db_subnet_ids[1] if db_subnet_ids|length > 1 else db_subnet_ids[0] }}", "WeightedCapacity": 2},
+        {"InstanceType": "r5n.large", "SubnetId": "{{ db_subnet_ids[0] }}", "WeightedCapacity": 1},
+        {"InstanceType": "r5n.xlarge", "SubnetId": "{{ db_subnet_ids[1] if db_subnet_ids|length > 1 else db_subnet_ids[0] }}", "WeightedCapacity": 2},
+        {"InstanceType": "i4i.large", "SubnetId": "{{ db_subnet_ids[0] }}", "WeightedCapacity": 1},
+        {"InstanceType": "i3.large", "SubnetId": "{{ db_subnet_ids[1] if db_subnet_ids|length > 1 else db_subnet_ids[0] }}", "WeightedCapacity": 1}
       ]
     }
   ],
   "OnDemandOptions": {
-    "AllocationStrategy": "prioritized",
-    "CapacityReservationOptions": {
-      "UsageStrategy": "use-capacity-reservations-first"
-    }
+    "AllocationStrategy": "prioritized"
   },
   "SpotOptions": {
-    "AllocationStrategy": "capacity-optimized-prioritized",
+    "AllocationStrategy": "price-capacity-optimized",
     "InstanceInterruptionBehavior": "terminate",
-    "InstancePoolsToUseCount": 2,
     "MaintenanceStrategies": {
       "CapacityRebalance": {
-        "ReplacementStrategy": "launch-before-terminate"
+        "ReplacementStrategy": "launch"
       }
     }
   },
   "ReplaceUnhealthyInstances": true,
-  "TerminateInstancesWithExpiration": false,
-  "TagSpecifications": [
-    {
-      "ResourceType": "fleet",
-      "Tags": [
-        {"Key": "Name", "Value": "multi-tier-fleet-{{ request_id }}"},
-        {"Key": "RequestId", "Value": "{{ request_id }}"},
-        {"Key": "TemplateId", "Value": "{{ template_id }}"},
-        {"Key": "CreatedBy", "Value": "{{ package_name | default('open-hostfactory-plugin') }}"},
-        {"Key": "Architecture", "Value": "multi-tier"},
-        {"Key": "Environment", "Value": "{{ environment }}"},
-        {"Key": "Application", "Value": "{{ application_name }}"},
-        {"Key": "WebTierCapacity", "Value": "{{ web_tier_capacity }}"},
-        {"Key": "AppTierCapacity", "Value": "{{ app_tier_capacity }}"},
-        {"Key": "DbTierCapacity", "Value": "{{ db_tier_capacity }}"},
-        {"Key": "CostOptimized", "Value": "true"}
-      ]
-    }
-  ]
+  "TagSpecifications": [{
+    "ResourceType": "fleet",
+    "Tags": [
+      {"Key": "Name", "Value": "multi-tier-{{ request_id }}"},
+      {"Key": "RequestId", "Value": "{{ request_id }}"},
+      {"Key": "TemplateId", "Value": "{{ template_id }}"},
+      {"Key": "CreatedBy", "Value": "{{ package_name }}"},
+      {"Key": "Architecture", "Value": "multi-tier"},
+      {"Key": "AllocationStrategy", "Value": "price-capacity-optimized"}
+    ]
+  }]
 }

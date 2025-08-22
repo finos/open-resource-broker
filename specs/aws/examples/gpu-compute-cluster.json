@@ -3,55 +3,50 @@
   "TargetCapacitySpecification": {
     "TotalTargetCapacity": "{{ requested_count }}",
     "DefaultTargetCapacityType": "on-demand",
+    "OnDemandTargetCapacity": "{{ on_demand_gpu_capacity | default(requested_count) }}",
+    "SpotTargetCapacity": "{{ spot_gpu_capacity | default(0) }}",
     "TargetCapacityUnitType": "units"
   },
-  "LaunchTemplateConfigs": [
-    {
-      "LaunchTemplateSpecification": {
-        "LaunchTemplateId": "{{ launch_template_id }}",
-        "Version": "{{ launch_template_version }}"
-      },
-      "Overrides": [
-        {% for compute_config in gpu_configurations %}
-        {
-          "InstanceType": "{{ compute_config.instance_type }}",
-          "SubnetId": "{{ compute_config.subnet_id }}",
-          "AvailabilityZone": "{{ compute_config.availability_zone }}",
-          "WeightedCapacity": "{{ compute_config.gpu_count }}",
-          "Placement": {
-            "GroupName": "{{ compute_config.placement_group }}",
-            "Tenancy": "default"
-          }
-        }{% if not loop.last %},{% endif %}
-        {% endfor %}
-      ]
-    }
-  ],
+  "LaunchTemplateConfigs": [{
+    "LaunchTemplateSpecification": {
+      "LaunchTemplateId": "{{ launch_template_id }}",
+      "Version": "{{ launch_template_version | default('$Latest') }}"
+    },
+    "Overrides": [
+      {"InstanceType": "p4d.24xlarge", "SubnetId": "{{ subnet_ids[0] }}", "WeightedCapacity": 8},
+      {"InstanceType": "p3.2xlarge", "SubnetId": "{{ subnet_ids[1] if subnet_ids|length > 1 else subnet_ids[0] }}", "WeightedCapacity": 1},
+      {"InstanceType": "p3.8xlarge", "SubnetId": "{{ subnet_ids[0] }}", "WeightedCapacity": 4},
+      {"InstanceType": "p3.16xlarge", "SubnetId": "{{ subnet_ids[1] if subnet_ids|length > 1 else subnet_ids[0] }}", "WeightedCapacity": 8},
+      {"InstanceType": "g4dn.xlarge", "SubnetId": "{{ subnet_ids[0] }}", "WeightedCapacity": 1},
+      {"InstanceType": "g4dn.2xlarge", "SubnetId": "{{ subnet_ids[1] if subnet_ids|length > 1 else subnet_ids[0] }}", "WeightedCapacity": 1},
+      {"InstanceType": "g4dn.4xlarge", "SubnetId": "{{ subnet_ids[0] }}", "WeightedCapacity": 1},
+      {"InstanceType": "g5.xlarge", "SubnetId": "{{ subnet_ids[1] if subnet_ids|length > 1 else subnet_ids[0] }}", "WeightedCapacity": 1},
+      {"InstanceType": "g5.2xlarge", "SubnetId": "{{ subnet_ids[0] }}", "WeightedCapacity": 1},
+      {"InstanceType": "g5.4xlarge", "SubnetId": "{{ subnet_ids[1] if subnet_ids|length > 1 else subnet_ids[0] }}", "WeightedCapacity": 1}
+    ]
+  }],
   "OnDemandOptions": {
-    "AllocationStrategy": "lowest-price",
-    "SingleInstanceType": false,
-    "SingleAvailabilityZone": "{{ single_az_deployment | default(false) }}",
-    "MinTargetCapacity": "{{ min_gpu_capacity | default(1) }}"
+    "AllocationStrategy": "prioritized"
+  },
+  "SpotOptions": {
+    "AllocationStrategy": "price-capacity-optimized",
+    "InstanceInterruptionBehavior": "terminate",
+    "MaintenanceStrategies": {
+      "CapacityRebalance": {
+        "ReplacementStrategy": "launch"
+      }
+    }
   },
   "ReplaceUnhealthyInstances": true,
-  "TerminateInstancesWithExpiration": false,
-  "TagSpecifications": [
-    {
-      "ResourceType": "fleet",
-      "Tags": [
-        {"Key": "Name", "Value": "gpu-cluster-{{ request_id }}"},
-        {"Key": "RequestId", "Value": "{{ request_id }}"},
-        {"Key": "TemplateId", "Value": "{{ template_id }}"},
-        {"Key": "CreatedBy", "Value": "{{ package_name | default('open-hostfactory-plugin') }}"},
-        {"Key": "WorkloadType", "Value": "{{ workload_type | default('machine-learning') }}"},
-        {"Key": "GPUOptimized", "Value": "true"},
-        {"Key": "HighPerformanceComputing", "Value": "true"},
-        {"Key": "ClusterSize", "Value": "{{ requested_count }}"},
-        {"Key": "TotalGPUs", "Value": "{{ total_gpu_count }}"},
-        {"Key": "Framework", "Value": "{{ ml_framework | default('pytorch') }}"},
-        {"Key": "CostCenter", "Value": "{{ cost_center | default('research') }}"},
-        {"Key": "Project", "Value": "{{ project_name }}"}
-      ]
-    }
-  ]
+  "TagSpecifications": [{
+    "ResourceType": "fleet",
+    "Tags": [
+      {"Key": "Name", "Value": "gpu-cluster-{{ request_id }}"},
+      {"Key": "RequestId", "Value": "{{ request_id }}"},
+      {"Key": "TemplateId", "Value": "{{ template_id }}"},
+      {"Key": "CreatedBy", "Value": "{{ package_name }}"},
+      {"Key": "WorkloadType", "Value": "gpu-compute"},
+      {"Key": "AllocationStrategy", "Value": "price-capacity-optimized"}
+    ]
+  }]
 }
