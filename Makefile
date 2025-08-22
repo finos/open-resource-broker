@@ -86,7 +86,7 @@ install-pip: $(VENV)/bin/activate  ## Install production dependencies (pip alter
 
 dev-install: generate-pyproject $(VENV)/bin/activate  ## Install development dependencies (UV-first)
 	@echo "Installing with UV (dev + ci dependencies)..."
-	uv sync --group ci --group dev
+	@uv sync --group ci --group dev --quiet
 
 dev-install-pip: generate-pyproject $(VENV)/bin/activate  ## Install development dependencies (pip alternative)
 	@echo "Generating requirements from uv.lock..."
@@ -98,7 +98,7 @@ dev-install-pip: generate-pyproject $(VENV)/bin/activate  ## Install development
 # CI installation targets
 ci-install: generate-pyproject  ## Install dependencies for CI (UV frozen)
 	@echo "Installing with UV (frozen mode - CI dependencies)..."
-	uv sync --frozen --group ci
+	@uv sync --frozen --group ci --quiet
 
 # Requirements generation
 requirements-generate:  ## Generate requirements files from uv.lock
@@ -193,8 +193,8 @@ quality-check-files: dev-install  ## Run quality checks on specific files (usage
 	./dev-tools/scripts/quality_check.py --strict --files $(FILES)
 
 format-fix: dev-install clean-whitespace  ## Auto-fix code formatting with Ruff
-	uv run ruff format .
-	uv run ruff check --fix --exit-zero .
+	@uv run ruff format --quiet .
+	@uv run ruff check --fix --exit-zero --quiet .
 
 container-health-check:  ## Test container health endpoint
 	./dev-tools/scripts/container_health_check.py
@@ -204,11 +204,11 @@ ci-git-setup:  ## Setup git configuration for CI automated commits
 	git config --local user.email "github-actions[bot]@users.noreply.github.com"
 
 lint: dev-install  ## Check enforced rules (fail on issues)
-	uv run ruff check .
-	uv run ruff format --check .
+	@uv run ruff check --quiet .
+	@uv run ruff format --check --quiet .
 
 lint-optional: dev-install  ## Check optional rules (warnings only)
-	uv run ruff check --select=N,UP,B,PL,C90,RUF . || true
+	@uv run ruff check --select=N,UP,B,PL,C90,RUF --quiet . || true
 
 pre-commit: format lint  ## Simulate pre-commit checks locally
 	@echo "All checks passed! Safe to commit."
@@ -447,12 +447,12 @@ publish-test: build  ## Publish to test PyPI
 # @SECTION CI Quality Checks
 # Individual code quality targets (with tool names)
 format: dev-install clean-whitespace  ## Format code with Ruff (no auto-fix)
-	uv run ruff format --check .
+	@uv run ruff format --check --quiet .
 
 ci-quality-ruff: dev-install  ## Run Ruff formatting and linting check
 	@echo "Running Ruff formatting and linting check..."
-	uv run ruff check .
-	uv run ruff format --check .
+	@uv run ruff check --quiet .
+	@uv run ruff format --check --quiet .
 
 ci-quality-ruff-optional:  ## Run Ruff extended linting (warnings only)
 	@echo "Running Ruff extended linting..."
