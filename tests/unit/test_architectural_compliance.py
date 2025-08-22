@@ -38,9 +38,9 @@ class TestDDDCompliance:
                     # Skip files with syntax errors
                     continue
 
-        assert (
-            not infrastructure_imports
-        ), f"Domain layer has infrastructure dependencies: {infrastructure_imports}"
+        assert not infrastructure_imports, (
+            f"Domain layer has infrastructure dependencies: {infrastructure_imports}"
+        )
 
     def test_domain_has_no_provider_dependencies(self):
         """Ensure domain layer imports no provider-specific code."""
@@ -197,9 +197,9 @@ class TestSOLIDCompliance:
 
         # All methods should be orchestration-related
         for method in methods:
-            assert any(
-                orch_method in method for orch_method in orchestration_methods
-            ), f"ApplicationService method {method} may violate SRP"
+            assert any(orch_method in method for orch_method in orchestration_methods), (
+                f"ApplicationService method {method} may violate SRP"
+            )
 
     def test_open_closed_principle(self):
         """Ensure classes are open for extension, closed for modification."""
@@ -226,9 +226,9 @@ class TestSOLIDCompliance:
             pytest.skip(f"Could not import provider classes: {e}")
 
         # AWS Provider should be substitutable for ProviderPort
-        assert issubclass(
-            AWSProvider, ProviderPort
-        ), "AWSProvider should be substitutable for ProviderPort"
+        assert issubclass(AWSProvider, ProviderPort), (
+            "AWSProvider should be substitutable for ProviderPort"
+        )
 
     def test_interface_segregation_principle(self):
         """Ensure clients depend only on interfaces they use."""
@@ -347,9 +347,9 @@ class TestCleanArchitectureCompliance:
                     continue
 
         # Domain should only depend on standard library and domain-specific libraries
-        assert (
-            len(external_deps) < 5
-        ), f"Domain layer has too many external dependencies: {external_deps}"
+        assert len(external_deps) < 5, (
+            f"Domain layer has too many external dependencies: {external_deps}"
+        )
 
     def test_framework_independence(self):
         """Ensure domain is independent of frameworks."""
@@ -395,9 +395,9 @@ class TestDesignPatternCompliance:
             pytest.skip(f"Could not import Repository: {e}")
 
         # Repository should be abstract
-        assert hasattr(
-            Repository, "__abstractmethods__"
-        ), "Repository should be abstract base class"
+        assert hasattr(Repository, "__abstractmethods__"), (
+            "Repository should be abstract base class"
+        )
 
     def test_factory_pattern_compliance(self):
         """Test Factory pattern implementation."""
@@ -427,12 +427,12 @@ class TestDesignPatternCompliance:
             template_id="test-template", machine_count=1, requester_id="test-user"
         )
 
-        assert hasattr(
-            request, "get_domain_events"
-        ), "Aggregates should have get_domain_events method"
-        assert hasattr(
-            request, "clear_domain_events"
-        ), "Aggregates should have clear_domain_events method"
+        assert hasattr(request, "get_domain_events"), (
+            "Aggregates should have get_domain_events method"
+        )
+        assert hasattr(request, "clear_domain_events"), (
+            "Aggregates should have clear_domain_events method"
+        )
 
 
 @pytest.mark.unit
@@ -466,9 +466,9 @@ class TestCodeQualityCompliance:
                 if "aws_handler" in content and "test" not in str(py_file):
                     aws_handler_usage.append(str(py_file))
 
-        assert (
-            not aws_handler_usage
-        ), f"Found aws_handler usage (should be provider_api): {aws_handler_usage}"
+        assert not aws_handler_usage, (
+            f"Found aws_handler usage (should be provider_api): {aws_handler_usage}"
+        )
 
     def test_proper_exception_hierarchy(self):
         """Test that exceptions follow correct hierarchy."""
@@ -479,6 +479,6 @@ class TestCodeQualityCompliance:
             pytest.skip(f"Could not import exception classes: {e}")
 
         # Domain exceptions should inherit from DomainException
-        assert issubclass(
-            RequestValidationError, DomainException
-        ), "Domain exceptions should inherit from DomainException"
+        assert issubclass(RequestValidationError, DomainException), (
+            "Domain exceptions should inherit from DomainException"
+        )

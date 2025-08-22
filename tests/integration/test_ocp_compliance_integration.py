@@ -264,9 +264,9 @@ class TestOCPComplianceIntegration:
                 ]
 
                 for pattern in hard_coded_patterns:
-                    assert (
-                        pattern not in content
-                    ), f"Found hard-coded conditional '{pattern}' in {file_path}"
+                    assert pattern not in content, (
+                        f"Found hard-coded conditional '{pattern}' in {file_path}"
+                    )
 
     def test_configuration_schema_no_legacy_mode(self):
         """Test that configuration schema no longer supports legacy mode."""

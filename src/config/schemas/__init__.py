@@ -21,8 +21,6 @@ from .performance_schema import (
 )
 from .provider_strategy_schema import (
     CircuitBreakerConfig as StrategyCircuitBreakerConfig,
-)
-from .provider_strategy_schema import (
     HealthCheckConfig,
     ProviderConfig,
     ProviderInstanceConfig,

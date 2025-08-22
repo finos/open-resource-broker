@@ -65,13 +65,13 @@ def validate_workflow_structure(file_path: Path):
                             step_str = str(step)
                             if step_str.count("uses:") > 1:
                                 issues.append(
-                                    f"Job '{job_name}' step {i+1} has duplicate 'uses' fields"
+                                    f"Job '{job_name}' step {i + 1} has duplicate 'uses' fields"
                                 )
 
                             # Check for steps that have name but no action (less strict)
                             if "name" in step and len(step) == 1:
                                 issues.append(
-                                    f"Job '{job_name}' step {i+1} ('{step['name']}') has no action"
+                                    f"Job '{job_name}' step {i + 1} ('{step['name']}') has no action"
                                 )
 
         return issues

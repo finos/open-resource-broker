@@ -36,8 +36,7 @@ class TemplateValidatedHandler(BaseLoggingEventHandler):
         )
 
         message = (
-            f"Template validated: {fields['template_name']} | "
-            f"Status: {fields['validation_status']}"
+            f"Template validated: {fields['template_name']} | Status: {fields['validation_status']}"
         )
 
         if fields["validation_errors"]:
@@ -66,7 +65,7 @@ class TemplateUpdatedHandler(BaseLoggingEventHandler):
             },
         )
 
-        message = f"Template updated: {fields['template_name']} | " f"By: {fields['updated_by']}"
+        message = f"Template updated: {fields['template_name']} | By: {fields['updated_by']}"
 
         if fields["changes"]:
             change_count = len(fields["changes"])

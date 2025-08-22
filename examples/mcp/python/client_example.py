@@ -5,6 +5,7 @@ Example Python MCP client for Open Host Factory Plugin.
 This example demonstrates how to connect to the MCP server and perform
 common infrastructure provisioning tasks.
 """
+
 import asyncio
 import logging
 from typing import Any, Dict

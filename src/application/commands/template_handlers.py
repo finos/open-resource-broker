@@ -262,7 +262,7 @@ class DeleteTemplateHandler(BaseCommandHandler[DeleteTemplateCommand, TemplateCo
                 # template
                 if template.is_in_use():
                     raise BusinessRuleError(
-                        f"Cannot delete template { command.template_id}: template is in use"
+                        f"Cannot delete template {command.template_id}: template is in use"
                     )
 
                 # Delete template

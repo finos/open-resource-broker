@@ -132,9 +132,9 @@ class TestCleanArchitectureIntegration:
             "security_group_ids",
         ]
         for field in aws_specific_fields:
-            assert (
-                field not in config_dict
-            ), f"AWS-specific field {field} should not be in clean template config"
+            assert field not in config_dict, (
+                f"AWS-specific field {field} should not be in clean template config"
+            )
 
     def test_aws_extension_configuration(self):
         """Test AWS extension configuration works correctly."""

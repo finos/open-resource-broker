@@ -115,12 +115,12 @@ def test_template_defaults_precedence():
         print(f"   - Final instance_type: {template.instance_type}")
 
         # Verify explicit values were preserved (not overridden by defaults)
-        assert template.subnet_ids == [
-            "subnet-explicit-123"
-        ], "Explicit subnet_ids should be preserved"
-        assert template.security_group_ids == [
-            "sg-explicit-456"
-        ], "Explicit security_group_ids should be preserved"
+        assert template.subnet_ids == ["subnet-explicit-123"], (
+            "Explicit subnet_ids should be preserved"
+        )
+        assert template.security_group_ids == ["sg-explicit-456"], (
+            "Explicit security_group_ids should be preserved"
+        )
         assert template.instance_type == "t3.large", "Explicit instance_type should be preserved"
 
         print("PASS: Template values correctly override defaults (correct precedence)")

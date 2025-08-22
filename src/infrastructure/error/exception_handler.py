@@ -689,7 +689,7 @@ class ExceptionHandler:
         # Context-aware exception mapping
         if "config" in context_lower or "template" in context_lower:
             return ConfigurationError(
-                message=f"Invalid JSON format in { context_str or 'configuration'}: { exc.msg}",
+                message=f"Invalid JSON format in {context_str or 'configuration'}: {exc.msg}",
                 details={
                     "original_error": str(exc),
                     "line_number": exc.lineno,
@@ -890,25 +890,25 @@ class ExceptionHandler:
 
     def _register_http_handlers(self) -> None:
         """Register HTTP error handlers."""
-        self._http_handlers: Dict[Type[Exception], Callable[[Exception], ErrorResponse]] = (
-            {  # Domain errors
-                ValidationError: self._handle_validation_error_http,
-                EntityNotFoundError: self._handle_not_found_error_http,
-                BusinessRuleViolationError: self._handle_business_rule_error_http,
-                # Request errors
-                RequestNotFoundError: self._handle_request_not_found_http,
-                RequestValidationError: self._handle_request_validation_http,
-                # Machine errors
-                MachineNotFoundError: self._handle_machine_not_found_http,
-                MachineValidationError: self._handle_machine_validation_http,
-                # Template errors
-                TemplateNotFoundError: self._handle_template_not_found_http,
-                TemplateValidationError: self._handle_template_validation_http,
-                # Infrastructure errors (will handle AWS errors through inheritance)
-                InfrastructureError: self._handle_infrastructure_error_http,
-                ConfigurationError: self._handle_configuration_error_http,
-            }
-        )
+        self._http_handlers: Dict[
+            Type[Exception], Callable[[Exception], ErrorResponse]
+        ] = {  # Domain errors
+            ValidationError: self._handle_validation_error_http,
+            EntityNotFoundError: self._handle_not_found_error_http,
+            BusinessRuleViolationError: self._handle_business_rule_error_http,
+            # Request errors
+            RequestNotFoundError: self._handle_request_not_found_http,
+            RequestValidationError: self._handle_request_validation_http,
+            # Machine errors
+            MachineNotFoundError: self._handle_machine_not_found_http,
+            MachineValidationError: self._handle_machine_validation_http,
+            # Template errors
+            TemplateNotFoundError: self._handle_template_not_found_http,
+            TemplateValidationError: self._handle_template_validation_http,
+            # Infrastructure errors (will handle AWS errors through inheritance)
+            InfrastructureError: self._handle_infrastructure_error_http,
+            ConfigurationError: self._handle_configuration_error_http,
+        }
 
     # HTTP ERROR HANDLERS
 

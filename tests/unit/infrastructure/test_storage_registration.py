@@ -105,7 +105,6 @@ class TestJSONStorageRegistration:
             ),
             patch("src.infrastructure.persistence.json.registration.JSONUnitOfWork"),
         ):
-
             register_json_storage()
 
             # Verify registration
@@ -211,7 +210,6 @@ class TestSQLStorageRegistration:
             ),
             patch("src.infrastructure.persistence.sql.registration.SQLUnitOfWork"),
         ):
-
             register_sql_storage()
 
             # Verify registration
@@ -299,7 +297,6 @@ class TestDynamoDBStorageRegistration:
             ),
             patch("src.providers.aws.persistence.dynamodb.registration.DynamoDBUnitOfWork"),
         ):
-
             register_dynamodb_storage()
 
             # Verify registration
@@ -388,7 +385,6 @@ class TestCentralStorageRegistration:
             patch("src.infrastructure.persistence.registration.SQLStorageStrategy"),
             patch("src.infrastructure.persistence.registration.DynamoDBStorageStrategy"),
         ):
-
             available_types = get_available_storage_types()
 
             # Should include all types when imports succeed

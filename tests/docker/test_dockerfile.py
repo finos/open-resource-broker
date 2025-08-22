@@ -33,9 +33,9 @@ class TestDockerfile:
         assert "FROM python:3.11-slim as production" in content, "Should have production stage"
 
         # Check for security best practices
-        assert (
-            "RUN groupadd -r ohfp && useradd -r -g ohfp" in content
-        ), "Should create non-root user"
+        assert "RUN groupadd -r ohfp && useradd -r -g ohfp" in content, (
+            "Should create non-root user"
+        )
         assert "USER ohfp" in content, "Should switch to non-root user"
 
         # Check for appropriate copying

@@ -295,7 +295,7 @@ class TestAdditionalEndToEnd:
                 provider_api=self.request.provider_api,
                 resource_id=resource_id,
                 result="executing",
-                private_ip_address=f"10.0.1.{i+10}",
+                private_ip_address=f"10.0.1.{i + 10}",
                 launch_time=int(datetime.now().timestamp()),
             )
             machines.append(machine)
@@ -417,7 +417,7 @@ class TestAdditionalEndToEnd:
                 resource_id=resource_id,
                 result="executing",
                 status="pending",
-                private_ip_address=f"10.0.1.{i+10}",
+                private_ip_address=f"10.0.1.{i + 10}",
                 launch_time=int(datetime.now().timestamp()),
                 instance_type="t2.micro",
                 price_type="spot",

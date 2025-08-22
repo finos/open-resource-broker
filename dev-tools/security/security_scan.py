@@ -6,6 +6,7 @@ This script orchestrates multiple security tools to provide comprehensive
 security analysis including SAST, dependency scanning, container security,
 and SBOM generation.
 """
+
 import argparse
 import json
 import subprocess
@@ -41,7 +42,7 @@ class SecurityScanner:
                 sarif_available = True
             except ImportError:
                 sarif_available = False
-                logger.warning(f"bandit-sarif-formatter not available, falling back to JSON")
+                logger.warning("bandit-sarif-formatter not available, falling back to JSON")
 
             # Generate JSON output (always)
             subprocess.run(
@@ -69,7 +70,7 @@ class SecurityScanner:
                 )
 
                 self.sarif_files.append("bandit-report.sarif")
-                logger.info(f"Bandit SARIF report generated for GitHub Security integration")
+                logger.info("Bandit SARIF report generated for GitHub Security integration")
 
             return True, "Bandit scan completed"
 
@@ -228,8 +229,8 @@ class SecurityScanner:
         # Write markdown summary
         md_report = f"""# Security Scan Report
 
-**Generated:** {report['scan_timestamp']}
-**Project:** {report['project']}
+**Generated:** {report["scan_timestamp"]}
+**Project:** {report["project"]}
 
 ## Scans Performed
 
@@ -239,7 +240,7 @@ class SecurityScanner:
             status = "PASS" if success else "FAIL"
             md_report += f"- **{status}**: {scan} - {message}\n"
 
-        md_report += f"""
+        md_report += """
 ## Generated Files
 
 ### SARIF Files (for GitHub Security tab)

@@ -5,6 +5,7 @@ File size checker for maintaining code quality.
 This script checks for files that are getting too large and warns about them.
 Large files often indicate violations of Single Responsibility Principle.
 """
+
 import argparse
 import logging
 import sys

@@ -266,6 +266,6 @@ class TestAuthenticationSecurity:
                 ]
 
                 for pattern in sensitive_patterns:
-                    assert (
-                        pattern.lower() not in error_detail.lower()
-                    ), f"Error message contains sensitive information: {pattern}"
+                    assert pattern.lower() not in error_detail.lower(), (
+                        f"Error message contains sensitive information: {pattern}"
+                    )

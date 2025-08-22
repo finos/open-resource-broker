@@ -39,7 +39,6 @@ class TestConfigDrivenProviderRegistration:
             patch("src.providers.aws.registration.register_aws_provider") as mock_aws_register,
             patch("src.infrastructure.di.provider_services.get_logger") as mock_logger,
         ):
-
             from infrastructure.di.provider_services import _register_providers
 
             # Execute registration
@@ -65,7 +64,6 @@ class TestConfigDrivenProviderRegistration:
             patch("src.providers.aws.registration.register_aws_provider") as mock_aws_register,
             patch("src.infrastructure.di.provider_services.get_logger") as mock_logger,
         ):
-
             from infrastructure.di.provider_services import _register_providers
 
             # Execute registration
@@ -104,7 +102,6 @@ class TestConfigDrivenProviderRegistration:
             patch("src.providers.aws.registration.register_aws_provider") as mock_aws_register,
             patch("src.infrastructure.di.provider_services.get_logger") as mock_logger,
         ):
-
             from infrastructure.di.provider_services import _register_providers
 
             # Execute registration
@@ -146,7 +143,6 @@ class TestConfigDrivenProviderRegistration:
             patch("src.providers.aws.registration.register_aws_provider") as mock_aws_register,
             patch("src.infrastructure.di.provider_services.get_logger") as mock_logger,
         ):
-
             from infrastructure.di.provider_services import _register_providers
 
             # Execute registration
@@ -171,7 +167,8 @@ class TestConfigDrivenProviderRegistration:
     def test_validate_provider_config_no_providers(self):
         """Test provider configuration validation with no providers."""
         provider_config = ProviderConfig(
-            selection_policy="FIRST_AVAILABLE", providers=[]  # No providers
+            selection_policy="FIRST_AVAILABLE",
+            providers=[],  # No providers
         )
 
         with patch("src.infrastructure.di.provider_services.get_logger"):

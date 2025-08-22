@@ -54,7 +54,7 @@ class TemplateExtensionRegistry:
         """
         if not isinstance(extension_instance, TemplateExtension):
             raise ValueError(
-                f"Extension instance must implement TemplateExtension, got { type(extension_instance)}"
+                f"Extension instance must implement TemplateExtension, got {type(extension_instance)}"
             )
 
         cls._extension_instances[provider_type] = extension_instance

@@ -144,6 +144,5 @@ class SDKConfig:
         valid_log_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
         if self.log_level.upper() not in valid_log_levels:
             raise ConfigurationError(
-                f"Invalid log level: {self.log_level}. "
-                f"Valid levels: {', '.join(valid_log_levels)}"
+                f"Invalid log level: {self.log_level}. Valid levels: {', '.join(valid_log_levels)}"
             )

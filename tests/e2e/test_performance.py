@@ -85,9 +85,9 @@ class TestPerformance:
             assert len(provider_data.get("providers", [])) == 50
 
         # Performance assertion (should load in under 1 second)
-        assert (
-            loading_time < 1.0
-        ), f"Configuration loading took {loading_time:.3f}s, expected < 1.0s"
+        assert loading_time < 1.0, (
+            f"Configuration loading took {loading_time:.3f}s, expected < 1.0s"
+        )
 
         print(f"Configuration loading performance: {loading_time:.3f}s for 50 providers")
 
@@ -134,9 +134,9 @@ class TestPerformance:
         avg_time = retrieval_time / 100
 
         # Performance assertion (should average under 1ms per call)
-        assert (
-            avg_time < 0.001
-        ), f"Provider info retrieval averaged {avg_time:.6f}s, expected < 0.001s"
+        assert avg_time < 0.001, (
+            f"Provider info retrieval averaged {avg_time:.6f}s, expected < 0.001s"
+        )
 
         print(f"Provider info retrieval performance: {avg_time:.6f}s average per call")
 
@@ -246,9 +246,9 @@ class TestPerformance:
                 assert result["active_providers"] == 5
 
         # Performance assertion
-        assert (
-            concurrent_time < 2.0
-        ), f"Concurrent access took {concurrent_time:.3f}s, expected < 2.0s"
+        assert concurrent_time < 2.0, (
+            f"Concurrent access took {concurrent_time:.3f}s, expected < 2.0s"
+        )
 
         print(f"Concurrent access performance: {concurrent_time:.3f}s for 50 concurrent operations")
 
@@ -291,9 +291,9 @@ class TestPerformance:
         memory_increase = final_memory - initial_memory
 
         # Memory usage should be reasonable (less than 50MB increase)
-        assert (
-            memory_increase < 50
-        ), f"Memory usage increased by {memory_increase:.1f}MB, expected < 50MB"
+        assert memory_increase < 50, (
+            f"Memory usage increased by {memory_increase:.1f}MB, expected < 50MB"
+        )
 
         print(f"Memory usage performance: {memory_increase:.1f}MB increase for 100 providers")
 
@@ -331,14 +331,14 @@ class TestPerformance:
         # Cached access should be significantly faster (or at least not slower)
         # Note: When operations are very fast (microseconds), the difference may not be significant
         if first_access_time > 0.001:  # Only assert significant improvement for slower operations
-            assert (
-                avg_cached_time < first_access_time / 10
-            ), f"Cached access ({avg_cached_time:.6f}s) not significantly faster than first access ({first_access_time:.6f}s)"
+            assert avg_cached_time < first_access_time / 10, (
+                f"Cached access ({avg_cached_time:.6f}s) not significantly faster than first access ({first_access_time:.6f}s)"
+            )
         else:
             # For very fast operations, just ensure cached access isn't slower
-            assert (
-                avg_cached_time <= first_access_time * 2
-            ), f"Cached access ({avg_cached_time:.6f}s) is slower than first access ({first_access_time:.6f}s)"
+            assert avg_cached_time <= first_access_time * 2, (
+                f"Cached access ({avg_cached_time:.6f}s) is slower than first access ({first_access_time:.6f}s)"
+            )
 
         print(
             f"Caching performance: First access {first_access_time:.6f}s, cached average {avg_cached_time:.6f}s"
@@ -492,9 +492,9 @@ class TestPerformance:
         operations_per_second = total_operations / 5.0  # 5 seconds
 
         # Should handle at least 1000 operations per second
-        assert (
-            operations_per_second > 1000
-        ), f"Stress test achieved {operations_per_second:.0f} ops/sec, expected > 1000 ops/sec"
+        assert operations_per_second > 1000, (
+            f"Stress test achieved {operations_per_second:.0f} ops/sec, expected > 1000 ops/sec"
+        )
 
         print(f"Stress test performance: {operations_per_second:.0f} operations/second")
 
@@ -560,8 +560,8 @@ class TestPerformance:
             assert validation_result["valid"] is True
 
         # Performance assertion (should handle large config in reasonable time)
-        assert (
-            processing_time < 5.0
-        ), f"Large configuration processing took {processing_time:.3f}s, expected < 5.0s"
+        assert processing_time < 5.0, (
+            f"Large configuration processing took {processing_time:.3f}s, expected < 5.0s"
+        )
 
         print(f"Large configuration performance: {processing_time:.3f}s for 1000 providers")

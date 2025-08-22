@@ -6,9 +6,6 @@ All functions maintain backward compatibility.
 """
 
 # Import only the functions that are actually used/exported
-from infrastructure.utilities.file import (
-    get_file_utils_logger,  # Import the actual function instead of redefining
-)
 from infrastructure.utilities.file import (  # YAML operations; JSON operations; Text operations; Binary operations; Directory operations; File operations; Path operations; Utility functions
     append_text_file,
     copy_file,
@@ -28,6 +25,7 @@ from infrastructure.utilities.file import (  # YAML operations; JSON operations;
     get_file_name,
     get_file_name_without_extension,
     get_file_size,
+    get_file_utils_logger,  # Import the actual function instead of redefining
     get_relative_path,
     is_binary_file,
     is_text_file,

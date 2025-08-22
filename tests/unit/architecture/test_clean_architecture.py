@@ -33,15 +33,15 @@ class TestCleanArchitecture:
 
         # Test that domain layer has no outward dependencies
         domain_violations = self._check_layer_dependencies("domain", layers)
-        assert (
-            len(domain_violations) == 0
-        ), f"Domain layer has outward dependencies: {domain_violations}"
+        assert len(domain_violations) == 0, (
+            f"Domain layer has outward dependencies: {domain_violations}"
+        )
 
         # Test that application layer only depends on domain
         app_violations = self._check_application_dependencies(layers)
-        assert (
-            len(app_violations) == 0
-        ), f"Application layer has invalid dependencies: {app_violations}"
+        assert len(app_violations) == 0, (
+            f"Application layer has invalid dependencies: {app_violations}"
+        )
 
     def _check_layer_dependencies(self, layer_name: str, layers: dict) -> List[str]:
         """Check if a layer has invalid dependencies."""
@@ -180,9 +180,9 @@ class TestCleanArchitecture:
             violations = self._check_forbidden_imports(
                 module_file, ["boto3", "fastapi", "sqlalchemy", "src.infrastructure"]
             )
-            assert (
-                len(violations) == 0
-            ), f"Domain module {module} has infrastructure dependencies: {violations}"
+            assert len(violations) == 0, (
+                f"Domain module {module} has infrastructure dependencies: {violations}"
+            )
 
     def test_interface_segregation(self):
         """Test interface segregation principle compliance."""
@@ -198,9 +198,9 @@ class TestCleanArchitecture:
 
         # Each interface should have a reasonable number of methods (not too many)
         assert len(auth_methods) <= 10, f"AuthPort interface too large: {len(auth_methods)} methods"
-        assert (
-            len(token_methods) <= 10
-        ), f"TokenPort interface too large: {len(token_methods)} methods"
+        assert len(token_methods) <= 10, (
+            f"TokenPort interface too large: {len(token_methods)} methods"
+        )
         assert len(user_methods) <= 10, f"UserPort interface too large: {len(user_methods)} methods"
 
     def test_dependency_inversion(self):
@@ -269,9 +269,9 @@ class TestCleanArchitecture:
         for file_path in domain_files:
             violations.extend(self._check_forbidden_imports(file_path, external_frameworks))
 
-        assert (
-            len(violations) == 0
-        ), f"Domain layer has external framework dependencies: {violations}"
+        assert len(violations) == 0, (
+            f"Domain layer has external framework dependencies: {violations}"
+        )
 
     def test_application_service_layer(self):
         """Test application service layer compliance."""

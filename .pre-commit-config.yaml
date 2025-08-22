@@ -8,31 +8,23 @@ repos:
         language: system
         files: \.(py)$
         pass_filenames: false
-        description: "Auto-format Python code with black and isort"
+        description: "Auto-format Python code with Ruff"
 
-      - id: black
-        name: Black (Code Formatting)
-        entry: make ci-quality-black
+      - id: ruff-check
+        name: Ruff (Code Quality)
+        entry: make ci-quality-ruff
         language: system
         files: \.(py)$
         pass_filenames: false
-        description: "Check Python code formatting with Black"
+        description: "Check Python code quality with Ruff"
 
-      - id: isort
-        name: isort (Import Sorting)
-        entry: make ci-quality-isort
+      - id: ruff-optional
+        name: Ruff (Extended Checks)
+        entry: make ci-quality-ruff-optional
         language: system
         files: \.(py)$
         pass_filenames: false
-        description: "Check Python import sorting with isort"
-
-      - id: flake8
-        name: flake8 (Style Guide)
-        entry: make ci-quality-flake8
-        language: system
-        files: \.(py)$
-        pass_filenames: false
-        description: "Check Python style guide compliance with flake8"
+        description: "Extended Python code checks with Ruff (warnings only)"
 
       - id: mypy
         name: mypy (Type Checking)
@@ -41,15 +33,6 @@ repos:
         files: \.(py)$
         pass_filenames: false
         description: "Check Python type annotations with mypy"
-        warning_only: true  # Allow this to fail without blocking commit
-
-      - id: pylint
-        name: pylint (Code Analysis)
-        entry: make ci-quality-pylint
-        language: system
-        files: \.(py)$
-        pass_filenames: false
-        description: "Run pylint code analysis"
         warning_only: true  # Allow this to fail without blocking commit
 
       - id: bandit

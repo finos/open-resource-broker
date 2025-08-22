@@ -200,15 +200,15 @@ class TestEventInheritanceHierarchy:
 
     def test_request_events_inherit_from_domain_event(self):
         """Test that request events inherit from DomainEvent."""
-        assert issubclass(
-            RequestCreatedEvent, DomainEvent
-        ), "RequestCreatedEvent should inherit from DomainEvent"
-        assert issubclass(
-            RequestStatusChangedEvent, DomainEvent
-        ), "RequestStatusChangedEvent should inherit from DomainEvent"
-        assert issubclass(
-            RequestCompletedEvent, DomainEvent
-        ), "RequestCompletedEvent should inherit from DomainEvent"
+        assert issubclass(RequestCreatedEvent, DomainEvent), (
+            "RequestCreatedEvent should inherit from DomainEvent"
+        )
+        assert issubclass(RequestStatusChangedEvent, DomainEvent), (
+            "RequestStatusChangedEvent should inherit from DomainEvent"
+        )
+        assert issubclass(RequestCompletedEvent, DomainEvent), (
+            "RequestCompletedEvent should inherit from DomainEvent"
+        )
 
     def test_domain_event_inheritance_chain(self):
         """Test the complete event inheritance chain."""
@@ -297,9 +297,9 @@ class TestEventAggregateInteraction:
 
         # Events should be in chronological order
         for i in range(1, len(events)):
-            assert (
-                events[i - 1].occurred_at <= events[i].occurred_at
-            ), "Events should be in chronological order"
+            assert events[i - 1].occurred_at <= events[i].occurred_at, (
+                "Events should be in chronological order"
+            )
 
 
 @pytest.mark.unit

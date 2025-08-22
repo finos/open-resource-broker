@@ -641,7 +641,7 @@ class FallbackProviderStrategy(ProviderStrategy):
         for i, strategy in enumerate(self._fallback_strategies):
             try:
                 health = strategy.check_health()
-                health_details[f"fallback_{i+1}"] = {
+                health_details[f"fallback_{i + 1}"] = {
                     "provider": strategy.provider_type,
                     "healthy": health.is_healthy,
                     "message": health.status_message,
@@ -649,7 +649,7 @@ class FallbackProviderStrategy(ProviderStrategy):
                 if health.is_healthy:
                     fallback_healthy_count += 1
             except Exception as e:
-                health_details[f"fallback_{i+1}"] = {
+                health_details[f"fallback_{i + 1}"] = {
                     "provider": strategy.provider_type,
                     "healthy": False,
                     "error": str(e),

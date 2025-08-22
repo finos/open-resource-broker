@@ -65,7 +65,7 @@ class TestAuthenticationPerformance:
         avg_time = total_time / num_requests
 
         print(f"No auth - {num_requests} requests in {total_time:.3f}s")
-        print(f"Average response time: {avg_time*1000:.2f}ms")
+        print(f"Average response time: {avg_time * 1000:.2f}ms")
 
         # Performance assertion - should be very fast
         assert avg_time < 0.1, f"Average response time {avg_time:.3f}s too slow"
@@ -87,7 +87,7 @@ class TestAuthenticationPerformance:
         avg_time = total_time / num_requests
 
         print(f"Bearer token auth - {num_requests} requests in {total_time:.3f}s")
-        print(f"Average response time: {avg_time*1000:.2f}ms")
+        print(f"Average response time: {avg_time * 1000:.2f}ms")
 
         # Performance assertion - should be reasonably fast
         assert avg_time < 0.2, f"Average response time {avg_time:.3f}s too slow"
@@ -121,7 +121,7 @@ class TestAuthenticationPerformance:
         total_requests = num_threads * requests_per_thread
 
         print(f"Concurrent auth - {total_requests} requests in {total_time:.3f}s")
-        print(f"Requests per second: {total_requests/total_time:.1f}")
+        print(f"Requests per second: {total_requests / total_time:.1f}")
 
         # All requests should succeed
         assert all(results), "Some concurrent requests failed"
@@ -157,7 +157,7 @@ class TestAuthenticationPerformance:
         avg_time = total_time / num_validations
 
         print(f"Token validation - {num_validations} validations in {total_time:.3f}s")
-        print(f"Average validation time: {avg_time*1000:.2f}ms")
+        print(f"Average validation time: {avg_time * 1000:.2f}ms")
 
         # Token validation should be very fast
         assert avg_time < 0.01, f"Token validation too slow: {avg_time:.4f}s"
@@ -203,9 +203,9 @@ class TestAuthenticationPerformance:
 
         # Overhead should be reasonable
         assert excluded_overhead < 50, f"Excluded path overhead too high: {excluded_overhead:.1f}%"
-        assert (
-            protected_overhead < 200
-        ), f"Protected path overhead too high: {protected_overhead:.1f}%"
+        assert protected_overhead < 200, (
+            f"Protected path overhead too high: {protected_overhead:.1f}%"
+        )
 
     def test_memory_usage_stability(self, auth_client_and_token):
         """Test memory usage stability under load."""

@@ -247,7 +247,7 @@ class SQLQueryBuilder(QueryManager):
         Returns:
             Tuple of (query, parameter_name)
         """
-        query = f"SELECT 1 FROM { self.table_name} WHERE {id_column} = :{id_column} LIMIT 1"  # nosec B608
+        query = f"SELECT 1 FROM {self.table_name} WHERE {id_column} = :{id_column} LIMIT 1"  # nosec B608
 
         self.logger.debug("Built EXISTS query for %s", self.table_name)
         return query, id_column

@@ -183,8 +183,7 @@ class ConfigurationLoader:
             return config
         else:
             get_config_logger().warning(
-                "Failed to load default configuration from any location. "
-                "Using empty configuration."
+                "Failed to load default configuration from any location. Using empty configuration."
             )
             return {}
 

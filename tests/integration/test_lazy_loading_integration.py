@@ -258,9 +258,9 @@ class TestLazyLoadingPerformanceIntegration:
         first_access_time = (time.time() - start_time) * 1000
 
         # First access should be reasonable (triggers lazy loading)
-        assert (
-            first_access_time < 1000
-        ), f"First access took {first_access_time:.1f}ms, expected <1000ms"
+        assert first_access_time < 1000, (
+            f"First access took {first_access_time:.1f}ms, expected <1000ms"
+        )
 
     async def test_cached_access_performance_integration(self):
         """Test cached access performance in integration context."""
@@ -278,9 +278,9 @@ class TestLazyLoadingPerformanceIntegration:
         cached_access_time = (time.time() - start_time) * 1000
 
         # Cached access should be very fast
-        assert (
-            cached_access_time < 10
-        ), f"Cached access took {cached_access_time:.1f}ms, expected <10ms"
+        assert cached_access_time < 10, (
+            f"Cached access took {cached_access_time:.1f}ms, expected <10ms"
+        )
 
 
 if __name__ == "__main__":

@@ -236,7 +236,7 @@ class ProviderCapabilityService:
         supported_apis = capabilities.get_feature("supported_apis", [])
         if template.provider_api not in supported_apis:
             result.errors.append(
-                f"Provider does not support API '{ template.provider_api}'. Supported APIs: {supported_apis}"
+                f"Provider does not support API '{template.provider_api}'. Supported APIs: {supported_apis}"
             )
         else:
             result.supported_features.append(f"API: {template.provider_api}")
@@ -266,7 +266,7 @@ class ProviderCapabilityService:
         elif price_type == "ondemand":
             if not api_caps.get("supports_on_demand", True):
                 result.errors.append(
-                    f"API '{ template.provider_api}' does not support on-demand instances"
+                    f"API '{template.provider_api}' does not support on-demand instances"
                 )
             else:
                 result.supported_features.append("Pricing: On-demand instances")
@@ -296,7 +296,7 @@ class ProviderCapabilityService:
 
         if supported_fleet_types and fleet_type not in supported_fleet_types:
             result.errors.append(
-                f"API '{ template.provider_api}' does not support fleet type '{fleet_type}'. Supported types: {supported_fleet_types}"
+                f"API '{template.provider_api}' does not support fleet type '{fleet_type}'. Supported types: {supported_fleet_types}"
             )
         elif supported_fleet_types:
             result.supported_features.append(f"Fleet type: {fleet_type}")
@@ -317,7 +317,7 @@ class ProviderCapabilityService:
 
         if template.max_instances > max_instances:
             result.errors.append(
-                f"Requested { template.max_instances} instances exceeds API limit of {max_instances}"
+                f"Requested {template.max_instances} instances exceeds API limit of {max_instances}"
             )
         else:
             result.supported_features.append(

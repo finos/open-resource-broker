@@ -95,9 +95,9 @@ class TestMultiProviderConfiguration:
 
             # Verify providers don't have old capabilities field
             for provider in providers:
-                assert (
-                    "capabilities" not in provider
-                ), f"Provider {provider['name']} has deprecated capabilities field"
+                assert "capabilities" not in provider, (
+                    f"Provider {provider['name']} has deprecated capabilities field"
+                )
 
     def test_handler_configuration_flexibility(self):
         """Test handler configuration with flexible additional fields."""

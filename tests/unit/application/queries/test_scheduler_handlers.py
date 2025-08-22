@@ -55,7 +55,6 @@ class TestListSchedulerStrategiesHandler:
             ),
             patch("src.config.manager.ConfigurationManager", return_value=mock_config_manager),
         ):
-
             response = await handler.execute_query(query)
 
             assert isinstance(response, SchedulerStrategyListResponse)
@@ -80,7 +79,6 @@ class TestListSchedulerStrategiesHandler:
             ),
             patch("src.config.manager.ConfigurationManager", return_value=mock_config_manager),
         ):
-
             response = await handler.execute_query(query)
 
             # Check that details are included
@@ -103,7 +101,6 @@ class TestListSchedulerStrategiesHandler:
                 side_effect=Exception("Config error"),
             ),
         ):
-
             response = await handler.execute_query(query)
 
             assert response.current_strategy == "unknown"
@@ -155,7 +152,6 @@ class TestGetSchedulerConfigurationHandler:
                 return_value=mock_registry,
             ),
         ):
-
             response = await handler.execute_query(query)
 
             assert isinstance(response, SchedulerConfigurationResponse)
@@ -177,7 +173,6 @@ class TestGetSchedulerConfigurationHandler:
                 return_value=mock_registry,
             ),
         ):
-
             response = await handler.execute_query(query)
 
             assert response.scheduler_name == "default"
@@ -198,7 +193,6 @@ class TestGetSchedulerConfigurationHandler:
                 return_value=mock_registry,
             ),
         ):
-
             response = await handler.execute_query(query)
 
             assert response.scheduler_name == "unknown"
@@ -248,7 +242,6 @@ class TestValidateSchedulerConfigurationHandler:
                 return_value=mock_registry,
             ),
         ):
-
             response = await handler.execute_query(query)
 
             assert isinstance(response, ValidationResultDTO)
@@ -269,7 +262,6 @@ class TestValidateSchedulerConfigurationHandler:
                 return_value=mock_registry,
             ),
         ):
-
             response = await handler.execute_query(query)
 
             assert response.is_valid is False
@@ -293,7 +285,6 @@ class TestValidateSchedulerConfigurationHandler:
                 return_value=mock_registry,
             ),
         ):
-
             response = await handler.execute_query(query)
 
             assert response.is_valid is False

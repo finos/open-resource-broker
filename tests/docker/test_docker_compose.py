@@ -177,9 +177,9 @@ class TestDockerCompose:
 
                 # Should be connected to the network
                 assert "networks" in service_config, f"{service} should be on network"
-                assert (
-                    "ohfp-network" in service_config["networks"]
-                ), f"{service} should be on ohfp-network"
+                assert "ohfp-network" in service_config["networks"], (
+                    f"{service} should be on ohfp-network"
+                )
 
     @pytest.mark.slow
     def test_docker_compose_config_validation(self, project_root):

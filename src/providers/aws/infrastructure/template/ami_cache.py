@@ -124,7 +124,6 @@ class RuntimeAMICache:
 
         # Clear persistent cache file if configured
         if self._persistent_file and os.path.exists(self._persistent_file):
-
             with suppress(Exception):
                 os.remove(self._persistent_file)
 

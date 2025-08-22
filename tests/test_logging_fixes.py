@@ -412,9 +412,9 @@ class TestLoggingFixes:
                 ]
 
                 for error_pattern in critical_errors:
-                    assert not any(
-                        error_pattern in msg for msg in error_messages
-                    ), f"Found critical error: {error_pattern}"
+                    assert not any(error_pattern in msg for msg in error_messages), (
+                        f"Found critical error: {error_pattern}"
+                    )
 
 
 class TestLoggingRegression:

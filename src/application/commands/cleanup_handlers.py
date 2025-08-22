@@ -82,7 +82,7 @@ class CleanupOldRequestsHandler(BaseCommandHandler[CleanupOldRequestsCommand, Di
                     resource_id="multiple",
                     provider="system",
                     resource_count=cleaned_count,
-                    cleanup_reason=f"Cleanup requests older than { command.older_than_days} days",
+                    cleanup_reason=f"Cleanup requests older than {command.older_than_days} days",
                 )
                 self.event_publisher.publish(cleanup_event)
 
@@ -183,7 +183,7 @@ class CleanupAllResourcesHandler(BaseCommandHandler[CleanupAllResourcesCommand, 
                     resource_id="all",
                     provider="system",
                     resource_count=requests_cleaned + machines_cleaned,
-                    cleanup_reason=f"Cleanup all resources older than { command.older_than_days} days",
+                    cleanup_reason=f"Cleanup all resources older than {command.older_than_days} days",
                 )
                 self.event_publisher.publish(cleanup_event)
 

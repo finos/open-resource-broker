@@ -55,7 +55,6 @@ class HandlersConfig(BaseModel):
             or self.auto_scaling_group != self.capabilities.auto_scaling_group
             or self.run_instances != self.capabilities.run_instances
         ):
-
             object.__setattr__(self.capabilities, "ec2_fleet", self.ec2_fleet)
             object.__setattr__(self.capabilities, "spot_fleet", self.spot_fleet)
             object.__setattr__(self.capabilities, "auto_scaling_group", self.auto_scaling_group)

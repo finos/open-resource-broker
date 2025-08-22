@@ -70,9 +70,9 @@ class BaseRegistry(ABC):
         self.mode = mode
         # Type-based registrations
         self._type_registrations: Dict[str, BaseRegistration] = {}
-        self._instance_registrations: Dict[str, BaseRegistration] = (
-            {}
-        )  # Instance-based registrations (multi-choice only)
+        self._instance_registrations: Dict[
+            str, BaseRegistration
+        ] = {}  # Instance-based registrations (multi-choice only)
         self._registry_lock = threading.RLock()  # Use RLock for nested locking
 
         from infrastructure.logging.logger import get_logger

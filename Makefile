@@ -142,39 +142,44 @@ $(VENV)/bin/activate: uv.lock
 	touch $(VENV)/bin/activate
 
 # @SECTION Testing
-# Testing targets (using dev-tools)
-test: test-quick  ## Run quick test suite (alias for test-quick)
+# Testing targets (using enhanced dispatcher)
+test: dev-install  ## Run tests (supports: make test path/to/tests -k pattern -v)
+	@./dev-tools/testing/run_tests.py $(filter-out $@,$(MAKECMDGOALS))
 
-test-unit: dev-install  ## Run unit tests only
-	./dev-tools/testing/run_tests.py --unit $(TEST_ARGS)
+test-unit: dev-install  ## Run unit tests (supports same args: make test-unit path -v)
+	@./dev-tools/testing/run_tests.py --unit $(filter-out $@,$(MAKECMDGOALS))
 
-test-integration: dev-install  ## Run integration tests only
-	./dev-tools/testing/run_tests.py --integration $(TEST_ARGS)
+test-integration: dev-install  ## Run integration tests (supports same args)
+	@./dev-tools/testing/run_tests.py --integration $(filter-out $@,$(MAKECMDGOALS))
 
-test-e2e: dev-install  ## Run end-to-end tests only
-	./dev-tools/testing/run_tests.py --e2e $(TEST_ARGS)
+test-e2e: dev-install  ## Run end-to-end tests (supports same args)
+	@./dev-tools/testing/run_tests.py --e2e $(filter-out $@,$(MAKECMDGOALS))
 
-test-all: dev-install  ## Run all tests
-	./dev-tools/testing/run_tests.py
+test-all: dev-install  ## Run all tests (supports same args)
+	@./dev-tools/testing/run_tests.py --all $(filter-out $@,$(MAKECMDGOALS))
 
-test-parallel: dev-install  ## Run tests in parallel
-	./dev-tools/testing/run_tests.py --parallel
+test-parallel: dev-install  ## Run tests in parallel (supports same args)
+	@./dev-tools/testing/run_tests.py --parallel $(filter-out $@,$(MAKECMDGOALS))
 
-test-quick: dev-install  ## Run quick test suite (unit + fast integration)
-	./dev-tools/testing/run_tests.py --unit --fast
+test-quick: dev-install  ## Run quick test suite (supports same args)
+	@./dev-tools/testing/run_tests.py --unit --fast $(filter-out $@,$(MAKECMDGOALS))
 
-test-performance: dev-install  ## Run performance tests
-	./dev-tools/testing/run_tests.py --markers slow
+test-performance: dev-install  ## Run performance tests (supports same args)
+	@./dev-tools/testing/run_tests.py --markers slow $(filter-out $@,$(MAKECMDGOALS))
 
-test-aws: dev-install  ## Run AWS-specific tests
-	./dev-tools/testing/run_tests.py --markers aws
+test-aws: dev-install  ## Run AWS-specific tests (supports same args)
+	@./dev-tools/testing/run_tests.py --markers aws $(filter-out $@,$(MAKECMDGOALS))
 
-test-cov: dev-install  ## Run tests with coverage report
-	./dev-tools/testing/run_tests.py --coverage
+test-cov: dev-install  ## Run tests with coverage (supports same args)
+	@./dev-tools/testing/run_tests.py --coverage $(filter-out $@,$(MAKECMDGOALS))
 
-test-html: dev-install  ## Run tests with HTML coverage report
-	./dev-tools/testing/run_tests.py --html-coverage
+test-html: dev-install  ## Run tests with HTML coverage (supports same args)
+	@./dev-tools/testing/run_tests.py --html-coverage $(filter-out $@,$(MAKECMDGOALS))
 	@echo "Coverage report generated in htmlcov/index.html"
+
+# Dummy target to prevent "No rule to make target" errors
+%:
+	@:
 
 test-report: dev-install  ## Generate comprehensive test report
 	./dev-tools/testing/run_tests.py --all --coverage --junit-xml=test-results-combined.xml --cov-xml=coverage-combined.xml --html-coverage --maxfail=1 --timeout=60
@@ -201,14 +206,19 @@ quality-check-files: dev-install  ## Run quality checks on specific files (usage
 	@echo "Running professional quality checks on specified files..."
 	./dev-tools/scripts/quality_check.py --strict --files $(FILES)
 
-lint: dev-install  ## Run comprehensive linting (black, isort, flake8, mypy, pylint)
-	./dev-tools/scripts/ci_check.py
+format: dev-install clean-whitespace  ## Format code with Ruff
+	uv run ruff format .
+	uv run ruff check --fix .
 
-lint-quick: dev-install  ## Run fast linting (skip slow mypy/pylint)
-	./dev-tools/scripts/ci_check.py --quick
+lint: dev-install  ## Check enforced rules (fail on issues)
+	uv run ruff check .
+	uv run ruff format --check .
 
-lint-fix: dev-install  ## Fix linting issues (black, isort auto-fix)
-	./dev-tools/scripts/ci_check.py --fix
+lint-optional: dev-install  ## Check optional rules (warnings only)
+	uv run ruff check --select=N,UP,B,PL,C90,RUF . || true
+
+pre-commit: format lint  ## Simulate pre-commit checks locally
+	@echo "All checks passed! Safe to commit."
 
 hadolint-check: ## Check Dockerfiles with hadolint
 	@if command -v hadolint >/dev/null 2>&1; then \
@@ -247,9 +257,6 @@ install-dev-tools-dry-run: ## Show what development tools would be installed
 clean-whitespace:  ## Clean whitespace in blank lines from all files
 	@echo "Cleaning whitespace in blank lines..."
 	./dev-tools/scripts/clean_whitespace.py
-
-format: dev-install clean-whitespace  ## Format code (Black + isort + autopep8 + autoflake + whitespace cleanup)
-	./dev-tools/scripts/format_code.py
 
 security: dev-install  ## Run security checks (bandit, safety)
 	./dev-tools/scripts/security_check.py
@@ -462,33 +469,28 @@ publish-test: build  ## Publish to test PyPI
 # CI/CD targets
 # @SECTION CI Quality Checks
 # Individual code quality targets (with tool names)
-ci-quality-black:  ## Run Black code formatting check
-	@echo "Running Black formatting check..."
-	$(call run-tool,black,--check $(PACKAGE) $(TESTS))
+ci-quality-ruff:  ## Run Ruff formatting and linting check
+	@echo "Running Ruff formatting and linting check..."
+	uv run ruff check .
+	uv run ruff format --check .
 
-ci-quality-isort:  ## Run isort import sorting check
-	@echo "Running isort import check..."
-	$(call run-tool,isort,--check-only $(PACKAGE) $(TESTS))
-
-ci-quality-flake8:  ## Run flake8 style guide check
-	@echo "Running flake8 style check..."
-	$(call run-tool,flake8,$(PACKAGE) $(TESTS))
-
-ci-quality-mypy:  ## Run mypy type checking
-	@echo "Running mypy type check..."
-	$(call run-tool,mypy,.,$(PACKAGE))
-
-ci-quality-pylint:  ## Run pylint code analysis
-	@echo "Running pylint analysis..."
-	$(call run-tool,pylint,$(PACKAGE) $(TESTS))
+ci-quality-ruff-optional:  ## Run Ruff extended linting (warnings only)
+	@echo "Running Ruff extended linting..."
+	uv run ruff check --select=N,UP,B,PL,C90,RUF . || true
 
 ci-quality-radon:  ## Run radon complexity analysis
 	@echo "Running radon complexity analysis..."
 	$(call run-tool,radon,cc $(PACKAGE) --min B --show-complexity)
 	$(call run-tool,radon,mi $(PACKAGE) --min B)
 
+ci-quality-mypy:  ## Run mypy type checking
+	@echo "Running mypy type check..."
+	$(call run-tool,mypy,.)
+
 # Composite target (for local convenience)
-ci-quality: ci-quality-black ci-quality-isort ci-quality-flake8 ci-quality-mypy ci-quality-pylint ci-quality-radon  ## Run all code quality checks
+ci-quality: ci-quality-ruff ci-quality-mypy  ## Run all enforced code quality checks
+
+ci-quality-full: ci-quality-ruff ci-quality-ruff-optional ci-quality-mypy  ## Run all code quality checks including optional
 
 # Individual architecture quality targets (with tool names)
 ci-arch-cqrs:  ## Run CQRS pattern validation

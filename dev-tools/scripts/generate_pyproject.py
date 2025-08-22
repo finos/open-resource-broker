@@ -77,7 +77,7 @@ def generate_pyproject():
     # Replace placeholders with actual values
     # Use CI VERSION env var if available (for dynamic versioning), otherwise use package version
     version_to_use = os.environ.get("VERSION", __version__)
-    
+
     replacements = {
         "{{PACKAGE_NAME}}": PACKAGE_NAME,
         "{{PACKAGE_NAME_SHORT}}": PACKAGE_NAME_SHORT,
@@ -100,7 +100,7 @@ def generate_pyproject():
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(generated_content)
 
-    logging.info(f"Generated pyproject.toml from template")
+    logging.info("Generated pyproject.toml from template")
     logging.info(f"Package: {PACKAGE_NAME} v{__version__}")
     logging.info(f"Repository: {REPO_URL}")
 

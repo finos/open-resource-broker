@@ -339,8 +339,7 @@ class BaseAPIHandler(BaseHandler, Generic[T, R]):
         def wrapper(request: T) -> R:
             """Wrapper function for validation middleware."""
             # Import jsonschema directly - it's a required dependency
-            from jsonschema import ValidationError as JsonSchemaValidationError
-            from jsonschema import validate
+            from jsonschema import ValidationError as JsonSchemaValidationError, validate
 
             try:
                 # Validate input against schema

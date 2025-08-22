@@ -48,7 +48,6 @@ class TestStorageRegistryIntegration:
                 "src.infrastructure.persistence.repositories.request_repository.RequestRepository"
             ) as mock_repo_class,
         ):
-
             mock_get_registry.return_value = mock_registry
             mock_repo_class.return_value = mock_repository
 
@@ -88,7 +87,6 @@ class TestStorageRegistryIntegration:
                 "src.infrastructure.utilities.factories.repository_factory.RepositoryFactory"
             ) as mock_factory_class,
         ):
-
             mock_factory_class.return_value = mock_factory
 
             # Register repository services

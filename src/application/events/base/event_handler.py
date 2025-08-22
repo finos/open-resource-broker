@@ -244,7 +244,7 @@ class EventHandler(ABC):
         if duration_ms < 1000:
             return f"{duration_ms:.1f}ms"
         else:
-            return f"{duration_ms/1000:.2f}s"
+            return f"{duration_ms / 1000:.2f}s"
 
     def format_status_change(
         self, old_status: str, new_status: str, reason: Optional[str] = None

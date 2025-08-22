@@ -82,29 +82,29 @@ class TestLoggingIntegration:
         ]
 
         # Should have exactly one SSM resolution log (no duplicates)
-        assert (
-            len(ssm_resolution_lines) <= 1
-        ), f"Found duplicate SSM resolution: {ssm_resolution_lines}"
+        assert len(ssm_resolution_lines) <= 1, (
+            f"Found duplicate SSM resolution: {ssm_resolution_lines}"
+        )
 
         # Verify provider mode is correctly detected
         provider_mode_lines = [line for line in log_lines if "Final provider mode:" in line]
         if provider_mode_lines:
             # Should show 'single' for test config (not 'unknown')
-            assert any(
-                "single" in line for line in provider_mode_lines
-            ), f"Provider mode not correctly detected: {provider_mode_lines}"
-            assert not any(
-                "unknown" in line for line in provider_mode_lines
-            ), f"Provider mode shows 'unknown': {provider_mode_lines}"
+            assert any("single" in line for line in provider_mode_lines), (
+                f"Provider mode not correctly detected: {provider_mode_lines}"
+            )
+            assert not any("unknown" in line for line in provider_mode_lines), (
+                f"Provider mode shows 'unknown': {provider_mode_lines}"
+            )
 
         # Verify provider names are correctly reported
         provider_names_lines = [line for line in log_lines if "Active provider names:" in line]
         if provider_names_lines:
             # Should contain the test provider instance
             provider_names_line = provider_names_lines[0]
-            assert (
-                "aws-test" in provider_names_line
-            ), f"Missing aws-test provider: {provider_names_line}"
+            assert "aws-test" in provider_names_line, (
+                f"Missing aws-test provider: {provider_names_line}"
+            )
 
         # Verify no template preloading logs
         preload_lines = [line for line in log_lines if "Preloading templates" in line]
@@ -119,12 +119,12 @@ class TestLoggingIntegration:
         if batch_resolution_lines:
             # Should mention resolving 1 unique parameter for multiple templates
             batch_line = batch_resolution_lines[0]
-            assert (
-                "1 unique SSM parameters" in batch_line
-            ), f"Batch resolution doesn't show correct count: {batch_line}"
-            assert (
-                "9 templates" in batch_line
-            ), f"Batch resolution doesn't show correct template count: {batch_line}"
+            assert "1 unique SSM parameters" in batch_line, (
+                f"Batch resolution doesn't show correct count: {batch_line}"
+            )
+            assert "9 templates" in batch_line, (
+                f"Batch resolution doesn't show correct template count: {batch_line}"
+            )
 
     def test_no_critical_errors_in_output(self, complete_test_environment):
         """Test that CLI execution doesn't produce any critical errors."""
@@ -154,9 +154,9 @@ class TestLoggingIntegration:
             if re.search(pattern, log_output, re.IGNORECASE):
                 found_errors.append(pattern)
 
-        assert (
-            len(found_errors) == 0
-        ), f"Found critical errors in log output: {found_errors}\nFull log output:\n{log_output}"
+        assert len(found_errors) == 0, (
+            f"Found critical errors in log output: {found_errors}\nFull log output:\n{log_output}"
+        )
 
     def test_json_output_structure(self, complete_test_environment):
         """Test that the JSON output has the expected structure."""
@@ -197,9 +197,9 @@ class TestLoggingIntegration:
 
         # Verify we're getting the test template
         template_ids = [t["templateId"] for t in output_data["templates"]]
-        assert (
-            "test-template-1" in template_ids or "test-template-2" in template_ids
-        ), f"Should contain test templates, got: {template_ids}"
+        assert "test-template-1" in template_ids or "test-template-2" in template_ids, (
+            f"Should contain test templates, got: {template_ids}"
+        )
 
     def test_logging_performance(self, complete_test_environment):
         """Test that logging doesn't significantly impact performance."""
@@ -222,14 +222,14 @@ class TestLoggingIntegration:
         log_lines = result.stderr.strip().split("\n") if result.stderr.strip() else []
 
         # Should have reasonable number of log messages (dry-run mode produces more logs)
-        assert (
-            len(log_lines) < 150
-        ), f"Too many log messages ({len(log_lines)}), possible logging spam"
+        assert len(log_lines) < 150, (
+            f"Too many log messages ({len(log_lines)}), possible logging spam"
+        )
 
         # Should have some log messages (not silent)
-        assert (
-            len(log_lines) > 10
-        ), f"Too few log messages ({len(log_lines)}), possible logging issues"
+        assert len(log_lines) > 10, (
+            f"Too few log messages ({len(log_lines)}), possible logging issues"
+        )
 
 
 if __name__ == "__main__":

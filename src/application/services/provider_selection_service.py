@@ -209,7 +209,7 @@ class ProviderSelectionService:
         return ProviderSelectionResult(
             provider_type=provider_type,
             provider_instance=selected_instance.name,
-            selection_reason=f"Load balanced across { len(instances)} {provider_type} instances",
+            selection_reason=f"Load balanced across {len(instances)} {provider_type} instances",
             confidence=0.9,
             alternatives=[inst.name for inst in instances if inst.name != selected_instance.name],
         )

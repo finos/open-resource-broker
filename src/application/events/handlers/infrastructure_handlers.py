@@ -36,8 +36,7 @@ class DatabaseConnectionHandler(BaseLoggingEventHandler):
         )
 
         message = (
-            f"Database connection: {fields['connection_status']} | "
-            f"Type: {fields['database_type']}"
+            f"Database connection: {fields['connection_status']} | Type: {fields['database_type']}"
         )
 
         if fields["connection_time"]:

@@ -170,9 +170,9 @@ class TestMemoryPerformance:
 
                 # Memory increase should be reasonable
                 memory_per_request = memory_increase / (i + 1) if i > 0 else 0
-                assert (
-                    memory_per_request < 10000
-                ), f"Memory per request too high: {memory_per_request} bytes"
+                assert memory_per_request < 10000, (
+                    f"Memory per request too high: {memory_per_request} bytes"
+                )
 
         final_memory = process.memory_info().rss
         total_increase = final_memory - initial_memory
@@ -227,9 +227,9 @@ class TestMemoryPerformance:
             memory_per_iteration = memory_trend / len(memory_samples)
 
             # Allow some memory increase but not excessive
-            assert (
-                memory_per_iteration < 1024 * 1024
-            ), f"Potential memory leak: {memory_per_iteration / 1024:.0f} KB per iteration"
+            assert memory_per_iteration < 1024 * 1024, (
+                f"Potential memory leak: {memory_per_iteration / 1024:.0f} KB per iteration"
+            )
 
     def test_garbage_collection_impact(self):
         """Test impact of garbage collection on performance."""
@@ -326,9 +326,9 @@ class TestConcurrentPerformance:
         throughput = total_requests / total_time
 
         # Performance assertions
-        assert (
-            avg_time_per_request < 0.01
-        ), f"Concurrent creation too slow: {avg_time_per_request:.6f}s"
+        assert avg_time_per_request < 0.01, (
+            f"Concurrent creation too slow: {avg_time_per_request:.6f}s"
+        )
         assert throughput > 100, f"Throughput too low: {throughput:.0f} requests/second"
 
         print(f"Concurrent creation - {total_requests} requests in {total_time:.2f}s")
@@ -529,9 +529,9 @@ class TestScalabilityLimits:
             }
 
             # Performance should scale reasonably
-            assert (
-                time_per_item < 0.01
-            ), f"Time per item too high for {size} items: {time_per_item:.6f}s"
+            assert time_per_item < 0.01, (
+                f"Time per item too high for {size} items: {time_per_item:.6f}s"
+            )
 
             print(f"Dataset size {size}: {total_time:.2f}s total, {time_per_item:.6f}s per item")
 
@@ -545,9 +545,9 @@ class TestScalabilityLimits:
         scalability_factor = large_time_per_item / small_time_per_item
 
         # Should scale reasonably (not exponentially)
-        assert (
-            scalability_factor < 5.0
-        ), f"Poor scalability: {scalability_factor:.2f}x slower for 20x data"
+        assert scalability_factor < 5.0, (
+            f"Poor scalability: {scalability_factor:.2f}x slower for 20x data"
+        )
 
     def test_memory_scalability_limits(self):
         """Test memory usage scalability limits."""

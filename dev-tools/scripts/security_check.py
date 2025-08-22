@@ -179,7 +179,7 @@ def main():
     passed = sum(results)
     total = len(results)
 
-    logger.info(f"\n=== Security Check Summary ===")
+    logger.info("\n=== Security Check Summary ===")
     logger.info(f"Passed: {passed}/{total} checks")
 
     if passed == total:

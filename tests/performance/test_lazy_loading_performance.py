@@ -74,9 +74,9 @@ class TestLazyLoadingPerformance:
         app.get_query_bus()
         first_access_time = (time.time() - start_time) * 1000
 
-        assert (
-            first_access_time < 1000
-        ), f"First query bus access took {first_access_time:.1f}ms, expected <1000ms"
+        assert first_access_time < 1000, (
+            f"First query bus access took {first_access_time:.1f}ms, expected <1000ms"
+        )
         print(f"PASS: First query bus access: {first_access_time:.1f}ms (target: <1000ms)")
 
     def test_cached_component_performance(self):
@@ -129,9 +129,9 @@ class TestLazyLoadingPerformance:
         register_all_services(container)
         registration_time = (time.time() - start_time) * 1000
 
-        assert (
-            registration_time < 200
-        ), f"Service registration took {registration_time:.1f}ms, expected <200ms"
+        assert registration_time < 200, (
+            f"Service registration took {registration_time:.1f}ms, expected <200ms"
+        )
         print(f"PASS: Service registration: {registration_time:.1f}ms (target: <200ms)")
 
     def test_handler_discovery_performance(self):
@@ -146,12 +146,12 @@ class TestLazyLoadingPerformance:
         results = discovery_service.discover_and_register_handlers("src.application")
         discovery_time = (time.time() - start_time) * 1000
 
-        assert (
-            discovery_time < 500
-        ), f"Handler discovery took {discovery_time:.1f}ms, expected <500ms"
-        assert (
-            results["total_handlers"] >= 50
-        ), f"Expected ≥50 handlers, got {results['total_handlers']}"
+        assert discovery_time < 500, (
+            f"Handler discovery took {discovery_time:.1f}ms, expected <500ms"
+        )
+        assert results["total_handlers"] >= 50, (
+            f"Expected ≥50 handlers, got {results['total_handlers']}"
+        )
         print(
             f"PASS: Handler discovery: {discovery_time:.1f}ms for {results['total_handlers']} handlers"
         )
@@ -166,9 +166,9 @@ class TestLazyLoadingPerformance:
         register_minimal_storage_types()
         registration_time = (time.time() - start_time) * 1000
 
-        assert (
-            registration_time < 100
-        ), f"Minimal storage registration took {registration_time:.1f}ms, expected <100ms"
+        assert registration_time < 100, (
+            f"Minimal storage registration took {registration_time:.1f}ms, expected <100ms"
+        )
         print(f"PASS: Minimal storage registration: {registration_time:.1f}ms (target: <100ms)")
 
     def test_scheduler_registration_performance(self):
@@ -179,9 +179,9 @@ class TestLazyLoadingPerformance:
         register_active_scheduler_only("default")
         registration_time = (time.time() - start_time) * 1000
 
-        assert (
-            registration_time < 50
-        ), f"Active scheduler registration took {registration_time:.1f}ms, expected <50ms"
+        assert registration_time < 50, (
+            f"Active scheduler registration took {registration_time:.1f}ms, expected <50ms"
+        )
         print(f"PASS: Active scheduler registration: {registration_time:.1f}ms (target: <50ms)")
 
     @pytest.mark.integration
@@ -223,9 +223,9 @@ class TestLazyLoadingPerformance:
         concurrent_time = (time.time() - start_time) * 1000
 
         assert len(results) == 5, "All concurrent operations should complete"
-        assert (
-            concurrent_time < 3000
-        ), f"Concurrent access took {concurrent_time:.1f}ms, expected <3000ms"
+        assert concurrent_time < 3000, (
+            f"Concurrent access took {concurrent_time:.1f}ms, expected <3000ms"
+        )
         print(f"PASS: Concurrent access (5 threads): {concurrent_time:.1f}ms (target: <3000ms)")
 
 

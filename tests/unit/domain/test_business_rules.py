@@ -621,7 +621,9 @@ class TestBusinessRuleEnforcement:
         # Invalid data should be rejected at creation
         with pytest.raises(RequestValidationError):
             Request.create_new_request(
-                template_id="", machine_count=1, requester_id="test-user"  # Invalid
+                template_id="",
+                machine_count=1,
+                requester_id="test-user",  # Invalid
             )
 
         # Invalid data should be rejected in methods

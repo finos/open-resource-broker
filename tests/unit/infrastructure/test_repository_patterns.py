@@ -35,15 +35,15 @@ class TestRepositoryPatternCompliance:
     def test_repositories_implement_common_interface(self):
         """Test that all repositories implement common interface."""
         # All repositories should inherit from BaseRepository
-        assert issubclass(
-            RequestRepository, BaseRepository
-        ), "RequestRepository should inherit from BaseRepository"
-        assert issubclass(
-            TemplateRepository, BaseRepository
-        ), "TemplateRepository should inherit from BaseRepository"
-        assert issubclass(
-            MachineRepository, BaseRepository
-        ), "MachineRepository should inherit from BaseRepository"
+        assert issubclass(RequestRepository, BaseRepository), (
+            "RequestRepository should inherit from BaseRepository"
+        )
+        assert issubclass(TemplateRepository, BaseRepository), (
+            "TemplateRepository should inherit from BaseRepository"
+        )
+        assert issubclass(MachineRepository, BaseRepository), (
+            "MachineRepository should inherit from BaseRepository"
+        )
 
     def test_repositories_have_standard_methods(self):
         """Test that repositories have standard CRUD methods."""
@@ -60,12 +60,12 @@ class TestRepositoryPatternCompliance:
         assert hasattr(request_repo, "delete"), "Repository should have delete method"
 
         # Should have aggregate-specific methods
-        assert hasattr(
-            request_repo, "find_by_status"
-        ), "RequestRepository should have find_by_status"
-        assert hasattr(
-            request_repo, "find_by_requester"
-        ), "RequestRepository should have find_by_requester"
+        assert hasattr(request_repo, "find_by_status"), (
+            "RequestRepository should have find_by_status"
+        )
+        assert hasattr(request_repo, "find_by_requester"), (
+            "RequestRepository should have find_by_requester"
+        )
 
     def test_repositories_handle_domain_events(self):
         """Test that repositories handle domain events properly."""

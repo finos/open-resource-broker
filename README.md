@@ -337,13 +337,16 @@ pip install -r requirements-dev.txt
 pip install -e .
 
 # Run tests
-pytest
+make test
 
-# Run linting
+# Format code (Ruff replaces Black + isort)
+make format
+
+# Check code quality
 make lint
 
-# Run type checking
-make type-check
+# Run before committing (replaces pre-commit hooks)
+make pre-commit
 ```
 
 ### Testing

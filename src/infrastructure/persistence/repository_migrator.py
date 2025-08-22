@@ -366,7 +366,7 @@ class RepositoryMigrator:
                                             str(conversion_error),
                                         )
                                         raise ValueError(
-                                            f"Entity conversion failed: { str(conversion_error)}"
+                                            f"Entity conversion failed: {str(conversion_error)}"
                                         )
                                 else:
                                     # Try to determine the entity class from the
@@ -398,7 +398,7 @@ class RepositoryMigrator:
                                                 str(conversion_error),
                                             )
                                             raise ValueError(
-                                                f"Entity creation failed: { str(conversion_error)}"
+                                                f"Entity creation failed: {str(conversion_error)}"
                                             )
                                     else:
                                         # Fallback to direct save, which might fail

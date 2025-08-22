@@ -133,7 +133,7 @@ def main():
             continue
 
         if args.extended:
-            logger.info(f"{Colors.BLUE}Hook {i+1}/{len(hooks)}: {name}{Colors.NC}")
+            logger.info(f"{Colors.BLUE}Hook {i + 1}/{len(hooks)}: {name}{Colors.NC}")
             logger.info(f"{Colors.BLUE}  Command: {command}{Colors.NC}")
 
         success = run_hook(name, command, warning_only, args.debug)

@@ -14,18 +14,12 @@ try:
     )
     from application.dto.queries import (
         GetMachineQuery,  # Use this instead of GetMachinesByRequestQuery
-    )
-    from application.dto.queries import (
+        GetRequestStatusQuery,
         ListTemplatesQuery,  # Use this instead of GetAvailableTemplatesQuery
     )
-    from application.dto.queries import GetRequestStatusQuery
     from application.queries.handlers import (
         GetMachineHandler,  # Use this instead of GetMachinesByRequestHandler
-    )
-    from application.queries.handlers import (
         GetRequestStatusQueryHandler,  # Note: different name than expected
-    )
-    from application.queries.handlers import (
         ListTemplatesHandler,  # Use this instead of GetAvailableTemplatesHandler
     )
     from infrastructure.di.buses import CommandBus, QueryBus
@@ -108,9 +102,9 @@ class TestCommandQuerySeparation:
                 verb in method.lower() for verb in ["set", "update", "create", "delete", "modify"]
             )
         ]
-        assert (
-            len(modifying_methods) == 0
-        ), f"Queries should not have modifying methods: {modifying_methods}"
+        assert len(modifying_methods) == 0, (
+            f"Queries should not have modifying methods: {modifying_methods}"
+        )
 
     def test_command_handlers_modify_state(self):
         """Test that command handlers are designed to modify state."""

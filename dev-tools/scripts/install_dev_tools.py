@@ -384,7 +384,7 @@ class DevToolsInstaller:
                 "-C",
                 "/usr/local/bin",
                 "--strip-components=1",
-                f"shellcheck-latest/shellcheck",
+                "shellcheck-latest/shellcheck",
             ]
         )
 

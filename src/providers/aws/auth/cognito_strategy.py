@@ -50,8 +50,7 @@ class CognitoAuthStrategy(AuthPort):
             self.jwks_url = jwks_url
         else:
             self.jwks_url = (
-                f"https://cognito-idp.{region}.amazonaws.com/"
-                f"{user_pool_id}/.well-known/jwks.json"
+                f"https://cognito-idp.{region}.amazonaws.com/{user_pool_id}/.well-known/jwks.json"
             )
 
         # Initialize Cognito client

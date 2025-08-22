@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Test runner script for the Open Host Factory Plugin."""
+
 import argparse
 import logging
 import subprocess
@@ -52,8 +53,24 @@ def main():
     parser.add_argument("--all", action="store_true", help="Run all test types")
     parser.add_argument("--maxfail", type=int, default=5, help="Stop after N failures")
     parser.add_argument("--timeout", type=int, default=300, help="Test timeout in seconds")
+    parser.add_argument("extra_args", nargs="*", help="Additional paths, patterns, or pytest options")
 
     args = parser.parse_args()
+
+    # Parse mixed arguments (paths, patterns, pytest options)
+    extra_paths = []
+    extra_pytest_args = []
+    
+    for arg in args.extra_args:
+        if arg.startswith('-'):
+            # Pytest option (e.g., -v, -s, --tb=short, -x)
+            extra_pytest_args.append(arg)
+        elif '/' in arg or arg.endswith('.py') or arg in ['tests', 'unit', 'integration', 'e2e']:
+            # Path or directory
+            extra_paths.append(arg)
+        else:
+            # Treat as keyword pattern
+            extra_pytest_args.extend(['-k', arg])
 
     # Base pytest command
     pytest_cmd = ["python", "-m", "pytest"]
@@ -130,7 +147,11 @@ def main():
     if args.markers:
         markers.append(args.markers)
 
-    # If no specific test type selected, run all
+    # Add extra paths from command line
+    if extra_paths:
+        test_paths.extend(extra_paths)
+
+    # If no specific test type selected and no extra paths, run default
     if not test_paths:
         test_paths = ["tests/"]
 
@@ -153,6 +174,10 @@ def main():
     # Add keyword filter
     if args.keyword:
         pytest_cmd.extend(["-k", args.keyword])
+
+    # Add extra pytest arguments from command line
+    if extra_pytest_args:
+        pytest_cmd.extend(extra_pytest_args)
 
     # Use centralized tool runner
     run_tool_script = "./dev-tools/scripts/run_tool.sh"

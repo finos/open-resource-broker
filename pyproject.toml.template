@@ -64,6 +64,12 @@ dependencies = [
 [dependency-groups]
 # CI Dependencies: What CI needs to test, lint, and build docs
 ci = [
+    # Code Quality Tools (ruff replaces black/isort/flake8/pylint)
+    "ruff>=0.1.0",
+    "mypy>=1.6.1,<2.0.0",
+    "bandit>=1.7.5,<2.0.0",
+    "bandit-sarif-formatter>=1.1.1,<2.0.0",
+    
     # Testing Framework
     "pytest>=7.4.3,<9.0.0",
     "pytest-cov>=4.1.0,<7.0.0",
@@ -76,35 +82,22 @@ ci = [
     "pytest-benchmark>=5.1.0,<6.0.0",
     "coverage>=7.3.2,<8.0.0",
     
-    # AWS Testing (moto includes botocore/boto3 stubs automatically)
+    # AWS Testing
     "moto[all]>=4.2.7,<6.0.0",
-    
-    # Test Data and Mocking
     "responses>=0.24.0,<1.0.0",
     "requests-mock>=1.11.0,<2.0.0",
     
-    # Code Quality and Linting
-    "black>=23.9.1,<25.0.0",
-    "isort>=5.12.0,<6.0.0",
-    "flake8>=6.1.0,<8.0.0",
-    "flake8-docstrings>=1.7.0,<2.0.0",
-    "flake8-bugbear>=23.9.16,<25.0.0",
-    "flake8-comprehensions>=3.14.0,<4.0.0",
-    "flake8-simplify>=0.21.0,<1.0.0",
-    "mypy>=1.6.1,<2.0.0",
-    "pylint>=3.0.2,<4.0.0",
-    
-    # Essential Type Stubs (only for core Python libraries)
+    # Essential Type Stubs
     "types-PyYAML>=6.0.12.12,<7.0.0",
     "types-python-dateutil>=2.8.19.14,<3.0.0",
     
     # Security Scanning
-    "bandit>=1.7.5,<2.0.0",
-    "bandit-sarif-formatter>=1.1.1,<2.0.0",
     "safety>=3.0.1,<4.0.0",
     "pip-audit>=2.6.1,<3.0.0",
+    "semgrep>=1.45.0,<2.0.0",
+    "cyclonedx-bom>=4.0.0,<5.0.0",
     
-    # Documentation (needed for docs workflow)
+    # Documentation
     "mkdocs>=1.5.0,<2.0.0",
     "mkdocs-material>=9.1.0,<10.0.0",
     "mkdocstrings>=0.22.0,<1.0.0",
@@ -114,21 +107,15 @@ ci = [
     "mkdocs-section-index>=0.3.0,<1.0.0",
     "mike>=1.1.0,<3.0.0",
     
-    # Build and Packaging (needed for CI builds)
+    # Build and Packaging
     "build>=1.0.3,<2.0.0",
     "wheel>=0.41.3,<1.0.0",
-    
-    # Security Tools (for CI security scans)
-    "semgrep>=1.45.0,<2.0.0",
-    "cyclonedx-bom>=4.0.0,<5.0.0",
 ]
 
-# Dev Dependencies: Additional dev tools (CI deps are inherited)
+# Dev Dependencies: Additional dev tools (includes all CI deps)
 dev = [
-    "autoflake>=2.2.1,<3.0.0",
-    "autopep8>=2.0.4,<3.0.0",
-    "bump2version>=1.0.1,<2.0.0",
     "pre-commit>=3.5.0,<4.0.0",
+    "bump2version>=1.0.1,<2.0.0",
     "line-profiler>=4.1.1,<5.0.0",
     "memory-profiler>=0.61.0,<1.0.0",
     "py-spy>=0.3.14,<1.0.0",
@@ -137,18 +124,8 @@ dev = [
     "ipython>=8.16.1,<9.0.0",
     "radon>=6.0.1,<7.0.0",
     "pip-tools>=7.3.0,<8.0.0",
-    
-    # Optional Type Stubs (for better dev experience, but may conflict)
-    # Developers can install these manually if they want better type checking
-    # "boto3-stubs[essential]>=1.34.0,<2.0.0",
-    # "types-requests>=2.31.0.10,<3.0.0",
-    # "mypy-boto3-ec2>=1.34.0,<2.0.0",
-    # "mypy-boto3-s3>=1.34.0,<2.0.0",
-    # "mypy-boto3-lambda>=1.34.0,<2.0.0",
-    # "mypy-boto3-dynamodb>=1.34.0,<2.0.0",
+    "twine>=4.0.0",
 ]
-
-[project.optional-dependencies]
 [project.scripts]
 {{PACKAGE_NAME_SHORT}} = "run:cli_main"     # From src._package.PACKAGE_NAME_SHORT
 {{PACKAGE_NAME}} = "run:cli_main"           # From src._package.PACKAGE_NAME
@@ -202,32 +179,41 @@ exclude_lines = [
     "if TYPE_CHECKING:",
 ]
 
-[tool.black]
+[tool.ruff]
+target-version = "py39"
 line-length = 100
-target-version = ['py39']
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | build
-  | dist
-)/
-'''
+exclude = [
+    ".eggs",
+    ".git",
+    ".hg", 
+    ".mypy_cache",
+    ".tox",
+    ".venv",
+    "build",
+    "dist",
+]
 
-[tool.isort]
-profile = "black"
-line_length = 100
-multi_line_output = 3
-include_trailing_comma = true
-force_grid_wrap = 0
-use_parentheses = true
-ensure_newline_before_comments = true
+[tool.ruff.lint]
+# ENFORCED: These rules fail CI (replace black/isort/flake8)
+select = ["E", "W", "F", "I"]
+# OPTIONAL: These warn but don't fail CI (replace pylint functionality)
+extend-select = ["N", "UP", "B", "PL", "C90", "RUF"]
+ignore = [
+    "E501",  # Line too long (handled by formatter)
+    "PLR0913",  # Too many arguments
+    "PLR0912",  # Too many branches
+    "PLR0915",  # Too many statements
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.ruff.lint.isort]
+known-first-party = ["ohfp", "application", "domain", "infrastructure", "interface", "api", "monitoring"]
+combine-as-imports = true
 
 [tool.mypy]
 python_version = "{{ project.python.default_version }}"

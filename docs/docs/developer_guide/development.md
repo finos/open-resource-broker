@@ -55,10 +55,10 @@ This guide covers setting up a development environment, understanding the codeba
 6. **Run Tests**
    ```bash
    # Run all tests
-   pytest
+   make test
 
    # Run with coverage
-   pytest --cov=src --cov-report=html
+   make test-cov
    ```
 
 7. **Start Development Server**
@@ -226,7 +226,7 @@ providers/
    touch tests/test_your_feature.py
 
    # Write failing tests
-   pytest tests/test_your_feature.py -v
+   make test tests/test_your_feature.py -v
    ```
 
 3. **Implement Feature**
@@ -238,13 +238,13 @@ providers/
 4. **Run Tests**
    ```bash
    # Run specific tests
-   pytest tests/test_your_feature.py -v
+   make test FILE=tests/test_your_feature.py
 
    # Run all tests
-   pytest
+   make test
 
    # Check coverage
-   pytest --cov=src --cov-report=term-missing
+   make test-cov
    ```
 
 5. **Update Documentation**
@@ -387,20 +387,44 @@ class TestRequestService:
 #### Running Tests
 
 ```bash
-# Run all tests
-pytest
+### Testing Examples
+
+```bash
+# Run all tests (default: quick test suite)
+make test
 
 # Run specific test file
-pytest tests/test_request_service.py
+make test tests/unit/test_request_service.py
 
-# Run tests with specific marker
-pytest -m unit
+# Run specific directory
+make test tests/unit
+
+# Run with verbose output
+make test -v
+
+# Run specific file with verbose output
+make test tests/unit/test_request_service.py -v
+
+# Run tests matching pattern
+make test -k "request"
+
+# Run specific test method
+make test tests/unit/test_request_service.py -k "test_create_request"
 
 # Run tests with coverage
-pytest --cov=src --cov-report=html
+make test-cov
 
 # Run tests in parallel
-pytest -n auto
+make test-parallel
+
+# Run only unit tests
+make test-unit
+
+# Run unit tests in specific directory
+make test-unit tests/unit/domain
+
+# Run integration tests with pattern
+make test-integration -k "workflow"
 ```
 
 ### Debugging
@@ -559,9 +583,8 @@ def get_requests_by_status(status: str) -> List[Request]:
 
 4. **Test Changes**
    ```bash
-   pytest
-   flake8 src/
-   mypy src/
+   make test
+   make ci-quality
    ```
 
 5. **Commit Changes**
@@ -640,10 +663,10 @@ python -m src.bootstrap --check-imports
 #### Test Failures
 ```bash
 # Run tests with verbose output
-pytest -v
+make test -v
 
 # Run specific failing test
-pytest tests/test_specific.py::test_method -v
+make test tests/test_specific.py -k "test_method" -v
 
 # Check test dependencies
 pip list | grep pytest

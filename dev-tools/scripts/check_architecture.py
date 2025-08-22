@@ -7,6 +7,7 @@ This script validates that Clean Architecture dependency rules are followed:
 - Application layer should not depend on Interface layer
 - Dependencies should flow inward only
 """
+
 import argparse
 import ast
 import logging

@@ -4,6 +4,7 @@ SBOM generation script.
 
 Generates SBOM files in CycloneDX and SPDX formats.
 """
+
 import argparse
 import json
 import subprocess

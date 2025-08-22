@@ -163,7 +163,6 @@ class TestRefactoredTemplateSystem:
             patch("builtins.open", create=True) as mock_open,
             patch("json.dump") as mock_json_dump,
         ):
-
             # Test save template
             await persistence_service.save_template(sample_template_dto)
 

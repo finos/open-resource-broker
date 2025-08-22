@@ -90,7 +90,6 @@ class TestFullWorkflow:
             patch.object(service, "_command_bus") as mock_command_bus,
             patch.object(service, "_query_bus") as mock_query_bus,
         ):
-
             # Mock request machines response
             mock_command_bus.dispatch.return_value = {
                 "request_id": "req-12345678",
@@ -137,7 +136,6 @@ class TestFullWorkflow:
             patch.object(service, "_command_bus") as mock_command_bus,
             patch.object(service, "_query_bus") as mock_query_bus,
         ):
-
             # Mock return request response
             mock_command_bus.dispatch.return_value = {
                 "request_id": "req-return-123",
@@ -182,7 +180,6 @@ class TestFullWorkflow:
 
         # Mock query bus
         with patch.object(service, "_query_bus") as mock_query_bus:
-
             # Mock machine status response
             mock_query_bus.dispatch.return_value = {
                 "machine_id": "machine-001",
@@ -351,7 +348,6 @@ class TestEndToEndScenarios:
             patch.object(service, "_query_bus") as mock_query_bus,
             patch.object(service, "_template_service") as mock_template_service,
         ):
-
             # Get available templates
             mock_template = Template(
                 id="template-001",
@@ -448,7 +444,6 @@ class TestEndToEndScenarios:
             patch.object(service, "_command_bus") as mock_command_bus,
             patch.object(service, "_query_bus") as mock_query_bus,
         ):
-
             # Simulate initial failure
             mock_command_bus.dispatch.side_effect = Exception("Temporary failure")
 

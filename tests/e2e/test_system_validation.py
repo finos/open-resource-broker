@@ -765,6 +765,6 @@ class TestSystemValidation:
         total_checks = len(validation_checklist)
 
         # Final assertion
-        assert (
-            passed_checks == total_checks
-        ), f"System validation failed: {passed_checks}/{total_checks} checks passed"
+        assert passed_checks == total_checks, (
+            f"System validation failed: {passed_checks}/{total_checks} checks passed"
+        )

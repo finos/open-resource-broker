@@ -123,22 +123,22 @@ def test_no_instance_manager_bypass():
         strategy.initialize()
 
         # Check that instance_manager property doesn't exist (should be removed)
-        assert not hasattr(
-            strategy, "instance_manager"
-        ), "instance_manager property should be removed"
+        assert not hasattr(strategy, "instance_manager"), (
+            "instance_manager property should be removed"
+        )
         print("PASS: instance_manager property correctly removed")
 
         # Check that _instance_manager attribute doesn't exist
-        assert not hasattr(
-            strategy, "_instance_manager"
-        ), "_instance_manager attribute should be removed"
+        assert not hasattr(strategy, "_instance_manager"), (
+            "_instance_manager attribute should be removed"
+        )
         print("PASS: _instance_manager attribute correctly removed")
 
         # Check that handlers and launch_template_manager exist instead
         assert hasattr(strategy, "handlers"), "handlers property should exist"
-        assert hasattr(
-            strategy, "launch_template_manager"
-        ), "launch_template_manager property should exist"
+        assert hasattr(strategy, "launch_template_manager"), (
+            "launch_template_manager property should exist"
+        )
         print("PASS: New handler system properties exist")
 
         return True

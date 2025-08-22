@@ -5,6 +5,7 @@ SARIF file validation script.
 Validates SARIF files for compliance with the SARIF 2.1.0 specification
 and GitHub Security tab requirements.
 """
+
 import argparse
 import json
 import logging

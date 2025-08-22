@@ -112,12 +112,30 @@ The project uses a secure three-tier publishing strategy:
 
 ### Formatting and Linting
 
+We use Ruff for code formatting and linting (replaces Black, isort, flake8, pylint).
+
+Since pre-commit hooks cannot be installed due to git configuration:
+
+1. **Enable format-on-save** in your IDE (see .vscode/settings.json)
+2. **Run before committing**: `make pre-commit`
+3. **Let CI auto-format**: If you forget, CI will auto-format and commit
+
+### IDE Setup
+- **VS Code**: Install Ruff extension, settings already configured
+- **PyCharm**: Install Ruff plugin, enable format-on-save
+
 ```bash
-# Format code
+# Format code (auto-fix what can be fixed)
 make format
 
-# Run linting
+# Check code quality (enforced rules)
 make lint
+
+# Check extended rules (warnings only)
+make lint-optional
+
+# Run all pre-commit checks locally
+make pre-commit
 
 # Type checking
 make type-check
@@ -154,7 +172,7 @@ The plugin follows Clean Architecture principles:
 ### Before Submitting
 
 1. **Run tests locally**: `make test`
-2. **Format code**: `make format`
+2. **Run pre-commit checks**: `make pre-commit`
 3. **Update documentation** if needed
 4. **Add tests** for new functionality
 
