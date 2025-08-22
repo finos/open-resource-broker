@@ -22,12 +22,12 @@ DEFAULT_PYTHON_VERSION := $(shell yq '.python.default_version' $(PROJECT_CONFIG)
 # Generate pyproject.toml from template with project configuration
 generate-pyproject:  ## Generate pyproject.toml from template using project config
 	@echo "Generating pyproject.toml from template using $(PROJECT_CONFIG)..."
-	@./dev-tools/scripts/generate_pyproject.py --config $(PROJECT_CONFIG)
+	@VERSION="$(VERSION)" ./dev-tools/scripts/generate_pyproject.py --config $(PROJECT_CONFIG)
 
-# Package information (loaded from project config)
+# Package information (loaded from project config, but respect environment VERSION for CI)
 PACKAGE_NAME := $(shell yq '.project.name' $(PROJECT_CONFIG))
 PACKAGE_NAME_SHORT := $(shell yq '.project.short_name' $(PROJECT_CONFIG))
-VERSION := $(shell yq '.project.version' $(PROJECT_CONFIG))
+VERSION ?= $(shell yq '.project.version' $(PROJECT_CONFIG))
 
 # Repository information (loaded from project config)
 REPO_ORG := $(shell yq '.repository.org' $(PROJECT_CONFIG))
