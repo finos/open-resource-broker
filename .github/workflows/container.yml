@@ -162,28 +162,31 @@ jobs:
       run: |
         if [[ "${{ github.event_name }}" == "release" ]]; then
           # Release: use release version and push to registry
-          {
-            echo "CONTAINER_VERSION=${{ github.ref_name }}"
-            echo "PUSH_IMAGES=true"
-            echo "CONTAINER_TAGS=latest,${{ github.ref_name }}"
-          } >> "$GITHUB_ENV"
+          CONTAINER_VERSION="${{ github.ref_name }}"
+          PUSH_IMAGES="true"
+          CONTAINER_TAGS="latest,${{ github.ref_name }}"
         elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
           # Main branch: use dev version and push
           VERSION="0.1.0.dev$(date +%Y%m%d%H%M%S)+$(git rev-parse --short HEAD)"
-          {
-            echo "CONTAINER_VERSION=$VERSION"
-            echo "PUSH_IMAGES=true"
-            echo "CONTAINER_TAGS=dev,$VERSION"
-          } >> "$GITHUB_ENV"
+          CONTAINER_VERSION="$VERSION"
+          PUSH_IMAGES="true"
+          CONTAINER_TAGS="dev,$VERSION"
         else
           # PR/comment triggers: use dev version but don't push (security)
           VERSION="0.1.0.dev$(date +%Y%m%d%H%M%S)+$(git rev-parse --short HEAD)"
-          {
-            echo "CONTAINER_VERSION=$VERSION"
-            echo "PUSH_IMAGES=false"
-            echo "CONTAINER_TAGS=$VERSION"
-          } >> "$GITHUB_ENV"
+          CONTAINER_VERSION="$VERSION"
+          PUSH_IMAGES="false"
+          CONTAINER_TAGS="$VERSION"
         fi
+        
+        # Export to environment for subsequent steps
+        {
+          echo "CONTAINER_VERSION=$CONTAINER_VERSION"
+          echo "PUSH_IMAGES=$PUSH_IMAGES"
+          echo "CONTAINER_TAGS=$CONTAINER_TAGS"
+        } >> "$GITHUB_ENV"
+        
+        # Display values for debugging
         echo "Container version: $CONTAINER_VERSION"
         echo "Push images: $PUSH_IMAGES"
         echo "Tags: $CONTAINER_TAGS"
@@ -228,7 +231,7 @@ jobs:
       env:
         REGISTRY: ${{ needs.get-config.outputs.container-registry }}
         IMAGE_NAME: ${{ needs.get-config.outputs.container-image }}
-        VERSION: ${{ needs.get-config.outputs.version }}
+        VERSION: ${{ env.CONTAINER_VERSION }}
         PYTHON_VERSION: ${{ matrix.python-version }}
         PLATFORMS: linux/amd64,linux/arm64
         PUSH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'release' || github.event.inputs.push_images == 'true') }}
@@ -241,7 +244,7 @@ jobs:
       if: matrix.python-version == needs.get-config.outputs.default-python-version
       run: |
         # Test that the container starts and responds to health check
-        IMAGE_TAG="${{ needs.get-config.outputs.container-registry }}/${{ needs.get-config.outputs.container-image }}:${{ needs.get-config.outputs.version }}-python${{ matrix.python-version }}"
+        IMAGE_TAG="${{ needs.get-config.outputs.container-registry }}/${{ needs.get-config.outputs.container-image }}:${{ env.CONTAINER_VERSION }}-python${{ matrix.python-version }}"
 
         echo "Testing container image: $IMAGE_TAG"
 
