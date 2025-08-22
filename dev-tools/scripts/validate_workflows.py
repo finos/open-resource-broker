@@ -104,34 +104,54 @@ def validate_workflow(file_path: Path):
 
 def main():
     """Main validation function."""
-    workflows_dir = Path(".github/workflows")
-
-    if not workflows_dir.exists():
-        logger.error(".github/workflows directory not found")
+    github_dir = Path(".github")
+    
+    if not github_dir.exists():
+        logger.error(".github directory not found")
         sys.exit(1)
 
-    workflow_files = list(workflows_dir.glob("*.yml")) + list(workflows_dir.glob("*.yaml"))
-
-    if not workflow_files:
-        logger.error("No workflow files found")
+    # Find all YAML files in .github directory and subdirectories
+    yaml_files = []
+    yaml_files.extend(github_dir.glob("**/*.yml"))
+    yaml_files.extend(github_dir.glob("**/*.yaml"))
+    
+    if not yaml_files:
+        logger.error("No YAML files found in .github directory")
         sys.exit(1)
 
-    logger.info(f"Validating {len(workflow_files)} workflow files...")
+    logger.info(f"Validating {len(yaml_files)} YAML files...")
     logger.info("")
 
-    all_valid = True
+    valid_count = 0
+    invalid_count = 0
 
-    for workflow_file in sorted(workflow_files):
-        if not validate_workflow(workflow_file):
-            all_valid = False
+    for yaml_file in sorted(yaml_files):
+        # Get relative path for cleaner output
+        rel_path = yaml_file.relative_to(github_dir)
+        
+        # Only do structure validation for workflow files
+        if yaml_file.parent.name == "workflows":
+            if validate_workflow(yaml_file):
+                valid_count += 1
+            else:
+                invalid_count += 1
+        else:
+            # For non-workflow files, just validate YAML syntax
+            logger.info(f"Validating {rel_path}...")
+            syntax_valid, syntax_error = validate_workflow_syntax(yaml_file)
+            if syntax_valid:
+                logger.info(f"  VALID: {rel_path}: Valid YAML")
+                valid_count += 1
+            else:
+                logger.error(f"  INVALID: {rel_path}: {syntax_error}")
+                invalid_count += 1
 
     logger.info("")
-    if all_valid:
-        logger.info(f"SUCCESS: All {len(workflow_files)} workflow files are valid!")
+    if invalid_count == 0:
+        logger.info(f"SUCCESS: All {len(yaml_files)} YAML files are valid!")
         sys.exit(0)
     else:
-        logger.error("FAILED: Found invalid workflow files")
-        logger.error("Fix the issues above before committing.")
+        logger.error(f"FAILED: {invalid_count} files have issues, {valid_count} are valid")
         sys.exit(1)
 
 
