@@ -856,68 +856,16 @@ print-json-%:
 
 # UV-specific targets for performance optimization
 uv-lock: ## Generate uv lock file for reproducible builds
-	@if ! command -v uv >/dev/null 2>&1; then \
-		echo "ERROR: uv not available. Install with: pip install uv"; \
-		exit 1; \
-	fi
-	@echo "INFO: Generating uv lock files..."
-	uv pip compile pyproject.toml --output-file requirements.lock
-	uv pip compile pyproject.toml --extra dev --output-file requirements-dev.lock
-	@echo "SUCCESS: Lock files generated: requirements.lock, requirements-dev.lock"
+	./dev-tools/scripts/uv_manager.py lock
 
 uv-sync: ## Sync environment with uv lock files
-	@if ! command -v uv >/dev/null 2>&1; then \
-		echo "ERROR: uv not available. Install with: pip install uv"; \
-		exit 1; \
-	fi
-	@if [ -f requirements.lock ]; then \
-		echo "INFO: Syncing with uv lock file..."; \
-		uv pip sync requirements.lock; \
-	else \
-		echo "ERROR: No lock file found. Run 'make uv-lock' first."; \
-		exit 1; \
-	fi
+	./dev-tools/scripts/uv_manager.py sync
 
 uv-sync-dev: ## Sync development environment with uv lock files
-	@if ! command -v uv >/dev/null 2>&1; then \
-		echo "ERROR: uv not available. Install with: pip install uv"; \
-		exit 1; \
-	fi
-	@if [ -f requirements-dev.lock ]; then \
-		echo "INFO: Syncing development environment with uv lock file..."; \
-		uv pip sync requirements-dev.lock; \
-	else \
-		echo "ERROR: No dev lock file found. Run 'make uv-lock' first."; \
-		exit 1; \
-	fi
+	./dev-tools/scripts/uv_manager.py sync-dev
 
 uv-check: ## Check if uv is available and show version
-	@if command -v uv >/dev/null 2>&1; then \
-		echo "SUCCESS: uv is available: $$(uv --version)"; \
-		echo "INFO: Performance comparison:"; \
-		echo "  • uv is typically 10-100x faster than pip"; \
-		echo "  • Better dependency resolution and error messages"; \
-		echo "  • Use 'make dev-install-uv' for faster development setup"; \
-	else \
-		echo "ERROR: uv not available"; \
-		echo "INFO: Install with: pip install uv"; \
-		echo "INFO: Or use system package manager: brew install uv"; \
-	fi
+	./dev-tools/scripts/uv_manager.py check
 
 uv-benchmark: ## Benchmark uv vs pip installation speed
-	@echo "INFO: Benchmarking uv vs pip installation speed..."
-	@echo "This will create temporary virtual environments for testing."
-	@echo ""
-	@if ! command -v uv >/dev/null 2>&1; then \
-		echo "ERROR: uv not available for benchmarking"; \
-		exit 1; \
-	fi
-	@echo "INFO: Testing pip installation speed..."
-	@time (python -m venv .venv-pip-test && .venv-pip-test/bin/pip install -e ".[dev]" > /dev/null 2>&1)
-	@echo ""
-	@echo "INFO: Testing uv installation speed..."
-	@time (python -m venv .venv-uv-test && uv pip install -e ".[dev]" --python .venv-uv-test/bin/python > /dev/null 2>&1)
-	@echo ""
-	@echo "INFO: Cleaning up test environments..."
-	@rm -rf .venv-pip-test .venv-uv-test
-	@echo "SUCCESS: Benchmark complete!"
+	./dev-tools/scripts/uv_manager.py benchmark
