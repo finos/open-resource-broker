@@ -1,8 +1,41 @@
 {
   "AutoScalingGroupName": "asg-{{ request_id }}",
-  "LaunchTemplate": {
-    "LaunchTemplateId": "{{ launch_template_id }}",
-    "Version": "{{ launch_template_version | default('$Latest') }}"
+  "MixedInstancesPolicy": {
+    "LaunchTemplate": {
+      "LaunchTemplateSpecification": {
+        "LaunchTemplateId": "{{ launch_template_id }}",
+        "Version": "{{ launch_template_version | default('$Latest') }}"
+      },
+      "Overrides": [
+        {"InstanceType": "r6i.xlarge"},
+        {"InstanceType": "r6a.2xlarge"},
+        {"InstanceType": "r5.4xlarge"},
+        {"InstanceType": "r5n.8xlarge"},
+        {"InstanceType": "r5a.12xlarge"},
+        {"InstanceType": "r5d.16xlarge"},
+        {"InstanceType": "r5.xlarge"},
+        {"InstanceType": "r5n.2xlarge"},
+        {"InstanceType": "r6a.4xlarge"},
+        {"InstanceType": "r5a.8xlarge"},
+        {"InstanceType": "m6i.xlarge"},
+        {"InstanceType": "m6a.2xlarge"},
+        {"InstanceType": "m5.4xlarge"},
+        {"InstanceType": "m5n.8xlarge"},
+        {"InstanceType": "m5a.12xlarge"},
+        {"InstanceType": "m5d.16xlarge"},
+        {"InstanceType": "m5.xlarge"},
+        {"InstanceType": "m5n.2xlarge"},
+        {"InstanceType": "m6a.4xlarge"},
+        {"InstanceType": "m5a.8xlarge"}
+      ]
+    },
+    "InstancesDistribution": {
+      "OnDemandBaseCapacity": "{{ on_demand_base_capacity | default(0) }}",
+      "OnDemandPercentageAboveBaseCapacity": "{{ on_demand_percentage | default(10) }}",
+      "SpotAllocationStrategy": "price-capacity-optimized",
+      "SpotInstancePools": "{{ spot_instance_pools | default(20) }}",
+      "SpotMaxPrice": "{{ spot_max_price | default('') }}"
+    }
   },
   "MinSize": "{{ min_size | default(0) }}",
   "MaxSize": "{{ max_size | default(requested_count * 2) }}",
@@ -11,9 +44,10 @@
   "HealthCheckType": "{{ health_check_type | default('EC2') }}",
   "HealthCheckGracePeriod": "{{ health_check_grace_period | default(300) }}",
   "Tags": [
-    {"Key": "Name", "Value": "asg-{{ request_id }}", "PropagateAtLaunch": true, "ResourceId": "asg-{{ request_id }}", "ResourceType": "auto-scaling-group"},
+    {"Key": "Name", "Value": "hpc-asg-{{ request_id }}", "PropagateAtLaunch": true, "ResourceId": "asg-{{ request_id }}", "ResourceType": "auto-scaling-group"},
     {"Key": "RequestId", "Value": "{{ request_id }}", "PropagateAtLaunch": true, "ResourceId": "asg-{{ request_id }}", "ResourceType": "auto-scaling-group"},
     {"Key": "TemplateId", "Value": "{{ template_id }}", "PropagateAtLaunch": true, "ResourceId": "asg-{{ request_id }}", "ResourceType": "auto-scaling-group"},
-    {"Key": "CreatedBy", "Value": "{{ package_name }}", "PropagateAtLaunch": true, "ResourceId": "asg-{{ request_id }}", "ResourceType": "auto-scaling-group"}
+    {"Key": "CreatedBy", "Value": "{{ package_name }}", "PropagateAtLaunch": true, "ResourceId": "asg-{{ request_id }}", "ResourceType": "auto-scaling-group"},
+    {"Key": "WorkloadType", "Value": "hpc", "PropagateAtLaunch": true, "ResourceId": "asg-{{ request_id }}", "ResourceType": "auto-scaling-group"}
   ]
 }

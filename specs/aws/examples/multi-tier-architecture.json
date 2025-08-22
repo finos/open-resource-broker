@@ -13,12 +13,12 @@
         "Version": "{{ web_tier_launch_template_version | default('$Latest') }}"
       },
       "Overrides": [
-        {"InstanceType": "m6i.large", "SubnetId": "{{ public_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "m6a.large", "SubnetId": "{{ public_subnet_ids[1] if public_subnet_ids|length > 1 else public_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "m5.large", "SubnetId": "{{ public_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "m5n.large", "SubnetId": "{{ public_subnet_ids[1] if public_subnet_ids|length > 1 else public_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "m6i.xlarge", "SubnetId": "{{ public_subnet_ids[0] }}", "WeightedCapacity": 2},
-        {"InstanceType": "m5.xlarge", "SubnetId": "{{ public_subnet_ids[1] if public_subnet_ids|length > 1 else public_subnet_ids[0] }}", "WeightedCapacity": 2}
+        {"InstanceType": "m6i.xlarge", "WeightedCapacity": 1},
+        {"InstanceType": "m6a.2xlarge", "WeightedCapacity": 2},
+        {"InstanceType": "m5.4xlarge", "WeightedCapacity": 4},
+        {"InstanceType": "m5n.xlarge", "WeightedCapacity": 1},
+        {"InstanceType": "m5a.2xlarge", "WeightedCapacity": 2},
+        {"InstanceType": "m5d.4xlarge", "WeightedCapacity": 4}
       ]
     },
     {
@@ -27,14 +27,15 @@
         "Version": "{{ app_tier_launch_template_version | default('$Latest') }}"
       },
       "Overrides": [
-        {"InstanceType": "m6i.large", "SubnetId": "{{ private_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "m6a.large", "SubnetId": "{{ private_subnet_ids[1] if private_subnet_ids|length > 1 else private_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "m5.large", "SubnetId": "{{ private_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "m5a.large", "SubnetId": "{{ private_subnet_ids[1] if private_subnet_ids|length > 1 else private_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "m6i.xlarge", "SubnetId": "{{ private_subnet_ids[0] }}", "WeightedCapacity": 2},
-        {"InstanceType": "m5.xlarge", "SubnetId": "{{ private_subnet_ids[1] if private_subnet_ids|length > 1 else private_subnet_ids[0] }}", "WeightedCapacity": 2},
-        {"InstanceType": "m6i.2xlarge", "SubnetId": "{{ private_subnet_ids[0] }}", "WeightedCapacity": 4},
-        {"InstanceType": "m5.2xlarge", "SubnetId": "{{ private_subnet_ids[1] if private_subnet_ids|length > 1 else private_subnet_ids[0] }}", "WeightedCapacity": 4}
+        {"InstanceType": "r6i.xlarge", "WeightedCapacity": 1},
+        {"InstanceType": "r6a.2xlarge", "WeightedCapacity": 2},
+        {"InstanceType": "r5.4xlarge", "WeightedCapacity": 4},
+        {"InstanceType": "r5n.8xlarge", "WeightedCapacity": 8},
+        {"InstanceType": "r5a.xlarge", "WeightedCapacity": 1},
+        {"InstanceType": "r5d.2xlarge", "WeightedCapacity": 2},
+        {"InstanceType": "m6i.2xlarge", "WeightedCapacity": 2},
+        {"InstanceType": "m5.4xlarge", "WeightedCapacity": 4},
+        {"InstanceType": "m5n.8xlarge", "WeightedCapacity": 8}
       ]
     },
     {
@@ -43,15 +44,15 @@
         "Version": "{{ db_tier_launch_template_version | default('$Latest') }}"
       },
       "Overrides": [
-        {"InstanceType": "r6i.large", "SubnetId": "{{ db_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "r6a.large", "SubnetId": "{{ db_subnet_ids[1] if db_subnet_ids|length > 1 else db_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "r5.large", "SubnetId": "{{ db_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "r5a.large", "SubnetId": "{{ db_subnet_ids[1] if db_subnet_ids|length > 1 else db_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "r5n.large", "SubnetId": "{{ db_subnet_ids[0] }}", "WeightedCapacity": 1},
-        {"InstanceType": "r6i.xlarge", "SubnetId": "{{ db_subnet_ids[1] if db_subnet_ids|length > 1 else db_subnet_ids[0] }}", "WeightedCapacity": 2},
-        {"InstanceType": "r5.xlarge", "SubnetId": "{{ db_subnet_ids[0] }}", "WeightedCapacity": 2},
-        {"InstanceType": "r6i.2xlarge", "SubnetId": "{{ db_subnet_ids[1] if db_subnet_ids|length > 1 else db_subnet_ids[0] }}", "WeightedCapacity": 4},
-        {"InstanceType": "r5.2xlarge", "SubnetId": "{{ db_subnet_ids[0] }}", "WeightedCapacity": 4}
+        {"InstanceType": "r6i.2xlarge", "WeightedCapacity": 2},
+        {"InstanceType": "r6a.4xlarge", "WeightedCapacity": 4},
+        {"InstanceType": "r5.8xlarge", "WeightedCapacity": 8},
+        {"InstanceType": "r5n.12xlarge", "WeightedCapacity": 12},
+        {"InstanceType": "r5a.16xlarge", "WeightedCapacity": 16},
+        {"InstanceType": "r5d.24xlarge", "WeightedCapacity": 24},
+        {"InstanceType": "r6i.xlarge", "WeightedCapacity": 1},
+        {"InstanceType": "r5.4xlarge", "WeightedCapacity": 4},
+        {"InstanceType": "r5n.8xlarge", "WeightedCapacity": 8}
       ]
     }
   ],
@@ -71,11 +72,12 @@
   "TagSpecifications": [{
     "ResourceType": "fleet",
     "Tags": [
-      {"Key": "Name", "Value": "multi-tier-{{ request_id }}"},
+      {"Key": "Name", "Value": "hpc-multi-tier-{{ request_id }}"},
       {"Key": "RequestId", "Value": "{{ request_id }}"},
       {"Key": "TemplateId", "Value": "{{ template_id }}"},
       {"Key": "CreatedBy", "Value": "{{ package_name }}"},
       {"Key": "Architecture", "Value": "multi-tier"},
+      {"Key": "WorkloadType", "Value": "hpc"},
       {"Key": "AllocationStrategy", "Value": "price-capacity-optimized"}
     ]
   }]
