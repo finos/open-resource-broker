@@ -113,18 +113,10 @@ deps-update:  ## Update dependencies and regenerate lock file
 	uv lock --upgrade
 
 deps-add:  ## Add new dependency (usage: make deps-add PACKAGE=package-name)
-	@if [ -z "$(PACKAGE)" ]; then \
-		echo "Error: PACKAGE is required. Usage: make deps-add PACKAGE=package-name"; \
-		exit 1; \
-	fi
-	uv add $(PACKAGE)
+	./dev-tools/scripts/deps_manager.py add $(PACKAGE)
 
 deps-add-dev:  ## Add new dev dependency (usage: make deps-add-dev PACKAGE=package-name)
-	@if [ -z "$(PACKAGE)" ]; then \
-		echo "Error: PACKAGE is required. Usage: make deps-add-dev PACKAGE=package-name"; \
-		exit 1; \
-	fi
-	uv add --dev $(PACKAGE)
+	./dev-tools/scripts/deps_manager.py add --dev $(PACKAGE)
 
 # Cleanup
 clean-requirements:  ## Remove generated requirements files
@@ -211,9 +203,7 @@ format-fix: dev-install clean-whitespace  ## Auto-fix code formatting with Ruff
 	uv run ruff check --fix --exit-zero .
 
 container-health-check:  ## Test container health endpoint
-	@echo "Testing container health endpoint..."
-	@timeout 30 bash -c 'until curl -f http://localhost:8000/health; do sleep 2; done' || (echo "Health check failed" && exit 1)
-	@echo "Container health check passed!"
+	./dev-tools/scripts/container_health_check.py
 
 ci-git-setup:  ## Setup git configuration for CI automated commits
 	git config --local user.name "github-actions[bot]"
@@ -231,14 +221,7 @@ pre-commit: format lint  ## Simulate pre-commit checks locally
 	@echo "All checks passed! Safe to commit."
 
 hadolint-check: ## Check Dockerfiles with hadolint
-	@if command -v hadolint >/dev/null 2>&1; then \
-		echo "Running hadolint on Dockerfiles..."; \
-		hadolint Dockerfile; \
-		hadolint dev-tools/docker/Dockerfile.dev-tools; \
-	else \
-		echo "hadolint not found - install with: brew install hadolint"; \
-		exit 1; \
-	fi
+	./dev-tools/scripts/hadolint_check.py
 
 dev-checks-container: ## Run all pre-commit checks in container (no local tools needed)
 	./dev-tools/scripts/run_dev_checks.sh all
