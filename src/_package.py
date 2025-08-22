@@ -50,7 +50,9 @@ if not config:
         "project": {
             "name": "open-hostfactory-plugin",
             "short_name": "ohfp",
-            "version": "0.1.0-dev",
+            # PEP 440 compliant development version - prevents PyPI normalization from "0.1.0-dev" to "0.1.0.dev0"
+            # CI builds will override this with dynamic versions like "0.1.0.dev20250822145030+abc1234"
+            "version": "0.1.0.dev0",
             "description": "Cloud provider integration plugin for IBM Spectrum Symphony Host Factory",
         },
         "repository": {"org": "awslabs", "name": "open-hostfactory-plugin", "registry": "ghcr.io"},

@@ -3,6 +3,7 @@
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -74,10 +75,13 @@ def generate_pyproject():
     python_classifiers_str = "\n".join(python_classifiers)
 
     # Replace placeholders with actual values
+    # Use CI VERSION env var if available (for dynamic versioning), otherwise use package version
+    version_to_use = os.environ.get("VERSION", __version__)
+    
     replacements = {
         "{{PACKAGE_NAME}}": PACKAGE_NAME,
         "{{PACKAGE_NAME_SHORT}}": PACKAGE_NAME_SHORT,
-        "{{VERSION}}": __version__,
+        "{{VERSION}}": version_to_use,
         "{{DESCRIPTION}}": DESCRIPTION,
         "{{AUTHOR}}": author,
         "{{EMAIL}}": email,
