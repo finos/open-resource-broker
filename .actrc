@@ -1,0 +1,24 @@
+# Act configuration for local GitHub Actions execution
+# See: https://github.com/nektos/act
+
+# Use consistent container architecture (important for M-series Macs)
+--container-architecture linux/amd64
+
+# Environment and secrets files
+--env-file .env.local
+--secret-file .secrets.local
+
+# Artifact handling
+--artifact-server-path .local/artifacts
+
+# Use host network for better performance
+--network host
+
+# Automatically remove containers after completion
+--rm
+
+# Use Ubuntu latest image for consistency with GitHub Actions
+--platform ubuntu-latest=catthehacker/ubuntu:act-latest
+
+# Reuse containers for better performance during development
+--reuse

@@ -426,8 +426,107 @@ version-bump:  ## Show version bump help
 	@echo ""
 	@echo "Current version: $(VERSION)"
 
+# @SECTION Local CI (GitHub Actions)
+# Local GitHub Actions execution with act
+local-list: dev-install  ## List available workflows and jobs for local execution
+	@echo "Available workflows and jobs for local execution:"
+	@if command -v act >/dev/null 2>&1; then \
+		act -l; \
+	else \
+		echo "Error: act not installed. Run 'make install-dev-tools' to install."; \
+		exit 1; \
+	fi
+
+local-dry-run: dev-install  ## Validate all workflows without running (dry run)
+	@echo "Validating workflows with act (dry run)..."
+	@if command -v act >/dev/null 2>&1; then \
+		act --dryrun; \
+	else \
+		echo "Error: act not installed. Run 'make install-dev-tools' to install."; \
+		exit 1; \
+	fi
+
+local-push: dev-install  ## Simulate push event (triggers CI workflow)
+	@echo "Simulating push event locally..."
+	@if command -v act >/dev/null 2>&1; then \
+		act push; \
+	else \
+		echo "Error: act not installed. Run 'make install-dev-tools' to install."; \
+		exit 1; \
+	fi
+
+local-pr: dev-install  ## Simulate pull request event (triggers CI + security workflows)
+	@echo "Simulating pull request event locally..."
+	@if command -v act >/dev/null 2>&1; then \
+		act pull_request; \
+	else \
+		echo "Error: act not installed. Run 'make install-dev-tools' to install."; \
+		exit 1; \
+	fi
+
+local-release: dev-install  ## Simulate release event (triggers publish workflow)
+	@echo "Simulating release event locally..."
+	@if command -v act >/dev/null 2>&1; then \
+		act release; \
+	else \
+		echo "Error: act not installed. Run 'make install-dev-tools' to install."; \
+		exit 1; \
+	fi
+
+local-ci: dev-install  ## Run CI workflow locally (.github/workflows/ci.yml)
+	@echo "Running CI workflow locally..."
+	@if command -v act >/dev/null 2>&1; then \
+		act -W .github/workflows/ci.yml; \
+	else \
+		echo "Error: act not installed. Run 'make install-dev-tools' to install."; \
+		exit 1; \
+	fi
+
+local-security: dev-install  ## Run security workflow locally (.github/workflows/security.yml)
+	@echo "Running security workflow locally..."
+	@if command -v act >/dev/null 2>&1; then \
+		act -W .github/workflows/security.yml; \
+	else \
+		echo "Error: act not installed. Run 'make install-dev-tools' to install."; \
+		exit 1; \
+	fi
+
+local-test-matrix: dev-install  ## Run test matrix workflow locally (.github/workflows/test-matrix.yml)
+	@echo "Running test matrix workflow locally..."
+	@if command -v act >/dev/null 2>&1; then \
+		act -W .github/workflows/test-matrix.yml; \
+	else \
+		echo "Error: act not installed. Run 'make install-dev-tools' to install."; \
+		exit 1; \
+	fi
+
+local-clean: ## Clean local act artifacts and containers
+	@echo "Cleaning local act artifacts..."
+	@rm -rf .local/artifacts
+	@if command -v docker >/dev/null 2>&1; then \
+		echo "Removing act containers..."; \
+		docker ps -a --filter "label=act" -q | xargs -r docker rm -f; \
+		echo "Removing act images (unused)..."; \
+		docker images --filter "dangling=true" -q | xargs -r docker rmi; \
+	fi
+	@echo "Local cleanup complete!"
+
+local-env-setup: ## Create local environment files from examples
+	@echo "Setting up local environment files..."
+	@if [ ! -f .env.local ]; then \
+		cp .env.local.example .env.local; \
+		echo "Created .env.local from example - please customize as needed"; \
+	else \
+		echo ".env.local already exists"; \
+	fi
+	@if [ ! -f .secrets.local ]; then \
+		cp .secrets.local.example .secrets.local; \
+		echo "Created .secrets.local from example - please add your secrets"; \
+		echo "WARNING: Never commit .secrets.local to version control!"; \
+	else \
+		echo ".secrets.local already exists"; \
+	fi
 # @SECTION Build & Deploy
-# Build targets (using dev-tools)
 build: clean generate-pyproject dev-install  ## Build package
 	BUILD_ARGS="$(BUILD_ARGS)" ./dev-tools/package/build.sh
 

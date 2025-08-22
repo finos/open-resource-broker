@@ -205,6 +205,20 @@ class DevToolsInstaller:
                     "generic": self._install_pip_audit_python,
                 },
             },
+            "act": {
+                "description": "Run GitHub Actions locally (optional)",
+                "check_cmd": ["act", "--version"],
+                "install": {
+                    "darwin": ["brew", "install", "act"],
+                    "windows": ["choco", "install", "-y", "act-cli"],
+                    "ubuntu": self._install_act_generic,
+                    "debian": self._install_act_generic,
+                    "rhel": self._install_act_generic,
+                    "centos": self._install_act_generic,
+                    "fedora": self._install_act_generic,
+                    "generic": self._install_act_generic,
+                },
+            },
         }
 
     def _detect_os_distro(self):
@@ -401,6 +415,12 @@ class DevToolsInstaller:
             ["curl", "-L", url, "|", "sudo", "tar", "-xz", "-C", "/usr/local/bin", "trufflehog"]
         )
 
+    def _install_act_generic(self):
+        """Install act using GitHub releases."""
+        return self._run_command([
+            "curl", "-s", "https://raw.githubusercontent.com/nektos/act/master/install.sh", "|", "sudo", "bash"
+        ])
+
     def _install_pip_audit_python(self):
         """Install pip-audit using Python package manager."""
         # Try uv first, fall back to pip
@@ -523,6 +543,7 @@ class DevToolsInstaller:
             "trufflehog",
             "actionlint",
             "shellcheck",
+            "act",
         ]
 
         tools_to_install = required_tools

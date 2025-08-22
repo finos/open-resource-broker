@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """UV package manager operations."""
 
-import sys
-import subprocess
 import shutil
+import subprocess
+import sys
 import time
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 
 def check_uv_available() -> bool:
@@ -32,11 +32,24 @@ def uv_lock() -> int:
     if not check_uv_available():
         print("ERROR: uv not available. Install with: pip install uv")
         return 1
-    
+
     print("INFO: Generating uv lock files...")
     try:
-        run_command(["uv", "pip", "compile", "pyproject.toml", "--output-file", "requirements.lock"])
-        run_command(["uv", "pip", "compile", "pyproject.toml", "--extra", "dev", "--output-file", "requirements-dev.lock"])
+        run_command(
+            ["uv", "pip", "compile", "pyproject.toml", "--output-file", "requirements.lock"]
+        )
+        run_command(
+            [
+                "uv",
+                "pip",
+                "compile",
+                "pyproject.toml",
+                "--extra",
+                "dev",
+                "--output-file",
+                "requirements-dev.lock",
+            ]
+        )
         print("SUCCESS: Lock files generated: requirements.lock, requirements-dev.lock")
         return 0
     except subprocess.CalledProcessError:
@@ -48,17 +61,17 @@ def uv_sync(dev: bool = False) -> int:
     if not check_uv_available():
         print("ERROR: uv not available. Install with: pip install uv")
         return 1
-    
+
     lock_file = "requirements-dev.lock" if dev else "requirements.lock"
-    
+
     if not Path(lock_file).exists():
         print(f"ERROR: No lock file found: {lock_file}")
         print("Run 'make uv-lock' first.")
         return 1
-    
+
     env_type = "development environment" if dev else "environment"
     print(f"INFO: Syncing {env_type} with uv lock file...")
-    
+
     try:
         run_command(["uv", "pip", "sync", lock_file])
         return 0
@@ -92,40 +105,43 @@ def uv_benchmark() -> int:
     print("INFO: Benchmarking uv vs pip installation speed...")
     print("This will create temporary virtual environments for testing.")
     print("")
-    
+
     if not check_uv_available():
         print("ERROR: uv not available for benchmarking")
         return 1
-    
+
     # Clean up any existing test environments
     for venv_dir in [".venv-pip-test", ".venv-uv-test"]:
         if Path(venv_dir).exists():
             shutil.rmtree(venv_dir)
-    
+
     try:
         print("INFO: Testing pip installation speed...")
         start_time = time.time()
         run_command(["python", "-m", "venv", ".venv-pip-test"])
         run_command([".venv-pip-test/bin/pip", "install", "-e", ".[dev]"], capture_output=True)
         pip_time = time.time() - start_time
-        
+
         print("")
         print("INFO: Testing uv installation speed...")
         start_time = time.time()
         run_command(["python", "-m", "venv", ".venv-uv-test"])
-        run_command(["uv", "pip", "install", "-e", ".[dev]", "--python", ".venv-uv-test/bin/python"], capture_output=True)
+        run_command(
+            ["uv", "pip", "install", "-e", ".[dev]", "--python", ".venv-uv-test/bin/python"],
+            capture_output=True,
+        )
         uv_time = time.time() - start_time
-        
+
         print("")
-        print(f"Results:")
+        print("Results:")
         print(f"  pip: {pip_time:.2f}s")
         print(f"  uv:  {uv_time:.2f}s")
         if uv_time > 0:
             speedup = pip_time / uv_time
             print(f"  uv is {speedup:.1f}x faster!")
-        
+
         return 0
-        
+
     except subprocess.CalledProcessError:
         return 1
     finally:
@@ -140,25 +156,25 @@ def uv_benchmark() -> int:
 def main() -> int:
     """Main entry point."""
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="UV package manager operations")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
-    
+
     # Lock command
     subparsers.add_parser("lock", help="Generate uv lock files for reproducible builds")
-    
+
     # Sync commands
     subparsers.add_parser("sync", help="Sync environment with uv lock files")
     subparsers.add_parser("sync-dev", help="Sync development environment with uv lock files")
-    
+
     # Check command
     subparsers.add_parser("check", help="Check if uv is available and show version")
-    
+
     # Benchmark command
     subparsers.add_parser("benchmark", help="Benchmark uv vs pip installation speed")
-    
+
     args = parser.parse_args()
-    
+
     if args.command == "lock":
         return uv_lock()
     elif args.command == "sync":
