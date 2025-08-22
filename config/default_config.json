@@ -95,7 +95,7 @@
   },
   "native_spec": {
     "enabled": true,
-    "merge_mode": "extend"
+    "merge_mode": "merge"
   },
   "naming": {
     "collections": {

@@ -13,11 +13,11 @@ class TestNativeSpecConfig:
         """Test default configuration values."""
         config = NativeSpecConfig()
         assert config.enabled is False
-        assert config.merge_mode == "extend"
+        assert config.merge_mode == "merge"
 
     def test_valid_merge_modes(self):
         """Test valid merge mode values."""
-        valid_modes = ["extend", "override", "none"]
+        valid_modes = ["merge", "replace"]
         for mode in valid_modes:
             config = NativeSpecConfig(merge_mode=mode)
             assert config.merge_mode == mode
@@ -29,6 +29,6 @@ class TestNativeSpecConfig:
 
     def test_enabled_configuration(self):
         """Test enabled configuration."""
-        config = NativeSpecConfig(enabled=True, merge_mode="override")
+        config = NativeSpecConfig(enabled=True, merge_mode="replace")
         assert config.enabled is True
-        assert config.merge_mode == "override"
+        assert config.merge_mode == "replace"
