@@ -10,26 +10,31 @@ from typing import Any, Callable, Dict, List, Optional
 from botocore.exceptions import ClientError
 
 from domain.base.dependency_injection import injectable
-from domain.base.ports import LoggingPort
+from domain.base.ports import LoggingPort, ConfigurationPort
+from domain.request.aggregate import Request
 from infrastructure.resilience import CircuitBreakerOpenError
+from providers.aws.domain.template.aggregate import AWSTemplate
 from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from providers.aws.infrastructure.aws_client import AWSClient
+from providers.aws.utilities.fleet_tag_builder import FleetTagBuilder
 
 
 @injectable
 class AWSOperations:
     """Integrated AWS operations utility with all common patterns."""
 
-    def __init__(self, aws_client: AWSClient, logger: LoggingPort) -> None:
+    def __init__(self, aws_client: AWSClient, logger: LoggingPort, config_port: Optional[ConfigurationPort] = None) -> None:
         """
         Initialize AWS operations utility.
 
         Args:
             aws_client: AWS client instance
             logger: Logger for logging messages
+            config_port: Configuration port for package info
         """
         self.aws_client = aws_client
         self._logger = logger
+        self._config_port = config_port
         self._retry_with_backoff = None  # Will be set by the handler
 
     def set_retry_method(self, retry_method: Callable) -> None:
@@ -446,3 +451,95 @@ class AWSOperations:
             return AWSPermissionError(f"{operation_name} failed: {error_message}")
         else:
             return AWSInfrastructureError(f"{operation_name} failed: {error_message}")
+
+    # Tagging Operations
+    def apply_base_tags_to_resource(self, resource_id: str, request: Request, template: AWSTemplate) -> bool:
+        """Apply base tags to AWS resource with retry and graceful failure.
+        
+        Args:
+            resource_id: AWS resource ID or ARN
+            request: Request domain entity
+            template: AWS template domain entity
+            
+        Returns:
+            True if tagging succeeded, False if failed (with warning logged)
+        """
+        try:
+            package_name = self._get_package_name()
+            tags = FleetTagBuilder.build_base_tags(request, template, package_name)
+            aws_tags = FleetTagBuilder.format_for_aws(tags)
+            
+            self.aws_client.ec2_client.create_tags(Resources=[resource_id], Tags=aws_tags)
+            self._logger.debug(f"Successfully tagged resource {resource_id} with base tags")
+            return True
+            
+        except Exception as e:
+            self._logger.warning(f"Failed to tag resource {resource_id}: {e}")
+            return False
+
+    def discover_and_tag_fleet_instances(self, fleet_id: str, request: Request, template: AWSTemplate, provider_api: str) -> int:
+        """Discover fleet instances and apply base tags.
+        
+        Args:
+            fleet_id: Fleet ID (EC2Fleet or SpotFleet)
+            request: Request domain entity
+            template: AWS template domain entity
+            provider_api: Provider API type (ec2_fleet or spot_fleet)
+            
+        Returns:
+            Number of instances successfully tagged
+        """
+        try:
+            # Discover instances based on fleet type
+            if provider_api.lower() == "ec2_fleet":
+                instance_ids = self._get_ec2_fleet_instances(fleet_id)
+            elif provider_api.lower() == "spot_fleet":
+                instance_ids = self._get_spot_fleet_instances(fleet_id)
+            else:
+                self._logger.warning(f"Unknown provider_api for fleet tagging: {provider_api}")
+                return 0
+            
+            if not instance_ids:
+                self._logger.info(f"No instances found for fleet {fleet_id}")
+                return 0
+            
+            # Tag each instance
+            tagged_count = 0
+            for instance_id in instance_ids:
+                if self.apply_base_tags_to_resource(instance_id, request, template):
+                    tagged_count += 1
+            
+            self._logger.info(f"Tagged {tagged_count}/{len(instance_ids)} instances for fleet {fleet_id}")
+            return tagged_count
+            
+        except Exception as e:
+            self._logger.error(f"Failed to discover and tag fleet instances for {fleet_id}: {e}")
+            return 0
+
+    def _get_ec2_fleet_instances(self, fleet_id: str) -> List[str]:
+        """Get instance IDs from EC2 Fleet."""
+        try:
+            response = self.aws_client.ec2_client.describe_fleet_instances(FleetId=fleet_id)
+            return [instance["InstanceId"] for instance in response.get("ActiveInstances", [])]
+        except Exception as e:
+            self._logger.error(f"Failed to get EC2Fleet instances for {fleet_id}: {e}")
+            return []
+
+    def _get_spot_fleet_instances(self, spot_fleet_id: str) -> List[str]:
+        """Get instance IDs from Spot Fleet."""
+        try:
+            response = self.aws_client.ec2_client.describe_spot_fleet_instances(SpotFleetRequestId=spot_fleet_id)
+            return [instance["InstanceId"] for instance in response.get("ActiveInstances", [])]
+        except Exception as e:
+            self._logger.error(f"Failed to get SpotFleet instances for {spot_fleet_id}: {e}")
+            return []
+
+    def _get_package_name(self) -> str:
+        """Get package name for CreatedBy tag with fallback."""
+        if self._config_port:
+            try:
+                package_info = self._config_port.get_package_info()
+                return package_info.get("name", "open-hostfactory-plugin")
+            except Exception:
+                pass
+        return "open-hostfactory-plugin"
