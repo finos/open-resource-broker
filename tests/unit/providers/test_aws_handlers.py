@@ -320,7 +320,7 @@ class TestEC2FleetHandler:
         # Test release_hosts method with empty resource_ids
         try:
             handler.release_hosts(request)
-            assert False, "Should have raised AWSInfrastructureError"
+            raise AssertionError("Should have raised AWSInfrastructureError")
         except Exception as e:
             assert "No EC2 Fleet ID found" in str(e)
 
