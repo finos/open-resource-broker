@@ -10,8 +10,7 @@ from providers.aws.infrastructure.handlers.base_context_mixin import BaseContext
 class TestableContextMixin(BaseContextMixin):
     """Testable implementation of BaseContextMixin."""
 
-    def __init__(self):
-        self.config_port = None
+    config_port = None
 
 
 class TestBaseContextMixin:

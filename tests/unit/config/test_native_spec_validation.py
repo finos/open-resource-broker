@@ -15,11 +15,11 @@ class TestNativeSpecValidation:
         config = NativeSpecConfig()
 
         assert config.enabled is False
-        assert config.merge_mode == "extend"
+        assert config.merge_mode == "merge"
 
     def test_native_spec_config_valid_merge_modes(self):
         """Test valid merge mode options."""
-        valid_modes = ["extend", "override", "none"]
+        valid_modes = ["merge", "replace"]
 
         for mode in valid_modes:
             config = NativeSpecConfig(enabled=True, merge_mode=mode)
@@ -133,19 +133,19 @@ class TestNativeSpecValidation:
 
     def test_native_spec_config_serialization(self):
         """Test native spec config serialization/deserialization."""
-        config = NativeSpecConfig(enabled=True, merge_mode="override")
+        config = NativeSpecConfig(enabled=True, merge_mode="replace")
 
         # Test dict conversion
         config_dict = config.model_dump()
         assert config_dict["enabled"] is True
-        assert config_dict["merge_mode"] == "override"
+        assert config_dict["merge_mode"] == "replace"
 
         # Test reconstruction
         new_config = NativeSpecConfig(**config_dict)
         assert new_config.enabled == config.enabled
         assert new_config.merge_mode == config.merge_mode
 
-    @pytest.mark.parametrize("merge_mode", ["extend", "override", "none"])
+    @pytest.mark.parametrize("merge_mode", ["merge", "replace"])
     def test_all_merge_modes(self, merge_mode):
         """Test all valid merge modes."""
         config = NativeSpecConfig(enabled=True, merge_mode=merge_mode)
@@ -159,7 +159,7 @@ class TestNativeSpecValidation:
         assert "merge_mode" in schema["properties"]
         assert schema["properties"]["enabled"]["type"] == "boolean"
         assert "enum" in schema["properties"]["merge_mode"]
-        assert set(schema["properties"]["merge_mode"]["enum"]) == {"extend", "override", "none"}
+        assert set(schema["properties"]["merge_mode"]["enum"]) == {"merge", "replace"}
 
     def test_aws_template_spec_field_types(self):
         """Test native spec field type validation."""

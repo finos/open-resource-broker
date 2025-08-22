@@ -527,7 +527,7 @@ class TestSystemValidation:
             # Should handle gracefully
             if provider_config and hasattr(provider_config, "get_mode"):
                 mode = provider_config.get_mode()
-                assert mode.value in ["none", "legacy"]
+                assert mode.value in ["replace", "legacy"]
         except Exception as e:
             # Or raise appropriate exception
             assert "provider" in str(e).lower()

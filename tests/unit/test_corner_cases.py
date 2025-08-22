@@ -688,7 +688,7 @@ class TestEdgeCaseIntegration:
         result1 = attempt_recovery("network")
         result2 = attempt_recovery("timeout")
         result3 = attempt_recovery("resource")
-        result4 = attempt_recovery("none")
+        result4 = attempt_recovery("replace")
 
         assert result1 == "recovered"
         assert result2 == "recovered"

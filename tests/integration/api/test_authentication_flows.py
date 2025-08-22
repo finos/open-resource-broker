@@ -17,7 +17,7 @@ class TestAuthenticationFlows:
     def test_no_auth_flow(self):
         """Test API access with no authentication."""
         # Create server config with no auth
-        server_config = ServerConfig(enabled=True, auth=AuthConfig(enabled=False, strategy="none"))
+        server_config = ServerConfig(enabled=True, auth=AuthConfig(enabled=False, strategy="replace"))
 
         # Create FastAPI app
         app = create_fastapi_app(server_config)

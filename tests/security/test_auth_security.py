@@ -162,7 +162,7 @@ class TestAuthenticationSecurity:
             none_token = jwt.encode(
                 {"sub": "malicious-user", "exp": int(time.time()) + 3600},
                 "",  # No secret for 'none' algorithm
-                algorithm="none",
+                algorithm="replace",
             )
 
             headers = {"Authorization": f"Bearer {none_token}"}

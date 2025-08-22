@@ -67,7 +67,7 @@ class TestEnvironmentVariableExpansion:
 
     def test_expand_non_string_values(self):
         """Test that non-string values are returned unchanged."""
-        config = {"number": 42, "boolean": True, "none": None}
+        config = {"number": 42, "boolean": True, "replace": None}
         result = expand_env_vars(config)
         assert result == config
 

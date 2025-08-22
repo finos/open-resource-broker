@@ -4,11 +4,11 @@ from unittest.mock import patch
 
 import pytest
 
-from domain.request.request import Request
-from domain.request.value_objects import RequestId
-from infrastructure.di.container import DIContainer
-from providers.aws.domain.template.aggregate import AWSTemplate
-from providers.aws.infrastructure.services.aws_native_spec_service import (
+domain.request.request import Request
+domain.request.value_objects import RequestId
+infrastructure.di.container import DIContainer
+providers.aws.domain.template.aggregate import AWSTemplate
+providers.aws.infrastructure.services.aws_native_spec_service import (
     AWSNativeSpecService,
 )
 
