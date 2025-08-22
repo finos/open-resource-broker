@@ -46,7 +46,7 @@ async def handle_get_request_status(args: "argparse.Namespace") -> Dict[str, Any
 
     # Validate parsed data
     if not isinstance(parsed_data_list, list) or len(parsed_data_list) == 0:
-        raise ValueError("No request_id has been provided")
+        return {"error": "No request ID provided", "message": "Request ID is required"}
 
     request_dtos = []
 
