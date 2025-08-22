@@ -1,7 +1,7 @@
 """Tests for handler integration with merge functionality."""
 
-import pytest
 from unittest.mock import Mock, patch
+
 from providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHandler
 from providers.aws.infrastructure.handlers.spot_fleet_handler import SpotFleetHandler
 
@@ -32,26 +32,31 @@ class TestHandlerMergeIntegration:
         mock_logger = Mock()
         mock_aws_ops = Mock()
         mock_launch_template_manager = Mock()
-        
+
         handler = EC2FleetHandler(
             mock_aws_client, mock_logger, mock_aws_ops, mock_launch_template_manager
         )
-        
+
         mock_native_service = Mock()
         mock_native_service.process_provider_api_spec_with_merge.return_value = {
-            "LaunchTemplateConfigs": [{"LaunchTemplateSpecification": {"LaunchTemplateId": "lt-123", "Version": "1"}}],
+            "LaunchTemplateConfigs": [
+                {"LaunchTemplateSpecification": {"LaunchTemplateId": "lt-123", "Version": "1"}}
+            ],
             "TargetCapacitySpecification": {"TotalTargetCapacity": 10},
-            "Type": "maintain"
+            "Type": "maintain",
         }
         handler.aws_native_spec_service = mock_native_service
-        
+
         template = self._create_mock_template()
         request = self._create_mock_request()
-        
+
         result = handler._create_fleet_config(template, request, "lt-123", "1")
-        
+
         mock_native_service.process_provider_api_spec_with_merge.assert_called_once()
-        assert result["LaunchTemplateConfigs"][0]["LaunchTemplateSpecification"]["LaunchTemplateId"] == "lt-123"
+        assert (
+            result["LaunchTemplateConfigs"][0]["LaunchTemplateSpecification"]["LaunchTemplateId"]
+            == "lt-123"
+        )
         assert result["LaunchTemplateConfigs"][0]["LaunchTemplateSpecification"]["Version"] == "1"
 
     def test_spotfleet_handler_uses_merge_method(self):
@@ -60,24 +65,24 @@ class TestHandlerMergeIntegration:
         mock_logger = Mock()
         mock_aws_ops = Mock()
         mock_launch_template_manager = Mock()
-        
+
         handler = SpotFleetHandler(
             mock_aws_client, mock_logger, mock_aws_ops, mock_launch_template_manager
         )
-        
+
         mock_native_service = Mock()
         mock_native_service.process_provider_api_spec_with_merge.return_value = {
             "LaunchSpecifications": [{"LaunchTemplate": {}}],
             "TargetCapacity": 5,
-            "AllocationStrategy": "diversified"
+            "AllocationStrategy": "diversified",
         }
         handler.aws_native_spec_service = mock_native_service
-        
+
         template = self._create_mock_template()
         request = self._create_mock_request()
-        
+
         result = handler._create_spot_fleet_config(template, request, "lt-123", "1")
-        
+
         mock_native_service.process_provider_api_spec_with_merge.assert_called_once()
         for spec in result["LaunchSpecifications"]:
             assert spec["LaunchTemplate"]["LaunchTemplateId"] == "lt-123"
@@ -89,24 +94,24 @@ class TestHandlerMergeIntegration:
         mock_logger = Mock()
         mock_aws_ops = Mock()
         mock_launch_template_manager = Mock()
-        
+
         handler = EC2FleetHandler(
             mock_aws_client, mock_logger, mock_aws_ops, mock_launch_template_manager
         )
-        
+
         mock_native_service = Mock()
         mock_native_service.process_provider_api_spec_with_merge.return_value = None
         mock_native_service.render_default_spec.return_value = {
             "LaunchTemplateConfigs": [{"LaunchTemplateSpecification": {}}],
-            "Type": "maintain"
+            "Type": "maintain",
         }
         handler.aws_native_spec_service = mock_native_service
-        
+
         template = self._create_mock_template()
         request = self._create_mock_request()
-        
+
         result = handler._create_fleet_config(template, request, "lt-123", "1")
-        
+
         mock_native_service.process_provider_api_spec_with_merge.assert_called_once()
         mock_native_service.render_default_spec.assert_called_once()
         assert result["Type"] == "maintain"
@@ -117,19 +122,19 @@ class TestHandlerMergeIntegration:
         mock_logger = Mock()
         mock_aws_ops = Mock()
         mock_launch_template_manager = Mock()
-        
+
         handler = EC2FleetHandler(
             mock_aws_client, mock_logger, mock_aws_ops, mock_launch_template_manager
         )
         handler.aws_native_spec_service = None
-        
+
         template = self._create_mock_template()
         request = self._create_mock_request()
-        
-        with patch.object(handler, '_create_fleet_config_legacy') as mock_legacy:
+
+        with patch.object(handler, "_create_fleet_config_legacy") as mock_legacy:
             mock_legacy.return_value = {"Type": "legacy"}
-            
+
             result = handler._create_fleet_config(template, request, "lt-123", "1")
-            
+
             mock_legacy.assert_called_once_with(template, request, "lt-123", "1")
             assert result["Type"] == "legacy"

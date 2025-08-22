@@ -1,6 +1,5 @@
 """Unit tests for FleetTagBuilder utility."""
 
-from datetime import datetime
 from unittest.mock import Mock, patch
 
 import pytest
@@ -55,15 +54,18 @@ class TestFleetTagBuilder:
         )
 
         assert len(tags) == 5  # 4 base tags + Name
-        assert tags["Name"] == str(self.mock_request.request_id)  # Empty prefix by default
+        # Empty prefix by default
+        assert tags["Name"] == str(self.mock_request.request_id)
         assert tags["RequestId"] == str(self.mock_request.request_id)
         assert tags["CreatedBy"] == "test-package"
 
     def test_build_resource_tags_with_template_tags(self):
         """Test building resource tags with template tags."""
         self.mock_template.tags = {"Environment": "test", "Owner": "team"}
-        
-        with patch('infrastructure.utilities.common.resource_naming.get_resource_prefix', return_value=""):
+
+        with patch(
+            "infrastructure.utilities.common.resource_naming.get_resource_prefix", return_value=""
+        ):
             tags = FleetTagBuilder.build_resource_tags(
                 self.mock_request, self.mock_template, "instance"
             )
@@ -117,7 +119,9 @@ class TestFleetTagBuilder:
         fleet_spec = next(spec for spec in tag_specs if spec["ResourceType"] == "fleet")
         assert fleet_spec is not None
         fleet_name_tag = next(tag for tag in fleet_spec["Tags"] if tag["Key"] == "Name")
-        assert fleet_name_tag["Value"] == str(self.mock_request.request_id)  # Empty prefix by default
+        assert fleet_name_tag["Value"] == str(
+            self.mock_request.request_id
+        )  # Empty prefix by default
 
     # Legacy compatibility tests
     def test_build_common_tags_legacy(self):

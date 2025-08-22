@@ -10,7 +10,7 @@ from typing import Any, Callable, Dict, List, Optional
 from botocore.exceptions import ClientError
 
 from domain.base.dependency_injection import injectable
-from domain.base.ports import LoggingPort, ConfigurationPort
+from domain.base.ports import ConfigurationPort, LoggingPort
 from domain.request.aggregate import Request
 from infrastructure.resilience import CircuitBreakerOpenError
 from providers.aws.domain.template.aggregate import AWSTemplate
@@ -23,7 +23,12 @@ from providers.aws.utilities.fleet_tag_builder import FleetTagBuilder
 class AWSOperations:
     """Integrated AWS operations utility with all common patterns."""
 
-    def __init__(self, aws_client: AWSClient, logger: LoggingPort, config_port: Optional[ConfigurationPort] = None) -> None:
+    def __init__(
+        self,
+        aws_client: AWSClient,
+        logger: LoggingPort,
+        config_port: Optional[ConfigurationPort] = None,
+    ) -> None:
         """
         Initialize AWS operations utility.
 
@@ -453,14 +458,16 @@ class AWSOperations:
             return AWSInfrastructureError(f"{operation_name} failed: {error_message}")
 
     # Tagging Operations
-    def apply_base_tags_to_resource(self, resource_id: str, request: Request, template: AWSTemplate) -> bool:
+    def apply_base_tags_to_resource(
+        self, resource_id: str, request: Request, template: AWSTemplate
+    ) -> bool:
         """Apply base tags to AWS resource with retry and graceful failure.
-        
+
         Args:
             resource_id: AWS resource ID or ARN
             request: Request domain entity
             template: AWS template domain entity
-            
+
         Returns:
             True if tagging succeeded, False if failed (with warning logged)
         """
@@ -468,24 +475,26 @@ class AWSOperations:
             package_name = self._get_package_name()
             tags = FleetTagBuilder.build_base_tags(request, template, package_name)
             aws_tags = FleetTagBuilder.format_for_aws(tags)
-            
+
             self.aws_client.ec2_client.create_tags(Resources=[resource_id], Tags=aws_tags)
             self._logger.debug(f"Successfully tagged resource {resource_id} with base tags")
             return True
-            
+
         except Exception as e:
             self._logger.warning(f"Failed to tag resource {resource_id}: {e}")
             return False
 
-    def discover_and_tag_fleet_instances(self, fleet_id: str, request: Request, template: AWSTemplate, provider_api: str) -> int:
+    def discover_and_tag_fleet_instances(
+        self, fleet_id: str, request: Request, template: AWSTemplate, provider_api: str
+    ) -> int:
         """Discover fleet instances and apply base tags.
-        
+
         Args:
             fleet_id: Fleet ID (EC2Fleet or SpotFleet)
             request: Request domain entity
             template: AWS template domain entity
             provider_api: Provider API type (ec2_fleet or spot_fleet)
-            
+
         Returns:
             Number of instances successfully tagged
         """
@@ -498,20 +507,22 @@ class AWSOperations:
             else:
                 self._logger.warning(f"Unknown provider_api for fleet tagging: {provider_api}")
                 return 0
-            
+
             if not instance_ids:
                 self._logger.info(f"No instances found for fleet {fleet_id}")
                 return 0
-            
+
             # Tag each instance
             tagged_count = 0
             for instance_id in instance_ids:
                 if self.apply_base_tags_to_resource(instance_id, request, template):
                     tagged_count += 1
-            
-            self._logger.info(f"Tagged {tagged_count}/{len(instance_ids)} instances for fleet {fleet_id}")
+
+            self._logger.info(
+                f"Tagged {tagged_count}/{len(instance_ids)} instances for fleet {fleet_id}"
+            )
             return tagged_count
-            
+
         except Exception as e:
             self._logger.error(f"Failed to discover and tag fleet instances for {fleet_id}: {e}")
             return 0
@@ -528,7 +539,9 @@ class AWSOperations:
     def _get_spot_fleet_instances(self, spot_fleet_id: str) -> List[str]:
         """Get instance IDs from Spot Fleet."""
         try:
-            response = self.aws_client.ec2_client.describe_spot_fleet_instances(SpotFleetRequestId=spot_fleet_id)
+            response = self.aws_client.ec2_client.describe_spot_fleet_instances(
+                SpotFleetRequestId=spot_fleet_id
+            )
             return [instance["InstanceId"] for instance in response.get("ActiveInstances", [])]
         except Exception as e:
             self._logger.error(f"Failed to get SpotFleet instances for {spot_fleet_id}: {e}")

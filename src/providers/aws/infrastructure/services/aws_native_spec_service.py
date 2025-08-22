@@ -82,11 +82,11 @@ class AWSNativeSpecService:
 
         # Render the native spec with context
         rendered_native_spec = self.native_spec_service.render_spec(native_spec, context)
-        
+
         # Get merge mode from configuration
         native_config = self.config_port.get_native_spec_config()
         merge_mode = native_config.get("merge_mode", "merge")
-        
+
         if merge_mode == "replace":
             return rendered_native_spec
         elif merge_mode == "merge":
@@ -94,7 +94,7 @@ class AWSNativeSpecService:
             default_spec = self.render_default_spec(spec_type, context)
             # Deep merge: default as base, native spec as override
             return deep_merge(default_spec, rendered_native_spec)
-        
+
         return rendered_native_spec  # Fallback to replace behavior
 
     def process_provider_api_spec(

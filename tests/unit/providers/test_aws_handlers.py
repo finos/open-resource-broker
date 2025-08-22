@@ -53,7 +53,7 @@ class TestContextFieldSupport:
 
         # Create handler with mocked dependencies
         handler = EC2FleetHandler(Mock(), Mock(), Mock(), Mock(), Mock())
-        
+
         # Mock the aws_native_spec_service to return None (use fallback)
         handler.aws_native_spec_service = None
 
@@ -157,7 +157,7 @@ class TestContextFieldSupport:
 
         # Create handler with mocked dependencies
         handler = EC2FleetHandler(Mock(), Mock(), Mock(), Mock(), Mock())
-        
+
         # Mock the aws_native_spec_service to return None (use fallback)
         handler.aws_native_spec_service = None
 
@@ -185,9 +185,10 @@ class TestEC2FleetHandler:
         """Test that EC2FleetHandler creates fleet successfully."""
         # Setup AWS resources
         ec2 = boto3.client("ec2", region_name="us-east-1")
-        
+
         # Create AWS client wrapper
         from providers.aws.infrastructure.aws_client import AWSClient
+
         aws_client = Mock(spec=AWSClient)
         aws_client.ec2_client = ec2
 
@@ -206,17 +207,19 @@ class TestEC2FleetHandler:
         aws_ops = AWSOperations(aws_client=aws_client, logger=Mock())
 
         # Create handler
-        handler = EC2FleetHandler(aws_client=aws_client, aws_ops=aws_ops, logger=Mock(), launch_template_manager=Mock())
+        handler = EC2FleetHandler(
+            aws_client=aws_client, aws_ops=aws_ops, logger=Mock(), launch_template_manager=Mock()
+        )
 
         # Create test request and template
         from domain.request.aggregate import Request
         from providers.aws.domain.template.aggregate import AWSTemplate
         from providers.aws.domain.template.value_objects import ProviderApi
-        
+
         request = Mock(spec=Request)
         request.request_id = "test-request-123"
         request.requested_count = 2
-        
+
         template = Mock(spec=AWSTemplate)
         template.template_id = "test-template"
         template.instance_type = "t2.micro"
@@ -229,10 +232,10 @@ class TestEC2FleetHandler:
         template.instance_types = ["t2.micro"]
         template.key_pair_name = None
         template.user_data = None
-        
+
         # Mock the AWS operations to return success
         aws_ops.execute_with_standard_error_handling = Mock(return_value="fleet-12345")
-        
+
         # Test acquire_hosts method
         result = handler.acquire_hosts(request, template)
 
@@ -244,25 +247,28 @@ class TestEC2FleetHandler:
     def test_ec2_fleet_handler_handles_creation_failure(self):
         """Test that EC2FleetHandler handles creation failures."""
         ec2 = boto3.client("ec2", region_name="us-east-1")
-        
+
         # Create AWS client wrapper
         from providers.aws.infrastructure.aws_client import AWSClient
+
         aws_client = Mock(spec=AWSClient)
         aws_client.ec2_client = ec2
-        
+
         aws_ops = AWSOperations(aws_client=aws_client, logger=Mock())
 
-        handler = EC2FleetHandler(aws_client=aws_client, aws_ops=aws_ops, logger=Mock(), launch_template_manager=Mock())
+        handler = EC2FleetHandler(
+            aws_client=aws_client, aws_ops=aws_ops, logger=Mock(), launch_template_manager=Mock()
+        )
 
         # Create test request and template with invalid configuration
         from domain.request.aggregate import Request
         from providers.aws.domain.template.aggregate import AWSTemplate
         from providers.aws.domain.template.value_objects import ProviderApi
-        
+
         request = Mock(spec=Request)
         request.request_id = "test-request-123"
         request.requested_count = 2
-        
+
         template = Mock(spec=AWSTemplate)
         template.template_id = "test-template"
         template.instance_type = "invalid-instance-type"
@@ -275,10 +281,12 @@ class TestEC2FleetHandler:
         template.instance_types = ["invalid-instance-type"]
         template.key_pair_name = None
         template.user_data = None
-        
+
         # Mock AWS operations to raise an exception
-        aws_ops.execute_with_standard_error_handling = Mock(side_effect=Exception("Fleet creation failed"))
-        
+        aws_ops.execute_with_standard_error_handling = Mock(
+            side_effect=Exception("Fleet creation failed")
+        )
+
         # Should handle failure gracefully - the handler catches exceptions and returns error result
         result = handler.acquire_hosts(request, template)
         assert result["success"] == False
@@ -288,27 +296,30 @@ class TestEC2FleetHandler:
     def test_ec2_fleet_handler_terminates_instances(self):
         """Test that EC2FleetHandler terminates instances."""
         ec2 = boto3.client("ec2", region_name="us-east-1")
-        
+
         # Create AWS client wrapper
         from providers.aws.infrastructure.aws_client import AWSClient
+
         aws_client = Mock(spec=AWSClient)
         aws_client.ec2_client = ec2
-        
+
         aws_ops = AWSOperations(aws_client=aws_client, logger=Mock())
 
-        handler = EC2FleetHandler(aws_client=aws_client, aws_ops=aws_ops, logger=Mock(), launch_template_manager=Mock())
+        handler = EC2FleetHandler(
+            aws_client=aws_client, aws_ops=aws_ops, logger=Mock(), launch_template_manager=Mock()
+        )
 
         # Create test request
         from domain.request.aggregate import Request
-        
+
         request = Mock(spec=Request)
         request.request_id = "test-request-123"
         request.fleet_id = "fleet-12345"
         request.resource_ids = []  # Empty resource_ids to trigger early return
-        
+
         # Test release_hosts method with empty resource_ids
         try:
-            result = handler.release_hosts(request)
+            handler.release_hosts(request)
             assert False, "Should have raised AWSInfrastructureError"
         except Exception as e:
             assert "No EC2 Fleet ID found" in str(e)

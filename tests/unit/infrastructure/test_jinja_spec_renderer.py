@@ -51,7 +51,7 @@ class TestJinjaSpecRenderer:
         """Test rendering spec from file with Jinja2 templating."""
         # Create temporary template file
         template_file = tmp_path / "test_template.json"
-        template_content = '''
+        template_content = """
 {
   "name": "{{ fleet_name }}",
   "capacity": {{ target_capacity }},
@@ -61,20 +61,20 @@ class TestJinjaSpecRenderer:
     {% endfor %}
   ]
 }
-        '''.strip()
+        """.strip()
         template_file.write_text(template_content)
-        
+
         context = {
             "fleet_name": "test-fleet",
             "target_capacity": 5,
             "base_tags": [
                 {"key": "RequestId", "value": "req-123"},
-                {"key": "TemplateId", "value": "template-456"}
-            ]
+                {"key": "TemplateId", "value": "template-456"},
+            ],
         }
-        
+
         result = renderer.render_spec_from_file(str(template_file), context)
-        
+
         assert result["name"] == "test-fleet"
         assert result["capacity"] == 5
         assert len(result["tags"]) == 2
@@ -85,19 +85,19 @@ class TestJinjaSpecRenderer:
         """Test rendering spec from static JSON file."""
         # Create temporary static JSON file
         json_file = tmp_path / "static.json"
-        json_content = '''
+        json_content = """
 {
   "name": "static-fleet",
   "capacity": 10,
   "type": "instant"
 }
-        '''.strip()
+        """.strip()
         json_file.write_text(json_content)
-        
+
         context = {"unused": "value"}
-        
+
         result = renderer.render_spec_from_file(str(json_file), context)
-        
+
         assert result["name"] == "static-fleet"
         assert result["capacity"] == 10
         assert result["type"] == "instant"

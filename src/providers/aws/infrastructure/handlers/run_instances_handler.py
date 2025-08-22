@@ -37,6 +37,7 @@ from domain.base.ports import ErrorHandlingPort, LoggingPort
 from domain.request.aggregate import Request
 from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from infrastructure.error.decorators import handle_infrastructure_exceptions
+from infrastructure.utilities.common.resource_naming import get_resource_prefix
 from providers.aws.domain.template.aggregate import AWSTemplate
 from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from providers.aws.infrastructure.handlers.base_context_mixin import BaseContextMixin
@@ -45,7 +46,6 @@ from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
 )
 from providers.aws.utilities.aws_operations import AWSOperations
-from infrastructure.utilities.common.resource_naming import get_resource_prefix
 
 
 @injectable
@@ -254,7 +254,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                     "launch_template_version": launch_template_version,
                 }
             )
-            
+
             native_spec = self.aws_native_spec_service.process_provider_api_spec_with_merge(
                 aws_template, request, "runinstances", context
             )
@@ -348,7 +348,10 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             {
                 "ResourceType": "instance",
                 "Tags": [
-                    {"Key": "Name", "Value": f"{get_resource_prefix('instance')}{request.request_id}"},
+                    {
+                        "Key": "Name",
+                        "Value": f"{get_resource_prefix('instance')}{request.request_id}",
+                    },
                     {"Key": "RequestId", "Value": str(request.request_id)},
                     {"Key": "TemplateId", "Value": str(aws_template.template_id)},
                     {"Key": "CreatedBy", "Value": created_by},

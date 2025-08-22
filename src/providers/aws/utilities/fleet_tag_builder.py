@@ -5,7 +5,7 @@ eliminating duplication and ensuring consistent tagging patterns.
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from domain.request.aggregate import Request
 from domain.template.aggregate import Template
@@ -16,7 +16,9 @@ class FleetTagBuilder:
     """Utility for building standardized AWS resource tags."""
 
     @staticmethod
-    def build_base_tags(request: Request, template: Template, package_name: str = "open-hostfactory-plugin") -> Dict[str, str]:
+    def build_base_tags(
+        request: Request, template: Template, package_name: str = "open-hostfactory-plugin"
+    ) -> Dict[str, str]:
         """Build base tags used across all AWS resources.
 
         Args:
@@ -35,7 +37,12 @@ class FleetTagBuilder:
         }
 
     @staticmethod
-    def build_resource_tags(request: Request, template: Template, resource_type: str, package_name: str = "open-hostfactory-plugin") -> Dict[str, str]:
+    def build_resource_tags(
+        request: Request,
+        template: Template,
+        resource_type: str,
+        package_name: str = "open-hostfactory-plugin",
+    ) -> Dict[str, str]:
         """Build complete tags for a specific resource type.
 
         Args:
@@ -48,15 +55,15 @@ class FleetTagBuilder:
             Dictionary of tag key-value pairs including Name tag
         """
         tags = FleetTagBuilder.build_base_tags(request, template, package_name)
-        
+
         # Add resource-specific Name tag using configuration
         prefix = get_resource_prefix(resource_type)
         tags["Name"] = f"{prefix}{request.request_id}"
-        
+
         # Add template tags if any
-        if hasattr(template, 'tags') and template.tags:
+        if hasattr(template, "tags") and template.tags:
             tags.update({str(k): str(v) for k, v in template.tags.items()})
-            
+
         return tags
 
     @staticmethod
@@ -73,10 +80,10 @@ class FleetTagBuilder:
 
     @staticmethod
     def build_tag_specifications(
-        request: Request, 
-        template: Template, 
+        request: Request,
+        template: Template,
         resource_types: List[str],
-        package_name: str = "open-hostfactory-plugin"
+        package_name: str = "open-hostfactory-plugin",
     ) -> List[Dict[str, Any]]:
         """Build AWS TagSpecifications for multiple resource types.
 
@@ -90,19 +97,20 @@ class FleetTagBuilder:
             List of TagSpecification dictionaries for AWS APIs
         """
         tag_specifications = []
-        
+
         for resource_type in resource_types:
             # Build tags for this resource type
             if resource_type in ["fleet", "spot-fleet-request", "instance"]:
-                tags = FleetTagBuilder.build_resource_tags(request, template, resource_type, package_name)
+                tags = FleetTagBuilder.build_resource_tags(
+                    request, template, resource_type, package_name
+                )
             else:
                 tags = FleetTagBuilder.build_base_tags(request, template, package_name)
-                
-            tag_specifications.append({
-                "ResourceType": resource_type,
-                "Tags": FleetTagBuilder.format_for_aws(tags)
-            })
-            
+
+            tag_specifications.append(
+                {"ResourceType": resource_type, "Tags": FleetTagBuilder.format_for_aws(tags)}
+            )
+
         return tag_specifications
 
     # Legacy compatibility methods
@@ -114,7 +122,9 @@ class FleetTagBuilder:
         return FleetTagBuilder.format_for_aws(tags)
 
     @staticmethod
-    def build_fleet_tags(request: Request, template: Template, fleet_name: str) -> List[Dict[str, str]]:
+    def build_fleet_tags(
+        request: Request, template: Template, fleet_name: str
+    ) -> List[Dict[str, str]]:
         """Legacy method for backward compatibility."""
         tags = FleetTagBuilder.build_base_tags(request, template)
         tags["Name"] = fleet_name
@@ -126,9 +136,11 @@ class FleetTagBuilder:
         return FleetTagBuilder.build_common_tags(request, template)
 
     @staticmethod
-    def add_template_tags(base_tags: List[Dict[str, str]], template: Template) -> List[Dict[str, str]]:
+    def add_template_tags(
+        base_tags: List[Dict[str, str]], template: Template
+    ) -> List[Dict[str, str]]:
         """Legacy method for backward compatibility."""
-        if not hasattr(template, 'tags') or not template.tags:
+        if not hasattr(template, "tags") or not template.tags:
             return base_tags
 
         template_tags = [{"Key": k, "Value": str(v)} for k, v in template.tags.items()]

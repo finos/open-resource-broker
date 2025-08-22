@@ -103,14 +103,24 @@ class BaseContextMixin:
             and template.monitoring_enabled is not None,
         }
 
-    def _apply_post_creation_tagging(self, resource_id: str, request: Request, template: AWSTemplate):
+    def _apply_post_creation_tagging(
+        self, resource_id: str, request: Request, template: AWSTemplate
+    ):
         """Apply base tags after resource creation using AWSOperations."""
-        if hasattr(self, 'aws_operations') and self.aws_operations:
+        if hasattr(self, "aws_operations") and self.aws_operations:
             self.aws_operations.apply_base_tags_to_resource(resource_id, request, template)
 
-    def _tag_fleet_instances_if_needed(self, fleet_id: str, request: Request, template: AWSTemplate):
+    def _tag_fleet_instances_if_needed(
+        self, fleet_id: str, request: Request, template: AWSTemplate
+    ):
         """Tag fleet instances based on provider_api using AWSOperations."""
-        if hasattr(self, 'aws_operations') and self.aws_operations:
-            if hasattr(template, 'provider_api') and template.provider_api:
-                provider_api_str = template.provider_api.value if hasattr(template.provider_api, 'value') else str(template.provider_api)
-                self.aws_operations.discover_and_tag_fleet_instances(fleet_id, request, template, provider_api_str)
+        if hasattr(self, "aws_operations") and self.aws_operations:
+            if hasattr(template, "provider_api") and template.provider_api:
+                provider_api_str = (
+                    template.provider_api.value
+                    if hasattr(template.provider_api, "value")
+                    else str(template.provider_api)
+                )
+                self.aws_operations.discover_and_tag_fleet_instances(
+                    fleet_id, request, template, provider_api_str
+                )

@@ -40,6 +40,7 @@ from infrastructure.di.buses import QueryBus
 from infrastructure.di.container import get_container
 from infrastructure.error.decorators import handle_infrastructure_exceptions
 from infrastructure.resilience import CircuitBreakerOpenError
+from infrastructure.utilities.common.resource_naming import get_resource_prefix
 from providers.aws.domain.template.aggregate import AWSTemplate
 from providers.aws.domain.template.value_objects import AWSFleetType
 from providers.aws.exceptions.aws_exceptions import (
@@ -53,7 +54,6 @@ from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
 )
 from providers.aws.utilities.aws_operations import AWSOperations
-from infrastructure.utilities.common.resource_naming import get_resource_prefix
 
 
 @injectable
@@ -350,7 +350,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                     "launch_template_version": launch_template_version,
                 }
             )
-            
+
             native_spec = self.aws_native_spec_service.process_provider_api_spec_with_merge(
                 template, request, "ec2fleet", context
             )
@@ -362,7 +362,8 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                         "Version": launch_template_version,
                     }
                 self._logger.info(
-                    "Using native provider API spec with merge for template %s", template.template_id
+                    "Using native provider API spec with merge for template %s",
+                    template.template_id,
                 )
                 return native_spec
 
@@ -407,7 +408,10 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 {
                     "ResourceType": "fleet",
                     "Tags": [
-                        {"Key": "Name", "Value": f"{get_resource_prefix('fleet')}{request.request_id}"},
+                        {
+                            "Key": "Name",
+                            "Value": f"{get_resource_prefix('fleet')}{request.request_id}",
+                        },
                         {"Key": "RequestId", "Value": str(request.request_id)},
                         {"Key": "TemplateId", "Value": str(template.template_id)},
                         {"Key": "CreatedBy", "Value": created_by},

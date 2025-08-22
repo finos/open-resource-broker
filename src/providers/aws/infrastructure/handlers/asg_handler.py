@@ -33,12 +33,12 @@ from domain.base.ports import LoggingPort
 from domain.request.aggregate import Request
 from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from infrastructure.error.decorators import handle_infrastructure_exceptions
+from infrastructure.utilities.common.resource_naming import get_resource_prefix
 from providers.aws.domain.template.aggregate import AWSTemplate
 from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from providers.aws.infrastructure.handlers.base_context_mixin import BaseContextMixin
 from providers.aws.infrastructure.handlers.base_handler import AWSHandler
 from providers.aws.utilities.aws_operations import AWSOperations
-from infrastructure.utilities.common.resource_naming import get_resource_prefix
 
 
 @injectable
@@ -228,7 +228,7 @@ class ASGHandler(AWSHandler, BaseContextMixin):
                     "asg_name": asg_name,
                 }
             )
-            
+
             native_spec = self.aws_native_spec_service.process_provider_api_spec_with_merge(
                 aws_template, request, "asg", context
             )
@@ -240,7 +240,8 @@ class ASGHandler(AWSHandler, BaseContextMixin):
                 native_spec["LaunchTemplate"]["Version"] = launch_template_version
                 native_spec["AutoScalingGroupName"] = asg_name
                 self._logger.info(
-                    "Using native provider API spec with merge for ASG template %s", aws_template.template_id
+                    "Using native provider API spec with merge for ASG template %s",
+                    aws_template.template_id,
                 )
                 return native_spec
 

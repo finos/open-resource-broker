@@ -35,6 +35,7 @@ from domain.base.ports import LoggingPort
 from domain.request.aggregate import Request
 from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from infrastructure.error.decorators import handle_infrastructure_exceptions
+from infrastructure.utilities.common.resource_naming import get_resource_prefix
 from providers.aws.domain.template.aggregate import AWSTemplate
 from providers.aws.domain.template.value_objects import AWSFleetType
 from providers.aws.exceptions.aws_exceptions import (
@@ -48,7 +49,6 @@ from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
 )
 from providers.aws.utilities.aws_operations import AWSOperations
-from infrastructure.utilities.common.resource_naming import get_resource_prefix
 
 
 @injectable
@@ -436,7 +436,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin):
                     "launch_template_version": launch_template_version,
                 }
             )
-            
+
             native_spec = self.aws_native_spec_service.process_provider_api_spec_with_merge(
                 template, request, "spotfleet", context
             )
@@ -449,7 +449,8 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin):
                         spec["LaunchTemplate"]["LaunchTemplateId"] = launch_template_id
                         spec["LaunchTemplate"]["Version"] = launch_template_version
                 self._logger.info(
-                    "Using native provider API spec with merge for SpotFleet template %s", template.template_id
+                    "Using native provider API spec with merge for SpotFleet template %s",
+                    template.template_id,
                 )
                 return native_spec
 
