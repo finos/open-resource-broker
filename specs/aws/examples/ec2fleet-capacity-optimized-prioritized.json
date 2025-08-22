@@ -6,21 +6,21 @@
       "Version": "{{ launch_template_version | default('$Latest') }}"
     },
     "Overrides": [
-      {"InstanceType": "r6i.large", "SubnetId": "{{ subnet_ids[0] }}", "Priority": 1},
-      {"InstanceType": "r6a.xlarge", "SubnetId": "{{ subnet_ids[1] if subnet_ids|length > 1 else subnet_ids[0] }}", "Priority": 2},
-      {"InstanceType": "r5.large", "SubnetId": "{{ subnet_ids[0] }}", "Priority": 3},
-      {"InstanceType": "r5n.xlarge", "SubnetId": "{{ subnet_ids[1] if subnet_ids|length > 1 else subnet_ids[0] }}", "Priority": 4},
-      {"InstanceType": "r5a.2xlarge", "SubnetId": "{{ subnet_ids[0] }}", "Priority": 5},
-      {"InstanceType": "r5d.large", "SubnetId": "{{ subnet_ids[1] if subnet_ids|length > 1 else subnet_ids[0] }}", "Priority": 6},
-      {"InstanceType": "r5dn.xlarge", "SubnetId": "{{ subnet_ids[0] }}", "Priority": 7},
-      {"InstanceType": "r6id.large", "SubnetId": "{{ subnet_ids[1] if subnet_ids|length > 1 else subnet_ids[0] }}", "Priority": 8},
-      {"InstanceType": "m6i.large", "SubnetId": "{{ subnet_ids[0] }}", "Priority": 9},
-      {"InstanceType": "m6a.xlarge", "SubnetId": "{{ subnet_ids[1] if subnet_ids|length > 1 else subnet_ids[0] }}", "Priority": 10},
-      {"InstanceType": "m5.large", "SubnetId": "{{ subnet_ids[0] }}", "Priority": 11},
-      {"InstanceType": "m5n.xlarge", "SubnetId": "{{ subnet_ids[1] if subnet_ids|length > 1 else subnet_ids[0] }}", "Priority": 12},
-      {"InstanceType": "m5a.2xlarge", "SubnetId": "{{ subnet_ids[0] }}", "Priority": 13},
-      {"InstanceType": "m5d.large", "SubnetId": "{{ subnet_ids[1] if subnet_ids|length > 1 else subnet_ids[0] }}", "Priority": 14},
-      {"InstanceType": "m5dn.xlarge", "SubnetId": "{{ subnet_ids[0] }}", "Priority": 15}
+      {"InstanceType": "r6i.large", "Priority": 1},
+      {"InstanceType": "r6a.xlarge", "Priority": 2},
+      {"InstanceType": "r5.large", "Priority": 3},
+      {"InstanceType": "r5n.xlarge", "Priority": 4},
+      {"InstanceType": "r5a.2xlarge", "Priority": 5},
+      {"InstanceType": "r5d.large", "Priority": 6},
+      {"InstanceType": "r5dn.xlarge", "Priority": 7},
+      {"InstanceType": "r6id.large", "Priority": 8},
+      {"InstanceType": "m6i.large", "Priority": 9},
+      {"InstanceType": "m6a.xlarge", "Priority": 10},
+      {"InstanceType": "m5.large", "Priority": 11},
+      {"InstanceType": "m5n.xlarge", "Priority": 12},
+      {"InstanceType": "m5a.2xlarge", "Priority": 13},
+      {"InstanceType": "m5d.large", "Priority": 14},
+      {"InstanceType": "m5dn.xlarge", "Priority": 15}
     ]
   }],
   "TargetCapacitySpecification": {
