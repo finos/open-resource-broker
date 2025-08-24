@@ -40,7 +40,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]  # Disabled windows-latest, macos-latest for now
-        python-version: ${{ fromJSON(needs.get-config.outputs.python-versions) }}
+        # Dynamic matrix from config with static fallback for act/dry-run
+        # Update static list when adding new Python versions (currently 3.9-3.13)
+        python-version: ${{ fromJSON(needs.get-config.outputs.python-versions || '["3.9", "3.10", "3.11", "3.12", "3.13"]') }}
     uses: ./.github/workflows/reusable-test.yml
     with:
       test-type: unit
@@ -55,7 +57,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]  # Disabled windows-latest, macos-latest for now
-        python-version: ${{ fromJSON(needs.get-config.outputs.python-versions) }}
+        # Dynamic matrix from config with static fallback for act/dry-run
+        # Update static list when adding new Python versions (currently 3.9-3.13)
+        python-version: ${{ fromJSON(needs.get-config.outputs.python-versions || '["3.9", "3.10", "3.11", "3.12", "3.13"]') }}
     uses: ./.github/workflows/reusable-test.yml
     with:
       test-type: integration
@@ -70,7 +74,9 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]  # Disabled windows-latest, macos-latest for now
-        python-version: ${{ fromJSON(needs.get-config.outputs.python-versions) }}
+        # Dynamic matrix from config with static fallback for act/dry-run
+        # Update static list when adding new Python versions (currently 3.9-3.13)
+        python-version: ${{ fromJSON(needs.get-config.outputs.python-versions || '["3.9", "3.10", "3.11", "3.12", "3.13"]') }}
     uses: ./.github/workflows/reusable-test.yml
     with:
       test-type: e2e
