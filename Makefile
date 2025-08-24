@@ -440,7 +440,13 @@ local-list: dev-install  ## List available workflows and jobs for local executio
 local-dry-run: dev-install  ## Validate all workflows without running (dry run)
 	@echo "Validating workflows with act (dry run)..."
 	@if command -v act >/dev/null 2>&1; then \
-		act --dryrun; \
+		echo "Validating CI workflow..."; \
+		act --dryrun -W .github/workflows/ci.yml; \
+		echo "Validating security workflow..."; \
+		act --dryrun -W .github/workflows/security.yml; \
+		echo "Validating container workflow..."; \
+		act --dryrun -W .github/workflows/container.yml; \
+		echo "All core workflows validated successfully!"; \
 	else \
 		echo "Error: act not installed. Run 'make install-dev-tools' to install."; \
 		exit 1; \
