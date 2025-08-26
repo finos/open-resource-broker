@@ -13,15 +13,10 @@ try:
         UpdateRequestStatusCommand,
     )
     from application.dto.queries import (
-        GetMachineQuery,  # Use this instead of GetMachinesByRequestQuery
         GetRequestStatusQuery,
-        ListTemplatesQuery,  # Use this instead of GetAvailableTemplatesQuery
     )
-    from application.queries.handlers import (
-        GetMachineHandler,  # Use this instead of GetMachinesByRequestHandler
-        GetRequestStatusQueryHandler,  # Note: different name than expected
-        ListTemplatesHandler,  # Use this instead of GetAvailableTemplatesHandler
-    )
+
+    # Handlers would be imported here when tests are implemented
     from infrastructure.di.buses import CommandBus, QueryBus
 
     IMPORTS_AVAILABLE = True

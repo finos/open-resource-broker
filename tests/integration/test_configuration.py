@@ -266,5 +266,6 @@ def test_configuration_loading():
 
 
 if __name__ == "__main__":
-    success = test_phase5_configuration()
-    sys.exit(0 if success else 1)
+    # Test configuration functionality
+    print("Configuration tests should be run via pytest")
+    sys.exit(0)

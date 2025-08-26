@@ -1,6 +1,14 @@
 """AWS-specific machine value objects."""
 
-from domain.machine.value_objects import *
+from domain.machine.value_objects import (
+    InstanceType,
+    MachineHealth,
+    MachineId,
+    MachineStatus,
+    PrivateIpAddress,
+    PublicIpAddress,
+    Tags,
+)
 from providers.aws.domain.template.value_objects import (
     AWSImageId,
     AWSInstanceType,

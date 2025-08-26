@@ -14,6 +14,15 @@ import time
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
+# Import AWS provider components
+try:
+    from src.providers.aws.config import AWSConfig
+    from src.providers.aws.strategy import AWSProviderStrategy
+except ImportError:
+    # Fallback for documentation examples
+    AWSConfig = None
+    AWSProviderStrategy = None
+
 from src.providers.base.strategy import (
     AggregationPolicy,
     CompositeProviderStrategy,

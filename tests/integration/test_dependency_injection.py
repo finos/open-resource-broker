@@ -284,5 +284,6 @@ def test_service_dependencies():
 
 
 if __name__ == "__main__":
-    success = test_phase6_dependency_injection()
-    sys.exit(0 if success else 1)
+    # Dependency injection tests should be run via pytest
+    print("Dependency injection tests should be run via pytest")
+    sys.exit(0)

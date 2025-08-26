@@ -83,7 +83,7 @@ class TestDockerfile:
     def test_docker_build_success(self, project_root):
         """Test that Docker build completes successfully."""
         try:
-            _ = subprocess.run(
+            result = subprocess.run(
                 [
                     "docker",
                     "build",
@@ -130,7 +130,7 @@ class TestDockerfile:
             )
 
             # Test version command
-            _ = subprocess.run(
+            result = subprocess.run(
                 ["docker", "run", "--rm", "ohfp-api:test-startup", "version"],
                 check=False,
                 capture_output=True,

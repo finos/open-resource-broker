@@ -242,7 +242,7 @@ def test_launch_template_integration():
             # Create test data
             from providers.aws.domain.template.value_objects import ProviderApi
 
-            _ = AWSTemplate(
+            aws_template = AWSTemplate(
                 template_id="test-template",
                 vm_type="t2.micro",
                 image_id="ami-12345",
@@ -252,7 +252,7 @@ def test_launch_template_integration():
 
             from domain.request.value_objects import RequestType
 
-            _ = Request.create_new_request(
+            request = Request.create_new_request(
                 request_type=RequestType.ACQUIRE,
                 template_id="test-template",
                 machine_count=1,
@@ -373,7 +373,7 @@ def test_domain_model_flow():
         print("   Testing domain model flow...")
 
         # Create test AWSTemplate
-        _ = AWSTemplate(
+        aws_template = AWSTemplate(
             template_id="test-template",
             provider_api=ProviderApi.SPOT_FLEET,
             vm_type="t2.micro",
@@ -599,7 +599,7 @@ def test_full_end_to_end_flow():
         # Create test data
         from providers.aws.domain.template.value_objects import AWSFleetType
 
-        _ = AWSTemplate(
+        aws_template = AWSTemplate(
             template_id="e2e-test-template",
             provider_api=ProviderApi.SPOT_FLEET,
             vm_type="t2.micro",
@@ -612,7 +612,7 @@ def test_full_end_to_end_flow():
 
         from domain.request.value_objects import RequestType
 
-        _ = Request.create_new_request(
+        request = Request.create_new_request(
             request_type=RequestType.ACQUIRE,
             template_id="e2e-test-template",
             machine_count=1,

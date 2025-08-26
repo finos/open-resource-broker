@@ -2,12 +2,16 @@
 """Pre-commit validation script - reads .pre-commit-config.yaml and executes hooks."""
 
 import argparse
+import logging
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 import yaml
+
+# Setup logging
+logger = logging.getLogger(__name__)
 
 
 # Colors

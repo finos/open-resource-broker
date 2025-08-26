@@ -5,6 +5,7 @@ from typing import Any
 from domain.base.dependency_injection import injectable
 from domain.base.ports.logging_port import LoggingPort
 from domain.base.ports.provider_validation_port import BaseProviderValidationAdapter
+from providers.aws.configuration.config import AWSProviderConfig as AWSProviderConfigBase
 from providers.aws.configuration.validator import (
     AWSProviderConfig,
     get_aws_config_manager,
@@ -380,8 +381,6 @@ def create_aws_validation_adapter(logger: LoggingPort) -> AWSValidationAdapter:
     except Exception as e:
         logger.debug("Could not load full AWS config for validation: %s", e)
         # Create a minimal config with dummy auth for validation only
-        from providers.aws.configuration.config import AWSProviderConfig
-
-        aws_config = AWSProviderConfig(profile="validation-only")
+        aws_config = AWSProviderConfigBase(profile="validation-only")
 
     return AWSValidationAdapter(aws_config, logger)

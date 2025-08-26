@@ -6,7 +6,13 @@ All classes maintain backward compatibility.
 """
 
 # Import all classes from the new organized structure
-from .load_balancing import *
+from .load_balancing import (
+    HealthCheckMode,
+    LoadBalancingAlgorithm,
+    LoadBalancingConfig,
+    LoadBalancingProviderStrategy,
+    StrategyStats,
+)
 
 # Maintain backward compatibility
 __all__: list[str] = [
