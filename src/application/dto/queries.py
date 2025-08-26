@@ -1,6 +1,7 @@
 """Query DTOs for application layer."""
 
 from __future__ import annotations
+
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import TYPE_CHECKING, Any, Dict, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, TypeVar
 
 # Import config classes for runtime use
 from config.schemas import AppConfig
@@ -183,15 +183,21 @@ class ConfigurationManager:
         """Resolve configuration path."""
         return self._ensure_path_resolver().resolve_path(path_type, default_path, config_path)
 
-    def get_work_dir(self, default_path: Optional[str] = None, config_path: Optional[str] = None) -> str:
+    def get_work_dir(
+        self, default_path: Optional[str] = None, config_path: Optional[str] = None
+    ) -> str:
         """Get work directory path."""
         return self._ensure_path_resolver().get_work_dir(default_path, config_path)
 
-    def get_conf_dir(self, default_path: Optional[str] = None, config_path: Optional[str] = None) -> str:
+    def get_conf_dir(
+        self, default_path: Optional[str] = None, config_path: Optional[str] = None
+    ) -> str:
         """Get configuration directory path."""
         return self._ensure_path_resolver().get_conf_dir(default_path, config_path)
 
-    def get_log_dir(self, default_path: Optional[str] = None, config_path: Optional[str] = None) -> str:
+    def get_log_dir(
+        self, default_path: Optional[str] = None, config_path: Optional[str] = None
+    ) -> str:
         """Get log directory path."""
         return self._ensure_path_resolver().get_log_dir(default_path, config_path)
 
