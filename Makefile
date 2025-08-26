@@ -778,7 +778,7 @@ validate-config: install  ## Validate configuration
 # Container targets
 container-build:  ## Build Docker image
 	REGISTRY=$(CONTAINER_REGISTRY) \
-	VERSION=$(VERSION) \
+	VERSION=$$(make -s get-version) \
 	IMAGE_NAME=$(CONTAINER_IMAGE) \
 	./dev-tools/scripts/container_build.sh
 
@@ -811,7 +811,7 @@ container-build-single: dev-install  ## Build container image for single Python 
 		exit 1; \
 	fi
 	REGISTRY=$(CONTAINER_REGISTRY) \
-	VERSION=$(VERSION) \
+	VERSION=$$(make -s get-version) \
 	IMAGE_NAME=$(CONTAINER_IMAGE) \
 	PYTHON_VERSION=$(PYTHON_VERSION) \
 	MULTI_PYTHON=true \
