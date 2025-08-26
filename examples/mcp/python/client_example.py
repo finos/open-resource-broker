@@ -65,7 +65,9 @@ class HostFactoryMCPClient:
         logger.info(f"Found {len(prompts)} prompts")
         return prompts
 
-    async def call_tool(self, name: str, arguments: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    async def call_tool(
+        self, name: str, arguments: Optional[dict[str, Any]] = None
+    ) -> dict[str, Any]:
         """Call a specific tool."""
         if arguments is None:
             arguments = {}
@@ -82,7 +84,9 @@ class HostFactoryMCPClient:
         logger.info(f"Resource content: {result}")
         return result
 
-    async def get_prompt(self, name: str, arguments: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    async def get_prompt(
+        self, name: str, arguments: Optional[dict[str, Any]] = None
+    ) -> dict[str, Any]:
         """Get a specific prompt."""
         if arguments is None:
             arguments = {}

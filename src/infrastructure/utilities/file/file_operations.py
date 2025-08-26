@@ -266,7 +266,9 @@ def create_temp_file(suffix: str = "", prefix: str = "", dir: Optional[str] = No
         raise OSError(f"Failed to create temporary file: {e!s}")
 
 
-def with_temp_file(suffix: str = "", prefix: str = "", dir: Optional[str] = None) -> ContextManager[str]:
+def with_temp_file(
+    suffix: str = "", prefix: str = "", dir: Optional[str] = None
+) -> ContextManager[str]:
     """
     Context manager for temporary file.
 

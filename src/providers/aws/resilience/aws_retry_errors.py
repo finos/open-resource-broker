@@ -1,6 +1,5 @@
 """AWS-specific retry error definitions."""
 
-
 # AWS service-specific retryable errors
 AWS_RETRYABLE_ERRORS: dict[str, list[str]] = {
     "ec2": [

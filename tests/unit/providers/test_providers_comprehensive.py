@@ -90,9 +90,7 @@ class TestAWSProviderComprehensive:
                             "create_instances",
                             "terminate_instances",
                         ]
-                        any(
-                            hasattr(handler, method) for method in common_methods
-                        )
+                        any(hasattr(handler, method) for method in common_methods)
 
                 except Exception as e:
                     # Log but don't fail

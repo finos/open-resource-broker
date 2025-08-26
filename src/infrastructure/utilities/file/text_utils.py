@@ -1,7 +1,6 @@
 """Text file operations utilities."""
 
 
-
 def read_text_file(file_path: str, encoding: str = "utf-8") -> str:
     """
     Read a text file and return its contents.

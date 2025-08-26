@@ -56,13 +56,18 @@ class ProviderResult(BaseModel):
     metadata: dict[str, Any] = {}
 
     @classmethod
-    def success_result(cls, data: Any = None, metadata: Optional[dict[str, Any]] = None) -> "ProviderResult":
+    def success_result(
+        cls, data: Any = None, metadata: Optional[dict[str, Any]] = None
+    ) -> "ProviderResult":
         """Create a successful result."""
         return cls(success=True, data=data, metadata=metadata or {})
 
     @classmethod
     def error_result(
-        cls, error_message: str, error_code: Optional[str] = None, metadata: Optional[dict[str, Any]] = None
+        cls,
+        error_message: str,
+        error_code: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
     ) -> "ProviderResult":
         """Create an error result."""
         return cls(

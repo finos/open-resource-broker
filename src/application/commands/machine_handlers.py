@@ -1,6 +1,5 @@
 """Command handlers for machine operations."""
 
-
 from application.base.handlers import BaseCommandHandler
 from application.decorators import command_handler
 from application.dto.base import BaseResponse

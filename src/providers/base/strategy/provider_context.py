@@ -117,7 +117,9 @@ class ProviderContext:
         """Get list of available strategy types."""
         return list(self._strategies.keys())
 
-    def register_strategy(self, strategy: ProviderStrategy, instance_name: Optional[str] = None) -> None:
+    def register_strategy(
+        self, strategy: ProviderStrategy, instance_name: Optional[str] = None
+    ) -> None:
         """
         Register a provider strategy.
 
@@ -413,7 +415,9 @@ class ProviderContext:
 
         return strategy.get_capabilities()
 
-    def check_strategy_health(self, strategy_type: Optional[str] = None) -> Optional[ProviderHealthStatus]:
+    def check_strategy_health(
+        self, strategy_type: Optional[str] = None
+    ) -> Optional[ProviderHealthStatus]:
         """
         Check health of a specific strategy or current strategy.
 
@@ -453,7 +457,9 @@ class ProviderContext:
                 f"Health check failed: {e!s}", {"exception": str(e)}
             )
 
-    def get_strategy_metrics(self, strategy_type: Optional[str] = None) -> Optional[StrategyMetrics]:
+    def get_strategy_metrics(
+        self, strategy_type: Optional[str] = None
+    ) -> Optional[StrategyMetrics]:
         """
         Get metrics for a specific strategy or current strategy.
 

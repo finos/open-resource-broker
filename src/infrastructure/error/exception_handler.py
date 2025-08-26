@@ -780,7 +780,9 @@ class ExceptionHandler:
                 },
             )
 
-    def _wrap_value_error(self, exc: ValueError, context: Optional[str] = None, **kwargs) -> ValidationError:
+    def _wrap_value_error(
+        self, exc: ValueError, context: Optional[str] = None, **kwargs
+    ) -> ValidationError:
         """Wrap value error into validation exception."""
         return ValidationError(
             message=f"Invalid value: {exc!s}",
@@ -794,7 +796,9 @@ class ExceptionHandler:
             },
         )
 
-    def _wrap_key_error(self, exc: KeyError, context: Optional[str] = None, **kwargs) -> ValidationError:
+    def _wrap_key_error(
+        self, exc: KeyError, context: Optional[str] = None, **kwargs
+    ) -> ValidationError:
         """Wrap key error into validation exception."""
         return ValidationError(
             message=f"Missing required key: {exc!s}",
@@ -808,7 +812,9 @@ class ExceptionHandler:
             },
         )
 
-    def _wrap_type_error(self, exc: TypeError, context: Optional[str] = None, **kwargs) -> ValidationError:
+    def _wrap_type_error(
+        self, exc: TypeError, context: Optional[str] = None, **kwargs
+    ) -> ValidationError:
         """Wrap type error into validation exception."""
         return ValidationError(
             message=f"Type error: {exc!s}",

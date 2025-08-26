@@ -173,7 +173,9 @@ class ConfigurationAdapter(ConfigurationPort):
         """Get typed configuration for compatibility with ConfigurationManager."""
         return self._config_manager.get_typed(config_type)
 
-    def resolve_file(self, file_type: str, filename: str, explicit_path: Optional[str] = None) -> str:
+    def resolve_file(
+        self, file_type: str, filename: str, explicit_path: Optional[str] = None
+    ) -> str:
         """Resolve file path for compatibility with ConfigurationManager."""
         return self._config_manager.resolve_file(file_type, filename, explicit_path)
 
@@ -181,15 +183,21 @@ class ConfigurationAdapter(ConfigurationPort):
         """Get provider type - delegate to ConfigurationManager."""
         return self._config_manager.get_provider_type()
 
-    def get_work_dir(self, default_path: Optional[str] = None, config_path: Optional[str] = None) -> str:
+    def get_work_dir(
+        self, default_path: Optional[str] = None, config_path: Optional[str] = None
+    ) -> str:
         """Get work directory - delegate to ConfigurationManager."""
         return self._config_manager.get_work_dir(default_path, config_path)
 
-    def get_conf_dir(self, default_path: Optional[str] = None, config_path: Optional[str] = None) -> str:
+    def get_conf_dir(
+        self, default_path: Optional[str] = None, config_path: Optional[str] = None
+    ) -> str:
         """Get config directory - delegate to ConfigurationManager."""
         return self._config_manager.get_conf_dir(default_path, config_path)
 
-    def get_log_dir(self, default_path: Optional[str] = None, config_path: Optional[str] = None) -> str:
+    def get_log_dir(
+        self, default_path: Optional[str] = None, config_path: Optional[str] = None
+    ) -> str:
         """Get log directory - delegate to ConfigurationManager."""
         return self._config_manager.get_log_dir(default_path, config_path)
 

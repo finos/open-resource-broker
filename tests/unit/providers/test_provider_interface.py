@@ -220,7 +220,6 @@ class TestProviderErrorHandling:
         # Configure to return errors
         provider.set_response("create_instances", Exception("Provider error"))
 
-
         # The mock provider should handle this gracefully
         # In a real implementation, this would raise an exception
         # or return an error response

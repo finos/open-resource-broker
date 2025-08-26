@@ -1,6 +1,5 @@
 """HostFactory-specific field mappings - moved from generic location."""
 
-
 from infrastructure.logging.logger import get_logger
 
 

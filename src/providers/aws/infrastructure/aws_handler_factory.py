@@ -5,7 +5,6 @@ This module provides a factory for creating AWS handlers based on template types
 It follows the Factory Method pattern to create the appropriate handler for each template.
 """
 
-
 from domain.base.dependency_injection import injectable
 from domain.base.ports import ConfigurationPort, LoggingPort
 from domain.template.aggregate import Template

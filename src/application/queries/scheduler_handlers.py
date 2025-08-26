@@ -1,6 +1,5 @@
 """Scheduler query handlers for administrative operations."""
 
-
 from application.base.handlers import BaseQueryHandler
 from application.decorators import query_handler
 from application.dto.system import (
