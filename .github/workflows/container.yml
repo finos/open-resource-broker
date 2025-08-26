@@ -179,18 +179,16 @@ jobs:
       if: matrix.python-version == needs.get-config.outputs.default-python-version
       run: |
         # Test that the container starts and responds to health check
-        IMAGE_TAG="${{ env.CONTAINER_URI }}"
-
-        echo "Testing container image: $IMAGE_TAG"
+        echo "Testing container image: ${{ env.CONTAINER_URI }}"
 
         # Run container in background
         docker run --rm -d --name test-container \
           -p 8000:8000 \
-          "$IMAGE_TAG"
+          "${{ env.CONTAINER_URI }}"
 
         # Wait for container to start
         echo "Waiting for container to start..."
-        sleep 15
+        sleep 20
 
         # Test health endpoint using Makefile target
         make container-health-check
