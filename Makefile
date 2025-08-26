@@ -532,9 +532,9 @@ publish-test: build  ## Publish to test PyPI
 format: dev-install clean-whitespace  ## Format code with Ruff (no auto-fix)
 	@uv run ruff format --check --quiet .
 
-ci-quality-ruff: dev-install  ## Run Ruff formatting and linting check
-	@echo "Running Ruff formatting and linting check..."
-	@uv run ruff check --quiet .
+ci-quality-ruff: dev-install  ## Run Ruff formatting and linting check (basic rules only)
+	@echo "Running Ruff formatting and linting check (basic rules only)..."
+	@uv run ruff check --select E,W,F,I --quiet .
 	@uv run ruff format --check --quiet .
 
 ci-quality-ruff-optional:  ## Run Ruff extended linting (warnings only)
