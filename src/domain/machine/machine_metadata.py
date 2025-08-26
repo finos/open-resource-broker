@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import field_validator, model_validator
 
@@ -57,9 +57,9 @@ class MachineConfiguration(ValueObject):
     private_ip: IPAddress
     provider_api: str
     resource_id: str
-    public_ip: IPAddress | None = None
+    public_ip: Optional[IPAddress] = None
     price_type: PriceType = PriceType.ON_DEMAND
-    cloud_host_id: str | None = None
+    cloud_host_id: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_configuration(self) -> MachineConfiguration:
@@ -110,9 +110,9 @@ class MachineEvent(ValueObject):
 
     timestamp: datetime
     event_type: str
-    old_state: str | None
-    new_state: str | None
-    details: dict[str, Any] | None = None
+    old_state: Optional[str]
+    new_state: Optional[str]
+    details: Optional[dict[str, Any]] = None
 
     @model_validator(mode="after")
     def validate_event(self) -> MachineEvent:
@@ -138,7 +138,7 @@ class HealthCheck(ValueObject):
     check_type: str
     status: bool
     timestamp: datetime
-    details: dict[str, Any] | None = None
+    details: Optional[dict[str, Any]] = None
 
     @model_validator(mode="after")
     def validate_health_check(self) -> HealthCheck:
@@ -290,8 +290,8 @@ class HealthCheckResult(ValueObject):
     system_status: bool
     instance_status: bool
     timestamp: datetime
-    system_details: dict[str, Any] | None = None
-    instance_details: dict[str, Any] | None = None
+    system_details: Optional[dict[str, Any]] = None
+    instance_details: Optional[dict[str, Any]] = None
 
     @property
     def is_healthy(self) -> bool:

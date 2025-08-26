@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Any
+from typing import Any, Optional
 
 from infrastructure.logging.logger import ContextLogger, with_context
 from infrastructure.patterns.singleton_registry import SingletonRegistry
@@ -85,7 +85,7 @@ class LoggerSingleton:
             if "correlation_id" in self._context:
                 del self._context["correlation_id"]
 
-    def get_correlation_id(self) -> str | None:
+    def get_correlation_id(self) -> Optional[str]:
         """
         Get current correlation ID.
 
