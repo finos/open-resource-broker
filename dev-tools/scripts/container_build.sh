@@ -26,7 +26,18 @@ log_error() {
 # Configuration
 IMAGE_NAME="${IMAGE_NAME:-open-hostfactory-plugin}"  # Will be overridden by Makefile with $(CONTAINER_IMAGE)
 REGISTRY="${REGISTRY:-}"
-VERSION="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo 'latest')}"
+
+# Unified versioning strategy (PEP 440 compliant)
+if [[ "${IS_RELEASE:-false}" == "true" ]]; then
+    VERSION="${VERSION:-0.1.0}"  # Release version from .project.yml
+else
+    COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')
+    VERSION="${VERSION:-0.1.0+${COMMIT}}"  # PEP 440 compliant development version
+fi
+
+# Docker-safe version (replace + with -)
+CONTAINER_VERSION="${VERSION//+/-}"
+
 BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 VCS_REF=$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')
 
@@ -123,11 +134,11 @@ build_image() {
 
     # Prepare tags with Python version support
     local tags=()
-    local version_tag="${VERSION}"
+    local version_tag="${CONTAINER_VERSION}"
 
     # Add Python version to tag if specified
     if [[ -n "${PYTHON_VERSION}" && "${MULTI_PYTHON}" == "true" ]]; then
-        version_tag="${VERSION}-python${PYTHON_VERSION}"
+        version_tag="${CONTAINER_VERSION}-python${PYTHON_VERSION}"
     fi
 
     if [[ -n "${REGISTRY}" ]]; then
@@ -213,9 +224,9 @@ test_image() {
     log_info "Testing built image..."
 
     # Use the same tagging logic as build_image function
-    local version_tag="${VERSION}"
+    local version_tag="${CONTAINER_VERSION}"
     if [[ -n "${PYTHON_VERSION}" && "${MULTI_PYTHON}" == "true" ]]; then
-        version_tag="${VERSION}-python${PYTHON_VERSION}"
+        version_tag="${CONTAINER_VERSION}-python${PYTHON_VERSION}"
     fi
 
     local test_image
@@ -330,10 +341,12 @@ main() {
     log_info "Build process completed successfully!"
 
     if [[ -n "${REGISTRY}" ]]; then
-        log_info "Image: ${REGISTRY}/${IMAGE_NAME}:${VERSION}"
+        log_info "Image: ${REGISTRY}/${IMAGE_NAME}:${CONTAINER_VERSION}"
     else
-        log_info "Image: ${IMAGE_NAME}:${VERSION}"
+        log_info "Image: ${IMAGE_NAME}:${CONTAINER_VERSION}"
     fi
+    
+    log_info "Python version: ${VERSION} | Container version: ${CONTAINER_VERSION}"
 }
 
 # Execute main function

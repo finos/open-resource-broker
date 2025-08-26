@@ -105,6 +105,8 @@ jobs:
           path: |
             .venv
             ~/.cache/uv
+            ~/.local/bin/uv
+            /opt/hostedtoolcache/uv
           key: ${{ steps.cache-key.outputs.key }}
 
       - name: Setup Python and UV (if cache miss)
@@ -132,17 +134,10 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ github.head_ref }}
 
-      - name: Install UV
-        uses: astral-sh/setup-uv@v6
-
-      - name: Restore UV environment
-        uses: actions/cache/restore@v4
+      - name: Setup UV with cached environment
+        uses: ./.github/actions/setup-uv-cached
         with:
-          path: |
-            .venv
-            ~/.cache/uv
-          key: ${{ needs.setup-dependencies.outputs.cache-key }}
-          fail-on-cache-miss: true
+          cache-key: ${{ needs.setup-dependencies.outputs.cache-key }}
 
       - name: Auto-format (no checks)
         run: make format-fix
@@ -164,17 +159,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      - name: Install UV
-        uses: astral-sh/setup-uv@v6
-
-      - name: Restore UV environment
-        uses: actions/cache/restore@v4
+      - name: Setup UV with cached environment
+        uses: ./.github/actions/setup-uv-cached
         with:
-          path: |
-            .venv
-            ~/.cache/uv
-          key: ${{ needs.setup-dependencies.outputs.cache-key }}
-          fail-on-cache-miss: true
+          cache-key: ${{ needs.setup-dependencies.outputs.cache-key }}
 
       - name: Check code quality
         run: make ci-quality-ruff
@@ -187,14 +175,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      - name: Restore UV environment
-        uses: actions/cache/restore@v4
+      - name: Setup UV with cached environment
+        uses: ./.github/actions/setup-uv-cached
         with:
-          path: |
-            .venv
-            ~/.cache/uv
-          key: ${{ needs.setup-dependencies.outputs.cache-key }}
-          fail-on-cache-miss: true
+          cache-key: ${{ needs.setup-dependencies.outputs.cache-key }}
 
       - name: Extended linting (warnings)
         run: make ci-quality-ruff-optional
@@ -209,14 +193,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
 
-    - name: Restore UV environment
-      uses: actions/cache/restore@v4
-      with:
-        path: |
-          .venv
-          ~/.cache/uv
-        key: ${{ needs.setup-dependencies.outputs.cache-key }}
-        fail-on-cache-miss: true
+      - name: Setup UV with cached environment
+        uses: ./.github/actions/setup-uv-cached
+        with:
+          cache-key: ${{ needs.setup-dependencies.outputs.cache-key }}
 
     - name: Run mypy type check
       run: make ci-quality-mypy
@@ -231,14 +211,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
 
-    - name: Restore UV environment
-      uses: actions/cache/restore@v4
-      with:
-        path: |
-          .venv
-          ~/.cache/uv
-        key: ${{ needs.setup-dependencies.outputs.cache-key }}
-        fail-on-cache-miss: true
+      - name: Setup UV with cached environment
+        uses: ./.github/actions/setup-uv-cached
+        with:
+          cache-key: ${{ needs.setup-dependencies.outputs.cache-key }}
 
     - name: Run CQRS pattern validation
       run: make ci-arch-cqrs
@@ -253,14 +229,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
 
-    - name: Restore UV environment
-      uses: actions/cache/restore@v4
-      with:
-        path: |
-          .venv
-          ~/.cache/uv
-        key: ${{ needs.setup-dependencies.outputs.cache-key }}
-        fail-on-cache-miss: true
+      - name: Setup UV with cached environment
+        uses: ./.github/actions/setup-uv-cached
+        with:
+          cache-key: ${{ needs.setup-dependencies.outputs.cache-key }}
 
     - name: Run Clean Architecture validation
       run: make ci-arch-clean
@@ -275,14 +247,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
 
-    - name: Restore UV environment
-      uses: actions/cache/restore@v4
-      with:
-        path: |
-          .venv
-          ~/.cache/uv
-        key: ${{ needs.setup-dependencies.outputs.cache-key }}
-        fail-on-cache-miss: true
+      - name: Setup UV with cached environment
+        uses: ./.github/actions/setup-uv-cached
+        with:
+          cache-key: ${{ needs.setup-dependencies.outputs.cache-key }}
 
     - name: Run import validation
       run: make ci-arch-imports
@@ -297,14 +265,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
 
-    - name: Restore UV environment
-      uses: actions/cache/restore@v4
-      with:
-        path: |
-          .venv
-          ~/.cache/uv
-        key: ${{ needs.setup-dependencies.outputs.cache-key }}
-        fail-on-cache-miss: true
+      - name: Setup UV with cached environment
+        uses: ./.github/actions/setup-uv-cached
+        with:
+          cache-key: ${{ needs.setup-dependencies.outputs.cache-key }}
 
     - name: Run file size checks
       run: make ci-arch-file-sizes
@@ -356,14 +320,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
 
-    - name: Restore UV environment
-      uses: actions/cache/restore@v4
+    - name: Setup UV with cached environment
+      uses: ./.github/actions/setup-uv-cached
       with:
-        path: |
-          .venv
-          ~/.cache/uv
-        key: ${{ needs.setup-dependencies.outputs.cache-key }}
-        fail-on-cache-miss: true
+        cache-key: ${{ needs.setup-dependencies.outputs.cache-key }}
 
     - name: Build package
       run: make build
@@ -386,14 +346,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
 
-    - name: Restore UV environment
-      uses: actions/cache/restore@v4
-      with:
-        path: |
-          .venv
-          ~/.cache/uv
-        key: ${{ needs.setup-dependencies.outputs.cache-key }}
-        fail-on-cache-miss: true
+      - name: Setup UV with cached environment
+        uses: ./.github/actions/setup-uv-cached
+        with:
+          cache-key: ${{ needs.setup-dependencies.outputs.cache-key }}
 
     - name: Download all test results
       uses: actions/download-artifact@v5
