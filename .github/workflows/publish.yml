@@ -105,8 +105,8 @@ jobs:
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
       with:
-        python-version: ${{ needs.get-config.outputs.default-python-version }}
-        cache-key-suffix: publish
+        cache-key: deps-${{ needs.get-config.outputs.default-python-version }}-${{ hashFiles('.project.yml', 'pyproject.toml.template', 'requirements*.txt') }}
+        fail-on-cache-miss: false
     - name: Build package
       run: |
         make build
@@ -165,8 +165,8 @@ jobs:
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
       with:
-        python-version: ${{ needs.get-config.outputs.default-python-version }}
-        cache-key-suffix: sbom
+        cache-key: deps-${{ needs.get-config.outputs.default-python-version }}-${{ hashFiles('.project.yml', 'pyproject.toml.template', 'requirements*.txt') }}
+        fail-on-cache-miss: false
 
     - name: Generate SBOM files
       run: |
