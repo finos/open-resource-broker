@@ -16,6 +16,7 @@ runs:
       uses: astral-sh/setup-uv@v6
 
     - name: Restore UV environment
+      id: restore-cache
       uses: actions/cache/restore@v4
       with:
         path: |
@@ -25,3 +26,8 @@ runs:
           /opt/hostedtoolcache/uv
         key: ${{ inputs.cache-key }}
         fail-on-cache-miss: ${{ inputs.fail-on-cache-miss }}
+
+    - name: Install dependencies if cache miss
+      if: steps.restore-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: make dev-install
