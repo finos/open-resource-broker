@@ -644,6 +644,14 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         """Get working directory from HF_PROVIDER_WORKDIR."""
         return os.environ.get("HF_PROVIDER_WORKDIR", os.getcwd())
 
+    def get_config_directory(self) -> str:
+        """Get config directory from HF_PROVIDER_CONFDIR."""
+        return os.environ.get("HF_PROVIDER_CONFDIR", os.path.join(self.get_working_directory(), "config"))
+
+    def get_logs_directory(self) -> str:
+        """Get logs directory from HF_PROVIDER_LOGDIR."""
+        return os.environ.get("HF_PROVIDER_LOGDIR", os.path.join(self.get_working_directory(), "logs"))
+
     def get_storage_base_path(self) -> str:
         """Get storage base path within working directory."""
         workdir = self.get_working_directory()

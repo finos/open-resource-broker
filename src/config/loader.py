@@ -598,10 +598,21 @@ class ConfigurationLoader:
 
             # Get current scheduler strategy
             registry = get_scheduler_registry()
-
-            # Try to get scheduler type from environment or default to 'default'
-            scheduler_type = os.environ.get("SCHEDULER_TYPE", "default")
-
+            
+            # Try to determine scheduler type from context
+            scheduler_type = None
+            
+            # First try environment variable (explicit override)
+            scheduler_type = os.environ.get("SCHEDULER_TYPE")
+            
+            # If no explicit override, try to detect from context
+            if not scheduler_type:
+                # Check if we're in a HostFactory environment
+                if any(os.environ.get(var) for var in ["HF_PROVIDER_CONFDIR", "HF_PROVIDER_WORKDIR", "HF_PROVIDER_LOGDIR"]):
+                    scheduler_type = "hostfactory"
+                else:
+                    scheduler_type = "default"
+            
             # Ensure scheduler type is registered
             registry.ensure_type_registered(scheduler_type)
 
@@ -610,8 +621,9 @@ class ConfigurationLoader:
 
             # Map file types to scheduler methods
             if file_type in ["conf", "template", "legacy"]:
-                config_path = scheduler.get_config_file_path()
-                return os.path.dirname(config_path) if config_path else None
+                return scheduler.get_config_directory()
+            elif file_type == "log":
+                return scheduler.get_logs_directory()
             elif file_type in ["work", "data"]:
                 return scheduler.get_storage_base_path()
             else:

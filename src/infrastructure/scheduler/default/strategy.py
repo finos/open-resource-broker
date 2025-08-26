@@ -139,6 +139,18 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
 
         return os.getcwd()
 
+    def get_config_directory(self) -> str:
+        """Get config directory - use working_dir/config."""
+        import os
+
+        return os.path.join(self.get_working_directory(), "config")
+
+    def get_logs_directory(self) -> str:
+        """Get logs directory - use working_dir/logs."""
+        import os
+
+        return os.path.join(self.get_working_directory(), "logs")
+
     def get_storage_base_path(self) -> str:
         """Get storage base path within working directory."""
         import os

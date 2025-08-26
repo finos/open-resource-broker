@@ -48,5 +48,13 @@ class SchedulerPort(ABC):
         """Get working directory for this scheduler."""
 
     @abstractmethod
+    def get_config_directory(self) -> str:
+        """Get config directory for this scheduler."""
+
+    @abstractmethod
+    def get_logs_directory(self) -> str:
+        """Get logs directory for this scheduler."""
+
+    @abstractmethod
     def get_storage_base_path(self) -> str:
         """Get storage base path within working directory."""
