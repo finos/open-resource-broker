@@ -78,8 +78,15 @@ class CachingAMIResolver(TemplateResolverPort):
             os.makedirs(cache_dir, exist_ok=True)
             return os.path.join(cache_dir, "ami_cache.json")
         except Exception:
-            # Fallback to environment variable or current directory
-            workdir = os.environ.get("HF_PROVIDER_WORKDIR", os.getcwd())
+            # Fallback to scheduler working directory
+            try:
+                from infrastructure.di.container import get_container
+
+                container = get_container()
+                scheduler = container.get("scheduler_strategy")
+                workdir = scheduler.get_working_directory()
+            except Exception:
+                workdir = os.getcwd()
             cache_dir = os.path.join(workdir, "cache")
             os.makedirs(cache_dir, exist_ok=True)
             return os.path.join(cache_dir, "ami_cache.json")

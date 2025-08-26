@@ -260,7 +260,7 @@ class ConfigurationManager:
     ) -> str:
         """Resolve a configuration file path with consistent priority:
         1. Explicit path (if provided and contains directory)
-        2. HF_PROVIDER_*DIR + filename (if file exists)
+        2. Scheduler-provided directory + filename (if file exists)
         3. Default directory + filename
 
         Args:
@@ -282,24 +282,15 @@ class ConfigurationManager:
         if explicit_path and not os.path.dirname(explicit_path):
             filename = explicit_path
 
-        # 2. Try environment variable directory + filename
-        env_dir = None
-
-        if file_type in ["conf", "template", "legacy"]:
-            env_dir = os.environ.get("HF_PROVIDER_CONFDIR")
-        elif file_type == "log":
-            env_dir = os.environ.get("HF_PROVIDER_LOGDIR")
-        elif file_type == "work":
-            env_dir = os.environ.get("HF_PROVIDER_WORKDIR")
-        elif file_type == "events":
-            env_dir = os.environ.get("HF_PROVIDER_EVENTSDIR")
-        elif file_type == "snapshots":
-            env_dir = os.environ.get("HF_PROVIDER_SNAPSHOTSDIR")
-
-        if env_dir:
-            env_path = os.path.join(env_dir, filename)
-            if os.path.exists(env_path):
-                return env_path
+        # 2. Try scheduler-provided directory + filename
+        try:
+            scheduler_dir = self._get_scheduler_directory(file_type)
+            if scheduler_dir:
+                scheduler_path = os.path.join(scheduler_dir, filename)
+                if os.path.exists(scheduler_path):
+                    return scheduler_path
+        except Exception:
+            pass
 
         # 3. Fall back to default directory + filename
         if default_dir is None:
@@ -321,6 +312,21 @@ class ConfigurationManager:
 
         fallback_path = os.path.join(default_dir, filename)
         return fallback_path
+
+    def _get_scheduler_directory(self, file_type: str) -> Optional[str]:
+        """Get directory path from scheduler strategy for the given file type."""
+        try:
+            scheduler = self.get_scheduler_strategy()
+            if file_type in ["conf", "template", "legacy"]:
+                return scheduler.get_config_directory()
+            elif file_type == "log":
+                return scheduler.get_logs_directory()
+            elif file_type in ["work", "data"]:
+                return scheduler.get_storage_base_path()
+            else:
+                return scheduler.get_working_directory()
+        except Exception:
+            return None
 
     def get_cache_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
