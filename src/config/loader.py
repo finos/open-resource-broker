@@ -89,19 +89,6 @@ class ConfigurationLoader:
         "MAX_MACHINES_PER_REQUEST": ("max_machines_per_request",),
     }
 
-    # Host Factory environment variables
-    HF_ENV_VARS = {
-        "HF_PROVIDER_WORKDIR": "workdir",
-        "HF_PROVIDER_LOGDIR": "logs",
-        "HF_PROVIDER_CONFDIR": "config",
-        "HF_PROVIDER_EVENTSDIR": "events",
-        "HF_PROVIDER_SNAPSHOTSDIR": "snapshots",
-        "HF_PROVIDER_NAME": "provider_name",
-        "HF_TEMPLATE_AMI_RESOLUTION_ENABLED": "template.ami_resolution.enabled",
-        "HF_TEMPLATE_AMI_RESOLUTION_FALLBACK_ON_FAILURE": "template.ami_resolution.fallback_on_failure",
-        "HF_TEMPLATE_AMI_RESOLUTION_CACHE_FILE": "template.ami_resolution.persistent_cache_file",
-    }
-
     # Default configuration file name
     DEFAULT_CONFIG_FILENAME = "default_config.json"
 
@@ -113,7 +100,7 @@ class ConfigurationLoader:
         Precedence order (highest to lowest):
         1. Environment variables (highest precedence)
         2. Explicit config file (if config_path provided)
-        3. HF_PROVIDER_CONFDIR/config.json (provider-specific)
+        3. Scheduler-provided config directory/config.json
         4. config/config.json (fallback)
         5. Legacy configuration (awsprov_config.json, awsprov_templates.json)
         6. default_config.json (lowest precedence)
@@ -130,7 +117,7 @@ class ConfigurationLoader:
         # Start with default configuration (lowest precedence)
         config = cls._load_default_config()
 
-        # Load main config.json with correct precedence (HF_PROVIDER_CONFDIR first,
+        # Load main config.json with correct precedence (scheduler config dir first,
         # then config/)
         main_config = cls._load_config_file("conf", "config.json", required=False)
         if main_config:
@@ -168,7 +155,7 @@ class ConfigurationLoader:
         """
         Load default configuration from file.
 
-        First tries to load from HF_PROVIDER_CONFDIR, then falls back to local config.
+        First tries to load from scheduler config directory, then falls back to local config.
 
         Returns:
             Default configuration dictionary
@@ -254,7 +241,7 @@ class ConfigurationLoader:
         """
         Centralized method for loading any configuration file with consistent priority:
         1. Explicit path (if provided and contains directory)
-        2. HF_PROVIDER_*DIR + filename (if file exists)
+        2. Scheduler-provided directory + filename (if file exists)
         3. Default directory + filename
 
         Args:
@@ -388,23 +375,6 @@ class ConfigurationLoader:
         # Process Host Factory environment variables
         cls._process_hf_env_vars(config)
 
-        # HF_ prefixed environment variables (legacy support)
-        env_prefix = "HF_"
-        for key, value in os.environ.items():
-            if key.startswith(env_prefix) and key not in cls.HF_ENV_VARS:
-                config_key = key[len(env_prefix) :].upper()
-
-                # Handle nested configuration using double underscore
-                if "__" in config_key:
-                    parts = config_key.split("__")
-                    current = config
-                    for part in parts[:-1]:
-                        current = current.setdefault(part, {})
-                    current[parts[-1]] = cls._convert_value(value)
-                else:
-                    # Add to root config
-                    config[config_key] = cls._convert_value(value)
-
         get_config_logger().debug("Loaded configuration from environment variables")
 
     @classmethod
@@ -444,37 +414,6 @@ class ConfigurationLoader:
                     )
         except Exception as e:
             get_config_logger().debug("Could not get scheduler directories: %s", e)
-
-        # Process AMI resolution environment variables (keep these as they're AWS-specific)
-        ami_resolution_enabled = os.environ.get("HF_TEMPLATE_AMI_RESOLUTION_ENABLED")
-        ami_resolution_fallback = os.environ.get("HF_TEMPLATE_AMI_RESOLUTION_FALLBACK_ON_FAILURE")
-        ami_resolution_cache_file = os.environ.get("HF_TEMPLATE_AMI_RESOLUTION_CACHE_FILE")
-
-        if any([ami_resolution_enabled, ami_resolution_fallback, ami_resolution_cache_file]):
-            template_config = config.setdefault("template", {})
-            ami_resolution_config = template_config.setdefault("ami_resolution", {})
-
-            if ami_resolution_enabled is not None:
-                ami_resolution_config["enabled"] = cls._convert_value(ami_resolution_enabled)
-                get_config_logger().debug(
-                    "Set ami_resolution.enabled to %s", ami_resolution_config["enabled"]
-                )
-
-            if ami_resolution_fallback is not None:
-                ami_resolution_config["fallback_on_failure"] = cls._convert_value(
-                    ami_resolution_fallback
-                )
-                get_config_logger().debug(
-                    "Set ami_resolution.fallback_on_failure to %s",
-                    ami_resolution_config["fallback_on_failure"],
-                )
-
-            if ami_resolution_cache_file is not None:
-                ami_resolution_config["persistent_cache_file"] = ami_resolution_cache_file
-                get_config_logger().debug(
-                    "Set ami_resolution.persistent_cache_file to %s",
-                    ami_resolution_config["persistent_cache_file"],
-                )
 
     @classmethod
     def _convert_value(cls, value: str) -> Any:
