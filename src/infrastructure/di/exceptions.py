@@ -44,7 +44,9 @@ class DependencyResolutionError(DIError):
         detail_str = " ".join(details)
         dependency_name = getattr(dependency_type, "__name__", str(dependency_type))
         if detail_str:
-            full_message = f"Failed to resolve dependency {dependency_name} ({detail_str}): {message}"
+            full_message = (
+                f"Failed to resolve dependency {dependency_name} ({detail_str}): {message}"
+            )
         else:
             full_message = f"Failed to resolve dependency {dependency_name}: {message}"
 
@@ -101,9 +103,7 @@ class CircularDependencyError(DependencyResolutionError):
         self.dependency_chain = dependency_chain
 
         # Format the dependency chain for the error message
-        chain_str = " -> ".join(
-            [getattr(t, "__name__", str(t)) for t in dependency_chain]
-        )
+        chain_str = " -> ".join([getattr(t, "__name__", str(t)) for t in dependency_chain])
         message = f"Circular dependency detected: {chain_str}"
 
         # Use the last dependency in the chain as the dependency_type

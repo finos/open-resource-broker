@@ -59,15 +59,10 @@ class TestHandlerMergeIntegration:
 
         mock_native_service.process_provider_api_spec_with_merge.assert_called_once()
         assert (
-            result["LaunchTemplateConfigs"][0]["LaunchTemplateSpecification"][
-                "LaunchTemplateId"
-            ]
+            result["LaunchTemplateConfigs"][0]["LaunchTemplateSpecification"]["LaunchTemplateId"]
             == "lt-123"
         )
-        assert (
-            result["LaunchTemplateConfigs"][0]["LaunchTemplateSpecification"]["Version"]
-            == "1"
-        )
+        assert result["LaunchTemplateConfigs"][0]["LaunchTemplateSpecification"]["Version"] == "1"
 
     def test_spotfleet_handler_uses_merge_method(self):
         """Test SpotFleetHandler uses new merge method."""

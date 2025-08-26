@@ -40,9 +40,7 @@ def create_json_strategy(config: Any) -> Any:
         # Use configured file path or fallback to default
         file_path = getattr(config, "file_path", "data/request_database.json")
 
-    return JSONStorageStrategy(
-        file_path=file_path, create_dirs=True, entity_type="generic"
-    )
+    return JSONStorageStrategy(file_path=file_path, create_dirs=True, entity_type="generic")
 
 
 def create_json_config(data: dict[str, Any]) -> Any:

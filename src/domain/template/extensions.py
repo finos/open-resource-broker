@@ -30,9 +30,7 @@ class TemplateExtensionRegistry:
     _extension_instances: dict[str, TemplateExtension] = {}
 
     @classmethod
-    def register_extension(
-        cls, provider_type: str, extension_class: type[BaseModel]
-    ) -> None:
+    def register_extension(cls, provider_type: str, extension_class: type[BaseModel]) -> None:
         """Register a provider-specific extension configuration class.
 
         Args:
@@ -40,9 +38,7 @@ class TemplateExtensionRegistry:
             extension_class: The Pydantic model class for the extension configuration
         """
         if not issubclass(extension_class, BaseModel):
-            raise ValueError(
-                f"Extension class must be a Pydantic BaseModel, got {extension_class}"
-            )
+            raise ValueError(f"Extension class must be a Pydantic BaseModel, got {extension_class}")
 
         cls._extensions[provider_type] = extension_class
 
@@ -97,10 +93,7 @@ class TemplateExtensionRegistry:
         Returns:
             True if the provider has registered extensions
         """
-        return (
-            provider_type in cls._extensions
-            or provider_type in cls._extension_instances
-        )
+        return provider_type in cls._extensions or provider_type in cls._extension_instances
 
     @classmethod
     def get_supported_providers(cls) -> list[str]:
@@ -109,9 +102,7 @@ class TemplateExtensionRegistry:
         Returns:
             List of provider types that have registered extensions
         """
-        all_providers = set(cls._extensions.keys()) | set(
-            cls._extension_instances.keys()
-        )
+        all_providers = set(cls._extensions.keys()) | set(cls._extension_instances.keys())
         return list(all_providers)
 
     @classmethod
@@ -166,9 +157,7 @@ class TemplateExtensionRegistry:
 
 
 # Convenience functions for common operations
-def register_provider_extension(
-    provider_type: str, extension_class: type[BaseModel]
-) -> None:
+def register_provider_extension(provider_type: str, extension_class: type[BaseModel]) -> None:
     """Register a provider extension."""
     TemplateExtensionRegistry.register_extension(provider_type, extension_class)
 

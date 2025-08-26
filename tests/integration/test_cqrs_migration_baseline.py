@@ -221,9 +221,7 @@ class TestCQRSArchitectureIntegration:
         assert isinstance(result, str)
         assert len(result) > 0
 
-    def test_provider_capability_service_integration(
-        self, mock_provider_capability_service
-    ):
+    def test_provider_capability_service_integration(self, mock_provider_capability_service):
         """Test provider capability service integration."""
         from domain.template.aggregate import Template
 
@@ -251,9 +249,7 @@ class TestCQRSArchitectureIntegration:
         assert isinstance(result.supported_features, list)
         assert isinstance(result.errors, list)
 
-    def test_provider_selection_service_integration(
-        self, mock_provider_selection_service
-    ):
+    def test_provider_selection_service_integration(self, mock_provider_selection_service):
         """Test provider selection service integration."""
         from domain.template.aggregate import Template
 
@@ -291,9 +287,7 @@ class TestCQRSArchitectureIntegration:
         )
 
         # Execute operation
-        result = mock_provider_context.execute_with_strategy(
-            "aws-aws-default", operation
-        )
+        result = mock_provider_context.execute_with_strategy("aws-aws-default", operation)
 
         # Verify result structure
         assert result.success is True
@@ -323,10 +317,7 @@ class TestCQRSArchitectureIntegration:
             await create_request_handler.execute_command(command)
 
         # Verify error type
-        assert (
-            "Template" in str(exc_info.value)
-            or "not found" in str(exc_info.value).lower()
-        )
+        assert "Template" in str(exc_info.value) or "not found" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
     async def test_error_handling_provider_failure(self, create_request_handler):
@@ -340,9 +331,7 @@ class TestCQRSArchitectureIntegration:
             metadata={},
             error_message="Provider operation failed",
         )
-        create_request_handler._provider_context.execute_with_strategy.return_value = (
-            failure_result
-        )
+        create_request_handler._provider_context.execute_with_strategy.return_value = failure_result
 
         # Create command
         command = CreateRequestCommand(

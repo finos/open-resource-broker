@@ -186,9 +186,7 @@ class ConvertMachineStatusCommandHandler(
 
 @command_handler(ConvertBatchMachineStatusCommand)
 class ConvertBatchMachineStatusCommandHandler(
-    BaseCommandHandler[
-        ConvertBatchMachineStatusCommand, ConvertBatchMachineStatusResponse
-    ]
+    BaseCommandHandler[ConvertBatchMachineStatusCommand, ConvertBatchMachineStatusResponse]
 ):
     """Handler for batch machine status conversion."""
 
@@ -303,9 +301,7 @@ class ValidateProviderStateCommandHandler(
 
 
 @command_handler(CleanupMachineResourcesCommand)
-class CleanupMachineResourcesHandler(
-    BaseCommandHandler[CleanupMachineResourcesCommand, None]
-):
+class CleanupMachineResourcesHandler(BaseCommandHandler[CleanupMachineResourcesCommand, None]):
     """Handler for cleaning up machine resources using centralized base handler."""
 
     def __init__(
@@ -330,9 +326,7 @@ class CleanupMachineResourcesHandler(
         machine = await self._machine_repository.get_by_id(command.machine_id)
         if not machine:
             if self.logger:
-                self.logger.warning(
-                    "Machine not found for cleanup: %s", command.machine_id
-                )
+                self.logger.warning("Machine not found for cleanup: %s", command.machine_id)
             return None
 
         # Perform cleanup
@@ -412,9 +406,7 @@ class DeregisterMachineHandler(BaseCommandHandler[DeregisterMachineCommand, None
         machine = await self._machine_repository.get_by_id(command.machine_id)
         if not machine:
             if self.logger:
-                self.logger.warning(
-                    "Machine not found for deregistration: %s", command.machine_id
-                )
+                self.logger.warning("Machine not found for deregistration: %s", command.machine_id)
             return None
 
         # Deregister machine

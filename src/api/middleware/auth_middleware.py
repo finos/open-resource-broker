@@ -83,9 +83,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             request.state.user_roles = auth_result.user_roles
             request.state.permissions = auth_result.permissions
 
-            self.logger.debug(
-                "Authentication successful for user: %s", auth_result.user_id
-            )
+            self.logger.debug("Authentication successful for user: %s", auth_result.user_id)
 
             # Continue to next middleware/handler
             response = await call_next(request)
@@ -229,9 +227,7 @@ class AuthDependency:
         # Check required roles
         for role in self.required_roles:
             if not auth_result.has_role(role):
-                self.logger.warning(
-                    "User %s missing role: %s", auth_result.user_id, role
-                )
+                self.logger.warning("User %s missing role: %s", auth_result.user_id, role)
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"Missing required role: {role}",

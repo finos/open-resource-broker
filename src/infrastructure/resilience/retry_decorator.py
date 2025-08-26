@@ -115,9 +115,7 @@ def retry(
                             )
                             raise MaxRetriesExceededError(attempt + 1, e)
                         else:
-                            logger.error(
-                                "Non-retryable error in %s: %s", func.__name__, e
-                            )
+                            logger.error("Non-retryable error in %s: %s", func.__name__, e)
                             raise
 
                     # Calculate delay

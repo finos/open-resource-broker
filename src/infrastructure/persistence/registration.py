@@ -62,14 +62,10 @@ def register_all_storage_types() -> None:
 
     # Log summary
     if registered_types:
-        logger.info(
-            "Successfully registered storage types: %s", ", ".join(registered_types)
-        )
+        logger.info("Successfully registered storage types: %s", ", ".join(registered_types))
 
     if failed_types:
-        failed_summary = ", ".join(
-            [f"{name} ({error})" for name, error in failed_types]
-        )
+        failed_summary = ", ".join([f"{name} ({error})" for name, error in failed_types])
         logger.warning("Failed to register storage types: %s", failed_summary)
 
     if not registered_types:
@@ -123,9 +119,7 @@ def register_storage_type_on_demand(storage_type: str) -> bool:
         return True
 
     except Exception as e:
-        logger.error(
-            "Failed to register storage type '%s' on demand: %s", storage_type, e
-        )
+        logger.error("Failed to register storage type '%s' on demand: %s", storage_type, e)
         return False
 
 

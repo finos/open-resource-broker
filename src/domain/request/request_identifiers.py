@@ -227,9 +227,7 @@ class ResourceIdentifier(ValueObject):
 
         # Basic validation of allowed characters
         if not re.match(r"^[a-z_][a-z0-9_]*$", normalized):
-            raise ValueError(
-                "Resource type must contain only letters, numbers, and underscores"
-            )
+            raise ValueError("Resource type must contain only letters, numbers, and underscores")
 
         return normalized
 
@@ -247,9 +245,7 @@ class ResourceIdentifier(ValueObject):
 
     def is_aws_resource(self) -> bool:
         """Check if this is an AWS resource based on ARN."""
-        return self.resource_arn is not None and self.resource_arn.startswith(
-            "arn:aws:"
-        )
+        return self.resource_arn is not None and self.resource_arn.startswith("arn:aws:")
 
     def get_resource_name(self) -> str:
         """Get a human-readable resource name."""

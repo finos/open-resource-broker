@@ -51,9 +51,7 @@ class APIHandlerFactory:
         logger.debug("Registered API handler: %s -> %s", name, handler_class.__name__)
 
     @classmethod
-    def create_handler(
-        cls, name: str, app_service: Optional["ApplicationService"] = None
-    ) -> None:
+    def create_handler(cls, name: str, app_service: Optional["ApplicationService"] = None) -> None:
         """
         Create a handler instance.
 

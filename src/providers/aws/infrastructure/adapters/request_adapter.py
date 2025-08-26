@@ -70,8 +70,7 @@ class AWSRequestAdapter(RequestAdapterPort):
                         {
                             "ResourceType": "instance",
                             "Tags": [
-                                {"Key": key, "Value": value}
-                                for key, value in instance_tags.items()
+                                {"Key": key, "Value": value} for key, value in instance_tags.items()
                             ]
                             + [
                                 {"Key": "Name", "Value": f"hf-{request.request_id}"},
@@ -95,9 +94,7 @@ class AWSRequestAdapter(RequestAdapterPort):
 
             return {
                 "launch_template_id": response["LaunchTemplate"]["LaunchTemplateId"],
-                "launch_template_name": response["LaunchTemplate"][
-                    "LaunchTemplateName"
-                ],
+                "launch_template_name": response["LaunchTemplate"]["LaunchTemplateName"],
                 "version_number": response["LaunchTemplate"]["LatestVersionNumber"],
                 "created_time": response["LaunchTemplate"]["CreateTime"].isoformat(),
             }
@@ -172,9 +169,7 @@ class AWSRequestAdapter(RequestAdapterPort):
             Dictionary with status information
         """
         try:
-            response = self._aws_client.ec2_client.describe_fleets(
-                FleetIds=[request.resource_id]
-            )
+            response = self._aws_client.ec2_client.describe_fleets(FleetIds=[request.resource_id])
 
             if not response["Fleets"]:
                 return {
@@ -191,9 +186,7 @@ class AWSRequestAdapter(RequestAdapterPort):
 
             return {
                 "status": fleet["FleetState"],
-                "target_capacity": fleet["TargetCapacitySpecification"][
-                    "TotalTargetCapacity"
-                ],
+                "target_capacity": fleet["TargetCapacitySpecification"]["TotalTargetCapacity"],
                 "fulfilled_capacity": (
                     fleet["FulfilledCapacity"] if "FulfilledCapacity" in fleet else 0
                 ),
@@ -240,10 +233,8 @@ class AWSRequestAdapter(RequestAdapterPort):
             fleet = response["SpotFleetRequestConfigs"][0]
 
             # Get instance information
-            instances_response = (
-                self._aws_client.ec2_client.describe_spot_fleet_instances(
-                    SpotFleetRequestId=request.resource_id
-                )
+            instances_response = self._aws_client.ec2_client.describe_spot_fleet_instances(
+                SpotFleetRequestId=request.resource_id
             )
 
             return {
@@ -329,9 +320,7 @@ class AWSRequestAdapter(RequestAdapterPort):
 
             instance_ids = request.resource_id.split(",")
 
-            response = self._aws_client.ec2_client.describe_instances(
-                InstanceIds=instance_ids
-            )
+            response = self._aws_client.ec2_client.describe_instances(InstanceIds=instance_ids)
 
             instances = []
             for reservation in response["Reservations"]:
@@ -376,9 +365,7 @@ class AWSRequestAdapter(RequestAdapterPort):
 
             instance_ids = request.resource_id.split(",")
 
-            response = self._aws_client.ec2_client.describe_instances(
-                InstanceIds=instance_ids
-            )
+            response = self._aws_client.ec2_client.describe_instances(InstanceIds=instance_ids)
 
             instances = []
             for reservation in response["Reservations"]:
@@ -392,9 +379,7 @@ class AWSRequestAdapter(RequestAdapterPort):
                     )
 
             # Check if all instances are terminated
-            all_terminated = all(
-                instance["state"] == "terminated" for instance in instances
-            )
+            all_terminated = all(instance["state"] == "terminated" for instance in instances)
 
             return {
                 "status": "complete" if all_terminated else "in_progress",
@@ -419,9 +404,7 @@ class AWSRequestAdapter(RequestAdapterPort):
             Dictionary with termination results
         """
         try:
-            response = self._aws_client.ec2_client.terminate_instances(
-                InstanceIds=instance_ids
-            )
+            response = self._aws_client.ec2_client.terminate_instances(InstanceIds=instance_ids)
 
             return {
                 "status": "success",
@@ -461,8 +444,7 @@ class AWSRequestAdapter(RequestAdapterPort):
                 return {
                     "status": "success",
                     "successful_fleets": [
-                        fleet["FleetId"]
-                        for fleet in response["SuccessfulFleetDeletions"]
+                        fleet["FleetId"] for fleet in response["SuccessfulFleetDeletions"]
                     ],
                     "unsuccessful_fleets": [
                         {
@@ -481,8 +463,7 @@ class AWSRequestAdapter(RequestAdapterPort):
                 return {
                     "status": "success",
                     "successful_fleets": [
-                        fleet["SpotFleetRequestId"]
-                        for fleet in response["SuccessfulFleetRequests"]
+                        fleet["SpotFleetRequestId"] for fleet in response["SuccessfulFleetRequests"]
                     ],
                     "unsuccessful_fleets": [
                         {

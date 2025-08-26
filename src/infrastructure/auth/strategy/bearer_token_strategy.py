@@ -77,9 +77,7 @@ class BearerTokenStrategy(AuthPort):
             # Check token expiration
             exp = payload.get("exp")
             if exp and time.time() > exp:
-                return AuthResult(
-                    status=AuthStatus.EXPIRED, error_message="Token has expired"
-                )
+                return AuthResult(status=AuthStatus.EXPIRED, error_message="Token has expired")
 
             # Extract user information from token
             user_id = payload.get("sub")
@@ -87,9 +85,7 @@ class BearerTokenStrategy(AuthPort):
             permissions = payload.get("permissions", [])
 
             if not user_id:
-                return AuthResult(
-                    status=AuthStatus.INVALID, error_message="Token missing user ID"
-                )
+                return AuthResult(status=AuthStatus.INVALID, error_message="Token missing user ID")
 
             self.logger.debug("Token validated for user: %s", user_id)
 
@@ -109,18 +105,12 @@ class BearerTokenStrategy(AuthPort):
             )
 
         except jwt.ExpiredSignatureError:
-            return AuthResult(
-                status=AuthStatus.EXPIRED, error_message="Token has expired"
-            )
+            return AuthResult(status=AuthStatus.EXPIRED, error_message="Token has expired")
         except jwt.InvalidTokenError as e:
-            return AuthResult(
-                status=AuthStatus.INVALID, error_message=f"Invalid token: {e!s}"
-            )
+            return AuthResult(status=AuthStatus.INVALID, error_message=f"Invalid token: {e!s}")
         except Exception as e:
             self.logger.error("Token validation error: %s", e)
-            return AuthResult(
-                status=AuthStatus.FAILED, error_message="Token validation failed"
-            )
+            return AuthResult(status=AuthStatus.FAILED, error_message="Token validation failed")
 
     async def refresh_token(self, refresh_token: str) -> AuthResult:
         """
@@ -134,18 +124,14 @@ class BearerTokenStrategy(AuthPort):
         """
         try:
             # Validate refresh token
-            payload = jwt.decode(
-                refresh_token, self.secret_key, algorithms=[self.algorithm]
-            )
+            payload = jwt.decode(refresh_token, self.secret_key, algorithms=[self.algorithm])
 
             # Check if it's actually a refresh token
             token_type = payload.get("type")
             if (
                 token_type != "refresh"  # nosec B105
             ):  # This is a token type identifier, not a password
-                return AuthResult(
-                    status=AuthStatus.INVALID, error_message="Invalid refresh token"
-                )
+                return AuthResult(status=AuthStatus.INVALID, error_message="Invalid refresh token")
 
             # Create new access token
             user_id = payload.get("sub")
@@ -171,9 +157,7 @@ class BearerTokenStrategy(AuthPort):
             )
         except Exception as e:
             self.logger.error("Token refresh error: %s", e)
-            return AuthResult(
-                status=AuthStatus.FAILED, error_message="Token refresh failed"
-            )
+            return AuthResult(status=AuthStatus.FAILED, error_message="Token refresh failed")
 
     async def revoke_token(self, token: str) -> bool:
         """
@@ -209,9 +193,7 @@ class BearerTokenStrategy(AuthPort):
         """
         return self.enabled
 
-    def _create_access_token(
-        self, user_id: str, roles: list[str], permissions: list[str]
-    ) -> str:
+    def _create_access_token(self, user_id: str, roles: list[str], permissions: list[str]) -> str:
         """
         Create a new access token.
 
@@ -236,9 +218,7 @@ class BearerTokenStrategy(AuthPort):
 
         return jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
 
-    def create_refresh_token(
-        self, user_id: str, roles: list[str], permissions: list[str]
-    ) -> str:
+    def create_refresh_token(self, user_id: str, roles: list[str], permissions: list[str]) -> str:
         """
         Create a refresh token.
 

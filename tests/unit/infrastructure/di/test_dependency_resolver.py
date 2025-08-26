@@ -471,9 +471,7 @@ class TestDependencyResolverEdgeCases:
             self.resolver.resolve(DependentClass)
 
         # The error should mention the failing class
-        assert "FailingClass" in str(exc_info.value) or "Intentional failure" in str(
-            exc_info.value
-        )
+        assert "FailingClass" in str(exc_info.value) or "Intentional failure" in str(exc_info.value)
 
 
 class TestDependencyResolverIntegration:

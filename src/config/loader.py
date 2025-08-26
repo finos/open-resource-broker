@@ -139,9 +139,7 @@ class ConfigurationLoader:
 
         # Load explicit configuration file if provided (higher precedence)
         if config_path:
-            get_config_logger().debug(
-                "Loading user configuration from: %s", config_path
-            )
+            get_config_logger().debug("Loading user configuration from: %s", config_path)
 
             # Extract filename from path for file resolution
             filename = os.path.basename(config_path) if config_path else "config.json"
@@ -153,9 +151,7 @@ class ConfigurationLoader:
                 cls._merge_config(config, file_config)
                 get_config_logger().info("Loaded user configuration")
             else:
-                get_config_logger().warning(
-                    "User configuration file not found: %s", config_path
-                )
+                get_config_logger().warning("User configuration file not found: %s", config_path)
 
         # Override with environment variables (highest precedence)
         cls._load_from_env(config)
@@ -180,9 +176,7 @@ class ConfigurationLoader:
         get_config_logger().debug("Loading default configuration")
 
         # Use file loading method
-        config = cls._load_config_file(
-            "conf", cls.DEFAULT_CONFIG_FILENAME, required=False
-        )
+        config = cls._load_config_file("conf", cls.DEFAULT_CONFIG_FILENAME, required=False)
 
         if config:
             get_config_logger().info("Loaded default configuration successfully")
@@ -219,9 +213,7 @@ class ConfigurationLoader:
         except KeyError as e:
             raise ConfigurationError("App", f"Missing required configuration: {e!s}")
         except Exception as e:
-            raise ConfigurationError(
-                "App", f"Failed to create typed configuration: {e!s}"
-            )
+            raise ConfigurationError("App", f"Failed to create typed configuration: {e!s}")
 
     @classmethod
     def _load_from_file(cls, config_path: str) -> dict[str, Any] | None:
@@ -240,9 +232,7 @@ class ConfigurationLoader:
         try:
             path = Path(config_path)
             if not path.exists():
-                get_config_logger().warning(
-                    "Configuration file not found: %s", config_path
-                )
+                get_config_logger().warning("Configuration file not found: %s", config_path)
                 return None
 
             with path.open() as f:
@@ -291,9 +281,7 @@ class ConfigurationLoader:
         resolved_path = cls._resolve_file_path(file_type, filename, explicit_path)
 
         if resolved_path:
-            get_config_logger().info(
-                "Loading %s configuration from: %s", file_type, resolved_path
-            )
+            get_config_logger().info("Loading %s configuration from: %s", file_type, resolved_path)
             return cls._load_from_file(resolved_path)
         else:
             if required:
@@ -330,9 +318,7 @@ class ConfigurationLoader:
 
         # 1. If explicit path provided and contains directory, use it directly
         if explicit_path and os.path.dirname(explicit_path):
-            get_config_logger().debug(
-                "Using explicit path with directory: %s", explicit_path
-            )
+            get_config_logger().debug("Using explicit path with directory: %s", explicit_path)
             return explicit_path if os.path.exists(explicit_path) else None
 
         # If explicit_path is just a filename, use it as the filename
@@ -363,9 +349,7 @@ class ConfigurationLoader:
         if env_dir:
             env_path = os.path.join(env_dir, filename)
             if os.path.exists(env_path):
-                get_config_logger().debug(
-                    "Found file using %s: %s", env_var_name, env_path
-                )
+                get_config_logger().debug("Found file using %s: %s", env_var_name, env_path)
                 return env_path
             else:
                 get_config_logger().debug(
@@ -453,17 +437,13 @@ class ConfigurationLoader:
 
         # Set up logging path based on HF_PROVIDER_LOGDIR
         if logdir:
-            config.setdefault("logging", {})["file_path"] = os.path.join(
-                logdir, "app.log"
-            )
+            config.setdefault("logging", {})["file_path"] = os.path.join(logdir, "app.log")
             get_config_logger().debug(
                 "Set logging file_path to %s", os.path.join(logdir, "app.log")
             )
         elif workdir:
             log_dir = os.path.join(workdir, "logs")
-            config.setdefault("logging", {})["file_path"] = os.path.join(
-                log_dir, "app.log"
-            )
+            config.setdefault("logging", {})["file_path"] = os.path.join(log_dir, "app.log")
             get_config_logger().debug(
                 "Set logging file_path to %s", os.path.join(log_dir, "app.log")
             )
@@ -506,45 +486,31 @@ class ConfigurationLoader:
             events_dir = os.path.join(workdir, "events")
             events_config = config.setdefault("events", {})
             events_config["default_events_path"] = events_dir
-            get_config_logger().debug(
-                "Set events default_events_path to %s", events_dir
-            )
+            get_config_logger().debug("Set events default_events_path to %s", events_dir)
 
         # Set up snapshots paths based on HF_PROVIDER_SNAPSHOTSDIR
         if snapshotsdir:
             events_config = config.setdefault("events", {})
             events_config["snapshot_store_path"] = snapshotsdir
             events_config["default_snapshots_path"] = snapshotsdir
-            get_config_logger().debug(
-                "Set snapshots snapshot_store_path to %s", snapshotsdir
-            )
+            get_config_logger().debug("Set snapshots snapshot_store_path to %s", snapshotsdir)
         elif workdir:
             snapshots_dir = os.path.join(workdir, "snapshots")
             events_config = config.setdefault("events", {})
             events_config["default_snapshots_path"] = snapshots_dir
-            get_config_logger().debug(
-                "Set snapshots default_snapshots_path to %s", snapshots_dir
-            )
+            get_config_logger().debug("Set snapshots default_snapshots_path to %s", snapshots_dir)
 
         # Process AMI resolution environment variables
         ami_resolution_enabled = os.environ.get("HF_TEMPLATE_AMI_RESOLUTION_ENABLED")
-        ami_resolution_fallback = os.environ.get(
-            "HF_TEMPLATE_AMI_RESOLUTION_FALLBACK_ON_FAILURE"
-        )
-        ami_resolution_cache_file = os.environ.get(
-            "HF_TEMPLATE_AMI_RESOLUTION_CACHE_FILE"
-        )
+        ami_resolution_fallback = os.environ.get("HF_TEMPLATE_AMI_RESOLUTION_FALLBACK_ON_FAILURE")
+        ami_resolution_cache_file = os.environ.get("HF_TEMPLATE_AMI_RESOLUTION_CACHE_FILE")
 
-        if any(
-            [ami_resolution_enabled, ami_resolution_fallback, ami_resolution_cache_file]
-        ):
+        if any([ami_resolution_enabled, ami_resolution_fallback, ami_resolution_cache_file]):
             template_config = config.setdefault("template", {})
             ami_resolution_config = template_config.setdefault("ami_resolution", {})
 
             if ami_resolution_enabled is not None:
-                ami_resolution_config["enabled"] = cls._convert_value(
-                    ami_resolution_enabled
-                )
+                ami_resolution_config["enabled"] = cls._convert_value(ami_resolution_enabled)
                 get_config_logger().debug(
                     "Set ami_resolution.enabled to %s", ami_resolution_config["enabled"]
                 )
@@ -559,9 +525,7 @@ class ConfigurationLoader:
                 )
 
             if ami_resolution_cache_file is not None:
-                ami_resolution_config["persistent_cache_file"] = (
-                    ami_resolution_cache_file
-                )
+                ami_resolution_config["persistent_cache_file"] = ami_resolution_cache_file
                 get_config_logger().debug(
                     "Set ami_resolution.persistent_cache_file to %s",
                     ami_resolution_config["persistent_cache_file"],

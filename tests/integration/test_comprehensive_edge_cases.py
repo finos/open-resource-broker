@@ -219,19 +219,9 @@ def test_launch_template_edge_cases():
                 reuse_existing = config.get("reuse_existing", True)
 
                 actual_behavior = None
-                if (
-                    has_lt_id
-                    and has_lt_version
-                    and reuse_existing
-                    and not create_per_request
-                ):
+                if has_lt_id and has_lt_version and reuse_existing and not create_per_request:
                     actual_behavior = "use_existing_with_version"
-                elif (
-                    has_lt_id
-                    and not has_lt_version
-                    and reuse_existing
-                    and not create_per_request
-                ):
+                elif has_lt_id and not has_lt_version and reuse_existing and not create_per_request:
                     actual_behavior = "use_existing_latest"
                 elif has_lt_id and create_per_request:
                     actual_behavior = "create_new_version"
@@ -370,9 +360,7 @@ def test_configuration_combinations():
                 if max_versions < 1:
                     print(f"       FAIL: Invalid max_versions: {max_versions}")
                 elif max_versions > 100:
-                    print(
-                        f"       WARN:  High max_versions may cause issues: {max_versions}"
-                    )
+                    print(f"       WARN:  High max_versions may cause issues: {max_versions}")
                 else:
                     print(f"       PASS: Valid max_versions: {max_versions}")
 
@@ -555,13 +543,9 @@ def test_scheduler_strategy_compliance():
                     converted_fields.append("storage_encryption")
 
                 # Check if all expected fields are present
-                missing_fields = [
-                    f for f in expected_fields if f not in converted_fields
-                ]
+                missing_fields = [f for f in expected_fields if f not in converted_fields]
                 if not missing_fields:
-                    print(
-                        f"       PASS: All expected fields converted: {expected_fields}"
-                    )
+                    print(f"       PASS: All expected fields converted: {expected_fields}")
                     passed_tests += 1
                 else:
                     print(f"       FAIL: Missing fields: {missing_fields}")
@@ -749,9 +733,7 @@ def test_request_machine_flows():
                 # Determine actual relationship
                 succeed_count = len([m for m in machines if m["result"] == "succeed"])
                 fail_count = len([m for m in machines if m["result"] == "fail"])
-                executing_count = len(
-                    [m for m in machines if m["result"] == "executing"]
-                )
+                executing_count = len([m for m in machines if m["result"] == "executing"])
 
                 # Check for mixed results first (has both success and failure)
                 if fail_count > 0 and succeed_count > 0:
@@ -858,15 +840,12 @@ def test_template_field_variations():
                     validation_errors.append("Missing image_id")
 
                 # Check field formats
-                if template_data.get("image_id") and not template_data[
-                    "image_id"
-                ].startswith("ami-"):
+                if template_data.get("image_id") and not template_data["image_id"].startswith(
+                    "ami-"
+                ):
                     validation_errors.append("Invalid AMI format")
 
-                if (
-                    template_data.get("root_volume_size")
-                    and template_data["root_volume_size"] < 0
-                ):
+                if template_data.get("root_volume_size") and template_data["root_volume_size"] < 0:
                     validation_errors.append("Invalid volume size")
 
                 # Determine validation result

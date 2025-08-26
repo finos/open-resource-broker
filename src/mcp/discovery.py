@@ -92,9 +92,7 @@ class MCPToolDiscovery:
             for tool_def in self._tool_definitions.values()
         ]
 
-    def _generate_description(
-        self, method_name: str, method_info: Optional[MethodInfo]
-    ) -> str:
+    def _generate_description(self, method_name: str, method_info: Optional[MethodInfo]) -> str:
         """
         Generate MCP tool description from method info.
 

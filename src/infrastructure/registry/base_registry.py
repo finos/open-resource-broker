@@ -142,9 +142,7 @@ class BaseRegistry(ABC):
             ValueError: If not in multi-choice mode or instance already registered
         """
         if self.mode != RegistryMode.MULTI_CHOICE:
-            raise ValueError(
-                "Instance registration only supported in MULTI_CHOICE mode"
-            )
+            raise ValueError("Instance registration only supported in MULTI_CHOICE mode")
 
         with self._registry_lock:
             if instance_name in self._instance_registrations:
@@ -154,9 +152,7 @@ class BaseRegistry(ABC):
                 type_name, strategy_factory, config_factory, **additional_factories
             )
             self._instance_registrations[instance_name] = registration
-            self.logger.info(
-                "Registered instance: %s (type: %s)", instance_name, type_name
-            )
+            self.logger.info("Registered instance: %s (type: %s)", instance_name, type_name)
 
     def create_strategy_by_type(self, type_name: str, config: Any) -> Any:
         """Create strategy by type name."""
@@ -166,14 +162,10 @@ class BaseRegistry(ABC):
     def create_strategy_by_instance(self, instance_name: str, config: Any) -> Any:
         """Create strategy by instance name (multi-choice mode only)."""
         if self.mode != RegistryMode.MULTI_CHOICE:
-            raise ValueError(
-                "Instance-based creation only supported in MULTI_CHOICE mode"
-            )
+            raise ValueError("Instance-based creation only supported in MULTI_CHOICE mode")
 
         registration = self._get_instance_registration(instance_name)
-        return self._create_strategy_from_registration(
-            registration, config, instance_name
-        )
+        return self._create_strategy_from_registration(registration, config, instance_name)
 
     def is_registered(self, type_name: str) -> bool:
         """Check if a type is registered."""
@@ -213,9 +205,7 @@ class BaseRegistry(ABC):
                 return True
             return False
 
-    def create_additional_component(
-        self, type_name: str, factory_name: str
-    ) -> Optional[Any]:
+    def create_additional_component(self, type_name: str, factory_name: str) -> Optional[Any]:
         """Create additional component (resolver, validator, etc.) by type."""
         registration = self._get_type_registration(type_name)
         factory = registration.get_factory(factory_name)
@@ -249,9 +239,7 @@ class BaseRegistry(ABC):
         **additional_factories,
     ) -> BaseRegistration:
         """Create registration object - can be overridden by subclasses."""
-        return BaseRegistration(
-            type_name, strategy_factory, config_factory, **additional_factories
-        )
+        return BaseRegistration(type_name, strategy_factory, config_factory, **additional_factories)
 
     def _get_type_registration(self, type_name: str) -> BaseRegistration:
         """Get type registration with error handling."""

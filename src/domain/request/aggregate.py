@@ -74,9 +74,7 @@ class Request(AggregateRoot):
         """Initialize the instance."""
         # Set default ID if not provided
         if "id" not in data:
-            data["id"] = data.get(
-                "request_id", f"request-{datetime.utcnow().isoformat()}"
-            )
+            data["id"] = data.get("request_id", f"request-{datetime.utcnow().isoformat()}")
 
         # Set default timestamps if not provided
         if "created_at" not in data:
@@ -91,9 +89,7 @@ class Request(AggregateRoot):
     def start_processing(self) -> "Request":
         """Mark request as started processing."""
         if self.status != RequestStatus.PENDING:
-            raise ValueError(
-                f"Cannot start processing request in status: {self.status}"
-            )
+            raise ValueError(f"Cannot start processing request in status: {self.status}")
 
         old_status = self.status
         data = self.model_dump()
@@ -124,9 +120,7 @@ class Request(AggregateRoot):
         # Check if request is complete
         if data["successful_count"] + self.failed_count >= self.requested_count:
             data["status"] = (
-                RequestStatus.COMPLETED
-                if self.failed_count == 0
-                else RequestStatus.PARTIAL
+                RequestStatus.COMPLETED if self.failed_count == 0 else RequestStatus.PARTIAL
             )
             data["completed_at"] = datetime.utcnow()
 
@@ -153,14 +147,10 @@ class Request(AggregateRoot):
         # Check if request is complete
         if self.successful_count + data["failed_count"] >= self.requested_count:
             data["status"] = (
-                RequestStatus.PARTIAL
-                if self.successful_count > 0
-                else RequestStatus.FAILED
+                RequestStatus.PARTIAL if self.successful_count > 0 else RequestStatus.FAILED
             )
             data["completed_at"] = datetime.utcnow()
-            data["status_message"] = (
-                f"Request completed with {data['failed_count']} failures"
-            )
+            data["status_message"] = f"Request completed with {data['failed_count']} failures"
 
         return Request.model_validate(data)
 
@@ -211,9 +201,7 @@ class Request(AggregateRoot):
 
         return updated_request
 
-    def fail(
-        self, error_message: str, error_details: Optional[dict[str, Any]] = None
-    ) -> "Request":
+    def fail(self, error_message: str, error_details: Optional[dict[str, Any]] = None) -> "Request":
         """Mark request as failed."""
         data = self.model_dump()
         data["status"] = RequestStatus.FAILED
@@ -250,9 +238,7 @@ class Request(AggregateRoot):
         """Remove a resource ID"""
         if resource_id in self.resource_ids:
             data = self.model_dump()
-            data["resource_ids"] = [
-                rid for rid in self.resource_ids if rid != resource_id
-            ]
+            data["resource_ids"] = [rid for rid in self.resource_ids if rid != resource_id]
             data["version"] = self.version + 1
             return Request.model_validate(data)
         return self
@@ -391,9 +377,7 @@ class Request(AggregateRoot):
         Returns:
             New return Request instance with creation event
         """
-        request_id = (
-            f"ret-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}-{len(machine_refs):04d}"
-        )
+        request_id = f"ret-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}-{len(machine_refs):04d}"
 
         # Extract instance IDs from machine references
         instance_ids = []
@@ -410,9 +394,7 @@ class Request(AggregateRoot):
             template_id="return-request",
             requested_count=len(machine_refs),
             provider_type=(
-                machine_refs[0].get("provider_type", "unknown")
-                if machine_refs
-                else "unknown"
+                machine_refs[0].get("provider_type", "unknown") if machine_refs else "unknown"
             ),  # Extract from machine refs
             status=RequestStatus.PENDING,
             instance_ids=instance_ids,
@@ -434,23 +416,17 @@ class Request(AggregateRoot):
         return request
 
     @classmethod
-    def from_provider_format(
-        cls, data: dict[str, Any], provider_type: str
-    ) -> "Request":
+    def from_provider_format(cls, data: dict[str, Any], provider_type: str) -> "Request":
         """Create request from provider-specific format."""
         core_data = {
             "request_id": data.get("request_id"),
-            "request_type": RequestType(
-                data.get("request_type", RequestType.CREATE.value)
-            ),
+            "request_type": RequestType(data.get("request_type", RequestType.CREATE.value)),
             "provider_type": provider_type,
             "template_id": data.get("template_id"),
             "requested_count": data.get("requested_count", 1),
             "status": RequestStatus(data.get("status", RequestStatus.PENDING.value)),
             "status_message": data.get("status_message"),
-            "instance_ids": [
-                InstanceId(value=id) for id in data.get("instance_ids", [])
-            ],
+            "instance_ids": [InstanceId(value=id) for id in data.get("instance_ids", [])],
             "successful_count": data.get("successful_count", 0),
             "failed_count": data.get("failed_count", 0),
             "created_at": datetime.fromisoformat(
@@ -470,9 +446,7 @@ class Request(AggregateRoot):
 
         return cls.model_validate(core_data)
 
-    def update_with_provisioning_result(
-        self, provisioning_result: dict[str, Any]
-    ) -> "Request":
+    def update_with_provisioning_result(self, provisioning_result: dict[str, Any]) -> "Request":
         """
         Update request with provider provisioning results.
 
@@ -486,9 +460,7 @@ class Request(AggregateRoot):
 
         # Extract instance IDs from provisioning result
         if "instance_ids" in provisioning_result:
-            instance_ids = [
-                InstanceId(value=id) for id in provisioning_result["instance_ids"]
-            ]
+            instance_ids = [InstanceId(value=id) for id in provisioning_result["instance_ids"]]
             data["instance_ids"] = self.instance_ids + instance_ids
             data["successful_count"] = len(data["instance_ids"])
 
@@ -508,9 +480,7 @@ class Request(AggregateRoot):
 
         return Request.model_validate(data)
 
-    def update_status(
-        self, status: RequestStatus, message: Optional[str] = None
-    ) -> "Request":
+    def update_status(self, status: RequestStatus, message: Optional[str] = None) -> "Request":
         """
         Update request status.
 

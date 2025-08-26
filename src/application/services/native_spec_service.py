@@ -11,9 +11,7 @@ from domain.base.ports.spec_rendering_port import SpecRenderingPort
 class NativeSpecService:
     """Generic native spec processing service - provider agnostic."""
 
-    def __init__(
-        self, config_port: ConfigurationPort, spec_renderer: SpecRenderingPort
-    ):
+    def __init__(self, config_port: ConfigurationPort, spec_renderer: SpecRenderingPort):
         self.config_port = config_port
         self.spec_renderer = spec_renderer
 
@@ -21,8 +19,6 @@ class NativeSpecService:
         """Check if native specs are enabled."""
         return self.config_port.get_native_spec_config()["enabled"]
 
-    def render_spec(
-        self, spec: dict[str, Any], context: dict[str, Any]
-    ) -> dict[str, Any]:
+    def render_spec(self, spec: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
         """Render spec with context - provider agnostic."""
         return self.spec_renderer.render_spec(spec, context)

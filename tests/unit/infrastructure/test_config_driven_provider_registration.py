@@ -36,9 +36,7 @@ class TestConfigDrivenProviderRegistration:
                 "src.infrastructure.di.provider_services.get_config_manager",
                 return_value=mock_config_manager,
             ),
-            patch(
-                "src.providers.aws.registration.register_aws_provider"
-            ) as mock_aws_register,
+            patch("src.providers.aws.registration.register_aws_provider") as mock_aws_register,
             patch("src.infrastructure.di.provider_services.get_logger") as mock_logger,
         ):
             from infrastructure.di.provider_services import _register_providers
@@ -63,9 +61,7 @@ class TestConfigDrivenProviderRegistration:
                 "src.infrastructure.di.provider_services.get_config_manager",
                 return_value=mock_config_manager,
             ),
-            patch(
-                "src.providers.aws.registration.register_aws_provider"
-            ) as mock_aws_register,
+            patch("src.providers.aws.registration.register_aws_provider") as mock_aws_register,
             patch("src.infrastructure.di.provider_services.get_logger") as mock_logger,
         ):
             from infrastructure.di.provider_services import _register_providers
@@ -103,9 +99,7 @@ class TestConfigDrivenProviderRegistration:
                 "src.infrastructure.di.provider_services.get_config_manager",
                 return_value=mock_config_manager,
             ),
-            patch(
-                "src.providers.aws.registration.register_aws_provider"
-            ) as mock_aws_register,
+            patch("src.providers.aws.registration.register_aws_provider") as mock_aws_register,
             patch("src.infrastructure.di.provider_services.get_logger"),
         ):
             from infrastructure.di.provider_services import _register_providers
@@ -146,9 +140,7 @@ class TestConfigDrivenProviderRegistration:
                 "src.infrastructure.di.provider_services.get_config_manager",
                 return_value=mock_config_manager,
             ),
-            patch(
-                "src.providers.aws.registration.register_aws_provider"
-            ) as mock_aws_register,
+            patch("src.providers.aws.registration.register_aws_provider") as mock_aws_register,
             patch("src.infrastructure.di.provider_services.get_logger"),
         ):
             from infrastructure.di.provider_services import _register_providers
@@ -163,9 +155,7 @@ class TestConfigDrivenProviderRegistration:
         """Test provider configuration validation with valid config."""
         provider_config = ProviderConfig(
             selection_policy="FIRST_AVAILABLE",
-            providers=[
-                ProviderInstanceConfig(name="aws-test", type="aws", enabled=True)
-            ],
+            providers=[ProviderInstanceConfig(name="aws-test", type="aws", enabled=True)],
         )
 
         with patch("src.infrastructure.di.provider_services.get_logger"):

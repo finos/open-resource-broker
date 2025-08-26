@@ -34,9 +34,7 @@ def test_configuration_updates():
 
         # Launch template configuration presence
         print("\nTesting Launch Template Configuration...")
-        results["launch_template_config_present"] = (
-            test_launch_template_config_present()
-        )
+        results["launch_template_config_present"] = test_launch_template_config_present()
 
         # AWS provider configuration class
         print("\nTesting AWS Provider Configuration Class...")
@@ -176,9 +174,7 @@ def test_aws_provider_config_class():
 
         # Validate default values
         if not lt_config.create_per_request:
-            print(
-                "   FAIL: LaunchTemplateConfiguration default create_per_request should be True"
-            )
+            print("   FAIL: LaunchTemplateConfiguration default create_per_request should be True")
             return False
 
         if lt_config.naming_strategy != "request_based":
@@ -210,9 +206,7 @@ def test_aws_provider_config_class():
             return False
 
         print("   PASS: AWSProviderConfig includes launch template configuration")
-        print(
-            f"   Launch template config type: {type(aws_config.launch_template).__name__}"
-        )
+        print(f"   Launch template config type: {type(aws_config.launch_template).__name__}")
 
         return True
 
@@ -259,9 +253,7 @@ def test_configuration_loading():
         print(
             f"   Launch template create_per_request: {aws_config.launch_template.create_per_request}"
         )
-        print(
-            f"   Launch template naming_strategy: {aws_config.launch_template.naming_strategy}"
-        )
+        print(f"   Launch template naming_strategy: {aws_config.launch_template.naming_strategy}")
 
         return True
 

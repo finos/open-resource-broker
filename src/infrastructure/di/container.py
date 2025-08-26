@@ -89,9 +89,7 @@ class DIContainer(DIContainerPort, CQRSHandlerRegistrationPort, ContainerPort):
         """Initialize the DI container."""
         self._service_registry = ServiceRegistry()
         self._cqrs_registry = CQRSHandlerRegistry()
-        self._dependency_resolver = DependencyResolver(
-            self._service_registry, self._cqrs_registry
-        )
+        self._dependency_resolver = DependencyResolver(self._service_registry, self._cqrs_registry)
         self._lock = threading.RLock()
 
         # Lazy loading support
@@ -161,16 +159,12 @@ class DIContainer(DIContainerPort, CQRSHandlerRegistrationPort, ContainerPort):
             return self._dependency_resolver.resolve(cls, parent_type, dependency_chain)
         except (DependencyResolutionError, UnregisteredDependencyError):
             # If lazy loading is enabled, try on-demand registration
-            if self._lazy_config.enabled and not self._service_registry.is_registered(
-                cls
-            ):
+            if self._lazy_config.enabled and not self._service_registry.is_registered(cls):
                 self._register_on_demand(cls)
 
                 # Try resolution again after on-demand registration
                 if self._service_registry.is_registered(cls):
-                    return self._dependency_resolver.resolve(
-                        cls, parent_type, dependency_chain
-                    )
+                    return self._dependency_resolver.resolve(cls, parent_type, dependency_chain)
 
             # Re-raise the original exception if lazy loading didn't help
             raise
@@ -178,9 +172,7 @@ class DIContainer(DIContainerPort, CQRSHandlerRegistrationPort, ContainerPort):
             if isinstance(e, CircularDependencyError):
                 raise
             else:
-                raise DependencyResolutionError(
-                    cls, f"Failed to resolve {cls.__name__}: {e!s}"
-                )
+                raise DependencyResolutionError(cls, f"Failed to resolve {cls.__name__}: {e!s}")
 
     def get_optional(self, dependency_type: type[T]) -> Optional[T]:
         """Get an optional instance of the specified type."""

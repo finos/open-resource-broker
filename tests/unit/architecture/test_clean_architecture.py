@@ -59,9 +59,7 @@ class TestCleanArchitecture:
 
         return violations
 
-    def _check_file_imports(
-        self, file_path: str, current_layer: str, layers: dict
-    ) -> list[str]:
+    def _check_file_imports(self, file_path: str, current_layer: str, layers: dict) -> list[str]:
         """Check imports in a specific file for layer violations."""
         violations = []
 
@@ -91,9 +89,7 @@ class TestCleanArchitecture:
             return node.module if node.module else ""
         return ""
 
-    def _is_layer_violation(
-        self, import_name: str, current_layer: str, layers: dict
-    ) -> bool:
+    def _is_layer_violation(self, import_name: str, current_layer: str, layers: dict) -> bool:
         """Check if an import violates layer dependency rules."""
         # Define allowed dependencies for each layer
         allowed_deps = {
@@ -143,16 +139,12 @@ class TestCleanArchitecture:
                         if file.endswith(".py"):
                             file_path = os.path.join(root, file)
                             violations.extend(
-                                self._check_forbidden_imports(
-                                    file_path, forbidden_imports
-                                )
+                                self._check_forbidden_imports(file_path, forbidden_imports)
                             )
 
         return violations
 
-    def _check_forbidden_imports(
-        self, file_path: str, forbidden: list[str]
-    ) -> list[str]:
+    def _check_forbidden_imports(self, file_path: str, forbidden: list[str]) -> list[str]:
         """Check for forbidden imports in a file."""
         violations = []
 
@@ -164,9 +156,7 @@ class TestCleanArchitecture:
                 for node in ast.walk(tree):
                     if isinstance(node, (ast.Import, ast.ImportFrom)):
                         import_name = self._get_import_name(node)
-                        if any(
-                            forbidden_lib in import_name for forbidden_lib in forbidden
-                        ):
+                        if any(forbidden_lib in import_name for forbidden_lib in forbidden):
                             violations.append(f"{file_path}: {import_name}")
         except (SyntaxError, UnicodeDecodeError):
             pass
@@ -201,26 +191,16 @@ class TestCleanArchitecture:
         from infrastructure.adapters.ports.auth.user_port import UserPort
 
         # Interfaces should be small and focused
-        auth_methods = [
-            method for method in dir(AuthPort) if not method.startswith("_")
-        ]
-        token_methods = [
-            method for method in dir(TokenPort) if not method.startswith("_")
-        ]
-        user_methods = [
-            method for method in dir(UserPort) if not method.startswith("_")
-        ]
+        auth_methods = [method for method in dir(AuthPort) if not method.startswith("_")]
+        token_methods = [method for method in dir(TokenPort) if not method.startswith("_")]
+        user_methods = [method for method in dir(UserPort) if not method.startswith("_")]
 
         # Each interface should have a reasonable number of methods (not too many)
-        assert len(auth_methods) <= 10, (
-            f"AuthPort interface too large: {len(auth_methods)} methods"
-        )
+        assert len(auth_methods) <= 10, f"AuthPort interface too large: {len(auth_methods)} methods"
         assert len(token_methods) <= 10, (
             f"TokenPort interface too large: {len(token_methods)} methods"
         )
-        assert len(user_methods) <= 10, (
-            f"UserPort interface too large: {len(user_methods)} methods"
-        )
+        assert len(user_methods) <= 10, f"UserPort interface too large: {len(user_methods)} methods"
 
     def test_dependency_inversion(self):
         """Validate dependency inversion implementation."""
@@ -286,9 +266,7 @@ class TestCleanArchitecture:
 
         violations = []
         for file_path in domain_files:
-            violations.extend(
-                self._check_forbidden_imports(file_path, external_frameworks)
-            )
+            violations.extend(self._check_forbidden_imports(file_path, external_frameworks))
 
         assert len(violations) == 0, (
             f"Domain layer has external framework dependencies: {violations}"
@@ -307,28 +285,18 @@ class TestCleanArchitecture:
             MockAppService()
 
             # Mock expected methods for coordinating use cases
-            mock_instance.validate_template_requirements = Mock(
-                return_value=Mock(is_valid=True)
-            )
-            mock_instance.list_supported_apis = Mock(
-                return_value=["EC2Fleet", "SpotFleet"]
-            )
-            mock_instance.get_provider_api_capabilities = Mock(
-                return_value={"max_instances": 1000}
-            )
+            mock_instance.validate_template_requirements = Mock(return_value=Mock(is_valid=True))
+            mock_instance.list_supported_apis = Mock(return_value=["EC2Fleet", "SpotFleet"])
+            mock_instance.get_provider_api_capabilities = Mock(return_value={"max_instances": 1000})
 
             # Should have methods for coordinating use cases
-            validation_result = mock_instance.validate_template_requirements(
-                Mock(), "aws-test"
-            )
+            validation_result = mock_instance.validate_template_requirements(Mock(), "aws-test")
             assert validation_result.is_valid is True
 
             apis = mock_instance.list_supported_apis("aws-test")
             assert "EC2Fleet" in apis
 
-            capabilities = mock_instance.get_provider_api_capabilities(
-                "aws-test", "EC2Fleet"
-            )
+            capabilities = mock_instance.get_provider_api_capabilities("aws-test", "EC2Fleet")
             assert "max_instances" in capabilities
 
     def test_infrastructure_layer_boundaries(self):

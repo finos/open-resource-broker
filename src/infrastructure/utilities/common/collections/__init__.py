@@ -61,16 +61,12 @@ def filter_dict(
     return {k: v for k, v in dictionary.items() if predicate(k, v)}
 
 
-def transform_list(
-    collection: list[Any], transform_func: Callable[[Any], Any]
-) -> list[Any]:
+def transform_list(collection: list[Any], transform_func: Callable[[Any], Any]) -> list[Any]:
     """Transform list elements - alias for compatibility."""
     return [transform_func(item) for item in collection]
 
 
-def validate_collection(
-    collection: list[Any], validator_func: Callable[[Any], bool]
-) -> bool:
+def validate_collection(collection: list[Any], validator_func: Callable[[Any], bool]) -> bool:
     """Validate collection elements - alias for compatibility."""
     return all_match(collection, validator_func)
 

@@ -56,9 +56,7 @@ class HealthCheckConfig(BaseModel):
     enabled: bool = Field(True, description="Enable health checks for this provider")
     interval: int = Field(300, description="Health check interval in seconds")
     timeout: int = Field(30, description="Health check timeout in seconds")
-    retry_count: int = Field(
-        3, description="Number of retries for failed health checks"
-    )
+    retry_count: int = Field(3, description="Number of retries for failed health checks")
 
     @field_validator("interval")
     @classmethod
@@ -148,9 +146,9 @@ class ProviderInstanceConfig(BaseModel):
                 # Merge or add handler
                 elif handler_name in effective_handlers:
                     # Merge with existing default
-                    effective_handlers[handler_name] = effective_handlers[
-                        handler_name
-                    ].merge_with(override_config)
+                    effective_handlers[handler_name] = effective_handlers[handler_name].merge_with(
+                        override_config
+                    )
                 else:
                     # New handler not in defaults
                     effective_handlers[handler_name] = override_config
@@ -204,9 +202,7 @@ class ProviderConfig(BaseModel):
     default_provider_instance: Optional[str] = Field(
         None, description="Default provider instance for templates"
     )
-    health_check_interval: int = Field(
-        300, description="Global health check interval in seconds"
-    )
+    health_check_interval: int = Field(300, description="Global health check interval in seconds")
     circuit_breaker: CircuitBreakerConfig = Field(
         default_factory=CircuitBreakerConfig,
         description="Circuit breaker configuration",

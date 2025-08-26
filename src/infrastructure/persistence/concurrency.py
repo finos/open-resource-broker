@@ -88,9 +88,7 @@ class OptimisticConcurrencyControl:
                 entity_class_name, entity_id, version_map[entity_id], entity.version
             )
 
-    def increment_version(
-        self, entity: T, entity_id: str, version_map: dict[str, int]
-    ) -> None:
+    def increment_version(self, entity: T, entity_id: str, version_map: dict[str, int]) -> None:
         """
         Increment entity version.
 

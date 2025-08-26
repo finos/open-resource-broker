@@ -45,10 +45,7 @@ def main() -> int:
     # Build Docker image for security scan
     logger.info("Building Docker image for security scan...")
     project_name = "open-hostfactory-plugin"  # Could be made configurable
-    if (
-        run_command(["docker", "build", "-t", f"{project_name}:security-scan", "."])
-        != 0
-    ):
+    if run_command(["docker", "build", "-t", f"{project_name}:security-scan", "."]) != 0:
         return 1
 
     # Run Trivy vulnerability scan
@@ -89,9 +86,7 @@ def main() -> int:
     logger.info("Running Hadolint Dockerfile scan...")
     try:
         with open("hadolint-results.sarif", "w") as f:
-            subprocess.run(
-                ["hadolint", "Dockerfile", "--format", "sarif"], stdout=f, check=True
-            )
+            subprocess.run(["hadolint", "Dockerfile", "--format", "sarif"], stdout=f, check=True)
     except subprocess.CalledProcessError:
         logger.info("Dockerfile issues found")
         # Don't fail the whole process for hadolint issues

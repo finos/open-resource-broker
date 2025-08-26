@@ -160,18 +160,14 @@ class TerminationError(AWSError):
         resource_ids: list[str],
         details: Optional[dict[str, Any]] = None,
     ) -> None:
-        super().__init__(
-            message, details={"resource_ids": resource_ids, **(details or {})}
-        )
+        super().__init__(message, details={"resource_ids": resource_ids, **(details or {})})
         self.resource_ids = resource_ids
 
 
 class EC2InstanceNotFoundError(AWSEntityNotFoundError):
     """Raised when an EC2 instance cannot be found."""
 
-    def __init__(
-        self, instance_id: str, details: Optional[dict[str, Any]] = None
-    ) -> None:
+    def __init__(self, instance_id: str, details: Optional[dict[str, Any]] = None) -> None:
         super().__init__(
             f"EC2 instance not found: {instance_id}",
             details={"instance_id": instance_id, **(details or {})},
@@ -233,9 +229,7 @@ class FleetRequestError(LaunchError):
 class AMIValidationError(AWSValidationError):
     """Raised when there are issues validating an AMI."""
 
-    def __init__(
-        self, message: str, ami_id: str, details: Optional[dict[str, Any]] = None
-    ) -> None:
+    def __init__(self, message: str, ami_id: str, details: Optional[dict[str, Any]] = None) -> None:
         super().__init__(message, details={"ami_id": ami_id, **(details or {})})
         self.ami_id = ami_id
 

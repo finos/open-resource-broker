@@ -237,9 +237,7 @@ def get_home_directory() -> str:
     return os.path.expanduser("~")
 
 
-def create_temp_directory(
-    suffix: str = "", prefix: str = "", dir: Optional[str] = None
-) -> str:
+def create_temp_directory(suffix: str = "", prefix: str = "", dir: Optional[str] = None) -> str:
     """
     Create a temporary directory.
 

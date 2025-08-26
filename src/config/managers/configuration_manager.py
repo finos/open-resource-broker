@@ -181,25 +181,17 @@ class ConfigurationManager:
         self, path_type: str, default_path: str, config_path: str | None = None
     ) -> str:
         """Resolve configuration path."""
-        return self._ensure_path_resolver().resolve_path(
-            path_type, default_path, config_path
-        )
+        return self._ensure_path_resolver().resolve_path(path_type, default_path, config_path)
 
-    def get_work_dir(
-        self, default_path: str | None = None, config_path: str | None = None
-    ) -> str:
+    def get_work_dir(self, default_path: str | None = None, config_path: str | None = None) -> str:
         """Get work directory path."""
         return self._ensure_path_resolver().get_work_dir(default_path, config_path)
 
-    def get_conf_dir(
-        self, default_path: str | None = None, config_path: str | None = None
-    ) -> str:
+    def get_conf_dir(self, default_path: str | None = None, config_path: str | None = None) -> str:
         """Get configuration directory path."""
         return self._ensure_path_resolver().get_conf_dir(default_path, config_path)
 
-    def get_log_dir(
-        self, default_path: str | None = None, config_path: str | None = None
-    ) -> str:
+    def get_log_dir(self, default_path: str | None = None, config_path: str | None = None) -> str:
         """Get log directory path."""
         return self._ensure_path_resolver().get_log_dir(default_path, config_path)
 

@@ -19,9 +19,7 @@ class FileManager:
     backup management, and integrity verification.
     """
 
-    def __init__(
-        self, file_path: str, create_dirs: bool = True, backup_count: int = 5
-    ) -> None:
+    def __init__(self, file_path: str, create_dirs: bool = True, backup_count: int = 5) -> None:
         """
         Initialize file manager.
 
@@ -54,9 +52,7 @@ class FileManager:
             with open(self.file_path, encoding="utf-8") as f:
                 content = f.read()
 
-            self.logger.debug(
-                "Read %s characters from %s", len(content), self.file_path
-            )
+            self.logger.debug("Read %s characters from %s", len(content), self.file_path)
             return content
 
         except Exception as e:
@@ -122,9 +118,7 @@ class FileManager:
 
         try:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = self.file_path.with_suffix(
-                f".backup_{timestamp}{self.file_path.suffix}"
-            )
+            backup_path = self.file_path.with_suffix(f".backup_{timestamp}{self.file_path.suffix}")
 
             shutil.copy2(self.file_path, backup_path)
             self.logger.debug("Created backup: %s", backup_path)
@@ -154,9 +148,7 @@ class FileManager:
                     backup_file.unlink()
                     self.logger.debug("Removed old backup: %s", backup_file)
                 except Exception as e:
-                    self.logger.warning(
-                        "Failed to remove old backup %s: %s", backup_file, e
-                    )
+                    self.logger.warning("Failed to remove old backup %s: %s", backup_file, e)
 
         except Exception as e:
             self.logger.error("Failed to cleanup old backups: %s", e)

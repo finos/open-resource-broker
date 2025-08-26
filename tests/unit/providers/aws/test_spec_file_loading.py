@@ -29,28 +29,20 @@ class TestSpecFileLoading:
         # Mock configuration
         self.mock_config_port.get_provider_config.return_value = {
             "provider_defaults": {
-                "aws": {
-                    "extensions": {"native_spec": {"spec_file_base_path": "specs/aws"}}
-                }
+                "aws": {"extensions": {"native_spec": {"spec_file_base_path": "specs/aws"}}}
             }
         }
 
         # Mock file content
         spec_content = {
             "Type": "instant",
-            "TargetCapacitySpecification": {
-                "TotalTargetCapacity": "{{ requested_count }}"
-            },
+            "TargetCapacitySpecification": {"TotalTargetCapacity": "{{ requested_count }}"},
         }
 
-        with patch(
-            "infrastructure.utilities.file.json_utils.read_json_file"
-        ) as mock_read:
+        with patch("infrastructure.utilities.file.json_utils.read_json_file") as mock_read:
             mock_read.return_value = spec_content
 
-            result = self.service._load_spec_file(
-                "examples/ec2fleet-price-capacity-optimized.json"
-            )
+            result = self.service._load_spec_file("examples/ec2fleet-price-capacity-optimized.json")
 
             assert result == spec_content
             mock_read.assert_called_once_with(
@@ -62,19 +54,13 @@ class TestSpecFileLoading:
         # Mock configuration with custom base path
         self.mock_config_port.get_provider_config.return_value = {
             "provider_defaults": {
-                "aws": {
-                    "extensions": {
-                        "native_spec": {"spec_file_base_path": "/opt/custom/specs"}
-                    }
-                }
+                "aws": {"extensions": {"native_spec": {"spec_file_base_path": "/opt/custom/specs"}}}
             }
         }
 
         spec_content = {"Type": "maintain"}
 
-        with patch(
-            "infrastructure.utilities.file.json_utils.read_json_file"
-        ) as mock_read:
+        with patch("infrastructure.utilities.file.json_utils.read_json_file") as mock_read:
             mock_read.return_value = spec_content
 
             result = self.service._load_spec_file("custom-template.json")
@@ -85,15 +71,11 @@ class TestSpecFileLoading:
     def test_load_spec_file_missing_config(self):
         """Test spec file loading with missing configuration."""
         # Mock configuration without native spec config
-        self.mock_config_port.get_provider_config.return_value = {
-            "provider_defaults": {"aws": {}}
-        }
+        self.mock_config_port.get_provider_config.return_value = {"provider_defaults": {"aws": {}}}
 
         spec_content = {"Type": "instant"}
 
-        with patch(
-            "infrastructure.utilities.file.json_utils.read_json_file"
-        ) as mock_read:
+        with patch("infrastructure.utilities.file.json_utils.read_json_file") as mock_read:
             mock_read.return_value = spec_content
 
             result = self.service._load_spec_file("test-template.json")
@@ -109,9 +91,7 @@ class TestSpecFileLoading:
 
         self.mock_config_port.get_provider_config.return_value = {
             "provider_defaults": {
-                "aws": {
-                    "extensions": {"native_spec": {"spec_file_base_path": "specs/aws"}}
-                }
+                "aws": {"extensions": {"native_spec": {"spec_file_base_path": "specs/aws"}}}
             }
         }
 
@@ -125,9 +105,7 @@ class TestSpecFileLoading:
 
         self.mock_config_port.get_provider_config.return_value = {
             "provider_defaults": {
-                "aws": {
-                    "extensions": {"native_spec": {"spec_file_base_path": "specs/aws"}}
-                }
+                "aws": {"extensions": {"native_spec": {"spec_file_base_path": "specs/aws"}}}
             }
         }
 
@@ -270,16 +248,12 @@ class TestSpecFileLoading:
             self.mock_config_port.get_provider_config.return_value = {
                 "provider_defaults": {
                     "aws": {
-                        "extensions": {
-                            "native_spec": {"spec_file_base_path": case["base_path"]}
-                        }
+                        "extensions": {"native_spec": {"spec_file_base_path": case["base_path"]}}
                     }
                 }
             }
 
-            with patch(
-                "infrastructure.utilities.file.json_utils.read_json_file"
-            ) as mock_read:
+            with patch("infrastructure.utilities.file.json_utils.read_json_file") as mock_read:
                 mock_read.return_value = {"test": "data"}
 
                 self.service._load_spec_file(case["file_name"])
@@ -290,17 +264,13 @@ class TestSpecFileLoading:
         """Test that spec files are loaded fresh each time (no caching)."""
         self.mock_config_port.get_provider_config.return_value = {
             "provider_defaults": {
-                "aws": {
-                    "extensions": {"native_spec": {"spec_file_base_path": "specs/aws"}}
-                }
+                "aws": {"extensions": {"native_spec": {"spec_file_base_path": "specs/aws"}}}
             }
         }
 
         spec_content = {"Type": "instant"}
 
-        with patch(
-            "infrastructure.utilities.file.json_utils.read_json_file"
-        ) as mock_read:
+        with patch("infrastructure.utilities.file.json_utils.read_json_file") as mock_read:
             mock_read.return_value = spec_content
 
             # Load same file twice
@@ -316,16 +286,12 @@ class TestSpecFileLoading:
         """Test spec file loading with YAML extension."""
         self.mock_config_port.get_provider_config.return_value = {
             "provider_defaults": {
-                "aws": {
-                    "extensions": {"native_spec": {"spec_file_base_path": "specs/aws"}}
-                }
+                "aws": {"extensions": {"native_spec": {"spec_file_base_path": "specs/aws"}}}
             }
         }
 
         # Note: This test assumes YAML support is added to the file utilities
-        with patch(
-            "infrastructure.utilities.file.json_utils.read_json_file"
-        ) as mock_read:
+        with patch("infrastructure.utilities.file.json_utils.read_json_file") as mock_read:
             mock_read.return_value = {"Type": "maintain"}
 
             result = self.service._load_spec_file("test.yaml")

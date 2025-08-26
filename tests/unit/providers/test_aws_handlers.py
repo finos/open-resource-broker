@@ -118,9 +118,7 @@ class TestContextFieldSupport:
 
         # Create handler with mocked dependencies
         aws_client = Mock()
-        aws_client.sts_client.get_caller_identity.return_value = {
-            "Account": "123456789012"
-        }
+        aws_client.sts_client.get_caller_identity.return_value = {"Account": "123456789012"}
         handler = SpotFleetHandler(aws_client, Mock(), Mock(), Mock(), Mock())
 
         # Test _create_spot_fleet_config method

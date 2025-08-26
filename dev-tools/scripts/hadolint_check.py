@@ -38,9 +38,7 @@ def main() -> int:
 
     parser = argparse.ArgumentParser(description="Check Dockerfiles with hadolint")
     parser.add_argument("files", nargs="*", help="Dockerfile paths to check")
-    parser.add_argument(
-        "--install-help", action="store_true", help="Show installation help"
-    )
+    parser.add_argument("--install-help", action="store_true", help="Show installation help")
 
     args = parser.parse_args()
 

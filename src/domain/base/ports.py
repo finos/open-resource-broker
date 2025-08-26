@@ -50,9 +50,7 @@ class PersistencePort(Protocol):
         """Save an aggregate root."""
         ...
 
-    def find_aggregate_by_id(
-        self, aggregate_id: str, aggregate_type: type
-    ) -> Optional[Any]:
+    def find_aggregate_by_id(self, aggregate_id: str, aggregate_type: type) -> Optional[Any]:
         """Find aggregate by ID."""
         ...
 
@@ -64,9 +62,7 @@ class PersistencePort(Protocol):
 class NotificationPort(Protocol):
     """Port for sending notifications from domain layer."""
 
-    def send_notification(
-        self, recipient: str, message: str, notification_type: str
-    ) -> None:
+    def send_notification(self, recipient: str, message: str, notification_type: str) -> None:
         """Send a notification."""
         ...
 

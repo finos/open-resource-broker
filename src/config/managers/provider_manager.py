@@ -73,11 +73,7 @@ class ProviderConfigManager:
             return []
 
         providers = getattr(provider_config, "providers", [])
-        return [
-            provider.name
-            for provider in providers
-            if getattr(provider, "enabled", True)
-        ]
+        return [provider.name for provider in providers if getattr(provider, "enabled", True)]
 
     def get_provider_instance_config(
         self, provider_name: str

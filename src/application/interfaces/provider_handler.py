@@ -24,9 +24,7 @@ class ProviderHandler(Generic[TRequest, TResponse], ABC):
     """
 
     @abstractmethod
-    async def handle(
-        self, request: TRequest, context: Optional[object] = None
-    ) -> TResponse:
+    async def handle(self, request: TRequest, context: Optional[object] = None) -> TResponse:
         """
         Handle a provider request.
 

@@ -35,9 +35,7 @@ def test_dependency_injection_updates():
 
         # Repository factory machine support
         print("\n2. Testing Repository Factory Machine Support...")
-        results["repository_factory_machine_support"] = (
-            test_repository_factory_machine_support()
-        )
+        results["repository_factory_machine_support"] = test_repository_factory_machine_support()
 
         # DI container resolution
         print("\n3. Testing DI Container Resolution...")

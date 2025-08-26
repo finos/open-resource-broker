@@ -160,9 +160,7 @@ def register_active_scheduler_only(scheduler_type: str = "default") -> bool:
             register_default_scheduler()
             logger.info("Registered active scheduler: %s", scheduler_type)
         else:
-            logger.warning(
-                "Unknown scheduler type: %s, falling back to default", scheduler_type
-            )
+            logger.warning("Unknown scheduler type: %s, falling back to default", scheduler_type)
             register_default_scheduler()
             logger.info("Registered active scheduler: default (fallback)")
 
@@ -196,13 +194,9 @@ def register_scheduler_on_demand(scheduler_type: str) -> bool:
             logger.error("Unknown scheduler type: %s", scheduler_type)
             return False
 
-        logger.info(
-            "Successfully registered scheduler type on demand: %s", scheduler_type
-        )
+        logger.info("Successfully registered scheduler type on demand: %s", scheduler_type)
         return True
 
     except Exception as e:
-        logger.error(
-            "Failed to register scheduler type '%s' on demand: %s", scheduler_type, e
-        )
+        logger.error("Failed to register scheduler type '%s' on demand: %s", scheduler_type, e)
         return False

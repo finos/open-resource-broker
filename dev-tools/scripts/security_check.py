@@ -57,14 +57,10 @@ def run_bandit():
     logger.info("=== Bandit Security Linter ===")
 
     # Run bandit with JSON output
-    json_success = run_tool(
-        "bandit", "-r", "src", "-f", "json", "-o", "bandit-report.json"
-    )
+    json_success = run_tool("bandit", "-r", "src", "-f", "json", "-o", "bandit-report.json")
 
     # Run bandit with SARIF output
-    sarif_success = run_tool(
-        "bandit", "-r", "src", "-f", "sarif", "-o", "bandit-results.sarif"
-    )
+    sarif_success = run_tool("bandit", "-r", "src", "-f", "sarif", "-o", "bandit-results.sarif")
 
     if not json_success or not sarif_success:
         logger.warning("Security issues found - check bandit-report.json")
@@ -153,9 +149,7 @@ def main():
     """Main security check function."""
     parser = argparse.ArgumentParser(description="Run security checks")
     parser.add_argument("--quick", action="store_true", help="Run only fast checks")
-    parser.add_argument(
-        "--container", action="store_true", help="Include container scans"
-    )
+    parser.add_argument("--container", action="store_true", help="Include container scans")
     parser.add_argument("--all", action="store_true", help="Run all security tools")
 
     args = parser.parse_args()

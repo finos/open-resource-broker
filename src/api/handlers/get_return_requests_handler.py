@@ -22,9 +22,7 @@ if TYPE_CHECKING:
 
 
 @injectable
-class GetReturnRequestsRESTHandler(
-    BaseAPIHandler[dict[str, Any], ReturnRequestResponse]
-):
+class GetReturnRequestsRESTHandler(BaseAPIHandler[dict[str, Any], ReturnRequestResponse]):
     """API handler for getting return requests."""
 
     def __init__(
@@ -58,9 +56,7 @@ class GetReturnRequestsRESTHandler(
         self._cache_duration = cache_duration
         self._cache = {}
 
-    async def validate_api_request(
-        self, request: dict[str, Any], context: RequestContext
-    ):
+    async def validate_api_request(self, request: dict[str, Any], context: RequestContext):
         """
         Validate API request for getting return requests.
 
@@ -87,9 +83,7 @@ class GetReturnRequestsRESTHandler(
                 except (ValueError, KeyError) as e:
                     raise ValueError(f"Invalid time range format: {e!s}")
 
-    @handle_interface_exceptions(
-        context="get_return_requests_api", interface_type="api"
-    )
+    @handle_interface_exceptions(context="get_return_requests_api", interface_type="api")
     async def execute_api_request(
         self, request: dict[str, Any], context: RequestContext
     ) -> ReturnRequestResponse:
@@ -140,23 +134,17 @@ class GetReturnRequestsRESTHandler(
 
             # Apply filters if provided
             if input_data and "filters" in input_data:
-                return_requests = self._apply_filters(
-                    return_requests, input_data["filters"]
-                )
+                return_requests = self._apply_filters(return_requests, input_data["filters"])
 
             # Format response
             formatted_requests = []
             for req in return_requests:
                 request_data = {
                     "machine": (
-                        req.machines[0].name
-                        if hasattr(req, "machines") and req.machines
-                        else None
+                        req.machines[0].name if hasattr(req, "machines") and req.machines else None
                     ),
                     "gracePeriod": await self._calculate_grace_period(req),
-                    "status": (
-                        req.status.value if hasattr(req.status, "value") else req.status
-                    ),
+                    "status": (req.status.value if hasattr(req.status, "value") else req.status),
                     "requestId": str(req.request_id),
                     "createdAt": (
                         req.created_at.isoformat()
@@ -169,21 +157,13 @@ class GetReturnRequestsRESTHandler(
                     request_data.update(
                         {
                             "machines": (
-                                [
-                                    m.to_dict() if hasattr(m, "to_dict") else m
-                                    for m in req.machines
-                                ]
+                                [m.to_dict() if hasattr(m, "to_dict") else m for m in req.machines]
                                 if hasattr(req, "machines")
                                 else []
                             ),
-                            "metadata": (
-                                req.metadata if hasattr(req, "metadata") else {}
-                            ),
+                            "metadata": (req.metadata if hasattr(req, "metadata") else {}),
                             "events": (
-                                [
-                                    e.to_dict() if hasattr(e, "to_dict") else e
-                                    for e in req.events
-                                ]
+                                [e.to_dict() if hasattr(e, "to_dict") else e for e in req.events]
                                 if hasattr(req, "events")
                                 else []
                             ),
@@ -253,8 +233,8 @@ class GetReturnRequestsRESTHandler(
         if self._scheduler_strategy and hasattr(
             self._scheduler_strategy, "format_return_requests_response"
         ):
-            formatted_response = (
-                await self._scheduler_strategy.format_return_requests_response(response)
+            formatted_response = await self._scheduler_strategy.format_return_requests_response(
+                response
             )
             return formatted_response
 
@@ -376,8 +356,7 @@ class GetReturnRequestsRESTHandler(
 
         # Check if machine is spot instance
         if hasattr(request, "machines") and any(
-            hasattr(m, "price_type") and m.price_type == "spot"
-            for m in request.machines
+            hasattr(m, "price_type") and m.price_type == "spot" for m in request.machines
         ):
             # Spot instances get 2 minutes grace period
             return 120

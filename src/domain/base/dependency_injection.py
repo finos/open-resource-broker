@@ -44,9 +44,7 @@ class DependencyInjectionPort(ABC):
         """
 
     @abstractmethod
-    def register(
-        self, cls: type[T], instance_or_factory: Union[T, Callable[[], T]]
-    ) -> None:
+    def register(self, cls: type[T], instance_or_factory: Union[T, Callable[[], T]]) -> None:
         """
         Register dependency in container.
 

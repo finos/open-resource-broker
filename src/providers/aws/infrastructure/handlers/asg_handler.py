@@ -64,9 +64,7 @@ class ASGHandler(AWSHandler, BaseContextMixin):
             request_adapter: Optional request adapter for terminating instances
         """
         # Use integrated base class initialization
-        super().__init__(
-            aws_client, logger, aws_ops, launch_template_manager, request_adapter
-        )
+        super().__init__(aws_client, logger, aws_ops, launch_template_manager, request_adapter)
 
         # Get AWS native spec service from container
         from infrastructure.di.container import get_container
@@ -88,9 +86,7 @@ class ASGHandler(AWSHandler, BaseContextMixin):
             self.config_port = None
 
     @handle_infrastructure_exceptions(context="asg_creation")
-    def acquire_hosts(
-        self, request: Request, aws_template: AWSTemplate
-    ) -> dict[str, Any]:
+    def acquire_hosts(self, request: Request, aws_template: AWSTemplate) -> dict[str, Any]:
         """
         Create an Auto Scaling Group to acquire hosts.
         Returns structured result with resource IDs and instance data.
@@ -122,10 +118,8 @@ class ASGHandler(AWSHandler, BaseContextMixin):
         self._validate_asg_prerequisites(aws_template)
 
         # Create launch template using the new manager
-        launch_template_result = (
-            self.launch_template_manager.create_or_update_launch_template(
-                aws_template, request
-            )
+        launch_template_result = self.launch_template_manager.create_or_update_launch_template(
+            aws_template, request
         )
 
         # Store launch template info in request (if request has this method)
@@ -159,10 +153,7 @@ class ASGHandler(AWSHandler, BaseContextMixin):
         self._tag_asg(asg_name, aws_template, request)
 
         # Enable instance protection if specified
-        if (
-            hasattr(aws_template, "instance_protection")
-            and aws_template.instance_protection
-        ):
+        if hasattr(aws_template, "instance_protection") and aws_template.instance_protection:
             self._enable_instance_protection(asg_name)
 
         # Set instance lifecycle hooks if needed
@@ -171,9 +162,7 @@ class ASGHandler(AWSHandler, BaseContextMixin):
 
         return asg_name
 
-    def _prepare_template_context(
-        self, template: AWSTemplate, request: Request
-    ) -> dict[str, Any]:
+    def _prepare_template_context(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
         """Prepare context with all computed values for template rendering."""
 
         # Start with base context
@@ -208,13 +197,9 @@ class ASGHandler(AWSHandler, BaseContextMixin):
             "default_cooldown": 300,
             "health_check_type": "EC2",
             "health_check_grace_period": 300,
-            "vpc_zone_identifier": ",".join(template.subnet_ids)
-            if template.subnet_ids
-            else None,
+            "vpc_zone_identifier": ",".join(template.subnet_ids) if template.subnet_ids else None,
             "context": (
-                template.context
-                if hasattr(template, "context") and template.context
-                else None
+                template.context if hasattr(template, "context") and template.context else None
             ),
             # ASG-specific flags
             "has_context": hasattr(template, "context") and bool(template.context),
@@ -244,10 +229,8 @@ class ASGHandler(AWSHandler, BaseContextMixin):
                 }
             )
 
-            native_spec = (
-                self.aws_native_spec_service.process_provider_api_spec_with_merge(
-                    aws_template, request, "asg", context
-                )
+            native_spec = self.aws_native_spec_service.process_provider_api_spec_with_merge(
+                aws_template, request, "asg", context
             )
             if native_spec:
                 # Ensure launch template info is in the spec
@@ -338,9 +321,7 @@ class ASGHandler(AWSHandler, BaseContextMixin):
                 try:
                     if request.machine_references:
                         # Terminate specific instances using existing utility
-                        instance_ids = [
-                            m.machine_id for m in request.machine_references
-                        ]
+                        instance_ids = [m.machine_id for m in request.machine_references]
                         self.aws_ops.terminate_instances_with_fallback(
                             instance_ids=instance_ids,
                             context=f"ASG-{asg_name}",
@@ -389,9 +370,7 @@ class ASGHandler(AWSHandler, BaseContextMixin):
                 DesiredCapacity=new_capacity,
                 MinSize=min(new_capacity, asg["MinSize"]),
             )
-            self._logger.info(
-                "Reduced ASG %s capacity to %s", request.resource_id, new_capacity
-            )
+            self._logger.info("Reduced ASG %s capacity to %s", request.resource_id, new_capacity)
 
             # Detach instances from ASG
             self._retry_with_backoff(
@@ -432,14 +411,10 @@ class ASGHandler(AWSHandler, BaseContextMixin):
                 try:
                     asg_instances = self._get_asg_instances(asg_name)
                     if asg_instances:
-                        formatted_instances = self._format_instance_data(
-                            asg_instances, asg_name
-                        )
+                        formatted_instances = self._format_instance_data(asg_instances, asg_name)
                         all_instances.extend(formatted_instances)
                 except Exception as e:
-                    self._logger.error(
-                        "Failed to get instances for ASG %s: %s", asg_name, e
-                    )
+                    self._logger.error("Failed to get instances for ASG %s: %s", asg_name, e)
                     continue
 
             return all_instances

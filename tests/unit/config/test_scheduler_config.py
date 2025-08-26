@@ -76,9 +76,7 @@ class TestAppConfigWithScheduler:
 
         # Test AWS provider paths
         assert app_config.get_config_file_path() == "/test/path/awsprov_config.json"
-        assert (
-            app_config.get_templates_file_path() == "/test/path/awsprov_templates.json"
-        )
+        assert app_config.get_templates_file_path() == "/test/path/awsprov_templates.json"
 
     def test_app_config_path_generation_provider1(self):
         """Test AppConfig path generation for Provider1 provider."""
@@ -100,13 +98,8 @@ class TestAppConfigWithScheduler:
         app_config = AppConfig(**config_data)
 
         # Test Provider1 provider paths
-        assert (
-            app_config.get_config_file_path() == "/test/path/provider1prov_config.json"
-        )
-        assert (
-            app_config.get_templates_file_path()
-            == "/test/path/provider1prov_templates.json"
-        )
+        assert app_config.get_config_file_path() == "/test/path/provider1prov_config.json"
+        assert app_config.get_templates_file_path() == "/test/path/provider1prov_templates.json"
 
     def test_app_config_path_generation_with_complex_provider_name(self):
         """Test AppConfig path generation with complex provider names."""
@@ -129,6 +122,4 @@ class TestAppConfigWithScheduler:
 
         # Should extract 'aws' from 'aws-production-east'
         assert app_config.get_config_file_path() == "/test/path/awsprov_config.json"
-        assert (
-            app_config.get_templates_file_path() == "/test/path/awsprov_templates.json"
-        )
+        assert app_config.get_templates_file_path() == "/test/path/awsprov_templates.json"

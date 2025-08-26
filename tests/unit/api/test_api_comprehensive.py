@@ -36,11 +36,7 @@ class TestAPIHandlersComprehensive:
         """Get handler classes from module."""
         classes = []
         for name, obj in inspect.getmembers(module):
-            if (
-                inspect.isclass(obj)
-                and "Handler" in name
-                and not name.startswith("Base")
-            ):
+            if inspect.isclass(obj) and "Handler" in name and not name.startswith("Base"):
                 classes.append((name, obj))
         return classes
 
@@ -125,15 +121,11 @@ class TestAPIHandlersComprehensive:
                             if callable(method) and not name.startswith("_")
                         ]
 
-                        assert len(methods) > 0, (
-                            f"{class_name} should have callable methods"
-                        )
+                        assert len(methods) > 0, f"{class_name} should have callable methods"
 
                         # Test common method names
                         common_methods = ["handle", "process", "execute", "__call__"]
-                        has_main_method = any(
-                            hasattr(handler, method) for method in common_methods
-                        )
+                        has_main_method = any(hasattr(handler, method) for method in common_methods)
 
                         if has_main_method:
                             # Try to call main method with mocked parameters
@@ -144,9 +136,7 @@ class TestAPIHandlersComprehensive:
                                         try:
                                             # Mock any dependencies the method might need
                                             if hasattr(handler, "query_bus"):
-                                                handler.query_bus.send = AsyncMock(
-                                                    return_value={}
-                                                )
+                                                handler.query_bus.send = AsyncMock(return_value={})
                                             if hasattr(handler, "command_bus"):
                                                 handler.command_bus.send = AsyncMock(
                                                     return_value={}

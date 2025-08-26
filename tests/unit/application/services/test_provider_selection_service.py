@@ -138,9 +138,7 @@ class TestProviderSelectionService:
             max_instances=1,
         )
 
-        with pytest.raises(
-            ValueError, match="Provider instance 'non-existent-provider' not found"
-        ):
+        with pytest.raises(ValueError, match="Provider instance 'non-existent-provider' not found"):
             service.select_provider_for_template(template)
 
     def test_explicit_provider_disabled(self, service):
@@ -154,9 +152,7 @@ class TestProviderSelectionService:
             max_instances=1,
         )
 
-        with pytest.raises(
-            ValueError, match="Provider instance 'aws-disabled' is disabled"
-        ):
+        with pytest.raises(ValueError, match="Provider instance 'aws-disabled' is disabled"):
             service.select_provider_for_template(template)
 
     def test_load_balanced_provider_selection(self, service, template_type_based):
@@ -198,9 +194,7 @@ class TestProviderSelectionService:
             max_instances=1,
         )
 
-        with pytest.raises(
-            ValueError, match="No enabled instances found for provider type 'aws'"
-        ):
+        with pytest.raises(ValueError, match="No enabled instances found for provider type 'aws'"):
             service.select_provider_for_template(template)
 
     def test_api_based_provider_selection(self, service, template_api_based):
@@ -223,9 +217,7 @@ class TestProviderSelectionService:
             max_instances=1,
         )
 
-        with pytest.raises(
-            ValueError, match="No providers support API 'UnsupportedAPI'"
-        ):
+        with pytest.raises(ValueError, match="No providers support API 'UnsupportedAPI'"):
             service.select_provider_for_template(template)
 
     def test_default_provider_selection(self, service, template_default):
@@ -286,9 +278,7 @@ class TestProviderSelectionService:
 
         service = ProviderSelectionService(mock_config_manager, mock_logger)
 
-        with pytest.raises(
-            ValueError, match="No enabled providers found in configuration"
-        ):
+        with pytest.raises(ValueError, match="No enabled providers found in configuration"):
             service.select_provider_for_template(template_default)
 
     def test_weighted_round_robin_selection(self, mock_config_manager, mock_logger):
@@ -336,9 +326,9 @@ class TestProviderSelectionService:
 
         # Should select both instances, but aws-heavy more frequently
         assert "aws-heavy" in selections
-        assert "aws-light" in selections or selections.count(
-            "aws-heavy"
-        ) > selections.count("aws-light")
+        assert "aws-light" in selections or selections.count("aws-heavy") > selections.count(
+            "aws-light"
+        )
 
     def test_get_available_providers(self, service):
         """Test getting list of available providers."""

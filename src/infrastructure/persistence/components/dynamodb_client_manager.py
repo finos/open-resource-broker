@@ -90,9 +90,7 @@ class DynamoDBClientManager(ResourceManager):
         try:
             # Create session
             if self.profile:
-                session = boto3.Session(
-                    profile_name=self.profile, region_name=self.region
-                )
+                session = boto3.Session(profile_name=self.profile, region_name=self.region)
             else:
                 session = boto3.Session(region_name=self.region)
 
@@ -218,9 +216,7 @@ class DynamoDBClientManager(ResourceManager):
             self.logger.error("Failed to put item to %s: %s", table_name, e)
             return False
 
-    def get_item(
-        self, table_name: str, key: dict[str, Any]
-    ) -> Optional[dict[str, Any]]:
+    def get_item(self, table_name: str, key: dict[str, Any]) -> Optional[dict[str, Any]]:
         """
         Get item from DynamoDB table.
 
@@ -336,25 +332,15 @@ class DynamoDBClientManager(ResourceManager):
         error_message = error.response["Error"]["Message"]
 
         if error_code == "ResourceNotFoundException":
-            self.logger.error(
-                "%s failed: Table not found - %s", operation, error_message
-            )
+            self.logger.error("%s failed: Table not found - %s", operation, error_message)
         elif error_code == "ValidationException":
-            self.logger.error(
-                "%s failed: Validation error - %s", operation, error_message
-            )
+            self.logger.error("%s failed: Validation error - %s", operation, error_message)
         elif error_code == "ConditionalCheckFailedException":
-            self.logger.error(
-                "%s failed: Conditional check failed - %s", operation, error_message
-            )
+            self.logger.error("%s failed: Conditional check failed - %s", operation, error_message)
         elif error_code == "ProvisionedThroughputExceededException":
-            self.logger.error(
-                "%s failed: Throughput exceeded - %s", operation, error_message
-            )
+            self.logger.error("%s failed: Throughput exceeded - %s", operation, error_message)
         else:
-            self.logger.error(
-                "%s failed: %s - %s", operation, error_code, error_message
-            )
+            self.logger.error("%s failed: %s - %s", operation, error_code, error_message)
 
     def get_client(self):
         """Get DynamoDB client."""

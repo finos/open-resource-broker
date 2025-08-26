@@ -146,9 +146,7 @@ async def handle_get_template(args: argparse.Namespace) -> dict[str, Any]:
             return {
                 "success": True,
                 "template": (
-                    template.model_dump()
-                    if hasattr(template, "model_dump")
-                    else template
+                    template.model_dump() if hasattr(template, "model_dump") else template
                 ),
                 "message": f"Retrieved template {template_id} successfully",
             }
@@ -452,11 +450,7 @@ async def handle_validate_template(args: argparse.Namespace) -> dict[str, Any]:
         validation_result = await query_bus.execute(query)
 
         # Check if validation result has errors
-        is_valid = (
-            not validation_result.errors
-            if hasattr(validation_result, "errors")
-            else True
-        )
+        is_valid = not validation_result.errors if hasattr(validation_result, "errors") else True
 
         return {
             "success": True,
@@ -465,9 +459,7 @@ async def handle_validate_template(args: argparse.Namespace) -> dict[str, Any]:
                 validation_result.errors if hasattr(validation_result, "errors") else []
             ),
             "validation_warnings": (
-                validation_result.warnings
-                if hasattr(validation_result, "warnings")
-                else []
+                validation_result.warnings if hasattr(validation_result, "warnings") else []
             ),
             "template_id": template_id,
             "message": "Validation completed successfully",
@@ -503,9 +495,7 @@ async def handle_refresh_templates(args: argparse.Namespace) -> dict[str, Any]:
 
         # Force refresh by listing templates with force_refresh parameter
         # This will trigger cache refresh in the query handler
-        query = ListTemplatesQuery(
-            provider_api=None, active_only=True, include_configuration=False
-        )
+        query = ListTemplatesQuery(provider_api=None, active_only=True, include_configuration=False)
 
         templates = await query_bus.execute(query)
         template_count = len(templates) if templates else 0

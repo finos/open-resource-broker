@@ -156,9 +156,7 @@ class TestAuthenticationFlows:
 
         # Create auth middleware
         auth_strategy = NoAuthStrategy(enabled=False)
-        middleware = AuthMiddleware(
-            app=Mock(), auth_port=auth_strategy, require_auth=False
-        )
+        middleware = AuthMiddleware(app=Mock(), auth_port=auth_strategy, require_auth=False)
 
         # Test context creation
         request = MockRequest()
@@ -190,9 +188,7 @@ class TestAuthenticationFlows:
         for path in excluded_paths:
             response = client.get(path)
             # Should not return 401 (may return 404 if endpoint doesn't exist)
-            assert response.status_code != 401, (
-                f"Path {path} should be excluded from auth"
-            )
+            assert response.status_code != 401, f"Path {path} should be excluded from auth"
 
     def test_cors_headers(self):
         """Test CORS headers are properly set."""

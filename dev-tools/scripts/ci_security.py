@@ -81,9 +81,7 @@ def semgrep_scan() -> int:
 def trivy_fs_scan() -> int:
     """Run Trivy filesystem scan."""
     if not shutil.which("trivy"):
-        logger.error(
-            "Trivy not available - install from https://aquasecurity.github.io/trivy/"
-        )
+        logger.error("Trivy not available - install from https://aquasecurity.github.io/trivy/")
         return 1
 
     logger.info("Running Trivy filesystem scan...")
@@ -119,9 +117,7 @@ def trufflehog_scan() -> int:
     logger.info("Running TruffleHog secrets scan...")
     try:
         with open("trufflehog-results.json", "w") as f:
-            subprocess.run(
-                ["trufflehog", "git", "file://.", "--json"], stdout=f, check=True
-            )
+            subprocess.run(["trufflehog", "git", "file://.", "--json"], stdout=f, check=True)
         return 0
     except subprocess.CalledProcessError:
         logger.warning("Secrets found")

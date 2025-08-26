@@ -173,9 +173,7 @@ class TestDDDComplianceFixed:
         assert not quota.is_at_limit
 
         # Test at limit scenario
-        quota_at_limit = ResourceQuota(
-            resource_type="instances", limit=10, used=10, available=0
-        )
+        quota_at_limit = ResourceQuota(resource_type="instances", limit=10, used=10, available=0)
 
         assert quota_at_limit.is_at_limit
         assert quota_at_limit.utilization_percentage == 100.0

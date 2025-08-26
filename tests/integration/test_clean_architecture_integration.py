@@ -77,9 +77,7 @@ class TestCleanArchitectureIntegration:
         return factory
 
     @pytest.fixture
-    def template_defaults_service(
-        self, mock_config_manager, mock_logger, template_factory
-    ):
+    def template_defaults_service(self, mock_config_manager, mock_logger, template_factory):
         """Template defaults service with all dependencies."""
         return TemplateDefaultsService(
             config_manager=mock_config_manager,
@@ -98,10 +96,7 @@ class TestCleanArchitectureIntegration:
 
         # Verify registration
         assert TemplateExtensionRegistry.has_extension("aws")
-        assert (
-            TemplateExtensionRegistry.get_extension_class("aws")
-            == AWSTemplateExtensionConfig
-        )
+        assert TemplateExtensionRegistry.get_extension_class("aws") == AWSTemplateExtensionConfig
 
         # Test extension defaults
         extension_defaults = TemplateExtensionRegistry.get_extension_defaults("aws")
@@ -178,9 +173,7 @@ class TestCleanArchitectureIntegration:
     def test_provider_extension_hierarchy(self, template_defaults_service):
         """Test provider extension hierarchy (type -> instance)."""
         # Get extension defaults for AWS provider
-        extension_defaults = template_defaults_service._get_extension_defaults(
-            "aws", "aws-primary"
-        )
+        extension_defaults = template_defaults_service._get_extension_defaults("aws", "aws-primary")
 
         # Should include both type and instance extension defaults
         assert isinstance(extension_defaults, dict)
@@ -219,9 +212,7 @@ class TestCleanArchitectureIntegration:
     def test_configuration_validation(self, template_defaults_service):
         """Test configuration validation with extensions."""
         # Test validation for AWS provider
-        validation_result = template_defaults_service.validate_template_defaults(
-            "aws-primary"
-        )
+        validation_result = template_defaults_service.validate_template_defaults("aws-primary")
 
         assert isinstance(validation_result, dict)
         assert "is_valid" in validation_result
@@ -237,10 +228,8 @@ class TestCleanArchitectureIntegration:
         }  # Template override
 
         # Get effective configuration
-        effective_config = (
-            template_defaults_service.get_effective_template_with_extensions(
-                template_dict, "aws-primary"
-            )
+        effective_config = template_defaults_service.get_effective_template_with_extensions(
+            template_dict, "aws-primary"
         )
 
         # Should include all levels of hierarchy
@@ -264,10 +253,7 @@ class TestCleanArchitectureIntegration:
             if field_name.startswith("default_"):
                 # Should be cleaned (remove default_ prefix)
                 clean_name = field_name.replace("default_", "")
-                assert (
-                    clean_name in global_defaults
-                    or field_name == "default_provider_api"
-                )
+                assert clean_name in global_defaults or field_name == "default_provider_api"
 
     def test_provider_strategy_schema_extensions(self):
         """Test provider strategy schema supports extensions."""

@@ -58,13 +58,9 @@ def is_sorted(collection: list[C], reverse: bool = False) -> bool:
         return True
 
     if reverse:
-        return all(
-            collection[i] >= collection[i + 1] for i in range(len(collection) - 1)
-        )
+        return all(collection[i] >= collection[i + 1] for i in range(len(collection) - 1))
     else:
-        return all(
-            collection[i] <= collection[i + 1] for i in range(len(collection) - 1)
-        )
+        return all(collection[i] <= collection[i + 1] for i in range(len(collection) - 1))
 
 
 def all_match(collection: Iterable[T], predicate: Callable[[T], bool]) -> bool:

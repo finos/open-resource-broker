@@ -410,9 +410,7 @@ class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
 
         return matching_entities
 
-    def _matches_criteria(
-        self, entity_data: dict[str, Any], criteria: dict[str, Any]
-    ) -> bool:
+    def _matches_criteria(self, entity_data: dict[str, Any], criteria: dict[str, Any]) -> bool:
         """
         Check if entity matches criteria.
 
@@ -436,9 +434,7 @@ class BaseStorageStrategy(StorageStrategy[T], Generic[T]):
                 if parts[-1] not in current or current[parts[-1]] != value:
                     return False
             # Handle list fields
-            elif isinstance(entity_data.get(field), list) and not isinstance(
-                value, list
-            ):
+            elif isinstance(entity_data.get(field), list) and not isinstance(value, list):
                 if value not in entity_data.get(field, []):
                     return False
             # Handle regular fields

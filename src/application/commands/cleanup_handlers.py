@@ -19,9 +19,7 @@ from domain.request.repository import RequestRepository
 
 
 @command_handler(CleanupOldRequestsCommand)
-class CleanupOldRequestsHandler(
-    BaseCommandHandler[CleanupOldRequestsCommand, dict[str, Any]]
-):
+class CleanupOldRequestsHandler(BaseCommandHandler[CleanupOldRequestsCommand, dict[str, Any]]):
     """Handler for cleaning up old requests using domain commands."""
 
     def __init__(
@@ -43,13 +41,9 @@ class CleanupOldRequestsHandler(
         if command.older_than_days <= 0:
             raise ValueError("older_than_days must be positive")
 
-    async def execute_command(
-        self, command: CleanupOldRequestsCommand
-    ) -> dict[str, Any]:
+    async def execute_command(self, command: CleanupOldRequestsCommand) -> dict[str, Any]:
         """Handle cleanup old requests command."""
-        self.logger.info(
-            "Cleaning up requests older than %s days", command.older_than_days
-        )
+        self.logger.info("Cleaning up requests older than %s days", command.older_than_days)
         cutoff_date = datetime.utcnow() - timedelta(days=command.older_than_days)
 
         try:
@@ -60,9 +54,7 @@ class CleanupOldRequestsHandler(
                 )
 
                 if command.dry_run:
-                    self.logger.info(
-                        "DRY RUN: Would cleanup %s requests", len(old_requests)
-                    )
+                    self.logger.info("DRY RUN: Would cleanup %s requests", len(old_requests))
                     return {
                         "dry_run": True,
                         "requests_found": len(old_requests),
@@ -78,9 +70,7 @@ class CleanupOldRequestsHandler(
                         self.logger.debug("Cleaned up request: %s", request.request_id)
                     except Exception as e:
                         # Per-item exception handling - appropriate to keep
-                        self.logger.error(
-                            "Failed to cleanup request %s: %s", request.request_id, e
-                        )
+                        self.logger.error("Failed to cleanup request %s: %s", request.request_id, e)
 
                 uow.commit()
 
@@ -96,9 +86,7 @@ class CleanupOldRequestsHandler(
                 )
                 self.event_publisher.publish(cleanup_event)
 
-                self.logger.info(
-                    "Successfully cleaned up %s old requests", cleaned_count
-                )
+                self.logger.info("Successfully cleaned up %s old requests", cleaned_count)
                 return {
                     "success": True,
                     "requests_cleaned": cleaned_count,
@@ -111,9 +99,7 @@ class CleanupOldRequestsHandler(
 
 
 @command_handler(CleanupAllResourcesCommand)
-class CleanupAllResourcesHandler(
-    BaseCommandHandler[CleanupAllResourcesCommand, dict[str, Any]]
-):
+class CleanupAllResourcesHandler(BaseCommandHandler[CleanupAllResourcesCommand, dict[str, Any]]):
     """Handler for cleaning up all resources (requests and machines)."""
 
     def __init__(
@@ -136,13 +122,9 @@ class CleanupAllResourcesHandler(
         if command.older_than_days <= 0:
             raise ValueError("older_than_days must be positive")
 
-    async def execute_command(
-        self, command: CleanupAllResourcesCommand
-    ) -> dict[str, Any]:
+    async def execute_command(self, command: CleanupAllResourcesCommand) -> dict[str, Any]:
         """Handle cleanup all resources command."""
-        self.logger.info(
-            "Cleaning up all resources older than %s days", command.older_than_days
-        )
+        self.logger.info("Cleaning up all resources older than %s days", command.older_than_days)
         cutoff_date = datetime.utcnow() - timedelta(days=command.older_than_days)
 
         try:
@@ -154,11 +136,7 @@ class CleanupAllResourcesHandler(
 
                 old_machines = uow.machines.find_old_machines(
                     cutoff_date=cutoff_date,
-                    statuses=(
-                        ["terminated", "failed"]
-                        if not command.include_pending
-                        else None
-                    ),
+                    statuses=(["terminated", "failed"] if not command.include_pending else None),
                 )
 
                 if command.dry_run:
@@ -184,9 +162,7 @@ class CleanupAllResourcesHandler(
                         requests_cleaned += 1
                     except Exception as e:
                         # Per-item exception handling - appropriate to keep
-                        self.logger.error(
-                            "Failed to cleanup request %s: %s", request.request_id, e
-                        )
+                        self.logger.error("Failed to cleanup request %s: %s", request.request_id, e)
 
                 # Cleanup machines
                 for machine in old_machines:
@@ -195,9 +171,7 @@ class CleanupAllResourcesHandler(
                         machines_cleaned += 1
                     except Exception as e:
                         # Per-item exception handling - appropriate to keep
-                        self.logger.error(
-                            "Failed to cleanup machine %s: %s", machine.machine_id, e
-                        )
+                        self.logger.error("Failed to cleanup machine %s: %s", machine.machine_id, e)
 
                 uow.commit()
 

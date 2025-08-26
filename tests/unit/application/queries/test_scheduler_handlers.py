@@ -44,13 +44,9 @@ class TestListSchedulerStrategiesHandler:
         return config_manager
 
     @pytest.mark.asyncio
-    async def test_list_strategies_basic(
-        self, handler, mock_registry, mock_config_manager
-    ):
+    async def test_list_strategies_basic(self, handler, mock_registry, mock_config_manager):
         """Test basic strategy listing."""
-        query = ListSchedulerStrategiesQuery(
-            include_current=True, include_details=False
-        )
+        query = ListSchedulerStrategiesQuery(include_current=True, include_details=False)
 
         with (
             patch(
@@ -75,9 +71,7 @@ class TestListSchedulerStrategiesHandler:
             assert active_strategies[0].name == "hostfactory"
 
     @pytest.mark.asyncio
-    async def test_list_strategies_with_details(
-        self, handler, mock_registry, mock_config_manager
-    ):
+    async def test_list_strategies_with_details(self, handler, mock_registry, mock_config_manager):
         """Test strategy listing with details."""
         query = ListSchedulerStrategiesQuery(include_current=True, include_details=True)
 
@@ -101,9 +95,7 @@ class TestListSchedulerStrategiesHandler:
     @pytest.mark.asyncio
     async def test_list_strategies_config_error(self, handler, mock_registry):
         """Test strategy listing when config manager fails."""
-        query = ListSchedulerStrategiesQuery(
-            include_current=True, include_details=False
-        )
+        query = ListSchedulerStrategiesQuery(include_current=True, include_details=False)
 
         with (
             patch(
@@ -155,9 +147,7 @@ class TestGetSchedulerConfigurationHandler:
         return registry
 
     @pytest.mark.asyncio
-    async def test_get_current_configuration(
-        self, handler, mock_config_manager, mock_registry
-    ):
+    async def test_get_current_configuration(self, handler, mock_config_manager, mock_registry):
         """Test getting current scheduler configuration."""
         query = GetSchedulerConfigurationQuery()
 
@@ -181,9 +171,7 @@ class TestGetSchedulerConfigurationHandler:
             assert "type" in response.configuration
 
     @pytest.mark.asyncio
-    async def test_get_specific_configuration(
-        self, handler, mock_config_manager, mock_registry
-    ):
+    async def test_get_specific_configuration(self, handler, mock_config_manager, mock_registry):
         """Test getting specific scheduler configuration."""
         query = GetSchedulerConfigurationQuery(scheduler_name="default")
 
@@ -258,9 +246,7 @@ class TestValidateSchedulerConfigurationHandler:
         return registry
 
     @pytest.mark.asyncio
-    async def test_validate_current_scheduler(
-        self, handler, mock_config_manager, mock_registry
-    ):
+    async def test_validate_current_scheduler(self, handler, mock_config_manager, mock_registry):
         """Test validating current scheduler configuration."""
         query = ValidateSchedulerConfigurationQuery()
 

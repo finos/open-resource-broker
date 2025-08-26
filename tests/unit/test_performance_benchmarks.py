@@ -381,13 +381,9 @@ class TestConcurrentPerformance:
         avg_time = statistics.mean(results)
         throughput = total_operations / total_time
 
-        assert avg_time < 0.05, (
-            f"Concurrent repository access too slow: {avg_time:.6f}s"
-        )
+        assert avg_time < 0.05, f"Concurrent repository access too slow: {avg_time:.6f}s"
 
-        print(
-            f"Repository concurrent access - {total_operations} operations in {total_time:.2f}s"
-        )
+        print(f"Repository concurrent access - {total_operations} operations in {total_time:.2f}s")
         print(f"Throughput: {throughput:.0f} operations/second")
 
     def test_thread_safety_performance_impact(self):
@@ -537,9 +533,7 @@ class TestScalabilityLimits:
                 f"Time per item too high for {size} items: {time_per_item:.6f}s"
             )
 
-            print(
-                f"Dataset size {size}: {total_time:.2f}s total, {time_per_item:.6f}s per item"
-            )
+            print(f"Dataset size {size}: {total_time:.2f}s total, {time_per_item:.6f}s per item")
 
             # Clean up
             requests.clear()
@@ -598,9 +592,7 @@ class TestScalabilityLimits:
 
         # Memory per item should not increase dramatically with scale
         memory_scaling = memory_per_item_1000 / memory_per_item_100
-        assert memory_scaling < 2.0, (
-            f"Memory usage scales poorly: {memory_scaling:.2f}x"
-        )
+        assert memory_scaling < 2.0, f"Memory usage scales poorly: {memory_scaling:.2f}x"
 
 
 @pytest.mark.performance

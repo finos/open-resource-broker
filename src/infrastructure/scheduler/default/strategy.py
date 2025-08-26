@@ -21,9 +21,7 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
     - Simple integration for systems using domain format directly
     """
 
-    def __init__(
-        self, config_manager: ConfigurationManager, logger: "LoggingPort"
-    ) -> None:
+    def __init__(self, config_manager: ConfigurationManager, logger: "LoggingPort") -> None:
         """Initialize the instance."""
         self.config_manager = config_manager
         self._logger = logger
@@ -74,9 +72,7 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
             return Template(**raw_data)
         except Exception as e:
             # Provide helpful error message for debugging
-            raise ValueError(
-                f"Failed to create Template from data: {e}. Data: {raw_data}"
-            )
+            raise ValueError(f"Failed to create Template from data: {e}. Data: {raw_data}")
 
     def parse_request_data(
         self, raw_data: dict[str, Any]
@@ -89,17 +85,13 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
 
         # Request Status
         if "requests" in raw_data:
-            return [
-                {"request_id": req.get("request_id")} for req in raw_data["requests"]
-            ]
+            return [{"request_id": req.get("request_id")} for req in raw_data["requests"]]
 
         # Request Machines
         # Return as-is since it's already in domain format
         return {
             "template_id": raw_data.get("template_id"),
-            "requested_count": raw_data.get(
-                "requested_count", raw_data.get("count", 1)
-            ),
+            "requested_count": raw_data.get("requested_count", raw_data.get("count", 1)),
             "request_type": raw_data.get("request_type", "provision"),
             "request_id": raw_data.get("request_id"),
             "metadata": raw_data.get("metadata", {}),

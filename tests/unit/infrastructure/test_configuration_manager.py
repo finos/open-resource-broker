@@ -74,9 +74,7 @@ class TestConfigurationManager:
         assert aws_config["region"] == "us-east-1"
         assert aws_config["profile"] == "default"
 
-    def test_get_configuration_value_with_default(
-        self, config_manager: ConfigurationManager
-    ):
+    def test_get_configuration_value_with_default(self, config_manager: ConfigurationManager):
         """Test getting configuration values with default."""
         # Existing key
         assert config_manager.get("aws.region", "default-region") == "us-east-1"
@@ -85,9 +83,7 @@ class TestConfigurationManager:
         assert config_manager.get("nonexistent.key", "default-value") == "default-value"
         assert config_manager.get("aws.nonexistent", "default") == "default"
 
-    def test_get_configuration_value_not_found(
-        self, config_manager: ConfigurationManager
-    ):
+    def test_get_configuration_value_not_found(self, config_manager: ConfigurationManager):
         """Test getting non-existent configuration values."""
         assert config_manager.get("nonexistent.key") is None
         assert config_manager.get("aws.nonexistent") is None
@@ -218,9 +214,7 @@ class TestConfigurationManager:
         assert manager.get("logging.level") == "DEBUG"  # Overridden value
         assert manager.get("logging.file_path") == "logs/app.log"  # New value added
 
-    def test_configuration_save_to_file(
-        self, config_manager: ConfigurationManager, temp_dir: Path
-    ):
+    def test_configuration_save_to_file(self, config_manager: ConfigurationManager, temp_dir: Path):
         """Test saving configuration to file."""
         output_file = temp_dir / "output_config.json"
 
@@ -435,9 +429,7 @@ class TestConfigurationManagerEdgeCases:
         manager = ConfigurationManager()
 
         # Create deeply nested configuration
-        config = {
-            "level1": {"level2": {"level3": {"level4": {"level5": "deep_value"}}}}
-        }
+        config = {"level1": {"level2": {"level3": {"level4": {"level5": "deep_value"}}}}}
         manager.load_from_dict(config)
 
         # Should be able to access deep values

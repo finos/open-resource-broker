@@ -23,9 +23,7 @@ def find_github_action_files():
     workflows_dir = github_dir / "workflows"
     workflow_files = []
     if workflows_dir.exists():
-        workflow_files = list(workflows_dir.glob("*.yml")) + list(
-            workflows_dir.glob("*.yaml")
-        )
+        workflow_files = list(workflows_dir.glob("*.yml")) + list(workflows_dir.glob("*.yaml"))
 
     # Find action files
     actions_dir = github_dir / "actions"
@@ -104,9 +102,7 @@ def main():
     # For action files, we already validated YAML syntax in validate_workflows.py
     if action_files:
         logger.info("INFO: Action files validated for YAML syntax only")
-        logger.info(
-            "      (actionlint doesn't validate action.yml files - only workflows)"
-        )
+        logger.info("      (actionlint doesn't validate action.yml files - only workflows)")
 
     return 0 if all_valid else 1
 

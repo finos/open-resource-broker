@@ -273,9 +273,7 @@ class TestAuthenticationSecurity:
 
         # Verify sensitive data is masked
         assert masked_data["aws_access_key"] == "********************"
-        assert (
-            masked_data["aws_secret_key"] == "****************************************"
-        )
+        assert masked_data["aws_secret_key"] == "****************************************"
         assert masked_data["password"] == "*********************"
         assert masked_data["api_key"] == "********************"
 
@@ -388,9 +386,7 @@ class TestDataProtectionSecurity:
                 if isinstance(value, str):
                     for pii_type, pattern in pii_patterns.items():
                         if re.search(pattern, value):
-                            detected_pii.append(
-                                {"type": pii_type, "path": path, "value": value}
-                            )
+                            detected_pii.append({"type": pii_type, "path": path, "value": value})
                 elif isinstance(value, dict):
                     for key, val in value.items():
                         scan_value(val, f"{path}.{key}" if path else key)
@@ -488,9 +484,7 @@ class TestCryptographicSecurity:
             """Hash password using secure method."""
             # Use SHA-256 with salt (in practice, use bcrypt or similar)
             salt = secrets.token_bytes(32)
-            password_hash = hashlib.pbkdf2_hmac(
-                "sha256", password.encode(), salt, 100000
-            )
+            password_hash = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 100000)
             return base64.b64encode(salt + password_hash).decode()
 
         def verify_password(password: str, hashed: str) -> bool:
@@ -498,9 +492,7 @@ class TestCryptographicSecurity:
             decoded = base64.b64decode(hashed.encode())
             salt = decoded[:32]
             stored_hash = decoded[32:]
-            password_hash = hashlib.pbkdf2_hmac(
-                "sha256", password.encode(), salt, 100000
-            )
+            password_hash = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 100000)
             return password_hash == stored_hash
 
         for password in passwords:
@@ -660,9 +652,7 @@ class TestSecurityConfiguration:
             request_history.append({"user_id": user_id, "timestamp": current_time + i})
 
         # Should be rate limited after exceeding limit
-        assert is_rate_limited(
-            user_id, current_time + rate_limits["requests_per_minute"]
-        )
+        assert is_rate_limited(user_id, current_time + rate_limits["requests_per_minute"])
 
     def test_input_length_limits(self):
         """Test input length limits for security."""

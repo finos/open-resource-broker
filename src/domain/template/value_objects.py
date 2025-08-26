@@ -19,9 +19,7 @@ class TemplateId(ResourceId):
 class FleetTypePort(Protocol):
     """Contract for provider-specific fleet type implementations."""
 
-    def get_valid_types_for_handler(
-        self, handler_type: "ProviderHandlerTypePort"
-    ) -> list[str]:
+    def get_valid_types_for_handler(self, handler_type: "ProviderHandlerTypePort") -> list[str]:
         """Get valid fleet types for a specific handler type."""
         ...
 

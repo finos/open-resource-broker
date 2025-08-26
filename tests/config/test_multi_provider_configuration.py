@@ -151,9 +151,7 @@ class TestMultiProviderConfiguration:
         with pytest.raises(Exception) as exc_info:
             converter.get_typed(AWSProviderConfig)
 
-        assert "At least one authentication method must be provided" in str(
-            exc_info.value
-        )
+        assert "At least one authentication method must be provided" in str(exc_info.value)
 
     def test_active_provider_not_found_fallback(self):
         """Test fallback when specified active provider is not found."""
@@ -251,9 +249,7 @@ class TestMultiProviderConfiguration:
         with pytest.raises(Exception) as exc_info:
             converter.get_typed(AWSProviderConfig)
 
-        assert "At least one authentication method must be provided" in str(
-            exc_info.value
-        )
+        assert "At least one authentication method must be provided" in str(exc_info.value)
 
     def test_missing_provider_config_section(self):
         """Test handling when provider config section is missing."""
@@ -264,9 +260,7 @@ class TestMultiProviderConfiguration:
         with pytest.raises(Exception) as exc_info:
             converter.get_typed(AWSProviderConfig)
 
-        assert "At least one authentication method must be provided" in str(
-            exc_info.value
-        )
+        assert "At least one authentication method must be provided" in str(exc_info.value)
 
     def test_provider_with_missing_config(self):
         """Test handling of provider instance with missing config section."""
@@ -288,9 +282,7 @@ class TestMultiProviderConfiguration:
         with pytest.raises(Exception) as exc_info:
             converter.get_typed(AWSProviderConfig)
 
-        assert "At least one authentication method must be provided" in str(
-            exc_info.value
-        )
+        assert "At least one authentication method must be provided" in str(exc_info.value)
 
     def test_multiple_aws_providers_priority_order(self):
         """Test that provider order matters when no active provider specified."""

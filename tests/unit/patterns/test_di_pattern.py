@@ -129,11 +129,7 @@ class TestDIPattern:
         container.register_type(ScopedService, ScopedService, DIScope.SCOPED)
 
         # Test within same scope
-        with (
-            container.create_scope()
-            if hasattr(container, "create_scope")
-            else container
-        ):
+        with container.create_scope() if hasattr(container, "create_scope") else container:
             instance1 = container.get(ScopedService)
             instance2 = container.get(ScopedService)
 
@@ -229,9 +225,7 @@ class TestDIPattern:
         def create_complex_service():
             return ComplexService({"setting": "value"})
 
-        container.register_factory(
-            ComplexService, create_complex_service, DIScope.SINGLETON
-        )
+        container.register_factory(ComplexService, create_complex_service, DIScope.SINGLETON)
 
         # Resolve using factory
         service = container.resolve(ComplexService)

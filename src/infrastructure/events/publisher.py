@@ -41,9 +41,7 @@ class ConfigurableEventPublisher(EventPublisher):
             # Don't re-raise - event publishing failure shouldn't break business
             # operations
 
-    def register_handler(
-        self, event_type: str, handler: Callable[[DomainEvent], None]
-    ) -> None:
+    def register_handler(self, event_type: str, handler: Callable[[DomainEvent], None]) -> None:
         """Register event handler for specific event type."""
         if event_type not in self._handlers:
             self._handlers[event_type] = []
@@ -72,9 +70,7 @@ class ConfigurableEventPublisher(EventPublisher):
             try:
                 handler(event)
             except Exception as e:
-                self._logger.error(
-                    "Event handler failed for %s: %s", event.event_type, e
-                )
+                self._logger.error("Event handler failed for %s: %s", event.event_type, e)
                 # Continue with other handlers
 
     def _publish_to_queue(self, event: DomainEvent) -> None:
@@ -84,9 +80,7 @@ class ConfigurableEventPublisher(EventPublisher):
 
     def get_registered_handlers(self) -> dict[str, int]:
         """Get count of registered handlers by event type (for debugging)."""
-        return {
-            event_type: len(handlers) for event_type, handlers in self._handlers.items()
-        }
+        return {event_type: len(handlers) for event_type, handlers in self._handlers.items()}
 
 
 # Factory function for DI container

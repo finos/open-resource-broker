@@ -136,9 +136,7 @@ class FleetTagBuilder:
         return FleetTagBuilder.format_for_aws(tags)
 
     @staticmethod
-    def build_instance_tags(
-        request: Request, template: Template
-    ) -> list[dict[str, str]]:
+    def build_instance_tags(request: Request, template: Template) -> list[dict[str, str]]:
         """Legacy method for backward compatibility."""
         return FleetTagBuilder.build_common_tags(request, template)
 

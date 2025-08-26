@@ -63,9 +63,7 @@ class TestCompleteWorkflowIntegration:
         mock_template_service.get_template_by_id.return_value = mock_template
 
         # Mock command bus responses
-        mock_command_bus.dispatch.return_value = (
-            "req-12345678-1234-1234-1234-123456789012"
-        )
+        mock_command_bus.dispatch.return_value = "req-12345678-1234-1234-1234-123456789012"
 
         # Mock query bus responses
         mock_request_status = {
@@ -84,9 +82,7 @@ class TestCompleteWorkflowIntegration:
         assert templates[0]["template_id"] == "test-template"
 
         # Request machines
-        request_id = app_service.request_machines(
-            template_id="test-template", machine_count=2
-        )
+        request_id = app_service.request_machines(template_id="test-template", machine_count=2)
         assert request_id == "req-12345678-1234-1234-1234-123456789012"
 
         # Check request status
@@ -196,9 +192,7 @@ class TestCompleteWorkflowIntegration:
             app_service.request_machines(template_id="test-template", machine_count=2)
 
         # Retry succeeds
-        request_id = app_service.request_machines(
-            template_id="test-template", machine_count=2
-        )
+        request_id = app_service.request_machines(template_id="test-template", machine_count=2)
         assert request_id == "req-12345678-1234-1234-1234-123456789012"
 
         # Verify retry behavior
@@ -294,9 +288,7 @@ class TestRepositoryIntegration:
         mock_storage = Mock()
         mock_event_publisher = Mock()
 
-        repository = RequestRepository(
-            storage=mock_storage, event_publisher=mock_event_publisher
-        )
+        repository = RequestRepository(storage=mock_storage, event_publisher=mock_event_publisher)
 
         # Create request with events
         request = Request.create_new_request(
@@ -305,9 +297,7 @@ class TestRepositoryIntegration:
 
         # Perform operations that generate more events
         request.start_processing()
-        request.complete_successfully(
-            machine_ids=["i-123", "i-456"], completion_message="Success"
-        )
+        request.complete_successfully(machine_ids=["i-123", "i-456"], completion_message="Success")
 
         # Save request
         repository.save(request)
@@ -471,9 +461,7 @@ class TestProviderIntegration:
         mock_primary_provider = Mock()
         mock_primary_provider.provider_type = "aws"
         mock_primary_provider.is_healthy.return_value = False
-        mock_primary_provider.provision_instances.side_effect = Exception(
-            "Provider unavailable"
-        )
+        mock_primary_provider.provision_instances.side_effect = Exception("Provider unavailable")
 
         # Setup backup provider (succeeds)
         mock_backup_provider = Mock()
@@ -709,9 +697,7 @@ class TestEventSystemIntegration:
         )
 
         request.start_processing()
-        request.complete_successfully(
-            machine_ids=["i-123", "i-456"], completion_message="Success"
-        )
+        request.complete_successfully(machine_ids=["i-123", "i-456"], completion_message="Success")
 
         # Get events and publish them
         events = request.get_domain_events()
@@ -745,9 +731,7 @@ class TestEventSystemIntegration:
         def mock_get_events(aggregate_id):
             """Mock event store retrieval."""
             return [
-                entry["event"]
-                for entry in stored_events
-                if entry["aggregate_id"] == aggregate_id
+                entry["event"] for entry in stored_events if entry["aggregate_id"] == aggregate_id
             ]
 
         mock_event_store.append_events.side_effect = mock_append_events
@@ -767,14 +751,10 @@ class TestEventSystemIntegration:
         # Modify request and store more events
         request.clear_domain_events()
         request.start_processing()
-        request.complete_successfully(
-            machine_ids=["i-123", "i-456"], completion_message="Success"
-        )
+        request.complete_successfully(machine_ids=["i-123", "i-456"], completion_message="Success")
 
         additional_events = request.get_domain_events()
-        mock_event_store.append_events(
-            request_id, additional_events, len(initial_events)
-        )
+        mock_event_store.append_events(request_id, additional_events, len(initial_events))
 
         # Verify events were stored
         all_stored_events = mock_event_store.get_events(request_id)
@@ -782,8 +762,6 @@ class TestEventSystemIntegration:
 
         # Verify event ordering
         timestamps = [
-            entry["timestamp"]
-            for entry in stored_events
-            if entry["aggregate_id"] == request_id
+            entry["timestamp"] for entry in stored_events if entry["aggregate_id"] == request_id
         ]
         assert timestamps == sorted(timestamps)  # Should be in chronological order

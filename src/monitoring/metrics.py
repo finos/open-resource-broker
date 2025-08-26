@@ -109,18 +109,14 @@ class MetricsCollector:
         self.register_gauge("memory_usage_bytes")
         self.register_gauge("cpu_usage_percent")
 
-    def register_counter(
-        self, name: str, labels: Optional[dict[str, str]] = None
-    ) -> Counter:
+    def register_counter(self, name: str, labels: Optional[dict[str, str]] = None) -> Counter:
         """Register a new counter metric."""
         with self._lock:
             counter = Counter(name, 0.0, labels=labels or {})
             self.metrics[name] = counter
             return counter
 
-    def register_gauge(
-        self, name: str, labels: Optional[dict[str, str]] = None
-    ) -> Gauge:
+    def register_gauge(self, name: str, labels: Optional[dict[str, str]] = None) -> Gauge:
         """Register a new gauge metric."""
         with self._lock:
             gauge = Gauge(name, 0.0, labels=labels or {})
@@ -143,9 +139,7 @@ class MetricsCollector:
             if isinstance(self.metrics[name], Gauge):
                 self.metrics[name].set(value)
 
-    def start_timer(
-        self, name: str = "", labels: Optional[dict[str, str]] = None
-    ) -> Timer:
+    def start_timer(self, name: str = "", labels: Optional[dict[str, str]] = None) -> Timer:
         """Start a new timer."""
         if labels is None:
             labels = {}
@@ -221,9 +215,7 @@ class MetricsCollector:
                     prom_file = self.metrics_dir / "metrics.prom"
                     with prom_file.open("w") as f:
                         for name, metric in metrics.items():
-                            labels = ",".join(
-                                f'{k}="{v}"' for k, v in metric["labels"].items()
-                            )
+                            labels = ",".join(f'{k}="{v}"' for k, v in metric["labels"].items())
                             f.write(f"{name}{{{labels}}} {metric['value']}\n")
 
                     time.sleep(self.config.get("METRICS_INTERVAL", 60))
@@ -282,6 +274,4 @@ class MetricsCollector:
                     try:
                         file.unlink()
                     except Exception as e:
-                        logger.warning(
-                            "Failed to delete old metrics file %s: %s", file, e
-                        )
+                        logger.warning("Failed to delete old metrics file %s: %s", file, e)

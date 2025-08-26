@@ -59,9 +59,7 @@ class BaseHandler:
             error: Exception that was raised
             **kwargs: Additional logging context
         """
-        self.logger.error(
-            "Error in %s: %s", method_name, str(error), exc_info=True, extra=kwargs
-        )
+        self.logger.error("Error in %s: %s", method_name, str(error), exc_info=True, extra=kwargs)
 
     def with_logging(self, func: Callable[..., T]) -> Callable[..., T]:
         """
@@ -89,9 +87,7 @@ class BaseHandler:
 
         return wrapper
 
-    def with_metrics(
-        self, func: Callable[..., T], name: Optional[str] = None
-    ) -> Callable[..., T]:
+    def with_metrics(self, func: Callable[..., T], name: Optional[str] = None) -> Callable[..., T]:
         """
         Add metrics to methods.
 
@@ -116,9 +112,7 @@ class BaseHandler:
                 self.metrics.record_success(method_name, time.time() - start_time)
                 return result
             except Exception as e:
-                self.metrics.record_error(
-                    method_name, time.time() - start_time, error=str(e)
-                )
+                self.metrics.record_error(method_name, time.time() - start_time, error=str(e))
                 raise
 
         return wrapper

@@ -14,9 +14,7 @@ class TestAWSNativeSpecServiceMerge:
         """Set up test fixtures."""
         self.mock_native_spec_service = Mock()
         self.mock_config_port = Mock()
-        self.service = AWSNativeSpecService(
-            self.mock_native_spec_service, self.mock_config_port
-        )
+        self.service = AWSNativeSpecService(self.mock_native_spec_service, self.mock_config_port)
 
     def test_merge_mode_replace(self):
         """Test replace mode returns only native spec."""
@@ -32,9 +30,7 @@ class TestAWSNativeSpecServiceMerge:
 
         # Mock template with native spec
         template = Mock()
-        template.provider_api_spec = {
-            "TargetCapacitySpecification": {"TotalTargetCapacity": 10}
-        }
+        template.provider_api_spec = {"TargetCapacitySpecification": {"TotalTargetCapacity": 10}}
         template.provider_api_spec_file = None
 
         request = Mock()
@@ -75,9 +71,7 @@ class TestAWSNativeSpecServiceMerge:
 
         # Mock template with native spec
         template = Mock()
-        template.provider_api_spec = {
-            "TargetCapacitySpecification": {"TotalTargetCapacity": 10}
-        }
+        template.provider_api_spec = {"TargetCapacitySpecification": {"TotalTargetCapacity": 10}}
         template.provider_api_spec_file = None
 
         request = Mock()
@@ -92,10 +86,7 @@ class TestAWSNativeSpecServiceMerge:
         # From native spec
         assert result["TargetCapacitySpecification"]["TotalTargetCapacity"] == 10
         # From default
-        assert (
-            result["TargetCapacitySpecification"]["DefaultTargetCapacityType"]
-            == "on-demand"
-        )
+        assert result["TargetCapacitySpecification"]["DefaultTargetCapacityType"] == "on-demand"
         assert result["Type"] == "maintain"  # From default
         assert result["LaunchTemplateConfigs"] == [
             {"LaunchTemplateSpecification": {}}
@@ -107,9 +98,7 @@ class TestAWSNativeSpecServiceMerge:
         """Test returns None when native spec is disabled."""
         self.mock_native_spec_service.is_native_spec_enabled.return_value = False
 
-        result = self.service.process_provider_api_spec_with_merge(
-            Mock(), Mock(), "ec2fleet", {}
-        )
+        result = self.service.process_provider_api_spec_with_merge(Mock(), Mock(), "ec2fleet", {})
 
         assert result is None
 
@@ -122,9 +111,7 @@ class TestAWSNativeSpecServiceMerge:
         template.provider_api_spec = None
         template.provider_api_spec_file = None
 
-        result = self.service.process_provider_api_spec_with_merge(
-            template, Mock(), "ec2fleet", {}
-        )
+        result = self.service.process_provider_api_spec_with_merge(template, Mock(), "ec2fleet", {})
 
         assert result is None
 
@@ -142,9 +129,7 @@ class TestAWSNativeSpecServiceMerge:
 
         # Mock template with native spec
         template = Mock()
-        template.provider_api_spec = {
-            "TargetCapacitySpecification": {"TotalTargetCapacity": 10}
-        }
+        template.provider_api_spec = {"TargetCapacitySpecification": {"TotalTargetCapacity": 10}}
         template.provider_api_spec_file = None
 
         request = Mock()
@@ -176,9 +161,7 @@ class TestAWSNativeSpecServiceMerge:
 
         # Mock _load_spec_file
         with patch.object(self.service, "_load_spec_file") as mock_load:
-            mock_load.return_value = {
-                "SpotOptions": {"AllocationStrategy": "diversified"}
-            }
+            mock_load.return_value = {"SpotOptions": {"AllocationStrategy": "diversified"}}
 
             # Mock template with spec file
             template = Mock()

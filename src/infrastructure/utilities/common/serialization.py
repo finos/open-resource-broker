@@ -21,9 +21,7 @@ def serialize_enum(enum_value: Optional[Enum]) -> Optional[str]:
     return enum_value.value if hasattr(enum_value, "value") else str(enum_value)
 
 
-def deserialize_enum(
-    enum_class: type[E], value: Any, default: Optional[E] = None
-) -> Optional[E]:
+def deserialize_enum(enum_class: type[E], value: Any, default: Optional[E] = None) -> Optional[E]:
     """
     Deserialize string to enum value.
 

@@ -23,9 +23,7 @@ LIMIT_QUERY = Query(None, description="Limit number of results")
     description="Get status of a specific request",
 )
 @handle_rest_exceptions(endpoint="/api/v1/requests/{request_id}/status", method="GET")
-async def get_request_status(
-    request_id: str, handler=REQUEST_STATUS_HANDLER
-) -> JSONResponse:
+async def get_request_status(request_id: str, handler=REQUEST_STATUS_HANDLER) -> JSONResponse:
     """
     Get the status of a specific request.
 
@@ -39,9 +37,7 @@ async def get_request_status(
     return JSONResponse(content=result)
 
 
-@router.get(
-    "/", summary="List Requests", description="List requests with optional filtering"
-)
+@router.get("/", summary="List Requests", description="List requests with optional filtering")
 @handle_rest_exceptions(endpoint="/api/v1/requests", method="GET")
 async def list_requests(
     status: Optional[str] = STATUS_QUERY,
@@ -67,9 +63,7 @@ async def list_requests(
     description="Get detailed information about a request",
 )
 @handle_rest_exceptions(endpoint="/api/v1/requests/{request_id}", method="GET")
-async def get_request_details(
-    request_id: str, handler=REQUEST_STATUS_HANDLER
-) -> JSONResponse:
+async def get_request_details(request_id: str, handler=REQUEST_STATUS_HANDLER) -> JSONResponse:
     """
     Get detailed information about a specific request.
 

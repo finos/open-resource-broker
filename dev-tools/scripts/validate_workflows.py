@@ -151,9 +151,7 @@ def main():
         logger.info(f"SUCCESS: All {len(yaml_files)} YAML files are valid!")
         sys.exit(0)
     else:
-        logger.error(
-            f"FAILED: {invalid_count} files have issues, {valid_count} are valid"
-        )
+        logger.error(f"FAILED: {invalid_count} files have issues, {valid_count} are valid")
         sys.exit(1)
 
 

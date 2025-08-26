@@ -93,9 +93,7 @@ class TestSchedulerRegistry:
 
         self.registry.register("hostfactory", strategy_factory, config_factory)
 
-        with pytest.raises(
-            ConfigurationError, match="Failed to create scheduler strategy"
-        ):
+        with pytest.raises(ConfigurationError, match="Failed to create scheduler strategy"):
             self.registry.create_strategy("hostfactory", {})
 
     def test_is_registered(self):

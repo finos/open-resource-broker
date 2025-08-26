@@ -93,9 +93,7 @@ class TemplateConfigurationManager:
         self.template_defaults_service = template_defaults_service
 
         # Initialize services
-        self.cache_service = cache_service or create_template_cache_service(
-            "ttl", logger
-        )
+        self.cache_service = cache_service or create_template_cache_service("ttl", logger)
         self.persistence_service = persistence_service or TemplatePersistenceService(
             scheduler_strategy, logger, event_publisher
         )
@@ -129,9 +127,7 @@ class TemplateConfigurationManager:
             # Get template file paths from scheduler strategy
             template_paths = self.scheduler_strategy.get_template_paths()
             if not template_paths:
-                self.logger.warning(
-                    "No template paths available from scheduler strategy"
-                )
+                self.logger.warning("No template paths available from scheduler strategy")
                 return []
 
             all_template_dicts = []
@@ -140,15 +136,11 @@ class TemplateConfigurationManager:
             for template_path in template_paths:
                 try:
                     # Use scheduler strategy to load and parse templates
-                    template_dicts = self.scheduler_strategy.load_templates_from_path(
-                        template_path
-                    )
+                    template_dicts = self.scheduler_strategy.load_templates_from_path(template_path)
                     all_template_dicts.extend(template_dicts)
 
                 except Exception as e:
-                    self.logger.error(
-                        "Failed to load templates from %s: %s", template_path, e
-                    )
+                    self.logger.error("Failed to load templates from %s: %s", template_path, e)
                     continue
 
             # Apply batch AMI resolution BEFORE converting to DTOs
@@ -164,23 +156,17 @@ class TemplateConfigurationManager:
                     self.logger.warning("Failed to convert template dict to DTO: %s", e)
                     continue
 
-            self.logger.debug(
-                "Loaded %s templates from scheduler strategy", len(all_templates)
-            )
+            self.logger.debug("Loaded %s templates from scheduler strategy", len(all_templates))
             return all_templates
 
         except Exception as e:
             self.logger.error("Failed to load templates from scheduler: %s", e)
             return []
 
-    def _convert_dict_to_template_dto(
-        self, template_dict: dict[str, Any]
-    ) -> TemplateDTO:
+    def _convert_dict_to_template_dto(self, template_dict: dict[str, Any]) -> TemplateDTO:
         """Convert template dictionary to TemplateDTO with defaults applied."""
         # Extract template ID (scheduler strategy should have normalized this)
-        template_id = template_dict.get(
-            "template_id", template_dict.get("templateId", "")
-        )
+        template_id = template_dict.get("template_id", template_dict.get("templateId", ""))
 
         if not template_id:
             raise ValueError("Template missing required template_id field")
@@ -190,10 +176,8 @@ class TemplateConfigurationManager:
         if self.template_defaults_service:
             # Determine provider instance for defaults
             provider_instance = self._determine_provider_instance(template_dict)
-            template_with_defaults = (
-                self.template_defaults_service.resolve_template_defaults(
-                    template_dict, provider_instance
-                )
+            template_with_defaults = self.template_defaults_service.resolve_template_defaults(
+                template_dict, provider_instance
             )
             self.logger.debug("Applied defaults to template %s", template_id)
 
@@ -212,9 +196,7 @@ class TemplateConfigurationManager:
             tags=template_with_defaults.get("tags", {}),
         )
 
-    def _determine_provider_instance(
-        self, template_dict: dict[str, Any]
-    ) -> Optional[str]:
+    def _determine_provider_instance(self, template_dict: dict[str, Any]) -> Optional[str]:
         """Determine which provider instance this template belongs to."""
         # 1. Check if template specifies provider instance
         if "provider_name" in template_dict:
@@ -232,9 +214,7 @@ class TemplateConfigurationManager:
             selection_result = selection_service.select_active_provider()
             return selection_result.provider_instance
         except Exception as e:
-            self.logger.debug(
-                "Could not determine provider instance via selection service: %s", e
-            )
+            self.logger.debug("Could not determine provider instance via selection service: %s", e)
 
             # Fallback: try direct provider config access
             try:
@@ -244,9 +224,7 @@ class TemplateConfigurationManager:
                     if active_providers:
                         return active_providers[0].name
             except Exception as e2:
-                self.logger.debug(
-                    "Could not determine provider instance via direct access: %s", e2
-                )
+                self.logger.debug("Could not determine provider instance via direct access: %s", e2)
 
         # 3. Fallback to default
         return "aws"
@@ -267,9 +245,7 @@ class TemplateConfigurationManager:
             resolved_template = template_dict.copy()
 
             # Resolve image_id if it's an SSM parameter
-            image_id = resolved_template.get("image_id") or resolved_template.get(
-                "imageId"
-            )
+            image_id = resolved_template.get("image_id") or resolved_template.get("imageId")
             if image_id and image_id.startswith("/aws/service/"):
                 try:
                     resolved_ami = ami_resolver.resolve_with_fallback(image_id)
@@ -283,9 +259,7 @@ class TemplateConfigurationManager:
                             resolved_ami,
                         )
                 except Exception as e:
-                    self.logger.warning(
-                        "Failed to resolve AMI parameter %s: %s", image_id, e
-                    )
+                    self.logger.warning("Failed to resolve AMI parameter %s: %s", image_id, e)
 
             return resolved_template
 
@@ -307,10 +281,8 @@ class TemplateConfigurationManager:
                 if hasattr(aws_defaults, "extensions"):
                     from domain.template.extensions import TemplateExtensionRegistry
 
-                    aws_extension_config = (
-                        TemplateExtensionRegistry.create_extension_config(
-                            "aws", aws_defaults.extensions or {}
-                        )
+                    aws_extension_config = TemplateExtensionRegistry.create_extension_config(
+                        "aws", aws_defaults.extensions or {}
                     )
                     return (
                         aws_extension_config.ami_resolution.enabled
@@ -340,9 +312,7 @@ class TemplateConfigurationManager:
             self.logger.debug("Could not get template resolver: %s", e)
             return None
 
-    def _batch_resolve_amis(
-        self, template_dicts: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
+    def _batch_resolve_amis(self, template_dicts: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Batch resolve AMI IDs from SSM parameters to avoid duplicate calls."""
         try:
             # Check if AMI resolution is enabled
@@ -372,18 +342,14 @@ class TemplateConfigurationManager:
                     if resolved_ami != ssm_param:  # Only cache if resolution succeeded
                         resolved_amis[ssm_param] = resolved_ami
                 except Exception as e:
-                    self.logger.warning(
-                        "Failed to resolve AMI parameter %s: %s", ssm_param, e
-                    )
+                    self.logger.warning("Failed to resolve AMI parameter %s: %s", ssm_param, e)
 
             # Apply resolved AMIs to templates
             resolved_templates = []
             for template_dict in template_dicts:
                 resolved_template = template_dict.copy()
 
-                image_id = resolved_template.get("image_id") or resolved_template.get(
-                    "imageId"
-                )
+                image_id = resolved_template.get("image_id") or resolved_template.get("imageId")
                 if image_id and image_id in resolved_amis:
                     resolved_ami = resolved_amis[image_id]
                     resolved_template["image_id"] = resolved_ami
@@ -438,9 +404,7 @@ class TemplateConfigurationManager:
             raise
         except Exception as e:
             self.logger.error("Failed to get template %s: %s", template_id, e)
-            raise TemplateConfigurationError(
-                f"Failed to retrieve template {template_id}: {e!s}"
-            )
+            raise TemplateConfigurationError(f"Failed to retrieve template {template_id}: {e!s}")
 
     async def get_templates_by_provider(self, provider_api: str) -> list[TemplateDTO]:
         """
@@ -573,9 +537,7 @@ class TemplateConfigurationManager:
             return validation_result
 
         except Exception as e:
-            self.logger.error(
-                "Template validation failed for %s: %s", template.template_id, e
-            )
+            self.logger.error("Template validation failed for %s: %s", template.template_id, e)
             validation_result["is_valid"] = False
             validation_result["errors"].append(f"Validation error: {e!s}")
             return validation_result
@@ -612,9 +574,7 @@ class TemplateConfigurationManager:
                     "Max instances is very high (>1000), consider if this is intentional"
                 )
 
-        self.logger.debug(
-            "Basic validation completed for template %s", template.template_id
-        )
+        self.logger.debug("Basic validation completed for template %s", template.template_id)
 
     async def _validate_with_provider_capabilities(
         self, template: TemplateDTO, provider_instance: str, result: dict[str, Any]
@@ -635,10 +595,8 @@ class TemplateConfigurationManager:
             # Use provider capability service for validation
             from application.services.provider_capability_service import ValidationLevel
 
-            capability_result = (
-                self.provider_capability_service.validate_template_requirements(
-                    domain_template, provider_instance, ValidationLevel.STRICT
-                )
+            capability_result = self.provider_capability_service.validate_template_requirements(
+                domain_template, provider_instance, ValidationLevel.STRICT
             )
 
             # Merge capability validation results
@@ -660,9 +618,7 @@ class TemplateConfigurationManager:
                 template.template_id,
                 e,
             )
-            result["warnings"].append(
-                f"Could not validate provider capabilities: {e!s}"
-            )
+            result["warnings"].append(f"Could not validate provider capabilities: {e!s}")
 
     def clear_cache(self) -> None:
         """Clear template cache."""

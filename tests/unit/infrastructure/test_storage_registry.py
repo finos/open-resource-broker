@@ -138,9 +138,7 @@ class TestStorageRegistry:
             config_factory=config_factory,
         )
 
-        with pytest.raises(
-            ConfigurationError, match="Failed to create storage strategy"
-        ):
+        with pytest.raises(ConfigurationError, match="Failed to create storage strategy"):
             self.registry.create_strategy("test_storage", {})
 
     def test_create_config_success(self):

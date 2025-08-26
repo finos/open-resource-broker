@@ -282,9 +282,7 @@ class DevToolsInstaller:
             return True
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to install Chocolatey: {e}")
-            logger.error(
-                "Please install Chocolatey manually: https://chocolatey.org/install"
-            )
+            logger.error("Please install Chocolatey manually: https://chocolatey.org/install")
             return False
 
     def _run_command(self, cmd, description="", shell=False):
@@ -308,9 +306,7 @@ class DevToolsInstaller:
                 logger.error(f"Error output: {e.stderr}")
             return False
         except FileNotFoundError:
-            logger.error(
-                f"Command not found: {cmd[0] if isinstance(cmd, list) else cmd}"
-            )
+            logger.error(f"Command not found: {cmd[0] if isinstance(cmd, list) else cmd}")
             return False
 
     def _install_yq_generic(self):
@@ -321,9 +317,7 @@ class DevToolsInstaller:
         elif arch in ["aarch64", "arm64"]:
             arch = "arm64"
 
-        url = (
-            f"https://github.com/mikefarah/yq/releases/latest/download/yq_linux_{arch}"
-        )
+        url = f"https://github.com/mikefarah/yq/releases/latest/download/yq_linux_{arch}"
         return self._run_command(
             ["sudo", "curl", "-L", url, "-o", "/usr/local/bin/yq"]
         ) and self._run_command(["sudo", "chmod", "+x", "/usr/local/bin/yq"])
@@ -374,9 +368,7 @@ class DevToolsInstaller:
 
     def _install_uv_generic(self):
         """Install uv using their install script."""
-        return self._run_command(
-            ["curl", "-LsSf", "https://astral.sh/uv/install.sh", "|", "sh"]
-        )
+        return self._run_command(["curl", "-LsSf", "https://astral.sh/uv/install.sh", "|", "sh"])
 
     def _install_actionlint_generic(self):
         """Install actionlint using official download script."""
@@ -555,9 +547,9 @@ class DevToolsInstaller:
         logger.info(f"Installing {tool_name}: {tool_info['description']}")
 
         # Get installation method for current OS
-        install_method = tool_info["install"].get(self.distro) or tool_info[
-            "install"
-        ].get("generic")
+        install_method = tool_info["install"].get(self.distro) or tool_info["install"].get(
+            "generic"
+        )
 
         if not install_method:
             logger.error(f"No installation method for {tool_name} on {self.distro}")
@@ -614,13 +606,9 @@ class DevToolsInstaller:
 def main():
     """Main installation function."""
     parser = argparse.ArgumentParser(description="Install development tools")
-    parser.add_argument(
-        "--dry-run", action="store_true", help="Show what would be installed"
-    )
+    parser.add_argument("--dry-run", action="store_true", help="Show what would be installed")
     parser.add_argument("--tool", help="Install only specific tool")
-    parser.add_argument(
-        "--required-only", action="store_true", help="Install only required tools"
-    )
+    parser.add_argument("--required-only", action="store_true", help="Install only required tools")
 
     args = parser.parse_args()
 

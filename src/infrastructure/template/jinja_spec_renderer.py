@@ -19,9 +19,7 @@ class JinjaSpecRenderer(SpecRenderingPort):
             loader=BaseLoader(), autoescape=select_autoescape(["json", "yaml", "yml"])
         )
 
-    def render_spec_from_file(
-        self, file_path: str, context: dict[str, Any]
-    ) -> dict[str, Any]:
+    def render_spec_from_file(self, file_path: str, context: dict[str, Any]) -> dict[str, Any]:
         """Render specification from file with Jinja2 templating support.
 
         Args:
@@ -49,9 +47,7 @@ class JinjaSpecRenderer(SpecRenderingPort):
             self.logger.error(f"Failed to render spec from file {file_path}: {e}")
             raise
 
-    def render_spec(
-        self, spec: dict[str, Any], context: dict[str, Any]
-    ) -> dict[str, Any]:
+    def render_spec(self, spec: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
         """Render Jinja2 templates in spec values."""
         return self._render_recursive(spec, context)
 

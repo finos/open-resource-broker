@@ -128,9 +128,7 @@ class BaseInfrastructureHandler(
             # Re-raise for upstream handling
             raise
 
-    async def validate_request(
-        self, request: TRequest, context: RequestContext
-    ) -> None:
+    async def validate_request(self, request: TRequest, context: RequestContext) -> None:
         """
         Validate infrastructure request before processing.
 
@@ -148,9 +146,7 @@ class BaseInfrastructureHandler(
             raise ValueError("Request cannot be None")
 
     @abstractmethod
-    async def execute_request(
-        self, request: TRequest, context: RequestContext
-    ) -> TResponse:
+    async def execute_request(self, request: TRequest, context: RequestContext) -> TResponse:
         """
         Execute infrastructure request processing logic.
 
@@ -186,9 +182,7 @@ class BaseInfrastructureHandler(
             metrics["total_duration"] / total_count if total_count > 0 else 0.0
         )
 
-    def _record_failure_metrics(
-        self, request_type: str, duration: float, error: Exception
-    ) -> None:
+    def _record_failure_metrics(self, request_type: str, duration: float, error: Exception) -> None:
         """Record failure metrics for monitoring."""
         if request_type not in self._metrics:
             self._metrics[request_type] = {
@@ -230,9 +224,7 @@ class BaseAPIHandler(BaseInfrastructureHandler[TRequest, TResponse]):
         super().__init__(logger, error_handler)
         self.middleware_stack: list[Callable] = []
 
-    async def validate_request(
-        self, request: TRequest, context: RequestContext
-    ) -> None:
+    async def validate_request(self, request: TRequest, context: RequestContext) -> None:
         """
         Validate API request with additional HTTP-specific checks.
 
@@ -245,9 +237,7 @@ class BaseAPIHandler(BaseInfrastructureHandler[TRequest, TResponse]):
         # Add API-specific validation
         await self.validate_api_request(request, context)
 
-    async def validate_api_request(
-        self, request: TRequest, context: RequestContext
-    ) -> None:
+    async def validate_api_request(self, request: TRequest, context: RequestContext) -> None:
         """
         Validate API-specific request properties.
 
@@ -258,9 +248,7 @@ class BaseAPIHandler(BaseInfrastructureHandler[TRequest, TResponse]):
             context: Request context
         """
 
-    async def execute_request(
-        self, request: TRequest, context: RequestContext
-    ) -> TResponse:
+    async def execute_request(self, request: TRequest, context: RequestContext) -> TResponse:
         """
         Execute API request with middleware processing.
 
@@ -281,9 +269,7 @@ class BaseAPIHandler(BaseInfrastructureHandler[TRequest, TResponse]):
         return await self.post_process_response(response, context)
 
     @abstractmethod
-    async def execute_api_request(
-        self, request: TRequest, context: RequestContext
-    ) -> TResponse:
+    async def execute_api_request(self, request: TRequest, context: RequestContext) -> TResponse:
         """
         Execute core API request logic.
 
@@ -297,9 +283,7 @@ class BaseAPIHandler(BaseInfrastructureHandler[TRequest, TResponse]):
             API response
         """
 
-    async def apply_middleware(
-        self, request: TRequest, context: RequestContext
-    ) -> TRequest:
+    async def apply_middleware(self, request: TRequest, context: RequestContext) -> TRequest:
         """
         Apply middleware stack to request.
 

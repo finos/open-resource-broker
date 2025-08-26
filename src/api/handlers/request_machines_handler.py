@@ -19,9 +19,7 @@ if TYPE_CHECKING:
 
 
 @injectable
-class RequestMachinesRESTHandler(
-    BaseAPIHandler[RequestMachinesModel, RequestMachinesResponse]
-):
+class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMachinesResponse]):
     """API handler for requesting machines."""
 
     def __init__(
@@ -48,9 +46,7 @@ class RequestMachinesRESTHandler(
         self._metrics = metrics
         self._validator = RequestValidator()
 
-    async def validate_api_request(
-        self, request: RequestMachinesModel, context
-    ) -> None:
+    async def validate_api_request(self, request: RequestMachinesModel, context) -> None:
         """
         Validate API request for requesting machines.
 

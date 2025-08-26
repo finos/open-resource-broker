@@ -33,9 +33,7 @@ class TestMCPToolDiscovery:
         """Test successful MCP tool discovery."""
         mock_sdk = Mock(spec=OpenHFPluginSDK)
         mock_sdk.initialized = True
-        mock_sdk.list_available_methods = Mock(
-            return_value=["test_method", "another_method"]
-        )
+        mock_sdk.list_available_methods = Mock(return_value=["test_method", "another_method"])
 
         mock_method_info = Mock(spec=MethodInfo)
         mock_method_info.description = "Test method description"
@@ -139,9 +137,7 @@ class TestMCPToolDiscovery:
         mock_method_info = Mock(spec=MethodInfo)
         mock_method_info.description = None
 
-        description = discovery._generate_description(
-            "create_request", mock_method_info
-        )
+        description = discovery._generate_description("create_request", mock_method_info)
 
         assert description == "Create Request - Execute create_request operation"
 

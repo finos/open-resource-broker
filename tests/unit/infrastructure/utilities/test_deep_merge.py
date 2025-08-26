@@ -57,10 +57,7 @@ class TestDeepMerge:
         assert result["TargetCapacitySpecification"]["OnDemandTargetCapacity"] == 3
 
         # Default values should be preserved
-        assert (
-            result["TargetCapacitySpecification"]["DefaultTargetCapacityType"]
-            == "on-demand"
-        )
+        assert result["TargetCapacitySpecification"]["DefaultTargetCapacityType"] == "on-demand"
         assert result["Type"] == "maintain"
         assert result["LaunchTemplateConfigs"] == [{"LaunchTemplateSpecification": {}}]
 

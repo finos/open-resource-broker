@@ -29,12 +29,8 @@ class TestDockerfile:
         content = dockerfile_path.read_text()
 
         # Check for multi-stage build
-        assert "FROM python:3.11-slim as builder" in content, (
-            "Should use multi-stage build"
-        )
-        assert "FROM python:3.11-slim as production" in content, (
-            "Should have production stage"
-        )
+        assert "FROM python:3.11-slim as builder" in content, "Should use multi-stage build"
+        assert "FROM python:3.11-slim as production" in content, "Should have production stage"
 
         # Check for security best practices
         assert "RUN groupadd -r ohfp && useradd -r -g ohfp" in content, (
@@ -43,9 +39,7 @@ class TestDockerfile:
         assert "USER ohfp" in content, "Should switch to non-root user"
 
         # Check for appropriate copying
-        assert "COPY --from=builder /opt/venv /opt/venv" in content, (
-            "Should copy venv from builder"
-        )
+        assert "COPY --from=builder /opt/venv /opt/venv" in content, "Should copy venv from builder"
         assert "COPY --chown=ohfp:ohfp" in content, "Should set correct ownership"
 
         # Check for health check
@@ -110,10 +104,7 @@ class TestDockerfile:
             )
 
             assert result.returncode == 0, f"Docker build failed: {result.stderr}"
-            assert (
-                "Successfully tagged ohfp-api:test-build" in result.stdout
-                or result.stderr
-            )
+            assert "Successfully tagged ohfp-api:test-build" in result.stdout or result.stderr
 
         except subprocess.TimeoutExpired:
             pytest.fail("Docker build timed out after 5 minutes")
@@ -147,9 +138,7 @@ class TestDockerfile:
                 timeout=30,
             )
 
-            assert result.returncode == 0, (
-                f"Container version command failed: {result.stderr}"
-            )
+            assert result.returncode == 0, f"Container version command failed: {result.stderr}"
             assert "Open Host Factory Plugin REST API" in result.stdout
             assert "Version:" in result.stdout
 
@@ -230,12 +219,8 @@ class TestDockerfile:
 
             finally:
                 # Cleanup
-                subprocess.run(
-                    ["docker", "stop", container_id], check=False, capture_output=True
-                )
-                subprocess.run(
-                    ["docker", "rm", container_id], check=False, capture_output=True
-                )
+                subprocess.run(["docker", "stop", container_id], check=False, capture_output=True)
+                subprocess.run(["docker", "rm", container_id], check=False, capture_output=True)
 
         except subprocess.TimeoutExpired:
             pytest.fail("Health check timed out")
@@ -253,9 +238,7 @@ class TestDockerfile:
         import stat
 
         file_stat = entrypoint_path.stat()
-        assert file_stat.st_mode & stat.S_IEXEC, (
-            "docker-entrypoint.sh should be executable"
-        )
+        assert file_stat.st_mode & stat.S_IEXEC, "docker-entrypoint.sh should be executable"
 
     def test_entrypoint_script_structure(self, project_root):
         """Test entrypoint script structure."""

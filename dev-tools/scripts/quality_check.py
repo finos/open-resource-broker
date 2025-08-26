@@ -72,15 +72,11 @@ ALLOWED_TECHNICAL_CHARS = {
 
 # Pre-compile regex patterns for better performance
 UNPROFESSIONAL_PATTERNS = {
-    re.compile(
-        r"\bawesome\b", re.IGNORECASE
-    ): 'Use "excellent" or specific technical terms',
+    re.compile(r"\bawesome\b", re.IGNORECASE): 'Use "excellent" or specific technical terms',
     re.compile(r"\brock\b", re.IGNORECASE): 'Use "implement" or "execute"',
     re.compile(r"\bcool\b", re.IGNORECASE): 'Use "effective" or specific benefits',
     re.compile(r"\bsweet\b", re.IGNORECASE): 'Use "beneficial" or specific advantages',
-    re.compile(
-        r"\bsick\b", re.IGNORECASE
-    ): 'Use "impressive" or specific technical terms',
+    re.compile(r"\bsick\b", re.IGNORECASE): 'Use "impressive" or specific technical terms',
     re.compile(r"\bepic\b", re.IGNORECASE): 'Use "comprehensive" or specific scope',
     re.compile(r"\binsane\b", re.IGNORECASE): 'Use "significant" or specific metrics',
     re.compile(r"\bcrazy\b", re.IGNORECASE): 'Use "substantial" or specific details',
@@ -88,9 +84,7 @@ UNPROFESSIONAL_PATTERNS = {
 
 # Hyperbolic marketing terms
 HYPERBOLIC_PATTERNS = {
-    re.compile(
-        r"\benhanced\b", re.IGNORECASE
-    ): 'Use "improved" only when factually accurate',
+    re.compile(r"\benhanced\b", re.IGNORECASE): 'Use "improved" only when factually accurate',
     re.compile(r"\bunified\b", re.IGNORECASE): 'Use "integrated" or "consolidated"',
     re.compile(
         r"\bproper\b(?!\s*(?:ty|ties))", re.IGNORECASE
@@ -104,48 +98,22 @@ HYPERBOLIC_PATTERNS = {
 
 # Implementation detail terms that should be removed from production code
 IMPLEMENTATION_DETAIL_PATTERNS = {
-    re.compile(
-        r"\bphase\s+\d+\b", re.IGNORECASE
-    ): "Remove implementation phase references",
-    re.compile(
-        r"\bphase\s+[a-z]+\b", re.IGNORECASE
-    ): "Remove implementation phase references",
-    re.compile(
-        r"\bmigrated\s+from\b", re.IGNORECASE
-    ): "Remove migration history references",
-    re.compile(
-        r"\bmigrating\s+to\b", re.IGNORECASE
-    ): "Remove migration process references",
-    re.compile(
-        r"\bthis\s+instead\s+of\s+that\b", re.IGNORECASE
-    ): "Remove comparison references",
-    re.compile(
-        r"\bold\s+implementation\b", re.IGNORECASE
-    ): "Remove old implementation references",
-    re.compile(
-        r"\bnew\s+implementation\b", re.IGNORECASE
-    ): "Remove new implementation references",
+    re.compile(r"\bphase\s+\d+\b", re.IGNORECASE): "Remove implementation phase references",
+    re.compile(r"\bphase\s+[a-z]+\b", re.IGNORECASE): "Remove implementation phase references",
+    re.compile(r"\bmigrated\s+from\b", re.IGNORECASE): "Remove migration history references",
+    re.compile(r"\bmigrating\s+to\b", re.IGNORECASE): "Remove migration process references",
+    re.compile(r"\bthis\s+instead\s+of\s+that\b", re.IGNORECASE): "Remove comparison references",
+    re.compile(r"\bold\s+implementation\b", re.IGNORECASE): "Remove old implementation references",
+    re.compile(r"\bnew\s+implementation\b", re.IGNORECASE): "Remove new implementation references",
     re.compile(r"\blegacy\s+code\b", re.IGNORECASE): "Remove legacy code references",
-    re.compile(
-        r"\btemporary\s+fix\b", re.IGNORECASE
-    ): "Remove temporary implementation references",
-    re.compile(
-        r"\btodo\s*:\b", re.IGNORECASE
-    ): "Remove TODO comments from production code",
-    re.compile(
-        r"\bfixme\s*:\b", re.IGNORECASE
-    ): "Remove FIXME comments from production code",
-    re.compile(
-        r"\bhack\s*:\b", re.IGNORECASE
-    ): "Remove HACK comments from production code",
+    re.compile(r"\btemporary\s+fix\b", re.IGNORECASE): "Remove temporary implementation references",
+    re.compile(r"\btodo\s*:\b", re.IGNORECASE): "Remove TODO comments from production code",
+    re.compile(r"\bfixme\s*:\b", re.IGNORECASE): "Remove FIXME comments from production code",
+    re.compile(r"\bhack\s*:\b", re.IGNORECASE): "Remove HACK comments from production code",
     re.compile(r"\bworkaround\s+for\b", re.IGNORECASE): "Remove workaround references",
     re.compile(r"\bquick\s+fix\b", re.IGNORECASE): "Remove quick fix references",
-    re.compile(
-        r"\bstep\s+\d+\b", re.IGNORECASE
-    ): "Remove step-by-step implementation references",
-    re.compile(
-        r"\btest\s+\d+\b", re.IGNORECASE
-    ): "Remove test numbering from production code",
+    re.compile(r"\bstep\s+\d+\b", re.IGNORECASE): "Remove step-by-step implementation references",
+    re.compile(r"\btest\s+\d+\b", re.IGNORECASE): "Remove test numbering from production code",
 }
 
 # Legitimate version references that should be excluded
@@ -202,9 +170,7 @@ class EmojiViolation(Violation):
 class UnprofessionalLanguageViolation(Violation):
     """Unprofessional language found in code or comments."""
 
-    def __init__(
-        self, file_path: str, line_num: int, content: str, term: str, suggestion: str
-    ):
+    def __init__(self, file_path: str, line_num: int, content: str, term: str, suggestion: str):
         super().__init__(
             file_path, line_num, content, f"Unprofessional term '{term}' - {suggestion}"
         )
@@ -215,12 +181,8 @@ class UnprofessionalLanguageViolation(Violation):
 class HyperbolicTermViolation(Violation):
     """Hyperbolic marketing term found in code or comments."""
 
-    def __init__(
-        self, file_path: str, line_num: int, content: str, term: str, suggestion: str
-    ):
-        super().__init__(
-            file_path, line_num, content, f"Hyperbolic term '{term}' - {suggestion}"
-        )
+    def __init__(self, file_path: str, line_num: int, content: str, term: str, suggestion: str):
+        super().__init__(file_path, line_num, content, f"Hyperbolic term '{term}' - {suggestion}")
         self.term = term
         self.suggestion = suggestion
 
@@ -228,9 +190,7 @@ class HyperbolicTermViolation(Violation):
 class ImplementationDetailViolation(Violation):
     """Implementation detail term found in production code."""
 
-    def __init__(
-        self, file_path: str, line_num: int, content: str, term: str, suggestion: str
-    ):
+    def __init__(self, file_path: str, line_num: int, content: str, term: str, suggestion: str):
         super().__init__(
             file_path,
             line_num,
@@ -244,9 +204,7 @@ class ImplementationDetailViolation(Violation):
 class MissingDocstringViolation(Violation):
     """Missing docstring in class, function, or module."""
 
-    def __init__(
-        self, file_path: str, line_num: int, element_type: str, element_name: str
-    ):
+    def __init__(self, file_path: str, line_num: int, element_type: str, element_name: str):
         super().__init__(
             file_path,
             line_num,
@@ -290,9 +248,7 @@ class CommentedCodeViolation(Violation):
     """Commented-out code found."""
 
     def __init__(self, file_path: str, line_num: int, content: str):
-        super().__init__(
-            file_path, line_num, content, "Commented-out code should be removed"
-        )
+        super().__init__(file_path, line_num, content, "Commented-out code should be removed")
 
 
 class DebugStatementViolation(Violation):
@@ -374,9 +330,7 @@ class LanguageChecker(FileChecker):
                 for match in matches:
                     term = match.group(0)
                     violations.append(
-                        HyperbolicTermViolation(
-                            file_path, line_num, line.strip(), term, suggestion
-                        )
+                        HyperbolicTermViolation(file_path, line_num, line.strip(), term, suggestion)
                     )
 
             # Check for implementation detail terms
@@ -416,13 +370,9 @@ class DocstringChecker(FileChecker):
             # Check module docstring (skip empty __init__.py files)
             if not ast.get_docstring(tree):
                 # Skip empty __init__.py files - they're just package markers
-                if not (
-                    Path(file_path).name == "__init__.py" and len(content.strip()) == 0
-                ):
+                if not (Path(file_path).name == "__init__.py" and len(content.strip()) == 0):
                     violations.append(
-                        MissingDocstringViolation(
-                            file_path, 1, "module", Path(file_path).name
-                        )
+                        MissingDocstringViolation(file_path, 1, "module", Path(file_path).name)
                     )
 
             # Check classes and functions
@@ -430,9 +380,7 @@ class DocstringChecker(FileChecker):
                 if isinstance(node, ast.ClassDef):
                     if not ast.get_docstring(node):
                         violations.append(
-                            MissingDocstringViolation(
-                                file_path, node.lineno, "class", node.name
-                            )
+                            MissingDocstringViolation(file_path, node.lineno, "class", node.name)
                         )
                 elif isinstance(node, ast.FunctionDef):
                     # Skip private methods (starting with _)
@@ -509,9 +457,7 @@ class ImportChecker(FileChecker):
             # If autoflake found issues, it returns non-zero exit code
             if result.returncode != 0:
                 violations.append(
-                    UnusedImportViolation(
-                        file_path, 1, "Run 'make format' to fix automatically"
-                    )
+                    UnusedImportViolation(file_path, 1, "Run 'make format' to fix automatically")
                 )
 
         except (subprocess.SubprocessError, FileNotFoundError):
@@ -592,9 +538,7 @@ class CommentChecker(FileChecker):
                     or "noqa:commented" in line.lower()
                 ):
                     continue
-                violations.append(
-                    CommentedCodeViolation(file_path, line_num, line.strip())
-                )
+                violations.append(CommentedCodeViolation(file_path, line_num, line.strip()))
 
             # Check for debug statements (skip for test files and markdown files)
             if (
@@ -604,9 +548,7 @@ class CommentChecker(FileChecker):
                 and "DEBUG" not in line.upper()
                 and "noqa" not in line.lower()
             ):
-                violations.append(
-                    DebugStatementViolation(file_path, line_num, line.strip())
-                )
+                violations.append(DebugStatementViolation(file_path, line_num, line.strip()))
 
         return violations
 
@@ -691,9 +633,7 @@ class QualityChecker:
             for future in as_completed(future_to_file):
                 completed += 1
                 if completed % 10 == 0 or completed == len(valid_files):
-                    logger.info(
-                        f"Progress: {completed}/{len(valid_files)} files checked"
-                    )
+                    logger.info(f"Progress: {completed}/{len(valid_files)} files checked")
 
                 try:
                     file_violations = future.result()
@@ -719,9 +659,7 @@ class QualityChecker:
                     text=True,
                     check=True,
                 )
-                modified_files = (
-                    result.stdout.strip().split("\n") if result.stdout.strip() else []
-                )
+                modified_files = result.stdout.strip().split("\n") if result.stdout.strip() else []
                 return [f for f in modified_files if f]
 
             # Local development: check staged, unstaged, and untracked files
@@ -732,9 +670,7 @@ class QualityChecker:
                 text=True,
                 check=True,
             )
-            staged_files = (
-                result.stdout.strip().split("\n") if result.stdout.strip() else []
-            )
+            staged_files = result.stdout.strip().split("\n") if result.stdout.strip() else []
 
             # Get unstaged files
             result = subprocess.run(
@@ -743,9 +679,7 @@ class QualityChecker:
                 text=True,
                 check=True,
             )
-            unstaged_files = (
-                result.stdout.strip().split("\n") if result.stdout.strip() else []
-            )
+            unstaged_files = result.stdout.strip().split("\n") if result.stdout.strip() else []
 
             # Get untracked files
             result = subprocess.run(
@@ -754,9 +688,7 @@ class QualityChecker:
                 text=True,
                 check=True,
             )
-            untracked_files = (
-                result.stdout.strip().split("\n") if result.stdout.strip() else []
-            )
+            untracked_files = result.stdout.strip().split("\n") if result.stdout.strip() else []
 
             # Combine all files
             all_files = list(set(staged_files + unstaged_files + untracked_files))
@@ -772,16 +704,12 @@ def main():
     """Run comprehensive code quality checks with configurable options."""
     """Main entry point for the quality checker."""
     parser = argparse.ArgumentParser(description="Professional Quality Check Tool")
-    parser.add_argument(
-        "--fix", action="store_true", help="Attempt to automatically fix issues"
-    )
+    parser.add_argument("--fix", action="store_true", help="Attempt to automatically fix issues")
     parser.add_argument(
         "--strict", action="store_true", help="Exit with error code on any violation"
     )
     parser.add_argument("--files", nargs="+", help="Specific files to check")
-    parser.add_argument(
-        "--all", action="store_true", help="Check all files in repository"
-    )
+    parser.add_argument("--all", action="store_true", help="Check all files in repository")
 
     args = parser.parse_args()
 

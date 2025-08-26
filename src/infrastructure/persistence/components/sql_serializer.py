@@ -41,9 +41,7 @@ class SQLSerializer(DataConverter):
         """Prepare domain criteria for SQL query (implements DataConverter interface)."""
         return self.prepare_criteria(criteria)
 
-    def serialize_for_insert(
-        self, entity_id: str, data: dict[str, Any]
-    ) -> dict[str, Any]:
+    def serialize_for_insert(self, entity_id: str, data: dict[str, Any]) -> dict[str, Any]:
         """
         Serialize domain data for database INSERT.
 
@@ -245,9 +243,7 @@ class SQLSerializer(DataConverter):
                 # Handle special operators
                 if "$in" in value:
                     prepared[key] = {
-                        "$in": [
-                            v.value if isinstance(v, Enum) else v for v in value["$in"]
-                        ]
+                        "$in": [v.value if isinstance(v, Enum) else v for v in value["$in"]]
                     }
                 elif "$like" in value:
                     prepared[key] = {"$like": value["$like"]}
@@ -258,9 +254,7 @@ class SQLSerializer(DataConverter):
 
         return prepared
 
-    def serialize_batch(
-        self, entities: dict[str, dict[str, Any]]
-    ) -> list[dict[str, Any]]:
+    def serialize_batch(self, entities: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Serialize multiple entities for batch operations.
 
@@ -277,9 +271,7 @@ class SQLSerializer(DataConverter):
                 serialized = self.serialize_for_insert(entity_id, data)
                 serialized_list.append(serialized)
 
-            self.logger.debug(
-                "Serialized %s entities for batch operation", len(entities)
-            )
+            self.logger.debug("Serialized %s entities for batch operation", len(entities))
             return serialized_list
 
         except Exception as e:

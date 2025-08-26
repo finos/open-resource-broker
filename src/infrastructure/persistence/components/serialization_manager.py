@@ -42,9 +42,7 @@ class JSONSerializer(SerializationManager):
         try:
             # Handle enum serialization
             serializable_data = self._prepare_for_serialization(data)
-            return json.dumps(
-                serializable_data, indent=2, default=str, ensure_ascii=False
-            )
+            return json.dumps(serializable_data, indent=2, default=str, ensure_ascii=False)
         except Exception as e:
             self.logger.error("JSON serialization failed: %s", e)
             raise
@@ -86,11 +84,7 @@ class JSONSerializer(SerializationManager):
                     (
                         self._prepare_for_serialization(item)
                         if isinstance(item, dict)
-                        else (
-                            self.serialize_enum(item)
-                            if isinstance(item, Enum)
-                            else item
-                        )
+                        else (self.serialize_enum(item) if isinstance(item, Enum) else item)
                     )
                     for item in value
                 ]

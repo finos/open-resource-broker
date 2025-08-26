@@ -99,21 +99,15 @@ class TemplatePersistenceService:
                         configuration=template.configuration,
                     )
                 self.event_publisher.publish(event)
-                self.logger.debug(
-                    "Published domain event for template %s", template.template_id
-                )
+                self.logger.debug("Published domain event for template %s", template.template_id)
 
-            self.logger.info(
-                "Saved template %s to %s", template.template_id, target_file
-            )
+            self.logger.info("Saved template %s to %s", template.template_id, target_file)
 
         except Exception as e:
             self.logger.error("Failed to save template %s: %s", template.template_id, e)
             raise
 
-    async def delete_template(
-        self, template_id: str, source_file: Optional[Path] = None
-    ) -> None:
+    async def delete_template(self, template_id: str, source_file: Optional[Path] = None) -> None:
         """
         Delete template from configuration files.
 
@@ -129,9 +123,7 @@ class TemplatePersistenceService:
                 # Use first template path as default
                 template_paths = self.scheduler_strategy.get_template_paths()
                 if not template_paths:
-                    raise ValueError(
-                        "No template paths available from scheduler strategy"
-                    )
+                    raise ValueError("No template paths available from scheduler strategy")
                 target_file = Path(template_paths[0])
 
             # Load existing templates from source file
@@ -142,8 +134,7 @@ class TemplatePersistenceService:
             existing_templates = [
                 t
                 for t in existing_templates
-                if t.get("template_id") != template_id
-                and t.get("templateId") != template_id
+                if t.get("template_id") != template_id and t.get("templateId") != template_id
             ]
 
             if len(existing_templates) == original_count:
@@ -161,9 +152,7 @@ class TemplatePersistenceService:
                     deletion_time=datetime.now(),
                 )
                 self.event_publisher.publish(event)
-                self.logger.debug(
-                    "Published deletion event for template %s", template_id
-                )
+                self.logger.debug("Published deletion event for template %s", template_id)
 
             self.logger.info("Deleted template %s from %s", template_id, target_file)
 

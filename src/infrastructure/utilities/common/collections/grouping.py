@@ -26,9 +26,7 @@ def group_by(collection: Iterable[T], key_func: Callable[[T], K]) -> dict[K, lis
     return dict(groups)
 
 
-def partition(
-    collection: Iterable[T], predicate: Callable[[T], bool]
-) -> tuple[list[T], list[T]]:
+def partition(collection: Iterable[T], predicate: Callable[[T], bool]) -> tuple[list[T], list[T]]:
     """
     Partition collection into two lists based on predicate.
 
@@ -101,9 +99,7 @@ def frequency_map(collection: Iterable[T]) -> dict[T, float]:
     return {item: count / total for item, count in counts.items()}
 
 
-def most_common(
-    collection: Iterable[T], n: Optional[int] = None
-) -> list[tuple[T, int]]:
+def most_common(collection: Iterable[T], n: Optional[int] = None) -> list[tuple[T, int]]:
     """
     Get most common elements.
 
@@ -118,9 +114,7 @@ def most_common(
     return counter.most_common(n)
 
 
-def least_common(
-    collection: Iterable[T], n: Optional[int] = None
-) -> list[tuple[T, int]]:
+def least_common(collection: Iterable[T], n: Optional[int] = None) -> list[tuple[T, int]]:
     """
     Get least common elements.
 

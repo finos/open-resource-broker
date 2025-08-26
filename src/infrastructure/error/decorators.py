@@ -59,14 +59,10 @@ def handle_exceptions(
                     exception_handler = handler or get_exception_handler()
 
                     # Build rich context
-                    context_data = _build_context_data(
-                        func, args, kwargs, additional_context
-                    )
+                    context_data = _build_context_data(func, args, kwargs, additional_context)
 
                     # Create exception context
-                    exc_context = ExceptionContext(
-                        operation=context, layer=layer, **context_data
-                    )
+                    exc_context = ExceptionContext(operation=context, layer=layer, **context_data)
 
                     # Handle exception
                     handled_exception = exception_handler.handle(e, exc_context)
@@ -87,14 +83,10 @@ def handle_exceptions(
                     exception_handler = handler or get_exception_handler()
 
                     # Build rich context
-                    context_data = _build_context_data(
-                        func, args, kwargs, additional_context
-                    )
+                    context_data = _build_context_data(func, args, kwargs, additional_context)
 
                     # Create exception context
-                    exc_context = ExceptionContext(
-                        operation=context, layer=layer, **context_data
-                    )
+                    exc_context = ExceptionContext(operation=context, layer=layer, **context_data)
 
                     # Handle exception
                     handled_exception = exception_handler.handle(e, exc_context)
@@ -107,9 +99,7 @@ def handle_exceptions(
     return decorator
 
 
-def handle_domain_exceptions(
-    context: str, additional_context: Optional[dict[str, Any]] = None
-):
+def handle_domain_exceptions(context: str, additional_context: Optional[dict[str, Any]] = None):
     """
     Specialized decorator for domain layer exception handling.
 
@@ -125,9 +115,7 @@ def handle_domain_exceptions(
         def validate_template(self, template: Template) -> None:
             # Domain validation logic
     """
-    return handle_exceptions(
-        context=context, layer="domain", additional_context=additional_context
-    )
+    return handle_exceptions(context=context, layer="domain", additional_context=additional_context)
 
 
 def handle_application_exceptions(

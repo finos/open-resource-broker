@@ -10,9 +10,7 @@ from providers.aws.domain.template.aggregate import AWSTemplate
 class BaseContextMixin:
     """Shared context preparation methods for all AWS handlers."""
 
-    def _prepare_base_context(
-        self, template: AWSTemplate, request: Request
-    ) -> dict[str, Any]:
+    def _prepare_base_context(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
         """Base context used by all handlers."""
         return {
             # Standard identifiers
@@ -63,9 +61,7 @@ class BaseContextMixin:
             "is_ondemand_only": template.price_type == "ondemand",
         }
 
-    def _prepare_standard_tags(
-        self, template: AWSTemplate, request: Request
-    ) -> dict[str, Any]:
+    def _prepare_standard_tags(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
         """Standard tag preparation for all handlers."""
         created_by = self._get_package_name()
 
@@ -95,13 +91,10 @@ class BaseContextMixin:
             "has_security_groups": bool(template.security_group_ids),
             # Configuration flags
             "has_instance_types": bool(getattr(template, "instance_types", None)),
-            "has_allocation_strategy": bool(
-                getattr(template, "allocation_strategy", None)
-            ),
+            "has_allocation_strategy": bool(getattr(template, "allocation_strategy", None)),
             # Optional configuration flags
             "has_key_name": hasattr(template, "key_name") and bool(template.key_name),
-            "has_user_data": hasattr(template, "user_data")
-            and bool(template.user_data),
+            "has_user_data": hasattr(template, "user_data") and bool(template.user_data),
             "has_instance_profile": hasattr(template, "instance_profile")
             and bool(template.instance_profile),
             "has_ebs_optimized": hasattr(template, "ebs_optimized")
@@ -115,9 +108,7 @@ class BaseContextMixin:
     ):
         """Apply base tags after resource creation using AWSOperations."""
         if hasattr(self, "aws_operations") and self.aws_operations:
-            self.aws_operations.apply_base_tags_to_resource(
-                resource_id, request, template
-            )
+            self.aws_operations.apply_base_tags_to_resource(resource_id, request, template)
 
     def _tag_fleet_instances_if_needed(
         self, fleet_id: str, request: Request, template: AWSTemplate

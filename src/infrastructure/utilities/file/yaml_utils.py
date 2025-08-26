@@ -29,9 +29,7 @@ def read_yaml_file(file_path: str, encoding: str = "utf-8") -> dict[str, Any]:
         raise yaml.YAMLError(f"Failed to parse YAML file {file_path}: {e!s}")
 
 
-def write_yaml_file(
-    file_path: str, data: dict[str, Any], encoding: str = "utf-8"
-) -> None:
+def write_yaml_file(file_path: str, data: dict[str, Any], encoding: str = "utf-8") -> None:
     """
     Write data to a YAML file.
 

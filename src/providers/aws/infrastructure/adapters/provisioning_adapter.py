@@ -139,12 +139,8 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             )
             return resource_id
         else:
-            self._logger.error(
-                "Provider strategy operation failed: %s", result.error_message
-            )
-            raise InfrastructureError(
-                f"Failed to provision resources: {result.error_message}"
-            )
+            self._logger.error("Provider strategy operation failed: %s", result.error_message)
+            raise InfrastructureError(f"Failed to provision resources: {result.error_message}")
 
     def _provision_via_handlers(self, request: Request, template: Template) -> str:
         """
@@ -163,19 +159,13 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         try:
             # Acquire hosts using the handler
             resource_id = handler.acquire_hosts(request, template)
-            self._logger.info(
-                "Successfully provisioned resources with ID %s", resource_id
-            )
+            self._logger.info("Successfully provisioned resources with ID %s", resource_id)
             return resource_id
         except AWSValidationError as e:
-            self._logger.error(
-                "Validation error during resource provisioning: %s", str(e)
-            )
+            self._logger.error("Validation error during resource provisioning: %s", str(e))
             raise
         except QuotaExceededError as e:
-            self._logger.error(
-                "Quota exceeded during resource provisioning: %s", str(e)
-            )
+            self._logger.error("Quota exceeded during resource provisioning: %s", str(e))
             raise
         except Exception as e:
             self._logger.error("Error during resource provisioning: %s", str(e))
@@ -195,15 +185,11 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             AWSEntityNotFoundError: If the resource is not found
             InfrastructureError: For other infrastructure errors
         """
-        self._logger.info(
-            "Checking status of resources for request %s", request.request_id
-        )
+        self._logger.info("Checking status of resources for request %s", request.request_id)
 
         if not request.resource_id:
             self._logger.error("No resource ID found in request %s", request.request_id)
-            raise AWSEntityNotFoundError(
-                f"No resource ID found in request {request.request_id}"
-            )
+            raise AWSEntityNotFoundError(f"No resource ID found in request {request.request_id}")
 
         # Get the template to determine the handler type
         if not self._template_config_manager:
@@ -257,9 +243,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
 
         if not request.resource_id:
             self._logger.error("No resource ID found in request %s", request.request_id)
-            raise AWSEntityNotFoundError(
-                f"No resource ID found in request {request.request_id}"
-            )
+            raise AWSEntityNotFoundError(f"No resource ID found in request {request.request_id}")
 
         # Get the template to determine the handler type
         if not self._template_config_manager:
@@ -286,9 +270,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         try:
             # Release hosts using the handler
             handler.release_hosts(request)
-            self._logger.info(
-                "Successfully released resources for request %s", request.request_id
-            )
+            self._logger.info("Successfully released resources for request %s", request.request_id)
         except AWSEntityNotFoundError as e:
             self._logger.error("Resource not found during release: %s", str(e))
             raise
@@ -333,9 +315,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
                 }
             elif resource_id.startswith("fleet-"):
                 # EC2 Fleet
-                response = self.aws_client.ec2_client.describe_fleets(
-                    FleetIds=[resource_id]
-                )
+                response = self.aws_client.ec2_client.describe_fleets(FleetIds=[resource_id])
                 if not response["Fleets"]:
                     raise AWSEntityNotFoundError(f"Fleet {resource_id} not found")
 
@@ -344,12 +324,8 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
                     "resource_id": resource_id,
                     "resource_type": "ec2_fleet",
                     "state": fleet["FleetState"],
-                    "status": (
-                        "active" if fleet["FleetState"] == "active" else "inactive"
-                    ),
-                    "target_capacity": fleet["TargetCapacitySpecification"][
-                        "TotalTargetCapacity"
-                    ],
+                    "status": ("active" if fleet["FleetState"] == "active" else "inactive"),
+                    "target_capacity": fleet["TargetCapacitySpecification"]["TotalTargetCapacity"],
                     "fulfilled_capacity": fleet.get("FulfilledCapacity", 0),
                     "details": fleet,
                 }
@@ -367,13 +343,9 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
                     "resource_type": "spot_fleet",
                     "state": fleet["SpotFleetRequestState"],
                     "status": (
-                        "active"
-                        if fleet["SpotFleetRequestState"] == "active"
-                        else "inactive"
+                        "active" if fleet["SpotFleetRequestState"] == "active" else "inactive"
                     ),
-                    "target_capacity": fleet["SpotFleetRequestConfig"][
-                        "TargetCapacity"
-                    ],
+                    "target_capacity": fleet["SpotFleetRequestConfig"]["TargetCapacity"],
                     "fulfilled_capacity": fleet.get("FulfilledCapacity", 0),
                     "details": fleet,
                 }
@@ -382,10 +354,8 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
                 # This is a simplified approach and might need to be expanded
                 try:
                     # Try as ASG
-                    response = (
-                        self.aws_client.autoscaling_client.describe_auto_scaling_groups(
-                            AutoScalingGroupNames=[resource_id]
-                        )
+                    response = self.aws_client.autoscaling_client.describe_auto_scaling_groups(
+                        AutoScalingGroupNames=[resource_id]
                     )
                     if response["AutoScalingGroups"]:
                         asg = response["AutoScalingGroups"][0]

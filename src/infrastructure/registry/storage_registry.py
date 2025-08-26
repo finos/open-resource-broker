@@ -141,9 +141,7 @@ class StorageRegistry(BaseRegistry):
         except ValueError as e:
             raise UnsupportedStorageError(str(e))
         except Exception as e:
-            error_msg = (
-                f"Failed to create config for storage type '{storage_type}': {e!s}"
-            )
+            error_msg = f"Failed to create config for storage type '{storage_type}': {e!s}"
             self.logger.error(error_msg)
             raise ConfigurationError(error_msg)
 
@@ -198,9 +196,7 @@ class StorageRegistry(BaseRegistry):
         except ImportError as e:
             from domain.base.exceptions import ConfigurationError
 
-            raise ConfigurationError(
-                f"Storage type '{storage_type}' not available: {e}"
-            )
+            raise ConfigurationError(f"Storage type '{storage_type}' not available: {e}")
 
     def _create_registration(
         self,

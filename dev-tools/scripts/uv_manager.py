@@ -18,9 +18,7 @@ def check_uv_available() -> bool:
     return shutil.which("uv") is not None
 
 
-def run_command(
-    cmd: list[str], capture_output: bool = False
-) -> subprocess.CompletedProcess:
+def run_command(cmd: list[str], capture_output: bool = False) -> subprocess.CompletedProcess:
     """Run command and return result."""
     try:
         return subprocess.run(cmd, check=True, capture_output=capture_output, text=True)
@@ -63,9 +61,7 @@ def uv_lock() -> int:
                 "requirements-dev.lock",
             ]
         )
-        logger.info(
-            "SUCCESS: Lock files generated: requirements.lock, requirements-dev.lock"
-        )
+        logger.info("SUCCESS: Lock files generated: requirements.lock, requirements-dev.lock")
         return 0
     except subprocess.CalledProcessError:
         return 1
@@ -134,9 +130,7 @@ def uv_benchmark() -> int:
         logger.info("INFO: Testing pip installation speed...")
         start_time = time.time()
         run_command(["python", "-m", "venv", ".venv-pip-test"])
-        run_command(
-            [".venv-pip-test/bin/pip", "install", "-e", ".[dev]"], capture_output=True
-        )
+        run_command([".venv-pip-test/bin/pip", "install", "-e", ".[dev]"], capture_output=True)
         pip_time = time.time() - start_time
 
         logger.info("")
@@ -190,9 +184,7 @@ def main() -> int:
 
     # Sync commands
     subparsers.add_parser("sync", help="Sync environment with uv lock files")
-    subparsers.add_parser(
-        "sync-dev", help="Sync development environment with uv lock files"
-    )
+    subparsers.add_parser("sync-dev", help="Sync development environment with uv lock files")
 
     # Check command
     subparsers.add_parser("check", help="Check if uv is available and show version")

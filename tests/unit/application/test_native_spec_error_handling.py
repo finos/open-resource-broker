@@ -55,9 +55,7 @@ class TestNativeSpecErrorHandling:
         spec = {"InstanceType": "{{ invalid_syntax }"}
         context = {"instance_type": "t3.micro"}
 
-        self.mock_spec_renderer.render_spec.side_effect = TemplateError(
-            "Invalid template syntax"
-        )
+        self.mock_spec_renderer.render_spec.side_effect = TemplateError("Invalid template syntax")
 
         with pytest.raises(TemplateError):
             self.service.render_spec(spec, context)
@@ -76,9 +74,7 @@ class TestNativeSpecErrorHandling:
 
     def test_config_port_error(self):
         """Test error handling when config port fails."""
-        self.mock_config_port.get_native_spec_config.side_effect = Exception(
-            "Config error"
-        )
+        self.mock_config_port.get_native_spec_config.side_effect = Exception("Config error")
 
         with pytest.raises(Exception) as exc_info:
             self.service.is_native_spec_enabled()
@@ -170,9 +166,7 @@ class TestNativeSpecErrorHandling:
         context = {"circular_ref": circular_dict}
 
         # Mock renderer should handle this appropriately
-        self.mock_spec_renderer.render_spec.side_effect = ValueError(
-            "Circular reference detected"
-        )
+        self.mock_spec_renderer.render_spec.side_effect = ValueError("Circular reference detected")
 
         with pytest.raises(ValueError):
             self.service.render_spec(spec, context)
@@ -241,9 +235,7 @@ class TestNativeSpecErrorHandling:
         context = {"very_complex_computation": "result"}
 
         # Simulate timeout
-        self.mock_spec_renderer.render_spec.side_effect = TimeoutError(
-            "Template rendering timeout"
-        )
+        self.mock_spec_renderer.render_spec.side_effect = TimeoutError("Template rendering timeout")
 
         with pytest.raises(TimeoutError):
             self.service.render_spec(spec, context)

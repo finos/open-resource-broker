@@ -43,9 +43,7 @@ class SchedulerRegistry(BaseRegistry):
     ) -> None:
         """Register scheduler strategy factory - implements abstract method."""
         try:
-            self.register_type(
-                scheduler_type, strategy_factory, config_factory, **kwargs
-            )
+            self.register_type(scheduler_type, strategy_factory, config_factory, **kwargs)
         except ValueError as e:
             raise ConfigurationError(str(e))
 
@@ -79,9 +77,7 @@ class SchedulerRegistry(BaseRegistry):
             else:
                 raise ValueError(f"Unknown scheduler type: {scheduler_type}")
         except ImportError as e:
-            raise ConfigurationError(
-                f"Scheduler type '{scheduler_type}' not available: {e}"
-            )
+            raise ConfigurationError(f"Scheduler type '{scheduler_type}' not available: {e}")
 
     def _create_registration(
         self,

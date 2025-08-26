@@ -176,9 +176,7 @@ class StrategyBasedRepository(Repository[T], Generic[T]):
                 event_bus = get_event_bus()
 
                 # Handle both new EventBus and legacy publisher
-                if hasattr(event_bus, "publish") and asyncio.iscoroutinefunction(
-                    event_bus.publish
-                ):
+                if hasattr(event_bus, "publish") and asyncio.iscoroutinefunction(event_bus.publish):
                     # New EventBus (async)
                     for event in events:
                         try:

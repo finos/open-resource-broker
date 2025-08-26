@@ -17,9 +17,7 @@ class StrategyStats:
     consecutive_successes: int = 0
     is_healthy: bool = True
     last_health_check: Optional[float] = None
-    response_times: deque = field(
-        default_factory=lambda: deque(maxlen=10)
-    )  # Recent response times
+    response_times: deque = field(default_factory=lambda: deque(maxlen=10))  # Recent response times
     average_response_time: float = 0.0
     weight: float = 1.0
 
@@ -56,9 +54,7 @@ class StrategyStats:
         # Update response time statistics
         self.response_times.append(response_time_ms)
         if self.response_times:
-            self.average_response_time = sum(self.response_times) / len(
-                self.response_times
-            )
+            self.average_response_time = sum(self.response_times) / len(self.response_times)
 
     def reset_stats(self) -> None:
         """Reset all statistics."""

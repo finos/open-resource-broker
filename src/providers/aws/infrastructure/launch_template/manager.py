@@ -158,9 +158,7 @@ class AWSLaunchTemplateManager:
             )
 
             version = str(response["LaunchTemplateVersion"]["VersionNumber"])
-            self._logger.info(
-                "Using version %s of launch template %s", version, template_id
-            )
+            self._logger.info("Using version %s of launch template %s", version, template_id)
 
             return LaunchTemplateResult(
                 template_id=template_id,
@@ -171,10 +169,7 @@ class AWSLaunchTemplateManager:
             )
 
         except ClientError as e:
-            if (
-                e.response["Error"]["Code"]
-                == "InvalidLaunchTemplateName.NotFoundException"
-            ):
+            if e.response["Error"]["Code"] == "InvalidLaunchTemplateName.NotFoundException":
                 # Template doesn't exist, create it
                 return self._create_new_launch_template(
                     launch_template_name,
@@ -187,9 +182,7 @@ class AWSLaunchTemplateManager:
                 # Some other error
                 raise
 
-    def _create_or_reuse_base_template(
-        self, aws_template: AWSTemplate
-    ) -> LaunchTemplateResult:
+    def _create_or_reuse_base_template(self, aws_template: AWSTemplate) -> LaunchTemplateResult:
         """
         Create or reuse a base launch template (not per-request).
         This strategy creates one template per template_id and reuses it.
@@ -204,9 +197,7 @@ class AWSLaunchTemplateManager:
         # For now, not implemented as we're using per-request strategy
         raise NotImplementedError("Base template strategy not yet implemented")
 
-    def _use_existing_template_strategy(
-        self, aws_template: AWSTemplate
-    ) -> LaunchTemplateResult:
+    def _use_existing_template_strategy(self, aws_template: AWSTemplate) -> LaunchTemplateResult:
         """
         Use an existing launch template specified in the template configuration.
 
@@ -227,9 +218,7 @@ class AWSLaunchTemplateManager:
 
             template_name = response["LaunchTemplates"][0]["LaunchTemplateName"]
 
-            self._logger.info(
-                "Using existing launch template %s version %s", template_id, version
-            )
+            self._logger.info("Using existing launch template %s version %s", template_id, version)
 
             return LaunchTemplateResult(
                 template_id=template_id,
@@ -284,9 +273,7 @@ class AWSLaunchTemplateManager:
         )
 
         launch_template = response["LaunchTemplate"]
-        self._logger.info(
-            "Created launch template %s", launch_template["LaunchTemplateId"]
-        )
+        self._logger.info("Created launch template %s", launch_template["LaunchTemplateId"])
 
         return LaunchTemplateResult(
             template_id=launch_template["LaunchTemplateId"],
@@ -296,9 +283,7 @@ class AWSLaunchTemplateManager:
             is_new_version=True,
         )
 
-    def _prepare_template_context(
-        self, template: AWSTemplate, request: Request
-    ) -> dict[str, Any]:
+    def _prepare_template_context(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
         """Prepare context with all computed values for template rendering."""
 
         # Get package name for CreatedBy tag
@@ -339,9 +324,7 @@ class AWSLaunchTemplateManager:
             "associate_public_ip": True,
             # Optional configurations
             "key_name": (
-                template.key_name
-                if hasattr(template, "key_name") and template.key_name
-                else None
+                template.key_name if hasattr(template, "key_name") and template.key_name else None
             ),
             "user_data": (
                 template.user_data
@@ -355,8 +338,7 @@ class AWSLaunchTemplateManager:
             ),
             "ebs_optimized": (
                 template.ebs_optimized
-                if hasattr(template, "ebs_optimized")
-                and template.ebs_optimized is not None
+                if hasattr(template, "ebs_optimized") and template.ebs_optimized is not None
                 else None
             ),
             "monitoring_enabled": (
@@ -369,8 +351,7 @@ class AWSLaunchTemplateManager:
             "has_subnet": hasattr(template, "subnet_id") and bool(template.subnet_id),
             "has_security_groups": bool(template.security_group_ids),
             "has_key_name": hasattr(template, "key_name") and bool(template.key_name),
-            "has_user_data": hasattr(template, "user_data")
-            and bool(template.user_data),
+            "has_user_data": hasattr(template, "user_data") and bool(template.user_data),
             "has_instance_profile": hasattr(template, "instance_profile")
             and bool(template.instance_profile),
             "has_ebs_optimized": hasattr(template, "ebs_optimized")
@@ -410,9 +391,7 @@ class AWSLaunchTemplateManager:
 
             # Use template-driven approach with native spec service
             context = self._prepare_template_context(aws_template, request)
-            return self.aws_native_spec_service.render_default_spec(
-                "launch-template", context
-            )
+            return self.aws_native_spec_service.render_default_spec("launch-template", context)
 
         # Fallback to legacy logic when native spec service is not available
         return self._create_launch_template_data_legacy(aws_template, request)
@@ -438,9 +417,7 @@ class AWSLaunchTemplateManager:
             raise AWSValidationError(error_msg)
 
         # Log the image_id being used
-        self._logger.info(
-            "Creating launch template with resolved image_id: %s", image_id
-        )
+        self._logger.info("Creating launch template with resolved image_id: %s", image_id)
 
         # Get instance name using the helper function
         get_instance_name(request.request_id)
@@ -477,15 +454,10 @@ class AWSLaunchTemplateManager:
             launch_template_data["UserData"] = aws_template.user_data
 
         if aws_template.instance_profile:
-            launch_template_data["IamInstanceProfile"] = {
-                "Name": aws_template.instance_profile
-            }
+            launch_template_data["IamInstanceProfile"] = {"Name": aws_template.instance_profile}
 
         # Add EBS optimization if specified (check if attribute exists)
-        if (
-            hasattr(aws_template, "ebs_optimized")
-            and aws_template.ebs_optimized is not None
-        ):
+        if hasattr(aws_template, "ebs_optimized") and aws_template.ebs_optimized is not None:
             launch_template_data["EbsOptimized"] = aws_template.ebs_optimized
 
         # Add monitoring if specified
@@ -493,9 +465,7 @@ class AWSLaunchTemplateManager:
             hasattr(aws_template, "monitoring_enabled")
             and aws_template.monitoring_enabled is not None
         ):
-            launch_template_data["Monitoring"] = {
-                "Enabled": aws_template.monitoring_enabled
-            }
+            launch_template_data["Monitoring"] = {"Enabled": aws_template.monitoring_enabled}
 
         return launch_template_data
 
@@ -534,9 +504,7 @@ class AWSLaunchTemplateManager:
 
         # Add template tags if any
         if aws_template.tags:
-            template_tags = [
-                {"Key": k, "Value": str(v)} for k, v in aws_template.tags.items()
-            ]
+            template_tags = [{"Key": k, "Value": str(v)} for k, v in aws_template.tags.items()]
             tags.extend(template_tags)
 
         return tags
@@ -573,9 +541,7 @@ class AWSLaunchTemplateManager:
             {"Key": "CreatedBy", "Value": created_by},
         ]
 
-    def _generate_client_token(
-        self, request: Request, aws_template: AWSTemplate
-    ) -> str:
+    def _generate_client_token(self, request: Request, aws_template: AWSTemplate) -> str:
         """
         Generate a deterministic client token for idempotency.
 
@@ -588,8 +554,6 @@ class AWSLaunchTemplateManager:
         """
         # Generate a deterministic client token based on the request ID, template ID, and image ID
         # This ensures idempotency - identical requests will return the same result
-        token_input = (
-            f"{request.request_id}:{aws_template.template_id}:{aws_template.image_id}"
-        )
+        token_input = f"{request.request_id}:{aws_template.template_id}:{aws_template.image_id}"
         # Truncate to 32 chars
         return hashlib.sha256(token_input.encode()).hexdigest()[:32]

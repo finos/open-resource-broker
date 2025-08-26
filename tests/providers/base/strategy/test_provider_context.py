@@ -21,14 +21,10 @@ from providers.base.strategy.provider_strategy import (
 class MockProviderStrategy(ProviderStrategy):
     """Mock provider strategy for testing."""
 
-    def __init__(
-        self, provider_type: str, supports_operations=None, health_status=None
-    ):
+    def __init__(self, provider_type: str, supports_operations=None, health_status=None):
         """Initialize the instance."""
         self._provider_type = provider_type
-        self._supports_operations = supports_operations or [
-            ProviderOperationType.CREATE_INSTANCES
-        ]
+        self._supports_operations = supports_operations or [ProviderOperationType.CREATE_INSTANCES]
         self._health_status = health_status or ProviderHealthStatus.healthy()
         self._initialized = False
         self.execute_count = 0
@@ -52,9 +48,7 @@ class MockProviderStrategy(ProviderStrategy):
         """Execute an operation."""
         self.execute_count += 1
         if operation.operation_type in self._supports_operations:
-            return ProviderResult.success_result(
-                {"executed": True, "count": self.execute_count}
-            )
+            return ProviderResult.success_result({"executed": True, "count": self.execute_count})
         return ProviderResult.error_result("Operation not supported", "UNSUPPORTED")
 
     def get_capabilities(self) -> ProviderCapabilities:
@@ -138,9 +132,7 @@ class TestProviderContext:
 
     def test_register_invalid_strategy(self, provider_context):
         """Test registering invalid strategy raises error."""
-        with pytest.raises(
-            ValueError, match="Strategy must implement ProviderStrategy interface"
-        ):
+        with pytest.raises(ValueError, match="Strategy must implement ProviderStrategy interface"):
             provider_context.register_strategy("not-a-strategy")
 
     def test_unregister_strategy(self, provider_context):
@@ -322,9 +314,7 @@ class TestProviderContext:
         capabilities = provider_context.get_strategy_capabilities("test-provider")
 
         assert capabilities is not None
-        assert (
-            ProviderOperationType.CREATE_INSTANCES in capabilities.supported_operations
-        )
+        assert ProviderOperationType.CREATE_INSTANCES in capabilities.supported_operations
 
     def test_context_manager(self, provider_context):
         """Test provider context as context manager."""

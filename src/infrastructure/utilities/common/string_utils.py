@@ -156,9 +156,7 @@ def hash_string(value: str, algorithm: str = "sha256") -> str:
         raise ValueError(f"Unsupported hash algorithm: {algorithm}")
 
 
-def mask_sensitive_data(
-    value: str, mask_char: str = "*", visible_chars: int = 4
-) -> str:
+def mask_sensitive_data(value: str, mask_char: str = "*", visible_chars: int = 4) -> str:
     """
     Mask sensitive data in a string.
 

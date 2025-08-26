@@ -44,9 +44,7 @@ class TemplateAdapterPort(ABC):
         """
 
     @abstractmethod
-    async def get_templates_by_provider_api(
-        self, provider_api: str
-    ) -> list[TemplateContract]:
+    async def get_templates_by_provider_api(self, provider_api: str) -> list[TemplateContract]:
         """
         Get templates filtered by provider API.
 
@@ -58,9 +56,7 @@ class TemplateAdapterPort(ABC):
         """
 
     @abstractmethod
-    async def validate_template(
-        self, template: TemplateContract
-    ) -> TemplateValidationResult:
+    async def validate_template(self, template: TemplateContract) -> TemplateValidationResult:
         """
         Validate a template configuration.
 

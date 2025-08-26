@@ -113,9 +113,7 @@ class ActionEventHandler(EventHandler):
             aggregate_id = getattr(event, "aggregate_id", "unknown")
             self.logger.debug("Action completed for %s (%s)", event_type, aggregate_id)
 
-    async def _handle_error(
-        self, event: DomainEvent, error: Exception, duration: float
-    ) -> None:
+    async def _handle_error(self, event: DomainEvent, error: Exception, duration: float) -> None:
         """
         Comprehensive error handling for action handlers.
 
@@ -148,9 +146,7 @@ class ActionEventHandler(EventHandler):
         if self.logger:
             event_type = getattr(event, "event_type", "unknown")
             aggregate_id = getattr(event, "aggregate_id", "unknown")
-            self.logger.error(
-                "Action failed for %s (%s): %s", event_type, aggregate_id, str(error)
-            )
+            self.logger.error("Action failed for %s (%s): %s", event_type, aggregate_id, str(error))
 
     def extract_action_data(self, event: DomainEvent) -> dict[str, Any]:
         """

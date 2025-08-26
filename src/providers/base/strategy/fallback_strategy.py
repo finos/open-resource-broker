@@ -270,9 +270,7 @@ class FallbackProviderStrategy(ProviderStrategy):
                         strategy.provider_type,
                     )
             except Exception as e:
-                self._self._logger.error(
-                    "Error initializing fallback strategy %s: %s", i + 1, e
-                )
+                self._self._logger.error("Error initializing fallback strategy %s: %s", i + 1, e)
 
         # Consider initialization successful if at least one strategy works
         self._initialized = success_count > 0
@@ -346,9 +344,7 @@ class FallbackProviderStrategy(ProviderStrategy):
                 {"total_execution_time_ms": total_time_ms},
             )
 
-    async def _execute_with_circuit_breaker(
-        self, operation: ProviderOperation
-    ) -> ProviderResult:
+    async def _execute_with_circuit_breaker(self, operation: ProviderOperation) -> ProviderResult:
         """Execute operation using circuit breaker pattern."""
         with self._lock:
             current_time = time.time()
@@ -384,10 +380,7 @@ class FallbackProviderStrategy(ProviderStrategy):
                 else:
                     # Failure - record and potentially open circuit
                     self._circuit_state.record_failure()
-                    if (
-                        self._circuit_state.failure_count
-                        >= self._config.circuit_breaker_threshold
-                    ):
+                    if self._circuit_state.failure_count >= self._config.circuit_breaker_threshold:
                         self._circuit_state.state = CircuitState.OPEN
                         self._self._logger.warning(
                             "Circuit breaker opened after %s failures",
@@ -400,20 +393,13 @@ class FallbackProviderStrategy(ProviderStrategy):
             except Exception as e:
                 # Exception - record failure and try fallback
                 self._circuit_state.record_failure()
-                if (
-                    self._circuit_state.failure_count
-                    >= self._config.circuit_breaker_threshold
-                ):
+                if self._circuit_state.failure_count >= self._config.circuit_breaker_threshold:
                     self._circuit_state.state = CircuitState.OPEN
-                    self._self._logger.warning(
-                        "Circuit breaker opened after exception: %s", e
-                    )
+                    self._self._logger.warning("Circuit breaker opened after exception: %s", e)
 
                 return await self._execute_fallback_chain(operation)
 
-    async def _execute_with_retry_fallback(
-        self, operation: ProviderOperation
-    ) -> ProviderResult:
+    async def _execute_with_retry_fallback(self, operation: ProviderOperation) -> ProviderResult:
         """Execute operation with retry then fallback."""
         last_error = None
 
@@ -453,9 +439,7 @@ class FallbackProviderStrategy(ProviderStrategy):
         )
         return await self._execute_fallback_chain(operation)
 
-    async def _execute_health_based(
-        self, operation: ProviderOperation
-    ) -> ProviderResult:
+    async def _execute_health_based(self, operation: ProviderOperation) -> ProviderResult:
         """Execute operation based on health status."""
         # Check primary health
         if self._primary_healthy:
@@ -470,17 +454,13 @@ class FallbackProviderStrategy(ProviderStrategy):
                     return await self._execute_fallback_chain(operation)
             except Exception as e:
                 self._primary_healthy = False
-                self._self._logger.warning(
-                    "Primary strategy failed, marking unhealthy: %s", e
-                )
+                self._self._logger.warning("Primary strategy failed, marking unhealthy: %s", e)
                 return await self._execute_fallback_chain(operation)
         else:
             # Primary is unhealthy, use fallback directly
             return await self._execute_fallback_chain(operation)
 
-    async def _execute_immediate_fallback(
-        self, operation: ProviderOperation
-    ) -> ProviderResult:
+    async def _execute_immediate_fallback(self, operation: ProviderOperation) -> ProviderResult:
         """Execute operation with immediate fallback on any failure."""
         try:
             result = await self._primary_strategy.execute_operation(operation)
@@ -493,9 +473,7 @@ class FallbackProviderStrategy(ProviderStrategy):
             self._self._logger.debug("Primary strategy failed, trying fallback: %s", e)
             return await self._execute_fallback_chain(operation)
 
-    async def _execute_fallback_chain(
-        self, operation: ProviderOperation
-    ) -> ProviderResult:
+    async def _execute_fallback_chain(self, operation: ProviderOperation) -> ProviderResult:
         """Execute operation through the fallback chain."""
         last_error = None
 
@@ -518,9 +496,7 @@ class FallbackProviderStrategy(ProviderStrategy):
                     return result
                 else:
                     last_error = result.error_message
-                    self._self._logger.debug(
-                        "Fallback strategy %s failed: %s", i + 1, last_error
-                    )
+                    self._self._logger.debug("Fallback strategy %s failed: %s", i + 1, last_error)
 
             except Exception as e:
                 last_error = str(e)
@@ -568,10 +544,7 @@ class FallbackProviderStrategy(ProviderStrategy):
     def _update_health_status(self) -> None:
         """Update health status of primary strategy if needed."""
         current_time = time.time()
-        if (
-            current_time - self._last_health_check
-            >= self._config.health_check_interval_seconds
-        ):
+        if current_time - self._last_health_check >= self._config.health_check_interval_seconds:
             try:
                 health = self._primary_strategy.check_health()
                 self._primary_healthy = health.is_healthy
@@ -615,16 +588,12 @@ class FallbackProviderStrategy(ProviderStrategy):
                 fallback_info.append(
                     {
                         "provider_type": strategy.provider_type,
-                        "operations": [
-                            op.value for op in capabilities.supported_operations
-                        ],
+                        "operations": [op.value for op in capabilities.supported_operations],
                         "features": capabilities.features,
                     }
                 )
             except Exception as e:
-                self._self._logger.warning(
-                    "Error getting fallback %s capabilities: %s", i + 1, e
-                )
+                self._self._logger.warning("Error getting fallback %s capabilities: %s", i + 1, e)
 
         # Add fallback-specific features
         combined_features.update(

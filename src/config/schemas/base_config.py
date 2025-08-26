@@ -7,12 +7,8 @@ class BaseCircuitBreakerConfig(BaseModel):
     """Base circuit breaker configuration."""
 
     enabled: bool = Field(True, description="Enable circuit breaker")
-    failure_threshold: int = Field(
-        5, description="Number of failures before opening circuit"
-    )
-    recovery_timeout: int = Field(
-        60, description="Time to wait before attempting recovery"
-    )
+    failure_threshold: int = Field(5, description="Number of failures before opening circuit")
+    recovery_timeout: int = Field(60, description="Time to wait before attempting recovery")
     half_open_max_calls: int = Field(3, description="Max calls in half-open state")
 
     @field_validator("failure_threshold")

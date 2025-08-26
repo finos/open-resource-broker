@@ -79,9 +79,7 @@ class TestFullWorkflow:
             assert template is not None
             assert isinstance(template, Template)
 
-    def test_machine_request_workflow(
-        self, test_config_file: Path, aws_mocks, mock_ec2_resources
-    ):
+    def test_machine_request_workflow(self, test_config_file: Path, aws_mocks, mock_ec2_resources):
         """Test machine request workflow."""
         app = Application(config_path=str(test_config_file))
         app.initialize()
@@ -127,9 +125,7 @@ class TestFullWorkflow:
             assert status["status"] == "processing"
             assert status["progress"] == 50.0
 
-    def test_machine_return_workflow(
-        self, test_config_file: Path, aws_mocks, mock_ec2_resources
-    ):
+    def test_machine_return_workflow(self, test_config_file: Path, aws_mocks, mock_ec2_resources):
         """Test machine return workflow."""
         app = Application(config_path=str(test_config_file))
         app.initialize()
@@ -303,9 +299,7 @@ class TestFullWorkflow:
         query_bus = container.get_query_bus()
         assert query_bus is not None
 
-    def test_provider_integration(
-        self, test_config_file: Path, aws_mocks, mock_ec2_resources
-    ):
+    def test_provider_integration(self, test_config_file: Path, aws_mocks, mock_ec2_resources):
         """Test provider integration."""
         app = Application(config_path=str(test_config_file))
         app.initialize()
@@ -604,9 +598,7 @@ class TestPerformanceIntegration:
             large_template_list.append(template)
 
         with patch.object(service, "_template_service") as mock_template_service:
-            mock_template_service.get_available_templates.return_value = (
-                large_template_list
-            )
+            mock_template_service.get_available_templates.return_value = large_template_list
 
             import time
 
@@ -652,9 +644,7 @@ class TestPerformanceIntegration:
                 end_times.append(end_time)
 
         # Run 50 concurrent operations
-        threads = [
-            threading.Thread(target=performance_worker, args=(i,)) for i in range(50)
-        ]
+        threads = [threading.Thread(target=performance_worker, args=(i,)) for i in range(50)]
 
         overall_start = time.time()
 

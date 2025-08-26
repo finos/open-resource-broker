@@ -14,9 +14,7 @@ class TestSchedulerNativeSpecParsing:
         )
 
         # Mock the dependencies to avoid DI container issues
-        with patch(
-            "infrastructure.scheduler.hostfactory.strategy.get_container"
-        ) as mock_container:
+        with patch("infrastructure.scheduler.hostfactory.strategy.get_container") as mock_container:
             mock_container.return_value.get.return_value = Mock()
 
             config_manager = Mock()
@@ -55,9 +53,7 @@ class TestSchedulerNativeSpecParsing:
             HostFactorySchedulerStrategy,
         )
 
-        with patch(
-            "infrastructure.scheduler.hostfactory.strategy.get_container"
-        ) as mock_container:
+        with patch("infrastructure.scheduler.hostfactory.strategy.get_container") as mock_container:
             mock_container.return_value.get.return_value = Mock()
 
             config_manager = Mock()
@@ -95,9 +91,7 @@ class TestSchedulerNativeSpecParsing:
             HostFactorySchedulerStrategy,
         )
 
-        with patch(
-            "infrastructure.scheduler.hostfactory.strategy.get_container"
-        ) as mock_container:
+        with patch("infrastructure.scheduler.hostfactory.strategy.get_container") as mock_container:
             mock_container.return_value.get.return_value = Mock()
 
             config_manager = Mock()

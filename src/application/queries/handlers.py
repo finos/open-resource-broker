@@ -86,13 +86,9 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 # No machines in storage but we have resource IDs - check provider and
                 # create machines
                 machines = await self._check_provider_and_create_machines(request)
-                self.logger.info(
-                    "DEBUG: Provider check returned %s machines", len(machines)
-                )
+                self.logger.info("DEBUG: Provider check returned %s machines", len(machines))
             elif machines:
-                self.logger.info(
-                    "DEBUG: Have %s machines, updating status from AWS", len(machines)
-                )
+                self.logger.info("DEBUG: Have %s machines, updating status from AWS", len(machines))
                 # We have machines - update their status from AWS
                 machines = await self._update_machine_status_from_aws(machines)
             else:
@@ -112,9 +108,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                         "public_ip": machine.public_ip,
                         "launch_time": machine.launch_time,
                         "launch_time_timestamp": (
-                            machine.launch_time.timestamp()
-                            if machine.launch_time
-                            else 0
+                            machine.launch_time.timestamp() if machine.launch_time else 0
                         ),
                     }
                 )
@@ -192,9 +186,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
                 parameters={
                     "resource_ids": request.resource_ids,
-                    "provider_api": request.metadata.get(
-                        "provider_api", "RunInstances"
-                    ),
+                    "provider_api": request.metadata.get("provider_api", "RunInstances"),
                     "template_id": request.template_id,
                 },
                 context={
@@ -212,9 +204,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             )
             self.logger.info("Operation parameters: %s", operation.parameters)
 
-            result = await provider_context.execute_with_strategy(
-                strategy_identifier, operation
-            )
+            result = await provider_context.execute_with_strategy(strategy_identifier, operation)
 
             self.logger.info(
                 "Provider strategy result: success=%s, data_keys=%s",
@@ -232,9 +222,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             # Get instance details from result
             instance_details = result.data.get("instances", [])
             if not instance_details:
-                self.logger.info(
-                    "No instances found for request %s", request.request_id
-                )
+                self.logger.info("No instances found for request %s", request.request_id)
                 return []
 
             # Create machine aggregates from instance details
@@ -307,14 +295,10 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             # Use the correct strategy identifier format:
             # provider_type-provider_type-instance
             strategy_identifier = f"{request.provider_type}-{request.provider_type}-{request.provider_instance or 'default'}"
-            result = await provider_context.execute_with_strategy(
-                strategy_identifier, operation
-            )
+            result = await provider_context.execute_with_strategy(strategy_identifier, operation)
 
             if not result.success:
-                self.logger.warning(
-                    "Failed to check resource status: %s", result.error_message
-                )
+                self.logger.warning("Failed to check resource status: %s", result.error_message)
                 return machines
 
             # Extract domain machine entities from result (provider strategy already
@@ -564,9 +548,7 @@ class GetRequestStatusQueryHandler(BaseQueryHandler[GetRequestStatusQuery, str])
 
 
 @query_handler(ListActiveRequestsQuery)
-class ListActiveRequestsHandler(
-    BaseQueryHandler[ListActiveRequestsQuery, list[RequestDTO]]
-):
+class ListActiveRequestsHandler(BaseQueryHandler[ListActiveRequestsQuery, list[RequestDTO]]):
     """Handler for listing active requests."""
 
     def __init__(
@@ -618,9 +600,7 @@ class ListActiveRequestsHandler(
 
 
 @query_handler(ListReturnRequestsQuery)
-class ListReturnRequestsHandler(
-    BaseQueryHandler[ListReturnRequestsQuery, list[RequestDTO]]
-):
+class ListReturnRequestsHandler(BaseQueryHandler[ListReturnRequestsQuery, list[RequestDTO]]):
     """Handler for listing return requests."""
 
     def __init__(
@@ -705,17 +685,12 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, Template]):
                 "name": template_dto.name or template_dto.template_id,
                 "provider_api": template_dto.provider_api or "aws",
                 # Extract required fields from configuration with defaults
-                "image_id": config.get("image_id")
-                or config.get("imageId")
-                or "default-image",
+                "image_id": config.get("image_id") or config.get("imageId") or "default-image",
                 "subnet_ids": config.get("subnet_ids")
                 or config.get("subnetIds")
                 or ["default-subnet"],
-                "instance_type": config.get("instance_type")
-                or config.get("instanceType"),
-                "max_instances": config.get("max_instances")
-                or config.get("maxNumber")
-                or 1,
+                "instance_type": config.get("instance_type") or config.get("instanceType"),
+                "max_instances": config.get("max_instances") or config.get("maxNumber") or 1,
                 "security_group_ids": config.get("security_group_ids")
                 or config.get("securityGroupIds")
                 or [],
@@ -802,9 +777,7 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[Template]])
                         domain_templates.append(domain_template)
 
                     except Exception as e:
-                        self.logger.warning(
-                            "Skipping invalid template %s: %s", dto.template_id, e
-                        )
+                        self.logger.warning("Skipping invalid template %s: %s", dto.template_id, e)
                         continue
 
             self.logger.info("Found %s templates", len(domain_templates))
@@ -841,9 +814,7 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
             template_port = self.container.get(TemplateConfigurationPort)
 
             # Validate template configuration
-            validation_errors = template_port.validate_template_config(
-                query.configuration
-            )
+            validation_errors = template_port.validate_template_config(query.configuration)
 
             # Log validation results
             if validation_errors:
@@ -863,9 +834,7 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
             }
 
         except Exception as e:
-            self.logger.error(
-                "Template validation failed for %s: %s", query.template_id, e
-            )
+            self.logger.error("Template validation failed for %s: %s", query.template_id, e)
             return {
                 "template_id": query.template_id,
                 "is_valid": False,
@@ -958,9 +927,7 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, list[MachineDTO]])
                         machine_id=str(machine.machine_id),
                         provider_id=machine.provider_id,
                         template_id=machine.template_id,
-                        request_id=(
-                            str(machine.request_id) if machine.request_id else None
-                        ),
+                        request_id=(str(machine.request_id) if machine.request_id else None),
                         status=machine.status.value,
                         instance_type=machine.instance_type,
                         created_at=machine.created_at,

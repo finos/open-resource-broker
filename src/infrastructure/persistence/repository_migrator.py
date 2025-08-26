@@ -108,9 +108,7 @@ class RepositoryMigrator:
             stats["status"] = "success"
             stats["completed_at"] = datetime.utcnow().isoformat()
 
-            self.logger.info(
-                "Migration completed: %s items migrated", stats["total_migrated"]
-            )
+            self.logger.info("Migration completed: %s items migrated", stats["total_migrated"])
 
         except Exception as e:
             self.logger.error("Migration failed: %s", str(e))
@@ -120,9 +118,7 @@ class RepositoryMigrator:
 
         return stats
 
-    def _create_repositories_for_storage_type(
-        self, storage_type: str
-    ) -> dict[str, Repository]:
+    def _create_repositories_for_storage_type(self, storage_type: str) -> dict[str, Repository]:
         """
         Create repositories for a specific storage type.
 
@@ -149,9 +145,7 @@ class RepositoryMigrator:
 
                 # Use centralized file resolution for consistent HF_PROVIDER_CONFDIR
                 # support
-                templates_path = config_manager.resolve_file(
-                    "template", "templates.json"
-                )
+                templates_path = config_manager.resolve_file("template", "templates.json")
                 legacy_templates_path = config_manager.resolve_file(
                     "template", "awsprov_templates.json"
                 )
@@ -163,14 +157,10 @@ class RepositoryMigrator:
                 get_logger().info("  awsprov_templates.json: %s", legacy_templates_path)
 
                 # Create a new template repository
-                template_repo = JSONTemplateRepository(
-                    templates_path, legacy_templates_path
-                )
+                template_repo = JSONTemplateRepository(templates_path, legacy_templates_path)
 
                 # Register it with the container
-                self.container.register_singleton(
-                    TemplateRepositoryInterface, template_repo
-                )
+                self.container.register_singleton(TemplateRepositoryInterface, template_repo)
 
             # For other repositories, create based on storage type
             if storage_type == "dynamodb":
@@ -209,9 +199,7 @@ class RepositoryMigrator:
 
                 # Get SQL config
                 sql_config = self.config_manager.get("sql", {})
-                connection_string = sql_config.get(
-                    "connection_string", "sqlite:///data.db"
-                )
+                connection_string = sql_config.get("connection_string", "sqlite:///data.db")
 
                 # Create engine and session
                 engine = create_engine(connection_string)
@@ -336,9 +324,7 @@ class RepositoryMigrator:
         try:
             items = source_repo.find_all()
             stats["total_items"] = len(items)
-            self.logger.info(
-                "Migrating %s items from %s", stats["total_items"], collection_name
-            )
+            self.logger.info("Migrating %s items from %s", stats["total_items"], collection_name)
 
             # Process in batches
             for i in range(0, len(items), batch_size):
@@ -351,9 +337,7 @@ class RepositoryMigrator:
                     try:
                         item_id = self._get_item_id(item, collection_name)
                         if not item_id:
-                            raise ValueError(
-                                f"Item without ID found in {collection_name}"
-                            )
+                            raise ValueError(f"Item without ID found in {collection_name}")
 
                         # Check if the item is already an entity object
                         if (
@@ -393,9 +377,7 @@ class RepositoryMigrator:
                                     entity_class = None
                                     # Use getattr with a default value to safely access
                                     # the attribute
-                                    entity_class = getattr(
-                                        target_repo, "entity_class", None
-                                    )
+                                    entity_class = getattr(target_repo, "entity_class", None)
 
                                     if entity_class:
                                         # Try to create entity using the entity class
@@ -403,9 +385,7 @@ class RepositoryMigrator:
                                             if hasattr(entity_class, "model_validate"):
                                                 # Use Pydantic's model_validate if
                                                 # available
-                                                entity = entity_class.model_validate(
-                                                    item
-                                                )
+                                                entity = entity_class.model_validate(item)
                                             elif hasattr(entity_class, "from_dict"):
                                                 # Use from_dict if available
                                                 entity = entity_class.from_dict(item)
@@ -431,18 +411,14 @@ class RepositoryMigrator:
                                         )
                                         target_repo.save(item)
                             except Exception as e:
-                                raise ValueError(
-                                    f"Failed to save item {item_id}: {e!s}"
-                                )
+                                raise ValueError(f"Failed to save item {item_id}: {e!s}")
                         stats["migrated"] += 1
 
                     except Exception as e:
                         stats["failed"] += 1
                         error_id = item_id if item_id else "unknown"
                         stats["errors"].append({"item_id": error_id, "error": str(e)})
-                        self.logger.warning(
-                            "Failed to migrate item %s: %s", error_id, str(e)
-                        )
+                        self.logger.warning("Failed to migrate item %s: %s", error_id, str(e))
 
                 self.logger.debug(
                     "Migrated batch %s (%s-%s) of %s",
@@ -455,9 +431,7 @@ class RepositoryMigrator:
         except Exception as e:
             stats["failed"] = stats["total_items"] - stats["migrated"]
             stats["errors"].append({"collection": collection_name, "error": str(e)})
-            self.logger.error(
-                "Failed to migrate collection %s: %s", collection_name, str(e)
-            )
+            self.logger.error("Failed to migrate collection %s: %s", collection_name, str(e))
 
         return stats
 
@@ -478,9 +452,7 @@ class RepositoryMigrator:
         if isinstance(item, dict):
             # Try collection-specific ID fields
             if collection_name == "templates":
-                return (
-                    item.get("id") or item.get("template_id") or item.get("templateId")
-                )
+                return item.get("id") or item.get("template_id") or item.get("templateId")
             elif collection_name == "requests":
                 return item.get("id") or item.get("request_id") or item.get("requestId")
             elif collection_name == "machines":

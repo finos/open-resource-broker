@@ -43,9 +43,7 @@ def register_core_services(container: DIContainer) -> None:
         CommandBus, lambda c: CommandBus(container=c, logger=c.get(LoggingPort))
     )
 
-    container.register_factory(
-        QueryBus, lambda c: QueryBus(container=c, logger=c.get(LoggingPort))
-    )
+    container.register_factory(QueryBus, lambda c: QueryBus(container=c, logger=c.get(LoggingPort)))
 
     # Register native spec service
     def create_native_spec_service(c):

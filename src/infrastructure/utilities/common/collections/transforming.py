@@ -9,9 +9,7 @@ K = TypeVar("K")
 V = TypeVar("V")
 
 
-def map_values(
-    collection: dict[K, V], transform_func: Callable[[V], Any]
-) -> dict[K, Any]:
+def map_values(collection: dict[K, V], transform_func: Callable[[V], Any]) -> dict[K, Any]:
     """
     Transform dictionary values.
 
@@ -25,9 +23,7 @@ def map_values(
     return {key: transform_func(value) for key, value in collection.items()}
 
 
-def map_keys(
-    collection: dict[K, V], transform_func: Callable[[K], Any]
-) -> dict[Any, V]:
+def map_keys(collection: dict[K, V], transform_func: Callable[[K], Any]) -> dict[Any, V]:
     """
     Transform dictionary keys.
 

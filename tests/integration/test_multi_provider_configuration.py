@@ -89,9 +89,7 @@ class TestMultiProviderConfiguration:
             selection_policy = provider_section.get("selection_policy")
             providers = provider_section.get("providers", [])
 
-            assert active_provider is None, (
-                "active_provider should be null for multi-provider mode"
-            )
+            assert active_provider is None, "active_provider should be null for multi-provider mode"
             assert selection_policy == "WEIGHTED_ROUND_ROBIN"
             assert len(providers) >= 2, "Should have multiple providers configured"
 

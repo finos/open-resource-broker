@@ -146,9 +146,7 @@ class TestSDKConfig:
             temp_path = f.name
 
         try:
-            with pytest.raises(
-                ConfigurationError, match="Failed to load configuration"
-            ):
+            with pytest.raises(ConfigurationError, match="Failed to load configuration"):
                 SDKConfig.from_file(temp_path)
         finally:
             os.unlink(temp_path)
@@ -172,9 +170,7 @@ class TestSDKConfig:
 
     def test_validate_success(self):
         """Test successful configuration validation."""
-        config = SDKConfig(
-            provider="mock", timeout=300, retry_attempts=3, log_level="INFO"
-        )
+        config = SDKConfig(provider="mock", timeout=300, retry_attempts=3, log_level="INFO")
 
         # Should not raise exception
         config.validate()
@@ -197,9 +193,7 @@ class TestSDKConfig:
         """Test validation failure with negative retry attempts."""
         config = SDKConfig(retry_attempts=-1)
 
-        with pytest.raises(
-            ConfigurationError, match="Retry attempts cannot be negative"
-        ):
+        with pytest.raises(ConfigurationError, match="Retry attempts cannot be negative"):
             config.validate()
 
     def test_validate_invalid_log_level(self):

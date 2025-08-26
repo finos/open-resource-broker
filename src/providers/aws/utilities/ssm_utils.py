@@ -276,9 +276,7 @@ def get_ssm_parameters_by_path(
 
 
 @retry(strategy="exponential", max_attempts=3, base_delay=1.0, service="ssm")
-def _get_parameters_by_path(
-    ssm_client: Any, path: str, recursive: bool = True
-) -> dict[str, str]:
+def _get_parameters_by_path(ssm_client: Any, path: str, recursive: bool = True) -> dict[str, str]:
     """Get SSM parameters by path with retry."""
     paginator = ssm_client.get_paginator("get_parameters_by_path")
     parameters = {}

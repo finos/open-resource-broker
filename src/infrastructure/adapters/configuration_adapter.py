@@ -24,12 +24,8 @@ class ConfigurationAdapter(ConfigurationPort):
             config = self._config_manager.get_typed(NamingConfig)
             return {
                 "patterns": {
-                    "request_id": config.patterns.get(
-                        "request_id", r"^(req-|ret-)[a-f0-9\-]{36}$"
-                    ),
-                    "ec2_instance": config.patterns.get(
-                        "ec2_instance", r"^i-[a-f0-9]{8,17}$"
-                    ),
+                    "request_id": config.patterns.get("request_id", r"^(req-|ret-)[a-f0-9\-]{36}$"),
+                    "ec2_instance": config.patterns.get("ec2_instance", r"^i-[a-f0-9]{8,17}$"),
                     "instance_type": config.patterns.get(
                         "instance_type", r"^[a-z0-9]+\.[a-z0-9]+$"
                     ),
@@ -39,9 +35,7 @@ class ConfigurationAdapter(ConfigurationPort):
                 },
                 "prefixes": {
                     "request": (
-                        config.prefixes.request
-                        if hasattr(config.prefixes, "request")
-                        else "req-"
+                        config.prefixes.request if hasattr(config.prefixes, "request") else "req-"
                     ),
                     "return": (
                         config.prefixes.return_prefix
@@ -112,9 +106,7 @@ class ConfigurationAdapter(ConfigurationPort):
         try:
             template_config = self._config_manager.get_typed(TemplateConfig)
             return {
-                "default_instance_tags": getattr(
-                    template_config, "default_instance_tags", {}
-                ),
+                "default_instance_tags": getattr(template_config, "default_instance_tags", {}),
                 "default_image_id": getattr(template_config, "default_image_id", ""),
                 "default_instance_type": getattr(
                     template_config, "default_instance_type", "t2.micro"

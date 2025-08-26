@@ -77,9 +77,7 @@ class EventPublisher(Protocol):
         """Publish a single domain event."""
         ...
 
-    def register_handler(
-        self, event_type: str, handler: Callable[[DomainEvent], None]
-    ) -> None:
+    def register_handler(self, event_type: str, handler: Callable[[DomainEvent], None]) -> None:
         """Register an event handler."""
         ...
 

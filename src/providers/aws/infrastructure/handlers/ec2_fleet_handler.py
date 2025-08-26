@@ -79,9 +79,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
             request_adapter: Optional request adapter for terminating instances
         """
         # Use base class initialization - eliminates duplication
-        super().__init__(
-            aws_client, logger, aws_ops, launch_template_manager, request_adapter
-        )
+        super().__init__(aws_client, logger, aws_ops, launch_template_manager, request_adapter)
 
         # Get AWS native spec service from container
         container = get_container()
@@ -101,9 +99,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
             self.config_port = None
 
     @handle_infrastructure_exceptions(context="ec2_fleet_creation")
-    def acquire_hosts(
-        self, request: Request, aws_template: AWSTemplate
-    ) -> dict[str, Any]:
+    def acquire_hosts(self, request: Request, aws_template: AWSTemplate) -> dict[str, Any]:
         """
         Create an EC2 Fleet to acquire hosts.
         Returns structured result with resource IDs and instance data.
@@ -141,9 +137,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 "error_message": str(e),
             }
 
-    def _create_fleet_internal(
-        self, request: Request, aws_template: AWSTemplate
-    ) -> str:
+    def _create_fleet_internal(self, request: Request, aws_template: AWSTemplate) -> str:
         """Create EC2 Fleet with pure business logic."""
         # Validate prerequisites
         self._validate_prerequisites(aws_template)
@@ -171,10 +165,8 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
             )
 
         # Create launch template using the new manager
-        launch_template_result = (
-            self.launch_template_manager.create_or_update_launch_template(
-                aws_template, request
-            )
+        launch_template_result = self.launch_template_manager.create_or_update_launch_template(
+            aws_template, request
         )
 
         # Store launch template info in request (if request has this method)
@@ -199,9 +191,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 **fleet_config,
             )
         except CircuitBreakerOpenError as e:
-            self._logger.error(
-                "Circuit breaker OPEN for EC2 Fleet creation: %s", str(e)
-            )
+            self._logger.error("Circuit breaker OPEN for EC2 Fleet creation: %s", str(e))
             # Re-raise to allow upper layers to handle graceful degradation
             raise
 
@@ -229,9 +219,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 )
 
             request.metadata["instance_ids"] = instance_ids
-            self._logger.debug(
-                "Stored instance IDs in request metadata: %s", instance_ids
-            )
+            self._logger.debug("Stored instance IDs in request metadata: %s", instance_ids)
 
         return fleet_id
 
@@ -251,9 +239,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
             for inst in instance_details
         ]
 
-    def _prepare_template_context(
-        self, template: AWSTemplate, request: Request
-    ) -> dict[str, Any]:
+    def _prepare_template_context(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
         """Prepare context with all computed values for template rendering."""
 
         # Start with base context
@@ -320,9 +306,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
             # Fleet-specific flags
             "is_maintain_fleet": template.fleet_type == AWSFleetType.MAINTAIN.value,
             "replace_unhealthy": template.fleet_type == AWSFleetType.MAINTAIN.value,
-            "has_spot_options": bool(
-                template.allocation_strategy or template.max_spot_price
-            ),
+            "has_spot_options": bool(template.allocation_strategy or template.max_spot_price),
             "has_ondemand_options": bool(template.allocation_strategy_on_demand),
             # Configuration values
             "allocation_strategy": (
@@ -331,20 +315,14 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 else None
             ),
             "allocation_strategy_on_demand": (
-                self._get_allocation_strategy_on_demand(
-                    template.allocation_strategy_on_demand
-                )
+                self._get_allocation_strategy_on_demand(template.allocation_strategy_on_demand)
                 if template.allocation_strategy_on_demand
                 else None
             ),
             "max_spot_price": (
-                str(template.max_spot_price)
-                if template.max_spot_price is not None
-                else None
+                str(template.max_spot_price) if template.max_spot_price is not None else None
             ),
-            "default_capacity_type": self._get_default_capacity_type(
-                template.price_type
-            ),
+            "default_capacity_type": self._get_default_capacity_type(template.price_type),
         }
 
     def _get_default_capacity_type(self, price_type: str) -> str:
@@ -374,17 +352,13 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 }
             )
 
-            native_spec = (
-                self.aws_native_spec_service.process_provider_api_spec_with_merge(
-                    template, request, "ec2fleet", context
-                )
+            native_spec = self.aws_native_spec_service.process_provider_api_spec_with_merge(
+                template, request, "ec2fleet", context
             )
             if native_spec:
                 # Ensure launch template info is in the spec
                 if "LaunchTemplateConfigs" in native_spec:
-                    native_spec["LaunchTemplateConfigs"][0][
-                        "LaunchTemplateSpecification"
-                    ] = {
+                    native_spec["LaunchTemplateConfigs"][0]["LaunchTemplateSpecification"] = {
                         "LaunchTemplateId": launch_template_id,
                         "Version": launch_template_version,
                     }
@@ -429,9 +403,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                     }
                 }
             ],
-            "TargetCapacitySpecification": {
-                "TotalTargetCapacity": request.requested_count
-            },
+            "TargetCapacitySpecification": {"TotalTargetCapacity": request.requested_count},
             "Type": template.fleet_type,
             "TagSpecifications": [
                 {
@@ -463,13 +435,9 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
         # Configure pricing type
         price_type = template.price_type or "ondemand"
         if price_type == "ondemand":
-            fleet_config["TargetCapacitySpecification"]["DefaultTargetCapacityType"] = (
-                "on-demand"
-            )
+            fleet_config["TargetCapacitySpecification"]["DefaultTargetCapacityType"] = "on-demand"
         elif price_type == "spot":
-            fleet_config["TargetCapacitySpecification"]["DefaultTargetCapacityType"] = (
-                "spot"
-            )
+            fleet_config["TargetCapacitySpecification"]["DefaultTargetCapacityType"] = "spot"
 
             # Add allocation strategy if specified
             if template.allocation_strategy:
@@ -483,9 +451,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
             if template.max_spot_price is not None:
                 if "SpotOptions" not in fleet_config:
                     fleet_config["SpotOptions"] = {}
-                fleet_config["SpotOptions"]["MaxTotalPrice"] = str(
-                    template.max_spot_price
-                )
+                fleet_config["SpotOptions"]["MaxTotalPrice"] = str(template.max_spot_price)
         elif price_type == "heterogeneous":
             # For heterogeneous fleets, we need to specify both on-demand and spot
             # capacities
@@ -493,15 +459,9 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
             on_demand_count = int(request.requested_count * percent_on_demand / 100)
             spot_count = request.requested_count - on_demand_count
 
-            fleet_config["TargetCapacitySpecification"]["OnDemandTargetCapacity"] = (
-                on_demand_count
-            )
-            fleet_config["TargetCapacitySpecification"]["SpotTargetCapacity"] = (
-                spot_count
-            )
-            fleet_config["TargetCapacitySpecification"]["DefaultTargetCapacityType"] = (
-                "on-demand"
-            )
+            fleet_config["TargetCapacitySpecification"]["OnDemandTargetCapacity"] = on_demand_count
+            fleet_config["TargetCapacitySpecification"]["SpotTargetCapacity"] = spot_count
+            fleet_config["TargetCapacitySpecification"]["DefaultTargetCapacityType"] = "on-demand"
 
             # Add allocation strategies if specified
             if template.allocation_strategy:
@@ -522,9 +482,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
             if template.max_spot_price is not None:
                 if "SpotOptions" not in fleet_config:
                     fleet_config["SpotOptions"] = {}
-                fleet_config["SpotOptions"]["MaxTotalPrice"] = str(
-                    template.max_spot_price
-                )
+                fleet_config["SpotOptions"]["MaxTotalPrice"] = str(template.max_spot_price)
 
         # Add overrides with weighted capacity if multiple instance types are specified
         if template.instance_types:
@@ -545,9 +503,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                     on_demand_overrides.append(override)
 
                 # Add on-demand overrides to the existing overrides
-                fleet_config["LaunchTemplateConfigs"][0]["Overrides"].extend(
-                    on_demand_overrides
-                )
+                fleet_config["LaunchTemplateConfigs"][0]["Overrides"].extend(on_demand_overrides)
 
         # Add subnet configuration
         if template.subnet_ids:
@@ -567,10 +523,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                         overrides.append(override)
 
                     # Add on-demand instance types for heterogeneous fleets
-                    if (
-                        price_type == "heterogeneous"
-                        and template.instance_types_ondemand
-                    ):
+                    if price_type == "heterogeneous" and template.instance_types_ondemand:
                         for (
                             instance_type,
                             weight,
@@ -629,14 +582,10 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
             query = GetTemplateQuery(template_id=str(request.template_id))
             template = await query_bus.execute(query)
             if not template:
-                raise AWSEntityNotFoundError(
-                    f"Template {request.template_id} not found"
-                )
+                raise AWSEntityNotFoundError(f"Template {request.template_id} not found")
 
             # Ensure fleet_type is not None
-            fleet_type_value = template.metadata.get("aws", {}).get(
-                "fleet_type", "instant"
-            )
+            fleet_type_value = template.metadata.get("aws", {}).get("fleet_type", "instant")
             if not fleet_type_value:
                 raise AWSValidationError("Fleet type is required")
 
@@ -735,18 +684,14 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
             if instance_ids:
                 if fleet_type == "maintain":
                     # For maintain fleets, reduce target capacity first
-                    current_capacity = fleet["TargetCapacitySpecification"][
-                        "TotalTargetCapacity"
-                    ]
+                    current_capacity = fleet["TargetCapacitySpecification"]["TotalTargetCapacity"]
                     new_capacity = max(0, current_capacity - len(instance_ids))
 
                     self._retry_with_backoff(
                         self.aws_client.ec2_client.modify_fleet,
                         operation_type="critical",
                         FleetId=fleet_id,
-                        TargetCapacitySpecification={
-                            "TotalTargetCapacity": new_capacity
-                        },
+                        TargetCapacitySpecification={"TotalTargetCapacity": new_capacity},
                     )
                     self._logger.info(
                         "Reduced maintain fleet %s capacity to %s",

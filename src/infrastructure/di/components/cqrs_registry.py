@@ -79,10 +79,7 @@ class CQRSHandlerRegistry:
     def has_event_handlers(self, event_type: type) -> bool:
         """Check if event handlers are registered."""
         with self._lock:
-            return (
-                event_type in self._event_handlers
-                and len(self._event_handlers[event_type]) > 0
-            )
+            return event_type in self._event_handlers and len(self._event_handlers[event_type]) > 0
 
     def clear(self) -> None:
         """Clear all CQRS handler registrations."""

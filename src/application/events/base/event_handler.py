@@ -163,9 +163,7 @@ class EventHandler(ABC):
         if last_exception:
             raise last_exception
 
-    async def _handle_error(
-        self, event: DomainEvent, error: Exception, duration: float
-    ) -> None:
+    async def _handle_error(self, event: DomainEvent, error: Exception, duration: float) -> None:
         """
         Handle event processing errors.
 
@@ -190,9 +188,7 @@ class EventHandler(ABC):
         # Future: Send to dead letter queue, trigger alerts, etc.
         await self._send_to_dead_letter_queue(event, error)
 
-    async def _send_to_dead_letter_queue(
-        self, event: DomainEvent, error: Exception
-    ) -> None:
+    async def _send_to_dead_letter_queue(self, event: DomainEvent, error: Exception) -> None:
         """
         Send failed event to dead letter queue.
 
@@ -208,9 +204,7 @@ class EventHandler(ABC):
             )
         # Future: Implement actual dead letter queue integration
 
-    def extract_fields(
-        self, event: DomainEvent, field_mapping: dict[str, Any]
-    ) -> dict[str, Any]:
+    def extract_fields(self, event: DomainEvent, field_mapping: dict[str, Any]) -> dict[str, Any]:
         """
         Extract and map fields from event data.
 

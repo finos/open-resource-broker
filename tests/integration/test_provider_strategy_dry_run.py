@@ -19,9 +19,7 @@ class TestProviderStrategyDryRun:
         self.mock_config = AWSProviderConfig(region="us-east-1", profile="default")
 
         # Create AWS provider strategy
-        self.aws_strategy = AWSProviderStrategy(
-            config=self.mock_config, logger=self.mock_logger
-        )
+        self.aws_strategy = AWSProviderStrategy(config=self.mock_config, logger=self.mock_logger)
 
         # Mock the initialization to avoid real AWS client creation
         with patch.object(self.aws_strategy, "initialize", return_value=True):
@@ -38,9 +36,7 @@ class TestProviderStrategyDryRun:
     def test_provider_operation_without_dry_run_context(self, mock_dry_run_context):
         """Test provider operation execution without dry-run context."""
         # Mock instance manager response
-        self.mock_instance_manager.create_instances.return_value = [
-            "i-1234567890abcdef0"
-        ]
+        self.mock_instance_manager.create_instances.return_value = ["i-1234567890abcdef0"]
 
         # Create operation without dry-run context
         operation = ProviderOperation(
@@ -71,9 +67,7 @@ class TestProviderStrategyDryRun:
     def test_provider_operation_with_dry_run_context(self, mock_dry_run_context):
         """Test provider operation execution with dry-run context."""
         # Mock instance manager response
-        self.mock_instance_manager.create_instances.return_value = [
-            "i-1234567890abcdef0"
-        ]
+        self.mock_instance_manager.create_instances.return_value = ["i-1234567890abcdef0"]
 
         # Mock the context manager
         mock_context_manager = MagicMock()
@@ -109,9 +103,7 @@ class TestProviderStrategyDryRun:
     def test_provider_operation_error_handling_with_dry_run(self):
         """Test provider operation error handling with dry-run context."""
         # Mock instance manager to raise exception
-        self.mock_instance_manager.create_instances.side_effect = Exception(
-            "Test error"
-        )
+        self.mock_instance_manager.create_instances.side_effect = Exception("Test error")
 
         # Create operation with dry-run context
         operation = ProviderOperation(
@@ -152,14 +144,10 @@ class TestProviderStrategyDryRun:
         assert "Unsupported operation" in result.error_message
 
     @patch("src.providers.aws.infrastructure.dry_run_adapter.aws_dry_run_context")
-    def test_multiple_operations_with_mixed_dry_run_contexts(
-        self, mock_dry_run_context
-    ):
+    def test_multiple_operations_with_mixed_dry_run_contexts(self, mock_dry_run_context):
         """Test multiple operations with different dry-run contexts."""
         # Mock instance manager responses
-        self.mock_instance_manager.create_instances.return_value = [
-            "i-1234567890abcdef0"
-        ]
+        self.mock_instance_manager.create_instances.return_value = ["i-1234567890abcdef0"]
         self.mock_instance_manager.terminate_instances.return_value = True
 
         # Mock the context manager

@@ -49,9 +49,7 @@ class TestCQRSCompliance:
         assert hasattr(query, "template_id")
 
         # Verify command and query are different types
-        assert not isinstance(command, type(query)) and not isinstance(
-            query, type(command)
-        )
+        assert not isinstance(command, type(query)) and not isinstance(query, type(command))
 
     def test_command_handler_interface(self):
         """Test that command handlers implement correct interface."""
@@ -147,9 +145,7 @@ class TestCQRSCompliance:
             # Command bus should have send/execute method
             mock_instance.send = Mock(return_value={"status": "success"})
 
-            command = CreateRequestCommand(
-                template_id="test-template", requested_count=2
-            )
+            command = CreateRequestCommand(template_id="test-template", requested_count=2)
 
             # Should be able to send command through bus
             result = mock_instance.send(command)

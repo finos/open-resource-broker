@@ -202,9 +202,7 @@ class TestAuthenticationPerformance:
         print(f"Protected path overhead: {protected_overhead:.1f}%")
 
         # Overhead should be reasonable
-        assert excluded_overhead < 50, (
-            f"Excluded path overhead too high: {excluded_overhead:.1f}%"
-        )
+        assert excluded_overhead < 50, f"Excluded path overhead too high: {excluded_overhead:.1f}%"
         assert protected_overhead < 200, (
             f"Protected path overhead too high: {protected_overhead:.1f}%"
         )
@@ -240,6 +238,4 @@ class TestAuthenticationPerformance:
         print(f"Memory increase: {memory_increase:.1f}MB")
 
         # Memory increase should be reasonable (allow for some growth)
-        assert memory_increase < 50, (
-            f"Memory increase too high: {memory_increase:.1f}MB"
-        )
+        assert memory_increase < 50, f"Memory increase too high: {memory_increase:.1f}MB"

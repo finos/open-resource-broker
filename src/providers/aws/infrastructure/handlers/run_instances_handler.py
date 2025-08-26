@@ -102,18 +102,14 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             self.config_port = None
 
     @handle_infrastructure_exceptions(context="run_instances_creation")
-    def acquire_hosts(
-        self, request: Request, aws_template: AWSTemplate
-    ) -> dict[str, Any]:
+    def acquire_hosts(self, request: Request, aws_template: AWSTemplate) -> dict[str, Any]:
         """
         Create EC2 instances using RunInstances to acquire hosts.
         Returns structured result with resource IDs and instance data.
         """
         try:
             resource_id = self.aws_ops.execute_with_standard_error_handling(
-                operation=lambda: self._create_instances_internal(
-                    request, aws_template
-                ),
+                operation=lambda: self._create_instances_internal(request, aws_template),
                 operation_name="run EC2 instances",
                 context="RunInstances",
             )
@@ -137,18 +133,14 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 "error_message": str(e),
             }
 
-    def _create_instances_internal(
-        self, request: Request, aws_template: AWSTemplate
-    ) -> str:
+    def _create_instances_internal(self, request: Request, aws_template: AWSTemplate) -> str:
         """Create RunInstances with pure business logic."""
         # Validate prerequisites
         self._validate_prerequisites(aws_template)
 
         # Create launch template using the new manager
-        launch_template_result = (
-            self.launch_template_manager.create_or_update_launch_template(
-                aws_template, request
-            )
+        launch_template_result = self.launch_template_manager.create_or_update_launch_template(
+            aws_template, request
         )
 
         # Store launch template info in request (if request has this method)
@@ -174,9 +166,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
 
         # Extract reservation ID and instance IDs from response
         reservation_id = response.get("ReservationId")
-        instance_ids = [
-            instance["InstanceId"] for instance in response.get("Instances", [])
-        ]
+        instance_ids = [instance["InstanceId"] for instance in response.get("Instances", [])]
 
         if not instance_ids:
             raise AWSInfrastructureError("No instances were created by RunInstances")
@@ -219,9 +209,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             for inst in instance_details
         ]
 
-    def _prepare_template_context(
-        self, template: AWSTemplate, request: Request
-    ) -> dict[str, Any]:
+    def _prepare_template_context(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
         """Prepare context with all computed values for template rendering."""
 
         # Start with base context
@@ -267,10 +255,8 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 }
             )
 
-            native_spec = (
-                self.aws_native_spec_service.process_provider_api_spec_with_merge(
-                    aws_template, request, "runinstances", context
-                )
+            native_spec = self.aws_native_spec_service.process_provider_api_spec_with_merge(
+                aws_template, request, "runinstances", context
             )
             if native_spec:
                 # Ensure launch template info is in the spec
@@ -290,9 +276,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 return native_spec
 
             # Use template-driven approach with native spec service
-            return self.aws_native_spec_service.render_default_spec(
-                "runinstances", context
-            )
+            return self.aws_native_spec_service.render_default_spec("runinstances", context)
 
         # Fallback to legacy logic when native spec service is not available
         return self._create_run_instances_params_legacy(
@@ -379,9 +363,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
 
         # Add template tags if any
         if aws_template.tags:
-            instance_tags = [
-                {"Key": k, "Value": v} for k, v in aws_template.tags.items()
-            ]
+            instance_tags = [{"Key": k, "Value": v} for k, v in aws_template.tags.items()]
             tag_specifications[0]["Tags"].extend(instance_tags)
 
         params["TagSpecifications"] = tag_specifications
@@ -414,14 +396,10 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             return self._get_instance_details(instance_ids)
 
         except Exception as e:
-            self._logger.error(
-                "Unexpected error checking RunInstances status: %s", str(e)
-            )
+            self._logger.error("Unexpected error checking RunInstances status: %s", str(e))
             raise AWSInfrastructureError(f"Failed to check RunInstances status: {e!s}")
 
-    def _find_instances_by_resource_ids(
-        self, resource_ids: list[str]
-    ) -> list[dict[str, Any]]:
+    def _find_instances_by_resource_ids(self, resource_ids: list[str]) -> list[dict[str, Any]]:
         """Find instances using resource IDs (reservation IDs for RunInstances)."""
         try:
             all_instances = []
@@ -486,13 +464,9 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
 
         except Exception as e:
             self._logger.error("Failed to find instances by resource IDs: %s", str(e))
-            raise AWSInfrastructureError(
-                f"Failed to find instances by resource IDs: {e!s}"
-            )
+            raise AWSInfrastructureError(f"Failed to find instances by resource IDs: {e!s}")
 
-    def _find_instances_by_tags_fallback(
-        self, resource_ids: list[str]
-    ) -> list[dict[str, Any]]:
+    def _find_instances_by_tags_fallback(self, resource_ids: list[str]) -> list[dict[str, Any]]:
         """Fallback method to find instances by tags when reservation-id filter is not supported."""
         try:
             self._logger.info(
@@ -547,9 +521,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                             instance_data["PrivateIpAddress"],
                         )
                 else:
-                    self._logger.info(
-                        "FALLBACK: No match for reservation %s", reservation_id
-                    )
+                    self._logger.info("FALLBACK: No match for reservation %s", reservation_id)
 
             self._logger.info(
                 "FALLBACK: Returning %s instances for resource IDs: %s",
@@ -559,9 +531,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             return matching_instances
 
         except Exception as e:
-            self._logger.error(
-                "FALLBACK: Fallback method failed to find instances: %s", e
-            )
+            self._logger.error("FALLBACK: Fallback method failed to find instances: %s", e)
             # Return empty list rather than raising exception to allow graceful
             # degradation
             return []
@@ -583,9 +553,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 instance_ids = request.metadata["instance_ids"]
 
             if not instance_ids:
-                self._logger.warning(
-                    "No instance IDs found for request %s", request.request_id
-                )
+                self._logger.warning("No instance IDs found for request %s", request.request_id)
                 return
 
             # Use consolidated AWS operations utility for instance termination
@@ -596,14 +564,8 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
 
         except ClientError as e:
             error = self._convert_client_error(e)
-            self._logger.error(
-                "Failed to release RunInstances resources: %s", str(error)
-            )
+            self._logger.error("Failed to release RunInstances resources: %s", str(error))
             raise error
         except Exception as e:
-            self._logger.error(
-                "Unexpected error releasing RunInstances resources: %s", str(e)
-            )
-            raise AWSInfrastructureError(
-                f"Failed to release RunInstances resources: {e!s}"
-            )
+            self._logger.error("Unexpected error releasing RunInstances resources: %s", str(e))
+            raise AWSInfrastructureError(f"Failed to release RunInstances resources: {e!s}")

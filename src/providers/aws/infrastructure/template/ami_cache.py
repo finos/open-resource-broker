@@ -27,9 +27,7 @@ class RuntimeAMICache:
     - Development workflows with repeated template operations
     """
 
-    def __init__(
-        self, persistent_file: Optional[str] = None, ttl_minutes: int = 60
-    ) -> None:
+    def __init__(self, persistent_file: Optional[str] = None, ttl_minutes: int = 60) -> None:
         """
         Initialize AMI cache with optional persistence.
 

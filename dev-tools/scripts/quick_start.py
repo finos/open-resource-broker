@@ -49,9 +49,7 @@ def install_system_tools():
     logger.info("=== Installing Required System Tools ===")
 
     script_path = Path(__file__).parent / "install_dev_tools.py"
-    success = run_command(
-        [str(script_path), "--required-only"], "Installing yq, uv, docker"
-    )
+    success = run_command([str(script_path), "--required-only"], "Installing yq, uv, docker")
 
     if not success:
         logger.error("Failed to install required system tools")
@@ -65,9 +63,7 @@ def generate_pyproject():
     """Generate pyproject.toml from template."""
     logger.info("=== Generating pyproject.toml ===")
 
-    success = run_command(
-        ["make", "generate-pyproject"], "Generating pyproject.toml from template"
-    )
+    success = run_command(["make", "generate-pyproject"], "Generating pyproject.toml from template")
 
     if not success:
         logger.error("Failed to generate pyproject.toml")
@@ -81,9 +77,7 @@ def install_python_deps():
     """Install Python development dependencies."""
     logger.info("=== Installing Python Dependencies ===")
 
-    success = run_command(
-        ["make", "dev-install"], "Installing Python development dependencies"
-    )
+    success = run_command(["make", "dev-install"], "Installing Python development dependencies")
 
     if not success:
         logger.error("Failed to install Python dependencies")
@@ -140,12 +134,8 @@ def show_next_steps():
 def main():
     """Main quick start function."""
     parser = argparse.ArgumentParser(description="Quick start setup for new developers")
-    parser.add_argument(
-        "--tools-only", action="store_true", help="Only install system tools"
-    )
-    parser.add_argument(
-        "--verify-only", action="store_true", help="Only run verification checks"
-    )
+    parser.add_argument("--tools-only", action="store_true", help="Only install system tools")
+    parser.add_argument("--verify-only", action="store_true", help="Only run verification checks")
 
     args = parser.parse_args()
 

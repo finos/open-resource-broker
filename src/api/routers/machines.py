@@ -59,9 +59,7 @@ async def request_machines(
     return JSONResponse(content=result)
 
 
-@router.post(
-    "/return", summary="Return Machines", description="Return machines to the provider"
-)
+@router.post("/return", summary="Return Machines", description="Return machines to the provider")
 @handle_rest_exceptions(endpoint="/api/v1/machines/return", method="POST")
 async def return_machines(
     request_data: ReturnMachinesRequest, handler=RETURN_MACHINES_HANDLER
@@ -79,9 +77,7 @@ async def return_machines(
     return JSONResponse(content=result)
 
 
-@router.get(
-    "/", summary="List Machines", description="List machines with optional filtering"
-)
+@router.get("/", summary="List Machines", description="List machines with optional filtering")
 @handle_rest_exceptions(endpoint="/api/v1/machines", method="GET")
 async def list_machines(
     status: Optional[str] = STATUS_QUERY,
@@ -109,9 +105,7 @@ async def list_machines(
     )
 
 
-@router.get(
-    "/{machine_id}", summary="Get Machine", description="Get specific machine details"
-)
+@router.get("/{machine_id}", summary="Get Machine", description="Get specific machine details")
 @handle_rest_exceptions(endpoint="/api/v1/machines/{machine_id}", method="GET")
 async def get_machine(machine_id: str) -> JSONResponse:
     """

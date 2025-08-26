@@ -149,9 +149,7 @@ def copy_file(source_path: str, destination_path: str) -> None:
         ensure_parent_directory_exists(destination_path)
         shutil.copy2(source_path, destination_path)
     except OSError as e:
-        raise OSError(
-            f"Failed to copy file from {source_path} to {destination_path}: {e!s}"
-        )
+        raise OSError(f"Failed to copy file from {source_path} to {destination_path}: {e!s}")
 
 
 def move_file(source_path: str, destination_path: str) -> None:
@@ -175,9 +173,7 @@ def move_file(source_path: str, destination_path: str) -> None:
         ensure_parent_directory_exists(destination_path)
         shutil.move(source_path, destination_path)
     except OSError as e:
-        raise OSError(
-            f"Failed to move file from {source_path} to {destination_path}: {e!s}"
-        )
+        raise OSError(f"Failed to move file from {source_path} to {destination_path}: {e!s}")
 
 
 def rename_file(file_path: str, new_name: str) -> str:
@@ -247,9 +243,7 @@ def is_file_empty(file_path: str) -> bool:
     return get_file_size(file_path) == 0
 
 
-def create_temp_file(
-    suffix: str = "", prefix: str = "", dir: Optional[str] = None
-) -> str:
+def create_temp_file(suffix: str = "", prefix: str = "", dir: Optional[str] = None) -> str:
     """
     Create a temporary file.
 

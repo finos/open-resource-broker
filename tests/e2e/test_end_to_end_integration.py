@@ -67,9 +67,7 @@ def test_end_to_end_integration():
 
         # Performance Metrics Integration
         print("\n6. Testing Performance Metrics Integration...")
-        results["performance_metrics_integration"] = (
-            test_performance_metrics_integration()
-        )
+        results["performance_metrics_integration"] = test_performance_metrics_integration()
 
         # Full End-to-End Flow
         print("\n7. Testing Full End-to-End Flow...")
@@ -157,9 +155,7 @@ def test_provider_strategy_integration():
                 print(f"   Testing {api.value} handler integration...")
 
                 # This should not raise an exception
-                handler_method = getattr(
-                    strategy, f"_get_{api.value.lower()}_handler", None
-                )
+                handler_method = getattr(strategy, f"_get_{api.value.lower()}_handler", None)
                 if handler_method:
                     print(f"   PASS: {api.value} handler method exists")
                 else:
@@ -204,9 +200,7 @@ def test_launch_template_integration():
 
         # Test launch template manager instantiation
         try:
-            lt_manager = AWSLaunchTemplateManager(
-                aws_client=mock_aws_client, logger=mock_logger
-            )
+            lt_manager = AWSLaunchTemplateManager(aws_client=mock_aws_client, logger=mock_logger)
             print("   PASS: Launch template manager instantiation successful")
         except Exception as e:
             print(f"   FAIL: Launch template manager instantiation failed: {e!s}")
@@ -226,9 +220,7 @@ def test_launch_template_integration():
                 if handler.launch_template_manager == lt_manager:
                     print("   PASS: Handler properly stores launch template manager")
                 else:
-                    print(
-                        "   FAIL: Handler launch template manager not properly assigned"
-                    )
+                    print("   FAIL: Handler launch template manager not properly assigned")
                     return False
             else:
                 print("   FAIL: Handler missing launch_template_manager attribute")
@@ -322,13 +314,9 @@ def test_handler_routing():
 
                 # Verify handler class exists and can be imported
                 if handler_class:
-                    print(
-                        f"   PASS: {handler_class.__name__} available for {api.value}"
-                    )
+                    print(f"   PASS: {handler_class.__name__} available for {api.value}")
                 else:
-                    print(
-                        f"   FAIL: {handler_class.__name__} not available for {api.value}"
-                    )
+                    print(f"   FAIL: {handler_class.__name__} not available for {api.value}")
                     return False
 
                 # Test handler instantiation with integrated constructor
@@ -354,9 +342,7 @@ def test_handler_routing():
                     if hasattr(handler, method_name):
                         print(f"   PASS: {handler_class.__name__}.{method_name} exists")
                     else:
-                        print(
-                            f"   FAIL: {handler_class.__name__}.{method_name} missing"
-                        )
+                        print(f"   FAIL: {handler_class.__name__}.{method_name} missing")
                         return False
 
             except Exception as e:
@@ -648,9 +634,7 @@ def test_full_end_to_end_flow():
         mock_aws_client.boto_config = Mock()
 
         # Mock STS get_caller_identity for fleet role ARN construction
-        mock_aws_client.sts_client.get_caller_identity.return_value = {
-            "Account": "123456789012"
-        }
+        mock_aws_client.sts_client.get_caller_identity.return_value = {"Account": "123456789012"}
 
         # Mock EC2 request_spot_fleet to return a fleet ID
         mock_aws_client.ec2_client.request_spot_fleet.return_value = {
@@ -658,9 +642,7 @@ def test_full_end_to_end_flow():
         }
 
         # Mock AWS operations to actually call the internal method
-        def mock_execute_with_standard_error_handling(
-            operation, operation_name, context
-        ):
+        def mock_execute_with_standard_error_handling(operation, operation_name, context):
             return operation()
 
         mock_aws_ops.execute_with_standard_error_handling = Mock(
@@ -668,9 +650,7 @@ def test_full_end_to_end_flow():
         )
 
         # Create launch template manager
-        lt_manager = AWSLaunchTemplateManager(
-            aws_client=mock_aws_client, logger=mock_logger
-        )
+        lt_manager = AWSLaunchTemplateManager(aws_client=mock_aws_client, logger=mock_logger)
 
         # Mock launch template creation
         mock_lt_result = Mock()

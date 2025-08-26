@@ -39,13 +39,9 @@ def main() -> int:
     import argparse
 
     parser = argparse.ArgumentParser(description="Test container health endpoint")
-    parser.add_argument(
-        "--url", default="http://localhost:8000/health", help="Health check URL"
-    )
+    parser.add_argument("--url", default="http://localhost:8000/health", help="Health check URL")
     parser.add_argument("--timeout", type=int, default=30, help="Timeout in seconds")
-    parser.add_argument(
-        "--interval", type=int, default=2, help="Retry interval in seconds"
-    )
+    parser.add_argument("--interval", type=int, default=2, help="Retry interval in seconds")
 
     args = parser.parse_args()
 

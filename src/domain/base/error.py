@@ -57,9 +57,7 @@ class ErrorContext:
     user_id: Optional[str] = None
 
     @classmethod
-    def create(
-        cls, operation: str, layer: str, request_id: Optional[str] = None
-    ) -> "ErrorContext":
+    def create(cls, operation: str, layer: str, request_id: Optional[str] = None) -> "ErrorContext":
         """Create error context with current timestamp."""
         return cls(
             timestamp=datetime.utcnow(),

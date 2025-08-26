@@ -33,7 +33,5 @@ class RequestRepository(AggregateRepository[Request]):
         """Find all active (non-completed/failed) requests."""
 
     @abstractmethod
-    def find_by_date_range(
-        self, start_date: datetime, end_date: datetime
-    ) -> list[Request]:
+    def find_by_date_range(self, start_date: datetime, end_date: datetime) -> list[Request]:
         """Find requests within date range."""

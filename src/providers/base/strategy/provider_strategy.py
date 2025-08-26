@@ -112,18 +112,14 @@ class ProviderHealthStatus(BaseModel):
         response_time_ms: Optional[float] = None,
     ) -> "ProviderHealthStatus":
         """Create a healthy status."""
-        return cls(
-            is_healthy=True, status_message=message, response_time_ms=response_time_ms
-        )
+        return cls(is_healthy=True, status_message=message, response_time_ms=response_time_ms)
 
     @classmethod
     def unhealthy(
         cls, message: str, error_details: Optional[dict[str, Any]] = None
     ) -> "ProviderHealthStatus":
         """Create an unhealthy status."""
-        return cls(
-            is_healthy=False, status_message=message, error_details=error_details or {}
-        )
+        return cls(is_healthy=False, status_message=message, error_details=error_details or {})
 
 
 class ProviderStrategy(ABC):
@@ -204,9 +200,7 @@ class ProviderStrategy(ABC):
             ValueError: If operation is not supported
         """
 
-    async def execute_operation_async(
-        self, operation: ProviderOperation
-    ) -> ProviderResult:
+    async def execute_operation_async(self, operation: ProviderOperation) -> ProviderResult:
         """
         Execute a provider operation asynchronously.
 
@@ -225,9 +219,7 @@ class ProviderStrategy(ABC):
         # Run sync version in thread pool to avoid blocking event loop
         loop = asyncio.get_event_loop()
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            return await loop.run_in_executor(
-                executor, self.execute_operation, operation
-            )
+            return await loop.run_in_executor(executor, self.execute_operation, operation)
 
     @abstractmethod
     def get_capabilities(self) -> ProviderCapabilities:
@@ -264,9 +256,7 @@ class ProviderStrategy(ABC):
     def __enter__(self) -> "ProviderStrategy":
         """Context manager entry."""
         if not self._initialized and not self.initialize():
-            raise RuntimeError(
-                f"Failed to initialize {self.provider_type} provider strategy"
-            )
+            raise RuntimeError(f"Failed to initialize {self.provider_type} provider strategy")
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:

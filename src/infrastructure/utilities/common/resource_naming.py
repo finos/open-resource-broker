@@ -6,9 +6,7 @@ from config import ResourceConfig
 from config.manager import get_config_manager
 
 
-def get_resource_prefix(
-    resource_type: str, config: Optional[ResourceConfig] = None
-) -> str:
+def get_resource_prefix(resource_type: str, config: Optional[ResourceConfig] = None) -> str:
     """
     Get the prefix for a specific resource type.
 

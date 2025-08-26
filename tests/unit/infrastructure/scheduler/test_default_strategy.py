@@ -12,9 +12,7 @@ class TestDefaultSchedulerStrategy:
         """Set up test fixtures."""
         self.mock_config_manager = Mock()
         self.mock_logger = Mock()
-        self.strategy = DefaultSchedulerStrategy(
-            self.mock_config_manager, self.mock_logger
-        )
+        self.strategy = DefaultSchedulerStrategy(self.mock_config_manager, self.mock_logger)
 
     def test_parse_request_data_requests_format(self):
         """Test request status parsing with requests format."""

@@ -18,9 +18,7 @@ class DynamoDBConverter(DataConverter):
     Handles type conversion, Decimal handling, and DynamoDB-specific data types.
     """
 
-    def __init__(
-        self, partition_key: str = "id", sort_key: Optional[str] = None
-    ) -> None:
+    def __init__(self, partition_key: str = "id", sort_key: Optional[str] = None) -> None:
         """
         Initialize DynamoDB converter.
 
@@ -35,9 +33,7 @@ class DynamoDBConverter(DataConverter):
     def to_storage_format(self, domain_data: dict[str, Any]) -> Any:
         """Convert domain data to DynamoDB format (implements DataConverter interface)."""
         # Extract entity_id from domain_data if present
-        entity_id = domain_data.get(
-            self.partition_key, domain_data.get("id", "unknown")
-        )
+        entity_id = domain_data.get(self.partition_key, domain_data.get("id", "unknown"))
         return self.to_dynamodb_item(entity_id, domain_data)
 
     def from_storage_format(self, storage_data: Any) -> dict[str, Any]:
@@ -64,9 +60,7 @@ class DynamoDBConverter(DataConverter):
 
             # Add sort key if specified
             if self.sort_key and self.sort_key in data:
-                item[self.sort_key] = self._convert_to_dynamodb_type(
-                    data[self.sort_key]
-                )
+                item[self.sort_key] = self._convert_to_dynamodb_type(data[self.sort_key])
 
             # Convert all other fields
             for key, value in data.items():
@@ -205,9 +199,7 @@ class DynamoDBConverter(DataConverter):
             from contextlib import suppress
 
             with suppress(ValueError, TypeError):
-                if "T" in value and (
-                    "Z" in value or "+" in value or value.endswith("00")
-                ):
+                if "T" in value and ("Z" in value or "+" in value or value.endswith("00")):
                     return datetime.fromisoformat(value.replace("Z", "+00:00"))
             return value
 
@@ -222,9 +214,7 @@ class DynamoDBConverter(DataConverter):
         # Return other types as-is
         return value
 
-    def get_key(
-        self, entity_id: str, sort_key_value: Optional[str] = None
-    ) -> dict[str, Any]:
+    def get_key(self, entity_id: str, sort_key_value: Optional[str] = None) -> dict[str, Any]:
         """
         Get DynamoDB key for entity.
 
@@ -278,9 +268,7 @@ class DynamoDBConverter(DataConverter):
                 elif "$contains" in value:
                     filter_expressions.append(Attr(key).contains(value["$contains"]))
                 elif "$begins_with" in value:
-                    filter_expressions.append(
-                        Attr(key).begins_with(value["$begins_with"])
-                    )
+                    filter_expressions.append(Attr(key).begins_with(value["$begins_with"]))
                 else:
                     # Default equality
                     filter_expressions.append(Attr(key).eq(value))
@@ -299,9 +287,7 @@ class DynamoDBConverter(DataConverter):
 
         return filter_expression, expression_attribute_values
 
-    def prepare_batch_items(
-        self, entities: dict[str, dict[str, Any]]
-    ) -> list[dict[str, Any]]:
+    def prepare_batch_items(self, entities: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Prepare multiple entities for batch operations.
 

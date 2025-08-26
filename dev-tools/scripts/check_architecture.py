@@ -69,10 +69,7 @@ class ArchitectureValidator:
                 continue
 
             # Domain should not import from infrastructure or interface layers
-            if any(
-                layer in import_name
-                for layer in ["src.infrastructure", "src.interface"]
-            ):
+            if any(layer in import_name for layer in ["src.infrastructure", "src.interface"]):
                 self.violations.append(
                     f"{file_path}: Domain layer importing from outer layer: {import_name}"
                 )
@@ -138,9 +135,7 @@ class ArchitectureValidator:
         for module, imports in module_imports.items():
             for imported_module in imports:
                 if imported_module in module_imports:
-                    if module.replace("src.", "") in str(
-                        module_imports[imported_module]
-                    ):
+                    if module.replace("src.", "") in str(module_imports[imported_module]):
                         self.violations.append(
                             f"Potential circular dependency: {module} <-> {imported_module}"
                         )
@@ -188,9 +183,7 @@ class ArchitectureValidator:
         # Summary statistics
         logger.info("Architecture Analysis Summary:")
         for layer, imports in self.layer_imports.items():
-            logger.info(
-                f"  {layer.capitalize()} layer: {len(imports)} imports analyzed"
-            )
+            logger.info(f"  {layer.capitalize()} layer: {len(imports)} imports analyzed")
 
     def generate_dependency_report(self) -> dict[str, list[str]]:
         """Generate a detailed dependency report."""
@@ -208,15 +201,9 @@ class ArchitectureValidator:
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="Validate Clean Architecture dependency rules"
-    )
-    parser.add_argument(
-        "--warn-only", action="store_true", help="Only warn, don't fail the build"
-    )
-    parser.add_argument(
-        "--report", action="store_true", help="Generate detailed dependency report"
-    )
+    parser = argparse.ArgumentParser(description="Validate Clean Architecture dependency rules")
+    parser.add_argument("--warn-only", action="store_true", help="Only warn, don't fail the build")
+    parser.add_argument("--report", action="store_true", help="Generate detailed dependency report")
 
     args = parser.parse_args()
 

@@ -139,9 +139,7 @@ class CLICommandHandler(CommandHandler[TCommand, TResponse]):
                     self.logger.debug("Loaded input from file: %s", command.file)
             except Exception as e:
                 if self.logger:
-                    self.logger.error(
-                        "Failed to load input from file %s: %s", command.file, e
-                    )
+                    self.logger.error("Failed to load input from file %s: %s", command.file, e)
                 raise
         elif hasattr(command, "data") and command.data:
             try:

@@ -31,9 +31,7 @@ class MockProvider(ProviderPort):
 
     def initialize(self, config: ProviderConfig) -> bool:
         """Initialize the mock provider."""
-        self._config = (
-            config if config is not None else ProviderConfig(provider_type="mock")
-        )
+        self._config = config if config is not None else ProviderConfig(provider_type="mock")
         self._initialized = True
         return True
 
@@ -41,9 +39,7 @@ class MockProvider(ProviderPort):
         """Configure mock responses for testing."""
         self._responses[operation] = response
 
-    def create_instances(
-        self, template_config: dict[str, Any], count: int
-    ) -> list[InstanceId]:
+    def create_instances(self, template_config: dict[str, Any], count: int) -> list[InstanceId]:
         """Create mock instances."""
         if "create_instances" in self._responses:
             return self._responses["create_instances"]
@@ -78,9 +74,7 @@ class MockProvider(ProviderPort):
 
         return True
 
-    def get_instance_status(
-        self, instance_ids: list[InstanceId]
-    ) -> dict[InstanceId, str]:
+    def get_instance_status(self, instance_ids: list[InstanceId]) -> dict[InstanceId, str]:
         """Get mock instance status."""
         if "get_instance_status" in self._responses:
             return self._responses["get_instance_status"]
@@ -89,9 +83,7 @@ class MockProvider(ProviderPort):
         status_map = {}
         for instance_id in instance_ids:
             if str(instance_id.value) in self._instances:
-                status_map[instance_id] = self._instances[str(instance_id.value)][
-                    "state"
-                ]
+                status_map[instance_id] = self._instances[str(instance_id.value)]["state"]
             else:
                 status_map[instance_id] = "not-found"
 

@@ -17,9 +17,7 @@ from monitoring.metrics import MetricsCollector
 
 
 @injectable
-class GetRequestStatusRESTHandler(
-    BaseAPIHandler[dict[str, Any], RequestStatusResponse]
-):
+class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusResponse]):
     """API handler for checking request status."""
 
     def __init__(
@@ -53,9 +51,7 @@ class GetRequestStatusRESTHandler(
         self._max_retries = max_retries
         self.validator = RequestValidator()
 
-    async def validate_api_request(
-        self, request: dict[str, Any], context: RequestContext
-    ) -> None:
+    async def validate_api_request(self, request: dict[str, Any], context: RequestContext) -> None:
         """
         Validate API request for checking request status.
 
@@ -125,8 +121,7 @@ class GetRequestStatusRESTHandler(
                 # Create response DTO
                 response = RequestStatusResponse(
                     requests=[
-                        req.to_dict() if hasattr(req, "to_dict") else req
-                        for req in requests
+                        req.to_dict() if hasattr(req, "to_dict") else req for req in requests
                     ],
                     metadata={
                         "correlation_id": correlation_id,
@@ -140,9 +135,7 @@ class GetRequestStatusRESTHandler(
                 validated_data = context.metadata.get("validated_data")
                 if not validated_data:
                     # Fallback validation if not done in validate_api_request
-                    validated_data = self.validator.validate(
-                        RequestStatusModel, input_data
-                    )
+                    validated_data = self.validator.validate(RequestStatusModel, input_data)
 
                 request_ids = validated_data.request_ids
                 requests = []
@@ -151,9 +144,7 @@ class GetRequestStatusRESTHandler(
                 # Process each request ID
                 for request_id in request_ids:
                     try:
-                        request_data = await self._get_request_with_retry(
-                            request_id, long
-                        )
+                        request_data = await self._get_request_with_retry(request_id, long)
 
                         if self.logger:
                             self.logger.info(
@@ -255,9 +246,7 @@ class GetRequestStatusRESTHandler(
         if self._scheduler_strategy and hasattr(
             self._scheduler_strategy, "format_request_response"
         ):
-            formatted_response = await self._scheduler_strategy.format_request_response(
-                response
-            )
+            formatted_response = await self._scheduler_strategy.format_request_response(response)
             return formatted_response
 
         return response
@@ -281,15 +270,11 @@ class GetRequestStatusRESTHandler(
             try:
                 if long:
                     # Get full request details with machines using CQRS query
-                    query = GetRequestStatusQuery(
-                        request_id=request_id, include_machines=True
-                    )
+                    query = GetRequestStatusQuery(request_id=request_id, include_machines=True)
                     return await self._query_bus.execute(query)
                 else:
                     # Get basic request status using CQRS query
-                    query = GetRequestStatusQuery(
-                        request_id=request_id, include_machines=False
-                    )
+                    query = GetRequestStatusQuery(request_id=request_id, include_machines=False)
                     return await self._query_bus.execute(query)
             except RequestNotFoundError:
                 # Don't retry if request not found
@@ -310,9 +295,7 @@ class GetRequestStatusRESTHandler(
         if last_error:
             raise last_error
         else:
-            raise Exception(
-                f"Failed to get request status after {self._max_retries} attempts"
-            )
+            raise Exception(f"Failed to get request status after {self._max_retries} attempts")
 
 
 if TYPE_CHECKING:

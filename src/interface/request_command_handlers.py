@@ -38,9 +38,7 @@ async def handle_get_request_status(args: "argparse.Namespace") -> dict[str, Any
             request_ids_from_args.append(args.request_id)
 
         raw_request_data = {
-            "requests": [
-                {"request_id": request_id} for request_id in request_ids_from_args
-            ]
+            "requests": [{"request_id": request_id} for request_id in request_ids_from_args]
         }
 
     # Let scheduler strategy parse the raw data (each scheduler handles its own format)
@@ -153,13 +151,9 @@ async def handle_request_machines(args: "argparse.Namespace") -> dict[str, Any]:
         # Fallback if we can't get request details
         from domain.base.ports import LoggingPort
 
-        container.get(LoggingPort).warning(
-            "Could not get request details for resource ID: %s", e
-        )
+        container.get(LoggingPort).warning("Could not get request details for resource ID: %s", e)
         if scheduler_strategy:
-            return scheduler_strategy.format_request_response(
-                {"request_id": request_id}
-            )
+            return scheduler_strategy.format_request_response({"request_id": request_id})
         else:
             return {
                 "error": "No scheduler strategy available",

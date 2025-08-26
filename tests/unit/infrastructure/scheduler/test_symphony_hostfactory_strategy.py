@@ -25,9 +25,7 @@ class TestSymphonyHostFactorySchedulerStrategy:
             # Mock provider config to return appropriate values instead of Mock objects
             mock_provider_config = Mock()
             mock_provider_config.active_provider = "aws-default"
-            self.mock_config_manager.get_provider_config.return_value = (
-                mock_provider_config
-            )
+            self.mock_config_manager.get_provider_config.return_value = mock_provider_config
 
             # Mock resolve_file method to return actual paths
             def mock_resolve_file(file_type, filename):
@@ -37,9 +35,7 @@ class TestSymphonyHostFactorySchedulerStrategy:
             self.mock_config_manager.resolve_file.side_effect = mock_resolve_file
 
             self.mock_logger = Mock()
-            self.strategy = HostFactorySchedulerStrategy(
-                self.mock_config_manager, self.mock_logger
-            )
+            self.strategy = HostFactorySchedulerStrategy(self.mock_config_manager, self.mock_logger)
 
     def test_get_templates_file_path(self):
         """Test templates file path generation."""
@@ -271,7 +267,4 @@ class TestSymphonyHostFactorySchedulerStrategy:
         assert symphony_template["maxNumber"] == original_data["maxNumber"]
         assert symphony_template["subnetIds"] == original_data["subnetIds"]
         assert symphony_template["priceType"] == original_data["priceType"]
-        assert (
-            symphony_template["allocationStrategy"]
-            == original_data["allocationStrategy"]
-        )
+        assert symphony_template["allocationStrategy"] == original_data["allocationStrategy"]

@@ -33,9 +33,7 @@ class ProviderPort(Protocol):
         """Initialize the provider with configuration."""
         ...
 
-    def create_instances(
-        self, template_config: dict[str, Any], count: int
-    ) -> list[InstanceId]:
+    def create_instances(self, template_config: dict[str, Any], count: int) -> list[InstanceId]:
         """Create instances based on template configuration."""
         ...
 
@@ -43,9 +41,7 @@ class ProviderPort(Protocol):
         """Terminate the specified instances."""
         ...
 
-    def get_instance_status(
-        self, instance_ids: list[InstanceId]
-    ) -> dict[InstanceId, str]:
+    def get_instance_status(self, instance_ids: list[InstanceId]) -> dict[InstanceId, str]:
         """Get the current status of the specified instances."""
         ...
 

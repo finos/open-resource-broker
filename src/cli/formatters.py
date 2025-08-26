@@ -75,9 +75,7 @@ def format_generic_table(items: list[dict], title: str = "Items") -> str:
             all_keys.update(item.keys())
 
         # Create table with dynamic columns
-        table = Table(
-            show_header=True, header_style="bold magenta", show_lines=True, title=title
-        )
+        table = Table(show_header=True, header_style="bold magenta", show_lines=True, title=title)
         for key in sorted(all_keys):
             # Convert snake_case or camelCase to readable headers
             header = key.replace("_", " ").replace("Id", " ID").title()
@@ -142,17 +140,14 @@ def _format_generic_ascii_table(items: list[dict], title: str) -> str:
     lines = [f"\n{title}:"]
 
     # Header row
-    header_row = " | ".join(
-        header.ljust(width) for header, width in zip(headers, widths)
-    )
+    header_row = " | ".join(header.ljust(width) for header, width in zip(headers, widths))
     lines.append(header_row)
     lines.append("-" * len(header_row))
 
     # Data rows
     for item in items:
         row_values = [
-            str(item.get(key, "N/A")).ljust(width)
-            for key, width in zip(all_keys, widths)
+            str(item.get(key, "N/A")).ljust(width) for key, width in zip(all_keys, widths)
         ]
         lines.append(" | ".join(row_values))
 

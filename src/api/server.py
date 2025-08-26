@@ -38,9 +38,7 @@ def create_fastapi_app(server_config: ServerConfig) -> FastAPI:
 
     # Add trusted host middleware if configured
     if server_config.trusted_hosts and server_config.trusted_hosts != ["*"]:
-        app.add_middleware(
-            TrustedHostMiddleware, allowed_hosts=server_config.trusted_hosts
-        )
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=server_config.trusted_hosts)
 
     # Add CORS middleware
     if server_config.cors.enabled:
@@ -61,9 +59,7 @@ def create_fastapi_app(server_config: ServerConfig) -> FastAPI:
     if server_config.auth.enabled:
         auth_strategy = _create_auth_strategy(server_config.auth)
         if auth_strategy:
-            app.add_middleware(
-                AuthMiddleware, auth_port=auth_strategy, require_auth=True
-            )
+            app.add_middleware(AuthMiddleware, auth_port=auth_strategy, require_auth=True)
             logger.info(
                 "Authentication middleware enabled with strategy: %s",
                 auth_strategy.get_strategy_name(),
@@ -130,9 +126,7 @@ def create_fastapi_app(server_config: ServerConfig) -> FastAPI:
             "version": __version__,
             "description": "REST API for Open Host Factory Plugin",
             "auth_enabled": server_config.auth.enabled,
-            "auth_strategy": (
-                server_config.auth.strategy if server_config.auth.enabled else None
-            ),
+            "auth_strategy": (server_config.auth.strategy if server_config.auth.enabled else None),
         }
 
     # Register API routers

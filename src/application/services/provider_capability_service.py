@@ -154,9 +154,7 @@ class ProviderCapabilityService:
 
         return result
 
-    def _get_provider_capabilities(
-        self, provider_instance: str
-    ) -> Optional[ProviderCapabilities]:
+    def _get_provider_capabilities(self, provider_instance: str) -> Optional[ProviderCapabilities]:
         """Get capabilities for specified provider instance."""
         if not self._provider_registry:
             # Fallback to hardcoded capabilities for testing
@@ -164,23 +162,17 @@ class ProviderCapabilityService:
 
         try:
             # Get provider strategy from registry
-            strategy = self._provider_registry.create_strategy_from_instance(
-                provider_instance, {}
-            )
+            strategy = self._provider_registry.create_strategy_from_instance(provider_instance, {})
             return strategy.get_capabilities()
         except Exception as e:
-            self._logger.warning(
-                "Failed to get capabilities for %s: %s", provider_instance, str(e)
-            )
+            self._logger.warning("Failed to get capabilities for %s: %s", provider_instance, str(e))
             return None
 
     def _get_default_capabilities(self, provider_instance: str) -> ProviderCapabilities:
         """Get default capabilities based on provider instance name."""
         # Extract provider type from instance name
         provider_type = (
-            provider_instance.split("-")[0]
-            if "-" in provider_instance
-            else provider_instance
+            provider_instance.split("-")[0] if "-" in provider_instance else provider_instance
         )
 
         if provider_type == "aws":
@@ -295,9 +287,7 @@ class ProviderCapabilityService:
         fleet_type = getattr(template, "fleet_type", None)
         if not fleet_type:
             # Try to get from metadata
-            fleet_type = (
-                template.metadata.get("fleet_type") if template.metadata else None
-            )
+            fleet_type = template.metadata.get("fleet_type") if template.metadata else None
 
         if not fleet_type:
             return  # No fleet type specified
@@ -336,9 +326,7 @@ class ProviderCapabilityService:
                 f"Instance count: {template.max_instances} (within limit)"
             )
 
-    def get_provider_api_capabilities(
-        self, provider_instance: str, api: str
-    ) -> dict[str, Any]:
+    def get_provider_api_capabilities(self, provider_instance: str, api: str) -> dict[str, Any]:
         """Get detailed capabilities for specific provider API."""
         capabilities = self._get_provider_capabilities(provider_instance)
         if not capabilities:

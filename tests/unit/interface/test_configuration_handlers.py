@@ -42,9 +42,7 @@ class TestProviderConfigHandlers:
         args = Namespace(resource="provider", action="config")
         mock_app = Mock()
 
-        with patch(
-            "src.interface.system_command_handlers.get_container"
-        ) as mock_get_container:
+        with patch("src.interface.system_command_handlers.get_container") as mock_get_container:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 
@@ -63,9 +61,7 @@ class TestProviderConfigHandlers:
         args = Namespace(resource="provider", action="validate")
         mock_app = Mock()
 
-        with patch(
-            "src.interface.system_command_handlers.get_container"
-        ) as mock_get_container:
+        with patch("src.interface.system_command_handlers.get_container") as mock_get_container:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 
@@ -84,9 +80,7 @@ class TestProviderConfigHandlers:
         args = Namespace(resource="provider", action="reload")
         mock_app = Mock()
 
-        with patch(
-            "src.interface.system_command_handlers.get_container"
-        ) as mock_get_container:
+        with patch("src.interface.system_command_handlers.get_container") as mock_get_container:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 

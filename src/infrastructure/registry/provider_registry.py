@@ -141,9 +141,7 @@ class ProviderRegistry(BaseRegistry):
                 validator_factory=validator_factory,
             )
         except ValueError:
-            raise ValueError(
-                f"Provider instance '{instance_name}' is already registered"
-            )
+            raise ValueError(f"Provider instance '{instance_name}' is already registered")
 
     def create_strategy(self, provider_type: str, config: Any) -> Any:
         """

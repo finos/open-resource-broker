@@ -56,9 +56,7 @@ class TestOCPComplianceIntegration:
 
     @patch("src.providers.aws.registration.AWSProviderStrategy")
     @patch("src.providers.aws.registration.AWSConfig")
-    def test_aws_provider_registration_integration(
-        self, mock_aws_config, mock_aws_strategy
-    ):
+    def test_aws_provider_registration_integration(self, mock_aws_config, mock_aws_strategy):
         """Test AWS provider registration integration."""
         from providers.aws.registration import register_aws_provider
 
@@ -90,9 +88,7 @@ class TestOCPComplianceIntegration:
         mock_aws_strategy.assert_called_once()
         assert strategy == mock_strategy_instance
 
-    @patch(
-        "src.infrastructure.factories.provider_strategy_factory.get_provider_registry"
-    )
+    @patch("src.infrastructure.factories.provider_strategy_factory.get_provider_registry")
     def test_provider_strategy_factory_integration(self, mock_get_registry):
         """Test provider strategy factory integration with registry."""
         from config.manager import ConfigurationManager
@@ -125,9 +121,7 @@ class TestOCPComplianceIntegration:
 
         # Verify registry was used
         mock_get_registry.assert_called_once()
-        mock_registry.create_strategy.assert_called_once_with(
-            "test_type", provider_config
-        )
+        mock_registry.create_strategy.assert_called_once_with("test_type", provider_config)
         assert result == mock_strategy
         assert result.name == "test-provider"
 
@@ -146,9 +140,7 @@ class TestOCPComplianceIntegration:
         registry = get_provider_registry()
 
         mock_resolver = Mock()
-        mock_resolver.resolve_template_resources = Mock(
-            return_value="resolved_template"
-        )
+        mock_resolver.resolve_template_resources = Mock(return_value="resolved_template")
 
         mock_validator = Mock()
         mock_validator.validate_template_config = Mock(return_value=[])
@@ -177,9 +169,7 @@ class TestOCPComplianceIntegration:
         )
 
         with patch.object(registry, "create_resolver", return_value=mock_resolver):
-            result = resolver_service.resolve_template_resources(
-                template, "test_provider"
-            )
+            result = resolver_service.resolve_template_resources(template, "test_provider")
             assert result == "resolved_template"
 
         # Test validator service

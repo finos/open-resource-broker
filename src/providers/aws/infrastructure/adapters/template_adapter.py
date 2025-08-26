@@ -198,12 +198,8 @@ class AWSTemplateAdapter(TemplateAdapterPort):
 
         # Validate instance type(s)
         if not (template.instance_type or getattr(template, "instance_types", None)):
-            errors["instance_type"] = (
-                "Either instance_type or instance_types must be specified"
-            )
-        elif template.instance_type and not self._is_valid_instance_type(
-            template.instance_type
-        ):
+            errors["instance_type"] = "Either instance_type or instance_types must be specified"
+        elif template.instance_type and not self._is_valid_instance_type(template.instance_type):
             errors["instance_type"] = f"Invalid instance type: {template.instance_type}"
 
         # Validate subnet IDs
@@ -219,9 +215,7 @@ class AWSTemplateAdapter(TemplateAdapterPort):
         if template.security_group_ids:
             for sg_id in template.security_group_ids:
                 if not self._is_valid_security_group_format(sg_id):
-                    errors["security_group_ids"] = (
-                        f"Invalid security group ID format: {sg_id}"
-                    )
+                    errors["security_group_ids"] = f"Invalid security group ID format: {sg_id}"
                     break
 
         return errors
@@ -245,13 +239,9 @@ class AWSTemplateAdapter(TemplateAdapterPort):
         """Get all available templates."""
         return await self._template_config_manager.get_all_templates()
 
-    async def get_templates_by_provider_api(
-        self, provider_api: str
-    ) -> list[TemplateDTO]:
+    async def get_templates_by_provider_api(self, provider_api: str) -> list[TemplateDTO]:
         """Get templates filtered by provider API."""
-        return await self._template_config_manager.get_templates_by_provider(
-            provider_api
-        )
+        return await self._template_config_manager.get_templates_by_provider(provider_api)
 
     async def validate_template_dto(self, template: TemplateDTO) -> dict[str, Any]:
         """Validate a template configuration."""
@@ -328,9 +318,7 @@ class AWSTemplateAdapter(TemplateAdapterPort):
                         f"SSM parameter {ami_id_or_alias} does not contain a valid AMI ID: {resolved_ami}"
                     )
             except Exception as e:
-                self._logger.error(
-                    "Failed to resolve SSM parameter %s: %s", ami_id_or_alias, e
-                )
+                self._logger.error("Failed to resolve SSM parameter %s: %s", ami_id_or_alias, e)
                 raise AWSValidationError(
                     f"Failed to resolve AMI ID from SSM parameter: {ami_id_or_alias}"
                 )
@@ -474,9 +462,7 @@ class AWSTemplateAdapter(TemplateAdapterPort):
             return parameter_value
 
         except Exception as e:
-            self._logger.error(
-                "Failed to resolve SSM parameter %s: %s", parameter_path, e
-            )
+            self._logger.error("Failed to resolve SSM parameter %s: %s", parameter_path, e)
             raise
 
     def _is_valid_ami_format(self, ami_id: str) -> bool:

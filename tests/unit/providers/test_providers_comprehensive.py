@@ -38,11 +38,7 @@ class TestAWSProviderComprehensive:
         """Get handler classes from module."""
         classes = []
         for name, obj in inspect.getmembers(module):
-            if (
-                inspect.isclass(obj)
-                and "Handler" in name
-                and not name.startswith("Base")
-            ):
+            if inspect.isclass(obj) and "Handler" in name and not name.startswith("Base"):
                 classes.append((name, obj))
         return classes
 
@@ -231,9 +227,7 @@ class TestAWSProviderComprehensive:
 
         for utility_file in utility_files:
             try:
-                module = importlib.import_module(
-                    f"src.providers.aws.utilities.{utility_file}"
-                )
+                module = importlib.import_module(f"src.providers.aws.utilities.{utility_file}")
                 utility_modules.append((utility_file, module))
             except ImportError:
                 continue
@@ -247,9 +241,7 @@ class TestAWSProviderComprehensive:
 
         for manager_file in manager_files:
             try:
-                module = importlib.import_module(
-                    f"src.providers.aws.managers.{manager_file}"
-                )
+                module = importlib.import_module(f"src.providers.aws.managers.{manager_file}")
                 manager_modules.append((manager_file, module))
             except ImportError:
                 continue
@@ -386,9 +378,7 @@ class TestProviderStrategyPatternsComprehensive:
 
         for module_name, class_name in strategy_modules:
             try:
-                module = importlib.import_module(
-                    f"src.providers.base.strategy.{module_name}"
-                )
+                module = importlib.import_module(f"src.providers.base.strategy.{module_name}")
                 strategy_class = getattr(module, class_name)
                 strategy_classes.append((class_name, strategy_class))
             except (ImportError, AttributeError):
@@ -507,9 +497,7 @@ class TestAWSAuthenticationComprehensive:
 
         for module_name, class_name in auth_strategies:
             try:
-                module = importlib.import_module(
-                    f"src.providers.aws.auth.{module_name}"
-                )
+                module = importlib.import_module(f"src.providers.aws.auth.{module_name}")
                 strategy_class = getattr(module, class_name)
 
                 # Try to create strategy

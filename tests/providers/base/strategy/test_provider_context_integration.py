@@ -64,10 +64,7 @@ class TestProviderContextIntegration:
             # Test capabilities
             capabilities = provider_context.get_strategy_capabilities("aws")
             assert capabilities is not None
-            assert (
-                ProviderOperationType.CREATE_INSTANCES
-                in capabilities.supported_operations
-            )
+            assert ProviderOperationType.CREATE_INSTANCES in capabilities.supported_operations
 
     def test_multi_provider_context_scenario(self, provider_context):
         """Test multi-provider context scenario."""
@@ -217,9 +214,7 @@ class TestProviderContextIntegration:
                 limitations={},
                 performance_metrics={},
             )
-            strategy.execute_operation.return_value = ProviderResult.success_result(
-                {"provider": i}
-            )
+            strategy.execute_operation.return_value = ProviderResult.success_result({"provider": i})
             strategies.append(strategy)
             provider_context.register_strategy(strategy)
 
@@ -332,9 +327,7 @@ class TestProviderContextIntegration:
             limitations={},
             performance_metrics={},
         )
-        primary_strategy.check_health.return_value = ProviderHealthStatus.unhealthy(
-            "Service down"
-        )
+        primary_strategy.check_health.return_value = ProviderHealthStatus.unhealthy("Service down")
 
         backup_strategy = Mock()
         backup_strategy.provider_type = "backup"

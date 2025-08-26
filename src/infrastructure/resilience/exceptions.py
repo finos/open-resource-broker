@@ -44,9 +44,7 @@ class RetryConfigurationError(RetryError):
 class CircuitBreakerOpenError(RetryError):
     """Exception raised when circuit breaker is in OPEN state."""
 
-    def __init__(
-        self, service_name: str, failure_count: int, last_failure_time: float
-    ) -> None:
+    def __init__(self, service_name: str, failure_count: int, last_failure_time: float) -> None:
         """
         Initialize CircuitBreakerOpenError.
 

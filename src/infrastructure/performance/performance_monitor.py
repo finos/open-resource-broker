@@ -47,9 +47,7 @@ class PerformanceMonitor:
         metric["avg_time"] = metric["total_time"] / metric["count"]
 
         if self.logger and duration > 1.0:  # Log slow operations (>1 second)
-            self.logger.warning(
-                "Slow operation detected: %s took %.2fs", operation_name, duration
-            )
+            self.logger.warning("Slow operation detected: %s took %.2fs", operation_name, duration)
 
     def get_metrics(self) -> dict[str, dict[str, Any]]:
         """Get all recorded metrics."""
@@ -57,9 +55,7 @@ class PerformanceMonitor:
 
     def get_slowest_operations(self, limit: int = 10) -> dict[str, dict[str, Any]]:
         """Get the slowest operations by average time."""
-        sorted_ops = sorted(
-            self._metrics.items(), key=lambda x: x[1]["avg_time"], reverse=True
-        )
+        sorted_ops = sorted(self._metrics.items(), key=lambda x: x[1]["avg_time"], reverse=True)
         return dict(sorted_ops[:limit])
 
     def reset_metrics(self) -> None:

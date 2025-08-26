@@ -256,8 +256,7 @@ class CircuitBreakerStrategy(RetryStrategy):
             # Check if we should transition to half-open
             if (
                 circuit_state["last_failure_time"]
-                and current_time - circuit_state["last_failure_time"]
-                >= self.reset_timeout
+                and current_time - circuit_state["last_failure_time"] >= self.reset_timeout
             ):
                 circuit_state["state"] = CircuitState.HALF_OPEN
                 circuit_state["half_open_start_time"] = current_time
@@ -278,8 +277,7 @@ class CircuitBreakerStrategy(RetryStrategy):
             # Check if we should timeout back to open
             if (
                 circuit_state["half_open_start_time"]
-                and current_time - circuit_state["half_open_start_time"]
-                >= self.half_open_timeout
+                and current_time - circuit_state["half_open_start_time"] >= self.half_open_timeout
             ):
                 circuit_state["state"] = CircuitState.OPEN
                 circuit_state["half_open_start_time"] = None

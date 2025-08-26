@@ -36,9 +36,7 @@ class AWSResourceManagerImpl(CloudProviderResourceManager[AWSClient]):
         elif specification.resource_type == ResourceType.STORAGE_VOLUME:
             return await self._provision_storage_volume(specification)
         else:
-            raise ValueError(
-                f"Unsupported resource type: {specification.resource_type}"
-            )
+            raise ValueError(f"Unsupported resource type: {specification.resource_type}")
 
     async def execute_deprovisioning(self, allocation: ResourceAllocation) -> None:
         """Execute AWS-specific resource deprovisioning."""
@@ -49,17 +47,13 @@ class AWSResourceManagerImpl(CloudProviderResourceManager[AWSClient]):
         else:
             raise ValueError(f"Unsupported resource type: {allocation.resource_type}")
 
-    async def fetch_resource_status(
-        self, resource_id: ResourceId
-    ) -> ResourceAllocation:
+    async def fetch_resource_status(self, resource_id: ResourceId) -> ResourceAllocation:
         """Fetch resource status from AWS."""
         # Implementation would call AWS APIs to get resource status
         # This is a simplified version
         try:
             # Example: Get EC2 instance status
-            response = await self.provider_client.describe_instances(
-                InstanceIds=[str(resource_id)]
-            )
+            response = await self.provider_client.describe_instances(InstanceIds=[str(resource_id)])
 
             if not response.get("Reservations"):
                 raise ValueError(f"Resource not found: {resource_id}")
@@ -136,9 +130,7 @@ class AWSResourceManagerImpl(CloudProviderResourceManager[AWSClient]):
                 name=specification.name,
                 status="pending",
                 metadata=instance_config,
-                provider_specific_data={
-                    "aws_region": specification.region or "us-east-1"
-                },
+                provider_specific_data={"aws_region": specification.region or "us-east-1"},
             )
 
     async def _provision_storage_volume(
@@ -160,9 +152,7 @@ class AWSResourceManagerImpl(CloudProviderResourceManager[AWSClient]):
             provider_specific_data={"aws_region": specification.region or "us-east-1"},
         )
 
-    async def _deprovision_compute_instance(
-        self, allocation: ResourceAllocation
-    ) -> None:
+    async def _deprovision_compute_instance(self, allocation: ResourceAllocation) -> None:
         """Deprovision EC2 compute instance."""
         # Implementation would call AWS EC2 terminate APIs
         self.logger.info("Terminating EC2 instance: %s", allocation.resource_id)

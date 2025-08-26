@@ -60,9 +60,7 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
         # Initialize table
         self._initialize_table()
 
-        self._self._logger.debug(
-            "Initialized DynamoDB storage strategy for table %s", table_name
-        )
+        self._self._logger.debug("Initialized DynamoDB storage strategy for table %s", table_name)
 
     def _initialize_table(self) -> None:
         """Initialize DynamoDB table if it doesn't exist."""
@@ -72,27 +70,21 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
                 # Partition key
                 key_schema = [{"AttributeName": "id", "KeyType": "HASH"}]
 
-                attribute_definitions = [
-                    {"AttributeName": "id", "AttributeType": "S"}
-                ]  # String
+                attribute_definitions = [{"AttributeName": "id", "AttributeType": "S"}]  # String
 
                 success = self.client_manager.create_table(
                     self.table_name, key_schema, attribute_definitions
                 )
 
                 if success:
-                    self._self._logger.info(
-                        "Created DynamoDB table: %s", self.table_name
-                    )
+                    self._self._logger.info("Created DynamoDB table: %s", self.table_name)
                 else:
                     self._self._logger.warning(
                         "Failed to create DynamoDB table: %s", self.table_name
                     )
 
         except Exception as e:
-            self._self._logger.error(
-                "Failed to initialize table %s: %s", self.table_name, e
-            )
+            self._self._logger.error("Failed to initialize table %s: %s", self.table_name, e)
             raise
 
     def save(self, entity_id: str, data: dict[str, Any]) -> None:
@@ -203,9 +195,7 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
                 if success:
                     self._self._logger.debug("Deleted entity: %s", entity_id)
                 else:
-                    self._self._logger.warning(
-                        "Entity not found for deletion: %s", entity_id
-                    )
+                    self._self._logger.warning("Entity not found for deletion: %s", entity_id)
 
             except ClientError as e:
                 self.client_manager.handle_client_error(e, "Delete")
@@ -236,9 +226,7 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
             return exists
 
         except Exception as e:
-            self._self._logger.error(
-                "Failed to check existence of entity %s: %s", entity_id, e
-            )
+            self._self._logger.error("Failed to check existence of entity %s: %s", entity_id, e)
             return False
 
     def find_by_criteria(self, criteria: dict[str, Any]) -> list[dict[str, Any]]:
@@ -266,9 +254,7 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
                 # Convert items to domain data
                 entities = self.converter.from_dynamodb_items(items)
 
-                self._self._logger.debug(
-                    "Found %s entities matching criteria", len(entities)
-                )
+                self._self._logger.debug("Found %s entities matching criteria", len(entities))
                 return entities
 
             except ClientError as e:
@@ -320,9 +306,7 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
                         key = self.converter.get_key(entity_id)
                         self.transaction_manager.add_delete_item(self.table_name, key)
 
-                self._self._logger.debug(
-                    "Deleted batch of %s entities", len(entity_ids)
-                )
+                self._self._logger.debug("Deleted batch of %s entities", len(entity_ids))
 
             except ClientError as e:
                 self.client_manager.handle_client_error(e, "Batch delete")
@@ -346,9 +330,7 @@ class DynamoDBStorageStrategy(BaseStorageStrategy):
     def cleanup(self) -> None:
         """Clean up resources."""
         # DynamoDB doesn't require explicit cleanup like file handles or connections
-        self._self._logger.debug(
-            "Cleaned up DynamoDB storage strategy for %s", self.table_name
-        )
+        self._self._logger.debug("Cleaned up DynamoDB storage strategy for %s", self.table_name)
 
     def get_table_name(self) -> str:
         """Get table name."""

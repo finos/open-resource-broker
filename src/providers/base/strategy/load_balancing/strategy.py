@@ -191,9 +191,7 @@ class LoadBalancingProviderStrategy(ProviderStrategy):
                 operation_type=operation.operation_type,
             )
 
-    def _select_strategy(
-        self, operation: ProviderOperation
-    ) -> Optional[ProviderStrategy]:
+    def _select_strategy(self, operation: ProviderOperation) -> Optional[ProviderStrategy]:
         """Select strategy based on configured algorithm."""
         with self._lock:
             healthy_strategies = {
@@ -238,9 +236,7 @@ class LoadBalancingProviderStrategy(ProviderStrategy):
                 # Default to round robin
                 return self._round_robin_selection(healthy_strategies)
 
-    def _round_robin_selection(
-        self, strategies: dict[str, ProviderStrategy]
-    ) -> ProviderStrategy:
+    def _round_robin_selection(self, strategies: dict[str, ProviderStrategy]) -> ProviderStrategy:
         """Round robin strategy selection."""
         strategy_list = list(strategies.values())
         selected = strategy_list[self._round_robin_index % len(strategy_list)]
@@ -285,9 +281,7 @@ class LoadBalancingProviderStrategy(ProviderStrategy):
 
         return selected_strategy or next(iter(strategies.values()))
 
-    def _random_selection(
-        self, strategies: dict[str, ProviderStrategy]
-    ) -> ProviderStrategy:
+    def _random_selection(self, strategies: dict[str, ProviderStrategy]) -> ProviderStrategy:
         """Random strategy selection."""
         import random
 
@@ -311,9 +305,7 @@ class LoadBalancingProviderStrategy(ProviderStrategy):
         index = operation_hash % len(strategy_list)
         return strategy_list[index]
 
-    def _adaptive_selection(
-        self, strategies: dict[str, ProviderStrategy]
-    ) -> ProviderStrategy:
+    def _adaptive_selection(self, strategies: dict[str, ProviderStrategy]) -> ProviderStrategy:
         """Adaptive strategy selection based on performance metrics."""
         # For now, use least response time as adaptive metric
         return self._least_response_time_selection(strategies)

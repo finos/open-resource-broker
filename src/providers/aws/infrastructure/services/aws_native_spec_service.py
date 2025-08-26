@@ -16,16 +16,12 @@ from providers.aws.domain.template.aggregate import AWSTemplate
 class AWSNativeSpecService:
     """AWS-specific native spec processing."""
 
-    def __init__(
-        self, native_spec_service: NativeSpecService, config_port: ConfigurationPort
-    ):
+    def __init__(self, native_spec_service: NativeSpecService, config_port: ConfigurationPort):
         self.native_spec_service = native_spec_service
         self.config_port = config_port
         self.spec_renderer = native_spec_service.spec_renderer
 
-    def render_default_spec(
-        self, spec_type: str, context: dict[str, Any]
-    ) -> dict[str, Any]:
+    def render_default_spec(self, spec_type: str, context: dict[str, Any]) -> dict[str, Any]:
         """Render default specification template with context.
 
         Args:
@@ -89,9 +85,7 @@ class AWSNativeSpecService:
             return None
 
         # Render the native spec with context
-        rendered_native_spec = self.native_spec_service.render_spec(
-            native_spec, context
-        )
+        rendered_native_spec = self.native_spec_service.render_spec(native_spec, context)
 
         # Get merge mode from configuration
         native_config = self.config_port.get_native_spec_config()
@@ -121,9 +115,7 @@ class AWSNativeSpecService:
         context = self._build_aws_context(template, request)
         return self.native_spec_service.render_spec(spec, context)
 
-    def _resolve_launch_template_spec(
-        self, template: AWSTemplate
-    ) -> Optional[dict[str, Any]]:
+    def _resolve_launch_template_spec(self, template: AWSTemplate) -> Optional[dict[str, Any]]:
         """Resolve launch template spec."""
         if template.launch_template_spec:
             return template.launch_template_spec
@@ -131,9 +123,7 @@ class AWSNativeSpecService:
             return self._load_spec_file(template.launch_template_spec_file)
         return None
 
-    def _resolve_provider_api_spec(
-        self, template: AWSTemplate
-    ) -> Optional[dict[str, Any]]:
+    def _resolve_provider_api_spec(self, template: AWSTemplate) -> Optional[dict[str, Any]]:
         """Resolve provider API spec."""
         if template.provider_api_spec:
             return template.provider_api_spec
@@ -152,9 +142,7 @@ class AWSNativeSpecService:
         )
         return read_json_file(f"{base_path}/{file_path}")
 
-    def _build_aws_context(
-        self, template: AWSTemplate, request: Request
-    ) -> dict[str, Any]:
+    def _build_aws_context(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
         """Build AWS-specific context."""
         # Get package info for template context
         package_info = self.config_port.get_package_info()

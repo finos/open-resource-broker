@@ -14,9 +14,7 @@ if TYPE_CHECKING:
 class TemplateConfigurationAdapter(TemplateConfigurationPort):
     """Adapter implementing TemplateConfigurationPort using centralized template configuration manager."""
 
-    def __init__(
-        self, template_manager: TemplateConfigurationManager, logger: LoggingPort
-    ) -> None:
+    def __init__(self, template_manager: TemplateConfigurationManager, logger: LoggingPort) -> None:
         """
         Initialize adapter with template configuration manager and logger.
 
@@ -134,9 +132,7 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
             List of Template domain objects
         """
         all_templates = self._template_manager.get_all_templates()
-        return [
-            t for t in all_templates if getattr(t, "provider_api", None) == provider_api
-        ]
+        return [t for t in all_templates if getattr(t, "provider_api", None) == provider_api]
 
     def clear_cache(self) -> None:
         """Clear template cache."""

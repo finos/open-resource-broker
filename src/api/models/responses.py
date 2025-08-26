@@ -28,9 +28,7 @@ def format_error_for_api(error_response: InfrastructureErrorResponse) -> dict[st
     }
 
 
-def format_success_for_api(
-    message: str, data: Optional[dict[str, Any]] = None
-) -> dict[str, Any]:
+def format_success_for_api(message: str, data: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     """Format success response for API consumption."""
     response = {"status": "success", "message": message}
     if data is not None:

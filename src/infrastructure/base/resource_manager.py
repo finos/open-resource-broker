@@ -48,9 +48,7 @@ class BaseResourceManager(ResourceManagerPort, ABC):
         self.max_retries = 3
         self.retry_delay = 2.0
 
-    async def provision_resources(
-        self, specification: ResourceSpecification
-    ) -> ResourceAllocation:
+    async def provision_resources(self, specification: ResourceSpecification) -> ResourceAllocation:
         """
         Provision resources with monitoring and retry logic.
 
@@ -115,9 +113,7 @@ class BaseResourceManager(ResourceManagerPort, ABC):
         start_time = time.time()
 
         if self.logger:
-            self.logger.info(
-                "Starting resource deprovisioning: %s", allocation.resource_id
-            )
+            self.logger.info("Starting resource deprovisioning: %s", allocation.resource_id)
 
         try:
             # Pre-deprovisioning checks
@@ -182,9 +178,7 @@ class BaseResourceManager(ResourceManagerPort, ABC):
 
             duration = time.time() - start_time
             if self.logger:
-                self.logger.debug(
-                    "Listed %s resources in %.3fs", len(resources), duration
-                )
+                self.logger.debug("Listed %s resources in %.3fs", len(resources), duration)
 
             self._record_metric(operation_id, duration, "success")
             return resources
@@ -216,9 +210,7 @@ class BaseResourceManager(ResourceManagerPort, ABC):
 
     # Template methods for concrete implementations
 
-    async def validate_specification(
-        self, specification: ResourceSpecification
-    ) -> None:
+    async def validate_specification(self, specification: ResourceSpecification) -> None:
         """
         Validate resource specification before provisioning.
 
@@ -236,14 +228,10 @@ class BaseResourceManager(ResourceManagerPort, ABC):
         Override in concrete implementations for provider-specific quota checks.
         """
         try:
-            quota = await self.get_resource_quota(
-                specification.resource_type, specification.region
-            )
+            quota = await self.get_resource_quota(specification.resource_type, specification.region)
             # Basic quota check - override for more sophisticated logic
             if quota.get("available", 0) <= 0:
-                raise ValueError(
-                    f"Insufficient quota for {specification.resource_type.value}"
-                )
+                raise ValueError(f"Insufficient quota for {specification.resource_type.value}")
         except Exception:
             # If quota check fails, log warning but don't block provisioning
             if self.logger:
@@ -260,9 +248,7 @@ class BaseResourceManager(ResourceManagerPort, ABC):
         if not allocation.resource_id:
             raise ValueError("Resource allocation must have a valid resource_id")
         if not allocation.is_active() and not allocation.is_provisioning():
-            raise ValueError(
-                f"Resource allocation has invalid status: {allocation.status}"
-            )
+            raise ValueError(f"Resource allocation has invalid status: {allocation.status}")
 
     async def validate_deprovisioning(self, allocation: ResourceAllocation) -> None:
         """
@@ -273,18 +259,14 @@ class BaseResourceManager(ResourceManagerPort, ABC):
         if not allocation.resource_id:
             raise ValueError("Cannot deprovision resource without valid resource_id")
 
-    async def cleanup_after_deprovisioning(
-        self, allocation: ResourceAllocation
-    ) -> None:
+    async def cleanup_after_deprovisioning(self, allocation: ResourceAllocation) -> None:
         """
         Cleanup after successful deprovisioning.
 
         Override in concrete implementations for provider-specific cleanup.
         """
         if self.logger:
-            self.logger.debug(
-                "Cleanup completed for resource: %s", allocation.resource_id
-            )
+            self.logger.debug("Cleanup completed for resource: %s", allocation.resource_id)
 
     # Abstract methods that must be implemented by concrete classes
 
@@ -307,9 +289,7 @@ class BaseResourceManager(ResourceManagerPort, ABC):
         """
 
     @abstractmethod
-    async def fetch_resource_status(
-        self, resource_id: ResourceId
-    ) -> ResourceAllocation:
+    async def fetch_resource_status(self, resource_id: ResourceId) -> ResourceAllocation:
         """
         Fetch current resource status from provider.
 
@@ -386,9 +366,7 @@ class BaseResourceManager(ResourceManagerPort, ABC):
         """Get performance metrics."""
         return self._metrics.copy()
 
-    def handle_error(
-        self, error: Exception, context: str
-    ) -> InfrastructureErrorResponse:
+    def handle_error(self, error: Exception, context: str) -> InfrastructureErrorResponse:
         """Handle errors consistently."""
         if self.logger:
             self.logger.error("Resource manager error in %s: %s", context, str(error))
@@ -404,15 +382,13 @@ class CloudProviderResourceManager(BaseResourceManager, Generic[T]):
     such as client management and provider-specific error handling.
     """
 
-    def __init__(
-        self, provider_client: T, logger: Optional[LoggingPort] = None
-    ) -> None:
+    def __init__(self, provider_client: T, logger: Optional[LoggingPort] = None) -> None:
         """Initialize with provider-specific client."""
         super().__init__(logger)
         self.provider_client = provider_client
-        self.provider_name = self.__class__.__name__.replace(
-            "ResourceManager", ""
-        ).replace("Impl", "")
+        self.provider_name = self.__class__.__name__.replace("ResourceManager", "").replace(
+            "Impl", ""
+        )
 
     async def validate_provider_connection(self) -> bool:
         """

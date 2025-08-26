@@ -50,11 +50,7 @@ class MachineDTO(BaseDTO):
         Returns:
             MachineDTO instance
         """
-        status = (
-            machine.status.value
-            if hasattr(machine.status, "value")
-            else str(machine.status)
-        )
+        status = machine.status.value if hasattr(machine.status, "value") else str(machine.status)
 
         # Common fields for both short and long formats
         common_fields = {
@@ -73,12 +69,8 @@ class MachineDTO(BaseDTO):
         if long:
             common_fields.update(
                 {
-                    "provider_api": (
-                        str(machine.provider_api) if machine.provider_api else None
-                    ),
-                    "resource_id": (
-                        str(machine.resource_id) if machine.resource_id else None
-                    ),
+                    "provider_api": (str(machine.provider_api) if machine.provider_api else None),
+                    "resource_id": (str(machine.resource_id) if machine.resource_id else None),
                     "price_type": (
                         machine.price_type.value
                         if hasattr(machine.price_type, "value")

@@ -76,9 +76,7 @@ class TestCommandQuerySeparation:
 
         # Commands should not have "get" methods
         get_methods = [method for method in command_methods if method.startswith("get")]
-        assert len(get_methods) == 0, (
-            f"Commands should not have get methods: {get_methods}"
-        )
+        assert len(get_methods) == 0, f"Commands should not have get methods: {get_methods}"
 
     def test_queries_do_not_modify_state(self):
         """Test that queries do not modify system state."""
@@ -96,8 +94,7 @@ class TestCommandQuerySeparation:
             method
             for method in query_methods
             if any(
-                verb in method.lower()
-                for verb in ["set", "update", "create", "delete", "modify"]
+                verb in method.lower() for verb in ["set", "update", "create", "delete", "modify"]
             )
         ]
         assert len(modifying_methods) == 0, (
@@ -153,12 +150,8 @@ class TestCommandQuerySeparation:
 
         # Should NOT have called any state-modifying methods
         assert not mock_repository.save.called, "Query handlers should not save data"
-        assert not mock_repository.delete.called, (
-            "Query handlers should not delete data"
-        )
-        assert not mock_repository.update.called, (
-            "Query handlers should not update data"
-        )
+        assert not mock_repository.delete.called, "Query handlers should not delete data"
+        assert not mock_repository.update.called, "Query handlers should not update data"
 
 
 @pytest.mark.unit
@@ -182,9 +175,7 @@ class TestCommandBusImplementation:
             template_id="test-template", machine_count=2, requester_id="test-user"
         )
 
-        update_command = UpdateRequestStatusCommand(
-            request_id="test-request", status="PROCESSING"
-        )
+        update_command = UpdateRequestStatusCommand(request_id="test-request", status="PROCESSING")
 
         command_bus.dispatch(create_command)
         command_bus.dispatch(update_command)
@@ -202,9 +193,7 @@ class TestCommandBusImplementation:
         )
 
         # Should raise appropriate exception for unregistered command
-        with pytest.raises(
-            Exception
-        ):  # Specific exception type depends on implementation
+        with pytest.raises(Exception):  # Specific exception type depends on implementation
             command_bus.dispatch(unregistered_command)
 
     def test_command_bus_supports_middleware(self):
@@ -324,9 +313,7 @@ class TestQueryBusImplementation:
         query_bus.register_handler(GetMachinesByRequestQuery, handler)
 
         # Parameterized query
-        query = GetMachinesByRequestQuery(
-            request_id="test-request", status="RUNNING", limit=10
-        )
+        query = GetMachinesByRequestQuery(request_id="test-request", status="RUNNING", limit=10)
 
         query_bus.dispatch(query)
 

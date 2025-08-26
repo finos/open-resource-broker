@@ -72,12 +72,8 @@ class SQLConnectionManager(ResourceManager):
             info.update(
                 {
                     "pool_size": getattr(self.engine.pool, "size", "N/A"),
-                    "checked_out_connections": getattr(
-                        self.engine.pool, "checkedout", "N/A"
-                    ),
-                    "overflow_connections": getattr(
-                        self.engine.pool, "overflow", "N/A"
-                    ),
+                    "checked_out_connections": getattr(self.engine.pool, "checkedout", "N/A"),
+                    "overflow_connections": getattr(self.engine.pool, "overflow", "N/A"),
                 }
             )
 
@@ -106,9 +102,7 @@ class SQLConnectionManager(ResourceManager):
                 username = self.config.get("username", "user")
                 password = self.config.get("password", "")
 
-                connection_string = (
-                    f"postgresql://{username}:{password}@{host}:{port}/{database}"
-                )
+                connection_string = f"postgresql://{username}:{password}@{host}:{port}/{database}"
 
                 self.engine = create_engine(
                     connection_string,
@@ -257,9 +251,7 @@ class SQLConnectionManager(ResourceManager):
                     )
                 elif db_type == "postgresql":
                     result = conn.execute(
-                        text(
-                            "SELECT tablename FROM pg_tables WHERE tablename = :table_name"
-                        ),
+                        text("SELECT tablename FROM pg_tables WHERE tablename = :table_name"),
                         {"table_name": table_name},
                     )
                 elif db_type == "mysql":

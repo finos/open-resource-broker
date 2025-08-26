@@ -43,9 +43,7 @@ class SDKMethodDiscovery:
         """Initialize the instance."""
         self._method_info_cache: dict[str, MethodInfo] = {}
 
-    async def discover_cqrs_methods(
-        self, query_bus, command_bus
-    ) -> dict[str, Callable]:
+    async def discover_cqrs_methods(self, query_bus, command_bus) -> dict[str, Callable]:
         """
         Auto-discover all CQRS handlers and create SDK methods using direct bus access.
 
@@ -190,9 +188,7 @@ class SDKMethodDiscovery:
             # Fallback to basic method info
             return MethodInfo(
                 name=method_name,
-                description=self._generate_method_description(
-                    method_name, operation_type
-                ),
+                description=self._generate_method_description(method_name, operation_type),
                 parameters={},
                 required_params=[],
                 return_type=None,
@@ -200,9 +196,7 @@ class SDKMethodDiscovery:
                 original_class=handler_type,
             )
 
-    def _generate_method_description(
-        self, method_name: str, operation_type: str
-    ) -> str:
+    def _generate_method_description(self, method_name: str, operation_type: str) -> str:
         """Generate human-readable description from method name."""
         # Convert snake_case to Title Case
         words = method_name.replace("_", " ").title()
@@ -269,9 +263,7 @@ class SDKMethodDiscovery:
         return sdk_method
 
     # Legacy methods (deprecated)
-    def _create_query_method(
-        self, service, query_type: type, method_info: MethodInfo
-    ) -> Callable:
+    def _create_query_method(self, service, query_type: type, method_info: MethodInfo) -> Callable:
         """Create SDK method for query handler (deprecated)."""
         raise NotImplementedError(
             "Legacy method deprecated. Use _create_query_method_cqrs instead."

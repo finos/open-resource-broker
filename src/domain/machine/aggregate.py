@@ -58,9 +58,7 @@ class Machine(AggregateRoot):
         """Initialize the instance."""
         # Set default ID if not provided
         if "id" not in data:
-            data["id"] = data.get(
-                "instance_id", f"machine-{data.get('template_id', 'unknown')}"
-            )
+            data["id"] = data.get("instance_id", f"machine-{data.get('template_id', 'unknown')}")
 
         # Set default timestamps if not provided
         from datetime import datetime
@@ -70,9 +68,7 @@ class Machine(AggregateRoot):
 
         super().__init__(**data)
 
-    def update_status(
-        self, new_status: MachineStatus, reason: Optional[str] = None
-    ) -> "Machine":
+    def update_status(self, new_status: MachineStatus, reason: Optional[str] = None) -> "Machine":
         """Update machine status and generate domain event."""
         old_status = self.status
 
@@ -208,9 +204,7 @@ class Machine(AggregateRoot):
         return base_format
 
     @classmethod
-    def from_provider_format(
-        cls, data: dict[str, Any], provider_type: str
-    ) -> "Machine":
+    def from_provider_format(cls, data: dict[str, Any], provider_type: str) -> "Machine":
         """Create machine from provider-specific format."""
         core_data = {
             "instance_id": InstanceId(value=data.get("instance_id")),
@@ -236,8 +230,6 @@ class Machine(AggregateRoot):
         if data.get("launch_time"):
             core_data["launch_time"] = datetime.fromisoformat(data["launch_time"])
         if data.get("termination_time"):
-            core_data["termination_time"] = datetime.fromisoformat(
-                data["termination_time"]
-            )
+            core_data["termination_time"] = datetime.fromisoformat(data["termination_time"])
 
         return cls.model_validate(core_data)

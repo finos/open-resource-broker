@@ -13,9 +13,7 @@ from unittest.mock import Mock
 import pytest
 
 # Add project root to path
-sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../.."))
-)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../..")))
 
 from domain.request.aggregate import Request
 from providers.aws.configuration.config import (
@@ -68,9 +66,7 @@ class TestAWSLaunchTemplateManager:
         )
 
         # Sample request
-        self.request = Request(
-            request_id="req-123", template_id="test-template", requested_count=2
-        )
+        self.request = Request(request_id="req-123", template_id="test-template", requested_count=2)
 
     def test_manager_initialization(self):
         """Test that manager initializes correctly."""
@@ -91,14 +87,10 @@ class TestAWSLaunchTemplateManager:
                 "LatestVersionNumber": 1,
             }
         }
-        self.mock_aws_client.ec2_client.create_launch_template.return_value = (
-            mock_response
-        )
+        self.mock_aws_client.ec2_client.create_launch_template.return_value = mock_response
 
         # Execute
-        result = self.manager.create_or_update_launch_template(
-            self.aws_template, self.request
-        )
+        result = self.manager.create_or_update_launch_template(self.aws_template, self.request)
 
         # Verify
         assert isinstance(result, LaunchTemplateResult)
@@ -133,9 +125,7 @@ class TestAWSLaunchTemplateManager:
         )
 
         # Execute
-        result = self.manager.create_or_update_launch_template(
-            self.aws_template, self.request
-        )
+        result = self.manager.create_or_update_launch_template(self.aws_template, self.request)
 
         # Verify
         assert result.template_id == "lt-existing"
@@ -149,9 +139,7 @@ class TestAWSLaunchTemplateManager:
     def test_create_launch_template_data_basic_fields(self):
         """Test launch template data creation with basic fields."""
         # Execute
-        data = self.manager._create_launch_template_data(
-            self.aws_template, self.request
-        )
+        data = self.manager._create_launch_template_data(self.aws_template, self.request)
 
         # Verify basic structure
         assert "ImageId" in data
@@ -171,9 +159,7 @@ class TestAWSLaunchTemplateManager:
         self.aws_template.public_ip_assignment = True
 
         # Execute
-        data = self.manager._create_launch_template_data(
-            self.aws_template, self.request
-        )
+        data = self.manager._create_launch_template_data(self.aws_template, self.request)
 
         # Verify network interfaces
         assert "NetworkInterfaces" in data
@@ -195,9 +181,7 @@ class TestAWSLaunchTemplateManager:
         self.aws_template.storage_encryption = True
 
         # Execute
-        data = self.manager._create_launch_template_data(
-            self.aws_template, self.request
-        )
+        data = self.manager._create_launch_template_data(self.aws_template, self.request)
 
         # Verify block device mappings
         assert "BlockDeviceMappings" in data
@@ -220,9 +204,7 @@ class TestAWSLaunchTemplateManager:
         self.aws_template.user_data = user_data_script
 
         # Execute
-        data = self.manager._create_launch_template_data(
-            self.aws_template, self.request
-        )
+        data = self.manager._create_launch_template_data(self.aws_template, self.request)
 
         # Verify user data (should be base64 encoded)
         assert "UserData" in data
@@ -237,9 +219,7 @@ class TestAWSLaunchTemplateManager:
         self.aws_template.instance_profile = "test-instance-profile"
 
         # Execute
-        data = self.manager._create_launch_template_data(
-            self.aws_template, self.request
-        )
+        data = self.manager._create_launch_template_data(self.aws_template, self.request)
 
         # Verify IAM instance profile
         assert "IamInstanceProfile" in data
@@ -251,9 +231,7 @@ class TestAWSLaunchTemplateManager:
         self.aws_template.monitoring_enabled = True
 
         # Execute
-        data = self.manager._create_launch_template_data(
-            self.aws_template, self.request
-        )
+        data = self.manager._create_launch_template_data(self.aws_template, self.request)
 
         # Verify monitoring
         assert "Monitoring" in data
@@ -284,9 +262,7 @@ class TestAWSLaunchTemplateManager:
     def test_create_instance_tags_with_aws_format(self):
         """Test instance tags creation with AWS string format."""
         # Configure template with AWS tag format
-        self.aws_template.aws_tag_format = (
-            "Environment=prod;Owner=team-alpha;Cost-Center=12345"
-        )
+        self.aws_template.aws_tag_format = "Environment=prod;Owner=team-alpha;Cost-Center=12345"
 
         # Execute
         tags = self.manager._create_instance_tags(self.aws_template, self.request)
@@ -333,9 +309,7 @@ class TestAWSLaunchTemplateManager:
                 }
             ]
         }
-        self.mock_aws_client.ec2_client.describe_launch_templates.return_value = (
-            mock_response
-        )
+        self.mock_aws_client.ec2_client.describe_launch_templates.return_value = mock_response
 
         # Execute
         result = self.manager._use_existing_template_strategy(self.aws_template)
@@ -350,9 +324,7 @@ class TestAWSLaunchTemplateManager:
         """Test using existing template when it doesn't exist."""
         # Mock AWS response (empty)
         mock_response = {"LaunchTemplates": []}
-        self.mock_aws_client.ec2_client.describe_launch_templates.return_value = (
-            mock_response
-        )
+        self.mock_aws_client.ec2_client.describe_launch_templates.return_value = mock_response
 
         # Mock create response
         mock_create_response = {
@@ -362,9 +334,7 @@ class TestAWSLaunchTemplateManager:
                 "LatestVersionNumber": 1,
             }
         }
-        self.mock_aws_client.ec2_client.create_launch_template.return_value = (
-            mock_create_response
-        )
+        self.mock_aws_client.ec2_client.create_launch_template.return_value = mock_create_response
 
         # Execute
         result = self.manager._use_existing_template_strategy(self.aws_template)
@@ -393,9 +363,7 @@ class TestAWSLaunchTemplateManager:
 
         # Execute and verify exception is raised
         with pytest.raises(Exception):
-            self.manager.create_or_update_launch_template(
-                self.aws_template, self.request
-            )
+            self.manager.create_or_update_launch_template(self.aws_template, self.request)
 
         # Verify error was logged
         self.mock_logger.error.assert_called()

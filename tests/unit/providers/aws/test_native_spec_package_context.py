@@ -53,9 +53,7 @@ class TestAWSNativeSpecPackageContext:
     def test_build_aws_context_package_info_fallback(self):
         """Test fallback when package info is unavailable."""
         # Arrange
-        self.mock_config_port.get_package_info.side_effect = Exception(
-            "Package info unavailable"
-        )
+        self.mock_config_port.get_package_info.side_effect = Exception("Package info unavailable")
 
         template = AWSTemplate(
             template_id="test-template", image_id="ami-12345", instance_type="t3.micro"

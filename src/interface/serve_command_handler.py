@@ -50,9 +50,7 @@ async def handle_serve_api(args) -> dict[str, Any]:
         if log_level:
             server_config.log_level = log_level
 
-        logger.info(
-            "Starting REST API server on %s:%s", server_config.host, server_config.port
-        )
+        logger.info("Starting REST API server on %s:%s", server_config.host, server_config.port)
         logger.info(
             "Workers: %s, Reload: %s, Log Level: %s",
             server_config.workers,

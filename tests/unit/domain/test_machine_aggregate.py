@@ -297,10 +297,7 @@ class TestMachineAggregate:
         assert machine.network_configuration.subnet_id == "subnet-12345678"
         assert "sg-12345678" in machine.network_configuration.security_group_ids
         assert "sg-87654321" in machine.network_configuration.security_group_ids
-        assert (
-            machine.network_configuration.private_dns_name
-            == "ip-10-0-1-100.ec2.internal"
-        )
+        assert machine.network_configuration.private_dns_name == "ip-10-0-1-100.ec2.internal"
         assert (
             machine.network_configuration.public_dns_name
             == "ec2-54-123-45-67.compute-1.amazonaws.com"

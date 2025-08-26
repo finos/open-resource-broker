@@ -176,9 +176,7 @@ def _register_aws_template_store(logger: "LoggingPort" = None) -> None:
     Provider-specific template logic is now handled by the scheduler strategy pattern.
     """
     if logger:
-        logger.debug(
-            "AWS template store registration skipped - using integrated template system"
-        )
+        logger.debug("AWS template store registration skipped - using integrated template system")
     # No-op: Template system has been consolidated
 
 
@@ -242,9 +240,7 @@ def register_aws_provider_with_di(provider_instance, container) -> bool:
         # Create provider strategy factory using DI container
         def aws_strategy_factory():
             """Factory function to create AWS strategy with DI container."""
-            return _create_aws_strategy_with_di(
-                container, aws_config, provider_instance.name
-            )
+            return _create_aws_strategy_with_di(container, aws_config, provider_instance.name)
 
         # Register the specific provider instance (no generic type registration)
         registry.register_provider_instance(
@@ -254,9 +250,7 @@ def register_aws_provider_with_di(provider_instance, container) -> bool:
             config_factory=lambda: aws_config,
         )
 
-        logger.debug(
-            "Successfully registered AWS provider instance: %s", provider_instance.name
-        )
+        logger.debug("Successfully registered AWS provider instance: %s", provider_instance.name)
         return True
 
     except Exception as e:
@@ -453,9 +447,7 @@ def register_aws_services_with_di(container) -> None:
         # Register AMI resolver if not already registered
         if not container.is_registered(CachingAMIResolver):
             container.register_singleton(CachingAMIResolver)
-            container.register_singleton(
-                TemplateResolverPort, lambda c: c.get(CachingAMIResolver)
-            )
+            container.register_singleton(TemplateResolverPort, lambda c: c.get(CachingAMIResolver))
             logger.debug("AWS AMI resolver registered with DI container")
 
         # Register AWS Launch Template Manager if not already registered
@@ -480,9 +472,7 @@ def register_aws_services_with_di(container) -> None:
                     config_port=c.get(ConfigurationPort),
                 )
 
-            container.register_factory(
-                AWSNativeSpecService, create_aws_native_spec_service
-            )
+            container.register_factory(AWSNativeSpecService, create_aws_native_spec_service)
             logger.debug("AWS Native Spec Service registered with DI container")
 
         logger.debug("AWS services registered with DI container")

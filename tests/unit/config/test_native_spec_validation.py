@@ -66,9 +66,8 @@ class TestNativeSpecValidation:
                 launch_template_spec_file="test-file.json",
             )
 
-        assert (
-            "Cannot specify both launch_template_spec and launch_template_spec_file"
-            in str(exc_info.value)
+        assert "Cannot specify both launch_template_spec and launch_template_spec_file" in str(
+            exc_info.value
         )
 
     def test_aws_template_mutual_exclusion_provider_api(self):
@@ -82,9 +81,8 @@ class TestNativeSpecValidation:
                 provider_api_spec_file="test-file.json",
             )
 
-        assert (
-            "Cannot specify both provider_api_spec and provider_api_spec_file"
-            in str(exc_info.value)
+        assert "Cannot specify both provider_api_spec and provider_api_spec_file" in str(
+            exc_info.value
         )
 
     def test_aws_template_valid_spec_combinations(self):

@@ -18,15 +18,11 @@ class ContainerPort(ABC):
         """Register service instance in container."""
 
     @abstractmethod
-    def register_factory(
-        self, service_type: type[T], factory_func: Callable[..., T]
-    ) -> None:
+    def register_factory(self, service_type: type[T], factory_func: Callable[..., T]) -> None:
         """Register service factory in container."""
 
     @abstractmethod
-    def register_singleton(
-        self, service_type: type[T], factory_func: Callable[..., T]
-    ) -> None:
+    def register_singleton(self, service_type: type[T], factory_func: Callable[..., T]) -> None:
         """Register singleton service in container."""
 
     @abstractmethod

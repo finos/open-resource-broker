@@ -87,9 +87,7 @@ class AWSTemplate(CoreTemplate):
             object.__setattr__(self, "fleet_type", AWSFleetType.REQUEST)
 
         # Validate spot configuration
-        if self.percent_on_demand is not None and not (
-            0 <= self.percent_on_demand <= 100
-        ):
+        if self.percent_on_demand is not None and not (0 <= self.percent_on_demand <= 100):
             raise ValueError("percent_on_demand must be between 0 and 100")
 
         # Validate launch template version format
@@ -161,9 +159,7 @@ class AWSTemplate(CoreTemplate):
 
         # Add AWS-specific allocation strategies
         if self.allocation_strategy_on_demand:
-            aws_format["allocation_strategy_on_demand"] = (
-                self.allocation_strategy_on_demand.value
-            )
+            aws_format["allocation_strategy_on_demand"] = self.allocation_strategy_on_demand.value
 
         return aws_format
 
@@ -174,9 +170,7 @@ class AWSTemplate(CoreTemplate):
         core_data = {
             "template_id": data.get("template_id"),
             "name": data.get("name", data.get("template_id")),
-            "instance_type": AWSInstanceType(
-                value=data.get("vm_type", data.get("instance_type"))
-            ),
+            "instance_type": AWSInstanceType(value=data.get("vm_type", data.get("instance_type"))),
             "image_id": data.get("image_id"),
             "max_instances": data.get("max_number", data.get("max_instances", 1)),
             "subnet_ids": data.get(
@@ -216,8 +210,8 @@ class AWSTemplate(CoreTemplate):
             )
 
         if "allocation_strategy_on_demand" in data:
-            aws_data["allocation_strategy_on_demand"] = (
-                AWSAllocationStrategy.from_string(data["allocation_strategy_on_demand"])
+            aws_data["allocation_strategy_on_demand"] = AWSAllocationStrategy.from_string(
+                data["allocation_strategy_on_demand"]
             )
 
         if "price_type" in data:
@@ -238,9 +232,7 @@ class AWSTemplate(CoreTemplate):
                 "Cannot specify both launch_template_spec and launch_template_spec_file"
             )
         if self.provider_api_spec and self.provider_api_spec_file:
-            raise ValueError(
-                "Cannot specify both provider_api_spec and provider_api_spec_file"
-            )
+            raise ValueError("Cannot specify both provider_api_spec and provider_api_spec_file")
         return self
 
     def get_aws_configuration(self) -> AWSConfiguration:
@@ -255,7 +247,5 @@ class AWSTemplate(CoreTemplate):
             ),
             price_type=self.price_type,
             subnet_ids=[AWSSubnetId(value=sid) for sid in self.subnet_ids],
-            security_group_ids=[
-                AWSSecurityGroupId(value=sgid) for sgid in self.security_group_ids
-            ],
+            security_group_ids=[AWSSecurityGroupId(value=sgid) for sgid in self.security_group_ids],
         )

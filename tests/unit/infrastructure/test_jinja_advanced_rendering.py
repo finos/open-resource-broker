@@ -46,10 +46,7 @@ class TestJinjaAdvancedRendering:
         result = self.renderer.render_spec(spec, context)
 
         assert result["LaunchTemplateData"]["InstanceType"] == "t3.medium"
-        assert (
-            result["LaunchTemplateData"]["NetworkInterfaces"][0]["SubnetId"]
-            == "subnet-12345"
-        )
+        assert result["LaunchTemplateData"]["NetworkInterfaces"][0]["SubnetId"] == "subnet-12345"
         assert (
             result["LaunchTemplateData"]["NetworkInterfaces"][0]["SecurityGroupIds"][0]
             == "sg-67890"
@@ -193,9 +190,7 @@ class TestJinjaAdvancedRendering:
         result = self.renderer.render_spec(spec, context)
 
         lt_config = result["LaunchTemplateConfigs"][0]
-        assert (
-            lt_config["LaunchTemplateSpecification"]["LaunchTemplateId"] == "lt-12345"
-        )
+        assert lt_config["LaunchTemplateSpecification"]["LaunchTemplateId"] == "lt-12345"
         assert lt_config["LaunchTemplateSpecification"]["Version"] == "$Latest"
         assert lt_config["Overrides"][0]["InstanceType"] == "t3.medium"
         assert lt_config["Overrides"][0]["SubnetId"] == "subnet-1a"
@@ -274,9 +269,7 @@ class TestJinjaAdvancedRendering:
 
     def test_recursive_rendering_depth(self):
         """Test deeply nested structure rendering."""
-        spec = {
-            "Level1": {"Level2": {"Level3": {"Level4": {"Value": "{{ deep_value }}"}}}}
-        }
+        spec = {"Level1": {"Level2": {"Level3": {"Level4": {"Value": "{{ deep_value }}"}}}}}
         context = {"deep_value": "deep-content"}
 
         result = self.renderer.render_spec(spec, context)
