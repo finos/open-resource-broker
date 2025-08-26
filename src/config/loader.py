@@ -386,20 +386,21 @@ class ConfigurationLoader:
                     else:
                         current = current.setdefault(key, {})
 
-        # Process Host Factory environment variables
-        cls._process_hf_env_vars(config, config_manager)
+        # Process scheduler-provided directory overrides
+        cls._process_scheduler_directories(config, config_manager)
 
         get_config_logger().debug("Loaded configuration from environment variables")
 
     @classmethod
-    def _process_hf_env_vars(
+    def _process_scheduler_directories(
         cls, config: dict[str, Any], config_manager: Optional[ConfigurationManager] = None
     ) -> None:
         """
-        Process Host Factory environment variables.
+        Process scheduler-provided directory overrides for logging and storage.
 
         Args:
             config: Configuration dictionary to update
+            config_manager: Configuration manager with scheduler access (optional)
         """
         # Get directories from scheduler
         try:
