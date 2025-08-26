@@ -43,7 +43,6 @@ jobs:
   test:
     name: ${{ inputs.test-type == 'unit' && 'Unit Tests' || inputs.test-type == 'integration' && 'Integration Tests' || inputs.test-type == 'e2e' && 'End-to-End Tests' || format('{0} Tests', inputs.test-type) }}
     runs-on: ${{ inputs.os }}
-    continue-on-error: ${{ inputs.continue-on-error }}
 
     steps:
       - name: Checkout code
@@ -57,6 +56,7 @@ jobs:
 
       - name: Run tests
         run: make ci-tests-${{ inputs.test-type }}
+        continue-on-error: ${{ inputs.continue-on-error }}
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
