@@ -14,7 +14,6 @@ runs:
   steps:
     - name: Install UV
       uses: astral-sh/setup-uv@v6
-      shell: bash
 
     - name: Restore UV environment
       uses: actions/cache/restore@v4
