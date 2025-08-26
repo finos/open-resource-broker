@@ -180,7 +180,7 @@ jobs:
             .venv
             ~/.cache/uv
           key: ${{ needs.setup-dependencies.outputs.cache-key }}
-          fail-on-cache-miss: true
+          fail-on-cache-miss: false
 
       - name: Extended linting (warnings)
         run: make ci-quality-ruff-optional
@@ -202,7 +202,7 @@ jobs:
           .venv
           ~/.cache/uv
         key: ${{ needs.setup-dependencies.outputs.cache-key }}
-        fail-on-cache-miss: true
+        fail-on-cache-miss: false
 
     - name: Run mypy type check
       run: make ci-quality-mypy
@@ -224,7 +224,7 @@ jobs:
           .venv
           ~/.cache/uv
         key: ${{ needs.setup-dependencies.outputs.cache-key }}
-        fail-on-cache-miss: true
+        fail-on-cache-miss: false
 
     - name: Run CQRS pattern validation
       run: make ci-arch-cqrs
@@ -246,7 +246,7 @@ jobs:
           .venv
           ~/.cache/uv
         key: ${{ needs.setup-dependencies.outputs.cache-key }}
-        fail-on-cache-miss: true
+        fail-on-cache-miss: false
 
     - name: Run Clean Architecture validation
       run: make ci-arch-clean
@@ -268,7 +268,7 @@ jobs:
           .venv
           ~/.cache/uv
         key: ${{ needs.setup-dependencies.outputs.cache-key }}
-        fail-on-cache-miss: true
+        fail-on-cache-miss: false
 
     - name: Run import validation
       run: make ci-arch-imports
@@ -290,7 +290,7 @@ jobs:
           .venv
           ~/.cache/uv
         key: ${{ needs.setup-dependencies.outputs.cache-key }}
-        fail-on-cache-miss: true
+        fail-on-cache-miss: false
 
     - name: Run file size checks
       run: make ci-arch-file-sizes
@@ -379,7 +379,7 @@ jobs:
           .venv
           ~/.cache/uv
         key: ${{ needs.setup-dependencies.outputs.cache-key }}
-        fail-on-cache-miss: true
+        fail-on-cache-miss: false
 
     - name: Download all test results
       uses: actions/download-artifact@v5
