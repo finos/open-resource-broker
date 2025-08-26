@@ -57,6 +57,8 @@ jobs:
     needs: [check-build-comment]
     outputs:
       default-python-version: ${{ steps.config.outputs.default-python-version }}
+      pypi-version: ${{ steps.config.outputs.pypi-version }}
+      is-release: ${{ steps.config.outputs.is-release }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
