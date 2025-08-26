@@ -2,35 +2,30 @@
 """Container health check script."""
 
 import logging
+import os
 import sys
 import time
 import urllib.error
 import urllib.request
-import random
-import os
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
-def check_health(
-    url: str = None, 
-    timeout: int = None, 
-    interval: int = None
-) -> bool:
+def check_health(url: str = None, timeout: int = None, interval: int = None) -> bool:
     """Check container health endpoint with timeout and retry logic."""
     # Use environment variables with fallbacks
-    url = url or os.getenv('HEALTH_CHECK_URL', 'http://localhost:8000/health')
-    timeout = timeout or int(os.getenv('HEALTH_CHECK_TIMEOUT', '60'))
-    interval = interval or int(os.getenv('HEALTH_CHECK_INTERVAL', '3'))
-    
+    url = url or os.getenv("HEALTH_CHECK_URL", "http://localhost:8000/health")
+    timeout = timeout or int(os.getenv("HEALTH_CHECK_TIMEOUT", "60"))
+    interval = interval or int(os.getenv("HEALTH_CHECK_INTERVAL", "3"))
+
     logger.info(f"Testing container health endpoint: {url}")
     logger.info(f"Timeout: {timeout}s, Retry interval: {interval}s")
 
     start_time = time.time()
     attempt = 0
-    
+
     while time.time() - start_time < timeout:
         attempt += 1
         try:
@@ -63,9 +58,18 @@ def main() -> int:
     import argparse
 
     parser = argparse.ArgumentParser(description="Test container health endpoint")
-    parser.add_argument("--url", help="Health check URL (default: env HEALTH_CHECK_URL or http://localhost:8000/health)")
-    parser.add_argument("--timeout", type=int, help="Timeout in seconds (default: env HEALTH_CHECK_TIMEOUT or 60)")
-    parser.add_argument("--interval", type=int, help="Retry interval in seconds (default: env HEALTH_CHECK_INTERVAL or 3)")
+    parser.add_argument(
+        "--url",
+        help="Health check URL (default: env HEALTH_CHECK_URL or http://localhost:8000/health)",
+    )
+    parser.add_argument(
+        "--timeout", type=int, help="Timeout in seconds (default: env HEALTH_CHECK_TIMEOUT or 60)"
+    )
+    parser.add_argument(
+        "--interval",
+        type=int,
+        help="Retry interval in seconds (default: env HEALTH_CHECK_INTERVAL or 3)",
+    )
     parser.add_argument("--port", type=int, help="Use specific port (overrides URL)")
 
     args = parser.parse_args()
