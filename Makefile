@@ -196,7 +196,10 @@ format-fix: clean-whitespace  ## Auto-fix code formatting with Ruff
 	@uv run ruff format --quiet .
 	@uv run ruff check --fix --exit-zero --quiet .
 
-container-health-check:  ## Test container health endpoint
+container-health-check:  ## Test container health endpoint (supports HEALTH_CHECK_TIMEOUT, HEALTH_CHECK_URL, HEALTH_CHECK_INTERVAL)
+	HEALTH_CHECK_TIMEOUT=$${HEALTH_CHECK_TIMEOUT:-60} \
+	HEALTH_CHECK_URL=$${HEALTH_CHECK_URL:-http://localhost:8000/health} \
+	HEALTH_CHECK_INTERVAL=$${HEALTH_CHECK_INTERVAL:-3} \
 	./dev-tools/scripts/container_health_check.py
 
 ci-git-setup:  ## Setup git configuration for CI automated commits

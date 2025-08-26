@@ -177,6 +177,9 @@ jobs:
 
     - name: Test container image
       if: matrix.python-version == needs.get-config.outputs.default-python-version
+      env:
+        HEALTH_CHECK_TIMEOUT: 90
+        HEALTH_CHECK_INTERVAL: 5
       run: |
         # Test that the container starts and responds to health check
         echo "Testing container image: ${{ env.CONTAINER_URI }}"
@@ -190,7 +193,7 @@ jobs:
         echo "Waiting for container to start..."
         sleep 20
 
-        # Test health endpoint using Makefile target
+        # Test health endpoint using Makefile target with CI timeout
         make container-health-check
 
         echo "Container test passed!"
