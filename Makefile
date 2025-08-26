@@ -242,7 +242,7 @@ install-dev-tools-dry-run: ## Show what development tools would be installed
 
 clean-whitespace:  ## Clean whitespace in blank lines from all files
 	@echo "Cleaning whitespace in blank lines..."
-	./dev-tools/scripts/clean_whitespace.py
+	$(call run-tool,python,./dev-tools/scripts/clean_whitespace.py)
 
 security: dev-install  ## Run security checks (bandit, safety)
 	./dev-tools/scripts/security_check.py
