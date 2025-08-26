@@ -49,8 +49,8 @@ jobs:
       - name: Setup Python and UV
         uses: ./.github/actions/setup-uv-cached
         with:
-          python-version: ${{ needs.get-config.outputs.default-python-version }}
-          cache-key-suffix: docs
+          cache-key: deps-${{ needs.get-config.outputs.default-python-version }}-${{ hashFiles('.project.yml', 'pyproject.toml.template', 'requirements*.txt') }}
+          fail-on-cache-miss: false
 
       - name: Configure Git for mike
         run: make ci-git-setup
