@@ -42,7 +42,7 @@ runs:
           }
           
           const comment = context.payload.comment.body.toLowerCase().trim();
-          const triggers = process.env.TRIGGERS.split(',').map(t => t.trim());
+          const triggers = process.env.TRIGGERS.split(',').map(t => t.trim().toLowerCase());
           const triggered = triggers.some(t => comment === t);
           
           console.log(`Comment: ${context.payload.comment.body}`);
