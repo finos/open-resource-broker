@@ -28,7 +28,7 @@ jobs:
 
       - name: Setup Python and UV
         if: contains(github.event.comment.body, '/approve-rc')
-        uses: ./.github/actions/setup-uv-cached
+        uses: ./.github/actions/setup-python-uv
         with:
           python-version: '3.11'
 
@@ -42,7 +42,7 @@ jobs:
           make promote-rc
           
           NEW_VERSION=$(yq '.project.version' .project.yml)
-          echo "RC_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo "RC_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -22,7 +22,7 @@ jobs:
           fetch-depth: 0  # Need full history for analysis
 
       - name: Setup Python and UV
-        uses: ./.github/actions/setup-uv-cached
+        uses: ./.github/actions/setup-python-uv
         with:
           python-version: '3.11'
 
@@ -30,11 +30,11 @@ jobs:
         id: analysis
         run: |
           if ./dev-tools/release/analyze_rc_readiness.sh; then
-            echo "ready=true" >> $GITHUB_OUTPUT
+            echo "ready=true" >> "$GITHUB_OUTPUT"
             NEXT_VERSION=$(yq '.project.version' .project.yml | sed 's/-beta\.[0-9]*/-rc.1/')
-            echo "version=$NEXT_VERSION" >> $GITHUB_OUTPUT
+            echo "version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
           else
-            echo "ready=false" >> $GITHUB_OUTPUT
+            echo "ready=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Check for existing RC suggestion
@@ -42,7 +42,7 @@ jobs:
         if: steps.analysis.outputs.ready == 'true'
         run: |
           EXISTING=$(gh issue list --label "release-candidate,needs-approval" --state open --json number --jq length)
-          echo "existing_count=$EXISTING" >> $GITHUB_OUTPUT
+          echo "existing_count=$EXISTING" >> "$GITHUB_OUTPUT"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
