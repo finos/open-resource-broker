@@ -1,6 +1,6 @@
 # Makefile for Open Host Factory Plugin
 
-.PHONY: help install install-pip dev-install dev-install-pip test test-unit test-integration test-e2e test-all test-cov test-html test-parallel test-quick test-performance test-aws test-report lint format security security-quick security-all security-with-container ci-security-container security-full security-scan security-validate-sarif security-report sbom-generate clean clean-all build build-test docs docs-build docs-serve docs-deploy docs-clean docs-deploy-version docs-list-versions docs-delete-version ci-docs-build ci-docs-build-for-pages ci-docs-deploy run run-dev version-show version-bump version-bump-patch version-bump-minor version-bump-major generate-pyproject ci-quality ci-security ci-security-codeql ci-security-container ci-architecture ci-imports ci-tests-unit ci-tests-integration ci-tests-e2e ci-tests-matrix ci-tests-performance ci-check ci-check-quick ci-check-fix ci-check-verbose ci ci-quick workflow-ci workflow-test-matrix workflow-security architecture-check architecture-report quality-check quality-check-fix quality-check-files quality-gates quality-full generate-completions install-completions install-bash-completions install-zsh-completions uninstall-completions test-completions dev-setup install-package uninstall-package reinstall-package init-db create-config validate-config container-build container-build-single container-build-multi container-push-multi container-show-version container-run docker-compose-up docker-compose-down quick-start dev status uv-lock uv-sync uv-sync-dev uv-check uv-benchmark file-sizes file-sizes-report validate-workflows detect-secrets clean-whitespace hadolint-check install-dev-tools install-dev-tools-required install-dev-tools-dry-run dev-checks-container dev-checks-container-required format-container hadolint-check-container pre-commit-check pre-commit-check-required
+.PHONY: help install install-pip dev-install dev-install-pip test test-unit test-integration test-e2e test-all test-cov test-html test-parallel test-quick test-performance test-aws test-report lint format security security-quick security-all security-with-container ci-security-container security-full security-scan security-validate-sarif security-report sbom-generate clean clean-all build build-test docs docs-build docs-serve docs-deploy docs-clean docs-deploy-version docs-list-versions docs-delete-version ci-docs-build ci-docs-build-for-pages ci-docs-deploy run run-dev version-show generate-pyproject ci-quality ci-security ci-security-codeql ci-security-container ci-architecture ci-imports ci-tests-unit ci-tests-integration ci-tests-e2e ci-tests-matrix ci-tests-performance ci-check ci-check-quick ci-check-fix ci-check-verbose ci ci-quick workflow-ci workflow-test-matrix workflow-security architecture-check architecture-report quality-check quality-check-fix quality-check-files quality-gates quality-full generate-completions install-completions install-bash-completions install-zsh-completions uninstall-completions test-completions dev-setup install-package uninstall-package reinstall-package init-db create-config validate-config container-build container-build-single container-build-multi container-push-multi container-show-version container-run docker-compose-up docker-compose-down quick-start dev status uv-lock uv-sync uv-sync-dev uv-check uv-benchmark file-sizes file-sizes-report validate-workflows detect-secrets clean-whitespace hadolint-check install-dev-tools install-dev-tools-required install-dev-tools-dry-run dev-checks-container dev-checks-container-required format-container hadolint-check-container pre-commit-check pre-commit-check-required
 
 # Python settings
 PYTHON := python3
@@ -423,23 +423,7 @@ get-version:  ## Generate unified version (works for PyPI, Docker, Git)
 		echo "$(VERSION).dev$${dev_int}"; \
 	fi
 
-version-bump-patch:  ## Bump patch version (1.0.0 -> 1.0.1)
-	@./dev-tools/package/version_bump.sh patch
 
-version-bump-minor:  ## Bump minor version (1.0.0 -> 1.1.0)
-	@./dev-tools/package/version_bump.sh minor
-
-version-bump-major:  ## Bump major version (1.0.0 -> 2.0.0)
-	@./dev-tools/package/version_bump.sh major
-
-version-bump:  ## Show version bump help
-	@echo "Version Management Commands:"
-	@echo "  make version-show         - Show current version"
-	@echo "  make version-bump-patch   - Bump patch version (1.0.0 -> 1.0.1)"
-	@echo "  make version-bump-minor   - Bump minor version (1.0.0 -> 1.1.0)"
-	@echo "  make version-bump-major   - Bump major version (1.0.0 -> 2.0.0)"
-	@echo ""
-	@echo "Current version: $(VERSION)"
 
 # @SECTION Local CI (GitHub Actions)
 # Local GitHub Actions execution with act
@@ -1034,10 +1018,10 @@ status:  ## Show project status and useful commands
 	@echo "  TO_COMMIT        End commit (optional, defaults to HEAD)"
 	@echo "  DRY_RUN          Test mode without making changes"
 	@echo ""
-	@echo "Version Management:"
-	@echo "  Patch version:  make version-bump-patch"
-	@echo "  Minor version:  make version-bump-minor"
-	@echo "  Major version:  make version-bump-major"
+	@echo "Release Management:"
+	@echo "  Standard releases:  make release-patch|minor|major"
+	@echo "  Pre-releases:       make release-patch-alpha|beta|rc"
+	@echo "  Promotions:         make promote-alpha|beta|rc|stable"
 	@echo ""
 	@echo "Container Management:"
 	@echo "  Show info:      make container-show-version"
@@ -1045,6 +1029,9 @@ status:  ## Show project status and useful commands
 	@echo "  Build all:      make container-build-multi"
 
 # Print variable targets for CI integration
+print-next-rc-version:  ## Calculate next RC version without making changes
+	@DRY_RUN=true ./dev-tools/release/version_manager.sh bump minor rc | grep "New version:" | cut -d' ' -f3
+
 print-%:
 	@echo $($*)
 

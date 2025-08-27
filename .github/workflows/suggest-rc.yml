@@ -31,7 +31,7 @@ jobs:
         run: |
           if ./dev-tools/release/analyze_rc_readiness.sh; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
-            NEXT_VERSION=$(yq '.project.version' .project.yml | sed 's/-beta\.[0-9]*/-rc.1/')
+            NEXT_VERSION=$(make print-next-rc-version)
             echo "version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
