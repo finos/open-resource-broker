@@ -45,7 +45,9 @@ def _get_from_package_metadata() -> Optional[dict]:
 config = _get_from_project_yml() or _get_from_package_metadata()
 
 if not config:
-    # Final fallback
+    # Final fallback - used when both .project.yml and package metadata are unavailable
+    # This occurs in scenarios like: missing .project.yml file, corrupted package installation,
+    # missing dependencies (PyYAML), or constrained deployment environments
     config = {
         "project": {
             "name": "open-hostfactory-plugin",
