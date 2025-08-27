@@ -70,11 +70,11 @@ Recommended configuration for most use cases:
       "aws": {
         "extensions": {
           "native_spec": {
-            "spec_file_base_path": "specs/aws",
+            "spec_file_base_path": "config/specs/aws",
             "template_search_paths": [
-              "specs/aws/templates",
+              "config/specs/aws/templates",
               "config/specs/aws/examples",
-              "specs/aws/production"
+              "config/specs/aws/production"
             ],
             "allowed_file_extensions": [".json", ".yaml", ".yml"],
             "max_file_size_mb": 10,
@@ -238,13 +238,13 @@ Recommended configuration for most use cases:
 
 #### `spec_file_base_path`
 - **Type**: `string`
-- **Default**: `"specs/aws"`
+- **Default**: `"config/specs/aws"`
 - **Description**: Base directory for spec template files
 - **Environment Variable**: `NATIVE_SPEC_BASE_PATH`
 
 #### `template_search_paths`
 - **Type**: `array[string]`
-- **Default**: `["specs/aws"]`
+- **Default**: `["config/specs/aws"]`
 - **Description**: Additional directories to search for template files
 
 #### `allowed_file_extensions`
@@ -269,11 +269,11 @@ Recommended configuration for most use cases:
       "aws": {
         "extensions": {
           "native_spec": {
-            "spec_file_base_path": "/opt/hostfactory/specs/aws",
+            "spec_file_base_path": "/opt/hostfactory/config/specs/aws",
             "template_search_paths": [
-              "/opt/hostfactory/specs/aws/production",
-              "/opt/hostfactory/specs/aws/staging",
-              "/opt/hostfactory/specs/aws/shared"
+              "/opt/hostfactory/config/specs/aws/production",
+              "/opt/hostfactory/config/specs/aws/staging",
+              "/opt/hostfactory/config/specs/aws/shared"
             ],
             "allowed_file_extensions": [".json", ".yaml"],
             "max_file_size_mb": 5,
@@ -396,7 +396,7 @@ export NATIVE_SPEC_CACHE_SIZE=500
 export NATIVE_SPEC_TIMEOUT=60
 
 # Custom spec file location
-export NATIVE_SPEC_BASE_PATH=/opt/custom/specs/aws
+export NATIVE_SPEC_BASE_PATH=/opt/custom/config/specs/aws
 ```
 
 ## Configuration Validation

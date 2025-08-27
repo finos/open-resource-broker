@@ -29,7 +29,7 @@ class TestSpecFileLoading:
         # Mock configuration
         self.mock_config_port.get_provider_config.return_value = {
             "provider_defaults": {
-                "aws": {"extensions": {"native_spec": {"spec_file_base_path": "specs/aws"}}}
+                "aws": {"extensions": {"native_spec": {"spec_file_base_path": "config/specs/aws"}}}
             }
         }
 
@@ -82,7 +82,7 @@ class TestSpecFileLoading:
 
             # Should use default base path
             assert result == spec_content
-            mock_read.assert_called_once_with("specs/aws/test-template.json")
+            mock_read.assert_called_once_with("config/specs/aws/test-template.json")
 
     @patch("infrastructure.utilities.file.json_utils.read_json_file")
     def test_load_spec_file_not_found(self, mock_read):
@@ -91,7 +91,7 @@ class TestSpecFileLoading:
 
         self.mock_config_port.get_provider_config.return_value = {
             "provider_defaults": {
-                "aws": {"extensions": {"native_spec": {"spec_file_base_path": "specs/aws"}}}
+                "aws": {"extensions": {"native_spec": {"spec_file_base_path": "config/specs/aws"}}}
             }
         }
 
@@ -105,7 +105,7 @@ class TestSpecFileLoading:
 
         self.mock_config_port.get_provider_config.return_value = {
             "provider_defaults": {
-                "aws": {"extensions": {"native_spec": {"spec_file_base_path": "specs/aws"}}}
+                "aws": {"extensions": {"native_spec": {"spec_file_base_path": "config/specs/aws"}}}
             }
         }
 
@@ -228,9 +228,9 @@ class TestSpecFileLoading:
         """Test spec file path construction with various configurations."""
         test_cases = [
             {
-                "base_path": "specs/aws",
+                "base_path": "config/specs/aws",
                 "file_name": "test.json",
-                "expected": "specs/aws/test.json",
+                "expected": "config/specs/aws/test.json",
             },
             {
                 "base_path": "/opt/specs",
@@ -264,7 +264,7 @@ class TestSpecFileLoading:
         """Test that spec files are loaded fresh each time (no caching)."""
         self.mock_config_port.get_provider_config.return_value = {
             "provider_defaults": {
-                "aws": {"extensions": {"native_spec": {"spec_file_base_path": "specs/aws"}}}
+                "aws": {"extensions": {"native_spec": {"spec_file_base_path": "config/specs/aws"}}}
             }
         }
 
@@ -286,7 +286,7 @@ class TestSpecFileLoading:
         """Test spec file loading with YAML extension."""
         self.mock_config_port.get_provider_config.return_value = {
             "provider_defaults": {
-                "aws": {"extensions": {"native_spec": {"spec_file_base_path": "specs/aws"}}}
+                "aws": {"extensions": {"native_spec": {"spec_file_base_path": "config/specs/aws"}}}
             }
         }
 
@@ -297,7 +297,7 @@ class TestSpecFileLoading:
             result = self.service._load_spec_file("test.yaml")
 
             assert result["Type"] == "maintain"
-            mock_read.assert_called_once_with("specs/aws/test.yaml")
+            mock_read.assert_called_once_with("config/specs/aws/test.yaml")
 
     def test_spec_resolution_priority(self):
         """Test that inline specs take priority over file specs."""
