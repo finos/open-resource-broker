@@ -157,12 +157,6 @@ check_overlapping_releases() {
     local from_commit=$1
     local to_commit=$2
     
-    # Skip overlap check in backfill mode
-    if [ "$ALLOW_BACKFILL" = "true" ]; then
-        echo "BACKFILL MODE: Skipping overlap validation"
-        return 0
-    fi
-    
     # Get the latest release tag and its commit
     latest_tag=$(git tag -l "v*" --sort=-version:refname | head -1)
     
@@ -170,6 +164,21 @@ check_overlapping_releases() {
         latest_tag_commit=$(git rev-list -n 1 "$latest_tag")
         
         # Check if FROM_COMMIT is before or at the latest release
+        if git merge-base --is-ancestor "$from_commit" "$latest_tag_commit" 2>/dev/null; then
+            if [ "$ALLOW_BACKFILL" = "true" ]; then
+                log_warn "BACKFILL MODE: Release range overlaps with existing release $latest_tag"
+                log_warn "This will create a backfill release with overlapping commits"
+                return 0
+            else
+                log_error "Release range overlaps with existing release $latest_tag"
+                echo "FROM_COMMIT ($from_commit) includes commits already released in $latest_tag"
+                echo "Use ALLOW_BACKFILL=true for backfill releases"
+                exit 1
+            fi
+        fi
+    else
+        log_debug "No existing releases found, proceeding with first release"
+    fi
         if git merge-base --is-ancestor "$from_commit" "$latest_tag_commit" || \
            [ "$from_commit" = "$latest_tag_commit" ]; then
             
