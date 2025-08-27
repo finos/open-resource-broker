@@ -7,11 +7,10 @@ import os
 import sys
 from pathlib import Path
 
-# Add src to Python path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root / "src"))
-
 import subprocess
+
+# Get project root
+project_root = Path(__file__).parent.parent.parent
 
 
 def _get_config_value(key: str) -> str:
@@ -32,24 +31,26 @@ def _get_config_value(key: str) -> str:
 
 
 try:
-    from _package import (
-        DESCRIPTION,
-        DOCS_URL,
-        PACKAGE_NAME,
-        PACKAGE_NAME_SHORT,
-        REPO_ISSUES_URL,
-        REPO_URL,
-        __version__,
-    )
-
-    # Get Python version info from config
-    python_versions = _get_config_value(".python.versions[]")
-    min_python_version = _get_config_value(".python.min_version")
+    # Get all values from .project.yml using yq
+    package_name = _get_config_value(".project.name")
+    package_name_short = _get_config_value(".project.short_name")
+    version = _get_config_value(".project.version")
+    description = _get_config_value(".project.description")
     author = _get_config_value(".project.author")
     email = _get_config_value(".project.email")
+    license_name = _get_config_value(".project.license")
+    repo_org = _get_config_value(".repository.org")
+    repo_name = _get_config_value(".repository.name")
+    python_versions = _get_config_value(".python.versions[]")
+    min_python_version = _get_config_value(".python.min_version")
+    
+    # Derived values
+    repo_url = f"https://github.com/{repo_org}/{repo_name}"
+    docs_url = f"https://{repo_org}.github.io/{repo_name}/"
+    repo_issues_url = f"{repo_url}/issues"
 
-except ImportError as e:
-    logging.error(f"Error importing package configuration: {e}")
+except Exception as e:
+    logging.error(f"Error reading project configuration: {e}")
     logging.error("Make sure yq is installed and .project.yml exists")
     sys.exit(1)
 
@@ -69,25 +70,26 @@ def generate_pyproject():
 
     # Generate Python classifiers
     python_classifiers = []
-    for version in python_versions.split("\n"):
-        if version.strip():
-            python_classifiers.append(f'    "Programming Language :: Python :: {version.strip()}",')
+    for py_version in python_versions.split("\n"):
+        if py_version.strip():
+            python_classifiers.append(f'    "Programming Language :: Python :: {py_version.strip()}",')
     python_classifiers_str = "\n".join(python_classifiers)
 
     # Replace placeholders with actual values
     # Use CI VERSION env var if available (for dynamic versioning), otherwise use package version
-    version_to_use = os.environ.get("VERSION", __version__)
+    version_to_use = os.environ.get("VERSION", version)
 
     replacements = {
-        "{{PACKAGE_NAME}}": PACKAGE_NAME,
-        "{{PACKAGE_NAME_SHORT}}": PACKAGE_NAME_SHORT,
+        "{{PACKAGE_NAME}}": package_name,
+        "{{PACKAGE_NAME_SHORT}}": package_name_short,
         "{{VERSION}}": version_to_use,
-        "{{DESCRIPTION}}": DESCRIPTION,
+        "{{DESCRIPTION}}": description,
         "{{AUTHOR}}": author,
         "{{EMAIL}}": email,
-        "{{REPO_URL}}": REPO_URL,
-        "{{DOCS_URL}}": DOCS_URL,
-        "{{REPO_ISSUES_URL}}": REPO_ISSUES_URL,
+        "{{REPO_URL}}": repo_url,
+        "{{DOCS_URL}}": docs_url,
+        "{{REPO_ISSUES_URL}}": repo_issues_url,
+        "{{MIN_PYTHON_VERSION}}": min_python_version,
         "{{PYTHON_CLASSIFIERS}}": python_classifiers_str,
         "{{MIN_PYTHON_VERSION}}": min_python_version,
     }
@@ -101,8 +103,8 @@ def generate_pyproject():
         f.write(generated_content)
 
     logging.info("Generated pyproject.toml from template")
-    logging.info(f"Package: {PACKAGE_NAME} v{__version__}")
-    logging.info(f"Repository: {REPO_URL}")
+    logging.info(f"Package: {package_name} v{version_to_use}")
+    logging.info(f"Repository: {repo_url}")
 
 
 if __name__ == "__main__":
