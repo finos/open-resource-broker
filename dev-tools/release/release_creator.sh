@@ -233,29 +233,56 @@ create_release() {
     local to_commit=$3
     
     # Generate release notes
-    echo "Generating release notes..."
+    log_info "Generating release notes..."
     NOTES=$(./dev-tools/release/release_notes.sh "$from_commit" "$to_commit")
+    
+    # Build package at the target commit
+    log_info "Building package at commit $to_commit..."
+    current_branch=$(git branch --show-current)
+    git checkout "$to_commit" -q
+    
+    # Convert git tag to package version format
+    PACKAGE_VERSION=$(./dev-tools/release/version_normalizer.sh "$tag_name" package)
+    log_debug "Building package with version: $PACKAGE_VERSION"
+    
+    # Build wheel with proper version (if build system exists at this commit)
+    if [ -f "Makefile" ] && grep -q "clean build" Makefile; then
+        VERSION="$PACKAGE_VERSION" make clean build 2>/dev/null || {
+            log_warn "Build system not available at commit $to_commit, skipping package build"
+        }
+    else
+        log_warn "Build system not available at commit $to_commit, skipping package build"
+    fi
+    
+    # Return to original branch
+    git checkout "$current_branch" -q
     
     # Determine release flags
     RELEASE_FLAGS=""
-    if [[ "$VERSION" =~ -alpha|-beta|-rc ]]; then
+    if [[ "$tag_name" =~ -alpha|-beta|-rc ]]; then
         RELEASE_FLAGS="--prerelease"
-        echo "Creating pre-release: $tag_name"
+        log_info "Creating pre-release: $tag_name"
     else
-        echo "Creating stable release: $tag_name"
+        log_info "Creating stable release: $tag_name"
     fi
     
     # Create git tag
-    echo "Creating git tag: $tag_name"
+    log_info "Creating git tag: $tag_name"
     git tag "$tag_name" "$to_commit"
     
     # Push tag
-    echo "Pushing tag to remote..."
+    log_info "Pushing tag to remote..."
     git push origin "$tag_name"
     
-    # Create GitHub release
-    echo "Creating GitHub release..."
-    gh release create "$tag_name" $RELEASE_FLAGS --notes "$NOTES"
+    # Create GitHub release with package if available
+    log_info "Creating GitHub release..."
+    if [ -d "dist" ] && [ -n "$(ls dist/*.whl 2>/dev/null)" ]; then
+        gh release create "$tag_name" $RELEASE_FLAGS --notes "$NOTES" dist/*.whl dist/*.tar.gz 2>/dev/null || \
+        gh release create "$tag_name" $RELEASE_FLAGS --notes "$NOTES" dist/*.whl 2>/dev/null || \
+        gh release create "$tag_name" $RELEASE_FLAGS --notes "$NOTES"
+    else
+        gh release create "$tag_name" $RELEASE_FLAGS --notes "$NOTES"
+    fi
     
     echo ""
     echo "Release created successfully!"

@@ -411,15 +411,17 @@ docs-clean:  ## Clean documentation build files
 version-show:  ## Show current version from project config
 	@echo "Current version: $(VERSION)"
 
-get-version:  ## Generate version (supports FORMAT=container for Docker-safe prefix)
+get-version:  ## Generate version (supports FORMAT=package|container|git|display)
 	@if [ "$${IS_RELEASE:-false}" = "true" ]; then \
-		echo "$(VERSION)"; \
+		./dev-tools/release/version_normalizer.sh "$(VERSION)" "$${FORMAT:-package}"; \
 	else \
 		commit=$$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown'); \
 		if [ "$${FORMAT}" = "container" ]; then \
-			echo "$(VERSION).dev-$${commit}"; \
+			./dev-tools/release/version_normalizer.sh "$(VERSION).dev-$${commit}" container; \
+		elif [ "$${FORMAT}" = "git" ]; then \
+			./dev-tools/release/version_normalizer.sh "$(VERSION).dev+$${commit}" git; \
 		else \
-			echo "$(VERSION).dev+$${commit}"; \
+			./dev-tools/release/version_normalizer.sh "$(VERSION).dev+$${commit}" package; \
 		fi; \
 	fi
 
