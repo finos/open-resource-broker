@@ -289,8 +289,10 @@ if [ "$DRY_RUN" != "true" ]; then
     echo "  Range: ${FROM_COMMIT:0:8}..${TO_COMMIT:0:8}"
     echo "  Pre-release: $([[ "$VERSION" =~ -alpha|-beta|-rc ]] && echo "yes" || echo "no")"
     
-    # Skip confirmation in non-interactive mode or CI
-    if [ -t 0 ] && [ "$CI" != "true" ]; then
+    # Skip confirmation in non-interactive mode, CI, or backfill mode
+    if [ "$ALLOW_BACKFILL" = "true" ] || [ ! -t 0 ] || [ "$CI" = "true" ]; then
+        log_info "Non-interactive mode: Creating release"
+    else
         echo ""
         read -p "Create release? (y/N): " -n 1 -r
         echo
@@ -298,8 +300,6 @@ if [ "$DRY_RUN" != "true" ]; then
             echo "Cancelled"
             exit 1
         fi
-    else
-        echo "Non-interactive mode: Creating release"
     fi
 fi
 
