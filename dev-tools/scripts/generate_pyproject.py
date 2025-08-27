@@ -4,10 +4,9 @@
 import argparse
 import logging
 import os
+import subprocess
 import sys
 from pathlib import Path
-
-import subprocess
 
 # Get project root
 project_root = Path(__file__).parent.parent.parent
@@ -43,7 +42,7 @@ try:
     repo_name = _get_config_value(".repository.name")
     python_versions = _get_config_value(".python.versions[]")
     min_python_version = _get_config_value(".python.min_version")
-    
+
     # Derived values
     repo_url = f"https://github.com/{repo_org}/{repo_name}"
     docs_url = f"https://{repo_org}.github.io/{repo_name}/"
@@ -72,7 +71,9 @@ def generate_pyproject():
     python_classifiers = []
     for py_version in python_versions.split("\n"):
         if py_version.strip():
-            python_classifiers.append(f'    "Programming Language :: Python :: {py_version.strip()}",')
+            python_classifiers.append(
+                f'    "Programming Language :: Python :: {py_version.strip()}",'
+            )
     python_classifiers_str = "\n".join(python_classifiers)
 
     # Replace placeholders with actual values
