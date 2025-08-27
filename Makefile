@@ -649,8 +649,8 @@ local-clean: ## Clean local act artifacts and containers
 	@echo "Local cleanup complete!"
 # @SECTION Build & Deploy
 build: clean dev-install  ## Build package
-	VERSION=$$(make -s get-version) $(MAKE) generate-pyproject && \
-	VERSION=$$(make -s get-version) BUILD_ARGS="$(BUILD_ARGS)" ./dev-tools/package/build.sh --quiet
+	VERSION=$${VERSION:-$$(make -s get-version)} $(MAKE) generate-pyproject && \
+	VERSION=$${VERSION:-$$(make -s get-version)} BUILD_ARGS="$(BUILD_ARGS)" ./dev-tools/package/build.sh
 
 build-test: build  ## Build and test package installation
 	./dev-tools/package/test_install.sh
