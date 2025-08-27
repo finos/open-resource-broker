@@ -68,11 +68,13 @@ validate_working_directory() {
         return 0
     fi
     
-    # Check if working directory is clean
-    if ! git diff-index --quiet HEAD --; then
-        echo "ERROR: Working directory has uncommitted changes"
+    # Check if working directory is clean (skip in backfill mode)
+    if [ "${ALLOW_BACKFILL:-false}" != "true" ] && ! git diff-index --quiet HEAD --; then
+        log_error "Working directory has uncommitted changes"
         echo "Commit or stash changes before creating a release"
         exit 1
+    elif [ "${ALLOW_BACKFILL:-false}" = "true" ]; then
+        log_debug "Skipping working directory check in backfill mode"
     fi
 }
 
@@ -83,9 +85,9 @@ validate_branch() {
         echo "WARNING: Creating release from branch '$current_branch' (not main)"
         echo "Use ALLOW_RELEASE_FROM_BRANCH=true to suppress this warning"
         
-        # Skip confirmation in non-interactive mode, dry-run, or CI
-        if [ "$DRY_RUN" = "true" ] || [ "$CI" = "true" ] || [ ! -t 0 ]; then
-            echo "Non-interactive mode: Proceeding with release from $current_branch"
+        # Skip confirmation in non-interactive mode, dry-run, CI, or backfill mode
+        if [ "$DRY_RUN" = "true" ] || [ "$CI" = "true" ] || [ ! -t 0 ] || [ "$ALLOW_BACKFILL" = "true" ]; then
+            log_info "Non-interactive mode: Proceeding with release from $current_branch"
             return 0
         fi
         
