@@ -563,6 +563,21 @@ def get_requests_by_status(status: str) -> List[Request]:
 
 ## Contributing
 
+### Release Management
+
+The project uses automated release management with semantic versioning:
+
+```bash
+# Create releases
+make release-minor-alpha     # Start new feature
+make promote-stable         # Final release
+
+# Test without changes
+DRY_RUN=true make release-patch
+```
+
+For complete release documentation, see [Release Management Guide](releases.md).
+
 ### Pull Request Process
 
 1. **Fork the Repository**
