@@ -31,10 +31,18 @@ def _get_from_package_metadata() -> Optional[dict]:
         return {
             "project": {
                 "name": meta["Name"],
+                "short_name": "ohfp",  # Not in package metadata, hardcode this one
                 "version": version("open-hostfactory-plugin"),
                 "description": meta["Summary"],
+                "author": meta["Author"],
+                "email": meta["Author-email"],
+                "license": meta["License"],
             },
-            "repository": {"org": "awslabs", "name": "open-hostfactory-plugin"},
+            "repository": {
+                "org": "awslabs",      # Not in package metadata
+                "name": "open-hostfactory-plugin",  # Not in package metadata
+                "registry": "ghcr.io"  # Not in package metadata
+            },
         }
     except Exception as e:
         logger.debug("Failed to read package metadata: %s", e)
