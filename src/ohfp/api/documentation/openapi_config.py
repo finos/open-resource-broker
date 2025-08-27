@@ -54,8 +54,8 @@ def configure_openapi(app: FastAPI, server_config: ServerConfig):
                     "email": "support@your-org.com",
                 },
                 "license": {
-                    "name": "MIT",
-                    "url": "https://opensource.org/licenses/MIT",
+                    "name": "Apache-2.0",
+                    "url": "https://www.apache.org/licenses/LICENSE-2.0",
                 },
             }
         )
