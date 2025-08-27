@@ -214,26 +214,15 @@ create_release() {
     log_info "Generating release notes..."
     NOTES=$(./dev-tools/release/release_notes.sh "$from_commit" "$to_commit")
     
-    # Build package at the target commit
-    log_info "Building package at commit $to_commit..."
-    current_branch=$(git branch --show-current)
-    git checkout "$to_commit" -q
-    
-    # Convert git tag to package version format
+    # Build package with normalized version (use current build system)
+    log_info "Building package with normalized version..."
     PACKAGE_VERSION=$(./dev-tools/release/version_normalizer.sh "$tag_name" package)
     log_debug "Building package with version: $PACKAGE_VERSION"
     
-    # Build wheel with proper version (if build system exists at this commit)
-    if [ -f "Makefile" ] && grep -q "clean build" Makefile; then
-        VERSION="$PACKAGE_VERSION" make clean build 2>/dev/null || {
-            log_warn "Build system not available at commit $to_commit, skipping package build"
-        }
-    else
-        log_warn "Build system not available at commit $to_commit, skipping package build"
-    fi
-    
-    # Return to original branch
-    git checkout "$current_branch" -q
+    # Build wheel with proper version using current build system
+    VERSION="$PACKAGE_VERSION" make clean build 2>/dev/null || {
+        log_warn "Package build failed, continuing without package"
+    }
     
     # Determine release flags
     RELEASE_FLAGS=""
