@@ -41,7 +41,7 @@ class TestConfigurationAdapterPackageInfo:
         # Assert - should return fallback values
         assert result["name"] == "open-hostfactory-plugin"
         assert result["version"] == "unknown"
-        assert result["description"] == "Cloud provider integration plugin"
+        assert result["description"] == "Cloud provider integration plugin for IBM Spectrum Symphony Host Factory"
         assert result["author"] == "AWS Professional Services"
 
     @patch("infrastructure.adapters.configuration_adapter._package")
