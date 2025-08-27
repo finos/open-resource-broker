@@ -1,0 +1,1 @@
+"""AWS infrastructure package."""
