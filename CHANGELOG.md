@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Features
 
+- migrate to git-changelog with proper command-line integration ([87ee1b1](https://github.com/awslabs/open-hostfactory-plugin/commit/87ee1b160ae4c1c0e5f0751fdce8cee32fb7f00c) by Flamur Gogolli).
 - reorganize specs for proper packaging and logical structure ([99d3b24](https://github.com/awslabs/open-hostfactory-plugin/commit/99d3b24e5b14a4d8872813d544c38d99b8a0ca2d) by Flamur Gogolli).
 - parameterize all remaining hardcoded references ([29de0ed](https://github.com/awslabs/open-hostfactory-plugin/commit/29de0ed4443d0353335e89230f37af64a4489a14) by Flamur Gogolli).
 - consolidate fallback system to single source of truth ([98545e6](https://github.com/awslabs/open-hostfactory-plugin/commit/98545e6fad06004f4ed2cb5d81b715ada752188e) by Flamur Gogolli).
@@ -110,6 +111,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Bug Fixes
 
+- improve backfill and historical build systems ([701114a](https://github.com/awslabs/open-hostfactory-plugin/commit/701114a2e40dd8caca647a42625c0938ae482d21) by Flamur Gogolli).
+- include changelog makefile and add delete release script ([efb49f4](https://github.com/awslabs/open-hostfactory-plugin/commit/efb49f464ed3eb54bfd2f22b33b2005432093229) by Flamur Gogolli).
 - update config.example.json to match default_config.json structure ([7eb7161](https://github.com/awslabs/open-hostfactory-plugin/commit/7eb71617756617c0a926c8712ad53b7bc3cd5588) by Flamur Gogolli).
 - use run-tool function consistently for Python execution ([a545ba5](https://github.com/awslabs/open-hostfactory-plugin/commit/a545ba5b4d8d072ed2d7843c3c0f1ea00a524bdc) by Flamur Gogolli).
 - update .PHONY declaration to include all public targets ([872a5cf](https://github.com/awslabs/open-hostfactory-plugin/commit/872a5cf32a7dd3df4fe9d4f8fdbf30d9ec3715e6) by Flamur Gogolli).

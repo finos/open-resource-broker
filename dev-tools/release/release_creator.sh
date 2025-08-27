@@ -311,11 +311,11 @@ create_release() {
     # Create GitHub release with package if available
     log_info "Creating GitHub release..."
     if [ "${SKIP_BUILD:-false}" = "false" ] && [ -d "dist" ] && [ -n "$(ls dist/*.whl 2>/dev/null)" ]; then
-        gh release create "$tag_name" $RELEASE_FLAGS --notes "$NOTES" dist/*.whl dist/*.tar.gz 2>/dev/null || \
-        gh release create "$tag_name" $RELEASE_FLAGS --notes "$NOTES" dist/*.whl 2>/dev/null || \
-        gh release create "$tag_name" $RELEASE_FLAGS --notes "$NOTES"
+        gh release create "$tag_name" $RELEASE_FLAGS --notes "$NOTES" --notes-from-tag=false dist/*.whl dist/*.tar.gz 2>/dev/null || \
+        gh release create "$tag_name" $RELEASE_FLAGS --notes "$NOTES" --notes-from-tag=false dist/*.whl 2>/dev/null || \
+        gh release create "$tag_name" $RELEASE_FLAGS --notes "$NOTES" --notes-from-tag=false
     else
-        gh release create "$tag_name" $RELEASE_FLAGS --notes "$NOTES"
+        gh release create "$tag_name" $RELEASE_FLAGS --notes "$NOTES" --notes-from-tag=false
         if [ "${SKIP_BUILD:-false}" = "true" ]; then
             log_info "Release created without package (build skipped)"
         fi
