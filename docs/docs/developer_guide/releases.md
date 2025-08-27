@@ -8,7 +8,7 @@ The project uses automated release management with:
 - **Semantic Versioning** (SemVer) with pre-release support
 - **GitHub Releases** with automatic tag creation
 - **PyPI Publishing** for both stable and pre-releases
-- **Container Registry** publishing with proper tagging
+- **Container Registry** publishing with structured tagging
 - **Automated Release Notes** generation
 
 ## Standard Release Workflow
