@@ -38,9 +38,17 @@ if ! $RUN_TOOL python -c "import build" 2>/dev/null; then
         echo "INFO: Installing build dependencies..."
     fi
     if command -v uv >/dev/null 2>&1; then
-        $RUN_TOOL uv add --dev build >/dev/null 2>&1
+        if [ "$QUIET" = true ]; then
+            $RUN_TOOL uv add --dev build >/dev/null 2>&1
+        else
+            $RUN_TOOL uv add --dev build
+        fi
     else
-        $RUN_TOOL pip install build >/dev/null 2>&1
+        if [ "$QUIET" = true ]; then
+            $RUN_TOOL pip install build >/dev/null 2>&1
+        else
+            $RUN_TOOL pip install build
+        fi
     fi
 fi
 
