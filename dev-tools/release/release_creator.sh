@@ -214,15 +214,39 @@ create_release() {
     log_info "Generating release notes..."
     NOTES=$(./dev-tools/release/release_notes.sh "$from_commit" "$to_commit")
     
-    # Build package with normalized version (use current build system)
-    log_info "Building package with normalized version..."
-    PACKAGE_VERSION=$(./dev-tools/release/version_normalizer.sh "$tag_name" package)
-    log_debug "Building package with version: $PACKAGE_VERSION"
-    
-    # Build wheel with proper version using current build system
-    VERSION="$PACKAGE_VERSION" make clean build 2>/dev/null || {
-        log_warn "Package build failed, continuing without package"
-    }
+    # For backfill releases, we need to build from the actual release commit
+    # but use modern build tools. Create a temporary branch at the target commit
+    # and cherry-pick the build system improvements.
+    if [ "$ALLOW_BACKFILL" = "true" ]; then
+        log_info "Building package from release commit $to_commit with modern build system..."
+        
+        # Create temporary branch at target commit
+        temp_branch="temp-build-$(date +%s)"
+        current_branch=$(git branch --show-current)
+        
+        git checkout -b "$temp_branch" "$to_commit" -q
+        
+        # Cherry-pick essential build files from current branch
+        git checkout "$current_branch" -- Makefile dev-tools/package/ dev-tools/scripts/ 2>/dev/null || true
+        
+        # Convert git tag to package version format
+        PACKAGE_VERSION=$(git show "$current_branch":dev-tools/release/version_normalizer.sh "$tag_name" package 2>/dev/null || echo "${tag_name#v}")
+        log_debug "Building package with version: $PACKAGE_VERSION"
+        
+        # Build with the actual release code but modern build system
+        VERSION="$PACKAGE_VERSION" make clean build 2>/dev/null || {
+            log_warn "Package build failed from release commit, skipping package"
+        }
+        
+        # Return to original branch and cleanup
+        git checkout "$current_branch" -q
+        git branch -D "$temp_branch" -q 2>/dev/null || true
+    else
+        # Regular release: build from current commit
+        log_info "Building package from current commit..."
+        PACKAGE_VERSION=$(./dev-tools/release/version_normalizer.sh "$tag_name" package)
+        VERSION="$PACKAGE_VERSION" make clean build
+    fi
     
     # Determine release flags
     RELEASE_FLAGS=""
