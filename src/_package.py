@@ -71,12 +71,12 @@ PACKAGE_NAME_SHORT = config["project"].get("short_name", "ohfp")
 __version__ = config["project"]["version"]
 VERSION = __version__
 DESCRIPTION = config["project"]["description"]
-AUTHOR = config["project"].get("author", "AWS Professional Services")
-EMAIL = config["project"].get("email", "aws-proserve@amazon.com")
+AUTHOR = config["project"]["author"]
+EMAIL = config["project"]["email"]
 
 # Repository metadata
-REPO_ORG = config["repository"].get("org", "awslabs")
-REPO_NAME = config["repository"].get("name", "open-hostfactory-plugin")
+REPO_ORG = config["repository"]["org"]
+REPO_NAME = config["repository"]["name"]
 CONTAINER_REGISTRY = config["repository"].get("registry", "ghcr.io")
 
 # Derived values
