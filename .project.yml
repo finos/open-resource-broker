@@ -5,7 +5,7 @@
 project:
   name: open-hostfactory-plugin
   short_name: ohfp # CLI command name
-  version: 0.0.1-rc.1
+  version: 0.1.0
   description: "Cloud provider integration plugin for IBM Spectrum Symphony Host Factory"
   author: "AWS Professional Services"
   email: "aws-proserve@amazon.com"
