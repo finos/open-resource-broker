@@ -103,16 +103,24 @@ echo "New version: $NEW_VERSION"
 # Dry run check
 if [ "$DRY_RUN" = "true" ]; then
     echo "DRY RUN: Would update .project.yml version to $NEW_VERSION"
+    # In dry-run, temporarily update version for downstream scripts
+    export RELEASE_DRY_RUN_VERSION="$NEW_VERSION"
     exit 0
 fi
 
-# Confirm update
-echo ""
-read -p "Update version to $NEW_VERSION? (y/N): " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Cancelled"
-    exit 1
+# Skip confirmation in non-interactive mode or CI
+if [ -t 0 ] && [ "$CI" != "true" ]; then
+    # Interactive mode - ask for confirmation
+    echo ""
+    read -p "Update version to $NEW_VERSION? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Cancelled"
+        exit 1
+    fi
+else
+    # Non-interactive mode - proceed automatically
+    echo "Non-interactive mode: Updating version to $NEW_VERSION"
 fi
 
 # Update .project.yml

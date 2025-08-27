@@ -20,13 +20,22 @@ if ! command -v git >/dev/null 2>&1; then
     exit 1
 fi
 
-# Get current version
-VERSION=$(make -s get-version)
+# Get current version (force fresh read, not cached)
+if [ "$DRY_RUN" = "true" ] && [ -n "$RELEASE_DRY_RUN_VERSION" ]; then
+    VERSION="$RELEASE_DRY_RUN_VERSION"
+else
+    VERSION=$(yq '.project.version' .project.yml)
+fi
 TAG_NAME="v$VERSION"
 
 echo "Creating release: $TAG_NAME"
 
 validate_working_directory() {
+    # Skip validation in dry-run mode
+    if [ "$DRY_RUN" = "true" ]; then
+        return 0
+    fi
+    
     # Check if working directory is clean
     if ! git diff-index --quiet HEAD --; then
         echo "ERROR: Working directory has uncommitted changes"
@@ -41,6 +50,13 @@ validate_branch() {
     if [ "$current_branch" != "main" ] && [ "$ALLOW_RELEASE_FROM_BRANCH" != "true" ]; then
         echo "WARNING: Creating release from branch '$current_branch' (not main)"
         echo "Use ALLOW_RELEASE_FROM_BRANCH=true to suppress this warning"
+        
+        # Skip confirmation in non-interactive mode, dry-run, or CI
+        if [ "$DRY_RUN" = "true" ] || [ "$CI" = "true" ] || [ ! -t 0 ]; then
+            echo "Non-interactive mode: Proceeding with release from $current_branch"
+            return 0
+        fi
+        
         read -p "Continue anyway? (y/N): " -n 1 -r
         echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -232,17 +248,25 @@ if [ "$DRY_RUN" = "true" ]; then
 fi
 
 # Final confirmation
-echo ""
-echo "Ready to create release:"
-echo "  Tag: $TAG_NAME"
-echo "  Range: ${FROM_COMMIT:0:8}..${TO_COMMIT:0:8}"
-echo "  Pre-release: $([[ "$VERSION" =~ -alpha|-beta|-rc ]] && echo "yes" || echo "no")"
-echo ""
-read -p "Create release? (y/N): " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Cancelled"
-    exit 1
+if [ "$DRY_RUN" != "true" ]; then
+    echo ""
+    echo "Ready to create release:"
+    echo "  Tag: $TAG_NAME"
+    echo "  Range: ${FROM_COMMIT:0:8}..${TO_COMMIT:0:8}"
+    echo "  Pre-release: $([[ "$VERSION" =~ -alpha|-beta|-rc ]] && echo "yes" || echo "no")"
+    
+    # Skip confirmation in non-interactive mode or CI
+    if [ -t 0 ] && [ "$CI" != "true" ]; then
+        echo ""
+        read -p "Create release? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "Cancelled"
+            exit 1
+        fi
+    else
+        echo "Non-interactive mode: Creating release"
+    fi
 fi
 
 # Create the release

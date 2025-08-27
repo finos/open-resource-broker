@@ -118,13 +118,19 @@ if [ "$DRY_RUN" = "true" ]; then
     exit 0
 fi
 
-# Confirm promotion
-echo ""
-read -p "Promote version to $NEW_VERSION? (y/N): " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Cancelled"
-    exit 1
+# Skip confirmation in non-interactive mode or CI
+if [ -t 0 ] && [ "$CI" != "true" ]; then
+    # Interactive mode - ask for confirmation
+    echo ""
+    read -p "Promote version to $NEW_VERSION? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Cancelled"
+        exit 1
+    fi
+else
+    # Non-interactive mode - proceed automatically
+    echo "Non-interactive mode: Promoting to $NEW_VERSION"
 fi
 
 # Update .project.yml

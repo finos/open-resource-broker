@@ -568,8 +568,12 @@ _release:
 		echo "Use: RELEASE_VERSION=$(RELEASE_VERSION) make release-version"; \
 		exit 1; \
 	fi
-	@./dev-tools/release/version_manager.sh bump $(BUMP_TYPE) $(PRERELEASE_TYPE)
-	@./dev-tools/release/release_creator.sh
+	@if [ "$(DRY_RUN)" = "true" ]; then \
+		./dev-tools/release/dry_run_release.sh bump $(BUMP_TYPE) $(PRERELEASE_TYPE); \
+	else \
+		./dev-tools/release/version_manager.sh bump $(BUMP_TYPE) $(PRERELEASE_TYPE); \
+		./dev-tools/release/release_creator.sh; \
+	fi
 
 _promote:
 	@if [ -n "$(RELEASE_VERSION)" ]; then \
@@ -577,8 +581,13 @@ _promote:
 		echo "Use: RELEASE_VERSION=$(RELEASE_VERSION) make release-version"; \
 		exit 1; \
 	fi
-	@./dev-tools/release/promote_manager.sh $(PROMOTE_TO)
-	@./dev-tools/release/release_creator.sh
+	@if [ "$(DRY_RUN)" = "true" ]; then \
+		echo "DRY RUN: Promotion simulation not yet implemented"; \
+		echo "Would promote using: $(PROMOTE_TO)"; \
+	else \
+		./dev-tools/release/promote_manager.sh $(PROMOTE_TO); \
+		./dev-tools/release/release_creator.sh; \
+	fi
 
 _release_custom:
 	@if [ -z "$(RELEASE_VERSION)" ]; then \
@@ -586,8 +595,12 @@ _release_custom:
 		echo "Usage: RELEASE_VERSION=1.2.3 make release-version"; \
 		exit 1; \
 	fi
-	@./dev-tools/release/version_manager.sh set $(RELEASE_VERSION)
-	@./dev-tools/release/release_creator.sh
+	@if [ "$(DRY_RUN)" = "true" ]; then \
+		./dev-tools/release/dry_run_release.sh set $(RELEASE_VERSION); \
+	else \
+		./dev-tools/release/version_manager.sh set $(RELEASE_VERSION); \
+		./dev-tools/release/release_creator.sh; \
+	fi
 
 _release_backfill:
 	@if [ -z "$(RELEASE_VERSION)" ] || [ -z "$(TO_COMMIT)" ]; then \
@@ -596,8 +609,13 @@ _release_backfill:
 		echo "Optional: FROM_COMMIT=def (defaults to first commit)"; \
 		exit 1; \
 	fi
-	@ALLOW_BACKFILL=true ./dev-tools/release/version_manager.sh set $(RELEASE_VERSION)
-	@ALLOW_BACKFILL=true ./dev-tools/release/release_creator.sh
+	@if [ "$(DRY_RUN)" = "true" ]; then \
+		echo "DRY RUN: Backfill simulation"; \
+		ALLOW_BACKFILL=true ./dev-tools/release/dry_run_release.sh set $(RELEASE_VERSION); \
+	else \
+		ALLOW_BACKFILL=true ./dev-tools/release/version_manager.sh set $(RELEASE_VERSION); \
+		ALLOW_BACKFILL=true ./dev-tools/release/release_creator.sh; \
+	fi
 
 local-security: dev-install  ## Run security workflow locally (.github/workflows/security.yml)
 	@echo "Running security workflow locally..."
