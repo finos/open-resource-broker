@@ -206,6 +206,18 @@ async def use_hostfactory():
         print(f"Request result: {result}")
 ```
 
+## Complete Examples
+
+For working implementations, see:
+
+- **Python Client**: [examples/mcp/python/client_example.py](../../examples/mcp/python/client_example.py)
+- **Node.js Client**: [examples/mcp/nodejs/client_example.js](../../examples/mcp/nodejs/client_example.js)
+
+These examples include:
+- Error handling
+- Async context management
+- Multiple tool usage patterns
+
 ### OpenAI Function Calling
 
 ```python

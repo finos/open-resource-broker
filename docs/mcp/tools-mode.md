@@ -53,6 +53,19 @@ ohfp mcp tools list --type command
 
 # Get information about a specific tool
 ohfp mcp tools info list_templates
+```
+
+## Complete Examples
+
+For working implementations, see:
+
+- **Python Client**: [examples/mcp/python/client_example.py](../../examples/mcp/python/client_example.py)
+- **Node.js Client**: [examples/mcp/nodejs/client_example.js](../../examples/mcp/nodejs/client_example.js)
+
+These examples demonstrate:
+- Async context management
+- Error handling
+- Multiple tool usage
 
 # Call a tool directly for testing
 ohfp mcp tools call list_templates --args '{"active_only": true}'

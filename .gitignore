@@ -222,3 +222,4 @@ bandit-results*.json
 trivy-*.sarif
 semgrep-results.json
 safety-results.json
+junit-*.xml
