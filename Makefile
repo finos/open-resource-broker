@@ -417,9 +417,7 @@ get-version:  ## Generate version (supports FORMAT=package|container|git|display
 	else \
 		commit=$$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown'); \
 		if [ "$${FORMAT}" = "container" ]; then \
-			./dev-tools/release/version_normalizer.sh "$(VERSION).dev-$${commit}" container; \
-		elif [ "$${FORMAT}" = "git" ]; then \
-			./dev-tools/release/version_normalizer.sh "$(VERSION).dev+$${commit}" git; \
+			./dev-tools/release/version_normalizer.sh "$(VERSION).dev+$${commit}" container; \
 		else \
 			./dev-tools/release/version_normalizer.sh "$(VERSION).dev+$${commit}" package; \
 		fi; \

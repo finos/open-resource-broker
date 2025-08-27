@@ -112,7 +112,9 @@ format_version() {
             fi
             if [ -n "$DEV_VERSION" ] || [ -n "$LOCAL_VERSION" ]; then
                 if [ -n "$LOCAL_VERSION" ]; then
-                    result="${result}.dev0+${LOCAL_VERSION}"
+                    # Convert hex to int for PEP 440 compliance (PyPI rejects + character)
+                    dev_int=$(python3 -c "print(int('${LOCAL_VERSION}'[:6], 16))")
+                    result="${result}.dev${dev_int}"
                 else
                     result="${result}.dev${DEV_VERSION:-0}"
                 fi
