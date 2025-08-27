@@ -4,20 +4,65 @@ set -e
 # Enhanced version manager with pre-release support
 # Usage: version_manager.sh <bump|set> <patch|minor|major|VERSION> [prerelease_type]
 
-if [ $# -lt 2 ]; then
-    echo "Usage: $0 <bump|set> <patch|minor|major|VERSION> [alpha|beta|rc]"
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Logging functions
+log_info() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+log_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+log_debug() {
+    if [ "${DEBUG:-false}" = "true" ] || [ "${VERBOSE:-false}" = "true" ]; then
+        echo -e "${BLUE}[DEBUG]${NC} $1"
+    fi
+}
+
+# Parse arguments for force flag
+FORCE_FLAG=false
+ARGS=()
+for arg in "$@"; do
+    case $arg in
+        --force|--yes|-y)
+            FORCE_FLAG=true
+            ;;
+        *)
+            ARGS+=("$arg")
+            ;;
+    esac
+done
+
+log_debug "Starting version_manager.sh with args: ${ARGS[*]}"
+log_debug "ALLOW_BACKFILL=${ALLOW_BACKFILL:-false}"
+log_debug "FORCE_FLAG=${FORCE_FLAG}"
+
+if [ ${#ARGS[@]} -lt 2 ]; then
+    echo "Usage: $0 <bump|set> <patch|minor|major|VERSION> [alpha|beta|rc] [--force]"
     echo ""
     echo "Examples:"
     echo "  $0 bump patch           # 1.0.0 -> 1.0.1"
     echo "  $0 bump minor alpha     # 1.0.0 -> 1.1.0-alpha.1"
     echo "  $0 set 1.2.3            # Set specific version"
     echo "  $0 set 1.2.3-beta.1     # Set specific pre-release"
+    echo "  $0 set 1.2.3 --force    # Set version without confirmation"
     exit 1
 fi
 
-COMMAND=$1
-VERSION_ARG=$2
-PRERELEASE_TYPE=$3
+COMMAND=${ARGS[0]}
+VERSION_ARG=${ARGS[1]}
+PRERELEASE_TYPE=${ARGS[2]}
 
 # Get to project root
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
@@ -111,8 +156,11 @@ if [ "$DRY_RUN" = "true" ]; then
     exit 0
 fi
 
-# Skip confirmation in non-interactive mode or CI
-if [ -t 0 ] && [ "$CI" != "true" ]; then
+# Skip confirmation in non-interactive mode, CI, force flag, or backfill mode
+if [ "$FORCE_FLAG" = "true" ] || [ "$ALLOW_BACKFILL" = "true" ] || [ ! -t 0 ] || [ "$CI" = "true" ]; then
+    # Non-interactive mode - proceed automatically
+    log_info "Updating version to $NEW_VERSION (non-interactive mode)"
+else
     # Interactive mode - ask for confirmation
     echo ""
     read -p "Update version to $NEW_VERSION? (y/N): " -n 1 -r
@@ -121,9 +169,6 @@ if [ -t 0 ] && [ "$CI" != "true" ]; then
         echo "Cancelled"
         exit 1
     fi
-else
-    # Non-interactive mode - proceed automatically
-    echo "Non-interactive mode: Updating version to $NEW_VERSION"
 fi
 
 # Update .project.yml

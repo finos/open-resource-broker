@@ -4,6 +4,38 @@ set -e
 # GitHub release creator with validation and conflict handling
 # Supports: FROM_COMMIT, TO_COMMIT, ALLOW_BACKFILL, DRY_RUN env vars
 
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Logging functions
+log_info() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+log_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+log_debug() {
+    if [ "${DEBUG:-false}" = "true" ] || [ "${VERBOSE:-false}" = "true" ]; then
+        echo -e "${BLUE}[DEBUG]${NC} $1"
+    fi
+}
+
+log_debug "Starting release_creator.sh"
+log_debug "ALLOW_BACKFILL=${ALLOW_BACKFILL:-false}"
+log_debug "FROM_COMMIT=${FROM_COMMIT:-unset}"
+log_debug "TO_COMMIT=${TO_COMMIT:-unset}"
+log_debug "DRY_RUN=${DRY_RUN:-false}"
+
 # Get to project root
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
