@@ -28,6 +28,7 @@ generate-pyproject:  ## Generate pyproject.toml from template using project conf
 PACKAGE_NAME := $(shell yq '.project.name' $(PROJECT_CONFIG))
 PACKAGE_NAME_SHORT := $(shell yq '.project.short_name' $(PROJECT_CONFIG))
 VERSION ?= $(shell yq '.project.version' $(PROJECT_CONFIG))
+AUTHOR := $(shell yq '.project.author' $(PROJECT_CONFIG))
 
 # Repository information (loaded from project config)
 REPO_ORG := $(shell yq '.repository.org' $(PROJECT_CONFIG))
