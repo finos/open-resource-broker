@@ -1,78 +1,459 @@
 # Changelog
 
-All notable changes to the Open Host Factory Plugin will be documented in this file.
+All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
+and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+<!-- insertion marker -->
+## Unreleased
 
-### Added
-- Complete MCP (Model Context Protocol) server implementation
-- AI assistant integration capabilities
-- MCP tools for all CLI operations
-- MCP resources for templates, requests, machines, and providers
-- AI-friendly prompts for infrastructure provisioning workflows
-- Comprehensive MCP test suite
-- MCP integration documentation and examples
-- Support for both stdio and TCP server modes
-- Claude Desktop configuration examples
-- Python and Node.js MCP client examples
+<small>[Compare with latest](https://github.com/awslabs/open-hostfactory-plugin/compare/b04b6dfdd9b9884bde513b4ff443cedcc1377c5b...HEAD)</small>
 
-### Changed
-- Consolidated async function handlers for improved performance
-- Updated README with MCP server documentation
-- Improved error handling with professional status indicators
-- Improved logging with structured messages
-- **Architecture**: Migrated `TemplateConfigurationManager` from `@injectable` decorator to manual DI registration for better configuration control
+### Features
 
-### Fixed
-- Handler signature consistency across all command handlers
-- Professional code standards compliance (removed emojis)
-- Template system unification and optimization
+- reorganize specs for proper packaging and logical structure ([99d3b24](https://github.com/awslabs/open-hostfactory-plugin/commit/99d3b24e5b14a4d8872813d544c38d99b8a0ca2d) by Flamur Gogolli).
+- parameterize all remaining hardcoded references ([29de0ed](https://github.com/awslabs/open-hostfactory-plugin/commit/29de0ed4443d0353335e89230f37af64a4489a14) by Flamur Gogolli).
+- consolidate fallback system to single source of truth ([98545e6](https://github.com/awslabs/open-hostfactory-plugin/commit/98545e6fad06004f4ed2cb5d81b715ada752188e) by Flamur Gogolli).
+- parameterize author/vendor using centralized .project.yml config ([c35882e](https://github.com/awslabs/open-hostfactory-plugin/commit/c35882eb10750ba73b70f35eef326b4b15e02f2f) by Flamur Gogolli).
+- add SKIP_BUILD flag to release system ([4d8a19d](https://github.com/awslabs/open-hostfactory-plugin/commit/4d8a19de1ebc838297da746b78ad99dd7136ae50) by Flamur Gogolli).
+- comprehensive version normalization and release system ([0b0006a](https://github.com/awslabs/open-hostfactory-plugin/commit/0b0006aed3310e242e440702844adaeae837b295) by Flamur Gogolli).
+- add comprehensive version normalization system ([c426765](https://github.com/awslabs/open-hostfactory-plugin/commit/c426765872336052a67b294f6a95ba77772e21d0) by Flamur Gogolli).
+- implement automated release system with scheduled workflows ([91eaa2d](https://github.com/awslabs/open-hostfactory-plugin/commit/91eaa2dee77ecbf60bdd5d5bcdf85cc4611da810) by Flamur Gogolli).
+- implement comprehensive release management system ([3f4b61d](https://github.com/awslabs/open-hostfactory-plugin/commit/3f4b61d9d499f615e10a33f8084a44224a667863) by Flamur Gogolli).
+- add automatic container registry cleanup ([0aaf62d](https://github.com/awslabs/open-hostfactory-plugin/commit/0aaf62d1d1eb80f709a37c4c010f7499521d34f9) by Flamur Gogolli).
+- improve build process and fix CI test configuration ([73347c6](https://github.com/awslabs/open-hostfactory-plugin/commit/73347c6226411d1964ba09936bd1ca53660ad212) by Flamur Gogolli).
+- Rename HF-specific function to be scheduler-agnostic ([b53161a](https://github.com/awslabs/open-hostfactory-plugin/commit/b53161a7becae871f4a40751eb913be1f1691e8c) by Flamur Gogolli).
+- Implement clean dependency injection for scheduler directory resolution ([c7b94f1](https://github.com/awslabs/open-hostfactory-plugin/commit/c7b94f1e54b089668339296af1a073217c89e2e5) by Flamur Gogolli).
+- Complete removal of HF_* environment variable hardcoding ([6cea8be](https://github.com/awslabs/open-hostfactory-plugin/commit/6cea8be55aa93eaf86e6479dfe3b312ccf9dd86c) by Flamur Gogolli).
+- Complete removal of HF_* hardcoding from config loader ([8798bc9](https://github.com/awslabs/open-hostfactory-plugin/commit/8798bc93ad94085790d2acd93404279b570dabb1) by Flamur Gogolli).
+- Remove remaining HF_* hardcoding from generic components ([d119adb](https://github.com/awslabs/open-hostfactory-plugin/commit/d119adb4d2c40c42680f4ef41e9bee2a7357bb79) by Flamur Gogolli).
+- Add scheduler port methods for config/logs directories ([84ecf20](https://github.com/awslabs/open-hostfactory-plugin/commit/84ecf203d943378c47ea571686aa79d33d0c2ab3) by Flamur Gogolli).
+- Replace hardcoded env vars with scheduler port pattern in config loader ([c39bd39](https://github.com/awslabs/open-hostfactory-plugin/commit/c39bd396253ab61034d46c8bf134505a0687b0cb) by Flamur Gogolli).
+- make container health check fully configurable via environment variables ([1854817](https://github.com/awslabs/open-hostfactory-plugin/commit/18548170a80ba851035e826842a5548205eb02d9) by Flamur Gogolli).
+- centralize version generation in get-config action ([6946400](https://github.com/awslabs/open-hostfactory-plugin/commit/6946400585b9d3cdf4e71411c6cbdc676fac27db) by Flamur Gogolli).
+- enhance setup-uv-cached to install dependencies on cache miss ([06b3430](https://github.com/awslabs/open-hostfactory-plugin/commit/06b3430714c0116120bbc9df192490e3c17997ff) by Flamur Gogolli).
+- complete systematic workflow standardization ([b6725bd](https://github.com/awslabs/open-hostfactory-plugin/commit/b6725bdec06ba1754535d4ea62e0977aa3ab3658) by Flamur Gogolli).
+- complete workflow optimization implementation ([88f93e5](https://github.com/awslabs/open-hostfactory-plugin/commit/88f93e550eb9b6a081c3188c1df676788266ad2f) by Flamur Gogolli).
+- add UV caching to ci.yml jobs ([3519d6e](https://github.com/awslabs/open-hostfactory-plugin/commit/3519d6eaa0c867ccca6a76b420008b97b679bee2) by Flamur Gogolli).
+- implement unified versioning and optimize CI dependency caching ([4892a48](https://github.com/awslabs/open-hostfactory-plugin/commit/4892a4868cabc329e888f5dd77980005d2314d11) by Flamur Gogolli).
+- optimize CI workflow with dependency caching and fix test dependencies ([a8b0335](https://github.com/awslabs/open-hostfactory-plugin/commit/a8b0335e6caa3a0027421003cff99f7a2f8f6802) by Flamur Gogolli).
+- Add act support for local GitHub Actions execution ([5c6c886](https://github.com/awslabs/open-hostfactory-plugin/commit/5c6c88623711d6c92593b9adafb9fe62c93e4ef3) by Flamur Gogolli).
+- Update actionlint validation for new GitHub Actions structure ([761d10b](https://github.com/awslabs/open-hostfactory-plugin/commit/761d10b8005067ac3dbfe8104ea479efb6c68f6e) by Flamur Gogolli).
+- Expand workflow validation to cover all GitHub YAML files ([b43d54b](https://github.com/awslabs/open-hostfactory-plugin/commit/b43d54b2d93725f2836a2efaa677ed17e0b6d48a) by Flamur Gogolli).
+- Add --quiet flags to reduce verbose output in Makefile targets ([49edb12](https://github.com/awslabs/open-hostfactory-plugin/commit/49edb121c9f40389279dbd48e5a542cd7f855a92) by Flamur Gogolli).
+- Complete workflow consolidation and standardization ([14e1c05](https://github.com/awslabs/open-hostfactory-plugin/commit/14e1c05675be6ca24f2ab745a72b45a5363df8f5) by Flamur Gogolli).
+- Complete Ruff migration and enhanced test dispatcher ([6f3ced1](https://github.com/awslabs/open-hostfactory-plugin/commit/6f3ced120c371f03b124aaa9b233e4c65d5dbeae) by Flamur Gogolli).
+- implement two-mode merge system for native specifications ([c840aa6](https://github.com/awslabs/open-hostfactory-plugin/commit/c840aa622d3d3ae64d275a20d4a68a0fa9dc3f00) by Flamur Gogolli).
+- standardize resource naming across all AWS handlers ([9159ec0](https://github.com/awslabs/open-hostfactory-plugin/commit/9159ec0cf4c86a9871044e4cf8a81e7726148744) by Flamur Gogolli).
+- add post-creation tagging support to AWS handlers ([0c5e90b](https://github.com/awslabs/open-hostfactory-plugin/commit/0c5e90b2fb877535be97c9c7e284f573c72ffb01) by Flamur Gogolli).
+- extend AWSOperations with comprehensive tagging capabilities ([b140f71](https://github.com/awslabs/open-hostfactory-plugin/commit/b140f71ae40df0b70f16975f13095c466b4fc04a) by Flamur Gogolli).
+- add instance TagSpecifications to EC2Fleet and SpotFleet templates ([4ca0188](https://github.com/awslabs/open-hostfactory-plugin/commit/4ca01886c9b28925c7def2d3358f6f00ecc2d00d) by Flamur Gogolli).
+- fix tests and documentation for standardized context preparation ([f0599e0](https://github.com/awslabs/open-hostfactory-plugin/commit/f0599e031905f64b74bf06d28080872b71338ee3) by Flamur Gogolli).
+- standardize handler context preparation and fix data duplication ([b1c3559](https://github.com/awslabs/open-hostfactory-plugin/commit/b1c3559497b13e3f9bf1b856aaf2883c6bbb500e) by Flamur Gogolli).
+- add native spec configuration foundation ([7204e16](https://github.com/awslabs/open-hostfactory-plugin/commit/7204e16b81dc78215df8dbffc7af4431addbd610) by Flamur Gogolli).
+- add py.typed markers for mypy type checking ([be8349a](https://github.com/awslabs/open-hostfactory-plugin/commit/be8349a13b3d204b635b416c99f554c117b9c310) by Flamur Gogolli).
+- optimize container build process ([3f868d2](https://github.com/awslabs/open-hostfactory-plugin/commit/3f868d2a712f258b9678432c03a7306fc73f0e29) by Flamur Gogolli).
+- add container comment triggers with version alignment ([2f5bb66](https://github.com/awslabs/open-hostfactory-plugin/commit/2f5bb66eb3ddf4dbbb31a00812ed61c18edcfa07) by Flamur Gogolli).
+- add PR comment triggers for CI/CD workflows ([96fb6bb](https://github.com/awslabs/open-hostfactory-plugin/commit/96fb6bbe6d93c1046bd6b3dafbd8e7adb549efa6) by Flamur Gogolli).
+- update AWS Context field to use proper AWS format ([a97edf7](https://github.com/awslabs/open-hostfactory-plugin/commit/a97edf7d2cbc80b35834bd4593a00aa7d8767433) by Flamur Gogolli).
+- add AWS Context field support for EC2 Fleet, ASG, and Spot Fleet ([685923f](https://github.com/awslabs/open-hostfactory-plugin/commit/685923f21769b89b7caa0680e9924e51cfc2352a) by Flamur Gogolli).
+- add shellcheck validation to validate-workflows.yml ([492e088](https://github.com/awslabs/open-hostfactory-plugin/commit/492e0888e7e9d1361b54fcddbe681fe956867566) by Flamur Gogolli).
+- create dedicated validation scripts for shell and actionlint ([aebd731](https://github.com/awslabs/open-hostfactory-plugin/commit/aebd731ce9be72ce86a4477f04a299afbb18de2f) by Flamur Gogolli).
+- add actionlint and shellcheck validation tools ([3572107](https://github.com/awslabs/open-hostfactory-plugin/commit/35721070e6d82540b5740e0a878e8f4ba2d46853) by Flamur Gogolli).
+- enhance workflow validation to catch YAML syntax issues ([cd6714c](https://github.com/awslabs/open-hostfactory-plugin/commit/cd6714ca9ffb4d642c438c89cdb6546c589e907b) by Flamur Gogolli).
+- complete package structure refactoring ([44111a5](https://github.com/awslabs/open-hostfactory-plugin/commit/44111a5ffbcaea2eacecc95a47cc6ba86464c1e0) by Flamur Gogolli).
+- complete metadata centralization to .project.yml ([c1588b0](https://github.com/awslabs/open-hostfactory-plugin/commit/c1588b0837fdfaf87dfc779d60eb1a7a47f56f2b) by Flamur Gogolli).
+- optimize Dockerfile for wheel-based builds and multi-architecture support ([2087259](https://github.com/awslabs/open-hostfactory-plugin/commit/2087259c985d49390e8dc37c8073b29a71e35b4c) by Flamur Gogolli).
+- consolidate Makefile and add comprehensive dev tools ([881fa9f](https://github.com/awslabs/open-hostfactory-plugin/commit/881fa9fb4cd224d24720e891aec56ef0f00bb238) by Flamur Gogolli).
+- add alphabetical sorting within help sections ([a9a2811](https://github.com/awslabs/open-hostfactory-plugin/commit/a9a281173dc19a8ec1804cff2175db894dbbd30a) by Flamur Gogolli).
+- implement dynamic section-based help system ([cdbdf57](https://github.com/awslabs/open-hostfactory-plugin/commit/cdbdf57bd7af752c5457bcc70621c511e4771597) by Flamur Gogolli).
+- organize make help output with logical groups and sorting ([08e795a](https://github.com/awslabs/open-hostfactory-plugin/commit/08e795a6c2ce54e102eff51a64b9f429d04bbc41) by Flamur Gogolli).
+- add multiple resource_ids handling to Spot Fleet and ASG handlers ([aca2428](https://github.com/awslabs/open-hostfactory-plugin/commit/aca2428c0e22050e9dd58ef1ecd87067b5056b46) by Flamur Gogolli).
+- comprehensive architectural consistency and violation fixes ([44a35c6](https://github.com/awslabs/open-hostfactory-plugin/commit/44a35c6b859ba0b00c4b84b4d3bc0c92a963b3c0) by Flamur Gogolli).
+- implement domain port consistency across all architectural patterns ([d6853b7](https://github.com/awslabs/open-hostfactory-plugin/commit/d6853b73bb95ac48ae22da74228f294663c07b77) by Flamur Gogolli).
+- transform system to async-first architecture ([b0f69f3](https://github.com/awslabs/open-hostfactory-plugin/commit/b0f69f3434132c0b8ae032671ce91da579102249) by Flamur Gogolli).
+- pure dynamic CLI formatters - eliminate all hardcoded field mappings ([9c50dbd](https://github.com/awslabs/open-hostfactory-plugin/commit/9c50dbd38a7ee3be160c5913184ddc81bd4a20a7) by Flamur Gogolli).
+- clean camelCase architecture - scheduler strategies handle field mapping, CLI formatters are pure presentation ([598f315](https://github.com/awslabs/open-hostfactory-plugin/commit/598f3156a4f182d16f5da21c7614806866144bc7) by Flamur Gogolli).
+- consistent strategy/registry/factory pattern across all components ([aeea7ca](https://github.com/awslabs/open-hostfactory-plugin/commit/aeea7ca3f59db3d5d79a9eb02ec27ac9fc365bb1) by Flamur Gogolli).
+- add caching to ProviderSelectionService to reduce redundant calls ([4d96689](https://github.com/awslabs/open-hostfactory-plugin/commit/4d96689b53457fcaa29050437be4bc8ef5b13823) by Flamur Gogolli).
+- update AWS client to use provider selection service for profile loading ([3acfc77](https://github.com/awslabs/open-hostfactory-plugin/commit/3acfc775e2124c2af9d30b8d5d12bc8257b5b1b8) by Flamur Gogolli).
+- proper provider selection architecture to replace hardcoded [0] usage ([8920f5f](https://github.com/awslabs/open-hostfactory-plugin/commit/8920f5f6bbec89b773be2d6544d64ad550c6da97) by Flamur Gogolli).
+- enhance quality check with noqa support and fix cloud provider references ([d3db683](https://github.com/awslabs/open-hostfactory-plugin/commit/d3db683916db98d275dc3919b495b2b1950cf787) by Flamur Gogolli).
+- consolidate build/test pipeline with centralized environment handling (proper) ([6ccbe7f](https://github.com/awslabs/open-hostfactory-plugin/commit/6ccbe7faea44d86879081eca321456043e894d29) by Flamur Gogolli).
+- comprehensive CI/pre-commit alignment ([5776ece](https://github.com/awslabs/open-hostfactory-plugin/commit/5776ece4ff3faa5ed33a3ebb59e620d0c2060cd2) by Flamur Gogolli).
+- convert dev scripts to Python with progress feedback ([998ce72](https://github.com/awslabs/open-hostfactory-plugin/commit/998ce72a4394b1ff7b109d3e54d16db38e1ae153) by Flamur Gogolli).
+- create flexible whitespace cleanup script ([aae53dd](https://github.com/awslabs/open-hostfactory-plugin/commit/aae53dd4a26acef25513bbd9c173c2f59a517e2d) by Flamur Gogolli).
+- add auto-format hook to prevent formatting issues ([0556d70](https://github.com/awslabs/open-hostfactory-plugin/commit/0556d704b4cdcbe0bd0752904d394f580447f939) by Flamur Gogolli).
+- align pre-commit warning-only with workflow continue-on-error settings ([ddb6cb5](https://github.com/awslabs/open-hostfactory-plugin/commit/ddb6cb5b32f1293bbef1ceee4f4c5d8162166a34) by Flamur Gogolli).
+- add essential formatting checks to pre-commit and fix formatting ([0ac237b](https://github.com/awslabs/open-hostfactory-plugin/commit/0ac237b7db3fb19e9e64b17a3ea9d90b021709ed) by Flamur Gogolli).
+- add standalone workflow YAML validation ([ab5a29a](https://github.com/awslabs/open-hostfactory-plugin/commit/ab5a29a4613900c674c40ea2b7125c28658d60c1) by Flamur Gogolli).
+- create proper script and Makefile target for secrets detection ([0691c5f](https://github.com/awslabs/open-hostfactory-plugin/commit/0691c5ff151dd20c99d947170f058b1fc9af5520) by Flamur Gogolli).
+- add debug and extended modes to pre-commit check script ([9c779bd](https://github.com/awslabs/open-hostfactory-plugin/commit/9c779bd588ad9c4d24739916a95f2f1e3f255cf0) by Flamur Gogolli).
+- add warning-only support for pre-commit checks ([b32264f](https://github.com/awslabs/open-hostfactory-plugin/commit/b32264f19fa3d9fc6e56eae44d415ae49d680914) by Flamur Gogolli).
+- consolidate pre-commit hooks to use Makefile targets as single entry point ([d1038a8](https://github.com/awslabs/open-hostfactory-plugin/commit/d1038a842c98d9ddbcb2101143a137cca80e9927) by Flamur Gogolli).
+- add workflow validation and pre-commit check scripts ([b88af4e](https://github.com/awslabs/open-hostfactory-plugin/commit/b88af4e4eb5dc3157612810b409601b00deea4ce) by Flamur Gogolli).
+- remove hardcoded Python versions from docs and test-matrix workflows ([2b04d50](https://github.com/awslabs/open-hostfactory-plugin/commit/2b04d5076e563be522fd5fc8543e29bb56fcb13d) by Flamur Gogolli).
+- consolidate version management into single _package.py ([ed68700](https://github.com/awslabs/open-hostfactory-plugin/commit/ed68700ad500cbb3ca4ec506c709dec15d64f4c8) by Flamur Gogolli).
+- centralize hardcoded values using Makefile as single source of truth ([c70062f](https://github.com/awslabs/open-hostfactory-plugin/commit/c70062fe7e1554f8c004d049462415cf51035835) by Flamur Gogolli).
+- establish Makefile as single source of truth for Python version across all workflows ([680449a](https://github.com/awslabs/open-hostfactory-plugin/commit/680449a89d425e150e7b9f2a802ce1e578dede90) by Flamur Gogolli).
+- fix Dockerfile and add container build/publish workflow ([92c3fa3](https://github.com/awslabs/open-hostfactory-plugin/commit/92c3fa3e8d22045114b1b924f42e0e8409019883) by Flamur Gogolli).
+- make CI documentation targets work in both venv and system-wide environments ([d946e2f](https://github.com/awslabs/open-hostfactory-plugin/commit/d946e2f5511facd87320afd2f7a2d561b04c011d) by Flamur Gogolli).
+- implement mike-based versioned documentation system ([5b7cb6f](https://github.com/awslabs/open-hostfactory-plugin/commit/5b7cb6ffb90b8428131cb4dc88581bbc9791abc9) by Flamur Gogolli).
+- add continue-on-error flags to test-matrix.yml workflow ([01f06e1](https://github.com/awslabs/open-hostfactory-plugin/commit/01f06e152d1c365f50f7dd851cc35e0bdcd0d6cc) by Flamur Gogolli).
+- add continue-on-error flags for quality checks and tests ([5450cf1](https://github.com/awslabs/open-hostfactory-plugin/commit/5450cf110edf77f49a1104d486d242afcdda0a84) by Flamur Gogolli).
+- add Python 3.13 support across all workflows and documentation ([9b058c1](https://github.com/awslabs/open-hostfactory-plugin/commit/9b058c138b41b199caf475a02ff0b4440f1c6932) by Flamur Gogolli).
+- comprehensive improvements to CI/CD and documentation ([100b1c4](https://github.com/awslabs/open-hostfactory-plugin/commit/100b1c478393b7711f9611d66da00c9d43e3d258) by Flamur Gogolli).
+- add architecture compliance validation script ([a96aac6](https://github.com/awslabs/open-hostfactory-plugin/commit/a96aac6b7ca8d8c29f48c061ebefb25991852a48) by Flamur Gogolli).
+- improve CI check script with temp file output and apply Black formatting ([0ab801d](https://github.com/awslabs/open-hostfactory-plugin/commit/0ab801d6a7273d5bc2fca03d9c3588559e6b29f0) by Flamur Gogolli).
+- add complexity checking and update CI configuration ([2835368](https://github.com/awslabs/open-hostfactory-plugin/commit/2835368392f78faea92a05844206a7c3410c3a0e) by Flamur Gogolli).
 
-## [1.0.0] - 2024-01-15
+### Bug Fixes
 
-### Added
-- Initial release of Open Host Factory Plugin
-- AWS provider support with EC2Fleet, SpotFleet, and Auto Scaling Groups
-- Clean Architecture implementation with DDD and CQRS patterns
-- REST API with OpenAPI/Swagger documentation
-- CLI interface with comprehensive command support
-- Configuration-driven provider system
-- Template-based infrastructure provisioning
-- Docker deployment support
-- Comprehensive test suite
-- Security scanning and SBOM generation workflows
+- update config.example.json to match default_config.json structure ([7eb7161](https://github.com/awslabs/open-hostfactory-plugin/commit/7eb71617756617c0a926c8712ad53b7bc3cd5588) by Flamur Gogolli).
+- use run-tool function consistently for Python execution ([a545ba5](https://github.com/awslabs/open-hostfactory-plugin/commit/a545ba5b4d8d072ed2d7843c3c0f1ea00a524bdc) by Flamur Gogolli).
+- update .PHONY declaration to include all public targets ([872a5cf](https://github.com/awslabs/open-hostfactory-plugin/commit/872a5cf32a7dd3df4fe9d4f8fdbf30d9ec3715e6) by Flamur Gogolli).
+- make _get_from_package_metadata() return complete config structure ([1cc0c6b](https://github.com/awslabs/open-hostfactory-plugin/commit/1cc0c6b3d045e5f931960b223e0818848d2ea072) by Flamur Gogolli).
+- remove duplicate MIN_PYTHON_VERSION key in generate_pyproject.py ([5d583fe](https://github.com/awslabs/open-hostfactory-plugin/commit/5d583fec6ff43cf93a399ca42d8cf31c403e4aec) by Flamur Gogolli).
+- make generate_pyproject.py independent of _package.py to resolve CI issue ([161d9f6](https://github.com/awslabs/open-hostfactory-plugin/commit/161d9f64a54d69482388f91fb517bc030a5c72d9) by Flamur Gogolli).
+- update test assertion for improved fallback description ([e1ec4b9](https://github.com/awslabs/open-hostfactory-plugin/commit/e1ec4b9c954ebbd694b575342530edce61b0b26b) by Flamur Gogolli).
+- parameterize remaining hardcoded license and improve fallbacks ([9332b59](https://github.com/awslabs/open-hostfactory-plugin/commit/9332b5933d3e375507cd1fefeaa1851f3c9ef468) by Flamur Gogolli).
+- standardize license to Apache-2.0 in API documentation ([54232ec](https://github.com/awslabs/open-hostfactory-plugin/commit/54232ecda902e35d761edcf7d9a4d242cf360bef) by Flamur Gogolli).
+- simplify container cleanup regex to keep all release types ([2a4f46b](https://github.com/awslabs/open-hostfactory-plugin/commit/2a4f46b323824883a78f26ce1d274ad0439a34ff) by Flamur Gogolli).
+- add required OCI labels and fix container cleanup regex ([d506b5a](https://github.com/awslabs/open-hostfactory-plugin/commit/d506b5a166378c26425013f35311f29d68bcd913) by Flamur Gogolli).
+- align container workflow with unified versioning system ([ab0e939](https://github.com/awslabs/open-hostfactory-plugin/commit/ab0e9399153547cbcdf2744889063cc693c38313) by Flamur Gogolli).
+- replace hyperbolic term 'Unified' with descriptive version description ([ffbfaea](https://github.com/awslabs/open-hostfactory-plugin/commit/ffbfaea74dfa38d813290f41295bea2ab76781ee) by Flamur Gogolli).
+- restore correct base version to 0.1.0 ([164dd81](https://github.com/awslabs/open-hostfactory-plugin/commit/164dd81a9acc4e6e4ab6a080292ac52ef935c35e) by Flamur Gogolli).
+- remove redundant version conversion in container build script ([f397637](https://github.com/awslabs/open-hostfactory-plugin/commit/f3976378c7090f6b4391916d314b4278f82446fd) by Flamur Gogolli).
+- implement PEP 440 compliant version normalization ([4061178](https://github.com/awslabs/open-hostfactory-plugin/commit/406117854e773ccca5253b47e86ba6afcf794fe2) by Flamur Gogolli).
+- use existing VERSION environment variable in build target ([8a6a273](https://github.com/awslabs/open-hostfactory-plugin/commit/8a6a2730c1a338fd303bb8c9afba73a2d1f76535) by Flamur Gogolli).
+- prevent VERSION environment variable override in generate-pyproject ([71c615e](https://github.com/awslabs/open-hostfactory-plugin/commit/71c615ea292cca609a2bd49e65d237241621583d) by Flamur Gogolli).
+- show dependency installation output when not in quiet mode ([c930bc5](https://github.com/awslabs/open-hostfactory-plugin/commit/c930bc5c0d26080216b1b6f1f41ac296740c3552) by Flamur Gogolli).
+- update container cleanup regex to preserve Python version tags ([eef49fe](https://github.com/awslabs/open-hostfactory-plugin/commit/eef49fe7da453b653ffdecb9e9a4bb0f60dbe297) by Flamur Gogolli).
+- build packages from current commit for backfill releases ([174d573](https://github.com/awslabs/open-hostfactory-plugin/commit/174d57375008a640cc88019f0acff11cdc50e1e6) by Flamur Gogolli).
+- remove duplicate code causing syntax error in release_creator.sh ([02eb196](https://github.com/awslabs/open-hostfactory-plugin/commit/02eb1966f3f26ce239155e8f23fe9f324ab06873) by Flamur Gogolli).
+- improve overlap protection for backfill releases ([c757404](https://github.com/awslabs/open-hostfactory-plugin/commit/c757404c0d7fa7cfcc43f84b08c00bb83309fab2) by Flamur Gogolli).
+- remove emoji from release notes generation ([05ffe01](https://github.com/awslabs/open-hostfactory-plugin/commit/05ffe016bd4d0285adbedf37998e518815d88221) by Flamur Gogolli).
+- remove emoji from release success message ([439b153](https://github.com/awslabs/open-hostfactory-plugin/commit/439b153d6b04a7400e40a1bbb13cba5f37000f70) by Flamur Gogolli).
+- skip final confirmation in backfill mode ([3b425d3](https://github.com/awslabs/open-hostfactory-plugin/commit/3b425d3c13cdd231869662220db528c9f8580422) by Flamur Gogolli).
+- skip branch confirmation in backfill mode ([2dddaaa](https://github.com/awslabs/open-hostfactory-plugin/commit/2dddaaa7cd2f95945d2c9c59661a6576e4704e79) by Flamur Gogolli).
+- add proper logging and force flag support to release scripts ([d086052](https://github.com/awslabs/open-hostfactory-plugin/commit/d0860528e7dd03823a8428dee149241839353e8e) by Flamur Gogolli).
+- remove emojis from automated release workflows ([7ec04da](https://github.com/awslabs/open-hostfactory-plugin/commit/7ec04da475866881ee6d0f90c081810432873ee1) by Flamur Gogolli).
+- resolve shellcheck issues in RC analysis script ([fa7cb37](https://github.com/awslabs/open-hostfactory-plugin/commit/fa7cb370e0268560b6190cbe609d1d103aef5ce9) by Flamur Gogolli).
+- resolve workflow validation issues in automated release system ([15fc2a3](https://github.com/awslabs/open-hostfactory-plugin/commit/15fc2a3ad308ae050683b5839d5299b4f3302b5f) by Flamur Gogolli).
+- replace hyperbolic language in releases documentation ([6e917d2](https://github.com/awslabs/open-hostfactory-plugin/commit/6e917d2b8f966596f8d5cc0dda5257a7e642927e) by Flamur Gogolli).
+- add required permissions to security workflow jobs ([b3bd2a4](https://github.com/awslabs/open-hostfactory-plugin/commit/b3bd2a475f8ed90d67cc1d8c924380a5c51b1edf) by Flamur Gogolli).
+- resolve shellcheck warnings in release scripts ([bb2838b](https://github.com/awslabs/open-hostfactory-plugin/commit/bb2838b6f368db8d38c87c40f5edd48b6fa0d023) by Flamur Gogolli).
+- resolve hanging interactive prompts in release scripts ([395808f](https://github.com/awslabs/open-hostfactory-plugin/commit/395808f2a8035d95480f2719aa7e2bb5266c6247) by Flamur Gogolli).
+- bulletproof continue-on-error for tests ([48668ef](https://github.com/awslabs/open-hostfactory-plugin/commit/48668ef7a6eef0a487d451b965bda8ed51bc8464) by Flamur Gogolli).
+- correct import paths in test_native_spec_package_context.py ([0ae455d](https://github.com/awslabs/open-hostfactory-plugin/commit/0ae455d667e58b8c34978339eb927175122f800b) by Flamur Gogolli).
+- correct CI continue-on-error and remove redundant VERSION env var ([376c3f8](https://github.com/awslabs/open-hostfactory-plugin/commit/376c3f8f2d39d3e7c69974e9565bf016307bb0ef) by Flamur Gogolli).
+- Pass config_manager parameter through _load_config_file method chain ([aa9cac2](https://github.com/awslabs/open-hostfactory-plugin/commit/aa9cac20f58adf23c22159c29e385794274b1088) by Flamur Gogolli).
+- Replace union type syntax (|) with Optional for Python 3.9 compatibility ([606018b](https://github.com/awslabs/open-hostfactory-plugin/commit/606018b1b2ca02d67d9b68ed8b73a9c8d1006220) by Flamur Gogolli).
+- add missing conditional checks to security workflow jobs ([1c72400](https://github.com/awslabs/open-hostfactory-plugin/commit/1c724007b404b025e2d761120b3407b6931a64ce) by Flamur Gogolli).
+- improve container health check script with better error handling and longer timeout ([3ec6aae](https://github.com/awslabs/open-hostfactory-plugin/commit/3ec6aaea19170d79d91dce45fa118d815f260db3) by Flamur Gogolli).
+- consolidate version handling and eliminate container build failures ([987133e](https://github.com/awslabs/open-hostfactory-plugin/commit/987133e0d4a02ede34b5d5fb4f9d4c9f59216b09) by Flamur Gogolli).
+- use correct version formats for package vs container builds ([d9dfd2d](https://github.com/awslabs/open-hostfactory-plugin/commit/d9dfd2d95f1495bda880c9e1d12c6d674c953668) by Flamur Gogolli).
+- prevent version duplication in container builds ([6a07fd0](https://github.com/awslabs/open-hostfactory-plugin/commit/6a07fd0a83d3077a333765dca28294e8b25d7f55) by Flamur Gogolli).
+- make comment trigger matching case-insensitive ([21c4fe7](https://github.com/awslabs/open-hostfactory-plugin/commit/21c4fe761aecb699093335b6142438bfa34a64b8) by Flamur Gogolli).
+- add missing outputs to publish workflow get-config job ([a242075](https://github.com/awslabs/open-hostfactory-plugin/commit/a242075702f002a6b02df6e18f416346dd012a25) by Flamur Gogolli).
+- update container workflow to use correct get-config outputs ([36d519e](https://github.com/awslabs/open-hostfactory-plugin/commit/36d519eb03fc93c8c2af8d311c9e9be4350fdad1) by Flamur Gogolli).
+- make local container targets use dynamic version generation ([8d6b945](https://github.com/awslabs/open-hostfactory-plugin/commit/8d6b9451c64aa7c0dc9ced0ddd7c423a07074ce4) by Flamur Gogolli).
+- ensure container workflow uses correct VERSION for package build ([c111e7e](https://github.com/awslabs/open-hostfactory-plugin/commit/c111e7e782305d22dd99d9cdc17abcc1b0111f6f) by Flamur Gogolli).
+- resolve workflow issues and improve test parallelization ([b25edc3](https://github.com/awslabs/open-hostfactory-plugin/commit/b25edc3e124acd9a858d14ea6466c0dcf2942c31) by Flamur Gogolli).
+- resolve shellcheck issues in publish workflow ([4b8a67d](https://github.com/awslabs/open-hostfactory-plugin/commit/4b8a67d64baf8f3584530ac3ebdd37f98f54c6a2) by Flamur Gogolli).
+- consolidate version generation through Makefile infrastructure ([1d2d80f](https://github.com/awslabs/open-hostfactory-plugin/commit/1d2d80fef03a001d6739bdb1ae59a78e4b29531c) by Flamur Gogolli).
+- add fail-on-cache-miss: false to auto-format and ruff jobs ([4c5ca11](https://github.com/awslabs/open-hostfactory-plugin/commit/4c5ca11883ab3a043aa6532154f58226edbeda8a) by Flamur Gogolli).
+- set fail-on-cache-miss: false for all CI jobs ([79ba2ae](https://github.com/awslabs/open-hostfactory-plugin/commit/79ba2aeb17df6016d17af67ba281b85163a6515d) by Flamur Gogolli).
+- resolve all workflow validation issues ([4245d04](https://github.com/awslabs/open-hostfactory-plugin/commit/4245d04d0efd623acae843f73b2622c2d36145c4) by Flamur Gogolli).
+- standardize publish.yml to use setup-uv-cached ([1867066](https://github.com/awslabs/open-hostfactory-plugin/commit/18670665084167352e8633ec8a2e93282ed0c691) by Flamur Gogolli).
+- correct setup-uv-cached parameters in docs.yml ([038459a](https://github.com/awslabs/open-hostfactory-plugin/commit/038459a80b4fb2246f635e5ceb3a12576f530b8b) by Flamur Gogolli).
+- remove invalid shell directive from composite action ([4818a9e](https://github.com/awslabs/open-hostfactory-plugin/commit/4818a9e02a1420c53d3ee90457279140ad031ffa) by Flamur Gogolli).
+- restore valid YAML syntax in ci.yml ([9a0c0d0](https://github.com/awslabs/open-hostfactory-plugin/commit/9a0c0d0103ac842b13c198a3295447aa890b843e) by Flamur Gogolli).
+- add UV installation to jobs using cached dependencies ([2008881](https://github.com/awslabs/open-hostfactory-plugin/commit/20088815adee799e8f8f07e85a2a02569ed81e34) by Flamur Gogolli).
+- resolve CI workflow issues ([7346646](https://github.com/awslabs/open-hostfactory-plugin/commit/7346646f3a12b0500dd4210d0d08965b28915e22) by Flamur Gogolli).
+- resolve all enforced ruff violations (F821, F401, F403/F405, F823, F841, I001) ([2ab2f2d](https://github.com/awslabs/open-hostfactory-plugin/commit/2ab2f2da648e11ced7ffa80f87c9abb25c3af4f0) by Flamur Gogolli).
+- resolve pathspec dependency issue in clean-whitespace target ([928a03f](https://github.com/awslabs/open-hostfactory-plugin/commit/928a03fcd0d1e7402da2e6ce151d83b60ebbb36e) by Flamur Gogolli).
+- remove dev-install dependency from format-fix target ([80e68b9](https://github.com/awslabs/open-hostfactory-plugin/commit/80e68b99b10ef82a070eae8cd6ffe912f9b3219b) by Flamur Gogolli).
+- restore two-tier Ruff configuration for CI pipeline ([d55053d](https://github.com/awslabs/open-hostfactory-plugin/commit/d55053d13b0be0a0997f60c5848c58a0a8260e91) by Flamur Gogolli).
+- resolve CI workflow failures for UV dependencies and Ruff rules ([4593a89](https://github.com/awslabs/open-hostfactory-plugin/commit/4593a89e28cb4ae88aae82db95393807ab75c706) by Flamur Gogolli).
+- Convert dev-tools print statements to proper logging and add pathspec dependency ([409de23](https://github.com/awslabs/open-hostfactory-plugin/commit/409de23fd9681ee245564bf515820aeb9049b905) by Flamur Gogolli).
+- Add static matrix fallback for act dry-run validation ([4cb8dea](https://github.com/awslabs/open-hostfactory-plugin/commit/4cb8deabbb73a119ff2434b757e464f823aee366) by Flamur Gogolli).
+- Fix local-dry-run matrix dependency resolution issue ([098354d](https://github.com/awslabs/open-hostfactory-plugin/commit/098354dbb2d2721f385bf46e0cb54f6a96c5bd7b) by Flamur Gogolli).
+- Update pre-commit hooks to use format-fix target ([8a61208](https://github.com/awslabs/open-hostfactory-plugin/commit/8a61208a2fbf8e0e7934ae4e9b312b895377e4a5) by Flamur Gogolli).
+- Complete Makefile consistency - eliminate all remaining bash logic ([87df18e](https://github.com/awslabs/open-hostfactory-plugin/commit/87df18e9a37092ed63aded8dc9d6141589365dc2) by Flamur Gogolli).
+- Resolve Makefile naming inconsistencies and move complex logic ([3ccedd0](https://github.com/awslabs/open-hostfactory-plugin/commit/3ccedd0dd976d049537ec32e06121fd2d3ca6bec) by Flamur Gogolli).
+- Standardize git bot identity across all workflows ([382038b](https://github.com/awslabs/open-hostfactory-plugin/commit/382038b63b87b57eccf500164eae7cbbdff9f61b) by Flamur Gogolli).
+- Critical workflow fixes for Makefile consistency and PR comment triggers ([b0bde4c](https://github.com/awslabs/open-hostfactory-plugin/commit/b0bde4c3c6729b24c761ba281119a2eefc8c0c04) by Flamur Gogolli).
+- Update invalid noqa directives to specify error codes ([3753a06](https://github.com/awslabs/open-hostfactory-plugin/commit/3753a06ed4b6506f24442922df57c86d7085126d) by Flamur Gogolli).
+- container manifest creation for multi-architecture images ([664a9be](https://github.com/awslabs/open-hostfactory-plugin/commit/664a9be4285b5ba4d1ff28bcb7bf140c05a99e95) by Flamur Gogolli).
+- use pyproject.toml.template consistently across ALL workflows ([414d537](https://github.com/awslabs/open-hostfactory-plugin/commit/414d537c83acba1a9d3a1b8b617a3b7fc048c4c4) by Flamur Gogolli).
+- final UV cache consistency corrections ([56a88e3](https://github.com/awslabs/open-hostfactory-plugin/commit/56a88e39490d54621b4ed057513ddbcd121c9a2c) by Flamur Gogolli).
+- standardize UV setup across all workflows ([4e02d62](https://github.com/awslabs/open-hostfactory-plugin/commit/4e02d625f7972eef93318015015fcb451a2e3755) by Flamur Gogolli).
+- comprehensive workflow versioning and dependency issues ([4787f27](https://github.com/awslabs/open-hostfactory-plugin/commit/4787f27254c17dd7f0926432ae3577ea93f88e2d) by Flamur Gogolli).
+- container workflow dynamic versioning ([2b3c2b5](https://github.com/awslabs/open-hostfactory-plugin/commit/2b3c2b5fd46c3305df084d012d3ebc45331d7811) by Flamur Gogolli).
+- implement proper dynamic versioning for PyPI publishing ([41626c7](https://github.com/awslabs/open-hostfactory-plugin/commit/41626c703597dea7b6acd7c0a8d6f21b44d9ac2d) by Flamur Gogolli).
+- ensure consistency with project patterns and fix test issues ([d3d90e4](https://github.com/awslabs/open-hostfactory-plugin/commit/d3d90e479fd4c10336e27216c0e74b1462c079b7) by Flamur Gogolli).
+- repair broken AWS handler tests ([5f36521](https://github.com/awslabs/open-hostfactory-plugin/commit/5f365212916c79fb04ad74122271a7dea3479a98) by Flamur Gogolli).
+- resolve shellcheck issues in run_tool.sh ([96f8317](https://github.com/awslabs/open-hostfactory-plugin/commit/96f831716c72c5c0070347d571c8008c7f984c35) by Flamur Gogolli).
+- mypy now runs successfully from src directory ([89711bb](https://github.com/awslabs/open-hostfactory-plugin/commit/89711bb4440f15b475709c58f1af46e9fcfc1dcf) by Flamur Gogolli).
+- improve mypy tooling execution ([023f780](https://github.com/awslabs/open-hostfactory-plugin/commit/023f78021ab7de0be469ce455beacc9edae33bf1) by Flamur Gogolli).
+- resolve tooling and security issues ([cd7add5](https://github.com/awslabs/open-hostfactory-plugin/commit/cd7add5e7702cbf6038050dba918d336ad153f8f) by Flamur Gogolli).
+- resolve flake8 undefined name errors ([8b9214c](https://github.com/awslabs/open-hostfactory-plugin/commit/8b9214cfe201003bcefe5f6e9e5778f4ff1d8548) by Flamur Gogolli).
+- apply black formatting to resolve code style issues ([3534b91](https://github.com/awslabs/open-hostfactory-plugin/commit/3534b91171afa9a07389c62701b7cd860d01ac2a) by Flamur Gogolli).
+- resolve easy mypy type issues ([08a2012](https://github.com/awslabs/open-hostfactory-plugin/commit/08a2012beaa37be83a85fc64cdcf2db85e824a2e) by Flamur Gogolli).
+- resolve syntax errors in template and provider components ([6ab049f](https://github.com/awslabs/open-hostfactory-plugin/commit/6ab049fd50b6a61635036755588749cdee3eb031) by Flamur Gogolli).
+- resolve syntax errors in persistence and resilience components ([3bbbf44](https://github.com/awslabs/open-hostfactory-plugin/commit/3bbbf44040b319dea8a136ab539b43389ce04bec) by Flamur Gogolli).
+- resolve more syntax errors in infrastructure components ([5d72f62](https://github.com/awslabs/open-hostfactory-plugin/commit/5d72f624e5bc3d576b9796544532d60709cc236d) by Flamur Gogolli).
+- resolve duration formatting syntax errors ([a861fae](https://github.com/awslabs/open-hostfactory-plugin/commit/a861faecbfa940092c28cdef9a6a442ba97f1295) by Flamur Gogolli).
+- resolve additional syntax errors in event handlers and decorators ([8117273](https://github.com/awslabs/open-hostfactory-plugin/commit/8117273baeee287565bfdccf454165f876d95c4e) by Flamur Gogolli).
+- resolve mypy configuration and black formatting issues ([494ce99](https://github.com/awslabs/open-hostfactory-plugin/commit/494ce9986acb413873d650bdb3b027b9ce7a5a8f) by Flamur Gogolli).
+- resolve var-annotated mypy violations ([d9d2d7d](https://github.com/awslabs/open-hostfactory-plugin/commit/d9d2d7d6cc0bee62368976d45d2889823da6e2ab) by Flamur Gogolli).
+- resolve misc mypy violations ([4336af0](https://github.com/awslabs/open-hostfactory-plugin/commit/4336af04ddcbcddc0e107c663d1cf8ee6a9e6a88) by Flamur Gogolli).
+- resolve no-untyped-def violations with proper type annotations ([4d46a2f](https://github.com/awslabs/open-hostfactory-plugin/commit/4d46a2feab99837d00f74b5bd2b83962b1c1b21b) by Flamur Gogolli).
+- resolve no-any-return violations with type casts ([e360760](https://github.com/awslabs/open-hostfactory-plugin/commit/e360760a90fb488facbdc8c655eb1fe59142ba12) by Flamur Gogolli).
+- add type annotations for __all__ and variables ([e481e51](https://github.com/awslabs/open-hostfactory-plugin/commit/e481e51f9cfe70b2c0884561797acc3b785c4787) by Flamur Gogolli).
+- correct decorator return type annotations ([88c2a50](https://github.com/awslabs/open-hostfactory-plugin/commit/88c2a50886abb2b2b6cd64ab61b3c4d925b74418) by Flamur Gogolli).
+- add missing return type annotations (-> None) ([5745b6b](https://github.com/awslabs/open-hostfactory-plugin/commit/5745b6ba8852fe22ddb5bef5af3a3deb17402832) by Flamur Gogolli).
+- add remaining 'from e' clauses to exception re-raising ([ec253cb](https://github.com/awslabs/open-hostfactory-plugin/commit/ec253cb8a1d251230e994bf7f92c1326f4bbb26a) by Flamur Gogolli).
+- add 'from e' clause to raise statements for proper exception chaining ([851888a](https://github.com/awslabs/open-hostfactory-plugin/commit/851888abad0e12bb9f5142788ea42e0cbb06ce64) by Flamur Gogolli).
+- replace f-strings with lazy formatting in logging calls ([e2a95b4](https://github.com/awslabs/open-hostfactory-plugin/commit/e2a95b46cefd272d43cd3d28ad5bae8585710d04) by Flamur Gogolli).
+- enforce security scan failures in CI and pre-commit ([8e56ebb](https://github.com/awslabs/open-hostfactory-plugin/commit/8e56ebbef39744cf76f6c4c922dfe02e8fd75911) by Flamur Gogolli).
+- improve container build reliability and security workflow ([fd4660b](https://github.com/awslabs/open-hostfactory-plugin/commit/fd4660bf67389d2daade3bd008d9c50230fc9612) by Flamur Gogolli).
+- resolve comment trigger dependency issues across all workflows ([86a19f1](https://github.com/awslabs/open-hostfactory-plugin/commit/86a19f16809adf71da9f0c77fd510f3700cd9593) by Flamur Gogolli).
+- resolve workflow validation errors ([c072059](https://github.com/awslabs/open-hostfactory-plugin/commit/c0720593f2f8c85c69c0543cd55a761b93a369b0) by Flamur Gogolli).
+- add build info as environment variables in container ([48a5ad8](https://github.com/awslabs/open-hostfactory-plugin/commit/48a5ad8403e666744ba7acd77d25c986b01d90e7) by Flamur Gogolli).
+- resolve storage list formatting error ([2f9ac20](https://github.com/awslabs/open-hostfactory-plugin/commit/2f9ac207fc7960d87c4db72e2358ff40958d9688) by Flamur Gogolli).
+- add bootstrap module to py-modules for container packaging ([608889f](https://github.com/awslabs/open-hostfactory-plugin/commit/608889ff5537abf35f4799fb50876e12967d5234) by Flamur Gogolli).
+- correct package structure for container build ([aec3480](https://github.com/awslabs/open-hostfactory-plugin/commit/aec34805e807a225d2d31711beaa6c6f96d8d534) by Flamur Gogolli).
+- minimal container build fix with proper entry points ([0714913](https://github.com/awslabs/open-hostfactory-plugin/commit/07149134bfe849c96b709efc40c3ce2aca8ef285) by Flamur Gogolli).
+- apply black formatting to resolve pipeline issues ([86a22f0](https://github.com/awslabs/open-hostfactory-plugin/commit/86a22f06e22cb9212b9c23f16c135824259792a6) by Flamur Gogolli).
+- use makefile targets for dev tools installation in Dockerfile ([9c5e0ed](https://github.com/awslabs/open-hostfactory-plugin/commit/9c5e0ed431f8ff791ce145fe7804c0ec4dfb1c42) by Flamur Gogolli).
+- remove unused variable in container build script ([ebfb71f](https://github.com/awslabs/open-hostfactory-plugin/commit/ebfb71fa776e73d8311f4ed29e53b4be47593231) by Flamur Gogolli).
+- correct Python version default to 3.13 in dev-tools Dockerfile ([75db71f](https://github.com/awslabs/open-hostfactory-plugin/commit/75db71fbcc1ac12c67db6faa295c014dccfb4e88) by Flamur Gogolli).
+- complete container security and build improvements ([c734bd4](https://github.com/awslabs/open-hostfactory-plugin/commit/c734bd43a33556e049561d32bd3fd8171e138929) by Flamur Gogolli).
+- align container builds and security scanning ([e7125ab](https://github.com/awslabs/open-hostfactory-plugin/commit/e7125ab960e36b121bd6dd29d8d474671bf98c75) by Flamur Gogolli).
+- add shellcheck disable for BUILD_ARGS word splitting ([f27cb45](https://github.com/awslabs/open-hostfactory-plugin/commit/f27cb45ccf723ffd5d1f5b539b1d250a08ebd739) by Flamur Gogolli).
+- handle empty BUILD_ARGS in build script ([6f5287c](https://github.com/awslabs/open-hostfactory-plugin/commit/6f5287c5aaebcd8284378016f4d2483b999b462c) by Flamur Gogolli).
+- resolve additional shellcheck issues found by GitHub Action ([94352cc](https://github.com/awslabs/open-hostfactory-plugin/commit/94352cce83fe8725a2a58e87e053fd2dfea3d303) by Flamur Gogolli).
+- resolve all shellcheck issues across shell scripts ([05e3b18](https://github.com/awslabs/open-hostfactory-plugin/commit/05e3b18c72065ba92e518b3dcf0d0a270df47b36) by Flamur Gogolli).
+- configure shellcheck action to exclude unwanted directories ([8bc670d](https://github.com/awslabs/open-hostfactory-plugin/commit/8bc670d723d4c8443843a1ca78d8ce5f217ab088) by Flamur Gogolli).
+- actionlint installation and run through problem matchers ([ed965a7](https://github.com/awslabs/open-hostfactory-plugin/commit/ed965a74da0db744609ab0853a9e3663f338e36a) by Flamur Gogolli).
+- use official actionlint download script for installation ([358f714](https://github.com/awslabs/open-hostfactory-plugin/commit/358f714e96487e677f9e58e58732843cc18f1d60) by Flamur Gogolli).
+- use GitHub Action for actionlint in CI and fix local installation ([b62865a](https://github.com/awslabs/open-hostfactory-plugin/commit/b62865ab391b3fd0670b0624d564a83b2367fee8) by Flamur Gogolli).
+- correct pre-commit target name and actionlint installation ([87fb217](https://github.com/awslabs/open-hostfactory-plugin/commit/87fb217d525882393edf45a0b4fd2c5158d1e15c) by Flamur Gogolli).
+- explicitly install shellcheck before using it ([1744962](https://github.com/awslabs/open-hostfactory-plugin/commit/17449622bc2d143ccfa4682755f6e6a2558e442a) by Flamur Gogolli).
+- explicitly install actionlint before using it ([ee2b11c](https://github.com/awslabs/open-hostfactory-plugin/commit/ee2b11c4f08e8ee3eeb51312e911e3f179af2f29) by Flamur Gogolli).
+- use 'uv run' for validate_workflows.py script ([53945fd](https://github.com/awslabs/open-hostfactory-plugin/commit/53945fdf1793a8ae0de351a9f266c071b7f8346d) by Flamur Gogolli).
+- use venv Python explicitly for validate_workflows.py ([b998f63](https://github.com/awslabs/open-hostfactory-plugin/commit/b998f63ba577812cc176a383f9e8907a2ee68362) by Flamur Gogolli).
+- use run-tool pattern for validate_workflows.py ([6437996](https://github.com/awslabs/open-hostfactory-plugin/commit/643799615ac3c2abf6f5740eb5de9033098322a8) by Flamur Gogolli).
+- use consistent config pattern in validate-workflows.yml ([0b868ec](https://github.com/awslabs/open-hostfactory-plugin/commit/0b868ec967b260234788694c48a6fad68f8a1475) by Flamur Gogolli).
+- add missing Python and uv setup to validate-workflows.yml ([466a72e](https://github.com/awslabs/open-hostfactory-plugin/commit/466a72e7baad77c9de49aac40b125ec58465ace9) by Flamur Gogolli).
+- resolve ALL remaining actionlint issues ([f0e941e](https://github.com/awslabs/open-hostfactory-plugin/commit/f0e941e70cf2591e1c55cb35720d273c03077bd4) by Flamur Gogolli).
+- resolve actionlint security and shellcheck issues ([c23ca13](https://github.com/awslabs/open-hostfactory-plugin/commit/c23ca13f557df2260b5e3e143309f7bf55d26625) by Flamur Gogolli).
+- resolve critical actionlint workflow dependency issues ([62e1a1d](https://github.com/awslabs/open-hostfactory-plugin/commit/62e1a1d60253f35ae294a0f669b686472bf2e1f0) by Flamur Gogolli).
+- enforce pip-audit installation consistency ([0757ef5](https://github.com/awslabs/open-hostfactory-plugin/commit/0757ef549c334aee8e90c950263c7bf84ee863df) by Flamur Gogolli).
+- enforce workflow consistency with Makefile targets ([ed4d61f](https://github.com/awslabs/open-hostfactory-plugin/commit/ed4d61fbbd3544b2eb5b01ee1ae143480d4d4ad2) by Flamur Gogolli).
+- remove duplicate 'id: config' steps in container.yml ([076c65d](https://github.com/awslabs/open-hostfactory-plugin/commit/076c65da89e84291cf9d373d89f7421bde5d29d0) by Flamur Gogolli).
+- systematically fix all workflow get-config jobs ([a03ab68](https://github.com/awslabs/open-hostfactory-plugin/commit/a03ab68ad304787e7e6fd092fead15b1e3c594c7) by Flamur Gogolli).
+- restore missing steps.version in get-config jobs ([7359e55](https://github.com/awslabs/open-hostfactory-plugin/commit/7359e55b0d898ae52866f114f15f9a6232dc9650) by Flamur Gogolli).
+- remove duplicate yq installations from workflows ([d63158d](https://github.com/awslabs/open-hostfactory-plugin/commit/d63158dfa3ac5d2b6151ba2de232ab78f88b202b) by Flamur Gogolli).
+- remove duplicate 'uses' statements in workflow files ([a0e205b](https://github.com/awslabs/open-hostfactory-plugin/commit/a0e205b87e4979dd9d68d3802164e2e06c9ea569) by Flamur Gogolli).
+- remove duplicate validate-workflows job from main CI ([6fa52e8](https://github.com/awslabs/open-hostfactory-plugin/commit/6fa52e884ba322cddb97242734098cedea187bc8) by Flamur Gogolli).
+- use consistent uv pattern for PyYAML installation ([174eda9](https://github.com/awslabs/open-hostfactory-plugin/commit/174eda91a502c7062d67bff2dd79ee33ae1cd147) by Flamur Gogolli).
+- add --system flag to PyYAML installation in CI ([235e7b4](https://github.com/awslabs/open-hostfactory-plugin/commit/235e7b45a0dd3b0b755de2d932e366aa50c1febf) by Flamur Gogolli).
+- make all SQL queries multiline for black stability ([53ef423](https://github.com/awslabs/open-hostfactory-plugin/commit/53ef4238f94d216ea17071ac3a17efcb87e08af4) by Flamur Gogolli).
+- resolve black formatting and CI issues ([2aa4d45](https://github.com/awslabs/open-hostfactory-plugin/commit/2aa4d459e5a609452949c4c49c264e7a33d503da) by Flamur Gogolli).
+- add proper nosec comments for bandit security scan ([caf33b2](https://github.com/awslabs/open-hostfactory-plugin/commit/caf33b2eb48afbeb06ae0c3919316cda2c6929a2) by Flamur Gogolli).
+- resolve emoji and bandit security issues ([fd133c8](https://github.com/awslabs/open-hostfactory-plugin/commit/fd133c899e38a31b2a773edf73a93666196998d1) by Flamur Gogolli).
+- resolve actionlint and shellcheck issues ([d8c0510](https://github.com/awslabs/open-hostfactory-plugin/commit/d8c051052bc4772e695c1ed59fa639235416e382) by Flamur Gogolli).
+- use dynamic URL from _package.py and resolve final YAML issue ([d944bd5](https://github.com/awslabs/open-hostfactory-plugin/commit/d944bd5d422095ff956e9734f66ad609644bf3cf) by Flamur Gogolli).
+- resolve workflow YAML syntax errors and hardcoded URLs ([da87407](https://github.com/awslabs/open-hostfactory-plugin/commit/da87407d5c59ea18d4f91284fd20fab640ba3894) by Flamur Gogolli).
+- update pyproject.toml.template for package refactoring ([5956215](https://github.com/awslabs/open-hostfactory-plugin/commit/59562155e38501d95a07be1431c6c720e595aabc) by Flamur Gogolli).
+- resolve critical workflow and runtime issues ([020f909](https://github.com/awslabs/open-hostfactory-plugin/commit/020f90971721d173b33712f6775f25e145574e4a) by Flamur Gogolli).
+- add remaining missing needs dependencies ([c1e6a38](https://github.com/awslabs/open-hostfactory-plugin/commit/c1e6a3815dd76e67b64e2138a8c8bd361975bb0b) by Flamur Gogolli).
+- add missing needs dependencies for Python setup ([c9987c7](https://github.com/awslabs/open-hostfactory-plugin/commit/c9987c7577af41b7d01024d8ba49a8becef17d6e) by Flamur Gogolli).
+- standardize workflow python version handling and remove hardcoded versions ([684058d](https://github.com/awslabs/open-hostfactory-plugin/commit/684058dc589b0dc5df7b7bf236e23d10f5cfda67) by Flamur Gogolli).
+- use dynamic version from pyproject.toml instead of hardcoded 1.0.0 ([5bfa90a](https://github.com/awslabs/open-hostfactory-plugin/commit/5bfa90a3c8c6e8129977d62788c7cee3450ecc6f) by Flamur Gogolli).
+- suppress Docker security warnings for auth config vars ([4c835bc](https://github.com/awslabs/open-hostfactory-plugin/commit/4c835bcd026700492646dc2719feed7a0a3df006) by Flamur Gogolli).
+- Use DI pattern for configuration access in serve command handler ([f2eeb9c](https://github.com/awslabs/open-hostfactory-plugin/commit/f2eeb9c7db355babe9c88aeb89a2b5b4188b97fc) by Flamur Gogolli).
+- Add missing system serve CLI parser and fix Docker entrypoint args ([01ccd89](https://github.com/awslabs/open-hostfactory-plugin/commit/01ccd891697518017128c135d3189424c64bf411) by Flamur Gogolli).
+- use single platform for local container builds ([08fa6c0](https://github.com/awslabs/open-hostfactory-plugin/commit/08fa6c06a9565bc5c5056b1aff456424600c8d39) by Flamur Gogolli).
+- make container test image tagging consistent with build ([8f74979](https://github.com/awslabs/open-hostfactory-plugin/commit/8f74979d5d991567fe891e4de54e6a686a740a00) by Flamur Gogolli).
+- add missing FastAPI and uvicorn dependencies ([3c6a968](https://github.com/awslabs/open-hostfactory-plugin/commit/3c6a968ee0ff720d3f36a98606cfa048946a2b5d) by Flamur Gogolli).
+- resolve console script and Docker optimization issues ([f491776](https://github.com/awslabs/open-hostfactory-plugin/commit/f4917769a044d08264085f1263c5436156793795) by Flamur Gogolli).
+- replace yq with PyYAML/metadata hybrid approach in _package.py ([6c2d08a](https://github.com/awslabs/open-hostfactory-plugin/commit/6c2d08a90c5b6680031168b5e68cd70d6f5e9f27) by Flamur Gogolli).
+- add missing PACKAGE_NAME_SHORT build arg to container build script ([0e1e011](https://github.com/awslabs/open-hostfactory-plugin/commit/0e1e0118c0d6fb6f309275f64024f7bf4d94e0e9) by Flamur Gogolli).
+- pin packages to latest available versions for security scanning ([ef2a8e3](https://github.com/awslabs/open-hostfactory-plugin/commit/ef2a8e30ac3e73ea9082402c33a87eb2913c2f63) by Flamur Gogolli).
+- remove hardcoded package versions in Dockerfile ([015351c](https://github.com/awslabs/open-hostfactory-plugin/commit/015351ccb28031eeda6210c0cdecbb35bab93611) by Flamur Gogolli).
+- resolve container workflow issues ([7075a68](https://github.com/awslabs/open-hostfactory-plugin/commit/7075a687614c6a7b35f445ea5bfb81a763f73fdf) by Flamur Gogolli).
+- use matrix python-version in setup-python action ([1140782](https://github.com/awslabs/open-hostfactory-plugin/commit/11407829445e13952e36ec2021413deab48b6502) by Flamur Gogolli).
+- correct matrix variable references in container workflow ([c647fd5](https://github.com/awslabs/open-hostfactory-plugin/commit/c647fd5ae7f6012d583a8135dd5a3c578feb71b0) by Flamur Gogolli).
+- remove emojis from dev tools scripts for professional code standards ([ebf210e](https://github.com/awslabs/open-hostfactory-plugin/commit/ebf210eda70bcb61bf0d09d9c556ca8ab121e2a7) by Flamur Gogolli).
+- resolve all remaining flake8 issues ([b5b941b](https://github.com/awslabs/open-hostfactory-plugin/commit/b5b941b0ac33685b83eaa9c93f3e0b4758843164) by Flamur Gogolli).
+- resolve flake8 linting issues ([0824992](https://github.com/awslabs/open-hostfactory-plugin/commit/0824992d1a966f278d18a12b5ef486bc03c82d46) by Flamur Gogolli).
+- make help now shows ci-quality-flake8 target ([1daa525](https://github.com/awslabs/open-hostfactory-plugin/commit/1daa5256f83a9a5f9d643bc36a26f34ccaea2fb5) by Flamur Gogolli).
+- replace 79 instances of hyperbolic term 'proper' with specific terms ([2836172](https://github.com/awslabs/open-hostfactory-plugin/commit/2836172ca6fcfbdeef4413cd7ced829117224090) by Flamur Gogolli).
+- make EC2 Fleet check_hosts_status sync for consistency ([8a35fc5](https://github.com/awslabs/open-hostfactory-plugin/commit/8a35fc57ffda04f1decafcb8e7c2c45ee05e1f39) by Flamur Gogolli).
+- remove hardcoded resource_ids[0] usage and eliminate 'proper' word ([7f624e0](https://github.com/awslabs/open-hostfactory-plugin/commit/7f624e01a707c44de410bf8c0c58d1ca4386343a) by Flamur Gogolli).
+- resolve pytest fixture import issue ([2f68f59](https://github.com/awslabs/open-hostfactory-plugin/commit/2f68f591f7e0c0f36835d42739f1aec553564e24) by Flamur Gogolli).
+- correct base scheduler strategy to match SchedulerPort interface ([9457f19](https://github.com/awslabs/open-hostfactory-plugin/commit/9457f19ae7bd32bf424941d569e9f54bdc8ac322) by Flamur Gogolli).
+- major warnings and errors - ConfigurationAdapter and resource_id issues ([ddd568f](https://github.com/awslabs/open-hostfactory-plugin/commit/ddd568f6fa787eefb2516aad429eb26701f5020b) by Flamur Gogolli).
+- ConfigurationPort import warning in query handlers ([e127a10](https://github.com/awslabs/open-hostfactory-plugin/commit/e127a105e99a07e44fa6e261f18ec091c8c5bbf2) by Flamur Gogolli).
+- AWSProviderConfig import error in validator.py ([9280be9](https://github.com/awslabs/open-hostfactory-plugin/commit/9280be96b0233cdddadc0bc20de5a3d065ce8bf1) by Flamur Gogolli).
+- strategy/registry/factory consistency and scheduler-agnostic interface ([44eb052](https://github.com/awslabs/open-hostfactory-plugin/commit/44eb05245bf6cb6b023a0553a56b9f8c89a90bb9) by Flamur Gogolli).
+- AMI resolution now working - clear failed cache and retry ([d89d4d9](https://github.com/awslabs/open-hostfactory-plugin/commit/d89d4d991d32a1f2796127869a2553f095b18ad8) by Flamur Gogolli).
+- use proper dependency injection instead of global cache hack ([74bf42d](https://github.com/awslabs/open-hostfactory-plugin/commit/74bf42d189432ef8e391c835ba085c7b76bd46ea) by Flamur Gogolli).
+- Properly fix configuration loading and provider selection caching ([5da7c82](https://github.com/awslabs/open-hostfactory-plugin/commit/5da7c8228d57c5b77042c8608a5e7af8b7b9fb4a) by Flamur Gogolli).
+- replace hardcoded active_provider access with proper get_active_providers() method ([7001df8](https://github.com/awslabs/open-hostfactory-plugin/commit/7001df88232ee86c638f20e31d2c9da9fdd803a5) by Flamur Gogolli).
+- improve ConfigurationError messages to show actual error details ([e00c05b](https://github.com/awslabs/open-hostfactory-plugin/commit/e00c05bcbf34440539b4d0f2bfd767f58e546c7c) by Flamur Gogolli).
+- add missing UnitOfWorkFactory import and fix AWS extension config imports ([b04b6df](https://github.com/awslabs/open-hostfactory-plugin/commit/b04b6dfdd9b9884bde513b4ff443cedcc1377c5b) by Flamur Gogolli).
+- add noqa support for debug prints and suppress legitimate CLI/bootstrap prints ([33c4250](https://github.com/awslabs/open-hostfactory-plugin/commit/33c4250dff9998d9475bc40a45ae0fd0184467ff) by Flamur Gogolli).
+- replace debug prints with proper logging in examples and tools ([34ceab0](https://github.com/awslabs/open-hostfactory-plugin/commit/34ceab042d2fdd6b5010797639f21a1423f08e8a) by Flamur Gogolli).
+- improve quality check script performance and formatting ([127f9eb](https://github.com/awslabs/open-hostfactory-plugin/commit/127f9ebcfc26f12cb528157ac1626be7b1977acf) by Flamur Gogolli).
+- replace print statements with proper logging in dev-tools scripts ([af3ce1f](https://github.com/awslabs/open-hostfactory-plugin/commit/af3ce1f06c65ec8b693335818ea8365fed874c2b) by Flamur Gogolli).
+- remove all implementation detail references from codebase ([bf06a98](https://github.com/awslabs/open-hostfactory-plugin/commit/bf06a98a07660dcbb46079193247129fe1dc18f8) by Flamur Gogolli).
+- remove implementation detail references from codebase ([e371d84](https://github.com/awslabs/open-hostfactory-plugin/commit/e371d8481dd2b65b311e356380d45a8539c56a9c) by Flamur Gogolli).
+- remove all emojis from codebase for professional standards ([15f9819](https://github.com/awslabs/open-hostfactory-plugin/commit/15f98195a3ef4e05f054c92a29a84a06ba0953df) by Flamur Gogolli).
+- complete workflow consolidation and Dockerfile issues ([732aef3](https://github.com/awslabs/open-hostfactory-plugin/commit/732aef358ccd2a6897c30e4bdb7762a1a7bb3303) by Flamur Gogolli).
+- create virtual environment before installing build dependencies ([2d54826](https://github.com/awslabs/open-hostfactory-plugin/commit/2d5482681391d770ab6eaae7759cebbf3214671f) by Flamur Gogolli).
+- use make targets instead of direct dev-tools script calls in workflows ([97ff163](https://github.com/awslabs/open-hostfactory-plugin/commit/97ff16397aa867d3eba20fb08b3497790aefb9b6) by Flamur Gogolli).
+- standardize dev-tools filenames to use underscores ([25ca90e](https://github.com/awslabs/open-hostfactory-plugin/commit/25ca90eadb3467cb39d68946d875a6a1a28edaac) by Flamur Gogolli).
+- critical quality check bug and build issues ([1e730e6](https://github.com/awslabs/open-hostfactory-plugin/commit/1e730e67a8e3b220464456f9918aac6311a1c65a) by Flamur Gogolli).
+- consolidate formatting tools to use consistent run-tool function ([7e72ec3](https://github.com/awslabs/open-hostfactory-plugin/commit/7e72ec350e11eeb58e4c7fcd0cb9c0ba28db11e4) by Flamur Gogolli).
+- black formatting consistency with CI configuration ([256af70](https://github.com/awslabs/open-hostfactory-plugin/commit/256af7017fd0f0774a7704793d60c90bc1b495b1) by Flamur Gogolli).
+- container workflow output name mismatch ([bed0358](https://github.com/awslabs/open-hostfactory-plugin/commit/bed03580b2c7f24b2b74b10e0ec3bd0872485716) by Flamur Gogolli).
+- standardize provider config variable naming and fix factory bug ([295d890](https://github.com/awslabs/open-hostfactory-plugin/commit/295d8906ef0d60bf186d0d802a40de174b7aa64b) by Flamur Gogolli).
+- add None checks for provider config usage ([b55b4d6](https://github.com/awslabs/open-hostfactory-plugin/commit/b55b4d6d35058a4e7462cc5841aa115603f47aa9) by Flamur Gogolli).
+- remove duplicate get_provider_config method caught by flake8 error ([8633c74](https://github.com/awslabs/open-hostfactory-plugin/commit/8633c741c58540effbf98d20b5e692b1f25eb792) by Flamur Gogolli).
+- fix remaining quality issues and remove unprofessional language ([69f021f](https://github.com/awslabs/open-hostfactory-plugin/commit/69f021fb2c67f1052c5148e18cb5f517e7d97602) by Flamur Gogolli).
+- remove hyperbolic terminology and fix quality issues ([ac6f194](https://github.com/awslabs/open-hostfactory-plugin/commit/ac6f194dc4180ffdd177df7ab380ad2c2a553a37) by Flamur Gogolli).
+- remove emojis from codebase and improve quality check accuracy ([96e5b45](https://github.com/awslabs/open-hostfactory-plugin/commit/96e5b452e08a67fb1cf73ac4cf4fb427ea3ba4da) by Flamur Gogolli).
+- repair make format command and apply comprehensive formatting ([920705a](https://github.com/awslabs/open-hostfactory-plugin/commit/920705ad9cf7dc78f96055140143dc5855c05540) by Flamur Gogolli).
+- apply black formatting to resolve CI formatting issues ([c0b718a](https://github.com/awslabs/open-hostfactory-plugin/commit/c0b718a295ce4e00c9248ef6200ad9ad00d36c6d) by Flamur Gogolli).
+- ensure consistent pyproject.toml generation in CI workflows ([17af2f1](https://github.com/awslabs/open-hostfactory-plugin/commit/17af2f15d0ff035356321a3cd3435ff4350de158) by Flamur Gogolli).
+- correct GitHub workflow dependencies and formatting ([86f7c35](https://github.com/awslabs/open-hostfactory-plugin/commit/86f7c35d4c1f393c4bcbd6691ead6d455a5c6f8b) by Flamur Gogolli).
+- add gitignore filtering to quality check ([83ae871](https://github.com/awslabs/open-hostfactory-plugin/commit/83ae871b82ac7604c2fee7bcbcb448485a7ff02b) by Flamur Gogolli).
+- quality check alignment and self-exclusion ([0f250bc](https://github.com/awslabs/open-hostfactory-plugin/commit/0f250bc70d6ae8a9649e756cb3e79b438d460505) by Flamur Gogolli).
+- complete quality check fixes ([185b7a2](https://github.com/awslabs/open-hostfactory-plugin/commit/185b7a2ea3db8156d78f0d2a922b969136a9a9bf) by Flamur Gogolli).
+- resolve quality check issues ([595b8b8](https://github.com/awslabs/open-hostfactory-plugin/commit/595b8b851969f08ce6c969789f88d6a6edf4febf) by Flamur Gogolli).
+- add execute permissions to all dev-tools scripts and fix package manager detection ([f00468c](https://github.com/awslabs/open-hostfactory-plugin/commit/f00468c973418cac5a96e71ae501c4c13dba235c) by Flamur Gogolli).
+- resolve all hadolint Dockerfile issues ([d4d73cb](https://github.com/awslabs/open-hostfactory-plugin/commit/d4d73cb9ba5b4c142eb4453a717836e2ac39c252) by Flamur Gogolli).
+- make format target DRY by using clean-whitespace dependency ([03e9a94](https://github.com/awslabs/open-hostfactory-plugin/commit/03e9a940023c2c412ff16af0609e5f92f2909a45) by Flamur Gogolli).
+- simplify whitespace cleanup to use find patterns ([7f09dce](https://github.com/awslabs/open-hostfactory-plugin/commit/7f09dce67a298b3d2a453306a8bcac024f442daf) by Flamur Gogolli).
+- remove redundant yq installation from workflow validation ([d21cc73](https://github.com/awslabs/open-hostfactory-plugin/commit/d21cc73aeefe4ad76fc16e457139a9e9e58e1c65) by Flamur Gogolli).
+- make validate_workflows.py executable ([ed9905e](https://github.com/awslabs/open-hostfactory-plugin/commit/ed9905e83d20bda1834911730eadeb5293f81436) by Flamur Gogolli).
+- clean up pre-commit config to remove duplicates and hardcoded commands ([3ccc2cc](https://github.com/awslabs/open-hostfactory-plugin/commit/3ccc2cc398ea51dbe89140a485005ccdcd0c1be5) by Flamur Gogolli).
+- implement DRY principle by reading pre-commit config dynamically ([23711f7](https://github.com/awslabs/open-hostfactory-plugin/commit/23711f7cf5ba78fcc4269a36732865ca904be94d) by Flamur Gogolli).
+- update pre-commit script to simulate actual .pre-commit-config.yaml hooks ([227cf60](https://github.com/awslabs/open-hostfactory-plugin/commit/227cf60f45bd2778e14da1b87e8e326b7f384e5f) by Flamur Gogolli).
+- resolve YAML syntax errors in all workflows ([c14cb94](https://github.com/awslabs/open-hostfactory-plugin/commit/c14cb94b977cdfa27805a09428b0c9e69edb4be6) by Flamur Gogolli).
+- output compact JSON for GitHub Actions and remove implementation comments ([5264767](https://github.com/awslabs/open-hostfactory-plugin/commit/5264767843fca77e603f1175ef40933925cce165) by Flamur Gogolli).
+- resolve all centralized configuration inconsistencies ([62e258d](https://github.com/awslabs/open-hostfactory-plugin/commit/62e258dcb9265998a71364780dc97651b536e44b) by Flamur Gogolli).
+- correct Makefile to use .python.default_version field name ([49f4d05](https://github.com/awslabs/open-hostfactory-plugin/commit/49f4d05719c04988dca8aa5d68c044286b95433f) by Flamur Gogolli).
+- correct matrix workflows to use python-versions for dynamic version arrays ([b38552d](https://github.com/awslabs/open-hostfactory-plugin/commit/b38552d9790e104d2834c8841e8832e0894c022b) by Flamur Gogolli).
+- standardize workflow job names and consolidate version-bump targets ([ffaeecb](https://github.com/awslabs/open-hostfactory-plugin/commit/ffaeecb92bc5cd6eeae87a81e23c150eaba83dd1) by Flamur Gogolli).
+- correct setup-python action inputs to use python-version ([c527993](https://github.com/awslabs/open-hostfactory-plugin/commit/c527993fb21234f9bd7485d32ddc085ae2c2d842) by Flamur Gogolli).
+- standardize ALL workflows to use default-python-version consistently ([635ba89](https://github.com/awslabs/open-hostfactory-plugin/commit/635ba893a52f6ff97fe89bba78ec6fd009c910e1) by Flamur Gogolli).
+- standardize workflow variable naming to kebab-case ([f4d1ef3](https://github.com/awslabs/open-hostfactory-plugin/commit/f4d1ef383dfccc8340ae2aea772d295bd641dfda) by Flamur Gogolli).
+- correct project version to 0.1.0 ([8ceddf3](https://github.com/awslabs/open-hostfactory-plugin/commit/8ceddf3c149b1642d11c682b7d2180b6adad9337) by Flamur Gogolli).
+- repair Makefile variable broken by sed command ([653cc24](https://github.com/awslabs/open-hostfactory-plugin/commit/653cc243d63165771137476753d85358994935e9) by Flamur Gogolli).
+- use print-DEFAULT_PYTHON target instead of grep in container workflow ([d3f4829](https://github.com/awslabs/open-hostfactory-plugin/commit/d3f4829bf197b7063932d642f0ca2e4c6f199247) by Flamur Gogolli).
+- remove duplicate print-json-% targets in Makefile ([951ca22](https://github.com/awslabs/open-hostfactory-plugin/commit/951ca222ad30c664e64ed27c64b7aa525705abbf) by Flamur Gogolli).
+- properly implement container workflow following CI patterns ([6525962](https://github.com/awslabs/open-hostfactory-plugin/commit/652596202db9f3e021e9df0b9265eedb0b0c3120) by Flamur Gogolli).
+- Fix CODEOWNERS file with the corrent GH usernames ([5a1267a](https://github.com/awslabs/open-hostfactory-plugin/commit/5a1267a3e976d9562844d1c4217e190bd2b0eff8) by Flamur Gogolli).
+- update safety command from deprecated check to scan ([963da30](https://github.com/awslabs/open-hostfactory-plugin/commit/963da306a5662340407ab298f3b94ed9fef2d579) by Flamur Gogolli).
+- resolve TruffleHog BASE==HEAD issue on main branch ([eafa5e3](https://github.com/awslabs/open-hostfactory-plugin/commit/eafa5e3dc088b7c63e95118cbcf24ee6d335b7e3) by Flamur Gogolli).
+- resolve main branch CI failures ([2ddee3c](https://github.com/awslabs/open-hostfactory-plugin/commit/2ddee3c14b53133072b1c82819dd1a61785043a4) by Flamur Gogolli).
+- use mkdocs build instead of mike for GitHub Pages deployment ([8d3ae4e](https://github.com/awslabs/open-hostfactory-plugin/commit/8d3ae4ee406ea16615d75575b473310170a1084d) by Flamur Gogolli).
+- implement proper GitHub Pages deployment using GitHub Actions ([2c85a5d](https://github.com/awslabs/open-hostfactory-plugin/commit/2c85a5d700d2e3196850303244b7abe1912a6c5e) by Flamur Gogolli).
+- use system Python for CI documentation targets ([0637638](https://github.com/awslabs/open-hostfactory-plugin/commit/06376384e8b3abc393f550623339b27d448b8dc2) by Flamur Gogolli).
+- resolve import validation script path calculation ([7b1a8f9](https://github.com/awslabs/open-hostfactory-plugin/commit/7b1a8f9ff6df58f70e8c4b89220bbb08d8d3ab5a) by Flamur Gogolli).
+- resolve file size compliance check script location ([3728f7e](https://github.com/awslabs/open-hostfactory-plugin/commit/3728f7edcdfbdc3ceb8902cd03ce0ac706d94186) by Flamur Gogolli).
+- resolve missing and duplicate Makefile targets ([2d72fd4](https://github.com/awslabs/open-hostfactory-plugin/commit/2d72fd465bdc9ff5ea4909b6d9e1880a4598afd4) by Flamur Gogolli).
+- update docs workflow to build only on main branch and add CI testing ([8f8cab7](https://github.com/awslabs/open-hostfactory-plugin/commit/8f8cab76f124108913512b421cb7cb2e6c40a766) by Flamur Gogolli).
+- resolve workflow dependency issues after granular job refactoring ([bd7c048](https://github.com/awslabs/open-hostfactory-plugin/commit/bd7c0488e1059f649e70f3565ec5e411927c9a93) by Flamur Gogolli).
+- restore proper test flow and fix YAML syntax error ([76728bf](https://github.com/awslabs/open-hostfactory-plugin/commit/76728bfe7e8b3a1e10dbc2f157c461ed40187ced) by Flamur Gogolli).
+- correct YAML syntax error in publish.yml SBOM generation ([14b2159](https://github.com/awslabs/open-hostfactory-plugin/commit/14b21595a4b8783734d05dd28cd9541a5af3cd58) by Flamur Gogolli).
+- restore full architecture validation functionality ([e59da2b](https://github.com/awslabs/open-hostfactory-plugin/commit/e59da2b8239f1a67f496c0ce83ce144fdf7b7773) by Flamur Gogolli).
+- resolve all identified CI/CD workflow failures ([673f265](https://github.com/awslabs/open-hostfactory-plugin/commit/673f26585dbe52d7a15cd8182a46e27563685ee6) by Flamur Gogolli).
+- restore missing test coverage and security functionality ([b283bb9](https://github.com/awslabs/open-hostfactory-plugin/commit/b283bb9fc2b250b5864ca26bb95a802c9b657593) by Flamur Gogolli).
+- update script paths in CI workflow ([a79ba0e](https://github.com/awslabs/open-hostfactory-plugin/commit/a79ba0ef1ad79b3d2ad1e3d00dfd3b2636a6f3ea) by Flamur Gogolli).
+- remove emojis from import validation script ([68ee147](https://github.com/awslabs/open-hostfactory-plugin/commit/68ee1474bd403bc1aee669c2c00cd2ddd8353908) by Flamur Gogolli).
+- remove emojis from workflow output messages ([673c659](https://github.com/awslabs/open-hostfactory-plugin/commit/673c659f04c90baa336ed945ebe1983fe3802984) by Flamur Gogolli).
+- resolve unit test configuration issues in conftest.py ([4af446e](https://github.com/awslabs/open-hostfactory-plugin/commit/4af446e1514a79d59d451d72d5353474b963cea8) by Flamur Gogolli).
+- remove unused pip cache from all GitHub Actions workflows ([95a6ecc](https://github.com/awslabs/open-hostfactory-plugin/commit/95a6eccf1f9dbea870df1feb52b210ecf11ccd3d) by Flamur Gogolli).
+- make MyPy allow failure in local CI check script ([e2b0d1c](https://github.com/awslabs/open-hostfactory-plugin/commit/e2b0d1cd1b479e88eaaf2b435d1e3e2ea64bbfe8) by Flamur Gogolli).
+- add continue-on-error to MyPy step in CI workflow ([b6a2e9b](https://github.com/awslabs/open-hostfactory-plugin/commit/b6a2e9bedcf5cc3a6e54e73773d6ee70f8edd599) by Flamur Gogolli).
+- resolve isort import sorting issues ([6bd0629](https://github.com/awslabs/open-hostfactory-plugin/commit/6bd062964712c42b5265b32e40461be74d2d651a) by Flamur Gogolli).
+- apply correct Black formatting with line-length 100 ([17303de](https://github.com/awslabs/open-hostfactory-plugin/commit/17303de5a815eb3c3f1b8a77f261f59d46599607) by Flamur Gogolli).
+- resolve all unterminated string literals caused by autopep8 aggressive mode ([9601190](https://github.com/awslabs/open-hostfactory-plugin/commit/96011909021f75cd81bdb27a5f1697f2afc31cdc) by Flamur Gogolli).
+- resolve final unterminated string literal in system_handlers.py ([7dde370](https://github.com/awslabs/open-hostfactory-plugin/commit/7dde3703f4ad93d4e0289fae3debcd1510c6ac85) by Flamur Gogolli).
+- manually resolve remaining unterminated string literal syntax errors ([29e88fc](https://github.com/awslabs/open-hostfactory-plugin/commit/29e88fc0f555dfd1fb0601dc84defadd783cffa4) by Flamur Gogolli).
+- resolve all unterminated string literal syntax errors across entire codebase ([7620852](https://github.com/awslabs/open-hostfactory-plugin/commit/76208523f811c610fdad957e8b92456c2c7d935a) by Flamur Gogolli).
+- resolve mypy configuration issues and add comprehensive CI testing ([171f959](https://github.com/awslabs/open-hostfactory-plugin/commit/171f95919122b1bc1ff9bb075334f25e938254ea) by Flamur Gogolli).
+- resolve additional mypy configuration and syntax issues ([c06fca3](https://github.com/awslabs/open-hostfactory-plugin/commit/c06fca3bebc4fedb78dec57bde737e527fa3b154) by Flamur Gogolli).
+- resolve CI pipeline failures ([9244e31](https://github.com/awslabs/open-hostfactory-plugin/commit/9244e31ac5c1796d54ce3b7a6be5a0fd2d408c0c) by Flamur Gogolli).
+- add comprehensive flake8 documentation and enable additional checks ([45e8551](https://github.com/awslabs/open-hostfactory-plugin/commit/45e8551593ba60057af2a51e064cb0a739089379) by Flamur Gogolli).
+- enable additional flake8 checks with appropriate ignores ([4b7e9a6](https://github.com/awslabs/open-hostfactory-plugin/commit/4b7e9a680513fbe3433b6a62b86f0d1049c66935) by Flamur Gogolli).
+- enable and resolve critical flake8 checks ([5ebf25c](https://github.com/awslabs/open-hostfactory-plugin/commit/5ebf25c768524a231e701e7af476c99ae57c8b27) by Flamur Gogolli).
+- apply black and isort formatting to pass CI checks ([d08db5c](https://github.com/awslabs/open-hostfactory-plugin/commit/d08db5c596c66ca2724c9639fd15bba5b9bc2e0e) by Flamur Gogolli).
+- resolve unused variables and improve formatting ([491e280](https://github.com/awslabs/open-hostfactory-plugin/commit/491e2802f4a1e27d7636b0570a4139d022778ec2) by Flamur Gogolli).
+- resolve critical F821 undefined name issues ([3706a39](https://github.com/awslabs/open-hostfactory-plugin/commit/3706a398bb39f6c687ed61d24a9f4a6f7d0a5274) by Flamur Gogolli).
+- resolve critical flake8 issues in tests ([e53b5a4](https://github.com/awslabs/open-hostfactory-plugin/commit/e53b5a4c68304ffc7df65e21639f0858d6c05b66) by Flamur Gogolli).
+- suppress false positive SIM102 warnings with noqa comments ([3f3495e](https://github.com/awslabs/open-hostfactory-plugin/commit/3f3495ea3ecc8bdd06228df5f6db439e351f5bdf) by Flamur Gogolli).
+- resolve SIM code simplification issues ([9247d83](https://github.com/awslabs/open-hostfactory-plugin/commit/9247d8368570fe8935efad32545b6212c19c175d) by Flamur Gogolli).
+- resolve utility function import mismatches ([fc4e313](https://github.com/awslabs/open-hostfactory-plugin/commit/fc4e313a71e29df4bea62c9cb7b0d5b92e15b2e2) by Flamur Gogolli).
+- address code quality issues (SIM codes) ([0f03596](https://github.com/awslabs/open-hostfactory-plugin/commit/0f035968efaddcb8e7602c9cac4f8d2cde46d29c) by Flamur Gogolli).
+- resolve flake8 issues and import problems ([836c533](https://github.com/awslabs/open-hostfactory-plugin/commit/836c5338dc39b632ddcd5c480ff48d5cd6e484a4) by Flamur Gogolli).
+- comprehensive flake8 improvements following best practices ([c0add70](https://github.com/awslabs/open-hostfactory-plugin/commit/c0add70b5b46d326b05975a9e3e924589d267ad0) by Flamur Gogolli).
+- remove unused imports for flake8 compliance ([a84b5b5](https://github.com/awslabs/open-hostfactory-plugin/commit/a84b5b588af6f33c313cb239cb8699ef11a613cc) by Flamur Gogolli).
+- resolve critical issues from flake8 fixes ([f34d968](https://github.com/awslabs/open-hostfactory-plugin/commit/f34d968a49b1e922f50b711ffd60f58d7576193d) by Flamur Gogolli).
+- resolve functional issues in loop variables and abstract methods ([64931a8](https://github.com/awslabs/open-hostfactory-plugin/commit/64931a868b81b3c56a69b519e008f7f9053887c3) by Flamur Gogolli).
+- resolve critical linting issues ([e4b1985](https://github.com/awslabs/open-hostfactory-plugin/commit/e4b1985ddbfb680a58c064f4dd9931334cbce1b4) by Flamur Gogolli).
 
-### Infrastructure
-- GitHub Actions CI/CD pipeline
-- Dependabot security updates
-- Pre-commit hooks with security checks
-- Code quality tools (bandit, pip-audit, safety)
-- Professional development standards
+### Reverts
 
-## [0.9.0] - 2024-01-10
+- maintain consistency - call dev-tools scripts directly ([9ed925d](https://github.com/awslabs/open-hostfactory-plugin/commit/9ed925d4a456a9967c8931e2fed74274656d06f0) by Flamur Gogolli).
+- keep safety check command instead of scan ([db49ddb](https://github.com/awslabs/open-hostfactory-plugin/commit/db49ddb1bd0dc52ef75e6ee02b345838e456c0fb) by Flamur Gogolli).
 
-### Added
-- Beta release with core functionality
-- AWS provider implementation
-- Basic CLI interface
-- Template system foundation
-- Initial documentation
+### Code Refactoring
 
-### Changed
-- Refactored architecture for scalability
-- Improved error handling
-- Improved configuration system
+- modernize UV tooling and remove obsolete lock files ([98b9ff6](https://github.com/awslabs/open-hostfactory-plugin/commit/98b9ff67e3fb4884d089c8387b42efd373e1dda3) by Flamur Gogolli).
+- split massive Makefile into modular structure ([e194a47](https://github.com/awslabs/open-hostfactory-plugin/commit/e194a47e995e390e95ebc02959e8e46a23c39721) by Flamur Gogolli).
+- remove old version-bump targets and fix workflows to use Makefile ([b4c3e05](https://github.com/awslabs/open-hostfactory-plugin/commit/b4c3e0529cd402ac0ba553b6d697135688f83ac0) by Flamur Gogolli).
+- remove redundant .get() fallbacks in _package.py ([a6c1bb3](https://github.com/awslabs/open-hostfactory-plugin/commit/a6c1bb3a0b126712630ff51a3d75350237049f99) by Flamur Gogolli).
+- consolidate CI test jobs with clean naming and matrix strategy ([b049168](https://github.com/awslabs/open-hostfactory-plugin/commit/b0491683db83fbd1ef01956533d1fbb3d82e735b) by Flamur Gogolli).
+- move E501 line length checks to optional rules ([c8fe995](https://github.com/awslabs/open-hostfactory-plugin/commit/c8fe99578e71cca526f42060230b636f55f5f002) by Flamur Gogolli).
+- Remove unnecessary local environment files for act ([559d0c3](https://github.com/awslabs/open-hostfactory-plugin/commit/559d0c3d1bfa63594e6b75ecbd181be3137cce55) by Flamur Gogolli).
+- Move all uv-* Makefile targets to unified uv_manager.py script ([c628881](https://github.com/awslabs/open-hostfactory-plugin/commit/c6288818bccdb9b200bb7d8f78f3e1ec5795e4b3) by Flamur Gogolli).
+- Move complex Makefile logic to dev-tools scripts ([5a64040](https://github.com/awslabs/open-hostfactory-plugin/commit/5a64040322715b4a34b8d72b9879057af40afd49) by Flamur Gogolli).
+- Fix Makefile target naming to follow ci-* pattern ([cf1c2d4](https://github.com/awslabs/open-hostfactory-plugin/commit/cf1c2d4e18382253fc39976cea62574a575cab0b) by Flamur Gogolli).
+- Consolidate git setup into single git-ci-setup target ([d406143](https://github.com/awslabs/open-hostfactory-plugin/commit/d40614324ddb222849050d87d994aca7df280e46) by Flamur Gogolli).
+- consolidate FleetTagBuilder to utilities and enhance functionality ([117e85b](https://github.com/awslabs/open-hostfactory-plugin/commit/117e85bfce766b0136cf708ea5ae5b198c970570) by Flamur Gogolli).
+- move test-docker.sh from tests/ to dev-tools/scripts/ ([9b08de5](https://github.com/awslabs/open-hostfactory-plugin/commit/9b08de598308401b886e2e1cee85df9ba2f71160) by Flamur Gogolli).
+- rename validation targets for clarity ([f26317b](https://github.com/awslabs/open-hostfactory-plugin/commit/f26317bb58725b0eac8b3e67c06850a95a4f7edc) by Flamur Gogolli).
+- centralize all metadata to project.yml/pyproject.toml ([d47a79e](https://github.com/awslabs/open-hostfactory-plugin/commit/d47a79e2c0ae61d4e8e04b76dfb524a5f7e063c5) by Flamur Gogolli).
+- remove redundant version definitions ([7c47f9d](https://github.com/awslabs/open-hostfactory-plugin/commit/7c47f9dbbaf28d824398d8439acc0de0e0fb2002) by Flamur Gogolli).
+- standardize strategy pattern across storage, scheduler, and provider ([501f9ae](https://github.com/awslabs/open-hostfactory-plugin/commit/501f9aecd9b59a7e12da26e8d2c5592d5f3f5eec) by Flamur Gogolli).
+- remove overuse of 'proper' and clean up comments ([002739b](https://github.com/awslabs/open-hostfactory-plugin/commit/002739b378012e0486758eba7948b300c0129dfe) by Flamur Gogolli).
+- legacy/migration provider configuration code ([2c3d2a5](https://github.com/awslabs/open-hostfactory-plugin/commit/2c3d2a55ba3c5c37bf849563b6e832148b374088) by Flamur Gogolli).
+- configuration files and ensure schema compliance ([fa25661](https://github.com/awslabs/open-hostfactory-plugin/commit/fa25661a7a7cf2680db420cc406bad2dbb46577c) by Flamur Gogolli).
+- extract format logic to script following project patterns ([db26f55](https://github.com/awslabs/open-hostfactory-plugin/commit/db26f55209aa0db835290b02feeffea24f45d47a) by Flamur Gogolli).
+- replace custom unused import detection with autoflake ([8d2cd33](https://github.com/awslabs/open-hostfactory-plugin/commit/8d2cd335b8c79066fa482d3d0398c6b95fa9ad20) by Flamur Gogolli).
+- rename DEFAULT_PYTHON to DEFAULT_PYTHON_VERSION for clarity ([21814fa](https://github.com/awslabs/open-hostfactory-plugin/commit/21814fa4c9d1f4f3e927eb576f904a4d67993ee6) by Flamur Gogolli).
+- use Makefile as single source of truth for container workflow ([7aeaf9f](https://github.com/awslabs/open-hostfactory-plugin/commit/7aeaf9fc46b230112d2a8ef8e4fa0c6572018de8) by Flamur Gogolli).
+- move complex CI documentation logic to dedicated scripts ([5008ae0](https://github.com/awslabs/open-hostfactory-plugin/commit/5008ae057971c4910b7b8f4f2602cbee847a45e9) by Flamur Gogolli).
+- consolidate documentation workflow and remove GitLab dependencies ([4186be3](https://github.com/awslabs/open-hostfactory-plugin/commit/4186be3b89e76b23f070381f4880e24ff9c2609a) by Flamur Gogolli).
+- consolidate documentation system with consistent versioning ([1bb3bb8](https://github.com/awslabs/open-hostfactory-plugin/commit/1bb3bb85883edc3487b86a3d7d54cca5785ea823) by Flamur Gogolli).
+- update CI to Python 3.13 and clarify fast test labels ([b0d328f](https://github.com/awslabs/open-hostfactory-plugin/commit/b0d328f76d2c79c489452992aa948857cd174c68) by Flamur Gogolli).
+- implement granular CI jobs with tool names for better visibility ([02a0826](https://github.com/awslabs/open-hostfactory-plugin/commit/02a0826f45b5594a9d6a9e592fad31e389dbabaa) by Flamur Gogolli).
+- extract Python scripts from YAML and use Makefile targets ([dd2af81](https://github.com/awslabs/open-hostfactory-plugin/commit/dd2af817fe167b013f709c72f7836b2e85a8d50e) by Flamur Gogolli).
+- align Makefile targets with consolidated workflows ([797f282](https://github.com/awslabs/open-hostfactory-plugin/commit/797f2824e33a63032b7664ea88e832aae3e9b107) by Flamur Gogolli).
+- merge SBOM generation into publish workflow ([d982660](https://github.com/awslabs/open-hostfactory-plugin/commit/d98266090cf82340b50e7454362725aeebc63be1) by Flamur Gogolli).
+- consolidate security workflows to eliminate duplication ([c3dbf9d](https://github.com/awslabs/open-hostfactory-plugin/commit/c3dbf9dd2f17a4e01424f19a2d4a54bb54df8858) by Flamur Gogolli).
+- optimize test execution to eliminate duplication ([5388d0f](https://github.com/awslabs/open-hostfactory-plugin/commit/5388d0fddbd56c616f2e89217891e9e438341f1c) by Flamur Gogolli).
+- move CI validation scripts to dev-tools directory ([ddb0fc5](https://github.com/awslabs/open-hostfactory-plugin/commit/ddb0fc50f8a858448c57bc54facd3e73ef22263c) by Flamur Gogolli).
+- remove marketing language from workflow descriptions ([f80b9bd](https://github.com/awslabs/open-hostfactory-plugin/commit/f80b9bd115f3294c64405d3b4ca5bebb7e9b9c0c) by Flamur Gogolli).
+- remove marketing language from development scripts ([409b6c1](https://github.com/awslabs/open-hostfactory-plugin/commit/409b6c12f60cd54fbeea889c8941a6b0dd96d868) by Flamur Gogolli).
 
-### Fixed
-- Various bug fixes and stability improvements
-
-## [0.1.0] - 2024-01-01
-
-### Added
-- Initial project structure
-- Basic provider interface
-- Foundation for template system
-- Development environment setup
+<!-- insertion marker -->
