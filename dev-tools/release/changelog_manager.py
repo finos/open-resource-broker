@@ -11,7 +11,7 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -43,7 +43,7 @@ class ChangelogManager:
         self.template_path = project_root / ".changelog-template.md"
 
     def run_command(
-        self, cmd: List[str], capture_output: bool = True
+        self, cmd: list[str], capture_output: bool = True
     ) -> subprocess.CompletedProcess:
         """Run command with error handling."""
         try:
@@ -56,7 +56,7 @@ class ChangelogManager:
             logger.error(f"Error: {e.stderr if e.stderr else str(e)}")
             raise
 
-    def get_git_tags(self) -> List[str]:
+    def get_git_tags(self) -> list[str]:
         """Get all git tags sorted by version."""
         result = self.run_command(["git", "tag", "-l", "v*", "--sort=-version:refname"])
         return [tag.strip() for tag in result.stdout.split("\n") if tag.strip()]
@@ -136,22 +136,6 @@ class ChangelogManager:
         # Write updated changelog
         with open(self.changelog_path, "w") as f:
             f.write(updated_content)
-        """Create temporary config for version-specific changelog."""
-        # Read base config
-        with open(self.config_path) as f:
-            config_content = f.read()
-
-        # Modify for version-specific generation
-        version_config = config_content.replace(
-            'output = "CHANGELOG.md"', f'output = ".changelog-{version}.tmp"'
-        )
-
-        # Add version filter if needed
-        if from_commit:
-            version_config += f'\nfrom_commit = "{from_commit}"\n'
-
-        with open(config_path, "w") as f:
-            f.write(version_config)
 
     def _insert_version_changelog(self, temp_changelog: Path, version: str) -> None:
         """Insert version changelog into main changelog."""
@@ -320,20 +304,6 @@ class ChangelogManager:
             # Write updated changelog
             with open(self.changelog_path, "w") as f:
                 f.write(updated_content)
-        """Create config for backfill changelog generation."""
-        with open(self.config_path) as f:
-            config_content = f.read()
-
-        # Modify for backfill
-        backfill_config = config_content.replace(
-            'output = "CHANGELOG.md"', f'output = ".changelog-backfill-{version}.tmp"'
-        )
-
-        # Add commit range
-        backfill_config += f'\nfrom_commit = "{from_commit}"\nto_commit = "{to_commit}"\n'
-
-        with open(config_path, "w") as f:
-            f.write(backfill_config)
 
     def _insert_backfill_changelog(self, temp_changelog: Path, version: str) -> None:
         """Insert backfill changelog in chronological order."""

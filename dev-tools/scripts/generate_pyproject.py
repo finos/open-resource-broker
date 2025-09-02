@@ -2,7 +2,6 @@
 """Generate pyproject.toml from template using centralized configuration."""
 
 import argparse
-import json
 import logging
 import os
 import subprocess
@@ -42,20 +41,20 @@ try:
     repo_org = _get_config_value(".repository.org")
     repo_name = _get_config_value(".repository.name")
     python_versions = _get_config_value(".python.versions[]")
-    
+
     # Auto-calculate min_version from versions array (fallback to explicit config)
     try:
         min_python_version = _get_config_value(".python.min_version")
         if not min_python_version or min_python_version == "null":
             # Auto-calculate from versions array (yq returns newline-separated values)
-            versions_list = [v.strip() for v in python_versions.strip().split('\n') if v.strip()]
+            versions_list = [v.strip() for v in python_versions.strip().split("\n") if v.strip()]
             # Sort versions and take the first (minimum)
-            versions_list.sort(key=lambda x: tuple(map(int, x.split('.'))))
+            versions_list.sort(key=lambda x: tuple(map(int, x.split("."))))
             min_python_version = versions_list[0]
     except:
         # Fallback: auto-calculate from versions array
-        versions_list = [v.strip() for v in python_versions.strip().split('\n') if v.strip()]
-        versions_list.sort(key=lambda x: tuple(map(int, x.split('.'))))
+        versions_list = [v.strip() for v in python_versions.strip().split("\n") if v.strip()]
+        versions_list.sort(key=lambda x: tuple(map(int, x.split("."))))
         min_python_version = versions_list[0]
 
     # Derived values
