@@ -5,14 +5,14 @@
 project:
   name: open-hostfactory-plugin
   short_name: ohfp # CLI command name
-  version: 0.1.0
+  version: 0.0.1rc1
   description: "Cloud provider integration plugin for IBM Spectrum Symphony Host Factory"
   author: "AWS Professional Services"
   email: "aws-proserve@amazon.com"
+  license: "Apache-2.0"
 python:
   versions: [3.9, 3.10, 3.11, 3.12, 3.13] # Supported Python versions
-  default_version: 3.13 # Default for builds and CI
-  min_version: 3.9 # Minimum required version
+  default_version: 3.13
 repository:
   org: awslabs
   name: open-hostfactory-plugin

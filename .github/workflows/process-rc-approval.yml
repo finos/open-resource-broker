@@ -41,7 +41,7 @@ jobs:
           echo "Creating RC release based on approval..."
           make promote-rc
           
-          NEW_VERSION=$(yq '.project.version' .project.yml)
+          NEW_VERSION=$(make print-VERSION)
           echo "RC_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

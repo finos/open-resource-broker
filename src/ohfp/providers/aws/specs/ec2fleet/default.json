@@ -1,0 +1,68 @@
+{
+  "LaunchTemplateConfigs": [
+    {
+      "LaunchTemplateSpecification": {
+        "LaunchTemplateId": "{{ launch_template_id }}",
+        "Version": "{{ launch_template_version }}"
+      }{% if needs_overrides %},
+      "Overrides": [
+        {% for override in instance_overrides %}
+        {
+          "InstanceType": "{{ override.instance_type }}"{% if override.subnet_id %},
+          "SubnetId": "{{ override.subnet_id }}"{% endif %}{% if override.weighted_capacity %},
+          "WeightedCapacity": {{ override.weighted_capacity }}{% endif %}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+        {% if ondemand_overrides %}
+        {% for override in ondemand_overrides %}
+        ,{
+          "InstanceType": "{{ override.instance_type }}",
+          "WeightedCapacity": {{ override.weighted_capacity }}
+        }{% endfor %}
+        {% endif %}
+      ]{% endif %}
+    }
+  ],
+  "TargetCapacitySpecification": {
+    "TotalTargetCapacity": {{ target_capacity }}{% if is_heterogeneous %},
+    "OnDemandTargetCapacity": {{ on_demand_count }},
+    "SpotTargetCapacity": {{ spot_count }}{% endif %},
+    "DefaultTargetCapacityType": "{{ default_capacity_type }}"
+  },
+  "Type": "{{ fleet_type }}"{% if is_maintain_fleet %},
+  "ReplaceUnhealthyInstances": {{ replace_unhealthy | tojson }},
+  "ExcessCapacityTerminationPolicy": "termination"{% endif %}{% if has_spot_options %},
+  "SpotOptions": {
+    "AllocationStrategy": "{{ allocation_strategy }}"{% if max_spot_price %},
+    "MaxTotalPrice": "{{ max_spot_price }}"{% endif %}
+  }{% endif %}{% if has_ondemand_options %},
+  "OnDemandOptions": {
+    "AllocationStrategy": "{{ allocation_strategy_on_demand }}"
+  }{% endif %},
+  "TagSpecifications": [
+    {
+      "ResourceType": "fleet",
+      "Tags": [
+        {"Key": "Name", "Value": "{{ fleet_name }}"},
+        {% for tag in base_tags %}
+        {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}{% if not loop.last or has_custom_tags %},{% endif %}
+        {% endfor %}{% if has_custom_tags %},
+        {% for tag in custom_tags %}
+        {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}{% if not loop.last %},{% endif %}
+        {% endfor %}{% endif %}
+      ]
+    }{% if fleet_type == "instant" %},
+    {
+      "ResourceType": "instance",
+      "Tags": [
+        {"Key": "Name", "Value": "{{ fleet_name }}"},
+        {% for tag in base_tags %}
+        {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}{% if not loop.last or has_custom_tags %},{% endif %}
+        {% endfor %}{% if has_custom_tags %},
+        {% for tag in custom_tags %}
+        {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}{% if not loop.last %},{% endif %}
+        {% endfor %}{% endif %}
+      ]
+    }{% endif %}
+  ]
+}

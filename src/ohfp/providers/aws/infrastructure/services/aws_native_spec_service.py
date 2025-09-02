@@ -37,11 +37,7 @@ class AWSNativeSpecService:
                 os.path.dirname(__file__),
                 "..",
                 "..",
-                "..",
-                "..",
-                "..",
                 "specs",
-                "aws",
                 spec_type,
                 "default.json",
             )

@@ -221,7 +221,7 @@ jobs:
         package-name: ${{ needs.get-config.outputs.container-image }}
         package-type: container
         min-versions-to-keep: 5
-        ignore-versions: '^(latest|main|dev|develop|v\d+\.\d+\.\d+.*|.*\.dev-[a-f0-9]+(-python\d+\.\d+)?)$'
+        ignore-versions: '^(latest|main|dev|develop|v?\d+\.\d+\.\d+.*)$'
 
   container-manifest:
     name: Create Multi-Architecture Manifests

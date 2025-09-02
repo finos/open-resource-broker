@@ -81,7 +81,7 @@
             "ssm_parameter_prefix": "/hostfactory/templates/"
           },
           "native_spec": {
-            "spec_file_base_path": "specs/aws"
+            "spec_file_base_path": "config/specs/aws"
           },
           "allocation_strategy": "capacityOptimized",
           "allocation_strategy_on_demand": "lowestPrice",

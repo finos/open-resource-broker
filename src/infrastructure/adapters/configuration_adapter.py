@@ -224,10 +224,5 @@ class ConfigurationAdapter(ConfigurationPort):
                 "author": AUTHOR,
             }
         except ImportError:
-            # Fallback if package info not available
-            return {
-                "name": "open-hostfactory-plugin",
-                "version": "unknown",
-                "description": "Cloud provider integration plugin",
-                "author": "AWS Professional Services",
-            }
+            # If _package.py itself fails, we have bigger problems - let it fail
+            raise

@@ -32,7 +32,7 @@ runs:
         DEFAULT_PYTHON_VERSION=$(make print-DEFAULT_PYTHON_VERSION)
         PYTHON_VERSIONS=$(make print-json-PYTHON_VERSIONS)
         CONTAINER_REGISTRY=$(make print-CONTAINER_REGISTRY || echo "ghcr.io")
-        CONTAINER_IMAGE=$(make print-CONTAINER_IMAGE || echo "awslabs/open-hostfactory-plugin")
+        CONTAINER_IMAGE=$(make print-CONTAINER_IMAGE || echo "$(make print-REPO_ORG)/$(make print-PACKAGE_NAME)")
         
         # Centralized version generation using Makefile infrastructure
         if [[ "${{ github.event_name }}" == "release" ]] || [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.environment }}" == "pypi" ]]; then

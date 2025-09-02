@@ -4,7 +4,7 @@ env:
   # Comment trigger words for security scans
   SECURITY_TRIGGERS: "/security"
   REGISTRY: ghcr.io
-  IMAGE_NAME: awslabs/open-hostfactory-plugin
+  IMAGE_NAME: ${{ vars.REPO_ORG || 'awslabs' }}/${{ vars.PACKAGE_NAME || 'open-hostfactory-plugin' }}
 
 on:
   push:

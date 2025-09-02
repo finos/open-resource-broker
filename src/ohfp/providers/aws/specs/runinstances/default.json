@@ -1,0 +1,22 @@
+{
+  "LaunchTemplate": {
+    "LaunchTemplateId": "{{ launch_template_id }}",
+    "Version": "{{ launch_template_version }}"
+  },
+  "MinCount": {{ min_count }},
+  "MaxCount": {{ max_count }},
+  "TagSpecifications": [
+    {
+      "ResourceType": "instance",
+      "Tags": [
+        {"Key": "Name", "Value": "{{ instance_name }}"},
+        {% for tag in base_tags %}
+        {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}{% if not loop.last or has_custom_tags %},{% endif %}
+        {% endfor %}{% if has_custom_tags %},
+        {% for tag in custom_tags %}
+        {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}{% if not loop.last %},{% endif %}
+        {% endfor %}{% endif %}
+      ]
+    }
+  ]
+}

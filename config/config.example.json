@@ -5,10 +5,47 @@
     "config_root": "$HF_PROVIDER_CONFDIR"
   },
   "provider": {
-    "active_provider": "aws-primary",
-    "selection_policy": "WEIGHTED_ROUND_ROBIN",
+    "providers": [
+      {
+        "name": "aws-primary",
+        "type": "aws",
+        "enabled": true,
+        "config": {
+          "region": "us-east-1",
+          "profile": "default"
+        }
+      },
+      {
+        "name": "aws-backup",
+        "type": "aws",
+        "enabled": true,
+        "config": {
+          "region": "us-west-2",
+          "profile": "default"
+        }
+      },
+      {
+        "name": "provider1",
+        "type": "provider1",
+        "enabled": false,
+        "config": {
+          "region": "east-1",
+          "credentials": "${PROVIDER1_CREDENTIALS}"
+        }
+      },
+      {
+        "name": "provider2",
+        "type": "provider2",
+        "enabled": false,
+        "config": {
+          "zone": "central-1a",
+          "project": "example-project",
+          "credentials_path": "/path/to/credentials.json"
+        }
+      }
+    ],
+    "selection_policy": "FIRST_AVAILABLE",
     "default_provider_type": "aws",
-    "default_provider_instance": "aws-primary",
     "health_check_interval": 60,
     "circuit_breaker": {
       "enabled": true,
@@ -48,247 +85,81 @@
           "image_id": "ami-0abcdef1234567890",
           "instance_type": "t3.micro",
           "security_group_ids": ["sg-0123456789abcdef0"],
-          "subnet_ids": ["subnet-0123456789abcdef0"],
+          "subnet_id": "subnet-0123456789abcdef0",
           "key_name": "my-key-pair",
-          "provider_api": "EC2Fleet",
-          "price_type": "ondemand",
-          "allocation_strategy": "capacityOptimized",
-          "allocation_strategy_on_demand": "lowestPrice",
-          "volume_type": "gp3",
-          "spot_fleet_request_expiry": 30,
-          "percent_on_demand": 0,
-          "root_device_volume_size": 20
-        }
-      },
-      "azure": {
-        "handlers": {
-          "VirtualMachineScaleSet": {
-            "handler_class": "AzureVMSSHandler",
-            "supports_spot": true,
-            "supports_standard": true
+          "iam_instance_profile": {
+            "Name": "EC2-Instance-Profile"
           },
-          "VirtualMachine": {
-            "handler_class": "AzureVMHandler",
-            "supports_spot": false,
-            "supports_standard": true
+          "user_data": "#!/bin/bash\necho 'Hello World' > /tmp/hello.txt",
+          "tags": {
+            "Environment": "development",
+            "Project": "hostfactory"
           }
-        },
-        "template_defaults": {
-          "vm_size": "Standard_B1s",
-          "image_publisher": "Canonical",
-          "image_offer": "0001-com-ubuntu-server-focal",
-          "image_sku": "20_04-lts-gen2",
-          "provider_api": "VirtualMachineScaleSet",
-          "price_type": "standard",
-          "os_disk_type": "Premium_LRS"
-        }
-      },
-      "gcp": {
-        "handlers": {
-          "InstanceGroup": {
-            "handler_class": "GCPInstanceGroupHandler",
-            "supports_preemptible": true,
-            "supports_standard": true
-          },
-          "ComputeEngine": {
-            "handler_class": "GCPComputeEngineHandler",
-            "supports_preemptible": false,
-            "supports_standard": true
-          }
-        },
-        "template_defaults": {
-          "machine_type": "e2-micro",
-          "image_family": "ubuntu-2004-lts",
-          "image_project": "ubuntu-os-cloud",
-          "provider_api": "InstanceGroup",
-          "price_type": "standard",
-          "disk_type": "pd-standard",
-          "disk_size_gb": 20
         }
       }
-    },
-    "providers": [
-      {
-        "name": "aws-primary",
-        "type": "aws",
-        "enabled": true,
-        "priority": 1,
-        "weight": 100,
-        "config": {
-          "region": "us-east-1",
-          "profile": "default",
-          "max_retries": 3,
-          "timeout": 30,
-          "service_role_spot_fleet": "AWSServiceRoleForEC2SpotFleet",
-          "ssm_parameter_prefix": "/hostfactory/templates/",
-          "connection_timeout_ms": 10000,
-          "request_retry_attempts": 0,
-          "instance_pending_timeout_sec": 180,
-          "describe_request_retry_attempts": 0,
-          "describe_request_interval": 0
-        },
-        "template_defaults": {
-          "context": "c-abc1234567890123",
-          "provider_api": "SpotFleet",
-          "instance_type": "t3.small"
-        }
-      },
-      {
-        "name": "aws-backup",
-        "type": "aws",
-        "enabled": true,
-        "priority": 2,
-        "weight": 50,
-        "config": {
-          "region": "us-west-2",
-          "profile": "default",
-          "max_retries": 3,
-          "timeout": 30,
-          "service_role_spot_fleet": "AWSServiceRoleForEC2SpotFleet",
-          "ssm_parameter_prefix": "/hostfactory/templates/"
-        }
-      },
-      {
-        "name": "azure-primary",
-        "type": "azure",
-        "enabled": false,
-        "priority": 3,
-        "weight": 30,
-        "config": {
-          "subscription_id": "12345678-1234-1234-1234-123456789012",
-          "resource_group": "hostfactory-rg",
-          "location": "East US",
-          "tenant_id": "87654321-4321-4321-4321-210987654321",
-          "client_id": "abcdef12-3456-7890-abcd-ef1234567890",
-          "client_secret": "${AZURE_CLIENT_SECRET}"
-        },
-        "template_defaults": {
-          "vm_size": "Standard_B2s",
-          "provider_api": "VirtualMachine"
-        }
-      },
-      {
-        "name": "gcp-primary",
-        "type": "gcp",
-        "enabled": false,
-        "priority": 4,
-        "weight": 20,
-        "config": {
-          "project_id": "my-gcp-project",
-          "zone": "us-central1-a",
-          "region": "us-central1",
-          "service_account_key_path": "/path/to/service-account.json",
-          "network": "default",
-          "subnetwork": "default"
-        },
-        "template_defaults": {
-          "machine_type": "e2-small"
-        }
-      }
-    ]
-  },
-  "logging": {
-    "level": "INFO",
-    "file_path": "logs/app.log",
-    "console_enabled": true,
-    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s [%(pathname)s:%(lineno)d (%(funcName)s)]",
-    "accept_propagated_setting": false
-  },
-  "template": {
-    "max_number": 10,
-    "templates_file_path": "config/templates.json",
-    "legacy_templates_file_path": "config/awsprov_templates.json",
-    "ami_resolution": {
-      "enabled": true,
-      "fallback_on_failure": true,
-      "cache_enabled": true
-    }
-  },
-  "events": {
-    "store_type": "memory",
-    "publisher_type": "composite",
-    "enable_logging": true,
-    "default_events_path": "events",
-    "snapshot_store_type": "memory",
-    "default_snapshots_path": "snapshots",
-    "snapshot_threshold": 100
-  },
-  "request": {
-    "default_timeout": 300,
-    "default_grace_period": 300,
-    "max_machines_per_request": 100
-  },
-  "environment": "production",
-  "debug": false,
-  "request_timeout": 300,
-  "max_machines_per_request": 100,
-  "performance": {
-    "enable_batching": true,
-    "batch_sizes": {
-      "terminate_instances": 25,
-      "create_tags": 20,
-      "describe_instances": 25,
-      "run_instances": 10
-    },
-    "enable_parallel": true,
-    "max_workers": 10,
-    "enable_caching": true,
-    "cache_ttl": 300
-  },
-  "retry": {
-    "max_attempts": 3,
-    "base_delay": 1.0,
-    "max_delay": 60.0,
-    "jitter": true,
-    "circuit_breaker": {
-      "failure_threshold": 5,
-      "reset_timeout": 60,
-      "half_open_timeout": 30
     }
   },
   "storage": {
-    "strategy": "json",
-    "default_storage_path": "data",
-    "json_strategy": {
-      "storage_type": "single_file",
-      "base_path": "data",
-      "filenames": {
-        "single_file": "request_database.json"
-      }
+    "type": "json",
+    "config": {
+      "base_path": "./data",
+      "backup_enabled": true,
+      "backup_interval": 3600
     }
   },
   "server": {
-    "enabled": true,
     "host": "0.0.0.0",
     "port": 8000,
-    "workers": 4,
+    "workers": 1,
     "reload": false,
-    "docs_enabled": true,
-    "auth": {
-      "enabled": true,
-      "strategy": "bearer_token",
-      "bearer_token": {
-        "secret_key": "your-secret-key-change-in-production",
-        "algorithm": "HS256",
-        "token_expiry": 3600
-      }
-    },
+    "log_level": "info",
+    "access_log": true,
     "cors": {
       "enabled": true,
-      "origins": [
-        "https://your-frontend-domain.com"
-      ],
-      "methods": [
-        "GET",
-        "POST",
-        "PUT",
-        "DELETE"
-      ],
-      "headers": [
-        "Authorization",
-        "Content-Type"
-      ],
-      "credentials": true
+      "allow_origins": ["*"],
+      "allow_methods": ["GET", "POST", "PUT", "DELETE"],
+      "allow_headers": ["*"]
+    },
+    "auth": {
+      "enabled": false,
+      "type": "bearer_token",
+      "config": {
+        "token": "${API_TOKEN}"
+      }
+    }
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "handlers": {
+      "console": {
+        "enabled": true,
+        "level": "INFO"
+      },
+      "file": {
+        "enabled": false,
+        "level": "DEBUG",
+        "filename": "hostfactory.log",
+        "max_bytes": 10485760,
+        "backup_count": 5
+      }
+    }
+  },
+  "performance": {
+    "monitoring": {
+      "enabled": true,
+      "metrics_interval": 60,
+      "health_check_timeout": 30
+    },
+    "caching": {
+      "enabled": true,
+      "ttl": 300,
+      "max_size": 1000
+    },
+    "rate_limiting": {
+      "enabled": false,
+      "requests_per_minute": 100,
+      "burst_size": 10
     }
   }
 }

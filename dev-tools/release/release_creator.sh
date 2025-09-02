@@ -222,29 +222,13 @@ create_release() {
         # but use modern build tools. Create a temporary branch at the target commit
         # and cherry-pick the build system improvements.
         if [ "$ALLOW_BACKFILL" = "true" ]; then
-            log_info "Building package from release commit $to_commit with modern build system..."
+            log_info "Building package from release commit $to_commit..."
             
-            # Create temporary branch at target commit
-            temp_branch="temp-build-$(date +%s)"
-            current_branch=$(git branch --show-current)
-            
-            git checkout -b "$temp_branch" "$to_commit" -q
-            
-            # Cherry-pick essential build files from current branch
-            git checkout "$current_branch" -- Makefile dev-tools/package/ dev-tools/scripts/ 2>/dev/null || true
-            
-            # Use tag name directly (unified format)
+            # Use existing build-historical system instead of duplicating logic
             PACKAGE_VERSION="${tag_name#v}"
-            log_debug "Building package with version: $PACKAGE_VERSION"
-            
-            # Build with the actual release code but modern build system
-            VERSION="$PACKAGE_VERSION" make clean build 2>/dev/null || {
+            make build-historical COMMIT="$to_commit" VERSION="$PACKAGE_VERSION" || {
                 log_warn "Package build failed from release commit, skipping package"
             }
-            
-            # Return to original branch and cleanup
-            git checkout "$current_branch" -q
-            git branch -D "$temp_branch" -q 2>/dev/null || true
         else
             # Regular release: build from current commit
             log_info "Building package from current commit..."

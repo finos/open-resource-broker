@@ -1,0 +1,77 @@
+{
+  "SpotFleetRequestConfig": {
+    "IamFleetRole": "{{ fleet_role }}",
+    "AllocationStrategy": "{{ allocation_strategy }}",
+    "TargetCapacity": {{ target_capacity }}{% if is_heterogeneous %},
+    "OnDemandTargetCapacity": {{ on_demand_count }}{% endif %},
+    "SpotPrice": "{{ spot_price }}",
+    "LaunchSpecifications": [
+      {% if has_overrides %}
+      {% for override in instance_overrides %}
+      {
+        "LaunchTemplate": {
+          "LaunchTemplateId": "{{ launch_template_id }}",
+          "Version": "{{ launch_template_version }}"
+        },
+        "ImageId": "{{ base_launch_spec.image_id }}",
+        "InstanceType": "{{ override.instance_type }}",
+        "WeightedCapacity": {{ override.weighted_capacity }}{% if override.subnet_id %},
+        "SubnetId": "{{ override.subnet_id }}"{% endif %}{% if base_launch_spec.security_groups %},
+        "SecurityGroups": [
+          {% for sg in base_launch_spec.security_groups %}
+          {"GroupId": "{{ sg }}"}{% if not loop.last %},{% endif %}
+          {% endfor %}
+        ]{% endif %}
+      }{% if not loop.last %},{% endif %}
+      {% endfor %}
+      {% else %}
+      {
+        "LaunchTemplate": {
+          "LaunchTemplateId": "{{ launch_template_id }}",
+          "Version": "{{ launch_template_version }}"
+        },
+        "ImageId": "{{ base_launch_spec.image_id }}",
+        "InstanceType": "{{ instance_overrides[0].instance_type }}",
+        "WeightedCapacity": {{ instance_overrides[0].weighted_capacity }}{% if instance_overrides[0].subnet_id %},
+        "SubnetId": "{{ instance_overrides[0].subnet_id }}"{% endif %}{% if base_launch_spec.security_groups %},
+        "SecurityGroups": [
+          {% for sg in base_launch_spec.security_groups %}
+          {"GroupId": "{{ sg }}"}{% if not loop.last %},{% endif %}
+          {% endfor %}
+        ]{% endif %},
+        "TagSpecifications": [
+          {
+            "ResourceType": "instance",
+            "Tags": [
+              {"Key": "Name", "Value": "{{ fleet_name }}"},
+              {% for tag in base_tags %}
+              {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}{% if not loop.last or has_custom_tags %},{% endif %}
+              {% endfor %}{% if has_custom_tags %},
+              {% for tag in custom_tags %}
+              {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}{% if not loop.last %},{% endif %}
+              {% endfor %}{% endif %}
+            ]
+          }
+        ]
+      }
+      {% endif %}
+    ],
+    "InstanceInterruptionBehavior": "{{ instance_interruption_behavior }}",
+    "ReplaceUnhealthyInstances": {{ replace_unhealthy_instances | tojson }},
+    "TagSpecifications": [
+      {
+        "ResourceType": "spot-fleet-request",
+        "Tags": [
+          {"Key": "Name", "Value": "{{ fleet_name }}"},
+          {"Key": "RequestId", "Value": "{{ request_id }}"},
+          {"Key": "TemplateId", "Value": "{{ template_id }}"},
+          {"Key": "CreatedBy", "Value": "{{ created_by }}"},
+          {"Key": "CreatedAt", "Value": "{{ timestamp }}"}{% if has_custom_tags %},
+          {% for tag in custom_tags %}
+          {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}{% if not loop.last %},{% endif %}
+          {% endfor %}{% endif %}
+        ]
+      }
+    ]
+  }
+}

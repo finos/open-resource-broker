@@ -1,0 +1,125 @@
+name: Changelog Validation
+
+on:
+  pull_request:
+    paths: 
+      - 'CHANGELOG.md'
+      - '.git-changelog.toml'
+      - '.changelog-template.md'
+      - 'dev-tools/release/changelog_manager.py'
+  push:
+    branches: [main]
+    paths:
+      - 'CHANGELOG.md'
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  validate-changelog:
+    name: Validate Changelog
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Need full history for changelog generation
+    
+    - name: Setup Python and UV
+      uses: ./.github/actions/setup-uv-cached
+      with:
+        cache-key: changelog-${{ env.PYTHON_VERSION }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+        fail-on-cache-miss: false
+    
+    - name: Install changelog dependencies
+      run: |
+        uv pip install git-changelog
+    
+    - name: Validate changelog format
+      run: |
+        make changelog-validate
+    
+    - name: Check changelog is up to date
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "Checking if changelog needs updates..."
+        
+        # Get base branch
+        BASE_SHA="${{ github.event.pull_request.base.sha }}"
+        HEAD_SHA="${{ github.sha }}"
+        
+        # Check if there are commits that should be in changelog
+        COMMIT_COUNT=$(git rev-list --count "${BASE_SHA}..${HEAD_SHA}")
+        
+        if [ "$COMMIT_COUNT" -gt 0 ]; then
+          echo "Found $COMMIT_COUNT new commits"
+          
+          # Check if changelog was modified
+          if git diff --name-only "${BASE_SHA}..${HEAD_SHA}" | grep -q "CHANGELOG.md"; then
+            echo "Changelog was updated"
+          else
+            echo "WARNING: New commits found but changelog not updated"
+            echo "Consider running: make changelog-preview"
+            # Don't fail - just warn
+          fi
+        else
+          echo "No new commits to check"
+        fi
+    
+    - name: Preview changelog changes
+      if: github.event_name == 'pull_request'
+      run: |
+        {
+          echo "## Changelog Preview"
+          echo ""
+          echo "Changes that would be added to changelog:"
+          echo ""
+          echo '```markdown'
+        } >> "$GITHUB_STEP_SUMMARY"
+        make changelog-preview --from-commit="${{ github.event.pull_request.base.sha }}" >> "$GITHUB_STEP_SUMMARY" || echo "No changes to preview" >> "$GITHUB_STEP_SUMMARY"
+        echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  check-changelog-sync:
+    name: Check Changelog Sync
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Setup Python and UV
+      uses: ./.github/actions/setup-uv-cached
+      with:
+        cache-key: changelog-sync-${{ env.PYTHON_VERSION }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+        fail-on-cache-miss: false
+    
+    - name: Install changelog dependencies
+      run: |
+        uv pip install git-changelog
+    
+    - name: Check if changelog needs regeneration
+      run: |
+        echo "Checking changelog synchronization..."
+        
+        # Generate temporary changelog
+        python3 dev-tools/release/changelog_manager.py generate --output /tmp/generated-changelog.md
+        
+        # Compare with existing
+        if ! diff -q CHANGELOG.md /tmp/generated-changelog.md >/dev/null; then
+          echo "WARNING: Changelog appears to be out of sync with git history"
+          echo "Consider running: make changelog-regenerate"
+          
+          {
+            echo "## Changelog Sync Check"
+            echo ""
+            echo "The changelog appears to be out of sync with git history."
+            echo "Run \`make changelog-regenerate\` to update it."
+          } >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "Changelog is in sync with git history"
+        fi

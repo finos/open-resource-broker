@@ -1,0 +1,35 @@
+{
+  "templates": [
+    {
+      "template_id": "TestTemplate",
+      "provider_api": "EC2Fleet",
+      "max_instances": 2,
+      "attributes": {
+        "type": [
+          "String",
+          "X86_64"
+        ],
+        "ncores": [
+          "Numeric",
+          "2"
+        ],
+        "ncpus": [
+          "Numeric",
+          "1"
+        ],
+        "nram": [
+          "Numeric",
+          "4096"
+        ]
+      },
+      "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
+      "subnet_ids": ["subnet-0f984e48e6e899311"],
+      "instance_type": "t2.micro",
+      "key_name": "HF_SSH_KEY",
+      "security_group_ids": [
+        "sg-0528dfedb6d763b16"
+      ]
+    }
+  ],
+  "_checksum": "8a3d2deab438e03eb57174b710de1c4f1cc1cfdb78023023a0df67e78a24c748"
+}

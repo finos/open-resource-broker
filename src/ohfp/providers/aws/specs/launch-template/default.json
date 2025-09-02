@@ -1,0 +1,53 @@
+{
+  "ImageId": "{{ image_id }}",
+  "InstanceType": "{{ instance_type }}",
+  {% if has_subnet %}
+  "NetworkInterfaces": [
+    {
+      "DeviceIndex": 0,
+      "SubnetId": "{{ subnet_id }}",
+      {% if has_security_groups %}
+      "Groups": {{ security_group_ids | tojson }},
+      {% endif %}
+      "AssociatePublicIpAddress": {{ associate_public_ip | tojson }}
+    }
+  ],
+  {% else %}
+  {% if has_security_groups %}
+  "SecurityGroupIds": {{ security_group_ids | tojson }},
+  {% endif %}
+  {% endif %}
+  {% if has_key_name %}
+  "KeyName": "{{ key_name }}",
+  {% endif %}
+  {% if has_user_data %}
+  "UserData": "{{ user_data | b64encode }}",
+  {% endif %}
+  {% if has_instance_profile %}
+  "IamInstanceProfile": {
+    "Name": "{{ instance_profile }}"
+  },
+  {% endif %}
+  {% if has_ebs_optimized %}
+  "EbsOptimized": {{ ebs_optimized | tojson }},
+  {% endif %}
+  {% if has_monitoring %}
+  "Monitoring": {
+    "Enabled": {{ monitoring_enabled | tojson }}
+  },
+  {% endif %}
+  "TagSpecifications": [
+    {
+      "ResourceType": "instance",
+      "Tags": [
+        {"Key": "Name", "Value": "{{ instance_name }}"},
+        {"Key": "RequestId", "Value": "{{ request_id }}"},
+        {"Key": "TemplateId", "Value": "{{ template_id }}"},
+        {"Key": "CreatedBy", "Value": "{{ created_by }}"}{% if has_custom_tags %},
+        {% for tag in custom_tags %}
+        {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}{% if not loop.last %},{% endif %}
+        {% endfor %}{% endif %}
+      ]
+    }
+  ]
+}

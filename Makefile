@@ -556,18 +556,22 @@ release-version: ## Create release with specific version (RELEASE_VERSION=1.2.3)
 	@$(MAKE) _release_custom
 
 release-backfill: ## Create backfill release (RELEASE_VERSION=1.2.3 TO_COMMIT=abc)
-	@$(MAKE) _release_backfill
+	@./dev-tools/release/release_backfill.sh $(RELEASE_VERSION) $(TO_COMMIT)
+
+update-release-notes: ## Update release notes for existing release (RELEASE_VERSION=1.2.3 FROM_COMMIT=abc TO_COMMIT=def)
+	@if [ -z "$(RELEASE_VERSION)" ] || [ -z "$(TO_COMMIT)" ]; then \
+		echo "Usage: make update-release-notes RELEASE_VERSION=1.2.3 FROM_COMMIT=abc TO_COMMIT=def"; \
+		echo "  FROM_COMMIT is optional, defaults to previous commit"; \
+		exit 1; \
+	fi
+	@./dev-tools/release/update_release_notes.sh $(RELEASE_VERSION) $(FROM_COMMIT) $(TO_COMMIT)
 
 build-historical:  ## Build historical release (usage: make build-historical COMMIT=abc123 VERSION=0.0.1)
 	@if [ -z "$(COMMIT)" ] || [ -z "$(VERSION)" ]; then \
 		echo "Usage: make build-historical COMMIT=<hash> VERSION=<version>"; \
 		exit 1; \
 	fi
-	@./dev-tools/release/historical_release.sh $(COMMIT) $(VERSION)
-
-release-historical:  ## Create and publish historical release
-	@$(MAKE) build-historical COMMIT=$(COMMIT) VERSION=$(VERSION)
-	@$(MAKE) publish-pypi
+	@./dev-tools/release/build_historical.sh $(COMMIT) $(VERSION)
 
 # Internal DRY implementations
 _release:
@@ -611,19 +615,8 @@ _release_custom:
 	fi
 
 _release_backfill:
-	@if [ -z "$(RELEASE_VERSION)" ] || [ -z "$(TO_COMMIT)" ]; then \
-		echo "ERROR: RELEASE_VERSION and TO_COMMIT required"; \
-		echo "Usage: RELEASE_VERSION=1.2.3 TO_COMMIT=abc make release-backfill"; \
-		echo "Optional: FROM_COMMIT=def (defaults to first commit)"; \
-		exit 1; \
-	fi
-	@if [ "$(DRY_RUN)" = "true" ]; then \
-		echo "DRY RUN: Backfill simulation"; \
-		ALLOW_BACKFILL=true ./dev-tools/release/dry_run_release.sh set $(RELEASE_VERSION); \
-	else \
-		ALLOW_BACKFILL=true ./dev-tools/release/version_manager.sh set $(RELEASE_VERSION); \
-		ALLOW_BACKFILL=true ./dev-tools/release/release_creator.sh; \
-	fi
+	@echo "ERROR: _release_backfill is deprecated. Use 'make release-backfill' instead."
+	@exit 1
 
 local-security: dev-install  ## Run security workflow locally (.github/workflows/security.yml)
 	@echo "Running security workflow locally..."
@@ -1022,6 +1015,7 @@ status:  ## Show project status and useful commands
 	@echo "  Promotions:     make promote-alpha|beta|rc|stable"
 	@echo "  Custom version: RELEASE_VERSION=1.2.3 make release-version"
 	@echo "  Backfill:       RELEASE_VERSION=1.2.3 TO_COMMIT=abc make release-backfill"
+	@echo "  Update notes:   RELEASE_VERSION=1.2.3 FROM_COMMIT=abc TO_COMMIT=def make update-release-notes"
 	@echo "  Historical:     COMMIT=abc123 VERSION=0.0.1 make build-historical"
 	@echo "  Dry run:        DRY_RUN=true make release-minor"
 	@echo ""

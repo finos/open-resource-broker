@@ -12,6 +12,10 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
+# Import project metadata
+sys.path.insert(0, "src")
+from _package import REPO_URL
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -79,7 +83,7 @@ def generate_spdx_fallback(output_file: str) -> bool:
             "dataLicense": "CC0-1.0",
             "SPDXID": "SPDXRef-DOCUMENT",
             "name": "open-hostfactory-plugin",
-            "documentNamespace": "https://github.com/awslabs/open-hostfactory-plugin",
+            "documentNamespace": REPO_URL,
             "creationInfo": {
                 "created": datetime.now(timezone.utc).isoformat(),
                 "creators": ["Tool: generate_sbom.py"],

@@ -324,14 +324,17 @@ class LanguageChecker(FileChecker):
                         )
                     )
 
-            # Check for hyperbolic terms
-            for pattern, suggestion in HYPERBOLIC_PATTERNS.items():
-                matches = pattern.finditer(line)
-                for match in matches:
-                    term = match.group(0)
-                    violations.append(
-                        HyperbolicTermViolation(file_path, line_num, line.strip(), term, suggestion)
-                    )
+            # Check for hyperbolic terms (skip CHANGELOG.md as it contains historical commit messages)
+            if not file_path.endswith("CHANGELOG.md"):
+                for pattern, suggestion in HYPERBOLIC_PATTERNS.items():
+                    matches = pattern.finditer(line)
+                    for match in matches:
+                        term = match.group(0)
+                        violations.append(
+                            HyperbolicTermViolation(
+                                file_path, line_num, line.strip(), term, suggestion
+                            )
+                        )
 
             # Check for implementation detail terms
             for pattern, suggestion in IMPLEMENTATION_DETAIL_PATTERNS.items():

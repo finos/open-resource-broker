@@ -10,6 +10,8 @@ ARG PACKAGE_NAME_SHORT
 ARG BUILD_DATE
 ARG VERSION=dev
 ARG VCS_REF
+ARG AUTHOR
+ARG LICENSE
 
 # Add metadata labels
 LABEL org.opencontainers.image.title="Open Host Factory Plugin Dev Tools" \
@@ -17,8 +19,8 @@ LABEL org.opencontainers.image.title="Open Host Factory Plugin Dev Tools" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.revision="${VCS_REF}" \
-      org.opencontainers.image.vendor="Open Host Factory" \
-      org.opencontainers.image.licenses="Apache-2.0"
+      org.opencontainers.image.vendor="${AUTHOR}" \
+      org.opencontainers.image.licenses="${LICENSE}"
 
 # Install system dependencies and create user in single layer
 RUN apt-get update && apt-get install -y --no-install-recommends \

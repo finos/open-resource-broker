@@ -31,10 +31,18 @@ def _get_from_package_metadata() -> Optional[dict]:
         return {
             "project": {
                 "name": meta["Name"],
+                "short_name": "ohfp",  # Not in package metadata, hardcode this one
                 "version": version("open-hostfactory-plugin"),
                 "description": meta["Summary"],
+                "author": meta["Author"],
+                "email": meta["Author-email"],
+                "license": meta["License"],
             },
-            "repository": {"org": "awslabs", "name": "open-hostfactory-plugin"},
+            "repository": {
+                "org": "awslabs",  # Not in package metadata
+                "name": "open-hostfactory-plugin",  # Not in package metadata
+                "registry": "ghcr.io",  # Not in package metadata
+            },
         }
     except Exception as e:
         logger.debug("Failed to read package metadata: %s", e)
@@ -45,7 +53,9 @@ def _get_from_package_metadata() -> Optional[dict]:
 config = _get_from_project_yml() or _get_from_package_metadata()
 
 if not config:
-    # Final fallback
+    # Final fallback - used when both .project.yml and package metadata are unavailable
+    # This occurs in scenarios like: missing .project.yml file, corrupted package installation,
+    # missing dependencies (PyYAML), or constrained deployment environments
     config = {
         "project": {
             "name": "open-hostfactory-plugin",
@@ -54,6 +64,9 @@ if not config:
             # CI builds will override this with dynamic versions like "0.1.0.dev20250822145030+abc1234"
             "version": "0.1.0.dev0",
             "description": "Cloud provider integration plugin for IBM Spectrum Symphony Host Factory",
+            "author": "AWS Professional Services",
+            "email": "aws-proserve@amazon.com",
+            "license": "Apache-2.0",
         },
         "repository": {
             "org": "awslabs",
@@ -68,12 +81,12 @@ PACKAGE_NAME_SHORT = config["project"].get("short_name", "ohfp")
 __version__ = config["project"]["version"]
 VERSION = __version__
 DESCRIPTION = config["project"]["description"]
-AUTHOR = config["project"].get("author", "AWS Professional Services")
-EMAIL = config["project"].get("email", "aws-proserve@amazon.com")
+AUTHOR = config["project"]["author"]
+EMAIL = config["project"]["email"]
 
 # Repository metadata
-REPO_ORG = config["repository"].get("org", "awslabs")
-REPO_NAME = config["repository"].get("name", "open-hostfactory-plugin")
+REPO_ORG = config["repository"]["org"]
+REPO_NAME = config["repository"]["name"]
 CONTAINER_REGISTRY = config["repository"].get("registry", "ghcr.io")
 
 # Derived values

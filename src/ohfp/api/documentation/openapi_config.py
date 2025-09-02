@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
-from _package import __version__
+from _package import AUTHOR, EMAIL, REPO_NAME, REPO_ORG, __version__
 from config.schemas.server_schema import ServerConfig
 
 from .examples import get_api_examples
@@ -49,13 +49,13 @@ def configure_openapi(app: FastAPI, server_config: ServerConfig):
         openapi_schema["info"].update(
             {
                 "contact": {
-                    "name": "Open Host Factory Plugin",
-                    "url": "https://github.com/your-org/open-hostfactory-plugin",
-                    "email": "support@your-org.com",
+                    "name": AUTHOR,
+                    "url": f"https://github.com/{REPO_ORG}/{REPO_NAME}",
+                    "email": EMAIL,
                 },
                 "license": {
-                    "name": "MIT",
-                    "url": "https://opensource.org/licenses/MIT",
+                    "name": "Apache-2.0",
+                    "url": "https://www.apache.org/licenses/LICENSE-2.0",
                 },
             }
         )

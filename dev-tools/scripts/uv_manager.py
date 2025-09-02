@@ -32,59 +32,39 @@ def run_command(cmd: list[str], capture_output: bool = False) -> subprocess.Comp
 
 
 def uv_lock() -> int:
-    """Generate uv lock files for reproducible builds."""
+    """Generate uv lock file for reproducible builds."""
     if not check_uv_available():
         logger.error(" uv not available. Install with: pip install uv")
         return 1
 
-    logger.info("INFO: Generating uv lock files...")
+    logger.info("INFO: Generating uv.lock file...")
     try:
-        run_command(
-            [
-                "uv",
-                "pip",
-                "compile",
-                "pyproject.toml",
-                "--output-file",
-                "requirements.lock",
-            ]
-        )
-        run_command(
-            [
-                "uv",
-                "pip",
-                "compile",
-                "pyproject.toml",
-                "--extra",
-                "dev",
-                "--output-file",
-                "requirements-dev.lock",
-            ]
-        )
-        logger.info("SUCCESS: Lock files generated: requirements.lock, requirements-dev.lock")
+        run_command(["uv", "lock"])
+        logger.info("SUCCESS: Lock file generated: uv.lock")
         return 0
     except subprocess.CalledProcessError:
         return 1
 
 
 def uv_sync(dev: bool = False) -> int:
-    """Sync environment with uv lock files."""
+    """Sync environment with uv.lock file."""
     if not check_uv_available():
         logger.error(" uv not available. Install with: pip install uv")
         return 1
 
-    lock_file = "requirements-dev.lock" if dev else "requirements.lock"
-
-    if not Path(lock_file).exists():
-        logger.info(f"ERROR: No lock file found: {lock_file}")
+    if not Path("uv.lock").exists():
+        logger.info("ERROR: No uv.lock file found")
         logger.info("Run 'make uv-lock' first.")
         return 1
 
     env_type = "development environment" if dev else "environment"
-    logger.info(f"INFO: Syncing {env_type} with uv lock file...")
+    logger.info(f"INFO: Syncing {env_type} with uv.lock...")
 
     try:
-        run_command(["uv", "pip", "sync", lock_file])
+        if dev:
+            run_command(["uv", "sync", "--all-groups"])
+        else:
+            run_command(["uv", "sync"])
         return 0
     except subprocess.CalledProcessError:
         return 1
@@ -180,11 +160,11 @@ def main() -> int:
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # Lock command
-    subparsers.add_parser("lock", help="Generate uv lock files for reproducible builds")
+    subparsers.add_parser("lock", help="Generate uv.lock file for reproducible builds")
 
     # Sync commands
-    subparsers.add_parser("sync", help="Sync environment with uv lock files")
-    subparsers.add_parser("sync-dev", help="Sync development environment with uv lock files")
+    subparsers.add_parser("sync", help="Sync environment with uv.lock file")
+    subparsers.add_parser("sync-dev", help="Sync development environment with uv.lock file")
 
     # Check command
     subparsers.add_parser("check", help="Check if uv is available and show version")

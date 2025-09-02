@@ -150,7 +150,11 @@ config/config.json
 data/
 monitoring/grafana/data/
 monitoring/prometheus/data/
-awscpinst/
+# AWS CP Instance runtime and local config
+awscpinst/logs/
+awscpinst/workdir/
+awscpinst/config/awsprov_config.json
+awscpinst/config/config.json*
 .aider*
 
 # OS
@@ -222,3 +226,4 @@ bandit-results*.json
 trivy-*.sarif
 semgrep-results.json
 safety-results.json
+junit-*.xml
