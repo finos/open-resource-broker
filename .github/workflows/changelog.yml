@@ -71,13 +71,15 @@ jobs:
     - name: Preview changelog changes
       if: github.event_name == 'pull_request'
       run: |
-        echo "## Changelog Preview" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "Changes that would be added to changelog:" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo '```markdown' >> $GITHUB_STEP_SUMMARY
-        make changelog-preview --from-commit="${{ github.event.pull_request.base.sha }}" >> $GITHUB_STEP_SUMMARY || echo "No changes to preview" >> $GITHUB_STEP_SUMMARY
-        echo '```' >> $GITHUB_STEP_SUMMARY
+        {
+          echo "## Changelog Preview"
+          echo ""
+          echo "Changes that would be added to changelog:"
+          echo ""
+          echo '```markdown'
+        } >> "$GITHUB_STEP_SUMMARY"
+        make changelog-preview --from-commit="${{ github.event.pull_request.base.sha }}" >> "$GITHUB_STEP_SUMMARY" || echo "No changes to preview" >> "$GITHUB_STEP_SUMMARY"
+        echo '```' >> "$GITHUB_STEP_SUMMARY"
 
   check-changelog-sync:
     name: Check Changelog Sync
@@ -112,10 +114,12 @@ jobs:
           echo "WARNING: Changelog appears to be out of sync with git history"
           echo "Consider running: make changelog-regenerate"
           
-          echo "## Changelog Sync Check" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "The changelog appears to be out of sync with git history." >> $GITHUB_STEP_SUMMARY
-          echo "Run \`make changelog-regenerate\` to update it." >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Changelog Sync Check"
+            echo ""
+            echo "The changelog appears to be out of sync with git history."
+            echo "Run \`make changelog-regenerate\` to update it."
+          } >> "$GITHUB_STEP_SUMMARY"
         else
           echo "Changelog is in sync with git history"
         fi
