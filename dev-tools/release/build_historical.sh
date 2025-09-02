@@ -125,4 +125,4 @@ fi
 
 log_info "Historical package $VERSION built successfully!"
 log_info "  - Built from commit $COMMIT_HASH"
-log_info "  - Package: $(ls dist/*.whl 2>/dev/null | tail -1)"
+log_info "  - Package: $(find dist -name "*.whl" -type f 2>/dev/null | tail -1)"

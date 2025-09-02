@@ -42,5 +42,5 @@ else
 fi
 
 # Cleanup
-rm -rf dist/ build/ *.egg-info/
+rm -rf dist/ build/ ./*.egg-info/
 echo "Cleaned up build artifacts"

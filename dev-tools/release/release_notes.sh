@@ -266,11 +266,11 @@ generate_fallback_notes() {
     docs=$(git log --oneline --no-merges "$from_commit..$to_commit" | grep -iE "$DOCS_PATTERN" || true)
     other=$(git log --oneline --no-merges "$from_commit..$to_commit" | grep -viE "($BREAKING_PATTERN|$FEATURES_PATTERN|$BUGS_PATTERN|$DOCS_PATTERN)" || true)
     
-    [ -n "$breaking" ] && echo "### Breaking Changes" && echo "$breaking" | sed 's/^/- /' && echo ""
-    [ -n "$features" ] && echo "### Features" && echo "$features" | sed 's/^/- /' && echo ""
-    [ -n "$bugs" ] && echo "### Bug Fixes" && echo "$bugs" | sed 's/^/- /' && echo ""
-    [ -n "$docs" ] && echo "### Documentation" && echo "$docs" | sed 's/^/- /' && echo ""
-    [ -n "$other" ] && echo "### Other Changes" && echo "$other" | sed 's/^/- /' && echo ""
+    [ -n "$breaking" ] && echo "### Breaking Changes" && echo "$breaking" | while IFS= read -r line; do echo "- $line"; done && echo ""
+    [ -n "$features" ] && echo "### Features" && echo "$features" | while IFS= read -r line; do echo "- $line"; done && echo ""
+    [ -n "$bugs" ] && echo "### Bug Fixes" && echo "$bugs" | while IFS= read -r line; do echo "- $line"; done && echo ""
+    [ -n "$docs" ] && echo "### Documentation" && echo "$docs" | while IFS= read -r line; do echo "- $line"; done && echo ""
+    [ -n "$other" ] && echo "### Other Changes" && echo "$other" | while IFS= read -r line; do echo "- $line"; done && echo ""
     
     # Extract contributors with GitHub usernames
     local contributors
