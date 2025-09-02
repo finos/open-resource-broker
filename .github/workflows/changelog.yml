@@ -107,10 +107,12 @@ jobs:
         echo "Checking changelog synchronization..."
         
         # Generate temporary changelog
-        python3 dev-tools/release/changelog_manager.py generate --output /tmp/generated-changelog.md
+        python3 dev-tools/release/changelog_manager.py generate
         
-        # Compare with existing
-        if ! diff -q CHANGELOG.md /tmp/generated-changelog.md >/dev/null; then
+        # Compare with existing (the generate command updates CHANGELOG.md directly)
+        if git diff --quiet CHANGELOG.md; then
+          echo "Changelog is in sync with git history"
+        else
           echo "WARNING: Changelog appears to be out of sync with git history"
           echo "Consider running: make changelog-regenerate"
           
@@ -120,6 +122,11 @@ jobs:
             echo "The changelog appears to be out of sync with git history."
             echo "Run \`make changelog-regenerate\` to update it."
           } >> "$GITHUB_STEP_SUMMARY"
+          
+          # Reset the changes since this is just a check
+          git checkout -- CHANGELOG.md
+          exit 1
+        fi
         else
           echo "Changelog is in sync with git history"
         fi
