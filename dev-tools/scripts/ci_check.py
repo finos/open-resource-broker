@@ -162,7 +162,7 @@ class CIChecker:
         project_yml = self.project_root / ".project.yml"
         if project_yml.exists():
             content = project_yml.read_text()
-            if 'default_version: 3.8' in content:
+            if "default_version: 3.8" in content:
                 self.log("FAIL: .project.yml still has Python 3.8 (need 3.11+)")
                 self.failed_checks.append(".project.yml Python version too old")
                 return False
