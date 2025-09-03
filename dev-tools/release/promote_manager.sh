@@ -60,7 +60,7 @@ case $PROMOTE_TO in
         if [ "$CURRENT_PRERELEASE" = "a" ]; then
             # Increment alpha number
             NEW_NUMBER=$((CURRENT_NUMBER + 1))
-            NEW_VERSION="$BASE_VERSION"a"$NEW_NUMBER"
+            NEW_VERSION="${BASE_VERSION}a${NEW_NUMBER}"
         else
             echo "ERROR: Cannot promote to alpha from $CURRENT_VERSION"
             echo "Alpha promotion only works from existing alpha versions"
@@ -70,11 +70,11 @@ case $PROMOTE_TO in
     beta)
         if [ "$CURRENT_PRERELEASE" = "a" ]; then
             # Promote alpha to beta.1
-            NEW_VERSION="$BASE_VERSION"b1""
+            NEW_VERSION="${BASE_VERSION}b1"
         elif [ "$CURRENT_PRERELEASE" = "b" ]; then
             # Increment beta number
             NEW_NUMBER=$((CURRENT_NUMBER + 1))
-            NEW_VERSION="$BASE_VERSION"b"$NEW_NUMBER"
+            NEW_VERSION="${BASE_VERSION}b${NEW_NUMBER}"
         else
             echo "ERROR: Cannot promote to beta from $CURRENT_VERSION"
             echo "Beta promotion works from alpha or existing beta versions"
@@ -84,11 +84,11 @@ case $PROMOTE_TO in
     rc)
         if [ "$CURRENT_PRERELEASE" = "b" ]; then
             # Promote beta to rc1
-            NEW_VERSION="$BASE_VERSION"rc1""
+            NEW_VERSION="${BASE_VERSION}rc1"
         elif [ "$CURRENT_PRERELEASE" = "rc" ]; then
             # Increment rc number
             NEW_NUMBER=$((CURRENT_NUMBER + 1))
-            NEW_VERSION="$BASE_VERSION"rc"$NEW_NUMBER"
+            NEW_VERSION="${BASE_VERSION}rc${NEW_NUMBER}"
         else
             echo "ERROR: Cannot promote to rc from $CURRENT_VERSION"
             echo "RC promotion works from beta or existing rc versions"
