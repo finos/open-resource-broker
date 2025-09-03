@@ -1,0 +1,45 @@
+# GitHub Labels Configuration
+# Use with: gh label sync --file .github/labels.yml
+
+# Release Management
+- name: "release"
+  color: "0366d6"
+  description: "Release-related issues and PRs"
+
+- name: "alpha"
+  color: "f9d0c4"
+  description: "Alpha release"
+
+- name: "beta"
+  color: "d4c5f9"
+  description: "Beta release"
+
+- name: "rc"
+  color: "c5f9d4"
+  description: "Release candidate"
+
+- name: "stable"
+  color: "0e8a16"
+  description: "Stable release"
+
+# Automation
+- name: "automated"
+  color: "ededed"
+  description: "Automated processes and PRs"
+
+- name: "changelog"
+  color: "0366d6"
+  description: "Changelog updates"
+
+- name: "weekly"
+  color: "fbca04"
+  description: "Weekly automated processes"
+
+# Workflow States
+- name: "pending-review"
+  color: "fbca04"
+  description: "Awaiting review or approval"
+
+- name: "ready-to-merge"
+  color: "0e8a16"
+  description: "Ready for merging"
