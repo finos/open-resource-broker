@@ -227,3 +227,6 @@ trivy-*.sarif
 semgrep-results.json
 safety-results.json
 junit-*.xml
+
+# Generated files - always regenerated from templates
+pyproject.toml

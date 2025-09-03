@@ -30,7 +30,7 @@ jobs:
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
       with:
-        cache-key: changelog-${{ env.PYTHON_VERSION }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+        cache-key: changelog-${{ env.PYTHON_VERSION }}-${{ hashFiles('pyproject.toml.template', 'uv.lock') }}
         fail-on-cache-miss: false
     
     - name: Install changelog dependencies
@@ -95,7 +95,7 @@ jobs:
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
       with:
-        cache-key: changelog-sync-${{ env.PYTHON_VERSION }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+        cache-key: changelog-sync-${{ env.PYTHON_VERSION }}-${{ hashFiles('pyproject.toml.template', 'uv.lock') }}
         fail-on-cache-miss: false
     
     - name: Validate changelog
