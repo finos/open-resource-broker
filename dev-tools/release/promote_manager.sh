@@ -133,9 +133,9 @@ else
     echo "Non-interactive mode: Promoting to $NEW_VERSION"
 fi
 
-# Update .project.yml
-yq -i ".project.version = \"$NEW_VERSION\"" .project.yml
-echo "Updated .project.yml with version $NEW_VERSION"
+# Version will be updated via changelog PR instead of direct commit
+log_info "Version promotion prepared: $CURRENT_VERSION -> $NEW_VERSION"
+log_info "Version update will be handled by changelog PR during release creation"
 
 # For stable promotion, consolidate release notes from pre-releases
 if [ "$PROMOTE_TO" = "stable" ]; then
@@ -143,3 +143,7 @@ if [ "$PROMOTE_TO" = "stable" ]; then
     echo "Note: Stable promotion will consolidate notes from all pre-releases"
     echo "This includes all changes from alpha, beta, and rc versions of $BASE_VERSION"
 fi
+
+# Export the new version for use by release_creator.sh
+export PROMOTED_VERSION="$NEW_VERSION"
+echo "PROMOTED_VERSION=$NEW_VERSION" >> "$GITHUB_ENV" 2>/dev/null || true

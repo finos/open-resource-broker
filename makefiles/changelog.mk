@@ -8,11 +8,15 @@ changelog-generate: dev-install changelog-install-deps  ## Generate full changel
 	@python3 dev-tools/release/changelog_manager.py generate
 	@echo "Changelog generated: CHANGELOG.md"
 
-changelog-update: dev-install changelog-install-deps  ## Update changelog for current version
-	@echo "Updating changelog for release..."
-	@$(eval VERSION := $(shell make -s get-version))
-	@python3 dev-tools/release/changelog_manager.py update "v$(VERSION)"
-	@echo "Changelog updated for v$(VERSION)"
+changelog-update: dev-install  ## Update changelog for release (VERSION=v1.2.3)
+	@if [ -z "$(VERSION)" ]; then \
+		echo "ERROR: VERSION required"; \
+		echo "Usage: make changelog-update VERSION=v1.2.3"; \
+		exit 1; \
+	fi
+	@echo "Updating changelog for release $(VERSION)..."
+	@python3 dev-tools/release/changelog_manager.py update "$(VERSION)"
+	@echo "Changelog updated for $(VERSION)"
 
 changelog-preview: dev-install changelog-install-deps  ## Preview changelog changes
 	@echo "Previewing changelog changes..."

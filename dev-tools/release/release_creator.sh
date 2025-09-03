@@ -267,6 +267,16 @@ create_release() {
         fi
     fi
     
+    # Create changelog PR
+    log_info "Creating changelog update PR..."
+    if [ "${SKIP_CHANGELOG:-false}" = "true" ]; then
+        log_info "Skipping changelog PR creation (SKIP_CHANGELOG=true)"
+    else
+        ./dev-tools/release/create_changelog_pr.sh "$tag_name" || {
+            log_warn "Failed to create changelog PR, but release was successful"
+        }
+    fi
+    
     echo ""
     echo "Release created successfully!"
     echo "Tag: $tag_name"
