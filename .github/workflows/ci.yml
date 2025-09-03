@@ -5,8 +5,6 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
-  issue_comment:
-    types: [created]
   schedule:
     # Run daily at 2 AM UTC
     - cron: '0 2 * * *'
@@ -21,36 +19,14 @@ env:
   CI_TRIGGERS: "/test,/build,/ci"
 
 jobs:
-  check-comment:
-    name: Check Comment Triggers
-    runs-on: ubuntu-latest
-    outputs:
-      triggered: ${{ steps.check.outputs.triggered }}
-      pr_ref: ${{ steps.check.outputs.pr_ref }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Check comment trigger
-        id: check
-        uses: ./.github/actions/check-comment-trigger
-        with:
-          triggers: ${{ env.CI_TRIGGERS }}
-
   get-config:
     name: Get Configuration
     runs-on: ubuntu-latest
-    if: |
-      github.event_name != 'issue_comment' || 
-      needs.check-comment.outputs.triggered == 'true'
-    needs: [check-comment]
     outputs:
       default-python-version: ${{ steps.config.outputs.default-python-version }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v5
-      with:
-        ref: ${{ needs.check-comment.outputs.pr_ref || github.sha }}
 
     - name: Get project configuration
       id: config
