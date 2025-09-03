@@ -84,7 +84,7 @@ jobs:
       # Trivy Filesystem Scan
       - name: Run Trivy filesystem vulnerability scanner
         if: inputs.scan-type == 'trivy-fs'
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.33.1
         with:
           scan-type: 'fs'
           scan-ref: '.'

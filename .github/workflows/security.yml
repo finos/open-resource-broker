@@ -124,7 +124,7 @@ jobs:
         fetch-depth: 0
 
     - name: Check for secrets with TruffleHog
-      uses: trufflesecurity/trufflehog@main
+      uses: trufflesecurity/trufflehog@v3.90.5
       with:
         path: ./
         base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
@@ -204,7 +204,7 @@ jobs:
         cache-to: type=gha,mode=max
 
     - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@0.33.1
       with:
         image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:security-scan-py${{ matrix.python-version }}
         format: 'sarif'
@@ -217,7 +217,7 @@ jobs:
         sarif_file: 'trivy-results-py${{ matrix.python-version }}.sarif'
 
     - name: Run Trivy vulnerability scanner (JSON output)
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@0.33.1
       with:
         image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:security-scan-py${{ matrix.python-version }}
         format: 'json'
