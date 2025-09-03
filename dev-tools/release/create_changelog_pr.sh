@@ -11,7 +11,6 @@ if [ $# -ne 1 ]; then
 fi
 
 TAG_NAME="$1"
-BRANCH_NAME="changelog/release-${TAG_NAME}"
 
 # Colors for output
 GREEN='\033[0;32m'
