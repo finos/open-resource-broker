@@ -123,7 +123,7 @@ lint: dev-install  ## Check enforced rules (fail on issues)
 lint-optional: dev-install  ## Check optional rules (warnings only)
 	@uv run ruff check --select=N,UP,B,PL,C90,RUF --quiet . || true
 
-pre-commit: format lint  ## Simulate pre-commit checks locally
+pre-commit: format lint validate-workflows  ## Simulate pre-commit checks locally
 	@echo "All checks passed! Safe to commit."
 
 pre-commit-check: dev-install  ## Run all pre-commit validation checks

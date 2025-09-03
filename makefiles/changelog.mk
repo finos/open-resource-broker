@@ -3,7 +3,7 @@
 
 # @SECTION Changelog Management
 
-changelog-generate: dev-install changelog-install-deps  ## Generate full changelog from git history
+changelog-generate: dev-install  ## Generate full changelog from git history
 	@echo "Generating complete changelog from git history..."
 	@python3 dev-tools/release/changelog_manager.py generate
 	@echo "Changelog generated: CHANGELOG.md"
@@ -18,7 +18,7 @@ changelog-update: dev-install  ## Update changelog for release (VERSION=v1.2.3)
 	@python3 dev-tools/release/changelog_manager.py update "$(VERSION)"
 	@echo "Changelog updated for $(VERSION)"
 
-changelog-preview: dev-install changelog-install-deps  ## Preview changelog changes
+changelog-preview: dev-install  ## Preview changelog changes
 	@echo "Previewing changelog changes..."
 	@python3 dev-tools/release/changelog_manager.py preview
 
