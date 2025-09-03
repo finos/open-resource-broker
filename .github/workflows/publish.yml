@@ -29,12 +29,9 @@ on:
         - pypi
 
 jobs:
-  check-build-comment:
   get-config:
     name: Get Configuration
     runs-on: ubuntu-latest
-    if: |
-    needs: [check-build-comment]
     outputs:
       default-python-version: ${{ steps.config.outputs.default-python-version }}
       package-version: ${{ steps.config.outputs.package-version }}

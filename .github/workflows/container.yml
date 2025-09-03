@@ -36,12 +36,9 @@ on:
         type: boolean
 
 jobs:
-  check-container-comment:
   get-config:
     name: Get Configuration
     runs-on: ubuntu-latest
-    if: |
-    needs: [check-container-comment]
     outputs:
       python-versions: ${{ steps.config.outputs.python-versions }}
       default-python-version: ${{ steps.config.outputs.default-python-version }}

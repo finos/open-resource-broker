@@ -86,8 +86,12 @@ jobs:
               pull_number: context.issue.number
             });
 
-            const title = pr.title.toLowerCase();
-            const labels = pr.labels.map(label => label.name);
+            // SECURITY: Sanitize inputs to prevent injection
+            const title = pr.title.toLowerCase().replace(/[^a-z0-9\-\s]/g, '');
+            const allowedLabels = ['patch', 'minor', 'major', 'dependencies', 'dev-dependencies', 'security'];
+            const labels = pr.labels
+              .map(label => label.name)
+              .filter(name => allowedLabels.includes(name));
 
             // Auto-merge conditions
             const isPatch = title.includes('patch') || labels.includes('patch');
@@ -96,8 +100,8 @@ jobs:
 
             const shouldAutoMerge = isPatch || (isMinor && isDev);
 
-            console.log(`Title: ${title}`);
-            console.log(`Labels: ${labels.join(', ')}`);
+            console.log(`Sanitized title: ${title}`);
+            console.log(`Filtered labels: ${labels.join(', ')}`);
             console.log(`Should auto-merge: ${shouldAutoMerge}`);
 
             return shouldAutoMerge;
