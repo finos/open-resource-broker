@@ -242,7 +242,7 @@ jobs:
             echo "ERROR: Source image $image_tag not found"
             return 1
           fi
-          echo "✓ Image validated: $image_tag"
+          echo "Image validated: $image_tag"
         }
         
         # Function to create manifest with retry
@@ -254,7 +254,7 @@ jobs:
           for attempt in $(seq 1 "$max_attempts"); do
             echo "Creating manifest: $target_tag (attempt $attempt/$max_attempts)"
             if docker buildx imagetools create -t "$target_tag" "$source_tag"; then
-              echo "✓ Successfully created manifest: $target_tag"
+              echo "Successfully created manifest: $target_tag"
               return 0
             fi
             if [ "$attempt" -lt "$max_attempts" ]; then
