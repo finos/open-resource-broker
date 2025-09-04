@@ -42,7 +42,7 @@ changelog-sync-check: dev-install  ## Check if changelog is in sync with git his
 # @SECTION Release Notes Management
 release-notes-generate: dev-install  ## Generate release notes for current version
 	@echo "Generating release notes for version $(VERSION)..."
-	./dev-tools/release/release_notes.sh $(VERSION)
+	./dev-tools/release/changelog_manager.py update $(VERSION)
 
 release-notes-preview: dev-install  ## Preview release notes for current version
 	@echo "Previewing release notes for version $(VERSION)..."
