@@ -87,7 +87,7 @@ def main():
     # Add parallel execution (only if pytest-xdist is available)
     if args.parallel:
         try:
-            import xdist  # noqa: F401 - Used conditionally
+            import xdist  # type: ignore[import-untyped] # noqa: F401 - Used conditionally
 
             pytest_cmd.extend(["-n", "auto"])
         except ImportError:
