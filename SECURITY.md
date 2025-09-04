@@ -18,8 +18,7 @@ We take the security of AWS Host Factory Plugin seriously. If you believe you ha
 **Please do not report security vulnerabilities through public GitHub issues.**
 
 Instead, please report them via email to:
-- Primary: security@awshostfactory.example.com
-- Secondary: aws-hostfactory-security@amazon.com
+- **aws-security@amazon.com**
 
 You should receive a response within 24 hours. If for some reason you do not, please follow up via email to ensure we received your original message.
 

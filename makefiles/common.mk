@@ -62,6 +62,6 @@ define run-tool
 	$(if $(3),cd $(3) && ../dev-tools/scripts/run_tool.sh $(1) $(2),@dev-tools/scripts/run_tool.sh $(1) $(2))
 endef
 
-# Virtual environment setup
-$(VENV)/bin/activate: uv.lock
+# Virtual environment setup (common dependency for all makefiles)
+venv-setup: uv.lock
 	./dev-tools/scripts/venv_setup.py

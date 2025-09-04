@@ -1,22 +1,21 @@
-# Development workflow targets
-# Installation, dependencies, testing, formatting, linting
+# Development and testing targets
 
 # @SECTION Setup & Installation
-install: $(VENV)/bin/activate  ## Install production dependencies (UV-first)
+install: venv-setup  ## Install production dependencies (UV-first)
 	@echo "Installing production dependencies with UV..."
 	uv sync --no-dev
 
-install-pip: $(VENV)/bin/activate  ## Install production dependencies (pip alternative)
+install-pip: venv-setup  ## Install production dependencies (pip alternative)
 	@echo "Generating production requirements from uv.lock..."
 	uv export --no-dev --no-header --output-file requirements.txt
 	@echo "Installing with pip..."
 	$(BIN)/pip install -r requirements.txt
 
-dev-install: generate-pyproject $(VENV)/bin/activate  ## Install development dependencies (UV-first)
+dev-install: generate-pyproject venv-setup  ## Install development dependencies (UV-first)
 	@echo "Installing with UV (all dependencies)..."
 	@uv sync --all-groups --quiet
 
-dev-install-pip: generate-pyproject $(VENV)/bin/activate  ## Install development dependencies (pip alternative)
+dev-install-pip: generate-pyproject venv-setup  ## Install development dependencies (pip alternative)
 	@echo "Generating requirements from uv.lock..."
 	uv export --no-dev --no-header --output-file requirements.txt
 	uv export --no-header --output-file requirements-dev.txt
@@ -33,26 +32,9 @@ requirements-generate:  ## Generate requirements files from uv.lock
 	@echo "Generating requirements files from uv.lock..."
 	uv export --no-dev --no-header --output-file requirements.txt
 	uv export --no-header --output-file requirements-dev.txt
-	@echo "Generated requirements.txt and requirements-dev.txt"
 
-# Dependency management
-deps-update:  ## Update dependencies and regenerate lock file
-	@echo "Updating dependencies..."
-	uv lock --upgrade
-
-deps-add:  ## Add new dependency (usage: make deps-add PACKAGE=package-name)
-	@if [ -z "$(PACKAGE)" ]; then echo "Usage: make deps-add PACKAGE=package-name"; exit 1; fi
-	./dev-tools/scripts/deps_manager.py add $(PACKAGE)
-
-deps-add-dev:  ## Add new dev dependency (usage: make deps-add-dev PACKAGE=package-name)
-	@if [ -z "$(PACKAGE)" ]; then echo "Usage: make deps-add-dev PACKAGE=package-name"; exit 1; fi
-	./dev-tools/scripts/deps_manager.py add --dev $(PACKAGE)
-
-# Cleanup
 clean-requirements:  ## Remove generated requirements files
 	rm -f requirements.txt requirements-dev.txt
-
-# @SECTION Testing
 # Testing targets (using enhanced dispatcher)
 test: dev-install  ## Run tests (supports: make test path/to/tests -k pattern -v)
 	@./dev-tools/testing/run_tests.py $(filter-out $@,$(MAKECMDGOALS))
@@ -95,48 +77,45 @@ test-html: dev-install  ## Run tests with HTML coverage (supports same args)
 test-report: dev-install  ## Generate comprehensive test report
 	./dev-tools/testing/run_tests.py --all --coverage --junit-xml=test-results-combined.xml --cov-xml=coverage-combined.xml --html-coverage --maxfail=1 --timeout=60
 
-test-install: build  ## Test package installation
-	./dev-tools/package/test_install.sh
+# @SECTION Development Tools
+generate-pyproject:  ## Generate pyproject.toml from template using project config
+	@echo "Generating pyproject.toml from template using $(PROJECT_CONFIG)..."
+	@./dev-tools/scripts/generate_pyproject.py --config $(PROJECT_CONFIG)
 
-test-completions:         ## Test completion generation
-	@echo "Testing bash completion generation..."
-	@$(call run-tool,python,src/run.py --completion bash) > /dev/null && echo "SUCCESS: Bash completion generation works"
-	@echo "Testing zsh completion generation..."
-	@$(call run-tool,python,src/run.py --completion zsh) > /dev/null && echo "SUCCESS: Zsh completion generation works"
+deps-add:  ## Add new dependency (usage: make deps-add PACKAGE=package-name)
+	@if [ -z "$(PACKAGE)" ]; then \
+		echo "Error: PACKAGE is required. Usage: make deps-add PACKAGE=package-name"; \
+		exit 1; \
+	fi
+	./dev-tools/scripts/deps_manager.py add $(PACKAGE)
 
-# @SECTION Code Quality
-# Code quality targets
-format: dev-install clean-whitespace  ## Format code with Ruff (no auto-fix)
-	@uv run ruff format --check --quiet .
+deps-add-dev:  ## Add new dev dependency (usage: make deps-add-dev PACKAGE=package-name)
+	@if [ -z "$(PACKAGE)" ]; then \
+		echo "Error: PACKAGE is required. Usage: make deps-add-dev PACKAGE=package-name"; \
+		exit 1; \
+	fi
+	./dev-tools/scripts/deps_manager.py add --dev $(PACKAGE)
 
-format-fix: clean-whitespace  ## Auto-fix code formatting with Ruff
-	@uv run ruff format --quiet .
-	@uv run ruff check --fix --exit-zero --quiet .
+# Cleanup
+clean:  ## Clean up build artifacts
+	rm -rf build/
+	rm -rf dist/
+	rm -rf *.egg-info
+	rm -rf .pytest_cache/
+	rm -rf .coverage
+	rm -rf $(COVERAGE_HTML)/
+	rm -f $(COVERAGE_REPORT)
+	rm -f test-results.xml
+	rm -f bandit-report.json
+	rm -f pyproject.toml
+	rm -rf .mypy_cache/
+	rm -rf .ruff_cache/
+	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 
-format-container: ## Format code in container (no local tools needed)
-	./dev-tools/scripts/run_dev_checks.sh format
-
-lint: dev-install  ## Check enforced rules (fail on issues)
-	@uv run ruff check --quiet .
-	@uv run ruff format --check --quiet .
-
-lint-optional: dev-install  ## Check optional rules (warnings only)
-	@uv run ruff check --select=N,UP,B,PL,C90,RUF --quiet . || true
-
-pre-commit: format lint validate-workflows  ## Simulate pre-commit checks locally
-	@echo "All checks passed! Safe to commit."
-
-pre-commit-check: dev-install  ## Run all pre-commit validation checks
-	@echo "Running pre-commit validation checks..."
-	./dev-tools/scripts/pre_commit_check.py
-
-pre-commit-check-required: dev-install  ## Run only required pre-commit checks (skip warnings)
-	@echo "Running required pre-commit validation checks..."
-	./dev-tools/scripts/pre_commit_check.py --required-only
-
-clean-whitespace:  ## Clean whitespace in blank lines from all files
-	@echo "Cleaning whitespace in blank lines..."
-	$(call run-tool,python,./dev-tools/scripts/clean_whitespace.py)
+clean-all: clean  ## Clean everything including virtual environment
+	@echo "Cleaning virtual environment..."
+	rm -rf $(VENV)/
 
 # Development targets
 dev-setup: dev-install  ## Set up development environment
@@ -147,91 +126,94 @@ dev-setup: dev-install  ## Set up development environment
 	@echo "  make lint          - Run code quality checks"
 	@echo "  make format        - Format code"
 
-dev: dev-install format lint test-quick  ## Quick development workflow (format, lint, test)
-	@echo "Development workflow completed successfully!"
-
-# Package management targets
-install-package: build  ## Install package locally
-	uv pip install dist/*.whl
+install-package: dev-install  ## Install package in development mode
+	@echo "Installing package in development mode..."
+	uv pip install -e .
 
 uninstall-package:  ## Uninstall package
-	uv pip uninstall $(PROJECT) -y
+	@echo "Uninstalling package..."
+	uv pip uninstall $(PACKAGE_NAME) -y || pip uninstall $(PACKAGE_NAME) -y
 
 reinstall-package: uninstall-package install-package  ## Reinstall package
 
-# UV-specific targets for performance optimization
-uv-lock: ## Generate uv.lock file for reproducible builds
-	./dev-tools/scripts/uv_manager.py lock
+init-db:  ## Initialize database (if applicable)
+	@echo "Initializing database..."
+	# Add database initialization commands here
 
-uv-sync: ## Sync environment with uv.lock file
-	./dev-tools/scripts/uv_manager.py sync
+create-config:  ## Create default configuration file
+	@echo "Creating default configuration..."
+	@mkdir -p config
+	@echo '{"debug": false, "log_level": "INFO"}' > $(CONFIG)
 
-uv-sync-dev: ## Sync development environment with uv.lock file
-	./dev-tools/scripts/uv_manager.py sync-dev
-
-uv-check: ## Check if uv is available and show version
-	./dev-tools/scripts/uv_manager.py check
-
-uv-benchmark: ## Benchmark uv vs pip installation speed
-	./dev-tools/scripts/uv_manager.py benchmark
-
-# Completion targets
-generate-completions:     ## Generate completion scripts (bash and zsh)
-	@echo "Generating bash completion..."
-	$(call run-tool,python,src/run.py --completion bash) > dev-tools/completions/bash/$(PACKAGE_NAME_SHORT)-completion.bash
-	@echo "Generating zsh completion..."
-	$(call run-tool,python,src/run.py --completion zsh) > dev-tools/completions/zsh/_$(PACKAGE_NAME_SHORT)
-	@echo "SUCCESS: Completion scripts generated in dev-tools/completions/"
-
-install-completions:      ## Install completions for current user
-	./dev-tools/scripts/install_completions.sh
-
-install-bash-completions: ## Install bash completions only
-	./dev-tools/scripts/install_completions.sh bash
-
-install-zsh-completions:  ## Install zsh completions only
-	./dev-tools/scripts/install_completions.sh zsh
-
-uninstall-completions:    ## Remove installed completions
-	./dev-tools/scripts/install_completions.sh --uninstall
-
-# Tool installation
-install-dev-tools: ## Install all development tools (yq, hadolint, trivy, syft, docker, uv, etc.)
-	@echo "Installing development tools for $(shell uname -s)..."
-	./dev-tools/scripts/install_dev_tools.py
-
-install-dev-tools-required: ## Install only required development tools (yq, uv, docker)
-	@echo "Installing required development tools..."
-	./dev-tools/scripts/install_dev_tools.py --required-only
-
-install-dev-tools-dry-run: ## Show what development tools would be installed
-	@echo "Checking what development tools would be installed..."
-	./dev-tools/scripts/install_dev_tools.py --dry-run
-
-# Application targets
-run: install  ## Run application
-	$(call run-tool,python,src/run.py)
-
-run-dev: dev-install  ## Run application in development mode
-	$(call run-tool,python,src/run.py --log-level DEBUG)
-
-# Database targets (if needed)
-init-db: install  ## Initialize database
-	$(call run-tool,python,src/run.py system init-db)
-
-# Configuration targets
-create-config:  ## Create default config file
-	@if [ ! -f $(CONFIG) ]; then \
-		mkdir -p config; \
-		cp config/config.example.json $(CONFIG); \
-		echo "Created $(CONFIG)"; \
+validate-config:  ## Validate configuration file
+	@echo "Validating configuration..."
+	@if [ -f "$(CONFIG)" ]; then \
+		echo "Configuration file exists: $(CONFIG)"; \
+		python -m json.tool $(CONFIG) > /dev/null && echo "Configuration is valid JSON"; \
 	else \
-		echo "$(CONFIG) already exists"; \
+		echo "Configuration file not found: $(CONFIG)"; \
+		echo "Run 'make create-config' to create a default configuration"; \
 	fi
 
-validate-config: install  ## Validate configuration
-	$(call run-tool,python,src/run.py config validate)
-
-# Quick start for new developers
-quick-start: ## Complete setup for new developers (install tools + dependencies + verify)
+quick-start: dev-install create-config  ## Quick start for new developers
+	@echo "Running quick start setup..."
 	./dev-tools/scripts/quick_start.py
+
+dev: dev-install format lint test-quick  ## Quick development workflow (format, lint, test)
+	@echo "Development workflow completed successfully!"
+
+# Show project status
+status:  ## Show project status and useful commands
+	@echo "=== $(PACKAGE_NAME) v$(VERSION) Status ==="
+	@echo ""
+	@echo "Python version: $(DEFAULT_PYTHON_VERSION)"
+	@echo "Package: $(PACKAGE_NAME)"
+	@echo "Version: $(VERSION)"
+	@echo ""
+	@echo "Available commands:"
+	@echo "  make dev-setup     - Set up development environment"
+	@echo "  make test          - Run tests"
+	@echo "  make lint          - Run linting"
+	@echo "  make format        - Format code"
+	@echo "  make docs-serve    - Start documentation server"
+	@echo "  make clean         - Clean build artifacts"
+
+# UV management targets
+uv-lock: generate-pyproject  ## Update uv.lock file
+	@echo "Updating uv.lock file..."
+	./dev-tools/scripts/uv_manager.py lock
+
+uv-sync: generate-pyproject  ## Sync dependencies from uv.lock
+	@echo "Syncing dependencies from uv.lock..."
+	./dev-tools/scripts/uv_manager.py sync
+
+uv-sync-dev: generate-pyproject  ## Sync all dependencies including dev
+	@echo "Syncing all dependencies including dev..."
+	./dev-tools/scripts/uv_manager.py sync-dev
+
+uv-check:  ## Check UV configuration and dependencies
+	@echo "Checking UV configuration..."
+	./dev-tools/scripts/uv_manager.py check
+
+deps-update:  ## Update dependencies and regenerate lock file
+	@echo "Updating dependencies..."
+	uv lock --upgrade
+
+clean-requirements:  ## Remove generated requirements files
+	rm -f requirements.txt requirements-dev.txt
+
+show-package-info:  ## Show package information
+	@echo "Package Name: $(PACKAGE_NAME)"
+	@echo "Short Name: $(PACKAGE_NAME_SHORT)"
+	@echo "Version: $(VERSION)"
+	@echo "Author: $(AUTHOR)"
+	@echo "License: $(LICENSE)"
+	@echo "Repository: $(REPO_URL)"
+	@echo "Container Registry: $(CONTAINER_REGISTRY)"
+
+print-json-PYTHON_VERSIONS:  ## Print Python versions as JSON (for CI)
+	@echo '$(PYTHON_VERSIONS)' | tr ' ' '\n' | jq -R . | jq -s .
+
+uv-benchmark:  ## Benchmark UV vs pip performance
+	@echo "Benchmarking UV vs pip performance..."
+	./dev-tools/scripts/uv_manager.py benchmark

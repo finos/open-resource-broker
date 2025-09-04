@@ -1,5 +1,4 @@
-# CI/CD integration targets
-# GitHub Actions workflows, local CI execution, and CI-specific checks
+# CI/CD targets that match GitHub Actions workflows exactly
 
 # @SECTION CI Quality Checks
 # Individual code quality targets (with tool names)
@@ -70,9 +69,6 @@ ci-security-trivy-fs: dev-install  ## Run Trivy filesystem scan
 ci-security-trufflehog: dev-install  ## Run TruffleHog secrets scan
 	./dev-tools/scripts/ci_security.py trufflehog
 
-ci-security-container: dev-install ## Run container security scans (CI)
-	./dev-tools/scripts/security_container.py
-
 # Composite target
 ci-security: ci-security-bandit ci-security-safety ci-security-semgrep ci-security-trivy-fs ci-security-trufflehog  ## Run all security scans
 
@@ -81,7 +77,6 @@ ci-build-sbom:  ## Generate SBOM files (matches publish.yml workflow)
 	@echo "This matches the GitHub Actions publish.yml workflow exactly"
 	$(MAKE) sbom-generate
 
-# CI test targets
 ci-tests-unit:  ## Run unit tests only (matches ci.yml unit-tests job)
 	@echo "Running unit tests..."
 	$(call run-tool,pytest,$(TESTS_UNIT) $(PYTEST_ARGS) $(PYTEST_COV_ARGS) --cov-report=xml:coverage-unit.xml --junitxml=junit-unit.xml)
@@ -102,7 +97,6 @@ ci-tests-performance:  ## Run performance tests only (matches ci.yml performance
 	@echo "Running performance tests..."
 	$(call run-tool,pytest,$(TESTS_PERFORMANCE) $(PYTEST_ARGS) --junitxml=junit-performance.xml)
 
-# CI pipeline targets
 ci-check:  ## Run comprehensive CI checks (matches GitHub Actions exactly)
 	@echo "Running comprehensive CI checks that match GitHub Actions pipeline..."
 	$(MAKE) ci-quality
@@ -124,12 +118,7 @@ ci: ci-check ci-tests-integration ci-tests-e2e  ## Run full CI pipeline (compreh
 ci-quick: ci-check-quick  ## Run quick CI pipeline (fast checks only)
 	@echo "Quick CI pipeline completed successfully!"
 
-# Git setup for CI
-ci-git-setup:  ## Setup git configuration for CI automated commits
-	git config --local user.name "github-actions[bot]"
-	git config --local user.email "github-actions[bot]@users.noreply.github.com"
-
-# @SECTION Workflow-specific targets (match GitHub Actions workflow names)
+# Workflow-specific targets (match GitHub Actions workflow names)
 workflow-ci: ci-check ci-tests-unit ci-tests-integration  ## Run complete CI workflow locally
 	@echo "CI workflow completed successfully!"
 
@@ -139,15 +128,13 @@ workflow-test-matrix: ci-tests-matrix  ## Run test matrix workflow locally
 workflow-security: ci-security ci-security-container  ## Run security workflow locally
 	@echo "Security workflow completed successfully!"
 
-# @SECTION Local CI (GitHub Actions)
-# Local GitHub Actions execution with act
+# @SECTION Local Workflow Execution (using act)
 local-list: dev-install  ## List available workflows and jobs for local execution
 	@echo "Available workflows and jobs for local execution:"
 	@if command -v act >/dev/null 2>&1; then \
 		act -l; \
 	else \
 		echo "Error: act not installed. Run 'make install-dev-tools' to install."; \
-		exit 1; \
 	fi
 
 local-dry-run: dev-install  ## Validate all workflows without running (dry run)
@@ -156,7 +143,6 @@ local-dry-run: dev-install  ## Validate all workflows without running (dry run)
 		act --dryrun; \
 	else \
 		echo "Error: act not installed. Run 'make install-dev-tools' to install."; \
-		exit 1; \
 	fi
 
 local-push: dev-install  ## Simulate push event (triggers CI workflow)
@@ -165,7 +151,6 @@ local-push: dev-install  ## Simulate push event (triggers CI workflow)
 		act push; \
 	else \
 		echo "Error: act not installed. Run 'make install-dev-tools' to install."; \
-		exit 1; \
 	fi
 
 local-pr: dev-install  ## Simulate pull request event (triggers CI + security workflows)
@@ -174,7 +159,6 @@ local-pr: dev-install  ## Simulate pull request event (triggers CI + security wo
 		act pull_request; \
 	else \
 		echo "Error: act not installed. Run 'make install-dev-tools' to install."; \
-		exit 1; \
 	fi
 
 local-release: dev-install  ## Simulate release event (triggers publish workflow)
@@ -183,7 +167,6 @@ local-release: dev-install  ## Simulate release event (triggers publish workflow
 		act release; \
 	else \
 		echo "Error: act not installed. Run 'make install-dev-tools' to install."; \
-		exit 1; \
 	fi
 
 local-ci: dev-install  ## Run CI workflow locally (.github/workflows/ci.yml)
@@ -192,7 +175,6 @@ local-ci: dev-install  ## Run CI workflow locally (.github/workflows/ci.yml)
 		act -W .github/workflows/ci.yml; \
 	else \
 		echo "Error: act not installed. Run 'make install-dev-tools' to install."; \
-		exit 1; \
 	fi
 
 local-security: dev-install  ## Run security workflow locally (.github/workflows/security.yml)
@@ -201,7 +183,6 @@ local-security: dev-install  ## Run security workflow locally (.github/workflows
 		act -W .github/workflows/security.yml; \
 	else \
 		echo "Error: act not installed. Run 'make install-dev-tools' to install."; \
-		exit 1; \
 	fi
 
 local-test-matrix: dev-install  ## Run test matrix workflow locally (.github/workflows/test-matrix.yml)
@@ -210,7 +191,6 @@ local-test-matrix: dev-install  ## Run test matrix workflow locally (.github/wor
 		act -W .github/workflows/test-matrix.yml; \
 	else \
 		echo "Error: act not installed. Run 'make install-dev-tools' to install."; \
-		exit 1; \
 	fi
 
 local-clean: ## Clean local act artifacts and containers
@@ -219,7 +199,8 @@ local-clean: ## Clean local act artifacts and containers
 	@if command -v docker >/dev/null 2>&1; then \
 		echo "Removing act containers..."; \
 		docker ps -a --filter "label=act" -q | xargs -r docker rm -f; \
-		echo "Removing act images (unused)..."; \
-		docker images --filter "dangling=true" -q | xargs -r docker rmi; \
 	fi
-	@echo "Local cleanup complete!"
+
+ci-git-setup:  ## Setup git configuration for CI automated commits
+	git config --local user.name "github-actions[bot]"
+	git config --local user.email "github-actions[bot]@users.noreply.github.com"

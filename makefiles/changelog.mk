@@ -1,101 +1,74 @@
-# Changelog Management Targets
-# Comprehensive changelog automation with git-changelog
+# Changelog management targets
 
 # @SECTION Changelog Management
-
 changelog-generate: dev-install  ## Generate full changelog from git history
-	@echo "Generating complete changelog from git history..."
-	@python3 dev-tools/release/changelog_manager.py generate
-	@echo "Changelog generated: CHANGELOG.md"
+	@echo "Generating full changelog from git history..."
+	./dev-tools/release/changelog_manager.py generate
 
-changelog-update: dev-install  ## Update changelog for release (VERSION=v1.2.3)
-	@if [ -z "$(VERSION)" ]; then \
-		echo "ERROR: VERSION required"; \
-		echo "Usage: make changelog-update VERSION=v1.2.3"; \
-		exit 1; \
-	fi
-	@echo "Updating changelog for release $(VERSION)..."
-	@python3 dev-tools/release/changelog_manager.py update "$(VERSION)"
-	@echo "Changelog updated for $(VERSION)"
-
-changelog-preview: dev-install  ## Preview changelog changes
-	@echo "Previewing changelog changes..."
-	@python3 dev-tools/release/changelog_manager.py preview
+changelog-update: dev-install  ## Update changelog for current version
+	@echo "Updating changelog for version $(VERSION)..."
+	./dev-tools/release/changelog_manager.py update --version $(VERSION)
 
 changelog-validate: dev-install  ## Validate changelog format and content
-	@echo "Validating changelog..."
-	@python3 dev-tools/release/changelog_manager.py validate
-	@echo "Changelog validation passed"
+	@echo "Validating changelog format..."
+	./dev-tools/release/changelog_manager.py validate
 
-changelog-regenerate: dev-install  ## Regenerate entire changelog (use after backfills/deletions)
-	@echo "Regenerating complete changelog..."
-	@python3 dev-tools/release/changelog_manager.py generate
-	@git add CHANGELOG.md
-	@if ! git diff --cached --quiet; then \
-		git commit -m "docs: regenerate changelog from git history"; \
-		echo "Changelog regenerated and committed"; \
-	else \
-		echo "Changelog regenerated (no changes)"; \
-	fi
+changelog-preview: dev-install  ## Preview changelog changes for current commits
+	@echo "Previewing changelog changes..."
+	./dev-tools/release/changelog_manager.py preview
 
-# Release deletion with changelog cleanup
-release-delete:  ## Delete release and update changelog (VERSION=v1.2.3)
+changelog-delete: dev-install  ## Delete version from changelog (usage: make changelog-delete VERSION=1.0.0)
 	@if [ -z "$(VERSION)" ]; then \
-		echo "Usage: make release-delete VERSION=v1.2.3"; \
+		echo "Error: VERSION is required. Usage: make changelog-delete VERSION=1.0.0"; \
 		exit 1; \
 	fi
-	@echo "Deleting release $(VERSION)..."
-	@./dev-tools/release/delete_release.sh "$(VERSION)"
-	@echo "✓ Release $(VERSION) deleted"
+	@echo "Deleting version $(VERSION) from changelog..."
+	./dev-tools/release/changelog_manager.py delete --version $(VERSION)
 
-# Backfill release with changelog handling
-release-backfill-with-changelog: dev-install  ## Create backfill release with changelog (VERSION=v1.2.3 FROM_COMMIT=abc TO_COMMIT=def)
-	@if [ -z "$(VERSION)" ] || [ -z "$(FROM_COMMIT)" ] || [ -z "$(TO_COMMIT)" ]; then \
-		echo "Usage: make release-backfill-with-changelog VERSION=v1.2.3 FROM_COMMIT=abc123 TO_COMMIT=def456"; \
-		exit 1; \
-	fi
-	@echo "Creating backfill release $(VERSION)..."
-	@python3 dev-tools/release/changelog_manager.py backfill "$(VERSION)" "$(FROM_COMMIT)" "$(TO_COMMIT)"
-	@ALLOW_BACKFILL=true FROM_COMMIT="$(FROM_COMMIT)" TO_COMMIT="$(TO_COMMIT)" ./dev-tools/release/release_creator.sh
-	@echo "✓ Backfill release $(VERSION) created with changelog"
+changelog-backfill: dev-install  ## Handle backfill release in changelog
+	@echo "Handling backfill release in changelog..."
+	./dev-tools/release/changelog_manager.py backfill
 
-# Development helpers
-changelog-setup:  ## Setup changelog configuration and templates
-	@echo "Setting up changelog configuration..."
-	@if [ ! -f .git-changelog.toml ]; then \
-		echo "✓ Changelog configuration already exists"; \
-	fi
-	@if [ ! -f .changelog-template.md ]; then \
-		echo "✓ Changelog template already exists"; \
-	fi
-	@echo "✓ Changelog setup complete"
+changelog-regenerate: dev-install  ## Regenerate entire changelog (destructive)
+	@echo "WARNING: This will regenerate the entire changelog from git history"
+	@echo "This is destructive and will overwrite manual changes"
+	@read -p "Are you sure? (y/N): " confirm && [ "$$confirm" = "y" ]
+	./dev-tools/release/changelog_manager.py generate --force
 
-# Integration with existing release targets
-changelog-commit:  ## Commit changelog changes
-	@if git diff --quiet CHANGELOG.md; then \
-		echo "No changelog changes to commit"; \
-	else \
-		echo "Committing changelog changes..."; \
-		git add CHANGELOG.md; \
-		git commit -m "docs: update changelog for v$(shell make -s get-version)"; \
-		echo "✓ Changelog changes committed"; \
-	fi
+changelog-sync-check: dev-install  ## Check if changelog is in sync with git history
+	@echo "Checking changelog synchronization..."
+	./dev-tools/release/changelog_manager.py validate --sync-check
 
-# Validation helpers
-changelog-check-deps:  ## Check if changelog dependencies are installed
-	@echo "Checking changelog dependencies..."
-	@python3 -c "import git_changelog" 2>/dev/null || (echo "❌ git-changelog not installed. Run: make changelog-install-deps" && exit 1)
-	@echo "✓ All changelog dependencies available"
+# @SECTION Release Notes Management
+release-notes-generate: dev-install  ## Generate release notes for current version
+	@echo "Generating release notes for version $(VERSION)..."
+	./dev-tools/release/release_notes.sh $(VERSION)
 
-changelog-status:  ## Show changelog status and recent changes
-	@echo "=== CHANGELOG STATUS ==="
-	@if [ -f CHANGELOG.md ]; then \
-		echo "✓ CHANGELOG.md exists"; \
-		echo "Size: $$(wc -l CHANGELOG.md | awk '{print $$1}') lines"; \
-		echo "Last modified: $$(stat -f "%Sm" -t "%Y-%m-%d %H:%M" CHANGELOG.md 2>/dev/null || stat -c "%y" CHANGELOG.md 2>/dev/null || echo "unknown")"; \
-	else \
-		echo "❌ CHANGELOG.md does not exist"; \
+release-notes-preview: dev-install  ## Preview release notes for current version
+	@echo "Previewing release notes for version $(VERSION)..."
+	./dev-tools/release/release_notes.sh $(VERSION) --preview
+
+release-backfill: dev-install  ## Backfill historical releases
+	@echo "Backfilling historical releases..."
+	./dev-tools/release/release_backfill.sh
+
+# @SECTION Git and Release Utilities
+git-changelog-since: dev-install  ## Show git log since last release (for manual changelog)
+	@echo "Git commits since last release:"
+	@last_tag=$$(git describe --tags --abbrev=0 2>/dev/null || echo "HEAD~10"); \
+	git log --oneline --no-merges "$${last_tag}..HEAD" || \
+	git log --oneline --no-merges -10
+
+git-unreleased-commits: dev-install  ## Count unreleased commits
+	@last_tag=$$(git describe --tags --abbrev=0 2>/dev/null || echo "HEAD~10"); \
+	count=$$(git rev-list --count "$${last_tag}..HEAD" 2>/dev/null || git rev-list --count HEAD~10..HEAD); \
+	echo "Unreleased commits: $$count"
+
+git-last-release: dev-install  ## Show information about last release
+	@echo "Last release information:"
+	@git describe --tags --abbrev=0 2>/dev/null || echo "No releases found"
+	@last_tag=$$(git describe --tags --abbrev=0 2>/dev/null); \
+	if [ -n "$$last_tag" ]; then \
+		echo "Release date: $$(git log -1 --format=%ci $$last_tag)"; \
+		echo "Commits since: $$(git rev-list --count $$last_tag..HEAD)"; \
 	fi
-	@echo ""
-	@echo "=== RECENT UNRELEASED CHANGES ==="
-	@python3 dev-tools/release/changelog_manager.py preview --from-commit $$(git tag -l "v*" --sort=-version:refname | head -1) 2>/dev/null || echo "No recent changes"

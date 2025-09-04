@@ -198,6 +198,67 @@ The release system performs comprehensive validation:
 
 Common error scenarios and solutions:
 
+## Release Process Requirements
+
+### Branch Requirements
+
+**IMPORTANT: All releases MUST be created from the `main` branch**
+
+1. **Switch to main branch:**
+   ```bash
+   git checkout main
+   git pull origin main
+   ```
+
+2. **Ensure clean working directory:**
+   ```bash
+   git status  # Should show "working tree clean"
+   ```
+
+3. **Run release commands:**
+   ```bash
+   make release-patch        # For patch releases
+   make promote-stable       # For promoting RC to stable
+   ```
+
+### Step-by-Step Release Process
+
+#### Completing an RC Release (e.g., 0.1.0rc0 → 0.1.0)
+
+1. **Switch to main branch:**
+   ```bash
+   git checkout main && git pull origin main
+   ```
+
+2. **Promote RC to stable:**
+   ```bash
+   make promote-stable
+   ```
+
+3. **Verify release creation:**
+   ```bash
+   gh release list --limit 5
+   ```
+
+#### Starting New Alpha Cycle (e.g., 0.1.0 → 0.1.1a1)
+
+1. **From main branch, promote to alpha:**
+   ```bash
+   make promote-alpha
+   ```
+
+2. **This will automatically:**
+   - Increment patch version (0.1.0 → 0.1.1)
+   - Start alpha cycle (0.1.1a1)
+   - Create changelog PR
+   - Trigger daily alpha workflow
+
+### Automated Release Cadence
+
+- **Daily:** Alpha releases (`0.1.1a1` → `0.1.1a2`)
+- **Weekly:** Beta releases (`0.1.1a5` → `0.1.1b1`)  
+- **Bi-weekly:** RC releases (`0.1.1b2` → `0.1.1rc1`)
+
 #### Tag Already Exists
 ```
 ERROR: Tag 'v1.0.1' already exists
