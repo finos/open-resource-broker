@@ -1,7 +1,7 @@
 version: 2
 updates:
-  # Python dependencies with UV support
-  - package-ecosystem: "pip"  # Using pip ecosystem as UV is still experimental in Dependabot
+  # Python dependencies using UV
+  - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"

@@ -46,8 +46,6 @@ jobs:
 
       - name: Update UV lock file
         run: |
-          echo "Updating UV lock file after Dependabot changes..."
-          # Simple approach: regenerate lock file from updated pyproject.toml
           uv lock
 
       - name: Commit updated lock file
