@@ -4,14 +4,23 @@ set -e
 # Pre-release promotion manager
 # Usage: promote_manager.sh <alpha|beta|rc|stable>
 
+# Colors for output
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+# Logging functions
+log_info() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
 if [ $# -ne 1 ]; then
     echo "Usage: $0 <alpha|beta|rc|stable>"
     echo ""
     echo "Examples:"
-    echo "  $0 alpha    # 1.0.0-alpha.1 -> 1.0.0-alpha.2"
-    echo "  $0 beta     # 1.0.0-alpha.2 -> 1.0.0-beta.1"
-    echo "  $0 rc       # 1.0.0-beta.1 -> 1.0.0-rc.1"
-    echo "  $0 stable   # 1.0.0-rc.1 -> 1.0.0"
+    echo "  $0 alpha    # 1.0.0a1 -> 1.0.0a2 OR 1.0.0rc0 -> 1.0.1a1"
+    echo "  $0 beta     # 1.0.0a2 -> 1.0.0b1"
+    echo "  $0 rc       # 1.0.0b1 -> 1.0.0rc1"
+    echo "  $0 stable   # 1.0.0rc1 -> 1.0.0"
     exit 1
 fi
 
@@ -61,9 +70,17 @@ case $PROMOTE_TO in
             # Increment alpha number
             NEW_NUMBER=$((CURRENT_NUMBER + 1))
             NEW_VERSION="${BASE_VERSION}a${NEW_NUMBER}"
+        elif [ "$CURRENT_PRERELEASE" = "rc" ] || [ -z "$CURRENT_PRERELEASE" ]; then
+            # Start new alpha cycle from RC or stable
+            # Increment patch version and start alpha.1
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
+            NEW_PATCH=$((PATCH + 1))
+            NEW_BASE_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+            NEW_VERSION="${NEW_BASE_VERSION}a1"
+            echo "Starting new alpha cycle: $CURRENT_VERSION -> $NEW_VERSION"
         else
             echo "ERROR: Cannot promote to alpha from $CURRENT_VERSION"
-            echo "Alpha promotion only works from existing alpha versions"
+            echo "Alpha promotion works from existing alpha, RC, or stable versions"
             exit 1
         fi
         ;;
