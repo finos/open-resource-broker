@@ -31,8 +31,10 @@ runs:
       run: |
         DEFAULT_PYTHON_VERSION=$(yq '.python.default_version' .project.yml)
         PYTHON_VERSIONS=$(yq -o json '.python.versions' .project.yml | tr -d '\n' | tr -d ' ')
-        CONTAINER_REGISTRY=$(make print-CONTAINER_REGISTRY || echo "ghcr.io")
-        CONTAINER_IMAGE=$(make print-CONTAINER_IMAGE || echo "$(make print-REPO_ORG)/$(make print-PACKAGE_NAME)")
+        CONTAINER_REGISTRY=$(yq '.repository.registry // "ghcr.io"' .project.yml)
+        REPO_ORG=$(yq '.repository.org' .project.yml)
+        REPO_NAME=$(yq '.repository.name' .project.yml)
+        CONTAINER_IMAGE="$REPO_ORG/$REPO_NAME"
         
         # Centralized version generation using Makefile infrastructure
         if [[ "${{ github.event_name }}" == "release" ]] || [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.environment }}" == "pypi" ]]; then
