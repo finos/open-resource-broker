@@ -38,9 +38,23 @@ runs:
         
         # Centralized version generation using Makefile infrastructure
         if [[ "${{ github.event_name }}" == "release" ]] || [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.environment }}" == "pypi" ]]; then
-          # Release build
+          # Explicit release triggers
           PACKAGE_VERSION=$(IS_RELEASE=true make -s get-version)
           IS_RELEASE="true"
+        elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+          # Intelligent version detection: compare against last successful release
+          CURRENT_VERSION=$(yq '.project.version' .project.yml)
+          LAST_RELEASED_VERSION=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null | sed 's/^v//' || echo "none")
+          
+          if [[ "$CURRENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && [[ "$CURRENT_VERSION" != "$LAST_RELEASED_VERSION" ]]; then
+            # Stable version that differs from last release - treat as release
+            PACKAGE_VERSION=$(IS_RELEASE=true make -s get-version)
+            IS_RELEASE="true"
+          else
+            # Pre-release version or already released - treat as development
+            PACKAGE_VERSION=$(make -s get-version)
+            IS_RELEASE="false"
+          fi
         else
           # Development build
           PACKAGE_VERSION=$(make -s get-version)
