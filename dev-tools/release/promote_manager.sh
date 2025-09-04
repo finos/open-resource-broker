@@ -165,4 +165,6 @@ fi
 
 # Export the new version for use by release_creator.sh
 export PROMOTED_VERSION="$NEW_VERSION"
-echo "PROMOTED_VERSION=$NEW_VERSION" >> "$GITHUB_ENV" 2>/dev/null || true
+if [ -n "$GITHUB_ENV" ]; then
+    echo "PROMOTED_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
+fi
