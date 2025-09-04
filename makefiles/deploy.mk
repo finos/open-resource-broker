@@ -116,7 +116,13 @@ container-build: dev-install  ## Build container image
 
 container-build-single: dev-install  ## Build single-platform container image
 	@echo "Building single-platform container image..."
-	docker build --load -t $(CONTAINER_REGISTRY)/$(CONTAINER_IMAGE):$(VERSION) .
+	@if [ -n "$(PYTHON_VERSION)" ]; then \
+		TAG="$(CONTAINER_REGISTRY)/$(CONTAINER_IMAGE):$(VERSION)-python$(PYTHON_VERSION)"; \
+	else \
+		TAG="$(CONTAINER_REGISTRY)/$(CONTAINER_IMAGE):$(VERSION)"; \
+	fi; \
+	echo "Building with tag: $$TAG"; \
+	docker build --load -t "$$TAG" .
 
 container-build-multi: dev-install  ## Build multi-platform container image
 	@echo "Building multi-platform container image..."
