@@ -251,16 +251,16 @@ jobs:
           local source_tag="$2"
           local max_attempts=3
           
-          for attempt in $(seq 1 $max_attempts); do
+          for attempt in $(seq 1 "$max_attempts"); do
             echo "Creating manifest: $target_tag (attempt $attempt/$max_attempts)"
             if docker buildx imagetools create -t "$target_tag" "$source_tag"; then
               echo "✓ Successfully created manifest: $target_tag"
               return 0
             fi
-            if [ $attempt -lt $max_attempts ]; then
+            if [ "$attempt" -lt "$max_attempts" ]; then
               sleep_time=$((attempt * 5))
               echo "Attempt $attempt failed, retrying in ${sleep_time}s..."
-              sleep $sleep_time
+              sleep "$sleep_time"
             fi
           done
           echo "ERROR: Failed to create manifest after $max_attempts attempts: $target_tag"
