@@ -219,7 +219,7 @@ jobs:
         output: 'trivy-results-py${{ matrix.python-version }}.json'
 
     - name: Dockerfile security scan with Hadolint
-      uses: hadolint/hadolint-action@v3.1.0
+      uses: hadolint/hadolint-action@v3.2.0
       with:
         dockerfile: Dockerfile
         format: sarif
@@ -227,7 +227,7 @@ jobs:
         no-fail: true
 
     - name: Dev-tools Dockerfile security scan with Hadolint
-      uses: hadolint/hadolint-action@v3.1.0
+      uses: hadolint/hadolint-action@v3.2.0
       with:
         dockerfile: dev-tools/docker/Dockerfile.dev-tools
         format: sarif
