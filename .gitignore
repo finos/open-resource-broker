@@ -1,5 +1,5 @@
 # Generated files
-pyproject.toml
+# pyproject.toml is now tracked - only metadata is templated, dependencies managed by Dependabot
 
 # Generated requirements files (generated on-demand from uv.lock)
 requirements.txt
@@ -229,4 +229,4 @@ safety-results.json
 junit-*.xml
 
 # Generated files - always regenerated from templates
-pyproject.toml
+# pyproject.toml is now tracked - selective templating only

@@ -1,0 +1,238 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "open-hostfactory-plugin"
+version = "0.1.0rc0"
+description = "Cloud provider integration plugin for IBM Spectrum Symphony Host Factory"
+readme = "README.md"
+license = "Apache-2.0"
+authors = [
+    {name = "AWS Professional Services", email = "aws-proserve@amazon.com"},
+]
+maintainers = [
+    {name = "AWS Professional Services", email = "aws-proserve@amazon.com"},
+]
+keywords = [
+    "aws",
+    "ec2",
+    "hostfactory",
+    "symphony",
+    "hpc",
+    "cluster",
+    "cloud",
+    "infrastructure",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Clustering",
+    "Topic :: System :: Distributed Computing",
+]
+requires-python = ">=3.9"
+
+dependencies = [
+    "boto3>=1.26.0",
+    "botocore>=1.29.0",
+    "pydantic>=2.0.0",
+    "sqlalchemy>=2.0.0",
+    "dynaconf>=3.2.0",
+    "structlog>=23.1.0",
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "psutil>=5.9.0",
+    "prometheus-client>=0.17.0",
+    "jsonschema>=4.17.0",
+    "rich>=13.3.0",
+    "python-dotenv>=1.0.0",
+    "PyJWT>=2.8.0",
+    "cryptography>=41.0.0",
+    "requests>=2.31.0",
+    "PyYAML>=6.0.0",
+    "click>=8.0.0",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "jinja2>=3.1.0",
+]
+
+[dependency-groups]
+# CI Dependencies: What CI needs to test, lint, and build docs
+ci = [
+    # Code Quality Tools (ruff replaces black/isort/flake8/pylint)
+    "ruff>=0.1.0",
+    "pathspec>=0.11.0",  # For gitignore pattern matching in dev-tools
+    "mypy>=1.6.1,<2.0.0",
+    "bandit>=1.7.5,<2.0.0",
+    "bandit-sarif-formatter>=1.1.1,<2.0.0",
+    
+    # Testing Framework
+    "pytest>=7.4.3,<9.0.0",
+    "pytest-cov>=4.1.0,<7.0.0",
+    "pytest-env>=1.1.1,<2.0.0",
+    "pytest-mock>=3.12.0,<4.0.0",
+    "pytest-asyncio>=0.21.1,<2.0.0",
+    "pytest-timeout>=2.2.0,<3.0.0",
+    "pytest-xdist>=3.3.1,<4.0.0",
+    "pytest-html>=4.1.1,<5.0.0",
+    "pytest-benchmark>=5.1.0,<6.0.0",
+    "coverage>=7.3.2,<8.0.0",
+    
+    # AWS Testing
+    "moto[all]>=4.2.7,<6.0.0",
+    "responses>=0.24.0,<1.0.0",
+    "requests-mock>=1.11.0,<2.0.0",
+    
+    # Essential Type Stubs
+    "types-PyYAML>=6.0.12.12,<7.0.0",
+    "types-python-dateutil>=2.8.19.14,<3.0.0",
+    
+    # Security Scanning
+    "safety>=3.0.1,<4.0.0",
+    "pip-audit>=2.6.1,<3.0.0",
+    "semgrep>=1.45.0,<2.0.0",
+    "cyclonedx-bom>=4.0.0,<5.0.0",
+    
+    # Documentation
+    "mkdocs>=1.5.0,<2.0.0",
+    "mkdocs-material>=9.1.0,<10.0.0",
+    "mkdocstrings>=0.22.0,<1.0.0",
+    "mkdocstrings-python>=1.1.0,<2.0.0",
+    "mkdocs-gen-files>=0.5.0,<1.0.0",
+    "mkdocs-literate-nav>=0.6.0,<1.0.0",
+    "mkdocs-section-index>=0.3.0,<1.0.0",
+    "mike>=1.1.0,<3.0.0",
+    
+    # Build and Packaging
+    "build>=1.0.3,<2.0.0",
+    "wheel>=0.41.3,<1.0.0",
+]
+
+# Dev Dependencies: Additional dev tools (includes all CI deps)
+dev = [
+    "pre-commit>=3.5.0,<4.0.0",
+    "bump2version>=1.0.1,<2.0.0",
+    "line-profiler>=4.1.1,<5.0.0",
+    "memory-profiler>=0.61.0,<1.0.0",
+    "py-spy>=0.3.14,<1.0.0",
+    "py-cpuinfo>=9.0.0,<10.0.0",
+    "ipdb>=0.13.13,<1.0.0",
+    "ipython>=8.16.1,<9.0.0",
+    "radon>=6.0.1,<7.0.0",
+    "pip-tools>=7.3.0,<8.0.0",
+    "twine>=4.0.0",
+    "git-changelog>=2.6.0,<3.0.0",
+]
+[project.scripts]
+ohfp = "run:cli_main"
+open-hostfactory-plugin = "run:cli_main"
+
+[project.urls]
+Homepage = "https://github.com/awslabs/open-hostfactory-plugin"
+Documentation = "https://awslabs.github.io/open-hostfactory-plugin/"
+Repository = "https://github.com/awslabs/open-hostfactory-plugin"
+"Bug Reports" = "https://github.com/awslabs/open-hostfactory-plugin/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools]
+py-modules = ["run", "_package", "bootstrap"]
+
+[tool.setuptools.package-data]
+"*" = ["py.typed"]
+
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --cov=ohfp --cov-report=term-missing --cov-report=html"
+env = [
+    "AWS_DEFAULT_REGION=us-east-1",
+    "AWS_ACCESS_KEY_ID=testing",
+    "AWS_SECRET_ACCESS_KEY=testing",
+    "AWS_SECURITY_TOKEN=testing",
+    "AWS_SESSION_TOKEN=testing"
+]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 100
+exclude = [
+    ".eggs",
+    ".git",
+    ".hg", 
+    ".mypy_cache",
+    ".tox",
+    ".venv",
+    "build",
+    "dist",
+]
+
+[tool.ruff.lint]
+# ENFORCED: These rules fail CI (replace black/isort/flake8)
+select = ["E", "W", "F", "I"]
+# OPTIONAL: These warn but don't fail CI (replace pylint functionality)
+extend-select = ["N", "UP", "B", "PL", "C90", "RUF"]
+ignore = [
+    "E501",  # Line too long (handled by formatter)
+    "PLR0913",  # Too many arguments
+    "PLR0912",  # Too many branches
+    "PLR0915",  # Too many statements
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.ruff.lint.isort]
+known-first-party = ["ohfp", "application", "domain", "infrastructure", "interface", "api", "monitoring"]
+combine-as-imports = true
+
+[tool.mypy]
+python_version = "{{ project.python.default_version }}"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+disallow_untyped_decorators = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+explicit_package_bases = true
+namespace_packages = true

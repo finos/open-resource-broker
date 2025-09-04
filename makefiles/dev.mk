@@ -78,8 +78,8 @@ test-report: dev-install  ## Generate comprehensive test report
 	./dev-tools/testing/run_tests.py --all --coverage --junit-xml=test-results-combined.xml --cov-xml=coverage-combined.xml --html-coverage --maxfail=1 --timeout=60
 
 # @SECTION Development Tools
-generate-pyproject:  ## Generate pyproject.toml from template using project config
-	@echo "Generating pyproject.toml from template using $(PROJECT_CONFIG)..."
+generate-pyproject:  ## Update pyproject.toml metadata from .project.yml (preserves dependencies)
+	@echo "Updating pyproject.toml metadata from $(PROJECT_CONFIG)..."
 	@./dev-tools/scripts/generate_pyproject.py --config $(PROJECT_CONFIG)
 
 deps-add:  ## Add new dependency (usage: make deps-add PACKAGE=package-name)
