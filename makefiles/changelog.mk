@@ -42,14 +42,8 @@ changelog-sync-check: dev-install  ## Check if changelog is in sync with git his
 # @SECTION Release Notes Management
 release-notes-generate: dev-install  ## Generate release notes for current version
 	@echo "Generating release notes for version $(VERSION)..."
-	@echo "# Release $(VERSION)" > release-notes-v$(VERSION).md
-	@echo "" >> release-notes-v$(VERSION).md
-	@echo "## What's Changed" >> release-notes-v$(VERSION).md
-	@echo "" >> release-notes-v$(VERSION).md
-	@git log --oneline --pretty=format:"* %s" $(shell git describe --tags --abbrev=0 2>/dev/null || echo "HEAD~10")..HEAD >> release-notes-v$(VERSION).md || echo "* Initial release" >> release-notes-v$(VERSION).md
-	@echo "" >> release-notes-v$(VERSION).md
-	@echo "" >> release-notes-v$(VERSION).md
-	@echo "**Full Changelog**: https://github.com/awslabs/open-hostfactory-plugin/commits/v$(VERSION)" >> release-notes-v$(VERSION).md
+	@LAST_TAG=$$(git describe --tags --abbrev=0 2>/dev/null || echo "HEAD~10"); \
+	./dev-tools/release/release_notes.sh "$$LAST_TAG" "HEAD" "$(VERSION)" > release-notes-v$(VERSION).md
 
 release-notes-preview: dev-install  ## Preview release notes for current version
 	@echo "Previewing release notes for version $(VERSION)..."
