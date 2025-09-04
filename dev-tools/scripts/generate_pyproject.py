@@ -12,7 +12,7 @@ try:
     import tomllib
 except ImportError:
     try:
-        import tomli as tomllib  # noqa: F401
+        import tomli as tomllib
     except ImportError:
         logging.error("Neither tomllib nor tomli available. Install tomli: pip install tomli")
         sys.exit(1)
@@ -103,6 +103,8 @@ def update_pyproject_selective(pyproject_path: Path) -> None:
 
     lines = content.split("\n")
     new_lines = []
+    skip_section = False
+    in_metadata_section = False
 
     i = 0
     while i < len(lines):
@@ -110,6 +112,7 @@ def update_pyproject_selective(pyproject_path: Path) -> None:
 
         # Check if we're entering a metadata section we want to replace
         if line.startswith("[project]"):
+            in_metadata_section = True
             # Write updated project metadata
             new_lines.extend(
                 [
@@ -198,35 +201,6 @@ def update_pyproject_selective(pyproject_path: Path) -> None:
                 ]
             )
             # Skip existing scripts section
-            i += 1
-            while i < len(lines) and not lines[i].strip().startswith("["):
-                i += 1
-            continue
-
-        elif line.startswith("[tool.mypy]"):
-            # Replace mypy section
-            new_lines.extend(
-                [
-                    "[tool.mypy]",
-                    f'python_version = "{default_python}"',
-                    "warn_return_any = true",
-                    "warn_unused_configs = true",
-                    "disallow_untyped_defs = false",
-                    "disallow_incomplete_defs = false",
-                    "check_untyped_defs = true",
-                    "disallow_untyped_decorators = false",
-                    "no_implicit_optional = true",
-                    "warn_redundant_casts = true",
-                    "warn_unused_ignores = true",
-                    "warn_no_return = true",
-                    "warn_unreachable = true",
-                    "strict_equality = true",
-                    "explicit_package_bases = true",
-                    "namespace_packages = true",
-                    "",
-                ]
-            )
-            # Skip existing mypy section
             i += 1
             while i < len(lines) and not lines[i].strip().startswith("["):
                 i += 1

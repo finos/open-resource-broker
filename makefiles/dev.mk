@@ -107,7 +107,6 @@ clean:  ## Clean up build artifacts
 	rm -f $(COVERAGE_REPORT)
 	rm -f test-results.xml
 	rm -f bandit-report.json
-	rm -f pyproject.toml
 	rm -rf .mypy_cache/
 	rm -rf .ruff_cache/
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
