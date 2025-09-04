@@ -1,0 +1,76 @@
+name: Manual Promote
+
+on:
+  workflow_dispatch:
+    inputs:
+      promote_to:
+        description: 'Promote to version type'
+        required: true
+        default: 'stable'
+        type: choice
+        options:
+        - alpha
+        - beta
+        - rc
+        - stable
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  get-config:
+    name: Get Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      default-python-version: ${{ steps.config.outputs.default-python-version }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+
+    - name: Get project configuration
+      id: config
+      uses: ./.github/actions/get-config
+
+  promote-version:
+    name: Promote Version
+    runs-on: ubuntu-latest
+    needs: get-config
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python and UV
+        uses: ./.github/actions/setup-uv-cached
+        with:
+          cache-key: deps-${{ needs.get-config.outputs.default-python-version }}-${{ hashFiles('.project.yml', 'pyproject.toml', 'requirements*.txt') }}
+          fail-on-cache-miss: false
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Promote Version
+        run: |
+          echo "Promoting to ${{ github.event.inputs.promote_to }}"
+          make promote-${{ github.event.inputs.promote_to }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get New Version
+        id: version
+        run: |
+          NEW_VERSION=$(make print-VERSION)
+          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        run: |
+          echo "Promotion completed successfully"
+          echo "Type: ${{ github.event.inputs.promote_to }}"
+          echo "New Version: ${{ steps.version.outputs.version }}"
