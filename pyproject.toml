@@ -242,8 +242,8 @@ explicit_package_bases = true
 namespace_packages = true
 
 [tool.semantic_release]
-version_toml = ["pyproject.toml:project.version"]
-build_command = "./dev-tools/integrated/release_orchestrator.sh"
+version_pattern = [".project.yml:project.version"]
+build_command = "./dev-tools/release/orchestrator.sh"
 major_on_zero = false
 allow_zero_version = true
 tag_format = "v{version}"

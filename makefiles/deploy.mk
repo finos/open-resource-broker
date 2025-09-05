@@ -86,7 +86,7 @@ release: dev-install ## Unified release command (forward/historical/analysis)
 		$(call run-tool,semantic-release,version); \
 	elif [ "$(MODE)" = "analysis" ]; then \
 		echo "Running release analysis"; \
-		RELEASE_MODE=analysis ./dev-tools/integrated/release_orchestrator.sh; \
+		RELEASE_MODE=analysis ./dev-tools/release/orchestrator.sh; \
 	else \
 		echo "Running forward release with semantic-release"; \
 		$(call run-tool,semantic-release,version); \

@@ -69,7 +69,7 @@ jobs:
             RELEASE_MODE=historical RELEASE_COMMIT=${{ inputs.commit }} RELEASE_VERSION=${{ inputs.version }} semantic-release version
           elif [ "${{ inputs.mode }}" = "analysis" ]; then
             echo "Running release analysis"
-            RELEASE_MODE=analysis ./dev-tools/integrated/release_orchestrator.sh
+            RELEASE_MODE=analysis ./dev-tools/release/orchestrator.sh
           else
             echo "Running forward release with semantic-release"
             semantic-release version

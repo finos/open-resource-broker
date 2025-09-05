@@ -92,7 +92,7 @@ jobs:
               ;;
             suggest-rc|analyze-rc)
               echo "Running RC readiness analysis..."
-              RELEASE_MODE=analysis ./dev-tools/integrated/release_orchestrator.sh || true
+              RELEASE_MODE=analysis ./dev-tools/release/orchestrator.sh || true
               ;;
             create-beta)
               echo "Creating beta release via semantic-release..."
