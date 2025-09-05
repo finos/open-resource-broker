@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Union
 if TYPE_CHECKING:
     pass
 
-from config.manager import ConfigurationManager
+from domain.base.ports.configuration_port import ConfigurationPort
 from domain.base.ports.logging_port import LoggingPort
 from domain.machine.aggregate import Machine
 from domain.request.aggregate import Request
@@ -23,7 +23,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
 
     def __init__(
         self,
-        config_manager: ConfigurationManager,
+        config_manager: ConfigurationPort,
         logger: LoggingPort,
         template_defaults_service=None,
     ) -> None:

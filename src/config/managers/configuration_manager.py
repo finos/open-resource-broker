@@ -316,17 +316,25 @@ class ConfigurationManager:
     def _get_scheduler_directory(self, file_type: str) -> Optional[str]:
         """Get directory path from scheduler strategy for the given file type."""
         try:
-            scheduler = self.get_scheduler_strategy()
-            if file_type in ["conf", "template", "legacy"]:
-                return scheduler.get_config_directory()
-            elif file_type == "log":
-                return scheduler.get_logs_directory()
-            elif file_type in ["work", "data"]:
-                return scheduler.get_storage_base_path()
-            else:
-                return scheduler.get_working_directory()
+            scheduler_type = self.get_scheduler_strategy()
+            
+            if scheduler_type == "hostfactory" or scheduler_type == "hf":
+                # Use the same logic as HostFactorySchedulerStrategy without instantiation
+                import os
+                
+                if file_type in ["conf", "template", "legacy"]:
+                    return os.environ.get("HF_PROVIDER_CONFDIR", 
+                                        os.path.join(os.environ.get("HF_PROVIDER_WORKDIR", os.getcwd()), "config"))
+                elif file_type == "log":
+                    return os.environ.get("HF_PROVIDER_LOGDIR", 
+                                        os.path.join(os.environ.get("HF_PROVIDER_WORKDIR", os.getcwd()), "logs"))
+                elif file_type in ["work", "data"]:
+                    return os.environ.get("HF_PROVIDER_WORKDIR", os.getcwd())
+                else:
+                    return os.environ.get("HF_PROVIDER_WORKDIR", os.getcwd())
         except Exception:
-            return None
+            pass
+        return None
 
     def get_cache_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
