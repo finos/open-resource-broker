@@ -13,12 +13,6 @@ on:
       - 'docs/**'
       - 'src/**'
   workflow_dispatch:
-    inputs:
-      use_integrated_publisher:
-        description: 'Use integrated publisher for docs'
-        required: false
-        default: true
-        type: boolean
 
 permissions:
   contents: read
