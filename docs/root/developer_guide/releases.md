@@ -1,398 +1,159 @@
 # Release Management Guide
 
-This guide covers the complete release management system for the Open Host Factory Plugin, including standard releases, pre-releases, and special cases.
+This guide covers the complete release management system for the Open Host Factory Plugin.
 
-## Overview
+## Release Process Overview
 
-The project uses automated release management with:
-- **Semantic Versioning** (SemVer) with pre-release support
-- **GitHub Releases** with automatic tag creation
-- **PyPI Publishing** for both stable and pre-releases
-- **Container Registry** publishing with structured tagging
-- **Automated Release Notes** generation
+### Automated Release Flow
 
-## Standard Release Workflow
+The system creates releases automatically based on a scheduled progression:
 
-### Basic Releases
+```
+Developer workflow → Scheduled releases → Manual stable release
+```
+
+### What Happens During Development
+
+**Pull Request Creation**:
+- Automated tests execute
+- No releases are created
+
+**Merge to Main Branch**:
+- Code is integrated
+- No immediate release occurs
+- Changes await scheduled release cycles
+
+### Scheduled Release Automation
+
+**Daily Alpha Releases (5 AM UTC)**:
+- System checks for commits since last alpha release
+- If changes exist: creates alpha version (e.g., `1.0.1-alpha.1`)
+- Publishes to TestPyPI for testing
+- If no changes: no action taken
+
+**Weekly Beta Releases (Monday 6 AM UTC)**:
+- System checks for alpha releases to promote
+- If new alphas exist: creates beta version (e.g., `1.0.1-beta.1`)
+- Publishes to TestPyPI for broader testing
+- If no new alphas: no action taken
+
+**Bi-weekly RC Releases (Wednesday 11 AM UTC)**:
+- System checks for beta releases to promote
+- If new betas exist: creates release candidate (e.g., `1.0.1-rc.1`)
+- Publishes to TestPyPI for final testing
+- If no new betas: no action taken
+
+**Manual Stable Releases**:
+- Developer executes: `make release`
+- Creates stable version (e.g., `1.0.1`)
+- Publishes to production PyPI
+
+## Manual Release Commands
+
+### Local Testing Commands
+```bash
+make release-alpha-if-needed    # Check if alpha release needed
+make release-beta-if-needed     # Check if beta release needed  
+make release-rc-if-needed       # Check if RC release needed
+```
+
+### Force Release Creation
+```bash
+make release-patch-alpha        # Create alpha release
+make release-patch-beta         # Create beta release
+make release-patch-rc           # Create RC release
+make release                    # Create stable release
+```
+
+### Version Increment Options
+```bash
+make release-patch              # 1.0.0 → 1.0.1
+make release-minor              # 1.0.0 → 1.1.0  
+make release-major              # 1.0.0 → 2.0.0
+```
+
+## Publication Targets
+
+### TestPyPI (Testing Environment)
+- Alpha releases: `1.0.1-alpha.1`
+- Beta releases: `1.0.1-beta.1`
+- RC releases: `1.0.1-rc.1`
+- Installation: `pip install --index-url https://test.pypi.org/simple/ open-hostfactory-plugin`
+
+### PyPI (Production Environment)
+- Stable releases: `1.0.1`
+- Installation: `pip install open-hostfactory-plugin`
+
+## Release Schedule
+
+| Frequency | Release Type | Version Format | Target |
+|-----------|--------------|----------------|--------|
+| Daily 5 AM UTC | Alpha | `1.0.1-alpha.1` | TestPyPI |
+| Monday 6 AM UTC | Beta | `1.0.1-beta.1` | TestPyPI |
+| Wednesday 11 AM UTC | RC | `1.0.1-rc.1` | TestPyPI |
+| Manual | Stable | `1.0.1` | PyPI |
+
+## Version Format Specification
+
+All versions follow PEP440 compliance:
+
+- Stable: `1.0.1`
+- Alpha: `1.0.1-alpha.1`
+- Beta: `1.0.1-beta.1`
+- RC: `1.0.1-rc.1`
+- Development: `1.0.1.dev123456`
+
+## Release Type Definitions
+
+- **Alpha**: Initial development releases with potential instability
+- **Beta**: More stable releases suitable for broader testing
+- **RC**: Release candidates approaching production readiness
+- **Stable**: Production-ready releases
+
+## Commit Message Requirements
+
+Version increments are determined by commit message format:
 
 ```bash
-# Patch release (1.0.0 -> 1.0.1)
-make release-patch
-
-# Minor release (1.0.0 -> 1.1.0)
-make release-minor
-
-# Major release (1.0.0 -> 2.0.0)
-make release-major
+feat: add new feature     # Minor version increment (1.0.0 → 1.1.0)
+fix: resolve bug         # Patch version increment (1.0.0 → 1.0.1)
+BREAKING CHANGE: ...     # Major version increment (1.0.0 → 2.0.0)
 ```
 
-### What Happens During a Release
+## Emergency Release Process
 
-1. **Version Bump**: Updates `.project.yml` with new version
-2. **Validation**: Checks working directory, branch, and commit ranges
-3. **Tag Creation**: Creates and pushes git tag (e.g., `v1.0.1`)
-4. **GitHub Release**: Creates GitHub release with generated notes
-5. **Automated Publishing**: Triggers PyPI and container registry publishing
-
-## Pre-release Workflow
-
-### Creating Pre-releases
-
-Pre-releases support alpha, beta, and rc (release candidate) stages:
+For critical production issues:
 
 ```bash
-# Alpha releases
-make release-patch-alpha    # 1.0.0 -> 1.0.1-alpha.1
-make release-minor-alpha    # 1.0.0 -> 1.1.0-alpha.1
-make release-major-alpha    # 1.0.0 -> 2.0.0-alpha.1
-
-# Beta releases
-make release-patch-beta     # 1.0.0 -> 1.0.1-beta.1
-make release-minor-beta     # 1.0.0 -> 1.1.0-beta.1
-make release-major-beta     # 1.0.0 -> 2.0.0-beta.1
-
-# Release candidates
-make release-patch-rc       # 1.0.0 -> 1.0.1-rc.1
-make release-minor-rc       # 1.0.0 -> 1.1.0-rc.1
-make release-major-rc       # 1.0.0 -> 2.0.0-rc.1
-```
-
-### Promoting Pre-releases
-
-Move between pre-release stages without changing the base version:
-
-```bash
-# Increment within same stage
-make promote-alpha          # 1.1.0-alpha.1 -> 1.1.0-alpha.2
-
-# Promote to next stage
-make promote-beta           # 1.1.0-alpha.2 -> 1.1.0-beta.1
-make promote-rc             # 1.1.0-beta.1 -> 1.1.0-rc.1
-
-# Final stable release
-make promote-stable         # 1.1.0-rc.1 -> 1.1.0
-```
-
-### Complete Pre-release Example
-
-```bash
-# Start new feature development
-make release-minor-alpha    # 0.1.0 -> 0.2.0-alpha.1
-
-# Continue alpha testing
-make promote-alpha          # 0.2.0-alpha.1 -> 0.2.0-alpha.2
-
-# Move to beta testing
-make promote-beta           # 0.2.0-alpha.2 -> 0.2.0-beta.1
-
-# Critical fix during beta
-make release-patch-beta     # 0.2.0-beta.1 -> 0.2.1-beta.1
-
-# Release candidate
-make promote-rc             # 0.2.1-beta.1 -> 0.2.1-rc.1
-
-# Final stable release
-make promote-stable         # 0.2.1-rc.1 -> 0.2.1
-```
-
-## Custom Releases
-
-### Specific Version Override
-
-Set an exact version instead of bumping:
-
-```bash
-# Set specific version
-RELEASE_VERSION=1.5.0 make release-version
-
-# Set specific pre-release
-RELEASE_VERSION=2.0.0-beta.3 make release-version
-```
-
-### Custom Commit Ranges
-
-Control which commits are included in the release:
-
-```bash
-# Release from specific commit to HEAD
-FROM_COMMIT=abc1234 make release-minor
-
-# Release between two specific commits
-FROM_COMMIT=abc1234 TO_COMMIT=def5678 make release-minor
-
-# Release from first commit to specific commit
-FROM_COMMIT=$(git rev-list --max-parents=0 HEAD) TO_COMMIT=abc1234 make release-major
-```
-
-### Backfill Releases
-
-Create releases for historical commit ranges (non-linear release history):
-
-```bash
-# Backfill release (requires specific version and end commit)
-RELEASE_VERSION=0.1.5 TO_COMMIT=abc1234 make release-backfill
-
-# Backfill with custom range
-RELEASE_VERSION=0.1.5 FROM_COMMIT=def5678 TO_COMMIT=abc1234 make release-backfill
-```
-
-## Environment Variables
-
-### Core Variables
-
-- **`RELEASE_VERSION`**: Override version (use with `release-version`/`release-backfill` only)
-- **`FROM_COMMIT`**: Start commit for release range (optional, smart defaults)
-- **`TO_COMMIT`**: End commit for release range (optional, defaults to HEAD)
-- **`DRY_RUN`**: Test mode - shows what would happen without making changes
-
-### Control Variables
-
-- **`ALLOW_BACKFILL`**: Enable non-linear releases (automatically set for backfill targets)
-- **`ALLOW_RELEASE_FROM_BRANCH`**: Allow releases from non-main branches
-
-### Smart Defaults
-
-The system provides intelligent defaults for commit ranges:
-
-- **Normal releases**: Start from commit after latest release
-- **Backfill releases**: Start from first commit if `FROM_COMMIT` not specified
-- **First release**: Uses entire repository history
-
-## Dry Run Mode
-
-Test any release operation without making changes:
-
-```bash
-# Test standard release
-DRY_RUN=true make release-minor
-
-# Test pre-release
-DRY_RUN=true make release-patch-alpha
-
-# Test custom release
-DRY_RUN=true RELEASE_VERSION=1.5.0 make release-version
-
-# Test backfill
-DRY_RUN=true RELEASE_VERSION=0.1.5 TO_COMMIT=abc1234 make release-backfill
-```
-
-Dry run mode shows:
-- What version would be created
-- What commit range would be used
-- Whether it would be a pre-release
-- Any validation errors
-
-## Validation and Safety
-
-### Automatic Validation
-
-The release system performs comprehensive validation:
-
-1. **Working Directory**: Must be clean (no uncommitted changes)
-2. **Branch Check**: Warns if not on main branch
-3. **Tag Conflicts**: Prevents duplicate tags with helpful error messages
-4. **Commit Range**: Validates chronological order and existence
-5. **Overlap Detection**: Prevents overlapping releases with suggested fixes
-
-### Error Handling
-
-Common error scenarios and solutions:
-
-## Release Process Requirements
-
-### Branch Requirements
-
-**IMPORTANT: All releases MUST be created from the `main` branch**
-
-1. **Switch to main branch:**
-   ```bash
-   git checkout main
-   git pull origin main
-   ```
-
-2. **Ensure clean working directory:**
-   ```bash
-   git status  # Should show "working tree clean"
-   ```
-
-3. **Run release commands:**
-   ```bash
-   make release-patch        # For patch releases
-   make promote-stable       # For promoting RC to stable
-   ```
-
-### Step-by-Step Release Process
-
-#### Completing an RC Release (e.g., 0.1.0rc0 → 0.1.0)
-
-1. **Switch to main branch:**
-   ```bash
-   git checkout main && git pull origin main
-   ```
-
-2. **Promote RC to stable:**
-   ```bash
-   make promote-stable
-   ```
-
-3. **Verify release creation:**
-   ```bash
-   gh release list --limit 5
-   ```
-
-#### Starting New Alpha Cycle (e.g., 0.1.0 → 0.1.1a1)
-
-1. **From main branch, promote to alpha:**
-   ```bash
-   make promote-alpha
-   ```
-
-2. **This will automatically:**
-   - Increment patch version (0.1.0 → 0.1.1)
-   - Start alpha cycle (0.1.1a1)
-   - Create changelog PR
-   - Trigger daily alpha workflow
-
-### Automated Release Cadence
-
-- **Daily:** Alpha releases (`0.1.1a1` → `0.1.1a2`)
-- **Weekly:** Beta releases (`0.1.1a5` → `0.1.1b1`)  
-- **Bi-weekly:** RC releases (`0.1.1b2` → `0.1.1rc1`)
-
-#### Tag Already Exists
-```
-ERROR: Tag 'v1.0.1' already exists
-Options:
-1. Use a different version: RELEASE_VERSION=1.0.2 make release-version
-2. Delete existing tag: git tag -d v1.0.1 && git push origin :refs/tags/v1.0.1
-```
-
-#### Overlapping Commits
-```
-ERROR: FROM_COMMIT 'abc1234' overlaps with existing release v1.0.0
-Latest release: v1.0.0 (commit: def5678)
-Use this instead:
-  FROM_COMMIT=xyz9876 make release-minor
-```
-
-#### Invalid Promotion
-```
-ERROR: Cannot promote to beta from 1.0.0
-Beta promotion works from alpha or existing beta versions
-```
-
-## Integration with CI/CD
-
-### Automatic Triggers
-
-Releases automatically trigger:
-
-1. **PyPI Publishing**: Stable and pre-releases go to PyPI
-2. **Container Publishing**: Multi-architecture container images
-3. **Documentation**: Version-specific documentation deployment
-
-### Manual Triggers
-
-You can also manually trigger workflows:
-
-```bash
-# Trigger container build for current version
-gh workflow run "Container Build and Publish"
-
-# Trigger documentation deployment
-gh workflow run "Documentation" --field version=$(make get-version)
+git checkout -b hotfix/issue-description
+# Implement fix
+git commit -m "fix: critical issue description"
+# Merge to main
+make release
 ```
 
 ## Troubleshooting
 
-### Common Issues
-
-1. **GitHub CLI not authenticated**: Run `gh auth login`
-2. **Working directory not clean**: Commit or stash changes
-3. **No commits since last release**: Nothing to release
-4. **Invalid version format**: Use semantic versioning (x.y.z)
-
-### Recovery Scenarios
-
-#### Accidental Release
+### Check Current Status
 ```bash
-# Delete local tag
-git tag -d v1.0.1
-
-# Delete remote tag
-git push origin :refs/tags/v1.0.1
-
-# Delete GitHub release
-gh release delete v1.0.1
+make version-show               # Display current version
+git tag -l "v*" --sort=-version:refname | head -5  # Show recent tags
 ```
 
-#### Fix Release Notes
+### Manual Package Build
 ```bash
-# Edit existing release
-gh release edit v1.0.1 --notes "Updated release notes"
+make build                      # Build package locally
 ```
 
-## Best Practices
+### Release Validation
+Scheduled releases automatically skip execution when no changes are detected since the last release of that type.
 
-### Release Planning
+## Technical Implementation
 
-1. **Use pre-releases** for feature development and testing
-2. **Follow semantic versioning** for version bumps
-3. **Test with dry-run** before actual releases
-4. **Create releases from main branch** for consistency
+The release system uses:
+- Semantic-release for version calculation and tagging
+- GitHub Actions for automation
+- PyPI trusted publishing for secure package distribution
+- Makefile targets for local execution and testing
 
-### Pre-release Strategy
-
-1. **Alpha**: Internal testing, frequent changes
-2. **Beta**: External testing, feature-complete
-3. **RC**: Final testing, bug fixes only
-4. **Stable**: Production-ready release
-
-### Version Strategy
-
-- **Patch**: Bug fixes, security updates
-- **Minor**: New features, backward compatible
-- **Major**: Breaking changes, major features
-
-## Examples
-
-### Feature Development Cycle
-
-```bash
-# Start feature development
-make release-minor-alpha        # 1.0.0 -> 1.1.0-alpha.1
-
-# Iterate during development
-make promote-alpha              # 1.1.0-alpha.1 -> 1.1.0-alpha.2
-make promote-alpha              # 1.1.0-alpha.2 -> 1.1.0-alpha.3
-
-# Feature complete, start beta testing
-make promote-beta               # 1.1.0-alpha.3 -> 1.1.0-beta.1
-
-# Bug fixes during beta
-make promote-beta               # 1.1.0-beta.1 -> 1.1.0-beta.2
-
-# Release candidate
-make promote-rc                 # 1.1.0-beta.2 -> 1.1.0-rc.1
-
-# Final release
-make promote-stable             # 1.1.0-rc.1 -> 1.1.0
-```
-
-### Hotfix Release
-
-```bash
-# Emergency patch
-make release-patch              # 1.1.0 -> 1.1.1
-
-# Or test first
-DRY_RUN=true make release-patch
-make release-patch
-```
-
-### Historical Release
-
-```bash
-# Create release for historical commits
-RELEASE_VERSION=0.9.0 TO_COMMIT=historical-commit make release-backfill
-```
+All release commands can be executed locally for testing and validation before automated execution.
