@@ -185,6 +185,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
 
         # Create the fleet with circuit breaker for critical operation
         try:
+            self._logger.debug(f"Fleet Config being sent to AWS {fleet_config}")
             response = self._retry_with_backoff(
                 self.aws_client.ec2_client.create_fleet,
                 operation_type="critical",
