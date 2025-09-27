@@ -26,9 +26,9 @@ Note:
     launches and is suitable for large-scale, complex deployments.
 """
 
+import json
 from datetime import datetime
 from typing import Any
-import json
 
 from botocore.exceptions import ClientError
 
@@ -330,9 +330,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 if template.allocation_strategy_on_demand
                 else None
             ),
-            "max_spot_price": (
-                str(template.max_price) if template.max_price is not None else None
-            ),
+            "max_spot_price": (str(template.max_price) if template.max_price is not None else None),
             "default_capacity_type": self._get_default_capacity_type(template.price_type),
         }
 
@@ -422,7 +420,9 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 }
             ],
             "TargetCapacitySpecification": {"TotalTargetCapacity": request.requested_count},
-            "Type": template.fleet_type.value if hasattr(template.fleet_type, 'value') else str(template.fleet_type),
+            "Type": template.fleet_type.value
+            if hasattr(template.fleet_type, "value")
+            else str(template.fleet_type),
             "TagSpecifications": [
                 {
                     "ResourceType": "fleet",
