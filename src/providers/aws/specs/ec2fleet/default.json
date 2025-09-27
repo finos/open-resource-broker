@@ -44,24 +44,24 @@
       "ResourceType": "fleet",
       "Tags": [
         {"Key": "Name", "Value": "{{ fleet_name }}"}
-        {% for tag in base_tags %},
+        {%- for tag in base_tags %},
         {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}
-        {% endfor %}
-        {% for tag in custom_tags %},
+        {%- endfor %}
+        {%- for tag in custom_tags %},
         {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}
-        {% endfor %}
+        {%- endfor %}
       ]
     }{% if fleet_type == "instant" %},
     {
       "ResourceType": "instance",
       "Tags": [
-        {"Key": "Name", "Value": "{{ fleet_name }}"},
-        {% for tag in base_tags %}
-        {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}{% if not loop.last or has_custom_tags %},{% endif %}
-        {% endfor %}{% if has_custom_tags %},
-        {% for tag in custom_tags %}
-        {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}{% if not loop.last %},{% endif %}
-        {% endfor %}{% endif %}
+        {"Key": "Name", "Value": "{{ fleet_name }}"}
+        {%- for tag in base_tags %},
+        {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}
+        {%- endfor %}
+        {%- for tag in custom_tags %},
+        {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}
+        {%- endfor %}
       ]
     }{% endif %}
   ]

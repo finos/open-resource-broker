@@ -78,6 +78,16 @@ class AWSTemplate(CoreTemplate):
             raise ValueError("At least one subnet_id is required for AWS templates")
 
         # Auto-assign default fleet_type if not provided
+        # Set fleet_type from metadata if not already set
+        if not self.fleet_type:
+            fleet_type_value = (self.metadata or {}).get("providerConfig", {}).get("fleet_type")
+            if fleet_type_value:
+                try:
+                    normalized_value = str(fleet_type_value).strip().lower()
+                    if normalized_value:
+                        object.__setattr__(self, "fleet_type", AWSFleetType(normalized_value))
+                except (ValueError, TypeError):
+                    pass  # Let defaulting logic handle invalid values
         if (
             not self.fleet_type
             and self.provider_api

@@ -405,6 +405,11 @@ class AWSOperations:
         Raises:
             Appropriate domain exception based on AWS error type
         """
+
+        self._logger.debug(
+            "execute_with_standard_error_handling %s with context: %s", operation_name, context
+        )
+
         try:
             self.log_operation_start(operation_name, context)
             result = operation(**kwargs)

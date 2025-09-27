@@ -328,9 +328,9 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
         if aws_template.price_type == "spot":
             params["InstanceMarketOptions"] = {"MarketType": "spot"}
 
-            if aws_template.max_spot_price:
+            if aws_template.max_price is not None:
                 params["InstanceMarketOptions"]["SpotOptions"] = {
-                    "MaxPrice": str(aws_template.max_spot_price)
+                    "MaxPrice": str(aws_template.max_price)
                 }
 
         # Add additional tags for instances (beyond launch template)

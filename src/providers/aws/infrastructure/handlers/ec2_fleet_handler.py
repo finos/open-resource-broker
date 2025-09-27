@@ -28,6 +28,7 @@ Note:
 
 from datetime import datetime
 from typing import Any
+import json
 
 from botocore.exceptions import ClientError
 
@@ -141,7 +142,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
         """Create EC2 Fleet with pure business logic."""
         # Validate prerequisites
         self._validate_prerequisites(aws_template)
-
+        print(f"KBG _create_fleet_internal aws_template.fleet_type {aws_template.fleet_type}")
         # Validate fleet type
         if not aws_template.fleet_type:
             raise AWSValidationError("Fleet type is required for EC2Fleet")
@@ -185,12 +186,20 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
 
         # Create the fleet with circuit breaker for critical operation
         try:
-            self._logger.debug(f"Fleet Config being sent to AWS {fleet_config}")
+            self._logger.debug(
+                "EC2 Fleet create_fleet payload:\n%s",
+                json.dumps(fleet_config, default=str, indent=2, sort_keys=True),
+            )
             response = self._retry_with_backoff(
                 self.aws_client.ec2_client.create_fleet,
                 operation_type="critical",
                 **fleet_config,
             )
+            self._logger.debug(
+                "EC2 Fleet create_fleet response:\n%s",
+                json.dumps(response, default=str, indent=2, sort_keys=True),
+            )
+
         except CircuitBreakerOpenError as e:
             self._logger.error("Circuit breaker OPEN for EC2 Fleet creation: %s", str(e))
             # Re-raise to allow upper layers to handle graceful degradation
@@ -207,10 +216,10 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
         # For instant fleets, store instance IDs in request metadata
         if fleet_type == AWSFleetType.INSTANT:
             instance_ids = []
-            # The correct field for instant fleets is 'fleetInstanceSet'
-            for instance in response.get("fleetInstanceSet", []):
-                if "InstanceId" in instance:
-                    instance_ids.append(instance["InstanceId"])
+            # For instant fleets, AWS returns 'Instances' -> [{ 'InstanceIds': ['i-...', 'i-...'], ... }]
+            for inst_block in response.get("Instances", []):
+                for instance_id in inst_block.get("InstanceIds", []):
+                    instance_ids.append(instance_id)
 
             # Log the response structure at debug level if no instances were found
             if not instance_ids:
@@ -222,6 +231,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
             request.metadata["instance_ids"] = instance_ids
             self._logger.debug("Stored instance IDs in request metadata: %s", instance_ids)
 
+            print(f"KBG creating EC2 Fleet {instance_ids}")
         return fleet_id
 
     def _format_instance_data(
@@ -298,7 +308,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
 
         return {
             # Fleet-specific values
-            "fleet_type": template.fleet_type,
+            "fleet_type": template.fleet_type.value,
             "fleet_name": f"{get_resource_prefix('fleet')}{request.request_id}",
             # Computed overrides
             "instance_overrides": instance_overrides,
@@ -307,7 +317,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
             # Fleet-specific flags
             "is_maintain_fleet": template.fleet_type == AWSFleetType.MAINTAIN.value,
             "replace_unhealthy": template.fleet_type == AWSFleetType.MAINTAIN.value,
-            "has_spot_options": bool(template.allocation_strategy or template.max_spot_price),
+            "has_spot_options": bool(template.allocation_strategy or template.max_price),
             "has_ondemand_options": bool(template.allocation_strategy_on_demand),
             # Configuration values
             "allocation_strategy": (
@@ -321,7 +331,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 else None
             ),
             "max_spot_price": (
-                str(template.max_spot_price) if template.max_spot_price is not None else None
+                str(template.max_price) if template.max_price is not None else None
             ),
             "default_capacity_type": self._get_default_capacity_type(template.price_type),
         }
@@ -345,7 +355,10 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
         """Create EC2 Fleet configuration with native spec support."""
         # Try native spec processing with merge support
         if self.aws_native_spec_service:
+            print(f"KBG Path 1 REQUEST: {request}")
+            print(f"KBG _create_fleet_config template.fleet_type: {template.fleet_type}")
             context = self._prepare_template_context(template, request)
+            print(f"KBG _create_fleet_config CONTEXT: {context}")
             context.update(
                 {
                     "launch_template_id": launch_template_id,
@@ -357,8 +370,10 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 template, request, "ec2fleet", context
             )
             if native_spec:
+                print("KBG Path 1.1 ")
                 # Ensure launch template info is in the spec
                 if "LaunchTemplateConfigs" in native_spec:
+                    print("KBG Path 1.1.1 ")
                     native_spec["LaunchTemplateConfigs"][0]["LaunchTemplateSpecification"] = {
                         "LaunchTemplateId": launch_template_id,
                         "Version": launch_template_version,
@@ -369,10 +384,12 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 )
                 return native_spec
 
+            print(f"KBG _create_fleet_config context: {context}")
             # Use template-driven approach with native spec service
             return self.aws_native_spec_service.render_default_spec("ec2fleet", context)
 
         # Fallback to legacy logic when native spec service is not available
+        print("KBG Path 2 ")
         return self._create_fleet_config_legacy(
             template, request, launch_template_id, launch_template_version
         )
@@ -405,7 +422,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 }
             ],
             "TargetCapacitySpecification": {"TotalTargetCapacity": request.requested_count},
-            "Type": template.fleet_type,
+            "Type": template.fleet_type.value if hasattr(template.fleet_type, 'value') else str(template.fleet_type),
             "TagSpecifications": [
                 {
                     "ResourceType": "fleet",
@@ -449,10 +466,10 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 }
 
             # Add max spot price if specified
-            if template.max_spot_price is not None:
+            if template.max_price is not None:
                 if "SpotOptions" not in fleet_config:
                     fleet_config["SpotOptions"] = {}
-                fleet_config["SpotOptions"]["MaxTotalPrice"] = str(template.max_spot_price)
+                fleet_config["SpotOptions"]["MaxTotalPrice"] = str(template.max_price)
         elif price_type == "heterogeneous":
             # For heterogeneous fleets, we need to specify both on-demand and spot
             # capacities
@@ -480,10 +497,10 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 }
 
             # Add max spot price if specified
-            if template.max_spot_price is not None:
+            if template.max_price is not None:
                 if "SpotOptions" not in fleet_config:
                     fleet_config["SpotOptions"] = {}
-                fleet_config["SpotOptions"]["MaxTotalPrice"] = str(template.max_spot_price)
+                fleet_config["SpotOptions"]["MaxTotalPrice"] = str(template.max_price)
 
         # Add overrides with weighted capacity if multiple instance types are specified
         if template.instance_types:
@@ -573,6 +590,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 raise AWSInfrastructureError("No Fleet ID found in request")
 
             fleet_id = request.resource_ids[0]  # Use first resource ID as fleet ID
+            print(f"KBG:  check_hosts_status{fleet_id}")
 
             # Get template using CQRS QueryBus
             container = get_container()
@@ -591,6 +609,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 raise AWSValidationError("Fleet type is required")
 
             fleet_type = AWSFleetType(fleet_type_value.lower())
+            print(f"KBG:  check_hosts_status Fleet Type{fleet_type}")
 
             # Get fleet information with pagination and retry
             fleet_list = self._retry_with_backoff(
@@ -606,6 +625,8 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 raise AWSEntityNotFoundError(f"Fleet {fleet_id} not found")
 
             fleet = fleet_list[0]
+
+            print(f"KBG {fleet_list} \n\n KBG: {request.metadata}")
 
             # Log fleet status
             self._logger.debug(
