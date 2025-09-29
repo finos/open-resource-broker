@@ -142,7 +142,6 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
         """Create EC2 Fleet with pure business logic."""
         # Validate prerequisites
         self._validate_prerequisites(aws_template)
-        print(f"KBG _create_fleet_internal aws_template.fleet_type {aws_template.fleet_type}")
         # Validate fleet type
         if not aws_template.fleet_type:
             raise AWSValidationError("Fleet type is required for EC2Fleet")
@@ -231,7 +230,6 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
             request.metadata["instance_ids"] = instance_ids
             self._logger.debug("Stored instance IDs in request metadata: %s", instance_ids)
 
-            print(f"KBG creating EC2 Fleet {instance_ids}")
         return fleet_id
 
     def _format_instance_data(
@@ -353,10 +351,8 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
         """Create EC2 Fleet configuration with native spec support."""
         # Try native spec processing with merge support
         if self.aws_native_spec_service:
-            print(f"KBG Path 1 REQUEST: {request}")
-            print(f"KBG _create_fleet_config template.fleet_type: {template.fleet_type}")
             context = self._prepare_template_context(template, request)
-            print(f"KBG _create_fleet_config CONTEXT: {context}")
+
             context.update(
                 {
                     "launch_template_id": launch_template_id,
@@ -368,10 +364,8 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 template, request, "ec2fleet", context
             )
             if native_spec:
-                print("KBG Path 1.1 ")
                 # Ensure launch template info is in the spec
                 if "LaunchTemplateConfigs" in native_spec:
-                    print("KBG Path 1.1.1 ")
                     native_spec["LaunchTemplateConfigs"][0]["LaunchTemplateSpecification"] = {
                         "LaunchTemplateId": launch_template_id,
                         "Version": launch_template_version,
@@ -382,12 +376,10 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 )
                 return native_spec
 
-            print(f"KBG _create_fleet_config context: {context}")
             # Use template-driven approach with native spec service
             return self.aws_native_spec_service.render_default_spec("ec2fleet", context)
 
         # Fallback to legacy logic when native spec service is not available
-        print("KBG Path 2 ")
         return self._create_fleet_config_legacy(
             template, request, launch_template_id, launch_template_version
         )
@@ -590,7 +582,6 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 raise AWSInfrastructureError("No Fleet ID found in request")
 
             fleet_id = request.resource_ids[0]  # Use first resource ID as fleet ID
-            print(f"KBG:  check_hosts_status{fleet_id}")
 
             # Get template using CQRS QueryBus
             container = get_container()
@@ -609,7 +600,6 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 raise AWSValidationError("Fleet type is required")
 
             fleet_type = AWSFleetType(fleet_type_value.lower())
-            print(f"KBG:  check_hosts_status Fleet Type{fleet_type}")
 
             # Get fleet information with pagination and retry
             fleet_list = self._retry_with_backoff(
@@ -625,8 +615,6 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                 raise AWSEntityNotFoundError(f"Fleet {fleet_id} not found")
 
             fleet = fleet_list[0]
-
-            print(f"KBG {fleet_list} \n\n KBG: {request.metadata}")
 
             # Log fleet status
             self._logger.debug(

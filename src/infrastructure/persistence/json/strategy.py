@@ -292,7 +292,7 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 return 0
 
     def _load_data(self) -> dict[str, dict[str, Any]]:
-        """Load data from file with caching."""
+        """Load data from file with hierarchical structure support."""
         if self._cache_valid and self._data_cache is not None:
             return self._data_cache
 
@@ -300,18 +300,21 @@ class JSONStorageStrategy(BaseStorageStrategy):
             content = self.file_manager.read_file()
 
             if not content.strip():
-                data = {}
+                entity_data = {}
             else:
-                data = self.serializer.deserialize(content)
-                if not isinstance(data, dict):
+                full_data = self.serializer.deserialize(content)
+                if not isinstance(full_data, dict):
                     self.logger.warning("Invalid data format in file, initializing empty data")
-                    data = {}
+                    entity_data = {}
+                else:
+                    # Extract only the entity type section from hierarchical structure
+                    entity_data = full_data.get(self.entity_type, {})
 
-            # Cache the data
-            self._data_cache = data
+            # Cache the entity-specific data
+            self._data_cache = entity_data
             self._cache_valid = True
 
-            return data
+            return entity_data
 
         except Exception as e:
             self.logger.error("Failed to load data: %s", e)
@@ -323,18 +326,35 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 self.logger.warning("No backup available, starting with empty data")
                 return {}
 
-    def _save_data(self, data: dict[str, dict[str, Any]]) -> None:
-        """Save data to file with backup."""
+    def _save_data(self, entity_data: dict[str, dict[str, Any]]) -> None:
+        """Save data to file with hierarchical structure support."""
         try:
             # Create backup before saving
             self.file_manager.create_backup()
 
-            # Serialize and save
-            content = self.serializer.serialize(data)
+            # Load full file structure to preserve other entity types
+            try:
+                content = self.file_manager.read_file()
+                if content.strip():
+                    full_data = self.serializer.deserialize(content)
+                else:
+                    full_data = {}
+            except:
+                full_data = {}
+
+            # Ensure full_data is a dictionary
+            if not isinstance(full_data, dict):
+                full_data = {}
+
+            # Update only our entity type section in the hierarchical structure
+            full_data[self.entity_type] = entity_data
+
+            # Serialize and save the complete hierarchical structure
+            content = self.serializer.serialize(full_data)
             self.file_manager.write_file(content)
 
-            # Update cache
-            self._data_cache = data
+            # Update cache with entity-specific data
+            self._data_cache = entity_data
             self._cache_valid = True
 
         except Exception as e:
