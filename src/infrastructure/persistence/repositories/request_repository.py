@@ -258,8 +258,11 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
             raise
 
     @handle_infrastructure_exceptions(context="request_repository_find_by_id")
-    def find_by_id(self, request_id: RequestId) -> Optional[Request]:
+    def find_by_id(self, request_id: RequestId | str) -> Optional[Request]:
         """Find request by ID (alias for get_by_id)."""
+        # Convert string to RequestId if needed
+        if isinstance(request_id, str):
+            request_id = RequestId(value=request_id)
         return self.get_by_id(request_id)
 
     @handle_infrastructure_exceptions(context="request_repository_find_by_request_id")
