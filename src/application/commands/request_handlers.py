@@ -32,8 +32,6 @@ from domain.template.repository import TemplateRepository
 from infrastructure.di.buses import QueryBus
 
 
-
-
 @command_handler(CreateRequestCommand)
 class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str]):
     """Handler for creating machine requests."""
@@ -444,12 +442,12 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         self,
         request_repository: RequestRepository,
         machine_repository: MachineRepository,
-        template_repository : TemplateRepository,  # Add template repository
+        template_repository: TemplateRepository,  # Add template repository
         logger: LoggingPort,
         container: ContainerPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
-        provider_port: ProviderPort
+        provider_port: ProviderPort,
     ) -> None:
         super().__init__(logger, event_publisher, error_handler)
         self._request_repository = request_repository
@@ -478,7 +476,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             # provider_type = config_manager.get_provider_config("provider.type", "aws")
             # provider_config = config_manager.get_provider_config()
             # print(f"KBG provider_config: {provider_config}")
-            provider_type = "aws" # KBG TODO
+            provider_type = "aws"  # KBG TODO
             # Create return request with business logic
             # Use first machine's template if available, otherwise use generic return
             # template
@@ -521,7 +519,6 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
 
             self.logger.info("Return request created: %s", request.request_id)
 
-
             try:
                 provisioning_result = await self._execute_deprovisioning(
                     command.machine_ids, request
@@ -540,10 +537,9 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             raise
 
     async def _execute_deprovisioning(self, machine_ids: list[str], request) -> dict[str, Any]:
-        """ Execute De-Provisioning release machines"""
+        """Execute De-Provisioning release machines"""
 
         try:
-
             # Import required types (using existing imports)
             from providers.base.strategy import ProviderOperation, ProviderOperationType
 
@@ -558,13 +554,10 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                 context={
                     # "correlation_id": str(request.request_id),
                     # "dry_run": request.metadata.get("dry_run", False),
-                }
+                },
             )
 
-
-            result = await self._provider_context.terminate_resources(
-                machine_ids, operation
-            )
+            result = await self._provider_context.terminate_resources(machine_ids, operation)
 
             pass
         except Exception as e:
