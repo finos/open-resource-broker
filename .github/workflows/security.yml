@@ -119,7 +119,7 @@ jobs:
         fetch-depth: 0
 
     - name: Check for secrets with TruffleHog
-      uses: trufflesecurity/trufflehog@v3.90.6
+      uses: trufflesecurity/trufflehog@v3.90.8
       with:
         path: ./
         base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
@@ -219,7 +219,7 @@ jobs:
         output: 'trivy-results-py${{ matrix.python-version }}.json'
 
     - name: Dockerfile security scan with Hadolint
-      uses: hadolint/hadolint-action@v3.2.0
+      uses: hadolint/hadolint-action@v3.3.0
       with:
         dockerfile: Dockerfile
         format: sarif
@@ -227,7 +227,7 @@ jobs:
         no-fail: true
 
     - name: Dev-tools Dockerfile security scan with Hadolint
-      uses: hadolint/hadolint-action@v3.2.0
+      uses: hadolint/hadolint-action@v3.3.0
       with:
         dockerfile: dev-tools/docker/Dockerfile.dev-tools
         format: sarif
