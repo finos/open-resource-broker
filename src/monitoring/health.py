@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from botocore.exceptions import ClientError
-
 from config.config_manager import ConfigurationManager
+
 from infrastructure.logging.logger import get_logger
 from providers.aws.infrastructure.aws_client import AWSClient
 
