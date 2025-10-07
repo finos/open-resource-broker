@@ -105,6 +105,7 @@ class HandlerDiscoveryService:
 
         # Try to load from cache first
         cached_result = self._try_load_from_cache(base_package)
+        print(f"KBG cache_results: {cached_result}")
         if cached_result:
             logger.info(
                 "Using cached handler discovery (%s handlers)",
@@ -208,6 +209,7 @@ class HandlerDiscoveryService:
             return None
 
         try:
+            print(f"KBG cache_file: {self.cache_file}")
             with open(self.cache_file) as f:
                 cache_data = json.load(f)
 

@@ -99,6 +99,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 )
                 # No machines in storage but we have resource IDs - check provider and
                 # create machines
+<<<<<<< HEAD
                 machine_objects_from_provider = await self._check_provider_and_create_machines(
                     request
                 )
@@ -109,6 +110,12 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 self.logger.info(
                     "DEBUG: Have %s machines, updating status from AWS", len(machine_obj_from_db)
                 )
+=======
+                machine_objects_from_provider = await self._check_provider_and_create_machines(request)
+                self.logger.info("Provider check returned %s machines", len(machine_obj_from_db))
+            elif machine_obj_from_db:
+                self.logger.info("Have %s machines, updating status from AWS", len(machine_obj_from_db))
+>>>>>>> c27a705 (Refactoring logging)
                 # We have machines - update their status from AWS
                 machine_objects_from_provider = await self._update_machine_status_from_aws(
                     machine_obj_from_db

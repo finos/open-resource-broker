@@ -199,7 +199,7 @@ class CompositeProviderStrategy(ProviderStrategy):
         try:
             strategy.cleanup()
         except Exception as e:
-            self._self._logger.warning("Error cleaning up strategy %s: %s", strategy_type, e)
+            self._self._logger.warning("Faild during cleaning up strategy %s: %s", strategy_type, e)
 
         # Remove from composition
         del self._strategies[strategy_type]
@@ -693,7 +693,7 @@ class CompositeProviderStrategy(ProviderStrategy):
             self._initialized = False
 
         except Exception as e:
-            self._self._logger.warning("Error during composite strategy cleanup: %s", e)
+            self._self._logger.warning("Exception during composite strategy cleanup: %s", e)
 
     def __str__(self) -> str:
         """Return string representation for debugging."""

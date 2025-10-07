@@ -574,7 +574,7 @@ class FallbackProviderStrategy(ProviderStrategy):
             combined_features = primary_capabilities.features.copy()
             combined_limitations = primary_capabilities.limitations.copy()
         except Exception as e:
-            self._self._logger.warning("Error getting primary capabilities: %s", e)
+            self._self._logger.warning("Failed Getting primary capabilities: %s", e)
             all_operations = set()
             combined_features = {}
             combined_limitations = {}
@@ -593,7 +593,7 @@ class FallbackProviderStrategy(ProviderStrategy):
                     }
                 )
             except Exception as e:
-                self._self._logger.warning("Error getting fallback %s capabilities: %s", i + 1, e)
+                self._self._logger.warning("Failed getting fallback %s capabilities: %s", i + 1, e)
 
         # Add fallback-specific features
         combined_features.update(
@@ -705,7 +705,7 @@ class FallbackProviderStrategy(ProviderStrategy):
             self._initialized = False
 
         except Exception as e:
-            self._self._logger.warning("Error during fallback strategy cleanup: %s", e)
+            self._self._logger.warning("Failed during fallback strategy cleanup: %s", e)
 
     def __str__(self) -> str:
         """Return string representation for debugging."""

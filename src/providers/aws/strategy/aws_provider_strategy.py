@@ -191,6 +191,8 @@ class AWSProviderStrategy(ProviderStrategy):
         Returns:
             Result of the operation execution
         """
+
+        self._logger.debug(f"KBG aws_provider_strategy execute_operation")
         if not self._initialized:
             return ProviderResult.error_result(
                 "AWS provider strategy not initialized", "NOT_INITIALIZED"
@@ -253,6 +255,7 @@ class AWSProviderStrategy(ProviderStrategy):
         Returns:
             Result of the operation execution
         """
+        print(f"KBG _execute_operation_internal    {operation}")
         # Route operation to appropriate handler
         if operation.operation_type == ProviderOperationType.CREATE_INSTANCES:
             return self._handle_create_instances(operation)
@@ -381,8 +384,10 @@ class AWSProviderStrategy(ProviderStrategy):
 
     def _handle_terminate_instances(self, operation: ProviderOperation) -> ProviderResult:
         """Handle instance termination operation."""
+        self._logger.debug(f"KBG _handle_terminate_instances")
         try:
             instance_ids = operation.parameters.get("instance_ids", [])
+            self._logger.debug(f"Terminating instances: {instance_ids}")
 
             if not instance_ids:
                 return ProviderResult.error_result(
@@ -435,7 +440,9 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             try:
+                print(f"KBG: _handle_get_instance_status: {instance_ids}")
                 response = aws_client.ec2_client.describe_instances(InstanceIds=instance_ids)
+                print(f"KBG aws_client.ec2_client.describe_instances(InstanceIds=instance_ids) responce: {response}")
 
                 # Convert AWS instances to domain Machine entities
                 machines = []
@@ -874,7 +881,7 @@ class AWSProviderStrategy(ProviderStrategy):
             self._initialized = False
 
         except Exception as e:
-            self._logger.warning("Error during AWS provider cleanup: %s", e)
+            self._logger.warning("Failed during AWS provider cleanup: %s", e)
 
     def __str__(self) -> str:
         """Return string representation for debugging."""

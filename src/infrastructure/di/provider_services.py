@@ -478,7 +478,7 @@ def _register_provider_specific_services(container: DIContainer) -> None:
     except ImportError:
         logger.debug("AWS provider not available, skipping AWS service registration")
     except Exception as e:
-        logger.warning("Error registering AWS services: %s", str(e))
+        logger.warning("Faild to register AWS services: %s", str(e))
 
 
 def _register_aws_services(container: DIContainer) -> None:

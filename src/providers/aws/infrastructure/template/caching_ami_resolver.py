@@ -104,7 +104,7 @@ class CachingAMIResolver(TemplateResolverPort):
         Raises:
             InfrastructureError: If resolution fails and fallback disabled
         """
-        self._logger.debug("resolve_with_fallback called with: %s", ami_id_or_parameter)
+        self._logger.debug("Resolve with fallback called with: %s", ami_id_or_parameter)
 
         # Skip resolution if disabled
         if not self._ami_config.enabled:
