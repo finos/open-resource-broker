@@ -4,7 +4,7 @@ from typing import Any, Optional
 
 from pydantic import ConfigDict, model_validator
 
-from domain.template.aggregate import Template as CoreTemplate
+from domain.template.template_aggregate import Template
 from providers.aws.domain.template.value_objects import (
     AWSAllocationStrategy,
     AWSConfiguration,
@@ -17,7 +17,7 @@ from providers.aws.domain.template.value_objects import (
 )
 
 
-class AWSTemplate(CoreTemplate):
+class AWSTemplate(Template):
     """AWS-specific template with AWS extensions."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

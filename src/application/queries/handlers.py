@@ -24,7 +24,7 @@ from domain.base import UnitOfWorkFactory
 # Exception handling through BaseQueryHandler (Clean Architecture compliant)
 from domain.base.exceptions import EntityNotFoundError
 from domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
-from domain.template.aggregate import Template
+from domain.template.template_aggregate import Template
 
 T = TypeVar("T")
 
@@ -61,7 +61,6 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     return cached_result
 
             # Cache miss - get request from storage
-            machine_ids_from_db = []
 
             with self.uow_factory.create_unit_of_work() as uow:
                 from domain.request.value_objects import RequestId
@@ -75,18 +74,9 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 )
 
                 if not request:
-                    raise EntityNotFoundError("Request", query.request_id)
+                    raise EntityNotFoundError("Request", request_id)
 
-                machine_ids_from_db = request.instance_ids
-                if len(request.instance_ids) == 0:
-                    self.logger.info("No machines in request, returning empty list")
-
-            # Fetch actual full Machine object from DB
-            machine_obj_from_db = []
-            with self.uow_factory.create_unit_of_work() as uow:
-                for m in machine_ids_from_db:
-                    res = uow.machines.get_by_id(m)
-                    machine_obj_from_db.append(res)
+                machine_obj_from_db = uow.machines.find_by_request_id(query.request_id)
 
             self.logger.debug(f"Machines associated with this request in DB: {machine_obj_from_db}")
 
@@ -118,8 +108,8 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     "DEBUG: No machines and no resource IDs for request %s",
                     query.request_id,
                 )
-            print(f"Machines from DB:  {machine_obj_from_db}")
-            print(f"Machines from cloud provider:  {machine_objects_from_provider}")
+            self.logger.debug(f"Machines from DB:  {machine_obj_from_db}")
+            self.logger.debug(f"Machines from cloud provider:  {machine_objects_from_provider}")
 
             # Determine if request status needs updating based on machine states
             new_status, status_message = self._determine_request_status_from_machines(
@@ -128,6 +118,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
             # Update request status if needed
             if new_status:
+                self.logger.debug(f"")
                 from domain.request.request_types import RequestStatus
 
                 updated_request = request.update_status(RequestStatus(new_status), status_message)
@@ -290,8 +281,6 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             if not machines:
                 return []
 
-            print(f"KBG machine type: {type(machines[0])}")
-
             # Get the request for the first machine (all should be same request)
             request_id = str(machines[0].request_id)
             with self.uow_factory.create_unit_of_work() as uow:
@@ -308,9 +297,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             from providers.base.strategy import ProviderOperation, ProviderOperationType
 
             # Extract instance IDs from machines
-            print("KBG --1")
             instance_ids = [str(machine.instance_id.value) for machine in machines]
-            print(f"KBG --2: {instance_ids}")
 
             operation = ProviderOperation(
                 operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
@@ -325,10 +312,8 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             # Use the correct strategy identifier format:
             # provider_type-provider_type-instance
             strategy_identifier = f"{request.provider_type}-{request.provider_type}-{request.provider_instance or 'default'}"
-            print(f"KBG --3: {strategy_identifier}")
-            # success
+
             result = await provider_context.execute_with_strategy(strategy_identifier, operation)
-            print(f"KBG --4: {result}")
             if not result.success:
                 self.logger.warning("Failed to check resource status: %s", result.error_message)
                 return machines
@@ -871,7 +856,7 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, Template]):
 
     async def execute_query(self, query: GetTemplateQuery) -> Template:
         """Execute get template query."""
-        from domain.template.aggregate import Template
+        from domain.template.template_aggregate import Template
         from infrastructure.template.configuration_manager import (
             TemplateConfigurationManager,
         )
@@ -937,7 +922,7 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[Template]])
 
     async def execute_query(self, query: ListTemplatesQuery) -> list[Template]:
         """Execute list templates query."""
-        from domain.template.aggregate import Template
+        from domain.template.template_aggregate import Template
         from infrastructure.template.configuration_manager import (
             TemplateConfigurationManager,
         )

@@ -1,6 +1,6 @@
 """Template bounded context - template domain logic."""
 
-from .aggregate import Template
+from .template_aggregate import Template
 from .exceptions import (
     InvalidTemplateConfigurationError,
     TemplateAlreadyExistsError,

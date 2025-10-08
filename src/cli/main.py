@@ -786,12 +786,12 @@ async def main() -> None:
                 print(formatted_output)  # noqa: CLI output
 
         except DomainException as e:
-            logger.error("Domain error: %s", e)
+            logger.exception("Domain error: %s", e)
             if not args.quiet:
                 print(f"Error: {e}")  # noqa: CLI error
             sys.exit(1)
         except Exception as e:
-            logger.error("Unexpected error: %s", e)
+            logger.exception("Unexpected error: %s", e)
             if args.verbose:
                 import traceback
 

@@ -5,7 +5,7 @@ from typing import Any
 from domain.base.ports.provider_port import ProviderPort
 from domain.machine.aggregate import Machine
 from domain.request.aggregate import Request
-from domain.template.aggregate import Template
+from domain.template.template_aggregate import Template
 from providers.base.strategy.provider_context import ProviderContext
 
 

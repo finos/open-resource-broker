@@ -582,7 +582,7 @@ class TemplateConfigurationManager:
         """Validate template against provider capabilities."""
         try:
             # Convert TemplateDTO to Template domain object for capability service
-            from domain.template.aggregate import Template
+            from domain.template.template_aggregate import Template
 
             # Create minimal Template object for validation
             domain_template = Template(

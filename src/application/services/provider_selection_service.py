@@ -12,7 +12,7 @@ from config.schemas.provider_strategy_schema import ProviderInstanceConfig
 from domain.base.dependency_injection import injectable
 from domain.base.ports import LoggingPort
 from domain.base.ports.configuration_port import ConfigurationPort
-from domain.template.aggregate import Template
+from domain.template.template_aggregate import Template
 from infrastructure.registry.provider_registry import ProviderRegistry
 
 

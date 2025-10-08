@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Any
 
 from domain.request.aggregate import Request
-from domain.template.aggregate import Template
+from domain.template.template_aggregate import Template
 from infrastructure.utilities.common.resource_naming import get_resource_prefix
 
 

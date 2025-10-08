@@ -13,7 +13,7 @@ from domain.base.dependency_injection import injectable
 from domain.base.ports import ConfigurationPort, LoggingPort
 from domain.request.aggregate import Request
 from infrastructure.resilience import CircuitBreakerOpenError
-from providers.aws.domain.template.aggregate import AWSTemplate
+from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from providers.aws.infrastructure.aws_client import AWSClient
 from providers.aws.utilities.fleet_tag_builder import FleetTagBuilder

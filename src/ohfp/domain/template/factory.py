@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Optional, Protocol
 
 from domain.base.ports.logging_port import LoggingPort
-from domain.template.aggregate import Template
+from domain.template.template_aggregate import Template
 from domain.template.extensions import TemplateExtensionRegistry
 
 
@@ -71,7 +71,7 @@ class TemplateFactory(BaseTemplateFactory):
         """Register built-in provider template classes."""
         try:
             # Register AWS template class
-            from providers.aws.domain.template.aggregate import AWSTemplate
+            from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
             self._provider_template_classes["aws"] = AWSTemplate
 

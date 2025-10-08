@@ -90,6 +90,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
 
             template_query = GetTemplateQuery(template_id=command.template_id)
             template = await self._query_bus.execute(template_query)
+            self.logger.debug("Template found: %s %s", type(template), template.to_dict())
 
             if not template:
                 raise EntityNotFoundError("Template", command.template_id)
@@ -468,7 +469,6 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             config_manager = self._container.get(ConfigurationPort)
             # provider_type = config_manager.get_provider_config("provider.type", "aws")
             # provider_config = config_manager.get_provider_config()
-            # print(f"KBG provider_config: {provider_config}")
             provider_type = "aws"  # KBG TODO
             # Create return request with business logic
             # Use first machine's template if available, otherwise use generic return
@@ -534,7 +534,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             # Import required types (using existing imports)
             from providers.base.strategy import ProviderOperation, ProviderOperationType
 
-            self.logger.debug(f"KBG De-Provisioning request {request} \n {self._provider_context}")
+            self.logger.debug(f"De-Provisioning request {request} \n {self._provider_context}")
             # Create provider operation using existing pattern
             operation = ProviderOperation(
                 operation_type=ProviderOperationType.TERMINATE_INSTANCES,

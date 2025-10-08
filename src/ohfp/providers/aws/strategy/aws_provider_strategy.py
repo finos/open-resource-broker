@@ -305,7 +305,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             # Convert template_config to AWSTemplate domain object
-            from providers.aws.domain.template.aggregate import AWSTemplate
+            from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
             try:
                 aws_template = AWSTemplate.model_validate(template_config)

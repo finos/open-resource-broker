@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from domain.request.aggregate import Request
-from providers.aws.domain.template.aggregate import AWSTemplate
+from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
 
 class BaseContextMixin:

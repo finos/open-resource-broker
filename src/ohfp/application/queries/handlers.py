@@ -24,7 +24,7 @@ from domain.base import UnitOfWorkFactory
 # Exception handling through BaseQueryHandler (Clean Architecture compliant)
 from domain.base.exceptions import EntityNotFoundError
 from domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
-from domain.template.aggregate import Template
+from domain.template.template_aggregate import Template
 
 T = TypeVar("T")
 
@@ -660,7 +660,7 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, Template]):
 
     async def execute_query(self, query: GetTemplateQuery) -> Template:
         """Execute get template query."""
-        from domain.template.aggregate import Template
+        from domain.template.template_aggregate import Template
         from infrastructure.template.configuration_manager import (
             TemplateConfigurationManager,
         )
@@ -726,7 +726,7 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[Template]])
 
     async def execute_query(self, query: ListTemplatesQuery) -> list[Template]:
         """Execute list templates query."""
-        from domain.template.aggregate import Template
+        from domain.template.template_aggregate import Template
         from infrastructure.template.configuration_manager import (
             TemplateConfigurationManager,
         )

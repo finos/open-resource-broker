@@ -4,7 +4,7 @@ from typing import Any, Optional
 
 from pydantic import ConfigDict, model_validator
 
-from domain.template.aggregate import Template as CoreTemplate
+from domain.template.template_aggregate import Template
 from providers.aws.domain.template.value_objects import (
     AWSAllocationStrategy,
     AWSConfiguration,
@@ -17,7 +17,7 @@ from providers.aws.domain.template.value_objects import (
 )
 
 
-class AWSTemplate(CoreTemplate):
+class AWSTemplate(Template):
     """AWS-specific template with AWS extensions."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -45,7 +45,7 @@ class AWSTemplate(CoreTemplate):
     launch_template_id: Optional[str] = None
     launch_template_version: Optional[str] = None
 
-    # AWS-specific instance types and priorities (extends CoreTemplate.instance_types)
+    # AWS-specific instance types and priorities (extends Template.instance_types)
     instance_types_ondemand: Optional[dict[str, int]] = None
     instance_types_priority: Optional[dict[str, int]] = None
 
@@ -80,7 +80,9 @@ class AWSTemplate(CoreTemplate):
         # Auto-assign default fleet_type if not provided
         # Set fleet_type from metadata if not already set
         if not self.fleet_type:
-            fleet_type_value = (self.metadata or {}).get("providerConfig", {}).get("fleet_type")
+            # Check both metadata.fleet_type and metadata.providerConfig.fleet_type
+            metadata = self.metadata or {}
+            fleet_type_value = metadata.get("fleet_type") or metadata.get("providerConfig", {}).get("fleet_type")
             if fleet_type_value:
                 try:
                     normalized_value = str(fleet_type_value).strip().lower()

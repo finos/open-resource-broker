@@ -7,7 +7,7 @@ It follows the Factory Method pattern to create the appropriate handler for each
 
 from domain.base.dependency_injection import injectable
 from domain.base.ports import ConfigurationPort, LoggingPort
-from domain.template.aggregate import Template
+from domain.template.template_aggregate import Template
 from providers.aws.domain.template.value_objects import ProviderApi
 from providers.aws.exceptions.aws_exceptions import AWSValidationError
 from providers.aws.infrastructure.aws_client import AWSClient

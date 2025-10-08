@@ -359,7 +359,7 @@ def register_aws_template_factory(
     try:
         # Try to import and register AWS template class
         try:
-            from providers.aws.domain.template.aggregate import AWSTemplate
+            from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
             factory.register_provider_template_class("aws", AWSTemplate)
 

@@ -10,7 +10,7 @@ from domain.base.ports.configuration_port import ConfigurationPort
 from domain.base.ports.logging_port import LoggingPort
 from domain.machine.aggregate import Machine
 from domain.request.aggregate import Request
-from domain.template.aggregate import Template
+from domain.template.template_aggregate import Template
 from infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
 from infrastructure.utilities.common.serialization import serialize_enum
 
@@ -49,11 +49,18 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             provider_type = selection_result.provider_type
             templates_file = f"{provider_type}prov_templates.json"
 
-            return self.config_manager.resolve_file("template", templates_file)
+            self._logger.debug("get_templates_file_path - provider_type: %s, templates_file: %s", provider_type, templates_file)
+
+            resolved_path = self.config_manager.resolve_file("template", templates_file)
+            self._logger.debug("get_templates_file_path - resolved_path: %s, exists: %s", resolved_path, os.path.exists(resolved_path))
+
+            return resolved_path
         except Exception as e:
             self._logger.error("Failed to determine templates file path: %s", e)
             # Fallback to aws for backward compatibility
-            return self.config_manager.resolve_file("template", "awsprov_templates.json")
+            fallback_path = self.config_manager.resolve_file("template", "awsprov_templates.json")
+            self._logger.debug("get_templates_file_path - fallback_path: %s, exists: %s", fallback_path, os.path.exists(fallback_path))
+            return fallback_path
 
     def get_template_paths(self) -> list[str]:
         """Get template file paths."""
@@ -449,6 +456,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         config_file = f"{provider_type}prov_config.json"
         return os.path.join(config_root, config_file)
 
+    #KBG TODO: function is not used
     def parse_template_config(self, raw_data: dict[str, Any]) -> Template:
         """
         Parse HostFactory template to domain Template.
@@ -507,6 +515,9 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         For [requests status]: supports both list and a single request_id
         """
 
+        # DEBUG: Log the raw input data
+        self._logger.debug("parse_request_data input: %s", raw_data)
+
         # Request Status
         # Handles 2 formats of requests
         # 1. {"requests": [{"requestId": "req-ABC"}, {"requestId": "req-DEF"}]}
@@ -514,30 +525,37 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         if "requests" in raw_data:
             requests = raw_data["requests"]
             requests_list = requests if isinstance(requests, list) else [requests]
-            return [
+            result = [
                 {"request_id": req.get("requestId", req.get("request_id"))} for req in requests_list
             ]
+            self._logger.debug("parse_request_data output (requests): %s", result)
+            return result
 
         # Request Machines
         # Handle nested HostFactory format: {"template": {"templateId": "...", "machineCount": ...}}
         if "template" in raw_data:
             template_data = raw_data["template"]
-            return {
+            self._logger.debug("Found template data: %s", template_data)
+            result = {
                 "template_id": template_data.get("templateId"),
                 "requested_count": template_data.get("machineCount", 1),
                 "request_type": template_data.get("requestType", "provision"),
                 "metadata": raw_data.get("metadata", {}),
             }
+            self._logger.debug("parse_request_data output (template): %s", result)
+            return result
 
         # Handle flat HostFactory format: {"templateId": ..., "maxNumber": ...}
         # Also handle request status format: {"requestId": ...}
-        return {
-            "template_id": raw_data.get("templateId"),
+        result = {
+            "template_id": raw_data.get("templateId") or raw_data.get("template_id"),
             "requested_count": raw_data.get("maxNumber", raw_data.get("machineCount", 1)),
             "request_type": raw_data.get("requestType", "provision"),
             "request_id": raw_data.get("requestId", raw_data.get("request_id")),
             "metadata": raw_data.get("metadata", {}),
         }
+        self._logger.debug("parse_request_data output (flat): %s", result)
+        return result
 
     def format_templates_response(self, templates: list[Template]) -> dict[str, Any]:
         """
@@ -581,35 +599,6 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             ]
         }
 
-    def format_request_status_response(self, requests: list[Request]) -> dict[str, Any]:
-        """
-        Format domain Requests to HostFactory status response.
-
-        This method handles the conversion from domain Request objects to HostFactory response format.
-        """
-        return {
-            "requests": [
-                {
-                    # Domain -> HostFactory field mapping using consistent serialization
-                    "requestId": serialize_enum(request.request_id) or str(request.request_id),
-                    "requestType": serialize_enum(request.request_type)
-                    or str(request.request_type),
-                    "templateId": str(request.template_id),
-                    "maxNumber": request.requested_count,
-                    "numAllocated": request.successful_count,
-                    "status": serialize_enum(request.status) or str(request.status),
-                    "statusMessage": request.status_message,
-                    "instanceIds": [
-                        serialize_enum(inst_id) or str(inst_id) for inst_id in request.instance_ids
-                    ],
-                    "createdAt": request.created_at,
-                    "startedAt": request.started_at,
-                    "completedAt": request.completed_at,
-                    "errorDetails": request.error_details,
-                }
-                for request in requests
-            ]
-        }
 
     def format_machine_status_response(self, machines: list[Machine]) -> dict[str, Any]:
         """

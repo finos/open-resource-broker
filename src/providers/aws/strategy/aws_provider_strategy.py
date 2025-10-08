@@ -308,10 +308,12 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             # Convert template_config to AWSTemplate domain object
-            from providers.aws.domain.template.aggregate import AWSTemplate
+            from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
             try:
+                self._logger.debug(f"Creating AWSTemplate object from template: {template_config}")
                 aws_template = AWSTemplate.model_validate(template_config)
+
             except Exception as e:
                 self._logger.error("Failed to create AWSTemplate from config: %s", e)
                 # Fallback: create minimal AWSTemplate with required fields
@@ -440,10 +442,9 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             try:
-                print(f"KBG: _handle_get_instance_status: {instance_ids}")
                 response = aws_client.ec2_client.describe_instances(InstanceIds=instance_ids)
-                print(
-                    f"KBG aws_client.ec2_client.describe_instances(InstanceIds=instance_ids) responce: {response}"
+                self._logger.debug(
+                    f"aws_client.ec2_client.describe_instances(InstanceIds=instance_ids) responce: {response}"
                 )
 
                 # Convert AWS instances to domain Machine entities

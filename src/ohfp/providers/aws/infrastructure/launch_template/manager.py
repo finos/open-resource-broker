@@ -18,7 +18,7 @@ from infrastructure.utilities.common.resource_naming import (
     get_instance_name,
     get_launch_template_name,
 )
-from providers.aws.domain.template.aggregate import AWSTemplate
+from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.exceptions.aws_exceptions import (
     AWSValidationError,
     InfrastructureError,
