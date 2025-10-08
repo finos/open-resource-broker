@@ -1,6 +1,5 @@
 """Template bounded context - template domain logic."""
 
-from .template_aggregate import Template
 from .exceptions import (
     InvalidTemplateConfigurationError,
     TemplateAlreadyExistsError,
@@ -8,6 +7,7 @@ from .exceptions import (
     TemplateNotFoundError,
     TemplateValidationError,
 )
+from .template_aggregate import Template
 
 __all__: list[str] = [
     "InvalidTemplateConfigurationError",

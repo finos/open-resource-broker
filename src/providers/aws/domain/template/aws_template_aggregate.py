@@ -82,7 +82,9 @@ class AWSTemplate(Template):
         if not self.fleet_type:
             # Check both metadata.fleet_type and metadata.providerConfig.fleet_type
             metadata = self.metadata or {}
-            fleet_type_value = metadata.get("fleet_type") or metadata.get("providerConfig", {}).get("fleet_type")
+            fleet_type_value = metadata.get("fleet_type") or metadata.get("providerConfig", {}).get(
+                "fleet_type"
+            )
             if fleet_type_value:
                 try:
                     normalized_value = str(fleet_type_value).strip().lower()

@@ -4,8 +4,8 @@ from abc import ABC, abstractmethod
 from typing import Any, Optional, Protocol
 
 from domain.base.ports.logging_port import LoggingPort
-from domain.template.template_aggregate import Template
 from domain.template.extensions import TemplateExtensionRegistry
+from domain.template.template_aggregate import Template
 
 
 class TemplateFactoryPort(Protocol):

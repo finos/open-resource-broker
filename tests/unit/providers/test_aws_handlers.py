@@ -215,8 +215,9 @@ class TestEC2FleetHandler:
         )
 
         # Create test request and template
-        from domain.request.aggregate import Request
         from providers.aws.domain.template.aggregate import AWSTemplate
+
+        from domain.request.aggregate import Request
         from providers.aws.domain.template.value_objects import ProviderApi
 
         request = Mock(spec=Request)
@@ -267,8 +268,9 @@ class TestEC2FleetHandler:
         )
 
         # Create test request and template with invalid configuration
-        from domain.request.aggregate import Request
         from providers.aws.domain.template.aggregate import AWSTemplate
+
+        from domain.request.aggregate import Request
         from providers.aws.domain.template.value_objects import ProviderApi
 
         request = Mock(spec=Request)

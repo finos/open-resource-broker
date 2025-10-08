@@ -3,8 +3,8 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from domain.template.template_aggregate import Template
 from domain.template.repository import TemplateRepository as TemplateRepositoryInterface
+from domain.template.template_aggregate import Template
 from domain.template.value_objects import TemplateId
 from infrastructure.error.decorators import handle_infrastructure_exceptions
 from infrastructure.logging.logger import get_logger

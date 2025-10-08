@@ -9,7 +9,6 @@ if TYPE_CHECKING:
 from domain.base.ports.configuration_port import ConfigurationPort
 from domain.base.ports.logging_port import LoggingPort
 from domain.machine.aggregate import Machine
-from domain.request.aggregate import Request
 from domain.template.template_aggregate import Template
 from infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
 from infrastructure.utilities.common.serialization import serialize_enum
@@ -49,17 +48,29 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             provider_type = selection_result.provider_type
             templates_file = f"{provider_type}prov_templates.json"
 
-            self._logger.debug("get_templates_file_path - provider_type: %s, templates_file: %s", provider_type, templates_file)
+            self._logger.debug(
+                "get_templates_file_path - provider_type: %s, templates_file: %s",
+                provider_type,
+                templates_file,
+            )
 
             resolved_path = self.config_manager.resolve_file("template", templates_file)
-            self._logger.debug("get_templates_file_path - resolved_path: %s, exists: %s", resolved_path, os.path.exists(resolved_path))
+            self._logger.debug(
+                "get_templates_file_path - resolved_path: %s, exists: %s",
+                resolved_path,
+                os.path.exists(resolved_path),
+            )
 
             return resolved_path
         except Exception as e:
             self._logger.error("Failed to determine templates file path: %s", e)
             # Fallback to aws for backward compatibility
             fallback_path = self.config_manager.resolve_file("template", "awsprov_templates.json")
-            self._logger.debug("get_templates_file_path - fallback_path: %s, exists: %s", fallback_path, os.path.exists(fallback_path))
+            self._logger.debug(
+                "get_templates_file_path - fallback_path: %s, exists: %s",
+                fallback_path,
+                os.path.exists(fallback_path),
+            )
             return fallback_path
 
     def get_template_paths(self) -> list[str]:
@@ -456,7 +467,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         config_file = f"{provider_type}prov_config.json"
         return os.path.join(config_root, config_file)
 
-    #KBG TODO: function is not used
+    # KBG TODO: function is not used
     def parse_template_config(self, raw_data: dict[str, Any]) -> Template:
         """
         Parse HostFactory template to domain Template.
@@ -598,7 +609,6 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
                 for template in templates
             ]
         }
-
 
     def format_machine_status_response(self, machines: list[Machine]) -> dict[str, Any]:
         """

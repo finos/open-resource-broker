@@ -118,7 +118,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
             # Update request status if needed
             if new_status:
-                self.logger.debug(f"")
+                self.logger.debug("")
                 from domain.request.request_types import RequestStatus
 
                 updated_request = request.update_status(RequestStatus(new_status), status_message)

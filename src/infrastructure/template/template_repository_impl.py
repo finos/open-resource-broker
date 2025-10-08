@@ -3,8 +3,8 @@
 from typing import Any, Optional
 
 from domain.base.ports import LoggingPort
-from domain.template.template_aggregate import Template
 from domain.template.repository import TemplateRepository
+from domain.template.template_aggregate import Template
 from infrastructure.template.configuration_manager import TemplateConfigurationManager
 
 

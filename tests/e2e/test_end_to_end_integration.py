@@ -107,6 +107,7 @@ def test_provider_strategy_integration():
     """Test that provider strategy properly integrates with consolidated handlers."""
     try:
         from providers.aws.domain.template.aggregate import AWSTemplate
+
         from providers.aws.domain.template.value_objects import ProviderApi
         from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
@@ -181,8 +182,9 @@ def test_provider_strategy_integration():
 def test_launch_template_integration():
     """Test that launch template manager integrates properly with handlers."""
     try:
-        from domain.request.aggregate import Request
         from providers.aws.domain.template.aggregate import AWSTemplate
+
+        from domain.request.aggregate import Request
         from providers.aws.infrastructure.handlers.spot_fleet_handler import (
             SpotFleetHandler,
         )
@@ -363,8 +365,9 @@ def test_handler_routing():
 def test_domain_model_flow():
     """Test that AWSTemplate flows properly through the system."""
     try:
-        from domain.request.aggregate import Request
         from providers.aws.domain.template.aggregate import AWSTemplate
+
+        from domain.request.aggregate import Request
         from providers.aws.domain.template.value_objects import ProviderApi
         from providers.aws.infrastructure.handlers.spot_fleet_handler import (
             SpotFleetHandler,
@@ -584,8 +587,9 @@ def test_performance_metrics_integration():
 def test_full_end_to_end_flow():
     """Test the complete end-to-end flow with mocked dependencies."""
     try:
-        from domain.request.aggregate import Request
         from providers.aws.domain.template.aggregate import AWSTemplate
+
+        from domain.request.aggregate import Request
         from providers.aws.domain.template.value_objects import ProviderApi
         from providers.aws.infrastructure.handlers.spot_fleet_handler import (
             SpotFleetHandler,

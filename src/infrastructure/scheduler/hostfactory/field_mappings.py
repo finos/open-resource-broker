@@ -15,7 +15,7 @@ class HostFactoryFieldMappings:
             "maxNumber": "max_instances",
             "imageId": "image_id",
             "keyName": "key_name",
-            "fleetType":"fleet_type",
+            "fleetType": "fleet_type",
             # Network configuration
             "subnetId": "subnet_ids",  # Will be converted to list
             "securityGroupIds": "security_group_ids",
@@ -31,8 +31,7 @@ class HostFactoryFieldMappings:
             "volumeType": "root_volume_type",
             "iops": "root_volume_iops",
             # Tags and metadata
-            "instanceTags": "tags"  # Will be parsed from string format
-
+            "instanceTags": "tags",  # Will be parsed from string format
         },
         # AWS-specific fields (only mapped when AWS provider is active)
         "aws": {
@@ -51,7 +50,6 @@ class HostFactoryFieldMappings:
             # AWS instance configuration
             "instanceProfile": "instance_profile",
             "userDataScript": "user_data",
-
         },
     }
 
