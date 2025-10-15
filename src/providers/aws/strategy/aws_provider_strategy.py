@@ -324,7 +324,8 @@ class AWSProviderStrategy(ProviderStrategy):
                     instance_type=template_config.get("instance_type", "t2.micro"),
                     subnet_ids=template_config.get("subnet_ids", []),
                     security_group_ids=template_config.get("security_group_ids", []),
-                    instance_profile=template_config.get("instance_profile") or metadata.get("instance_profile"),
+                    instance_profile=template_config.get("instance_profile")
+                    or metadata.get("instance_profile"),
                     key_name=template_config.get("key_name") or metadata.get("key_name"),
                     user_data=template_config.get("user_data") or metadata.get("user_data"),
                     fleet_role=template_config.get("fleet_role") or metadata.get("fleet_role"),
