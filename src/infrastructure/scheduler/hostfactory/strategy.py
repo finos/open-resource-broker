@@ -560,7 +560,9 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         # Also handle request status format: {"requestId": ...}
         result = {
             "template_id": raw_data.get("templateId") or raw_data.get("template_id"),
-            "requested_count": raw_data.get("requested_count", raw_data.get("maxNumber", raw_data.get("machineCount", 1))),
+            "requested_count": raw_data.get(
+                "requested_count", raw_data.get("maxNumber", raw_data.get("machineCount", 1))
+            ),
             "request_type": raw_data.get("requestType", "provision"),
             "request_id": raw_data.get("requestId", raw_data.get("request_id")),
             "metadata": raw_data.get("metadata", {}),

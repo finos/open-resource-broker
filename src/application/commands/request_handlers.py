@@ -486,11 +486,19 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                         if is_private_ip_address(first_machine_id):
                             # It's a private IP address, use find_by_private_ip
                             machine = uow.machines.find_by_private_ip(first_machine_id)
-                            self.logger.info("Found machine by private IP %s: %s", first_machine_id, machine.instance_id if machine else "None")
+                            self.logger.info(
+                                "Found machine by private IP %s: %s",
+                                first_machine_id,
+                                machine.instance_id if machine else "None",
+                            )
                         else:
                             # It's an instance ID, use find_by_id
                             machine = uow.machines.find_by_id(first_machine_id)
-                            self.logger.info("Found machine by ID %s: %s", first_machine_id, machine.instance_id if machine else "None")
+                            self.logger.info(
+                                "Found machine by ID %s: %s",
+                                first_machine_id,
+                                machine.instance_id if machine else "None",
+                            )
 
                         if machine and machine.template_id:
                             template_id = f"return-{machine.template_id}"

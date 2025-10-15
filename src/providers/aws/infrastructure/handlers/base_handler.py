@@ -350,6 +350,7 @@ class AWSHandler(ABC):
         # This is a temporary fix for AWS eventual consistency issues where instances
         # are created but not immediately available for describe_instances calls
         import time
+
         time.sleep(2)
 
         try:

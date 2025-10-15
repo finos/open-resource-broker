@@ -25,7 +25,9 @@ def is_private_ip_address(identifier: str) -> bool:
     import re
 
     # IPv4 address pattern
-    ip_pattern = re.compile(r'^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$')
+    ip_pattern = re.compile(
+        r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+    )
     return bool(ip_pattern.match(identifier.strip()))
 
 
@@ -42,7 +44,7 @@ def is_instance_id(identifier: str) -> bool:
     import re
 
     # EC2 instance ID pattern: i-xxxxxxxxx (8-17 hex characters)
-    instance_id_pattern = re.compile(r'^i-[0-9a-f]{8,17}$')
+    instance_id_pattern = re.compile(r"^i-[0-9a-f]{8,17}$")
     return bool(instance_id_pattern.match(identifier.strip()))
 
 
@@ -247,7 +249,9 @@ def get_instance_by_private_ip(private_ip: str, aws_client: Any = None) -> dict[
 
         # Check if instance exists
         if not response["Reservations"]:
-            raise InfrastructureError("AWS.EC2", f"EC2 instance with private IP {private_ip} not found")
+            raise InfrastructureError(
+                "AWS.EC2", f"EC2 instance with private IP {private_ip} not found"
+            )
 
         # Find the instance with matching private IP
         for reservation in response["Reservations"]:
@@ -336,10 +340,15 @@ def resolve_machine_identifiers(identifiers: list[str], aws_client: Any = None) 
                 logger.info(f"Resolved private IP {identifier} to instance ID: {instance_id}")
             except InfrastructureError:
                 logger.error(f"Private IP {identifier} could not be resolved to an instance")
-                raise InfrastructureError("AWS.EC2", f"Private IP {identifier} could not be resolved to an instance")
+                raise InfrastructureError(
+                    "AWS.EC2", f"Private IP {identifier} could not be resolved to an instance"
+                )
         else:
             # Invalid format
-            raise InfrastructureError("AWS.EC2", f"Invalid machine identifier format: {identifier}. Expected EC2 instance ID (i-xxxxxxxxx) or private IP address")
+            raise InfrastructureError(
+                "AWS.EC2",
+                f"Invalid machine identifier format: {identifier}. Expected EC2 instance ID (i-xxxxxxxxx) or private IP address",
+            )
 
     return resolved_instance_ids
 
@@ -421,12 +430,7 @@ def _describe_instance(ec2_client: Any, instance_id: str) -> dict[str, Any]:
 def _describe_instances_by_private_ip(ec2_client: Any, private_ip: str) -> dict[str, Any]:
     """Describe EC2 instances by private IP address."""
     return ec2_client.describe_instances(
-        Filters=[
-            {
-                "Name": "private-ip-address",
-                "Values": [private_ip]
-            }
-        ]
+        Filters=[{"Name": "private-ip-address", "Values": [private_ip]}]
     )
 
 

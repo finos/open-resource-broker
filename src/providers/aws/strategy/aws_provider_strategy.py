@@ -440,7 +440,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 self._logger.info(
                     "Resolved machine identifiers for termination: %s -> %s",
                     instance_ids,
-                    resolved_instance_ids
+                    resolved_instance_ids,
                 )
 
             except Exception as e:
@@ -450,13 +450,19 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             try:
-                response = aws_client.ec2_client.terminate_instances(InstanceIds=resolved_instance_ids)
+                response = aws_client.ec2_client.terminate_instances(
+                    InstanceIds=resolved_instance_ids
+                )
                 terminating_count = len(response.get("TerminatingInstances", []))
                 success = terminating_count == len(resolved_instance_ids)
 
                 return ProviderResult.success_result(
                     {"success": success, "terminated_count": terminating_count},
-                    {"operation": "terminate_instances", "original_identifiers": instance_ids, "resolved_instance_ids": resolved_instance_ids},
+                    {
+                        "operation": "terminate_instances",
+                        "original_identifiers": instance_ids,
+                        "resolved_instance_ids": resolved_instance_ids,
+                    },
                 )
 
             except Exception as e:
