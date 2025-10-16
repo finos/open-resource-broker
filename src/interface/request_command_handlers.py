@@ -209,13 +209,16 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> dict[str
     machine_ids = []
     if hasattr(args, "input_data") and args.input_data:
         # Extract machine IDs from JSON input data
-        # Expected format: {"machines": [{"name": "i-xxx"}, {"name": "i-yyy"}]}
+        # There is a discrepency in the documentation of the original HF https://www.ibm.com/docs/en/spectrum-symphony/7.3.2?topic=specification-requestreturnmachines
+        # documented expected format {"name": "(mandatory)(string) Host name of the machine that must be returned"}
+        # but in practice we get the following:
+        # Format: {"machines": [{"name": "192.168.0.1", "machineId": "i-xxx"}, {{"name": "192.168.0.2", "machineId": "i-yyy"}]}
         raw_request_data = args.input_data
         if "machines" in raw_request_data:
             machine_ids = [
-                machine.get("name")
+                machine.get("machineId")
                 for machine in raw_request_data["machines"]
-                if machine.get("name")
+                if machine.get("machineId")
             ]
     else:
         # Use positional arguments
