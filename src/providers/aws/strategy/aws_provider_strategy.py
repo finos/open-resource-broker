@@ -431,38 +431,14 @@ class AWSProviderStrategy(ProviderStrategy):
                     "AWS client not available", "AWS_CLIENT_NOT_AVAILABLE"
                 )
 
-            # Resolve machine identifiers (instance IDs or private IPs) to instance IDs
             try:
-                from providers.aws.utilities.ec2.instances import resolve_machine_identifiers
-
-                resolved_instance_ids = resolve_machine_identifiers(instance_ids, aws_client)
-
-                self._logger.info(
-                    "Resolved machine identifiers for termination: %s -> %s",
-                    instance_ids,
-                    resolved_instance_ids,
-                )
-
-            except Exception as e:
-                self._logger.error("Failed to resolve machine identifiers: %s", e)
-                return ProviderResult.error_result(
-                    f"Failed to resolve machine identifiers: {e!s}", "IDENTIFIER_RESOLUTION_ERROR"
-                )
-
-            try:
-                response = aws_client.ec2_client.terminate_instances(
-                    InstanceIds=resolved_instance_ids
-                )
+                response = aws_client.ec2_client.terminate_instances(InstanceIds=instance_ids)
                 terminating_count = len(response.get("TerminatingInstances", []))
-                success = terminating_count == len(resolved_instance_ids)
+                success = terminating_count == len(instance_ids)
 
                 return ProviderResult.success_result(
                     {"success": success, "terminated_count": terminating_count},
-                    {
-                        "operation": "terminate_instances",
-                        "original_identifiers": instance_ids,
-                        "resolved_instance_ids": resolved_instance_ids,
-                    },
+                    {"operation": "terminate_instances", "instance_ids": instance_ids},
                 )
 
             except Exception as e:

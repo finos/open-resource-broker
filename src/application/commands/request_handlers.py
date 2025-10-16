@@ -477,28 +477,8 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             if command.machine_ids:
                 # Try to get template from first machine
                 try:
-                    from providers.aws.utilities.ec2.instances import is_private_ip_address
-
-                    # Check if the first machine_id is an IP address or instance ID
-                    first_machine_id = command.machine_ids[0]
-
                     with self.uow_factory.create_unit_of_work() as uow:
-                        if is_private_ip_address(first_machine_id):
-                            # It's a private IP address, use find_by_private_ip
-                            machine = uow.machines.find_by_private_ip(first_machine_id)
-                            self.logger.info(
-                                "Found machine by private IP %s: %s",
-                                first_machine_id,
-                                machine.instance_id if machine else "None",
-                            )
-                        else:
-                            # It's an instance ID, use find_by_id
-                            machine = uow.machines.find_by_id(first_machine_id)
-                            self.logger.info(
-                                "Found machine by ID %s: %s",
-                                first_machine_id,
-                                machine.instance_id if machine else "None",
-                            )
+                        machine = self.machines.find_by_id(command.machine_ids[0])
 
                         if machine and machine.template_id:
                             template_id = f"return-{machine.template_id}"

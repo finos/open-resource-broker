@@ -234,19 +234,6 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
             self.logger.error("Failed to find machines by request_id %s: %s", request_id, e)
             raise
 
-    @handle_infrastructure_exceptions(context="machine_repository_find_by_private_ip")
-    def find_by_private_ip(self, private_ip: str) -> Optional[Machine]:
-        """Find machine by private IP address."""
-        try:
-            criteria = {"private_ip": private_ip}
-            data_list = self.storage_port.find_by_criteria(criteria)
-            if data_list:
-                return self.serializer.from_dict(data_list[0])
-            return None
-        except Exception as e:
-            self.logger.error("Failed to find machine by private_ip %s: %s", private_ip, e)
-            raise
-
     @handle_infrastructure_exceptions(context="machine_repository_find_active_machines")
     def find_active_machines(self) -> list[Machine]:
         """Find all active (non-terminated) machines."""

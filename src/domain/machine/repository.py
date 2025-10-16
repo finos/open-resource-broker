@@ -30,9 +30,5 @@ class MachineRepository(AggregateRepository[Machine]):
         """Find machines by request ID."""
 
     @abstractmethod
-    def find_by_private_ip(self, private_ip: str) -> Optional[Machine]:
-        """Find machine by private IP address."""
-
-    @abstractmethod
     def find_active_machines(self) -> list[Machine]:
         """Find all active (non-terminated) machines."""

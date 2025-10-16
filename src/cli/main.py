@@ -199,9 +199,7 @@ For more information, visit: {REPO_URL}
     # Machines return (terminate machines)
     machines_return = machines_subparsers.add_parser("return", help="Return machines")
     machines_return.add_argument(
-        "machine_ids",
-        nargs="*",
-        help="Machine IDs (i-xxxxxxxxx) or private IP addresses to return (optional if using -f/--file)",
+        "machine_ids", nargs="*", help="Machine IDs to return (optional if using -f/--file)"
     )
     machines_return.add_argument(
         "--force", action="store_true", help="Force return without confirmation"
