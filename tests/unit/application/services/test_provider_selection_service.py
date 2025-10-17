@@ -15,7 +15,7 @@ from config.schemas.provider_strategy_schema import (
     ProviderInstanceConfig,
 )
 from domain.base.ports import LoggingPort
-from domain.template.aggregate import Template
+from domain.template.template_aggregate import Template
 
 
 class TestProviderSelectionService:

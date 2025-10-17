@@ -574,14 +574,6 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 elif status == MachineStatus.SHUTTING_DOWN:
                     shutting_down_count += 1
 
-            total_accounted = (
-                running_count
-                + pending_count
-                + failed_count
-                + terminated_count
-                + shutting_down_count
-            )
-
             self.logger.debug(
                 "Machine status analysis for request %s (type: %s): "
                 "requested=%d, provider_total=%d, running=%d, pending=%d, failed=%d, terminated=%d, shutting_down=%d",

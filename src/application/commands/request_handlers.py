@@ -19,7 +19,6 @@ from application.services.provider_selection_service import ProviderSelectionSer
 from domain.base import UnitOfWorkFactory
 from domain.base.exceptions import EntityNotFoundError
 from domain.base.ports import (
-    ConfigurationPort,
     ContainerPort,
     ErrorHandlingPort,
     EventPublisherPort,
@@ -466,30 +465,27 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             # Get provider type from configuration using injected container
             from domain.request.aggregate import Request
 
-            config_manager = self._container.get(ConfigurationPort)
+            # config_manager = self._container.get(ConfigurationPort)
             # provider_type = config_manager.get_provider_config("provider.type", "aws")
             # provider_config = config_manager.get_provider_config()
             provider_type = "aws"  # KBG TODO
             # Create return request with business logic
             # Use first machine's template if available, otherwise use generic return
             # template
-            template_id = "return-machines"  # Business template for return operations
-            if command.machine_ids:
-                # Try to get template from first machine
-                try:
-                    with self.uow_factory.create_unit_of_work() as uow:
-                        machine = self.machines.find_by_id(command.machine_ids[0])
+            # template_id = "return-machines"  # Business template for return operations
+            # if command.machine_ids:
+            #     # Try to get template from first machine
+            #     try:
+            #         with self.uow_factory.create_unit_of_work() as uow:
+            #             machine = self.machines.find_by_id(command.machine_ids[0])
 
-                        if machine and machine.template_id:
-                            template_id = f"return-{machine.template_id}"
-
-                except Exception as e:
-                    # Fallback to generic return template
-                    self.logger.warning(
-                        "Failed to determine return template ID from machine: %s",
-                        e,
-                        extra={"machine_ids": command.machine_ids},
-                    )
+            #     except Exception as e:
+            #         # Fallback to generic return template
+            #         self.logger.warning(
+            #             "Failed to determine return template ID from machine: %s",
+            #             e,
+            #             extra={"machine_ids": command.machine_ids},
+            #         )
 
             request = Request.create_return_request(
                 instance_ids=command.machine_ids,
@@ -514,6 +510,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                 provisioning_result = await self._execute_deprovisioning(
                     command.machine_ids, request
                 )
+                self.logger.info(f"Provisioning results: {provisioning_result}")
 
             except:
                 # Handle provisioning errors
@@ -549,6 +546,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             )
 
             result = await self._provider_context.terminate_resources(machine_ids, operation)
+            self.logger.info(f"De-Provisioning results: {result}")
 
             pass
         except Exception as e:

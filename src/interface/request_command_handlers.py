@@ -201,7 +201,7 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> dict[str
     """
     container = get_container()
     command_bus = container.get(CommandBus)
-    scheduler_strategy = container.get(SchedulerPort)
+    # scheduler_strategy = container.get(SchedulerPort)
 
     from application.dto.commands import CreateReturnRequestCommand
 

@@ -9,7 +9,6 @@ import pytest
 
 # Import repository components
 try:
-    from domain.base.domain_interfaces import Repository
     from domain.machine.repository import MachineRepository as MachineRepositoryInterface
     from domain.request.aggregate import Request
     from domain.request.repository import RequestRepository as RequestRepositoryInterface

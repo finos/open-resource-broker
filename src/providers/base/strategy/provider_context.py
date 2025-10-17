@@ -320,7 +320,7 @@ class ProviderContext:
         self._logger.debug(f"terminate_resources: _current_strategy {self._current_strategy}")
         self._logger.debug(f"terminate_resources: _strategies {self._strategies}")
 
-        strategy = self._strategies.get("aws-aws-default")  # KBG TODO
+        # strategy = self._strategies.get("aws-aws-default")  # KBG TODO
 
         await self._current_strategy.execute_operation(operation)
 
