@@ -2,10 +2,8 @@
 """Template processor for onaws tests - generates populated templates from base templates and config."""
 
 import json
-import os
-import re
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
 
 class TemplateProcessor:
@@ -41,11 +39,11 @@ class TemplateProcessor:
             raise FileNotFoundError(f"AWS provider templates not found: {awsprov_templates_file}")
 
         # Load config.json
-        with open(config_file, 'r') as f:
+        with open(config_file) as f:
             config_data = json.load(f)
 
         # Load awsprov_templates.json
-        with open(awsprov_templates_file, 'r') as f:
+        with open(awsprov_templates_file) as f:
             templates_data = json.load(f)
 
         # Extract configuration values from the loaded files
@@ -54,7 +52,9 @@ class TemplateProcessor:
         # Extract from config.json
         if "provider" in config_data:
             # Extract active_provider
-            extracted_config["active_provider"] = config_data["provider"].get("active_provider", "aws-default")
+            extracted_config["active_provider"] = config_data["provider"].get(
+                "active_provider", "aws-default"
+            )
 
             if "providers" in config_data["provider"]:
                 provider = config_data["provider"]["providers"][0]
@@ -68,8 +68,12 @@ class TemplateProcessor:
                 template_defaults = aws_defaults.get("template_defaults", {})
 
                 extracted_config["image_id"] = template_defaults.get("image_id", "ami-12345678")
-                extracted_config["security_group_ids"] = template_defaults.get("security_group_ids", ["sg-12345678"])
-                extracted_config["subnet_ids"] = template_defaults.get("subnet_ids", ["subnet-12345678"])
+                extracted_config["security_group_ids"] = template_defaults.get(
+                    "security_group_ids", ["sg-12345678"]
+                )
+                extracted_config["subnet_ids"] = template_defaults.get(
+                    "subnet_ids", ["subnet-12345678"]
+                )
 
                 # Keep legacy keys for backward compatibility
                 extracted_config["imageId"] = extracted_config["image_id"]
@@ -81,7 +85,7 @@ class TemplateProcessor:
 
         # Extract from awsprov_templates.json (use first template as reference)
         # Only use these values if they're not already set from config.json
-        if "templates" in templates_data and templates_data["templates"]:
+        if templates_data.get("templates"):
             first_template = templates_data["templates"][0]
 
             # Override with actual values from templates if available and not already set
@@ -110,17 +114,19 @@ class TemplateProcessor:
             template_name: Name of the template file (e.g., 'awsprov_templates.base.json', 'config.base.json')
         """
         # If template_name doesn't have extension, add .base.json for backward compatibility
-        if not template_name.endswith('.base.json'):
+        if not template_name.endswith(".base.json"):
             template_name = f"{template_name}.base.json"
 
         template_file = self.config_templates_dir / template_name
         if not template_file.exists():
             raise FileNotFoundError(f"Base template not found: {template_file}")
 
-        with open(template_file, 'r') as f:
+        with open(template_file) as f:
             return json.load(f)
 
-    def replace_placeholders(self, template: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+    def replace_placeholders(
+        self, template: Dict[str, Any], config: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Replace placeholders in template with actual config values.
 
         Args:
@@ -149,7 +155,13 @@ class TemplateProcessor:
         # Parse back to dictionary
         return json.loads(template_str)
 
-    def generate_test_templates(self, test_name: str, base_template: str = None, awsprov_base_template: str = None, overrides: dict = None) -> None:
+    def generate_test_templates(
+        self,
+        test_name: str,
+        base_template: str = None,
+        awsprov_base_template: str = None,
+        overrides: dict = None,
+    ) -> None:
         """Generate populated templates for a specific test.
 
         Args:
@@ -180,7 +192,7 @@ class TemplateProcessor:
         template_files = [
             ("awsprov_templates", "awsprov_templates.json"),
             ("config", "config.json"),
-            ("default_config", "default_config.json")
+            ("default_config", "default_config.json"),
         ]
 
         for base_name, output_name in template_files:
@@ -204,11 +216,15 @@ class TemplateProcessor:
 
                 # Write populated template (always use standard output name)
                 output_file = test_dir / output_name
-                with open(output_file, 'w') as f:
+                with open(output_file, "w") as f:
                     json.dump(populated_template, f, indent=2)
 
                 # Show the actual template file used
-                actual_template_name = template_name if template_name.endswith('.base.json') else f"{template_name}.base.json"
+                actual_template_name = (
+                    template_name
+                    if template_name.endswith(".base.json")
+                    else f"{template_name}.base.json"
+                )
                 print(f"Generated {output_file} from {actual_template_name}")
 
             except Exception as e:
@@ -224,6 +240,7 @@ class TemplateProcessor:
         test_dir = self.run_templates_dir / test_name
         if test_dir.exists():
             import shutil
+
             shutil.rmtree(test_dir)
             print(f"Cleaned up {test_dir}")
 

@@ -315,15 +315,13 @@ class ConfigurationManager:
 
     def _get_scheduler_directory(self, file_type: str) -> Optional[str]:
         """Get directory path from scheduler strategy for the given file type.
-        
+
         Reads directly from environment variables to avoid circular import issues
         during configuration bootstrap.
         """
         import os
 
-        logger.debug(
-            "[CONFIG_MGR] Getting scheduler directory for file_type=%s", file_type
-        )
+        logger.debug("[CONFIG_MGR] Getting scheduler directory for file_type=%s", file_type)
 
         # Read directly from environment variables (HostFactory convention)
         if file_type in ["conf", "template", "legacy"]:

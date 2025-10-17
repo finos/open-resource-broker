@@ -198,7 +198,6 @@ def main():
     if extra_pytest_args:
         pytest_cmd.extend(extra_pytest_args)
 
-
     # Run the tests
     success = run_command(final_cmd, "Running Tests")
 

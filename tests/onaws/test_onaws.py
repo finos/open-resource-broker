@@ -1,19 +1,17 @@
-import pytest
 import json
 import logging
-import time
 import os
+import time
+
 import boto3
+import pytest
 from botocore.exceptions import ClientError
+from jsonschema import ValidationError, validate as validate_json_schema
 
-from jsonschema import validate as validate_json_schema
-from jsonschema import ValidationError
-
-from tests.onaws import plugin_io_schemas
-from tests.onaws import scenarios
+from hfmock import HostFactoryMock
+from tests.onaws import plugin_io_schemas, scenarios
 from tests.onaws.parse_output import parse_and_print_output
 from tests.onaws.template_processor import TemplateProcessor
-from hfmock import HostFactoryMock
 
 pytestmark = [  # Apply default markers to every test in this module
     pytest.mark.manual_aws,
@@ -21,29 +19,29 @@ pytestmark = [  # Apply default markers to every test in this module
 ]
 
 # Set environment variables for local development
-os.environ['USE_LOCAL_DEV'] = '1'
-os.environ['HF_LOGDIR'] = './logs'  # Set log directory to avoid permission issues
-os.environ['AWS_PROVIDER_LOG_DIR'] = './logss'
-os.environ['LOG_DESTINATION'] = 'file'
+os.environ["USE_LOCAL_DEV"] = "1"
+os.environ["HF_LOGDIR"] = "./logs"  # Set log directory to avoid permission issues
+os.environ["AWS_PROVIDER_LOG_DIR"] = "./logss"
+os.environ["LOG_DESTINATION"] = "file"
 
 _boto_session = boto3.session.Session()
 _ec2_region = (
-    os.environ.get('AWS_REGION')
-    or os.environ.get('AWS_DEFAULT_REGION')
+    os.environ.get("AWS_REGION")
+    or os.environ.get("AWS_DEFAULT_REGION")
     or _boto_session.region_name
-    or 'eu-west-1'
+    or "eu-west-1"
 )
-ec2_client = _boto_session.client('ec2', region_name=_ec2_region)
+ec2_client = _boto_session.client("ec2", region_name=_ec2_region)
 
-log = logging.getLogger('awsome_test')
+log = logging.getLogger("awsome_test")
 log.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(formatter)
 
-file_handler = logging.FileHandler('logs/awsome_test.log')
+file_handler = logging.FileHandler("logs/awsome_test.log")
 file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(formatter)
 
@@ -62,22 +60,15 @@ def get_instance_state(instance_id):
         dict: Contains existence status and state if instance exists
     """
     try:
-
         response = ec2_client.describe_instances(InstanceIds=[instance_id])
 
-        instance_state = response['Reservations'][0]['Instances'][0]['State']['Name']
+        instance_state = response["Reservations"][0]["Instances"][0]["State"]["Name"]
 
-        return {
-            "exists": True,
-            "state": instance_state
-        }
+        return {"exists": True, "state": instance_state}
 
     except ClientError as e:
-        if e.response['Error']['Code'] == 'InvalidInstanceID.NotFound':
-            return {
-                "exists": False,
-                "state": None
-            }
+        if e.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
+            return {"exists": False, "state": None}
         else:
             print(f"Error checking instance: {e}")
             raise
@@ -92,35 +83,35 @@ def get_instance_details(instance_id):
     """
     try:
         response = ec2_client.describe_instances(InstanceIds=[instance_id])
-        instance = response['Reservations'][0]['Instances'][0]
+        instance = response["Reservations"][0]["Instances"][0]
 
         # Get root device volume details
-        root_device_name = instance.get('RootDeviceName')
+        root_device_name = instance.get("RootDeviceName")
         root_volume_size = None
         volume_type = None
 
-        if root_device_name and 'BlockDeviceMappings' in instance:
-            for block_device in instance['BlockDeviceMappings']:
-                if block_device.get('DeviceName') == root_device_name:
-                    ebs = block_device.get('Ebs', {})
-                    volume_id = ebs.get('VolumeId')
+        if root_device_name and "BlockDeviceMappings" in instance:
+            for block_device in instance["BlockDeviceMappings"]:
+                if block_device.get("DeviceName") == root_device_name:
+                    ebs = block_device.get("Ebs", {})
+                    volume_id = ebs.get("VolumeId")
                     if volume_id:
                         # Get volume details
                         volume_response = ec2_client.describe_volumes(VolumeIds=[volume_id])
-                        if volume_response['Volumes']:
-                            volume = volume_response['Volumes'][0]
-                            root_volume_size = volume.get('Size')
-                            volume_type = volume.get('VolumeType')
+                        if volume_response["Volumes"]:
+                            volume = volume_response["Volumes"][0]
+                            root_volume_size = volume.get("Size")
+                            volume_type = volume.get("VolumeType")
                     break
 
         return {
             "instance_id": instance_id,
-            "subnet_id": instance.get('SubnetId'),
+            "subnet_id": instance.get("SubnetId"),
             "root_device_volume_size": root_volume_size,
             "volume_type": volume_type,
-            "instance_type": instance.get('InstanceType'),
-            "state": instance.get('State', {}).get('Name'),
-            "launch_time": instance.get('LaunchTime')
+            "instance_type": instance.get("InstanceType"),
+            "state": instance.get("State", {}).get("Name"),
+            "launch_time": instance.get("LaunchTime"),
         }
 
     except ClientError as e:
@@ -140,11 +131,13 @@ def validate_root_device_volume_size(instance_details, template, instance_id):
     Returns:
         bool: True if validation passes
     """
-    expected_size = template.get('rootDeviceVolumeSize')
-    actual_size = instance_details.get('root_device_volume_size')
+    expected_size = template.get("rootDeviceVolumeSize")
+    actual_size = instance_details.get("root_device_volume_size")
 
     if expected_size is None:
-        log.info(f"Instance {instance_id}: No rootDeviceVolumeSize specified in template, skipping validation")
+        log.info(
+            f"Instance {instance_id}: No rootDeviceVolumeSize specified in template, skipping validation"
+        )
         return True
 
     if actual_size is None:
@@ -152,10 +145,14 @@ def validate_root_device_volume_size(instance_details, template, instance_id):
         return False
 
     if actual_size == expected_size:
-        log.info(f"Instance {instance_id}: Root device volume size validation PASSED - Expected: {expected_size}GB, Actual: {actual_size}GB")
+        log.info(
+            f"Instance {instance_id}: Root device volume size validation PASSED - Expected: {expected_size}GB, Actual: {actual_size}GB"
+        )
         return True
     else:
-        log.error(f"Instance {instance_id}: Root device volume size validation FAILED - Expected: {expected_size}GB, Actual: {actual_size}GB")
+        log.error(
+            f"Instance {instance_id}: Root device volume size validation FAILED - Expected: {expected_size}GB, Actual: {actual_size}GB"
+        )
         return False
 
 
@@ -171,11 +168,13 @@ def validate_volume_type(instance_details, template, instance_id):
     Returns:
         bool: True if validation passes
     """
-    expected_type = template.get('volumeType')
-    actual_type = instance_details.get('volume_type')
+    expected_type = template.get("volumeType")
+    actual_type = instance_details.get("volume_type")
 
     if expected_type is None:
-        log.info(f"Instance {instance_id}: No volumeType specified in template, skipping validation")
+        log.info(
+            f"Instance {instance_id}: No volumeType specified in template, skipping validation"
+        )
         return True
 
     if actual_type is None:
@@ -183,10 +182,14 @@ def validate_volume_type(instance_details, template, instance_id):
         return False
 
     if actual_type == expected_type:
-        log.info(f"Instance {instance_id}: Volume type validation PASSED - Expected: {expected_type}, Actual: {actual_type}")
+        log.info(
+            f"Instance {instance_id}: Volume type validation PASSED - Expected: {expected_type}, Actual: {actual_type}"
+        )
         return True
     else:
-        log.error(f"Instance {instance_id}: Volume type validation FAILED - Expected: {expected_type}, Actual: {actual_type}")
+        log.error(
+            f"Instance {instance_id}: Volume type validation FAILED - Expected: {expected_type}, Actual: {actual_type}"
+        )
         return False
 
 
@@ -202,8 +205,8 @@ def validate_subnet_id(instance_details, template, instance_id):
     Returns:
         bool: True if validation passes
     """
-    expected_subnet = template.get('subnetId')
-    actual_subnet = instance_details.get('subnet_id')
+    expected_subnet = template.get("subnetId")
+    actual_subnet = instance_details.get("subnet_id")
 
     if expected_subnet is None:
         log.info(f"Instance {instance_id}: No subnetId specified in template, skipping validation")
@@ -214,10 +217,14 @@ def validate_subnet_id(instance_details, template, instance_id):
         return False
 
     if actual_subnet == expected_subnet:
-        log.info(f"Instance {instance_id}: Subnet ID validation PASSED - Expected: {expected_subnet}, Actual: {actual_subnet}")
+        log.info(
+            f"Instance {instance_id}: Subnet ID validation PASSED - Expected: {expected_subnet}, Actual: {actual_subnet}"
+        )
         return True
     else:
-        log.error(f"Instance {instance_id}: Subnet ID validation FAILED - Expected: {expected_subnet}, Actual: {actual_subnet}")
+        log.error(
+            f"Instance {instance_id}: Subnet ID validation FAILED - Expected: {expected_subnet}, Actual: {actual_subnet}"
+        )
         return False
 
 
@@ -237,13 +244,15 @@ def validate_instance_attributes(instance_id, template):
     try:
         # Get instance details from AWS
         instance_details = get_instance_details(instance_id)
-        log.debug(f"Instance {instance_id} details: {json.dumps(instance_details, indent=2, default=str)}")
+        log.debug(
+            f"Instance {instance_id} details: {json.dumps(instance_details, indent=2, default=str)}"
+        )
 
         # Run all validation functions
         validations = [
             validate_root_device_volume_size(instance_details, template, instance_id),
             validate_volume_type(instance_details, template, instance_id),
-            validate_subnet_id(instance_details, template, instance_id)
+            validate_subnet_id(instance_details, template, instance_id),
         ]
 
         # Check if all validations passed
@@ -283,10 +292,11 @@ def validate_random_instance_attributes(status_response, template):
     selected_machine = random.choice(machines)
     instance_id = selected_machine["machineId"]
 
-    log.info(f"Selected random instance {instance_id} for attribute validation (out of {len(machines)} instances)")
+    log.info(
+        f"Selected random instance {instance_id} for attribute validation (out of {len(machines)} instances)"
+    )
 
     return validate_instance_attributes(instance_id, template)
-
 
 
 @pytest.fixture
@@ -296,13 +306,22 @@ def setup_host_factory_mock(request):
     test_name = request.node.name  # Get the actual test function name
 
     # Get base template and overrides from test parameters if available
-    base_template = getattr(request, 'param', {}).get('base_template', None) if hasattr(request, 'param') and isinstance(request.param, dict) else None
-    overrides = getattr(request, 'param', {}).get('overrides', {}) if hasattr(request, 'param') and isinstance(request.param, dict) else {}
+    base_template = (
+        getattr(request, "param", {}).get("base_template", None)
+        if hasattr(request, "param") and isinstance(request.param, dict)
+        else None
+    )
+    overrides = (
+        getattr(request, "param", {}).get("overrides", {})
+        if hasattr(request, "param") and isinstance(request.param, dict)
+        else {}
+    )
 
     # Clear any existing files from the test directory first
     test_config_dir = processor.run_templates_dir / test_name
     if test_config_dir.exists():
         import shutil
+
         shutil.rmtree(test_config_dir)
         print(f"Cleared existing test directory: {test_config_dir}")
 
@@ -311,12 +330,11 @@ def setup_host_factory_mock(request):
 
     # Set environment variables to use generated templates
     test_config_dir = processor.run_templates_dir / test_name
-    os.environ['HF_PROVIDER_CONFDIR'] = str(test_config_dir)
-    os.environ['HF_PROVIDER_LOGDIR'] = str(test_config_dir / "logs")
-    os.environ['HF_PROVIDER_WORKDIR'] = str(test_config_dir / "work")
-    os.environ['AWS_PROVIDER_LOG_DIR'] = str(test_config_dir / "logs")
-    os.environ['HF_LOGDIR'] = str(test_config_dir / "logs")
-
+    os.environ["HF_PROVIDER_CONFDIR"] = str(test_config_dir)
+    os.environ["HF_PROVIDER_LOGDIR"] = str(test_config_dir / "logs")
+    os.environ["HF_PROVIDER_WORKDIR"] = str(test_config_dir / "work")
+    os.environ["AWS_PROVIDER_LOG_DIR"] = str(test_config_dir / "logs")
+    os.environ["HF_LOGDIR"] = str(test_config_dir / "logs")
 
     # Create the log and work directories
     (test_config_dir / "logs").mkdir(exist_ok=True)
@@ -325,6 +343,7 @@ def setup_host_factory_mock(request):
     hfm = HostFactoryMock()
 
     return hfm
+
 
 @pytest.fixture
 def setup_host_factory_mock_with_scenario(request):
@@ -336,35 +355,39 @@ def setup_host_factory_mock_with_scenario(request):
     # Extract the scenario name from the test node name
     # For parametrized tests, the node name will be like "test_sample[EC2Fleet]"
     scenario_name = None
-    if '[' in test_name and ']' in test_name:
+    if "[" in test_name and "]" in test_name:
         # Extract the parameter value from the test name
-        scenario_name = test_name.split('[')[1].split(']')[0]
+        scenario_name = test_name.split("[")[1].split("]")[0]
 
     # Get the specific test case for this scenario
     from tests.onaws import scenarios
+
     test_case = scenarios.get_test_case_by_name(scenario_name) if scenario_name else {}
 
     # Extract overrides and base template from test_case if available
-    overrides = test_case.get('overrides', {}) if test_case else {}
-    awsprov_base_template = test_case.get('awsprov_base_template') if test_case else None
+    overrides = test_case.get("overrides", {}) if test_case else {}
+    awsprov_base_template = test_case.get("awsprov_base_template") if test_case else None
 
     # Clear any existing files from the test directory first
     test_config_dir = processor.run_templates_dir / test_name
     if test_config_dir.exists():
         import shutil
+
         shutil.rmtree(test_config_dir)
         print(f"Cleared existing test directory: {test_config_dir}")
 
     # Generate populated templates with overrides and base template from test case
-    processor.generate_test_templates(test_name, awsprov_base_template=awsprov_base_template, overrides=overrides)
+    processor.generate_test_templates(
+        test_name, awsprov_base_template=awsprov_base_template, overrides=overrides
+    )
 
     # Set environment variables to use generated templates
     test_config_dir = processor.run_templates_dir / test_name
-    os.environ['HF_PROVIDER_CONFDIR'] = str(test_config_dir)
-    os.environ['HF_PROVIDER_LOGDIR'] = str(test_config_dir / "logs")
-    os.environ['HF_PROVIDER_WORKDIR'] = str(test_config_dir / "work")
-    os.environ['AWS_PROVIDER_LOG_DIR'] = str(test_config_dir / "logs")
-    os.environ['HF_LOGDIR'] = str(test_config_dir / "logs")
+    os.environ["HF_PROVIDER_CONFDIR"] = str(test_config_dir)
+    os.environ["HF_PROVIDER_LOGDIR"] = str(test_config_dir / "logs")
+    os.environ["HF_PROVIDER_WORKDIR"] = str(test_config_dir / "work")
+    os.environ["AWS_PROVIDER_LOG_DIR"] = str(test_config_dir / "logs")
+    os.environ["HF_LOGDIR"] = str(test_config_dir / "logs")
 
     # Create the log and work directories
     (test_config_dir / "logs").mkdir(exist_ok=True)
@@ -375,18 +398,15 @@ def setup_host_factory_mock_with_scenario(request):
     return hfm
 
 
-
 def _check_request_machines_response_status(status_response):
-
     assert status_response["requests"][0]["status"] == "complete"
     for machine in status_response["requests"][0]["machines"]:
         # it is possible that ec2 host is still initialising
         assert machine["status"] in ["running", "pending"]
 
+
 def _check_all_ec2_hosts_are_being_provisioned(status_response):
-
     for machine in status_response["requests"][0]["machines"]:
-
         ec2_instance_id = machine["machineId"]
         res = get_instance_state(ec2_instance_id)
 
@@ -396,12 +416,11 @@ def _check_all_ec2_hosts_are_being_provisioned(status_response):
 
         log.debug(f"EC2 {ec2_instance_id} state: {json.dumps(res, indent=4)}")
 
-def _check_all_ec2_hosts_are_being_terminated(ec2_instance_ids):
 
+def _check_all_ec2_hosts_are_being_terminated(ec2_instance_ids):
     all_are_deallocated = True
 
     for ec2_id in ec2_instance_ids:
-
         res = get_instance_state(ec2_id)
 
         if res["exists"] == True:
@@ -409,6 +428,7 @@ def _check_all_ec2_hosts_are_being_terminated(ec2_instance_ids):
                 all_are_deallocated = False
                 break
     return all_are_deallocated
+
 
 def provide_release_control_loop(hfm, template_json, capacity_to_request):
     """
@@ -429,8 +449,7 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request):
         pytest.Failed: If JSON schema validation fails
     """
 
-
-    #<1.> Request capacity. #######################################################################
+    # <1.> Request capacity. #######################################################################
     log.debug(f"Requesting capacity for the template \n {json.dumps(template_json, indent=4)}")
 
     res = hfm.request_machines(template_json["templateId"], capacity_to_request)
@@ -441,11 +460,13 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request):
     # log.debug(json.dumps(res, indent=4))
 
     try:
-        validate_json_schema(instance=res, schema=plugin_io_schemas.expected_request_machines_schema)
+        validate_json_schema(
+            instance=res, schema=plugin_io_schemas.expected_request_machines_schema
+        )
     except ValidationError as e:
         pytest.fail(f"JSON validation failed for request_machines response json: {e}")
 
-    #<2.> Wait until request is completed. ########################################################
+    # <2.> Wait until request is completed. ########################################################
 
     start_time = time.time()
     status_response = None
@@ -455,10 +476,13 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request):
         # Force immediate output for debugging
         print(f"DEBUG: Status Response: {json.dumps(status_response, indent=2)}")
         import sys
+
         sys.stdout.flush()
 
         try:
-            validate_json_schema(instance=status_response, schema=plugin_io_schemas.expected_request_status_schema)
+            validate_json_schema(
+                instance=status_response, schema=plugin_io_schemas.expected_request_status_schema
+            )
         except ValidationError as e:
             pytest.fail(f"JSON validation failed for get_reqest_status response json: {e}")
 
@@ -475,24 +499,31 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request):
 
     # Validate instance attributes against template
     log.info("Starting instance attribute validation against template")
-    attribute_validation_passed = validate_random_instance_attributes(status_response, template_json)
+    attribute_validation_passed = validate_random_instance_attributes(
+        status_response, template_json
+    )
 
     if not attribute_validation_passed:
-        pytest.fail("Instance attribute validation failed - EC2 instance attributes do not match template configuration")
+        pytest.fail(
+            "Instance attribute validation failed - EC2 instance attributes do not match template configuration"
+        )
     else:
-        log.info("Instance attribute validation PASSED - EC2 instance attributes match template configuration")
+        log.info(
+            "Instance attribute validation PASSED - EC2 instance attributes match template configuration"
+        )
 
-    #<3.> Deallocate capacity and verify that capacity is released. ###############################
+    # <3.> Deallocate capacity and verify that capacity is released. ###############################
 
-    ec2_instance_ids = [machine["machineId"] for machine in status_response["requests"][0]["machines"]]
+    ec2_instance_ids = [
+        machine["machineId"] for machine in status_response["requests"][0]["machines"]
+    ]
     # ec2_instance_ids = [machine["name"] for machine in status_response["requests"][0]["machines"]] #TODO
     log.debug(f"Deallocating instances: {ec2_instance_ids}")
 
     return_request_id = hfm.request_return_machines(ec2_instance_ids)
     log.debug(f"Deallocating: {json.dumps(return_request_id, indent=4)}")
 
-
-    while not  _check_all_ec2_hosts_are_being_terminated(ec2_instance_ids):
+    while not _check_all_ec2_hosts_are_being_terminated(ec2_instance_ids):
         status_response = hfm.get_return_requests(return_request_id)
         log.debug(json.dumps(status_response, indent=4))
 
@@ -512,28 +543,34 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request):
 @pytest.mark.aws
 @pytest.mark.slow
 def test_get_available_templates(setup_host_factory_mock):
-
     hfm = setup_host_factory_mock
 
     res = hfm.get_available_templates()
 
     try:
-        validate_json_schema(instance=res, schema=plugin_io_schemas.expected_get_available_templates_schema)
+        validate_json_schema(
+            instance=res, schema=plugin_io_schemas.expected_get_available_templates_schema
+        )
     except ValidationError as e:
         pytest.fail(f"JSON validation failed: {e}")
 
+
 @pytest.mark.aws
 @pytest.mark.slow
-@pytest.mark.parametrize("setup_host_factory_mock", [
-    {
-        "base_template": "config",  # Use custom base template
-        "overrides": {
-            "region": "us-west-2",  # Override region
-            "imageId": "ami-custom123",  # Override image ID
-            "profile": "test-profile"  # Override profile
+@pytest.mark.parametrize(
+    "setup_host_factory_mock",
+    [
+        {
+            "base_template": "config",  # Use custom base template
+            "overrides": {
+                "region": "us-west-2",  # Override region
+                "imageId": "ami-custom123",  # Override image ID
+                "profile": "test-profile",  # Override profile
+            },
         }
-    }
-], indirect=True)
+    ],
+    indirect=True,
+)
 def test_get_available_templates_with_overrides(setup_host_factory_mock):
     """Test with custom base template and configuration overrides."""
 
@@ -542,7 +579,9 @@ def test_get_available_templates_with_overrides(setup_host_factory_mock):
     res = hfm.get_available_templates()
 
     try:
-        validate_json_schema(instance=res, schema=plugin_io_schemas.expected_get_available_templates_schema)
+        validate_json_schema(
+            instance=res, schema=plugin_io_schemas.expected_get_available_templates_schema
+        )
     except ValidationError as e:
         pytest.fail(f"JSON validation failed: {e}")
 
@@ -568,4 +607,6 @@ def test_sample(setup_host_factory_mock_with_scenario, test_case):
 
     res = hfm.get_available_templates()
 
-    provide_release_control_loop(hfm, template_json=res["templates"][0], capacity_to_request=test_case["capacity_to_request"])
+    provide_release_control_loop(
+        hfm, template_json=res["templates"][0], capacity_to_request=test_case["capacity_to_request"]
+    )

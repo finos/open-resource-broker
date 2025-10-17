@@ -19,10 +19,7 @@ expected_get_available_templates_schema = {
                     "maxNumber": {"type": "integer", "minimum": 1},
                     "pgrpName": {"type": ["string", "null"]},
                     "onDemandCapacity": {"type": "integer"},
-                    "vmTypes": {
-                        "type": "object",
-                        "additionalProperties": {"type": "integer"}
-                    },
+                    "vmTypes": {"type": "object", "additionalProperties": {"type": "integer"}},
                     "instanceTags": {"type": "string"},
                     "attributes": {
                         "type": "object",
@@ -91,7 +88,10 @@ expected_request_status_schema = {
                         "pattern": "^(req-|ret-)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
                     },
                     "message": {"type": "string"},
-                    "status": {"type": "string", "enum": ["running", "complete", "complete_with_error", "in_progress"]},
+                    "status": {
+                        "type": "string",
+                        "enum": ["running", "complete", "complete_with_error", "in_progress"],
+                    },
                     "machines": {
                         "type": "array",
                         "items": {
@@ -108,22 +108,19 @@ expected_request_status_schema = {
                             "properties": {
                                 "machineId": {"type": "string", "pattern": "^i-[0-9a-f]+$"},
                                 "name": {"type": "string"},
-                                "priceType": {
-                                    "type": "string",
-                                    "enum": ["ondemand", "spot"]
-                                },
+                                "priceType": {"type": "string", "enum": ["ondemand", "spot"]},
                                 "instanceType": {"type": "string"},
                                 "result": {
                                     "type": "string",
-                                    "enum": ["executing", "succeed", "fail"]
+                                    "enum": ["executing", "succeed", "fail"],
                                 },
                                 "status": {
                                     "type": "string",
-                                    "enum": ["pending", "running", "terminated", "failed", "error"]
+                                    "enum": ["pending", "running", "terminated", "failed", "error"],
                                 },
                                 "privateIpAddress": {
                                     "type": ["string", "null"],
-                                    "pattern": "^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$"
+                                    "pattern": "^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$",
                                 },
                                 "instanceTags": {"type": "string"},
                                 "cloudHostId": {"type": "null"},

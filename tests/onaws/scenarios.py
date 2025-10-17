@@ -1,6 +1,5 @@
 def get_test_cases():
     return [
-
         # {
         #     "test_name": "EC2FleetInstant",
         #     "capacity_to_request": 2,
@@ -12,19 +11,14 @@ def get_test_cases():
             "test_name": "EC2FleetRequest",
             "capacity_to_request": 2,
             "awsprov_base_template": "awsprov_templates2.base.json",
-            "overrides": {
-                "fleetType":"request"
-            }
+            "overrides": {"fleetType": "request"},
         },
         {
             "test_name": "EC2FleetInstant",
             "capacity_to_request": 2,
             "awsprov_base_template": "awsprov_templates1.base.json",
-            "overrides": {
-                "fleetType":"instant"
-            }
-        }
-
+            "overrides": {"fleetType": "instant"},
+        },
         # {
         #     "test_name": "EC2FleetRequest",
         #     "capacity_to_request": 2
@@ -52,6 +46,7 @@ def get_test_cases():
         # }
     ]
 
+
 def get_test_case_by_name(test_name: str):
     """Get a specific test case by test name."""
     test_cases = get_test_cases()
@@ -60,8 +55,4 @@ def get_test_case_by_name(test_name: str):
             return test_case
 
     # Return a default test case if not found
-    return {
-        "test_name": test_name,
-        "capacity_to_request": 2,
-        "overrides": {}
-    }
+    return {"test_name": test_name, "capacity_to_request": 2, "overrides": {}}

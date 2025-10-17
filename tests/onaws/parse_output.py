@@ -66,13 +66,13 @@ def format_request_response(response: Dict[str, Any]) -> str:
         formatted_lines = []
 
         # Extract key information
-        if 'requestId' in response:
+        if "requestId" in response:
             formatted_lines.append(f"Request ID: {response['requestId']}")
 
-        if 'status' in response:
+        if "status" in response:
             formatted_lines.append(f"Status: {response['status']}")
 
-        if 'message' in response:
+        if "message" in response:
             formatted_lines.append(f"Message: {response['message']}")
 
         # Add full JSON for reference
@@ -103,10 +103,10 @@ def print_machine_status(machines: list) -> None:
     print("-" * 80)
 
     for machine in machines:
-        machine_id = machine.get('machineId', 'N/A')[:19]
-        status = machine.get('status', 'N/A')
-        state = machine.get('state', 'N/A')
-        machine_type = machine.get('type', 'N/A')
+        machine_id = machine.get("machineId", "N/A")[:19]
+        status = machine.get("status", "N/A")
+        state = machine.get("state", "N/A")
+        machine_type = machine.get("type", "N/A")
 
         print(f"{machine_id:<20} {status:<15} {state:<15} {machine_type:<15}")
 
@@ -133,9 +133,9 @@ def print_template_info(templates: list) -> None:
         print(f"  Name: {template.get('name', 'N/A')}")
         print(f"  Description: {template.get('description', 'N/A')}")
 
-        if 'attributes' in template:
+        if "attributes" in template:
             print("  Attributes:")
-            for key, value in template['attributes'].items():
+            for key, value in template["attributes"].items():
                 print(f"    {key}: {value}")
 
     print("=" * 60)
