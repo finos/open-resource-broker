@@ -50,11 +50,11 @@ class TestListSchedulerStrategiesHandler:
 
         with (
             patch(
-                "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
+                "infrastructure.registry.scheduler_registry.get_scheduler_registry",
                 return_value=mock_registry,
             ),
             patch(
-                "src.config.manager.ConfigurationManager",
+                "config.manager.ConfigurationManager",
                 return_value=mock_config_manager,
             ),
         ):
@@ -77,11 +77,11 @@ class TestListSchedulerStrategiesHandler:
 
         with (
             patch(
-                "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
+                "infrastructure.registry.scheduler_registry.get_scheduler_registry",
                 return_value=mock_registry,
             ),
             patch(
-                "src.config.manager.ConfigurationManager",
+                "config.manager.ConfigurationManager",
                 return_value=mock_config_manager,
             ),
         ):
@@ -99,11 +99,11 @@ class TestListSchedulerStrategiesHandler:
 
         with (
             patch(
-                "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
+                "infrastructure.registry.scheduler_registry.get_scheduler_registry",
                 return_value=mock_registry,
             ),
             patch(
-                "src.config.manager.ConfigurationManager",
+                "config.manager.ConfigurationManager",
                 side_effect=Exception("Config error"),
             ),
         ):
@@ -153,11 +153,11 @@ class TestGetSchedulerConfigurationHandler:
 
         with (
             patch(
-                "src.config.manager.ConfigurationManager",
+                "config.manager.ConfigurationManager",
                 return_value=mock_config_manager,
             ),
             patch(
-                "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
+                "infrastructure.registry.scheduler_registry.get_scheduler_registry",
                 return_value=mock_registry,
             ),
         ):
@@ -177,11 +177,11 @@ class TestGetSchedulerConfigurationHandler:
 
         with (
             patch(
-                "src.config.manager.ConfigurationManager",
+                "config.manager.ConfigurationManager",
                 return_value=mock_config_manager,
             ),
             patch(
-                "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
+                "infrastructure.registry.scheduler_registry.get_scheduler_registry",
                 return_value=mock_registry,
             ),
         ):
@@ -200,11 +200,11 @@ class TestGetSchedulerConfigurationHandler:
 
         with (
             patch(
-                "src.config.manager.ConfigurationManager",
+                "config.manager.ConfigurationManager",
                 return_value=mock_config_manager,
             ),
             patch(
-                "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
+                "infrastructure.registry.scheduler_registry.get_scheduler_registry",
                 return_value=mock_registry,
             ),
         ):
@@ -252,11 +252,11 @@ class TestValidateSchedulerConfigurationHandler:
 
         with (
             patch(
-                "src.config.manager.ConfigurationManager",
+                "config.manager.ConfigurationManager",
                 return_value=mock_config_manager,
             ),
             patch(
-                "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
+                "infrastructure.registry.scheduler_registry.get_scheduler_registry",
                 return_value=mock_registry,
             ),
         ):
@@ -275,11 +275,11 @@ class TestValidateSchedulerConfigurationHandler:
 
         with (
             patch(
-                "src.config.manager.ConfigurationManager",
+                "config.manager.ConfigurationManager",
                 return_value=mock_config_manager,
             ),
             patch(
-                "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
+                "infrastructure.registry.scheduler_registry.get_scheduler_registry",
                 return_value=mock_registry,
             ),
         ):
@@ -301,11 +301,11 @@ class TestValidateSchedulerConfigurationHandler:
 
         with (
             patch(
-                "src.config.manager.ConfigurationManager",
+                "config.manager.ConfigurationManager",
                 return_value=mock_config_manager,
             ),
             patch(
-                "src.infrastructure.registry.scheduler_registry.get_scheduler_registry",
+                "infrastructure.registry.scheduler_registry.get_scheduler_registry",
                 return_value=mock_registry,
             ),
         ):

@@ -24,6 +24,7 @@ from domain.base import UnitOfWorkFactory
 # Exception handling through BaseQueryHandler (Clean Architecture compliant)
 from domain.base.exceptions import EntityNotFoundError
 from domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
+from domain.template.factory import TemplateFactory, get_default_template_factory
 from domain.template.template_aggregate import Template
 
 T = TypeVar("T")
@@ -873,30 +874,38 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, Template]):
 
             # Convert TemplateDTO to Template domain object (same logic as
             # ListTemplatesHandler)
-            config = template_dto.configuration or {}
+            config = dict(template_dto.configuration or {})
 
-            template_data = {
-                "template_id": template_dto.template_id,
-                "name": template_dto.name or template_dto.template_id,
-                "provider_api": template_dto.provider_api or "aws",
-                # Extract required fields from configuration with defaults
-                "image_id": config.get("image_id") or config.get("imageId") or "default-image",
-                "subnet_ids": config.get("subnet_ids")
-                or config.get("subnetIds")
-                or ["default-subnet"],
-                "instance_type": config.get("instance_type") or config.get("instanceType"),
-                "max_instances": config.get("max_instances") or config.get("maxNumber") or 1,
-                "security_group_ids": config.get("security_group_ids")
-                or config.get("securityGroupIds")
-                or [],
-                "user_data": config.get("user_data"),
-                "instance_profile": config.get("instance_profile"),
-                "key_pair_name": config.get("key_name"),
-                "tags": config.get("tags") or {},
-                "metadata": config,
-            }
+            template_data = dict(config)
+            template_data.setdefault("template_id", template_dto.template_id)
+            template_data.setdefault("name", template_dto.name or template_dto.template_id)
+            template_data.setdefault("provider_api", template_dto.provider_api or "aws")
+            template_data.setdefault(
+                "image_id", config.get("image_id") or config.get("imageId") or "default-image"
+            )
+            template_data.setdefault(
+                "subnet_ids",
+                config.get("subnet_ids") or config.get("subnetIds") or ["default-subnet"],
+            )
+            template_data.setdefault(
+                "instance_type", config.get("instance_type") or config.get("instanceType")
+            )
+            template_data.setdefault(
+                "max_instances", config.get("max_instances") or config.get("maxNumber") or 1
+            )
+            template_data.setdefault(
+                "security_group_ids",
+                config.get("security_group_ids") or config.get("securityGroupIds") or [],
+            )
+            template_data.setdefault("tags", config.get("tags") or {})
+            template_data.setdefault("metadata", config)
 
-            domain_template = Template(**template_data)
+            if self._container.has(TemplateFactory):
+                template_factory = self._container.get(TemplateFactory)
+            else:
+                template_factory = get_default_template_factory()
+
+            domain_template = template_factory.create_template(template_data)
 
             self.logger.info("Retrieved template: %s", query.template_id)
             return domain_template
@@ -934,50 +943,52 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[Template]])
         try:
             template_manager = self._container.get(TemplateConfigurationManager)
 
+            if self._container.has(TemplateFactory):
+                template_factory = self._container.get(TemplateFactory)
+            else:
+                template_factory = get_default_template_factory()
+
             if query.provider_api:
-                domain_templates = await template_manager.get_templates_by_provider(
+                template_dtos = await template_manager.get_templates_by_provider(
                     query.provider_api
                 )
             else:
                 template_dtos = await template_manager.load_templates()
-                # Convert TemplateDTO objects to Template domain objects
-                domain_templates = []
-                for dto in template_dtos:
-                    try:
-                        # Extract fields from configuration with defaults
-                        config = dto.configuration or {}
 
-                        # Create template with field mapping
-                        template_data = {
-                            "template_id": dto.template_id,
-                            "name": dto.name or dto.template_id,
-                            "provider_api": dto.provider_api or "aws",
-                            # Extract required fields from configuration with defaults
-                            "image_id": config.get("image_id")
-                            or config.get("imageId")
-                            or "default-image",
-                            "subnet_ids": config.get("subnet_ids")
-                            or config.get("subnetIds")
-                            or ["default-subnet"],
-                            "instance_type": config.get("instance_type")
-                            or config.get("instanceType"),
-                            "max_instances": config.get("max_instances")
-                            or config.get("maxNumber")
-                            or 1,
-                            "security_group_ids": config.get("security_group_ids")
-                            or config.get("securityGroupIds")
-                            or [],
-                            "user_data": config.get("user_data"),
-                            "tags": config.get("tags") or {},
-                            "metadata": {},
-                        }
+            domain_templates = []
+            for dto in template_dtos:
+                try:
+                    config = dict(dto.configuration or {})
+                    template_data = dict(config)
+                    template_data.setdefault("template_id", dto.template_id)
+                    template_data.setdefault("name", dto.name or dto.template_id)
+                    template_data.setdefault("provider_api", dto.provider_api or "aws")
+                    template_data.setdefault(
+                        "image_id", config.get("image_id") or config.get("imageId") or "default-image"
+                    )
+                    template_data.setdefault(
+                        "subnet_ids",
+                        config.get("subnet_ids") or config.get("subnetIds") or ["default-subnet"],
+                    )
+                    template_data.setdefault(
+                        "instance_type", config.get("instance_type") or config.get("instanceType")
+                    )
+                    template_data.setdefault(
+                        "max_instances", config.get("max_instances") or config.get("maxNumber") or 1
+                    )
+                    template_data.setdefault(
+                        "security_group_ids",
+                        config.get("security_group_ids") or config.get("securityGroupIds") or [],
+                    )
+                    template_data.setdefault("tags", config.get("tags") or {})
+                    template_data.setdefault("metadata", config)
 
-                        domain_template = Template(**template_data)
-                        domain_templates.append(domain_template)
+                    domain_template = template_factory.create_template(template_data)
+                    domain_templates.append(domain_template)
 
-                    except Exception as e:
-                        self.logger.warning("Skipping invalid template %s: %s", dto.template_id, e)
-                        continue
+                except Exception as e:
+                    self.logger.warning("Skipping invalid template %s: %s", dto.template_id, e)
+                    continue
 
             self.logger.info("Found %s templates", len(domain_templates))
             return domain_templates
