@@ -48,6 +48,9 @@ test-integration: dev-install  ## Run integration tests (supports same args)
 test-e2e: dev-install  ## Run end-to-end tests (supports same args)
 	@./dev-tools/testing/run_tests.py --e2e $(filter-out $@,$(MAKECMDGOALS))
 
+test-onaws: dev-install  ## Run AWS integration tests (supports same args)
+	@./dev-tools/testing/run_tests.py --onaws $(filter-out $@,$(MAKECMDGOALS))
+
 test-all: dev-install  ## Run all tests (supports same args)
 	@./dev-tools/testing/run_tests.py --all $(filter-out $@,$(MAKECMDGOALS))
 
@@ -76,6 +79,10 @@ test-html: dev-install  ## Run tests with HTML coverage (supports same args)
 
 test-report: dev-install  ## Generate comprehensive test report
 	./dev-tools/testing/run_tests.py --all --coverage --junit-xml=test-results-combined.xml --cov-xml=coverage-combined.xml --html-coverage --maxfail=1 --timeout=60
+
+system-tests: dev-install  ## Run system integration tests (using pytest)
+	@echo "Running system integration tests..."
+	@uv run python -m pytest tests/onaws/test_onaws.py -v -m manual_aws --no-cov --tb=long
 
 # @SECTION Development Tools
 generate-pyproject:  ## Update pyproject.toml metadata from .project.yml (preserves dependencies)

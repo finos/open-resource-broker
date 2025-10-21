@@ -1,0 +1,67 @@
+{
+  "version": "2.0.0",
+  "scheduler": {
+    "type": "hostfactory",
+    "config_root": "$HF_PROVIDER_CONFDIR"
+  },
+  "provider": {
+    "providers": [
+      {
+        "name": "aws-default",
+        "type": "aws",
+        "enabled": true,
+        "config": {
+          "region": "{{region}}",
+          "profile": "{{profile}}"
+        }
+      }
+    ],
+    "selection_policy": "FIRST_AVAILABLE",
+    "default_provider_type": "aws",
+    "provider_defaults": {
+      "aws": {
+        "template_defaults": {
+          "image_id": "{{imageId}}",
+          "instance_type": "t2.micro",
+          "security_group_ids": "{{securityGroupIds}}",
+          "subnet_ids": ["{{subnetId}}"],
+          "key_name": "",
+          "provider_api": "EC2Fleet",
+          "price_type": "ondemand",
+          "tags": {
+            "Environment": "development",
+            "Project": "hostfactory"
+          }
+        },
+        "extensions": {
+          "ami_resolution": {
+            "enabled": true,
+            "fallback_on_failure": true,
+            "ssm_parameter_prefix": "/hostfactory/templates/"
+          }
+        }
+      }
+    }
+  },
+  "logging": {
+    "level": "INFO",
+    "file_path": "logs/app.log",
+    "console_enabled": false
+  },
+  "storage": {
+    "strategy": "json",
+    "default_storage_path": "data",
+    "json_strategy": {
+      "storage_type": "single_file",
+      "base_path": "data",
+      "filenames": {
+        "single_file": "request_database.json",
+        "split_files": {
+          "templates": "templates.json",
+          "requests": "requests.json",
+          "machines": "machines.json"
+        }
+      }
+    }
+  }
+}

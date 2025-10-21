@@ -15,6 +15,7 @@ class HostFactoryFieldMappings:
             "maxNumber": "max_instances",
             "imageId": "image_id",
             "keyName": "key_name",
+            "fleetType": "fleet_type",
             # Network configuration
             "subnetId": "subnet_ids",  # Will be converted to list
             "securityGroupIds": "security_group_ids",
@@ -26,9 +27,9 @@ class HostFactoryFieldMappings:
             "maxSpotPrice": "max_price",
             "allocationStrategy": "allocation_strategy",
             # Storage configuration
-            "rootDeviceVolumeSize": "root_volume_size",
-            "volumeType": "root_volume_type",
-            "iops": "root_volume_iops",
+            "rootDeviceVolumeSize": "root_device_volume_size",
+            "volumeType": "volume_type",
+            "iops": "iops",
             # Tags and metadata
             "instanceTags": "tags",  # Will be parsed from string format
         },

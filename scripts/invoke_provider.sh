@@ -1,9 +1,35 @@
 #!/bin/bash
 
-# Configuration - can be overridden by environment variables
+export USE_LOCAL_DEV="true"
+export LOG_CONSOLE_ENABLED=false
+export LOG_SCRIPTS="true"
+
+SCRIPTS_LOG_FILE="${HF_LOGDIR}/scripts.log"
+
 USE_LOCAL_DEV=${USE_LOCAL_DEV:-false}
 PACKAGE_NAME=${OHFP_PACKAGE_NAME:-"open-hostfactory-plugin"}
 PACKAGE_COMMAND=${OHFP_COMMAND:-"ohfp"}
+
+if [ "$LOG_SCRIPTS" = "true" ] || [ "$LOG_SCRIPTS" = "1" ]; then
+{
+
+    echo "=== Input Arguments Start ==="
+    echo "Timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
+    echo "Arguments: $@"
+
+    prev_arg=""
+    for i in "$@"; do
+        if [ "$prev_arg" = "-f" ] && [ -f "$i" ]; then
+            echo "File content:"
+            # This line prints the content of the file with indentation
+            cat "$i" | sed 's/^/      /'
+        fi
+        prev_arg="$i"
+    done
+    echo "=== Input Arguments End ==="
+    echo "OUTPUT:"
+} >> "$SCRIPTS_LOG_FILE"
+fi
 
 # Get script directory and project root
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
@@ -26,7 +52,7 @@ export HF_LOGGING_CONSOLE_ENABLED
 # Determine execution mode
 if [ "$USE_LOCAL_DEV" = "true" ] || [ "$USE_LOCAL_DEV" = "1" ]; then
     # Local development mode - use src/run.py from project root
-    echo "Using local development mode (src/run.py)" >&2
+    # echo "Using local development mode (src/run.py)" >&2
 
     # Add project root to PYTHONPATH
     export PYTHONPATH="${PROJECT_ROOT}:${PYTHONPATH}"
@@ -75,7 +101,8 @@ if [ "$USE_LOCAL_DEV" = "true" ] || [ "$USE_LOCAL_DEV" = "1" ]; then
     done
 
     # Execute the Python script with global args first, then command args
-    exec $PYTHON_CMD "${PROJECT_ROOT}/src/run.py" "${global_args[@]}" "${command_args[@]}"
+    $PYTHON_CMD "${PROJECT_ROOT}/src/run.py" "${global_args[@]}" "${command_args[@]}" 2>&1 | tee -a "$SCRIPTS_LOG_FILE"
+    exit ${PIPESTATUS[0]}
 
 else
     # Package mode - use installed command
@@ -93,5 +120,6 @@ else
     fi
 
     # Execute the installed command with all arguments
-    exec "$PACKAGE_COMMAND" "--legacy" "$@"
+    "$PACKAGE_COMMAND" "$@" 2>&1 | tee -a "$SCRIPTS_LOG_FILE"
+    exit ${PIPESTATUS[0]}
 fi

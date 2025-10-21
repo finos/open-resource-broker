@@ -42,7 +42,11 @@ class AWSInstanceManager:
 
                 # Add optional parameters using domain field names
                 if template_config.get("user_data"):
-                    params["UserData"] = template_config["user_data"]
+                    import base64
+
+                    params["UserData"] = base64.b64encode(
+                        template_config["user_data"].encode("utf-8")
+                    ).decode("ascii")
 
                 # Add subnet configuration
                 subnet_ids = template_config.get("subnet_ids")

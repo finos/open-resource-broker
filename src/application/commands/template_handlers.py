@@ -17,7 +17,7 @@ from domain.base.ports import (
     EventPublisherPort,
     LoggingPort,
 )
-from domain.template.aggregate import Template
+from domain.template.template_aggregate import Template
 
 
 @command_handler(CreateTemplateCommand)

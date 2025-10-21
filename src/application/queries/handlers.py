@@ -24,7 +24,8 @@ from domain.base import UnitOfWorkFactory
 # Exception handling through BaseQueryHandler (Clean Architecture compliant)
 from domain.base.exceptions import EntityNotFoundError
 from domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
-from domain.template.aggregate import Template
+from domain.template.factory import TemplateFactory, get_default_template_factory
+from domain.template.template_aggregate import Template
 
 T = TypeVar("T")
 
@@ -61,73 +62,89 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     return cached_result
 
             # Cache miss - get request from storage
+
             with self.uow_factory.create_unit_of_work() as uow:
                 from domain.request.value_objects import RequestId
 
                 request_id = RequestId(value=query.request_id)
-                request = uow.requests.get_by_id(request_id)
-                if not request:
-                    raise EntityNotFoundError("Request", query.request_id)
 
-            # Get machines from storage
-            machines = await self._get_machines_from_storage(query.request_id)
-            self.logger.info(
-                "DEBUG: Found %s machines in storage for request %s",
-                len(machines),
-                query.request_id,
-            )
+                request = uow.requests.get_by_id(request_id)
+
+                self.logger.debug(
+                    f"Searching for request_id: {request_id} request object retrieved: {request}"
+                )
+
+                if not request:
+                    raise EntityNotFoundError("Request", request_id)
+
+                machine_obj_from_db = uow.machines.find_by_request_id(query.request_id)
+
+            self.logger.debug(f"Machines associated with this request in DB: {machine_obj_from_db}")
 
             # Update machine status if needed
-            if not machines and request.resource_ids:
+            machine_objects_from_provider = []
+            if not machine_obj_from_db and request.resource_ids:
                 self.logger.info(
                     "DEBUG: No machines in storage but have resource IDs %s, checking provider",
                     request.resource_ids,
                 )
                 # No machines in storage but we have resource IDs - check provider and
                 # create machines
-                machines = await self._check_provider_and_create_machines(request)
-                self.logger.info("DEBUG: Provider check returned %s machines", len(machines))
-            elif machines:
-                self.logger.info("DEBUG: Have %s machines, updating status from AWS", len(machines))
+                machine_objects_from_provider = await self._check_provider_and_create_machines(
+                    request
+                )
+                self.logger.info(
+                    "DEBUG: Provider check returned %s machines", len(machine_obj_from_db)
+                )
+            elif machine_obj_from_db:
+                self.logger.info(
+                    "DEBUG: Have %s machines, updating status from AWS", len(machine_obj_from_db)
+                )
                 # We have machines - update their status from AWS
-                machines = await self._update_machine_status_from_aws(machines)
+                machine_objects_from_provider = await self._update_machine_status_from_aws(
+                    machine_obj_from_db
+                )
             else:
                 self.logger.info(
                     "DEBUG: No machines and no resource IDs for request %s",
                     query.request_id,
                 )
+            self.logger.debug(f"Machines from DB:  {machine_obj_from_db}")
+            self.logger.debug(f"Machines from cloud provider:  {machine_objects_from_provider}")
 
-            # Convert to DTO with machine data
-            machines_data = []
-            for machine in machines:
-                machines_data.append(
-                    {
-                        "instance_id": str(machine.instance_id.value),
-                        "status": machine.status.value,
-                        "private_ip": machine.private_ip,
-                        "public_ip": machine.public_ip,
-                        "launch_time": machine.launch_time,
-                        "launch_time_timestamp": (
-                            machine.launch_time.timestamp() if machine.launch_time else 0
-                        ),
-                    }
-                )
+            # Determine if request status needs updating based on machine states
+            new_status, status_message = self._determine_request_status_from_machines(
+                machine_obj_from_db, machine_objects_from_provider, request
+            )
 
-            # Create machine references from machine data
+            # Update request status if needed
+            if new_status:
+                from domain.request.request_types import RequestStatus
+
+                updated_request = request.update_status(RequestStatus(new_status), status_message)
+
+                # Save updated request
+                with self.uow_factory.create_unit_of_work() as uow:
+                    uow.requests.save(updated_request)
+
+                # Update the request object for DTO creation
+                request = updated_request
+
+            # Convert machines directly to DTOs
             from application.request.dto import MachineReferenceDTO
 
-            machine_references = []
-            for machine_data in machines_data:
-                machine_ref = MachineReferenceDTO(
-                    machine_id=machine_data["instance_id"],
-                    name=machine_data.get("private_ip", machine_data["instance_id"]),
-                    result=self._map_machine_status_to_result(machine_data["status"]),
-                    status=machine_data["status"],
-                    private_ip_address=machine_data.get("private_ip", ""),
-                    public_ip_address=machine_data.get("public_ip"),
-                    launch_time=int(machine_data.get("launch_time_timestamp", 0)),
+            machine_references = [
+                MachineReferenceDTO(
+                    machine_id=str(machine.instance_id.value),
+                    name=machine.private_ip or str(machine.instance_id.value),
+                    result=self._map_machine_status_to_result(machine.status.value),
+                    status=machine.status.value,
+                    private_ip_address=machine.private_ip or "",
+                    public_ip_address=machine.public_ip,
+                    launch_time=int(machine.launch_time.timestamp() if machine.launch_time else 0),
                 )
-                machine_references.append(machine_ref)
+                for machine in machine_objects_from_provider
+            ]
 
             request_dto = RequestDTO(
                 request_id=str(request.request_id),
@@ -145,7 +162,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
             self.logger.info(
                 "Retrieved request with %s machines: %s",
-                len(machines_data),
+                len(machine_references),
                 query.request_id,
             )
             return request_dto
@@ -228,6 +245,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             # Create machine aggregates from instance details
             machines = []
             for instance_data in instance_details:
+                self.logger.debug("instance_data: %s", instance_data)
                 machine = self._create_machine_from_aws_data(instance_data, request)
                 machines.append(machine)
 
@@ -254,7 +272,9 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             return machines
 
         except Exception as e:
-            self.logger.error("Failed to check provider and create machines: %s", e)
+            self.logger.exception(
+                "Failed to check provider and create machines: %s", e, exc_info=True
+            )
             return []
 
     async def _update_machine_status_from_aws(self, machines: list) -> list:
@@ -295,8 +315,8 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             # Use the correct strategy identifier format:
             # provider_type-provider_type-instance
             strategy_identifier = f"{request.provider_type}-{request.provider_type}-{request.provider_instance or 'default'}"
-            result = await provider_context.execute_with_strategy(strategy_identifier, operation)
 
+            result = await provider_context.execute_with_strategy(strategy_identifier, operation)
             if not result.success:
                 self.logger.warning("Failed to check resource status: %s", result.error_message)
                 return machines
@@ -427,23 +447,81 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
         return SimpleProviderContext(self._container)
 
+    # def _create_machine_from_aws_data(self, aws_instance: dict[str, Any], request):
+    #     """Create machine aggregate from AWS instance data."""
+    #     from domain.base.value_objects import InstanceId
+    #     from domain.machine.aggregate import Machine
+
+    #     return Machine(
+    #         instance_id=InstanceId(value=aws_instance["InstanceId"]),
+    #         request_id=str(request.request_id),
+    #         # Use first for backward compatibility
+    #         resource_id=request.resource_ids[0] if request.resource_ids else None,
+    #         template_id=request.template_id,
+    #         provider_type="aws",
+    #         status=self._map_aws_state_to_machine_status(aws_instance["State"]),
+    #         private_ip=aws_instance.get("PrivateIpAddress"),
+    #         public_ip=aws_instance.get("PublicIpAddress"),
+    #         launch_time=aws_instance.get("LaunchTime"),
+    #     )
+
     def _create_machine_from_aws_data(self, aws_instance: dict[str, Any], request):
-        """Create machine aggregate from AWS instance data."""
+        """Create machine aggregate using Pydantic validation with format detection."""
         from domain.base.value_objects import InstanceId
         from domain.machine.aggregate import Machine
 
-        return Machine(
-            instance_id=InstanceId(value=aws_instance["InstanceId"]),
-            request_id=str(request.request_id),
-            # Use first for backward compatibility
-            resource_id=request.resource_ids[0] if request.resource_ids else None,
-            template_id=request.template_id,
-            provider_type="aws",
-            status=self._map_aws_state_to_machine_status(aws_instance["State"]),
-            private_ip=aws_instance.get("PrivateIpAddress"),
-            public_ip=aws_instance.get("PublicIpAddress"),
-            launch_time=aws_instance.get("LaunchTime"),
+        # Detect format and normalize to snake_case for Pydantic
+        if "instance_id" in aws_instance:
+            # Already in snake_case format (from machine adapter)
+            machine_data = dict(aws_instance)
+        else:
+            # PascalCase format (from provider strategy) - convert to snake_case
+            machine_data = {
+                "instance_id": aws_instance.get("InstanceId"),
+                "status": aws_instance.get("State", {}).get("Name")
+                if isinstance(aws_instance.get("State"), dict)
+                else aws_instance.get("State"),
+                "instance_type": aws_instance.get("InstanceType"),
+                "image_id": aws_instance.get("ImageId", "unknown"),
+                "private_ip": aws_instance.get("PrivateIpAddress"),
+                "public_ip": aws_instance.get("PublicIpAddress"),
+                "launch_time": aws_instance.get("LaunchTime"),
+                "subnet_id": aws_instance.get("SubnetId"),
+                "security_group_ids": aws_instance.get("SecurityGroups", []),
+                "tags": {
+                    "tags": {
+                        tag.get("Key", ""): tag.get("Value", "")
+                        for tag in aws_instance.get("Tags", [])
+                    }
+                },
+                "metadata": aws_instance,  # Store original data as metadata
+            }
+
+        # Add required context fields
+        machine_data.update(
+            {
+                "template_id": request.template_id,
+                "provider_type": "aws",
+            }
         )
+
+        # Validate required fields before Pydantic validation
+        if not machine_data.get("instance_id"):
+            raise ValueError("Missing instance_id in AWS instance data")
+        if not machine_data.get("instance_type"):
+            raise ValueError("Missing instance_type in AWS instance data")
+        if not machine_data.get("image_id"):
+            machine_data["image_id"] = "unknown"  # Provide default
+
+        # Create value objects explicitly for Pydantic
+        from domain.base.value_objects import InstanceType
+
+        # Convert strings to proper value objects
+        machine_data["instance_id"] = InstanceId(value=machine_data["instance_id"])
+        machine_data["instance_type"] = InstanceType(value=machine_data["instance_type"])
+
+        # Let Pydantic handle validation, type conversion, and field mapping
+        return Machine.model_validate(machine_data)
 
     def _map_aws_state_to_machine_status(self, aws_state: str):
         """Map AWS instance state to machine status."""
@@ -506,6 +584,177 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     """Publish event (no-op implementation)."""
 
             return NoOpEventPublisher()
+
+    def _determine_request_status_from_machines(
+        self, machine_objects_from_database: list, machine_objects_from_provider: list, request
+    ) -> tuple[str, str]:
+        """
+        Compare machine objects from database and provider to determine if request status needs updating.
+        Handles both ACQUIRE and RETURN request types with different logic.
+
+        Args:
+            machine_objects_from_database: List of machine objects from local database
+            machine_objects_from_provider: List of machine objects from cloud provider
+            request: The request object containing requested_count, current status, and request_type
+
+        Returns:
+            Tuple of (new_status, status_message) or (None, None) if no change needed
+        """
+        from domain.machine.machine_status import MachineStatus
+        from domain.request.request_types import RequestStatus, RequestType
+
+        try:
+            requested_count = request.requested_count
+            current_status = request.status
+            request_type = request.request_type
+
+            # Count machines by status from provider data (most up-to-date)
+            provider_machine_count = len(machine_objects_from_provider)
+            database_machine_count = len(machine_objects_from_database)
+
+            # Analyze provider machine statuses
+            running_count = 0
+            pending_count = 0
+            failed_count = 0
+            terminated_count = 0
+            shutting_down_count = 0
+
+            for machine in machine_objects_from_provider:
+                status = machine.status if hasattr(machine, "status") else machine.get("status")
+                if isinstance(status, str):
+                    status = MachineStatus(status)
+
+                if status == MachineStatus.RUNNING:
+                    running_count += 1
+                elif status in [MachineStatus.PENDING]:
+                    pending_count += 1
+                elif status in [MachineStatus.FAILED]:
+                    failed_count += 1
+                elif status in [MachineStatus.TERMINATED, MachineStatus.STOPPED]:
+                    terminated_count += 1
+                elif status == MachineStatus.SHUTTING_DOWN:
+                    shutting_down_count += 1
+
+            self.logger.debug(
+                "Machine status analysis for request %s (type: %s): "
+                "requested=%d, provider_total=%d, running=%d, pending=%d, failed=%d, terminated=%d, shutting_down=%d",
+                request.request_id,
+                request_type.value,
+                requested_count,
+                provider_machine_count,
+                running_count,
+                pending_count,
+                failed_count,
+                terminated_count,
+                shutting_down_count,
+            )
+
+            # Determine new status based on request type and machine states
+            new_status = None
+            status_message = None
+
+            if request_type == RequestType.RETURN:
+                # RETURN REQUEST LOGIC
+
+                # Case 1: All machines terminated or no machines found (terminated long ago)
+                if provider_machine_count == 0 or (
+                    terminated_count > 0
+                    and running_count == 0
+                    and pending_count == 0
+                    and shutting_down_count == 0
+                ):
+                    if current_status != RequestStatus.COMPLETED:
+                        new_status = RequestStatus.COMPLETED.value
+                        if provider_machine_count == 0:
+                            status_message = f"Return request completed: all machines terminated (no longer visible in provider) (total in DB: {database_machine_count})"
+                        else:
+                            status_message = f"Return request completed: {terminated_count} machines terminated (total in DB: {database_machine_count})"
+
+                # Case 2: Machines are shutting down (in progress)
+                elif shutting_down_count > 0:
+                    if current_status != RequestStatus.IN_PROGRESS:
+                        new_status = RequestStatus.IN_PROGRESS.value
+                        status_message = f"Return in progress: {shutting_down_count} machines shutting down, {terminated_count} terminated (total in DB: {database_machine_count})"
+
+                # Case 3: Still have running machines (return not yet initiated or failed)
+                elif running_count > 0:
+                    if current_status not in [RequestStatus.IN_PROGRESS, RequestStatus.PENDING]:
+                        new_status = RequestStatus.IN_PROGRESS.value
+                        status_message = f"Return in progress: {running_count} machines still running, awaiting termination (total in DB: {database_machine_count})"
+
+                # Case 4: Return request failed (machines failed to terminate properly)
+                elif failed_count > 0 and running_count == 0 and shutting_down_count == 0:
+                    if current_status != RequestStatus.FAILED:
+                        new_status = RequestStatus.FAILED.value
+                        status_message = f"Return request failed: {failed_count} machines failed to terminate properly (total in DB: {database_machine_count})"
+
+            elif request_type == RequestType.ACQUIRE:
+                # ACQUIRE REQUEST LOGIC (original logic)
+
+                # Case 1: All requested machines are running successfully
+                if running_count == requested_count and failed_count == 0:
+                    if current_status != RequestStatus.COMPLETED:
+                        new_status = RequestStatus.COMPLETED.value
+                        status_message = f"All {requested_count} machines are running successfully (total in DB: {database_machine_count})"
+
+                # Case 2: Some machines running, some failed (partial success)
+                elif (
+                    running_count > 0
+                    and failed_count > 0
+                    and (running_count + failed_count) >= requested_count
+                ):
+                    if current_status != RequestStatus.PARTIAL:
+                        new_status = RequestStatus.PARTIAL.value
+                        status_message = f"Partial success: {running_count}/{requested_count} machines running, {failed_count} failed (total in DB: {database_machine_count})"
+
+                # Case 3: All machines failed
+                elif failed_count >= requested_count and running_count == 0:
+                    if current_status != RequestStatus.FAILED:
+                        new_status = RequestStatus.FAILED.value
+                        status_message = f"All {requested_count} machines failed to start (total in DB: {database_machine_count})"
+
+                # Case 4: Still have pending machines (in progress)
+                elif pending_count > 0 and failed_count < requested_count:
+                    if current_status not in [RequestStatus.IN_PROGRESS, RequestStatus.PENDING]:
+                        new_status = RequestStatus.IN_PROGRESS.value
+                        status_message = f"Processing: {running_count} running, {pending_count} pending, {failed_count} failed (total in DB: {database_machine_count})"
+
+                # Case 5: No machines found but request expects them (potential timeout or provider issue)
+                elif provider_machine_count == 0 and requested_count > 0:
+                    if current_status in [RequestStatus.IN_PROGRESS] and hasattr(
+                        request, "created_at"
+                    ):
+                        # Check if request has been in progress too long (e.g., 30 minutes)
+                        from datetime import datetime, timedelta
+
+                        time_elapsed = datetime.utcnow() - request.created_at
+                        if time_elapsed > timedelta(minutes=30):
+                            new_status = RequestStatus.TIMEOUT.value
+                            status_message = f"Request timed out - no machines found after 30 minutes (total in DB: {database_machine_count})"
+
+            # Log the decision
+            if new_status:
+                self.logger.info(
+                    "Request %s (%s) status change determined: %s -> %s (%s)",
+                    request.request_id,
+                    request_type.value,
+                    current_status.value,
+                    new_status,
+                    status_message,
+                )
+            else:
+                self.logger.debug(
+                    "Request %s (%s) status remains unchanged: %s",
+                    request.request_id,
+                    request_type.value,
+                    current_status.value,
+                )
+
+            return (new_status, status_message)
+
+        except Exception as e:
+            self.logger.error("Failed to determine request status from machines: %s", e)
+            return (None, None)
 
 
 @query_handler(GetRequestStatusQuery)
@@ -660,7 +909,6 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, Template]):
 
     async def execute_query(self, query: GetTemplateQuery) -> Template:
         """Execute get template query."""
-        from domain.template.aggregate import Template
         from infrastructure.template.configuration_manager import (
             TemplateConfigurationManager,
         )
@@ -678,27 +926,38 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, Template]):
 
             # Convert TemplateDTO to Template domain object (same logic as
             # ListTemplatesHandler)
-            config = template_dto.configuration or {}
+            config = dict(template_dto.configuration or {})
 
-            template_data = {
-                "template_id": template_dto.template_id,
-                "name": template_dto.name or template_dto.template_id,
-                "provider_api": template_dto.provider_api or "aws",
-                # Extract required fields from configuration with defaults
-                "image_id": config.get("image_id") or config.get("imageId") or "default-image",
-                "subnet_ids": config.get("subnet_ids")
-                or config.get("subnetIds")
-                or ["default-subnet"],
-                "instance_type": config.get("instance_type") or config.get("instanceType"),
-                "max_instances": config.get("max_instances") or config.get("maxNumber") or 1,
-                "security_group_ids": config.get("security_group_ids")
-                or config.get("securityGroupIds")
-                or [],
-                "tags": config.get("tags") or {},
-                "metadata": config,
-            }
+            template_data = dict(config)
+            template_data.setdefault("template_id", template_dto.template_id)
+            template_data.setdefault("name", template_dto.name or template_dto.template_id)
+            template_data.setdefault("provider_api", template_dto.provider_api or "aws")
+            template_data.setdefault(
+                "image_id", config.get("image_id") or config.get("imageId") or "default-image"
+            )
+            template_data.setdefault(
+                "subnet_ids",
+                config.get("subnet_ids") or config.get("subnetIds") or ["default-subnet"],
+            )
+            template_data.setdefault(
+                "instance_type", config.get("instance_type") or config.get("instanceType")
+            )
+            template_data.setdefault(
+                "max_instances", config.get("max_instances") or config.get("maxNumber") or 1
+            )
+            template_data.setdefault(
+                "security_group_ids",
+                config.get("security_group_ids") or config.get("securityGroupIds") or [],
+            )
+            template_data.setdefault("tags", config.get("tags") or {})
+            template_data.setdefault("metadata", config)
 
-            domain_template = Template(**template_data)
+            if self._container.has(TemplateFactory):
+                template_factory = self._container.get(TemplateFactory)
+            else:
+                template_factory = get_default_template_factory()
+
+            domain_template = template_factory.create_template(template_data)
 
             self.logger.info("Retrieved template: %s", query.template_id)
             return domain_template
@@ -726,7 +985,6 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[Template]])
 
     async def execute_query(self, query: ListTemplatesQuery) -> list[Template]:
         """Execute list templates query."""
-        from domain.template.aggregate import Template
         from infrastructure.template.configuration_manager import (
             TemplateConfigurationManager,
         )
@@ -736,49 +994,51 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[Template]])
         try:
             template_manager = self._container.get(TemplateConfigurationManager)
 
+            if self._container.has(TemplateFactory):
+                template_factory = self._container.get(TemplateFactory)
+            else:
+                template_factory = get_default_template_factory()
+
             if query.provider_api:
-                domain_templates = await template_manager.get_templates_by_provider(
-                    query.provider_api
-                )
+                template_dtos = await template_manager.get_templates_by_provider(query.provider_api)
             else:
                 template_dtos = await template_manager.load_templates()
-                # Convert TemplateDTO objects to Template domain objects
-                domain_templates = []
-                for dto in template_dtos:
-                    try:
-                        # Extract fields from configuration with defaults
-                        config = dto.configuration or {}
 
-                        # Create template with field mapping
-                        template_data = {
-                            "template_id": dto.template_id,
-                            "name": dto.name or dto.template_id,
-                            "provider_api": dto.provider_api or "aws",
-                            # Extract required fields from configuration with defaults
-                            "image_id": config.get("image_id")
-                            or config.get("imageId")
-                            or "default-image",
-                            "subnet_ids": config.get("subnet_ids")
-                            or config.get("subnetIds")
-                            or ["default-subnet"],
-                            "instance_type": config.get("instance_type")
-                            or config.get("instanceType"),
-                            "max_instances": config.get("max_instances")
-                            or config.get("maxNumber")
-                            or 1,
-                            "security_group_ids": config.get("security_group_ids")
-                            or config.get("securityGroupIds")
-                            or [],
-                            "tags": config.get("tags") or {},
-                            "metadata": {},
-                        }
+            domain_templates = []
+            for dto in template_dtos:
+                try:
+                    config = dict(dto.configuration or {})
+                    template_data = dict(config)
+                    template_data.setdefault("template_id", dto.template_id)
+                    template_data.setdefault("name", dto.name or dto.template_id)
+                    template_data.setdefault("provider_api", dto.provider_api or "aws")
+                    template_data.setdefault(
+                        "image_id",
+                        config.get("image_id") or config.get("imageId") or "default-image",
+                    )
+                    template_data.setdefault(
+                        "subnet_ids",
+                        config.get("subnet_ids") or config.get("subnetIds") or ["default-subnet"],
+                    )
+                    template_data.setdefault(
+                        "instance_type", config.get("instance_type") or config.get("instanceType")
+                    )
+                    template_data.setdefault(
+                        "max_instances", config.get("max_instances") or config.get("maxNumber") or 1
+                    )
+                    template_data.setdefault(
+                        "security_group_ids",
+                        config.get("security_group_ids") or config.get("securityGroupIds") or [],
+                    )
+                    template_data.setdefault("tags", config.get("tags") or {})
+                    template_data.setdefault("metadata", config)
 
-                        domain_template = Template(**template_data)
-                        domain_templates.append(domain_template)
+                    domain_template = template_factory.create_template(template_data)
+                    domain_templates.append(domain_template)
 
-                    except Exception as e:
-                        self.logger.warning("Skipping invalid template %s: %s", dto.template_id, e)
-                        continue
+                except Exception as e:
+                    self.logger.warning("Skipping invalid template %s: %s", dto.template_id, e)
+                    continue
 
             self.logger.info("Found %s templates", len(domain_templates))
             return domain_templates

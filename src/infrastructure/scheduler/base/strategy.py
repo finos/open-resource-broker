@@ -8,6 +8,7 @@ from abc import ABC
 from typing import Any
 
 from domain.base.ports.scheduler_port import SchedulerPort
+from domain.request.aggregate import Request
 
 
 class BaseSchedulerStrategy(SchedulerPort, ABC):
@@ -28,3 +29,16 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
         """
         self.config_manager = config_manager
         self.logger = logger
+
+    def format_request_status_response(self, requests: list[Request]) -> dict[str, Any]:
+        """
+        Format domain Requests to native domain response format.
+
+        Uses the Request's to_dict() method to serialize to native format.
+        """
+        # KBG TODO requestId for hostfactory returned as request_id, but it does not trigger an error, likely ignored by HF
+        return {
+            "requests": [request.to_dict() for request in requests],
+            "message": "Request status retrieved successfully",
+            "count": len(requests),
+        }

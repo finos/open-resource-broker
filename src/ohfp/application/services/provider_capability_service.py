@@ -9,7 +9,7 @@ from enum import Enum
 from typing import Any, Optional
 
 from domain.base.ports import LoggingPort
-from domain.template.aggregate import Template
+from domain.template.template_aggregate import Template
 from infrastructure.registry.provider_registry import ProviderRegistry
 from providers.base.strategy.provider_strategy import (
     ProviderCapabilities,

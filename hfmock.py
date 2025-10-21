@@ -151,7 +151,7 @@ class HostFactoryMock:
                 "/opt/ibm/spectrumcomputing/hostfactory/1.2/providerplugins/aws/scripts/"
             )
         elif TARGET == "AWS_PLUGIN":
-            os.environ["AWS_PROVIDER_LOG_DIR"] = "./logs"
+            # os.environ["AWS_PROVIDER_LOG_DIR"] = "./logs"
             os.environ["LOG_DESTINATION"] = "file"
 
             hf_scripts_location = Path("./scripts/")
@@ -330,7 +330,7 @@ class HostFactoryMock:
 
     def request_return_machines(self, machine_names: list[str]) -> dict[str, Any]:
         """Request machines to be returned."""
-        mn_list = [{"name": machine_name} for machine_name in machine_names]
+        mn_list = [{"machineId": machine_name} for machine_name in machine_names]
         request = {"machines": mn_list}
         log.debug(f"input_request: {json.dumps(request, indent=4)}")
 

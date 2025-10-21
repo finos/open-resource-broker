@@ -40,6 +40,53 @@ class HostFactoryTransformations:
             return {}
 
     @staticmethod
+    def transform_user_data(value: Any) -> str | None:
+        """
+        Transform HostFactory user_data field by reading file content if it's a file path.
+
+        If the value is a file path (starts with / or contains .sh/.ps1/.bat),
+        read the file content. Otherwise, return the value as-is.
+        """
+        if not isinstance(value, str) or not value.strip():
+            return value
+
+        # Check if it looks like a file path
+        if (
+            value.startswith("/")
+            or value.endswith(".sh")
+            or value.endswith(".ps1")
+            or value.endswith(".bat")
+            or "/" in value
+        ):
+            try:
+                import os
+
+                # Convert to absolute path if relative
+                if not os.path.isabs(value):
+                    # Assume relative to current working directory
+                    value = os.path.abspath(value)
+
+                if os.path.isfile(value):
+                    with open(value, encoding="utf-8") as f:
+                        content = f.read()
+                    logger = get_logger(__name__)
+                    logger.info(
+                        "Read user data script from file: %s (%d bytes)", value, len(content)
+                    )
+                    return content
+                else:
+                    logger = get_logger(__name__)
+                    logger.warning("User data file not found: %s", value)
+                    return value  # Return original value if file doesn't exist
+            except Exception as e:
+                logger = get_logger(__name__)
+                logger.error("Failed to read user data file %s: %s", value, e)
+                return value  # Return original value on error
+
+        # Return as-is if it doesn't look like a file path
+        return value
+
+    @staticmethod
     def ensure_instance_type_consistency(mapped_data: dict[str, Any]) -> dict[str, Any]:
         """
         Ensure instance_type and instance_types fields are consistent for HostFactory.
@@ -84,6 +131,36 @@ class HostFactoryTransformations:
                 "HostFactory: Transformed tags: %s -> %s",
                 original_value,
                 mapped_data["tags"],
+            )
+
+        # Transform user_data (read file content if it's a file path)
+        if "user_data" in mapped_data:
+            original_value = mapped_data["user_data"]
+            mapped_data["user_data"] = HostFactoryTransformations.transform_user_data(
+                original_value
+            )
+            if mapped_data["user_data"] != original_value:
+                logger.debug(
+                    "HostFactory: Transformed user_data from file path: %s -> %d bytes of content",
+                    original_value,
+                    len(mapped_data["user_data"]) if mapped_data["user_data"] else 0,
+                )
+
+        # Transform volume-related camelCase fields to snake_case
+        if "rootDeviceVolumeSize" in mapped_data:
+            mapped_data["root_device_volume_size"] = mapped_data["rootDeviceVolumeSize"]
+            logger.debug(
+                "HostFactory: Transformed rootDeviceVolumeSize: %s -> root_device_volume_size: %s",
+                mapped_data["rootDeviceVolumeSize"],
+                mapped_data["root_device_volume_size"],
+            )
+
+        if "volumeType" in mapped_data:
+            mapped_data["volume_type"] = mapped_data["volumeType"]
+            logger.debug(
+                "HostFactory: Transformed volumeType: %s -> volume_type: %s",
+                mapped_data["volumeType"],
+                mapped_data["volume_type"],
             )
 
         # Ensure instance type consistency

@@ -34,6 +34,7 @@ def main():
     parser.add_argument("--unit", action="store_true", help="Run unit tests only")
     parser.add_argument("--integration", action="store_true", help="Run integration tests only")
     parser.add_argument("--e2e", action="store_true", help="Run end-to-end tests only")
+    parser.add_argument("--onaws", action="store_true", help="Run AWS integration tests only")
     parser.add_argument("--coverage", action="store_true", help="Run tests with coverage")
     parser.add_argument(
         "--html-coverage", action="store_true", help="Generate HTML coverage report"
@@ -104,8 +105,8 @@ def main():
     # Add maxfail
     pytest_cmd.extend(["--maxfail", str(args.maxfail)])
 
-    # Add coverage options
-    if args.coverage or args.html_coverage or args.ci:
+    # Disable coverage for onaws tests to avoid import issues
+    if not args.onaws and (args.coverage or args.html_coverage or args.ci):
         pytest_cmd.extend(
             [
                 "--cov=src",
@@ -122,6 +123,9 @@ def main():
             pytest_cmd.extend([f"--cov-report=xml:{args.cov_xml}"])
         elif args.ci:
             pytest_cmd.extend(["--cov-report=xml:coverage.xml"])
+    elif args.onaws:
+        # Explicitly disable coverage for onaws tests
+        pytest_cmd.append("--no-cov")
 
     # Add JUnit XML output for CI
     if args.junit_xml:
@@ -129,9 +133,8 @@ def main():
     elif args.ci:
         pytest_cmd.extend(["--junitxml=junit.xml"])
 
-    # Use centralized tool runner
-    run_tool_script = "./dev-tools/scripts/run_tool.sh"
-    final_cmd = [run_tool_script, *pytest_cmd]
+    # Use UV directly instead of the complex run_tool.sh script
+    final_cmd = ["uv", "run"] + pytest_cmd
     test_paths = []
     markers = []
 
@@ -148,6 +151,10 @@ def main():
     if args.e2e:
         test_paths.append("tests/e2e")
         markers.append("e2e")
+
+    if args.onaws:
+        test_paths.append("tests/onaws")
+        markers.append("aws")
 
     if args.fast:
         markers.append("not slow")
@@ -183,13 +190,13 @@ def main():
     if args.keyword:
         pytest_cmd.extend(["-k", args.keyword])
 
+    # Enable manual AWS flows when requested
+    if args.onaws and "--run-manual-aws" not in pytest_cmd:
+        pytest_cmd.append("--run-manual-aws")
+
     # Add extra pytest arguments from command line
     if extra_pytest_args:
         pytest_cmd.extend(extra_pytest_args)
-
-    # Use centralized tool runner
-    run_tool_script = "./dev-tools/scripts/run_tool.sh"
-    final_cmd = [run_tool_script, *pytest_cmd]
 
     # Run the tests
     success = run_command(final_cmd, "Running Tests")

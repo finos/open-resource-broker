@@ -7,16 +7,11 @@ import pytest
 
 # Import CQRS components that actually exist
 try:
-    from application.commands.request_handlers import CreateRequestHandler
-    from application.dto.commands import (
-        CreateRequestCommand,
-        UpdateRequestStatusCommand,
+    from application.commands.request_handlers import (
+        CreateMachineRequestHandler as CreateRequestHandler,
     )
-    from application.dto.queries import (
-        GetRequestStatusQuery,
-    )
-
-    # Handlers would be imported here when tests are implemented
+    from application.dto.commands import CreateRequestCommand, UpdateRequestStatusCommand
+    from application.dto.queries import GetRequestStatusQuery
     from infrastructure.di.buses import CommandBus, QueryBus
 
     IMPORTS_AVAILABLE = True

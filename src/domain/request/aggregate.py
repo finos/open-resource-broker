@@ -364,52 +364,46 @@ class Request(AggregateRoot):
     @classmethod
     def create_return_request(
         cls,
-        machine_refs: list[dict[str, Any]],
+        instance_ids: list[str],
+        provider_type: str,
         metadata: Optional[dict[str, Any]] = None,
     ) -> "Request":
         """
         Create a return/terminate request.
 
         Args:
-            machine_refs: List of machine references to return
+            instance_ids: List of machine IDs
             metadata: Optional metadata
 
         Returns:
             New return Request instance with creation event
         """
-        request_id = f"ret-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}-{len(machine_refs):04d}"
-
-        # Extract instance IDs from machine references
-        instance_ids = []
-        for ref in machine_refs:
-            if isinstance(ref, dict) and "instance_id" in ref:
-                instance_ids.append(InstanceId(value=ref["instance_id"]))
-            elif hasattr(ref, "instance_id"):
-                instance_ids.append(InstanceId(value=str(ref.instance_id)))
+        request_id = RequestId.generate(RequestType.RETURN)
 
         # Create return request
         request = cls(
             request_id=request_id,
-            request_type=RequestType.TERMINATE,
+            request_type=RequestType.RETURN,
             template_id="return-request",
-            requested_count=len(machine_refs),
-            provider_type=(
-                machine_refs[0].get("provider_type", "unknown") if machine_refs else "unknown"
-            ),  # Extract from machine refs
+            requested_count=len(instance_ids),
+            provider_type=provider_type,
             status=RequestStatus.PENDING,
-            instance_ids=instance_ids,
+            instance_ids=[InstanceId(value=id_str) for id_str in instance_ids],
             metadata=metadata or {},
             created_at=datetime.utcnow(),
             version=0,
         )
 
         # Add domain event
-        creation_event = RequestCreatedEvent.create(
-            request_id=request_id,
-            request_type=RequestType.TERMINATE.value,
+        creation_event = RequestCreatedEvent(
+            aggregate_id=str(request_id.value),  # Use .value for string representation
+            aggregate_type="Request",
+            request_id=str(request_id.value),  # Use .value for string representation
+            request_type=RequestType.RETURN.value,
             template_id="return-request",
-            machine_count=len(machine_refs),
-            metadata=metadata or {},
+            machine_count=len(instance_ids),
+            timeout=metadata.get("timeout") if metadata else None,
+            tags=metadata.get("tags", {}) if metadata else {},
         )
         request.add_domain_event(creation_event)
 

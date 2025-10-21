@@ -131,6 +131,9 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
 
     def __init__(self, storage_port: StoragePort) -> None:
         """Initialize repository with storage port."""
+        if hasattr(storage_port, "entity_type"):
+            storage_port.entity_type = "machines"
+
         self.storage_port = storage_port
         self.serializer = MachineSerializer()
         self.logger = get_logger(__name__)
@@ -159,10 +162,16 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
             raise
 
     @handle_infrastructure_exceptions(context="machine_repository_get_by_id")
-    def get_by_id(self, machine_id: MachineId) -> Optional[Machine]:
+    def get_by_id(self, machine_id: MachineId | str) -> Optional[Machine]:
         """Get machine by ID using storage strategy."""
         try:
-            data = self.storage_port.find_by_id(str(machine_id.value))
+            # Handle both MachineId objects and strings
+            if isinstance(machine_id, MachineId):
+                id_str = str(machine_id.value)
+            else:
+                id_str = str(machine_id)
+
+            data = self.storage_port.find_by_id(id_str)
             if data:
                 return self.serializer.from_dict(data)
             return None

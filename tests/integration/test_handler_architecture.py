@@ -167,8 +167,9 @@ def test_method_signatures():
     """Test that all handlers have consistent method signatures."""
     try:
         # Import all handlers
-        from domain.request.aggregate import Request
         from providers.aws.domain.template.aggregate import AWSTemplate
+
+        from domain.request.aggregate import Request
         from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
         from providers.aws.infrastructure.handlers.ec2_fleet_handler import (
             EC2FleetHandler,

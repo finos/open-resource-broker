@@ -26,7 +26,7 @@ class TestCommandHandlersComprehensive:
 
         for handler_file in handler_files:
             try:
-                module = importlib.import_module(f"src.application.commands.{handler_file}")
+                module = importlib.import_module(f"application.commands.{handler_file}")
                 handler_modules.append((handler_file, module))
             except ImportError:
                 continue
@@ -165,7 +165,7 @@ class TestQueryHandlersComprehensive:
 
         for handler_file in handler_files:
             try:
-                module = importlib.import_module(f"src.application.queries.{handler_file}")
+                module = importlib.import_module(f"application.queries.{handler_file}")
                 handler_modules.append((handler_file, module))
             except ImportError:
                 continue
@@ -259,7 +259,7 @@ class TestApplicationDTOsComprehensive:
 
         for dto_file in dto_files:
             try:
-                module = importlib.import_module(f"src.application.dto.{dto_file}")
+                module = importlib.import_module(f"application.dto.{dto_file}")
                 dto_modules.append((dto_file, module))
             except ImportError:
                 continue
@@ -432,7 +432,7 @@ class TestApplicationEventsComprehensive:
 
         # Check base events
         try:
-            module = importlib.import_module("src.application.events.base.event_handler")
+            module = importlib.import_module("application.events.base.event_handler")
             event_modules.append(("base.event_handler", module))
         except ImportError:
             pass
@@ -448,7 +448,7 @@ class TestApplicationEventsComprehensive:
 
         for handler_file in handler_files:
             try:
-                module = importlib.import_module(f"src.application.events.handlers.{handler_file}")
+                module = importlib.import_module(f"application.events.handlers.{handler_file}")
                 event_modules.append((f"handlers.{handler_file}", module))
             except ImportError:
                 continue

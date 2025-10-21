@@ -1,0 +1,59 @@
+{
+  "templates": [
+    {
+      "templateId": "EC2FleetInstant",
+      "providerApi": "EC2Fleet",
+      "fleetType": "{{fleetType}}",
+      "maxNumber": 2,
+      "attributes": {
+        "type": ["String", "X86_64"],
+        "ncores": ["Numeric", "2"],
+        "ncpus": ["Numeric", "1"],
+        "nram": ["Numeric", "4096"]
+      },
+      "imageId": "{{imageId}}",
+      "subnetId": "{{subnetId}}",
+      "vmType": "t2.micro",
+      "rootDeviceVolumeSize": 100,
+      "volumeType" : "gp2",
+      "securityGroupIds": "{{securityGroupIds}}",
+      "instanceProfile": "{{instanceProfile}}",
+      "fleetRole": "{{fleetRole}}",
+      "userDataScript": "{{userDataScript}}"
+    },
+    {
+      "templateId": "EC2FleetMaintain",
+      "providerApi": "EC2Fleet",
+      "fleetType": "{{fleetType}}",
+      "maxNumber": 2,
+      "attributes": {
+        "type": ["String", "X86_64"],
+        "ncores": ["Numeric", "2"],
+        "ncpus": ["Numeric", "1"],
+        "nram": ["Numeric", "4096"]
+      },
+      "imageId": "{{imageId}}",
+      "subnetId": "{{subnetId}}",
+      "vmType": "t2.micro",
+      "keyName": "HF_SSH_KEY",
+      "securityGroupIds": "{{securityGroupIds}}"
+    },
+    {
+      "templateId": "EC2FleetRequest",
+      "providerApi": "EC2Fleet",
+      "fleetType": "{{fleetType}}",
+      "maxNumber": 2,
+      "attributes": {
+        "type": ["String", "X86_64"],
+        "ncores": ["Numeric", "2"],
+        "ncpus": ["Numeric", "1"],
+        "nram": ["Numeric", "4096"]
+      },
+      "imageId": "{{imageId}}",
+      "subnetId": "{{subnetId}}",
+      "vmType": "t2.micro",
+      "keyName": "HF_SSH_KEY",
+      "securityGroupIds": "{{securityGroupIds}}"
+    }
+  ]
+}

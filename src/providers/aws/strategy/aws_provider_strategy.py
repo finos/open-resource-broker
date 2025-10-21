@@ -13,6 +13,7 @@ from domain.base.ports import LoggingPort
 
 # Import AWS-specific components
 from providers.aws.configuration.config import AWSProviderConfig
+from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from providers.aws.infrastructure.aws_client import AWSClient
 from providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHandler
 from providers.aws.infrastructure.handlers.run_instances_handler import (
@@ -133,6 +134,8 @@ class AWSProviderStrategy(ProviderStrategy):
 
             aws_ops = AWSOperations(self.aws_client, self._logger)
 
+            machine_adapter = AWSMachineAdapter(self.aws_client, self._logger)
+
             # Initialize handlers with launch template manager
             self._handlers = {
                 "SpotFleet": SpotFleetHandler(
@@ -140,18 +143,21 @@ class AWSProviderStrategy(ProviderStrategy):
                     logger=self._logger,
                     aws_ops=aws_ops,
                     launch_template_manager=self.launch_template_manager,
+                    machine_adapter=machine_adapter,
                 ),
                 "EC2Fleet": EC2FleetHandler(
                     aws_client=self.aws_client,
                     logger=self._logger,
                     aws_ops=aws_ops,
                     launch_template_manager=self.launch_template_manager,
+                    machine_adapter=machine_adapter,
                 ),
                 "RunInstances": RunInstancesHandler(
                     aws_client=self.aws_client,
                     logger=self._logger,
                     aws_ops=aws_ops,
                     launch_template_manager=self.launch_template_manager,
+                    machine_adapter=machine_adapter,
                 ),
             }
         return self._handlers
@@ -191,6 +197,8 @@ class AWSProviderStrategy(ProviderStrategy):
         Returns:
             Result of the operation execution
         """
+
+        self._logger.debug(" aws_provider_strategy execute_operation")
         if not self._initialized:
             return ProviderResult.error_result(
                 "AWS provider strategy not initialized", "NOT_INITIALIZED"
@@ -305,12 +313,37 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             # Convert template_config to AWSTemplate domain object
-            from providers.aws.domain.template.aggregate import AWSTemplate
+            from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+
+            # Extract metadata for additional fields
+            metadata = template_config.get("metadata", {})
+
+            # Create enhanced template config with metadata fields
+            enhanced_config = template_config.copy()
+
+            # Extract volume parameters from metadata if not in main config
+            if not enhanced_config.get("root_device_volume_size") and metadata.get(
+                "root_device_volume_size"
+            ):
+                enhanced_config["root_device_volume_size"] = metadata.get("root_device_volume_size")
+            if not enhanced_config.get("volume_type") and metadata.get("volume_type"):
+                enhanced_config["volume_type"] = metadata.get("volume_type")
+            if not enhanced_config.get("iops") and metadata.get("iops"):
+                enhanced_config["iops"] = metadata.get("iops")
+
+            # Extract other AWS-specific fields from metadata
+            for field in ["fleet_role", "fleet_type", "instance_profile", "key_name", "user_data"]:
+                if not enhanced_config.get(field) and metadata.get(field):
+                    enhanced_config[field] = metadata.get(field)
 
             try:
-                aws_template = AWSTemplate.model_validate(template_config)
+                self._logger.debug(
+                    f"Creating AWSTemplate object from enhanced template: {enhanced_config}"
+                )
+                aws_template = AWSTemplate.model_validate(enhanced_config)
+
             except Exception as e:
-                self._logger.error("Failed to create AWSTemplate from config: %s", e)
+                self._logger.error("Failed to create AWSTemplate from enhanced config: %s", e)
                 # Fallback: create minimal AWSTemplate with required fields
                 aws_template = AWSTemplate(
                     template_id=template_config.get("template_id", "unknown"),
@@ -318,6 +351,12 @@ class AWSProviderStrategy(ProviderStrategy):
                     instance_type=template_config.get("instance_type", "t2.micro"),
                     subnet_ids=template_config.get("subnet_ids", []),
                     security_group_ids=template_config.get("security_group_ids", []),
+                    instance_profile=template_config.get("instance_profile")
+                    or metadata.get("instance_profile"),
+                    key_name=template_config.get("key_name") or metadata.get("key_name"),
+                    user_data=template_config.get("user_data") or metadata.get("user_data"),
+                    fleet_role=template_config.get("fleet_role") or metadata.get("fleet_role"),
+                    fleet_type=template_config.get("fleet_type") or metadata.get("fleet_type"),
                 )
 
             # Create a minimal request object for handler using domain factory
@@ -381,8 +420,10 @@ class AWSProviderStrategy(ProviderStrategy):
 
     def _handle_terminate_instances(self, operation: ProviderOperation) -> ProviderResult:
         """Handle instance termination operation."""
+        self._logger.debug(" _handle_terminate_instances")
         try:
             instance_ids = operation.parameters.get("instance_ids", [])
+            self._logger.debug(f"Terminating instances: {instance_ids}")
 
             if not instance_ids:
                 return ProviderResult.error_result(
@@ -436,6 +477,9 @@ class AWSProviderStrategy(ProviderStrategy):
 
             try:
                 response = aws_client.ec2_client.describe_instances(InstanceIds=instance_ids)
+                self._logger.debug(
+                    f"aws_client.ec2_client.describe_instances(InstanceIds=instance_ids) responce: {response}"
+                )
 
                 # Convert AWS instances to domain Machine entities
                 machines = []
@@ -560,23 +604,33 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             # Format instance details for consistent output
+            # KBG TODO: review code below.
             formatted_instances = []
             for instance_data in instance_details:
+                self._logger.debug("instance_data: %s", instance_data)
+
+                # Handle both snake_case (from machine adapter) and PascalCase (legacy) formats
                 formatted_instance = {
-                    "InstanceId": instance_data.get("InstanceId"),
-                    "State": instance_data.get("State", "unknown"),
-                    "PrivateIpAddress": instance_data.get("PrivateIpAddress"),
-                    "PublicIpAddress": instance_data.get("PublicIpAddress"),
-                    "LaunchTime": instance_data.get("LaunchTime"),
-                    "InstanceType": instance_data.get("InstanceType"),
-                    "SubnetId": instance_data.get("SubnetId"),
-                    "VpcId": instance_data.get("VpcId"),
+                    "InstanceId": instance_data.get("instance_id")
+                    or instance_data.get("InstanceId"),
+                    "State": instance_data.get("status") or instance_data.get("State", "unknown"),
+                    "PrivateIpAddress": instance_data.get("private_ip")
+                    or instance_data.get("PrivateIpAddress"),
+                    "PublicIpAddress": instance_data.get("public_ip")
+                    or instance_data.get("PublicIpAddress"),
+                    "LaunchTime": instance_data.get("launch_time")
+                    or instance_data.get("LaunchTime"),
+                    "InstanceType": instance_data.get("instance_type")
+                    or instance_data.get("InstanceType"),
+                    "SubnetId": instance_data.get("subnet_id") or instance_data.get("SubnetId"),
+                    "VpcId": instance_data.get("vpc_id") or instance_data.get("VpcId"),
                 }
                 formatted_instances.append(formatted_instance)
 
+            self._logger.debug("formatted_instances: %s", formatted_instances)
             return ProviderResult.success_result(
-                {"instances": formatted_instances},
-                {
+                data={"instances": formatted_instances},
+                metadata={
                     "operation": "describe_resource_instances",
                     "resource_ids": resource_ids,
                     "provider_api": provider_api,
@@ -874,7 +928,7 @@ class AWSProviderStrategy(ProviderStrategy):
             self._initialized = False
 
         except Exception as e:
-            self._logger.warning("Error during AWS provider cleanup: %s", e)
+            self._logger.warning("Failed during AWS provider cleanup: %s", e)
 
     def __str__(self) -> str:
         """Return string representation for debugging."""

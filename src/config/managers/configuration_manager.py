@@ -314,20 +314,39 @@ class ConfigurationManager:
         return fallback_path
 
     def _get_scheduler_directory(self, file_type: str) -> Optional[str]:
-        """Get directory path from scheduler strategy for the given file type."""
-        try:
-            # Get the actual scheduler strategy instance and delegate to it
-            from domain.base.ports.scheduler_port import SchedulerPort
-            from infrastructure.di.container import Container
+        """Get directory path from scheduler strategy for the given file type.
 
-            container = Container()
-            scheduler_strategy = container.get(SchedulerPort)
+        Reads directly from environment variables to avoid circular import issues
+        during configuration bootstrap.
+        """
+        import os
 
-            if scheduler_strategy:
-                return scheduler_strategy.get_directory(file_type)
-        except Exception:
-            pass
-        return None
+        logger.debug("[CONFIG_MGR] Getting scheduler directory for file_type=%s", file_type)
+
+        # Read directly from environment variables (HostFactory convention)
+        if file_type in ["conf", "template", "legacy"]:
+            confdir = os.environ.get("HF_PROVIDER_CONFDIR")
+            workdir = os.environ.get("HF_PROVIDER_WORKDIR", os.getcwd())
+            result = confdir if confdir else os.path.join(workdir, "config")
+        elif file_type == "log":
+            logdir = os.environ.get("HF_PROVIDER_LOGDIR")
+            workdir = os.environ.get("HF_PROVIDER_WORKDIR", os.getcwd())
+            result = logdir if logdir else os.path.join(workdir, "logs")
+        elif file_type in ["work", "data"]:
+            result = os.environ.get("HF_PROVIDER_WORKDIR", os.getcwd())
+        else:
+            result = os.environ.get("HF_PROVIDER_WORKDIR", os.getcwd())
+
+        logger.debug(
+            "[CONFIG_MGR] Resolved directory for file_type=%s: %s (HF_PROVIDER_LOGDIR=%s, HF_PROVIDER_WORKDIR=%s, HF_PROVIDER_CONFDIR=%s)",
+            file_type,
+            result,
+            os.environ.get("HF_PROVIDER_LOGDIR", "NOT_SET"),
+            os.environ.get("HF_PROVIDER_WORKDIR", "NOT_SET"),
+            os.environ.get("HF_PROVIDER_CONFDIR", "NOT_SET"),
+        )
+
+        return result
 
     def get_cache_stats(self) -> dict[str, Any]:
         """Get cache statistics."""

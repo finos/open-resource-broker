@@ -163,7 +163,29 @@ def setup_logging(config: LoggingConfig) -> None:
 
     # Create formatters
     json_formatter = JsonFormatter()
-    colored_formatter = ColoredFormatter(
+
+    # Create a custom formatter that highlights filenames
+    class FileHighlightFormatter(ColoredFormatter):
+        def format(self, record):
+            # First apply the parent formatting (colors for log levels and path shortening)
+            formatted = super().format(record)
+
+            # Extract just the filename from the pathname
+            import os
+
+            filename = os.path.basename(record.pathname)
+
+            # Replace the full pathname with bold blue filename in the formatted string
+            # Pattern: [pathname:lineno (funcName)] -> [path/to/FILENAME:lineno (funcName)]
+            path_without_filename = record.pathname.replace(filename, "")
+            highlighted_path = f"{path_without_filename}\033[1;34m{filename}\033[0m"
+
+            # Replace the pathname in the formatted string
+            formatted = formatted.replace(f"[{record.pathname}:", f"[{highlighted_path}:")
+
+            return formatted
+
+    colored_formatter = FileHighlightFormatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s [%(pathname)s:%(lineno)d (%(funcName)s)]"
     )
 

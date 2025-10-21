@@ -7,7 +7,7 @@ import pytest
 
 from domain.machine.aggregate import Machine
 from domain.request.aggregate import Request
-from domain.template.aggregate import Template
+from domain.template.template_aggregate import Template
 from infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
 
 

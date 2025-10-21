@@ -80,8 +80,8 @@ class RequestStatus(str, Enum):
     """
 
     PENDING = "pending"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
+    IN_PROGRESS = "in_progress"  # KBG TODO in_progress in legacy HF this called "running" but it doesn't trigger an error.
+    COMPLETED = "complete"  # KBG TODO
     FAILED = "failed"
     CANCELLED = "cancelled"
     PARTIAL = "partial"

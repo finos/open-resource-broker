@@ -128,7 +128,9 @@ def create_instance(
             params["SubnetId"] = subnet_id
 
         if user_data:
-            params["UserData"] = user_data
+            import base64
+
+            params["UserData"] = base64.b64encode(user_data.encode("utf-8")).decode("ascii")
 
         # Create instance with retry built-in
         response = _run_instance(ec2_client, params)

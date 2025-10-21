@@ -19,16 +19,13 @@ from application.services.provider_selection_service import ProviderSelectionSer
 from domain.base import UnitOfWorkFactory
 from domain.base.exceptions import EntityNotFoundError
 from domain.base.ports import (
-    ConfigurationPort,
     ContainerPort,
     ErrorHandlingPort,
     EventPublisherPort,
     LoggingPort,
     ProviderPort,
 )
-from domain.machine.repository import MachineRepository
 from domain.request.repository import RequestRepository
-from domain.template.repository import TemplateRepository
 from infrastructure.di.buses import QueryBus
 
 
@@ -92,6 +89,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
 
             template_query = GetTemplateQuery(template_id=command.template_id)
             template = await self._query_bus.execute(template_query)
+            self.logger.debug("Template found: %s %s", type(template), template.to_dict())
 
             if not template:
                 raise EntityNotFoundError("Template", command.template_id)
@@ -329,7 +327,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                 launch_time = datetime.fromisoformat(launch_time.replace("Z", "+00:00"))
             except ValueError:
                 launch_time = None
-
+        self.logger.debug("_create_machine_aggregate instance_data: [%s]", instance_data)
         return Machine(
             instance_id=InstanceId(value=instance_data["instance_id"]),
             request_id=str(request.request_id),
@@ -440,9 +438,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
 
     def __init__(
         self,
-        request_repository: RequestRepository,
-        machine_repository: MachineRepository,
-        template_repository: TemplateRepository,  # Add template repository
+        uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
         container: ContainerPort,
         event_publisher: EventPublisherPort,
@@ -450,9 +446,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         provider_port: ProviderPort,
     ) -> None:
         super().__init__(logger, event_publisher, error_handler)
-        self._request_repository = request_repository
-        self._machine_repository = machine_repository
-        self._template_repository = template_repository
+        self.uow_factory = uow_factory
         self._container = container
         self._provider_context = provider_port
 
@@ -470,52 +464,45 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             # Create return request aggregate
             # Get provider type from configuration using injected container
             from domain.request.aggregate import Request
-            from domain.request.value_objects import RequestType
 
-            config_manager = self._container.get(ConfigurationPort)
+            # config_manager = self._container.get(ConfigurationPort)
             # provider_type = config_manager.get_provider_config("provider.type", "aws")
             # provider_config = config_manager.get_provider_config()
-            # print(f"KBG provider_config: {provider_config}")
             provider_type = "aws"  # KBG TODO
             # Create return request with business logic
             # Use first machine's template if available, otherwise use generic return
             # template
-            template_id = "return-machines"  # Business template for return operations
-            print(f"KBG [{command.machine_ids}]")
-            if command.machine_ids:
-                self.logger.debug(f"KBG machine_ids provided: {command.machine_ids}")
-                # Try to get template from first machine
-                try:
-                    self.logger.debug(f"KBG looking up machine with ID: {command.machine_ids[0]}")
-                    machine = self._machine_repository.find_by_id(command.machine_ids[0])
-                    self.logger.debug(f"KBG found machine: {machine}")
-                    if machine and machine.template_id:
-                        template_id = f"return-{machine.template_id}"
-                        self.logger.debug(f"KBG using template_id from machine: {template_id}")
-                except Exception as e:
-                    # Fallback to generic return template
-                    self.logger.warning(
-                        "Failed to determine return template ID from machine: %s",
-                        e,
-                        extra={
-                            "machine_ids": command.machine_ids,
-                            "request_id": command.request_id,
-                        },
-                    )
+            # template_id = "return-machines"  # Business template for return operations
+            # if command.machine_ids:
+            #     # Try to get template from first machine
+            #     try:
+            #         with self.uow_factory.create_unit_of_work() as uow:
+            #             machine = self.machines.find_by_id(command.machine_ids[0])
 
-            request = Request.create_new_request(
-                request_type=RequestType.RETURN,
-                template_id=template_id,
-                machine_count=len(command.machine_ids),
+            #     except Exception as e:
+            #         # Fallback to generic return template
+            #         self.logger.warning(
+            #             "Failed to determine return template ID from machine: %s",
+            #             e,
+            #             extra={"machine_ids": command.machine_ids},
+            #         )
+
+            request = Request.create_return_request(
+                instance_ids=command.machine_ids,
                 provider_type=provider_type,
                 metadata=command.metadata or {},
             )
 
-            # Save request and get extracted events
-            events = self._request_repository.save(request)
-            # Publish events
-            for event in events:
-                self.event_publisher.publish(event)
+            # Add machine IDs to the request
+            # from domain.base.value_objects import InstanceId
+            # for machine_id in command.machine_ids:
+            #     request = request.add_instance_id(InstanceId(value=machine_id))
+            # KBG TODO
+
+            with self.uow_factory.create_unit_of_work() as uow:
+                events = uow.requests.save(request)
+                for event in events:
+                    self.event_publisher.publish(event)
 
             self.logger.info("Return request created: %s", request.request_id)
 
@@ -523,6 +510,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                 provisioning_result = await self._execute_deprovisioning(
                     command.machine_ids, request
                 )
+                self.logger.info(f"Provisioning results: {provisioning_result}")
 
             except:
                 # Handle provisioning errors
@@ -543,7 +531,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             # Import required types (using existing imports)
             from providers.base.strategy import ProviderOperation, ProviderOperationType
 
-            self.logger.debug(f"KBG De-Provisioning request {request} \n {self._provider_context}")
+            self.logger.debug(f"De-Provisioning request {request} \n {self._provider_context}")
             # Create provider operation using existing pattern
             operation = ProviderOperation(
                 operation_type=ProviderOperationType.TERMINATE_INSTANCES,
@@ -558,6 +546,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             )
 
             result = await self._provider_context.terminate_resources(machine_ids, operation)
+            self.logger.info(f"De-Provisioning results: {result}")
 
             pass
         except Exception as e:
@@ -576,12 +565,14 @@ class UpdateRequestStatusHandler(BaseCommandHandler[UpdateRequestStatusCommand, 
 
     def __init__(
         self,
+        uow_factory: UnitOfWorkFactory,
         request_repository: RequestRepository,
         logger: LoggingPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
     ) -> None:
         super().__init__(logger, event_publisher, error_handler)
+        self.uow_factory = uow_factory
         self._request_repository = request_repository
 
     async def validate_command(self, command: UpdateRequestStatusCommand) -> None:
@@ -597,10 +588,11 @@ class UpdateRequestStatusHandler(BaseCommandHandler[UpdateRequestStatusCommand, 
         self.logger.info("Updating request status: %s -> %s", command.request_id, command.status)
 
         try:
-            # Get request
-            request = self._request_repository.get_by_id(command.request_id)
-            if not request:
-                raise EntityNotFoundError("Request", command.request_id)
+            # Find request in the storage
+            with self.uow_factory.create_unit_of_work() as uow:
+                request = uow.requests.find_by_id(command.request_id)
+                if not request:
+                    raise EntityNotFoundError("Request", command.request_id)
 
             # Update status
             request.update_status(
@@ -610,10 +602,11 @@ class UpdateRequestStatusHandler(BaseCommandHandler[UpdateRequestStatusCommand, 
             )
 
             # Save changes and get extracted events
-            events = self._request_repository.save(request)
-            # Publish events
-            for event in events:
-                self.event_publisher.publish(event)
+            with self.uow_factory.create_unit_of_work() as uow:
+                events = self.requests.save(request)
+                # Publish events
+                for event in events:
+                    self.event_publisher.publish(event)
 
             self.logger.info("Request status updated: %s -> %s", command.request_id, command.status)
 

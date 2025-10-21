@@ -28,7 +28,7 @@ Note:
 
 import json
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from domain.base.dependency_injection import injectable
 from domain.base.ports import LoggingPort
@@ -36,7 +36,7 @@ from domain.request.aggregate import Request
 from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from infrastructure.error.decorators import handle_infrastructure_exceptions
 from infrastructure.utilities.common.resource_naming import get_resource_prefix
-from providers.aws.domain.template.aggregate import AWSTemplate
+from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.domain.template.value_objects import AWSFleetType
 from providers.aws.exceptions.aws_exceptions import (
     AWSInfrastructureError,
@@ -50,6 +50,9 @@ from providers.aws.infrastructure.launch_template.manager import (
 )
 from providers.aws.utilities.aws_operations import AWSOperations
 
+if TYPE_CHECKING:
+    from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
+
 
 @injectable
 class SpotFleetHandler(AWSHandler, BaseContextMixin):
@@ -62,6 +65,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin):
         aws_ops: AWSOperations,
         launch_template_manager: AWSLaunchTemplateManager,
         request_adapter: RequestAdapterPort = None,
+        machine_adapter: Optional["AWSMachineAdapter"] = None,
     ) -> None:
         """
         Initialize the Spot Fleet handler.
@@ -74,7 +78,14 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin):
             request_adapter: Optional request adapter for terminating instances
         """
         # Use base class initialization - eliminates duplication
-        super().__init__(aws_client, logger, aws_ops, launch_template_manager, request_adapter)
+        super().__init__(
+            aws_client,
+            logger,
+            aws_ops,
+            launch_template_manager,
+            request_adapter,
+            machine_adapter,
+        )
 
         # Get AWS native spec service from container
         from infrastructure.di.container import get_container
@@ -90,6 +101,11 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin):
             from domain.base.ports.configuration_port import ConfigurationPort
 
             self.config_port = container.get(ConfigurationPort)
+
+            if self._machine_adapter is None:
+                from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
+
+                self._machine_adapter = container.get(AWSMachineAdapter)
         except Exception:
             # Service not available, native specs disabled
             self.aws_native_spec_service = None
@@ -746,7 +762,9 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin):
                 try:
                     fleet_instances = self._get_spot_fleet_instances(fleet_id)
                     if fleet_instances:
-                        formatted_instances = self._format_instance_data(fleet_instances, fleet_id)
+                        formatted_instances = self._format_instance_data(
+                            fleet_instances, fleet_id, request
+                        )
                         all_instances.extend(formatted_instances)
                 except Exception as e:
                     self._logger.error("Failed to get instances for spot fleet %s: %s", fleet_id, e)
@@ -758,7 +776,9 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin):
             self._logger.error("Unexpected error checking Spot Fleet status: %s", str(e))
             raise AWSInfrastructureError(f"Failed to check Spot Fleet status: {e!s}")
 
-    def _get_spot_fleet_instances(self, fleet_id: str) -> list[dict[str, Any]]:
+    def _get_spot_fleet_instances(
+        self, fleet_id: str, request_id: str = None
+    ) -> list[dict[str, Any]]:
         """Get instances for a specific spot fleet."""
         # Get fleet information
         fleet_list = self._retry_with_backoff(
@@ -786,7 +806,40 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin):
             return []
 
         instance_ids = [instance["InstanceId"] for instance in active_instances]
-        return self._get_instance_details(instance_ids)
+        return self._get_instance_details(
+            instance_ids, request_id=request_id, resource_id=fleet_id, provider_api="SpotFleet"
+        )
+
+    def _format_instance_data(
+        self,
+        instance_details: list[dict[str, Any]],
+        resource_id: str,
+        request: Request,
+    ) -> list[dict[str, Any]]:
+        """Format Spot Fleet instance details to standard structure."""
+        metadata = getattr(request, "metadata", {}) or {}
+        provider_api_value = metadata.get("provider_api", "SpotFleet")
+
+        if self._machine_adapter:
+            try:
+                return [
+                    self._machine_adapter.create_machine_from_aws_instance(
+                        inst,
+                        request_id=str(request.request_id),
+                        provider_api=provider_api_value,
+                        resource_id=resource_id,
+                    )
+                    for inst in instance_details
+                ]
+            except Exception as exc:
+                self._logger.error("Failed to normalize instances with machine adapter: %s", exc)
+                raise AWSInfrastructureError(
+                    "Failed to normalize instance data with AWS machine adapter"
+                ) from exc
+
+        return [
+            self._build_fallback_machine_payload(inst, resource_id) for inst in instance_details
+        ]
 
     def release_hosts(self, request: Request) -> None:
         """Release hosts across all spot fleets in the request."""

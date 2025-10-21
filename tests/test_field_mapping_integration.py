@@ -7,6 +7,7 @@ through the scheduler strategy to the AWS template creation.
 from unittest.mock import Mock
 
 import pytest
+from providers.aws.domain.template.aggregate import AWSTemplate
 
 from config.manager import ConfigurationManager
 from infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings
@@ -14,7 +15,6 @@ from infrastructure.scheduler.hostfactory.strategy import HostFactorySchedulerSt
 from infrastructure.scheduler.hostfactory.transformations import (
     HostFactoryTransformations,
 )
-from providers.aws.domain.template.aggregate import AWSTemplate
 
 
 class TestFieldMappingIntegration:

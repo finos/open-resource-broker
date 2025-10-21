@@ -36,6 +36,19 @@
     "Enabled": {{ monitoring_enabled | tojson }}
   },
   {% endif %}
+  {% if has_root_device_volume_size %}
+  "BlockDeviceMappings": [
+    {
+      "DeviceName": "/dev/xvda",
+      "Ebs": {
+        "VolumeSize": {{ root_device_volume_size }},
+        "VolumeType": "{{ volume_type }}",
+        "DeleteOnTermination": true{% if has_iops and volume_type in ["io1", "io2", "gp3"] %},
+        "Iops": {{ iops }}{% endif %}
+      }
+    }
+  ],
+  {% endif %}
   "TagSpecifications": [
     {
       "ResourceType": "instance",

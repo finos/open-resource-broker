@@ -198,7 +198,9 @@ For more information, visit: {REPO_URL}
 
     # Machines return (terminate machines)
     machines_return = machines_subparsers.add_parser("return", help="Return machines")
-    machines_return.add_argument("machine_ids", nargs="+", help="Machine IDs to return")
+    machines_return.add_argument(
+        "machine_ids", nargs="*", help="Machine IDs to return (optional if using -f/--file)"
+    )
     machines_return.add_argument(
         "--force", action="store_true", help="Force return without confirmation"
     )
@@ -786,12 +788,12 @@ async def main() -> None:
                 print(formatted_output)  # noqa: CLI output
 
         except DomainException as e:
-            logger.error("Domain error: %s", e)
+            logger.exception("Domain error: %s", e)
             if not args.quiet:
                 print(f"Error: {e}")  # noqa: CLI error
             sys.exit(1)
         except Exception as e:
-            logger.error("Unexpected error: %s", e)
+            logger.exception("Unexpected error: %s", e)
             if args.verbose:
                 import traceback
 

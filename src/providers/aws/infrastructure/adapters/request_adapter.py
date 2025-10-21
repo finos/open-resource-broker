@@ -5,6 +5,7 @@ This module provides an adapter for AWS-specific request operations.
 It extracts AWS-specific logic from the domain layer.
 """
 
+import base64
 from typing import Any
 
 from domain.base.dependency_injection import injectable
@@ -65,7 +66,9 @@ class AWSRequestAdapter(RequestAdapterPort):
                     "InstanceType": instance_type,
                     "SecurityGroupIds": security_group_ids,
                     "KeyName": key_name,
-                    "UserData": user_data,
+                    "UserData": base64.b64encode(user_data.encode("utf-8")).decode("ascii")
+                    if user_data
+                    else None,
                     "TagSpecifications": [
                         {
                             "ResourceType": "instance",

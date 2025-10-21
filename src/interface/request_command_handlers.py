@@ -201,13 +201,38 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> dict[str
     """
     container = get_container()
     command_bus = container.get(CommandBus)
-    container.get(SchedulerPort)
+    # scheduler_strategy = container.get(SchedulerPort)
 
     from application.dto.commands import CreateReturnRequestCommand
 
+    # Handle input data from -f flag (HostFactory compatibility)
+    machine_ids = []
+    if hasattr(args, "input_data") and args.input_data:
+        # Extract machine IDs from JSON input data
+        # There is a discrepency in the documentation of the original HF https://www.ibm.com/docs/en/spectrum-symphony/7.3.2?topic=specification-requestreturnmachines
+        # documented expected format {"name": "(mandatory)(string) Host name of the machine that must be returned"}
+        # but in practice we get the following:
+        # Format: {"machines": [{"name": "192.168.0.1", "machineId": "i-xxx"}, {{"name": "192.168.0.2", "machineId": "i-yyy"}]}
+        raw_request_data = args.input_data
+        if "machines" in raw_request_data:
+            machine_ids = [
+                machine.get("machineId")
+                for machine in raw_request_data["machines"]
+                if machine.get("machineId")
+            ]
+    else:
+        # Use positional arguments
+        machine_ids = getattr(args, "machine_ids", [])
+
+    if not machine_ids:
+        return {
+            "error": "Machine IDs are required",
+            "message": "Machine IDs must be provided either as arguments or in JSON file",
+        }
+
     command = CreateReturnRequestCommand(
         request_id=getattr(args, "request_id", None),
-        machine_ids=getattr(args, "machine_ids", []),
+        machine_ids=machine_ids,
     )
     result = await command_bus.execute(command)
 

@@ -8,7 +8,7 @@ from infrastructure.template.configuration_manager import TemplateConfigurationM
 
 # Use TYPE_CHECKING to avoid direct domain import
 if TYPE_CHECKING:
-    from domain.template.aggregate import Template
+    from domain.template.template_aggregate import Template
 
 
 class TemplateConfigurationAdapter(TemplateConfigurationPort):
@@ -57,7 +57,7 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         # Use template manager for validation
         try:
             # Create a temporary template for validation
-            from domain.template.aggregate import Template
+            from domain.template.template_aggregate import Template
 
             temp_template = Template(
                 template_id=config.get("template_id", "temp"),

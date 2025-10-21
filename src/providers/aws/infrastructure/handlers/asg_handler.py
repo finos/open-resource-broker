@@ -26,7 +26,7 @@ Note:
     based on demand and maintain high availability across multiple AZs.
 """
 
-from typing import Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from domain.base.dependency_injection import injectable
 from domain.base.ports import LoggingPort
@@ -34,11 +34,14 @@ from domain.request.aggregate import Request
 from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from infrastructure.error.decorators import handle_infrastructure_exceptions
 from infrastructure.utilities.common.resource_naming import get_resource_prefix
-from providers.aws.domain.template.aggregate import AWSTemplate
+from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from providers.aws.infrastructure.handlers.base_context_mixin import BaseContextMixin
 from providers.aws.infrastructure.handlers.base_handler import AWSHandler
 from providers.aws.utilities.aws_operations import AWSOperations
+
+if TYPE_CHECKING:
+    from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 
 
 @injectable
@@ -52,6 +55,7 @@ class ASGHandler(AWSHandler, BaseContextMixin):
         aws_ops: AWSOperations,
         launch_template_manager,
         request_adapter: RequestAdapterPort = None,
+        machine_adapter: Optional["AWSMachineAdapter"] = None,
     ) -> None:
         """
         Initialize the ASG handler with integrated dependencies.
@@ -64,7 +68,14 @@ class ASGHandler(AWSHandler, BaseContextMixin):
             request_adapter: Optional request adapter for terminating instances
         """
         # Use integrated base class initialization
-        super().__init__(aws_client, logger, aws_ops, launch_template_manager, request_adapter)
+        super().__init__(
+            aws_client,
+            logger,
+            aws_ops,
+            launch_template_manager,
+            request_adapter,
+            machine_adapter,
+        )
 
         # Get AWS native spec service from container
         from infrastructure.di.container import get_container
@@ -80,6 +91,11 @@ class ASGHandler(AWSHandler, BaseContextMixin):
             from domain.base.ports.configuration_port import ConfigurationPort
 
             self.config_port = container.get(ConfigurationPort)
+
+            if self._machine_adapter is None:
+                from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
+
+                self._machine_adapter = container.get(AWSMachineAdapter)
         except Exception:
             # Service not available, native specs disabled
             self.aws_native_spec_service = None
@@ -310,6 +326,37 @@ class ASGHandler(AWSHandler, BaseContextMixin):
 
         return self._get_instance_details(instance_ids)
 
+    def _format_instance_data(
+        self,
+        instance_details: list[dict[str, Any]],
+        resource_id: str,
+        request: Request,
+    ) -> list[dict[str, Any]]:
+        """Format ASG instance details to standard structure."""
+        metadata = getattr(request, "metadata", {}) or {}
+        provider_api_value = metadata.get("provider_api", "ASG")
+
+        if self._machine_adapter:
+            try:
+                return [
+                    self._machine_adapter.create_machine_from_aws_instance(
+                        inst,
+                        request_id=str(request.request_id),
+                        provider_api=provider_api_value,
+                        resource_id=resource_id,
+                    )
+                    for inst in instance_details
+                ]
+            except Exception as exc:
+                self._logger.error("Failed to normalize instances with machine adapter: %s", exc)
+                raise AWSInfrastructureError(
+                    "Failed to normalize instance data with AWS machine adapter"
+                ) from exc
+
+        return [
+            self._build_fallback_machine_payload(inst, resource_id) for inst in instance_details
+        ]
+
     def release_hosts(self, request: Request) -> None:
         """Release hosts across all ASGs in the request."""
         try:
@@ -411,7 +458,9 @@ class ASGHandler(AWSHandler, BaseContextMixin):
                 try:
                     asg_instances = self._get_asg_instances(asg_name)
                     if asg_instances:
-                        formatted_instances = self._format_instance_data(asg_instances, asg_name)
+                        formatted_instances = self._format_instance_data(
+                            asg_instances, asg_name, request
+                        )
                         all_instances.extend(formatted_instances)
                 except Exception as e:
                     self._logger.error("Failed to get instances for ASG %s: %s", asg_name, e)

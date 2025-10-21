@@ -6,8 +6,8 @@ from typing import Any, Optional
 
 from config.managers.configuration_manager import ConfigurationManager
 from domain.base.exceptions import ConfigurationError
-from domain.template.aggregate import Template
 from domain.template.repository import TemplateRepository
+from domain.template.template_aggregate import Template
 from infrastructure.logging.logger import get_logger
 from infrastructure.patterns.singleton_registry import SingletonRegistry
 from infrastructure.persistence.base import StrategyBasedRepository

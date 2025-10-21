@@ -28,7 +28,7 @@ Note:
 """
 
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from botocore.exceptions import ClientError
 
@@ -38,7 +38,7 @@ from domain.request.aggregate import Request
 from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from infrastructure.error.decorators import handle_infrastructure_exceptions
 from infrastructure.utilities.common.resource_naming import get_resource_prefix
-from providers.aws.domain.template.aggregate import AWSTemplate
+from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from providers.aws.infrastructure.handlers.base_context_mixin import BaseContextMixin
 from providers.aws.infrastructure.handlers.base_handler import AWSHandler
@@ -46,6 +46,9 @@ from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
 )
 from providers.aws.utilities.aws_operations import AWSOperations
+
+if TYPE_CHECKING:
+    from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 
 
 @injectable
@@ -59,6 +62,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
         aws_ops: AWSOperations,
         launch_template_manager: AWSLaunchTemplateManager,
         request_adapter: RequestAdapterPort = None,
+        machine_adapter: Optional["AWSMachineAdapter"] = None,
         error_handler: ErrorHandlingPort = None,
     ) -> None:
         """
@@ -79,6 +83,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             aws_ops,
             launch_template_manager,
             request_adapter,
+            machine_adapter,
             error_handler,
         )
 
@@ -96,6 +101,11 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             from domain.base.ports.configuration_port import ConfigurationPort
 
             self.config_port = container.get(ConfigurationPort)
+
+            if self._machine_adapter is None:
+                from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
+
+                self._machine_adapter = container.get(AWSMachineAdapter)
         except Exception:
             # Service not available, native specs disabled
             self.aws_native_spec_service = None
@@ -117,7 +127,9 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             # Get instance details immediately
             instance_ids = request.metadata.get("instance_ids", [])
             instance_details = self._get_instance_details(instance_ids)
-            instances = self._format_instance_data(instance_details, resource_id)
+            instances = self._format_instance_data(
+                instance_details, resource_id, request, aws_template
+            )
 
             return {
                 "success": True,
@@ -194,19 +206,42 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
         return resource_id
 
     def _format_instance_data(
-        self, instance_details: list[dict[str, Any]], resource_id: str
+        self,
+        instance_details: list[dict[str, Any]],
+        resource_id: str,
+        request: Request,
+        aws_template: Optional[AWSTemplate] = None,
     ) -> list[dict[str, Any]]:
         """Format AWS instance details to standard structure."""
+        metadata = getattr(request, "metadata", {}) or {}
+        if aws_template and aws_template.provider_api is not None:
+            provider_api_value = (
+                aws_template.provider_api.value
+                if hasattr(aws_template.provider_api, "value")
+                else str(aws_template.provider_api)
+            )
+        else:
+            provider_api_value = metadata.get("provider_api", "RunInstances")
+
+        if self._machine_adapter:
+            try:
+                return [
+                    self._machine_adapter.create_machine_from_aws_instance(
+                        inst,
+                        request_id=str(request.request_id),
+                        provider_api=provider_api_value,
+                        resource_id=resource_id,
+                    )
+                    for inst in instance_details
+                ]
+            except Exception as exc:
+                self._logger.error("Failed to normalize instances with machine adapter: %s", exc)
+                raise AWSInfrastructureError(
+                    "Failed to normalize instance data with AWS machine adapter"
+                ) from exc
+
         return [
-            {
-                "instance_id": inst["InstanceId"],
-                "resource_id": resource_id,
-                "status": inst["State"],
-                "private_ip": inst.get("PrivateIpAddress"),
-                "public_ip": inst.get("PublicIpAddress"),
-                "launch_time": inst.get("LaunchTime"),
-            }
-            for inst in instance_details
+            self._build_fallback_machine_payload(inst, resource_id) for inst in instance_details
         ]
 
     def _prepare_template_context(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
@@ -384,7 +419,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                         "No instance IDs in metadata, searching by resource IDs: %s",
                         request.resource_ids,
                     )
-                    return self._find_instances_by_resource_ids(request.resource_ids)
+                    return self._find_instances_by_resource_ids(request, request.resource_ids)
                 else:
                     self._logger.info(
                         "No instance IDs or resource IDs found in request %s",
@@ -393,147 +428,110 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                     return []
 
             # Get detailed instance information using instance IDs
-            return self._get_instance_details(instance_ids)
+            instance_details = self._get_instance_details(instance_ids)
+            metadata = getattr(request, "metadata", {}) or {}
+            resource_id = (
+                metadata.get("run_instances_resource_id")
+                or metadata.get("reservation_id")
+                or (request.resource_ids[0] if getattr(request, "resource_ids", None) else "")
+            )
+
+            return self._format_instance_data(instance_details, resource_id, request, None)
 
         except Exception as e:
             self._logger.error("Unexpected error checking RunInstances status: %s", str(e))
             raise AWSInfrastructureError(f"Failed to check RunInstances status: {e!s}")
 
-    def _find_instances_by_resource_ids(self, resource_ids: list[str]) -> list[dict[str, Any]]:
+    def _find_instances_by_resource_ids(
+        self, request: Request, resource_ids: list[str]
+    ) -> list[dict[str, Any]]:
         """Find instances using resource IDs (reservation IDs for RunInstances)."""
         try:
-            all_instances = []
+            all_instances: list[dict[str, Any]] = []
 
             for resource_id in resource_ids:
-                # For RunInstances, resource_id is the reservation ID
-                # Try to use describe_instances with Filters to find instances by
-                # reservation ID
                 try:
                     response = self.aws_client.ec2_client.describe_instances(
                         Filters=[{"Name": "reservation-id", "Values": [resource_id]}]
                     )
 
-                    # Extract instances from reservations
+                    instance_ids = []
                     for reservation in response.get("Reservations", []):
-                        for instance in reservation["Instances"]:
-                            instance_data = {
-                                "InstanceId": instance["InstanceId"],
-                                "State": instance["State"]["Name"],
-                                "PrivateIpAddress": instance.get("PrivateIpAddress"),
-                                "PublicIpAddress": instance.get("PublicIpAddress"),
-                                "LaunchTime": (
-                                    instance["LaunchTime"].isoformat()
-                                    if instance.get("LaunchTime")
-                                    else None
-                                ),
-                                "Tags": instance.get("Tags", []),
-                                "InstanceType": instance["InstanceType"],
-                            }
-                            all_instances.append(instance_data)
+                        instance_ids.extend(
+                            instance["InstanceId"] for instance in reservation.get("Instances", [])
+                        )
+
+                    if instance_ids:
+                        detailed_instances = self._get_instance_details(instance_ids)
+                        formatted = self._format_instance_data(
+                            detailed_instances, resource_id, request, None
+                        )
+                        all_instances.extend(formatted)
 
                 except ClientError as e:
                     if e.response["Error"]["Code"] == "InvalidReservationID.NotFound":
                         self._logger.warning("Reservation ID %s not found", resource_id)
                         continue
-                    elif "Filter dicts have not been implemented" in str(e):
-                        # Moto doesn't support reservation-id filter, fall back to
-                        # describe all instances
+                    if "Filter dicts have not been implemented" in str(e):
                         self._logger.info(
                             "Reservation-id filter not supported (likely moto), falling back to describe all instances"
                         )
-                        return self._find_instances_by_tags_fallback(resource_ids)
-                    else:
-                        raise
+                        return self._find_instances_by_tags_fallback(request, resource_ids)
+                    raise
                 except Exception as e:
                     if "Filter dicts have not been implemented" in str(e):
-                        # Moto doesn't support reservation-id filter, fall back to
-                        # describe all instances
                         self._logger.info(
                             "Reservation-id filter not supported (likely moto), falling back to describe all instances"
                         )
-                        return self._find_instances_by_tags_fallback(resource_ids)
-                    else:
-                        raise
+                        return self._find_instances_by_tags_fallback(request, resource_ids)
+                    raise
 
             self._logger.info(
-                "Found %s instances for resource IDs: %s",
+                "Normalized %s instances for resource IDs: %s",
                 len(all_instances),
                 resource_ids,
             )
+
             return all_instances
 
         except Exception as e:
-            self._logger.error("Failed to find instances by resource IDs: %s", str(e))
-            raise AWSInfrastructureError(f"Failed to find instances by resource IDs: {e!s}")
+            self._logger.error(
+                "Error finding instances by resource IDs %s: %s", resource_ids, str(e)
+            )
+            raise AWSInfrastructureError(
+                f"Failed to find instances by resource IDs {resource_ids}: {e!s}"
+            )
 
-    def _find_instances_by_tags_fallback(self, resource_ids: list[str]) -> list[dict[str, Any]]:
+    def _find_instances_by_tags_fallback(
+        self, request: Request, resource_ids: list[str]
+    ) -> list[dict[str, Any]]:
         """Fallback method to find instances by tags when reservation-id filter is not supported."""
         try:
-            self._logger.info(
-                "FALLBACK: Starting fallback method for resource IDs: %s", resource_ids
-            )
-
-            # In mock mode (moto), we can't use reservation-id filter
-            # Instead, look for instances with our RequestId tag
-            # This assumes the instances were tagged during creation
-
-            # Get all instances and filter by tags
             response = self.aws_client.ec2_client.describe_instances()
-            self._logger.info(
-                "FALLBACK: Found %s total reservations",
-                len(response.get("Reservations", [])),
-            )
+            formatted_instances: list[dict[str, Any]] = []
 
-            matching_instances = []
             for reservation in response.get("Reservations", []):
-                reservation_id = reservation["ReservationId"]
-                self._logger.info(
-                    "FALLBACK: Checking reservation %s against targets %s",
-                    reservation_id,
-                    resource_ids,
+                reservation_id = reservation.get("ReservationId")
+                if reservation_id not in resource_ids:
+                    continue
+
+                instance_ids = [
+                    instance.get("InstanceId") for instance in reservation.get("Instances", [])
+                ]
+                instance_ids = [instance_id for instance_id in instance_ids if instance_id]
+
+                if not instance_ids:
+                    continue
+
+                detailed_instances = self._get_instance_details(instance_ids)
+                formatted_instances.extend(
+                    self._format_instance_data(detailed_instances, reservation_id, request, None)
                 )
 
-                # Check if this reservation matches any of our resource IDs
-                if reservation_id in resource_ids:
-                    self._logger.info(
-                        "FALLBACK: MATCH! Reservation %s found %s instances",
-                        reservation_id,
-                        len(reservation["Instances"]),
-                    )
-                    for instance in reservation["Instances"]:
-                        instance_data = {
-                            "InstanceId": instance["InstanceId"],
-                            "State": instance["State"]["Name"],
-                            "PrivateIpAddress": instance.get("PrivateIpAddress"),
-                            "PublicIpAddress": instance.get("PublicIpAddress"),
-                            "LaunchTime": (
-                                instance["LaunchTime"].isoformat()
-                                if instance.get("LaunchTime")
-                                else None
-                            ),
-                            "Tags": instance.get("Tags", []),
-                            "InstanceType": instance["InstanceType"],
-                        }
-                        matching_instances.append(instance_data)
-                        self._logger.info(
-                            "FALLBACK: Added instance %s with IP %s",
-                            instance_data["InstanceId"],
-                            instance_data["PrivateIpAddress"],
-                        )
-                else:
-                    self._logger.info("FALLBACK: No match for reservation %s", reservation_id)
-
-            self._logger.info(
-                "FALLBACK: Returning %s instances for resource IDs: %s",
-                len(matching_instances),
-                resource_ids,
-            )
-            return matching_instances
+            return formatted_instances
 
         except Exception as e:
             self._logger.error("FALLBACK: Fallback method failed to find instances: %s", e)
-            # Return empty list rather than raising exception to allow graceful
-            # degradation
             return []
 
     def release_hosts(self, request: Request) -> None:

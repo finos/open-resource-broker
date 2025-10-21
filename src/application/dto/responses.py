@@ -40,7 +40,7 @@ from application.request.dto import (
 )
 
 # Templates use domain objects directly with scheduler strategy for formatting
-from domain.template.aggregate import Template
+from domain.template.template_aggregate import Template
 
 __all__: list[str] = [
     "BaseDTO",

@@ -11,7 +11,7 @@ from domain.base.dependency_injection import injectable
 from domain.base.exceptions import EntityNotFoundError
 from domain.base.ports import LoggingPort
 from domain.request.aggregate import Request
-from domain.template.aggregate import Template
+from domain.template.template_aggregate import Template
 from infrastructure.adapters.ports.resource_provisioning_port import (
     ResourceProvisioningPort,
 )

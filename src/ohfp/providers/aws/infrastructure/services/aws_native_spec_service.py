@@ -9,7 +9,7 @@ from domain.base.ports.configuration_port import ConfigurationPort
 from domain.request.aggregate import Request
 from infrastructure.utilities.common.deep_merge import deep_merge
 from infrastructure.utilities.file.json_utils import read_json_file
-from providers.aws.domain.template.aggregate import AWSTemplate
+from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
 
 @injectable

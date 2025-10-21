@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from domain.request.aggregate import Request
-from domain.template.aggregate import Template
+from domain.template.template_aggregate import Template
 
 
 class ResourceProvisioningPort(ABC):

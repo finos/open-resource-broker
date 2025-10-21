@@ -14,10 +14,10 @@ class MachineReferenceDTO(BaseDTO):
     """Data Transfer Object for machine reference."""
 
     machine_id: str
-    name: str
+    name: str = ""
     result: str  # 'executing', 'fail', or 'succeed'
     status: str
-    private_ip_address: str  # Already using the expected API field name
+    private_ip_address: str = ""
     public_ip_address: Optional[str] = None  # Already using the expected API field name
     instance_type: Optional[str] = None
     price_type: Optional[str] = None

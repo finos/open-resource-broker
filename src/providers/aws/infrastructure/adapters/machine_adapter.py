@@ -48,8 +48,12 @@ class AWSMachineAdapter:
         """
         Convert AWS instance data to machine domain data.
 
+        Now handles both formats:
+        - PascalCase (raw AWS API format)
+        - snake_case (already processed by base_handler)
+
         Args:
-            aws_instance_data: Raw AWS instance data
+            aws_instance_data: AWS instance data (either format)
             request_id: Associated request ID
             provider_api: Provider API type used
             resource_id: Resource ID (e.g., fleet ID)
@@ -60,74 +64,118 @@ class AWSMachineAdapter:
         Raises:
             AWSError: If there's an issue processing the AWS instance data
         """
-        self._logger.debug(
-            "Creating machine from AWS instance: %s",
-            aws_instance_data.get("InstanceId"),
-        )
-
         try:
-            # Validate required fields
-            required_fields = [
-                "InstanceId",
-                "State",
-                "InstanceType",
-                "PrivateIpAddress",
-                "Placement",
-                "SubnetId",
-                "VpcId",
-                "ImageId",
-            ]
-            for field in required_fields:
-                if field not in aws_instance_data:
-                    self._logger.error("Missing required field in AWS instance data: %s", field)
-                    raise AWSError(f"Missing required field in AWS instance data: {field}")
+            # Detect format and normalize field access
+            if "instance_id" in aws_instance_data:
+                # Already in snake_case format from base_handler - much simpler!
+                self._logger.debug(
+                    "Processing snake_case formatted data for instance: %s",
+                    aws_instance_data.get("instance_id"),
+                )
 
-            # Validate AWS handler type
-            try:
-                ProviderApi(provider_api)
-            except ValueError:
-                self._logger.error("Invalid provider API type: %s", provider_api)
-                raise AWSError(f"Invalid provider API type: {provider_api}")
+                # Data is already properly formatted, just add missing fields
+                machine_data = aws_instance_data.copy()  # Start with existing data
 
-            # Validate instance type
-            try:
-                InstanceType(aws_instance_data["InstanceType"])
-            except ValueError:
-                self._logger.error("Invalid instance type: %s", aws_instance_data["InstanceType"])
-                raise AWSError(f"Invalid instance type: {aws_instance_data['InstanceType']}")
+                # Ensure required fields are present
+                machine_data.update(
+                    {
+                        "request_id": request_id,
+                        "provider_api": provider_api,
+                        "resource_id": resource_id,
+                    }
+                )
 
-            # Extract core machine data
-            machine_data = {
-                "machine_id": aws_instance_data["InstanceId"],
-                "request_id": request_id,
-                "name": aws_instance_data.get("PrivateDnsName", ""),
-                "status": MachineStatus.from_aws_state(aws_instance_data["State"]["Name"]).value,
-                "instance_type": aws_instance_data["InstanceType"],
-                "private_ip": aws_instance_data["PrivateIpAddress"],
-                "public_ip": aws_instance_data.get("PublicIpAddress"),
-                "provider_api": provider_api,
-                "resource_id": resource_id,
-                "price_type": (
-                    PriceType.SPOT.value
-                    if aws_instance_data.get("InstanceLifecycle") == "spot"
-                    else PriceType.ON_DEMAND.value
-                ),
-                "cloud_host_id": aws_instance_data.get("Placement", {}).get("HostId"),
-                "metadata": {
-                    "availability_zone": aws_instance_data["Placement"]["AvailabilityZone"],
-                    "subnet_id": aws_instance_data["SubnetId"],
-                    "vpc_id": aws_instance_data["VpcId"],
-                    "ami_id": aws_instance_data["ImageId"],
-                    "ebs_optimized": aws_instance_data.get("EbsOptimized", False),
-                    "monitoring": aws_instance_data.get("Monitoring", {}).get("State", "disabled"),
-                    "tags": {tag["Key"]: tag["Value"] for tag in aws_instance_data.get("Tags", [])},
-                },
-            }
+                # Add name if not present
+                if "name" not in machine_data or not machine_data["name"]:
+                    machine_data["name"] = machine_data.get(
+                        "private_ip", machine_data.get("instance_id", "")
+                    )
 
-            self._logger.debug(
-                "Successfully created machine data for %s", machine_data["machine_id"]
-            )
-            return machine_data
+                # Ensure launch_time is present (might be missing in some cases)
+                if "launch_time" not in machine_data:
+                    machine_data["launch_time"] = None
+
+                self._logger.debug(
+                    "Successfully processed snake_case data for %s", machine_data["instance_id"]
+                )
+                return machine_data
+
+            else:
+                # Legacy PascalCase format - need full conversion
+                self._logger.debug(
+                    "Processing PascalCase formatted data for instance: %s",
+                    aws_instance_data.get("InstanceId"),
+                )
+
+                # Validate required fields for PascalCase format
+                required_fields = [
+                    "InstanceId",
+                    "State",
+                    "InstanceType",
+                    "PrivateIpAddress",
+                    "Placement",
+                    "SubnetId",
+                    "VpcId",
+                    "ImageId",
+                ]
+                for field in required_fields:
+                    if field not in aws_instance_data:
+                        self._logger.error("Missing required field in AWS instance data: %s", field)
+                        raise AWSError(f"Missing required field in AWS instance data: {field}")
+
+                # Validate AWS handler type
+                try:
+                    ProviderApi(provider_api)
+                except ValueError:
+                    self._logger.error("Invalid provider API type: %s", provider_api)
+                    raise AWSError(f"Invalid provider API type: {provider_api}")
+
+                # Validate instance type
+                try:
+                    InstanceType(value=aws_instance_data["InstanceType"])
+                except ValueError:
+                    self._logger.error(
+                        "Invalid instance type: %s", aws_instance_data["InstanceType"]
+                    )
+                    raise AWSError(f"Invalid instance type: {aws_instance_data['InstanceType']}")
+
+                # Extract core machine data from PascalCase format
+                machine_data = {
+                    "instance_id": aws_instance_data["InstanceId"],
+                    "request_id": request_id,
+                    "name": aws_instance_data.get("PrivateDnsName", ""),
+                    "status": MachineStatus.from_str(aws_instance_data["State"]["Name"]).value,
+                    "instance_type": aws_instance_data["InstanceType"],
+                    "private_ip": aws_instance_data["PrivateIpAddress"],
+                    "public_ip": aws_instance_data.get("PublicIpAddress"),
+                    "launch_time": aws_instance_data.get("LaunchTime"),
+                    "provider_api": provider_api,
+                    "resource_id": resource_id,
+                    "price_type": (
+                        PriceType.SPOT.value
+                        if aws_instance_data.get("InstanceLifecycle") == "spot"
+                        else PriceType.ON_DEMAND.value
+                    ),
+                    "cloud_host_id": aws_instance_data.get("Placement", {}).get("HostId"),
+                    "metadata": {
+                        "availability_zone": aws_instance_data["Placement"]["AvailabilityZone"],
+                        "subnet_id": aws_instance_data["SubnetId"],
+                        "vpc_id": aws_instance_data["VpcId"],
+                        "ami_id": aws_instance_data["ImageId"],
+                        "ebs_optimized": aws_instance_data.get("EbsOptimized", False),
+                        "monitoring": aws_instance_data.get("Monitoring", {}).get(
+                            "State", "disabled"
+                        ),
+                        "tags": {
+                            tag["Key"]: tag["Value"] for tag in aws_instance_data.get("Tags", [])
+                        },
+                    },
+                }
+
+                self._logger.debug(
+                    "Successfully converted PascalCase data for %s", machine_data["instance_id"]
+                )
+                return machine_data
 
         except KeyError as e:
             self._logger.error("Missing key in AWS instance data: %s", str(e))
@@ -150,7 +198,7 @@ class AWSMachineAdapter:
             EC2InstanceNotFoundError: If the instance cannot be found
             AWSError: For other AWS-related errors
         """
-        self._logger.debug("Performing health check for machine: %s", machine.machine_id)
+        self._logger.debug("Performing health check for machine: %s", machine.instance_id)
 
         try:
             health_checks = {}

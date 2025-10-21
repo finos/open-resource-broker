@@ -10,7 +10,7 @@ from application.services.provider_capability_service import (
     ValidationResult,
 )
 from domain.base.ports import LoggingPort
-from domain.template.aggregate import Template
+from domain.template.template_aggregate import Template
 from providers.base.strategy.provider_strategy import ProviderOperationType
 
 

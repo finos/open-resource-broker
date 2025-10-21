@@ -5,7 +5,7 @@ from typing import Any, Optional
 
 from domain.base.domain_interfaces import AggregateRepository
 
-from .aggregate import Template
+from .template_aggregate import Template
 
 
 class TemplateRepository(AggregateRepository[Template]):

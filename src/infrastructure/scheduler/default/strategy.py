@@ -5,8 +5,7 @@ from typing import Any, Union
 from config.manager import ConfigurationManager
 from domain.base.ports.logging_port import LoggingPort
 from domain.machine.aggregate import Machine
-from domain.request.aggregate import Request
-from domain.template.aggregate import Template
+from domain.template.template_aggregate import Template
 from infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
 
 
@@ -107,18 +106,6 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
             "templates": [template.to_dict() for template in templates],
             "message": "Templates retrieved successfully",
             "count": len(templates),
-        }
-
-    def format_request_status_response(self, requests: list[Request]) -> dict[str, Any]:
-        """
-        Format domain Requests to native domain response format.
-
-        Uses the Request's to_dict() method to serialize to native format.
-        """
-        return {
-            "requests": [request.to_dict() for request in requests],
-            "message": "Request status retrieved successfully",
-            "count": len(requests),
         }
 
     def format_machine_status_response(self, machines: list[Machine]) -> dict[str, Any]:
