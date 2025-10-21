@@ -14,6 +14,7 @@ from domain.base.ports import LoggingPort
 # Import AWS-specific components
 from providers.aws.configuration.config import AWSProviderConfig
 from providers.aws.infrastructure.aws_client import AWSClient
+from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHandler
 from providers.aws.infrastructure.handlers.run_instances_handler import (
     RunInstancesHandler,
@@ -133,6 +134,8 @@ class AWSProviderStrategy(ProviderStrategy):
 
             aws_ops = AWSOperations(self.aws_client, self._logger)
 
+            machine_adapter = AWSMachineAdapter(self.aws_client, self._logger)
+
             # Initialize handlers with launch template manager
             self._handlers = {
                 "SpotFleet": SpotFleetHandler(
@@ -140,18 +143,21 @@ class AWSProviderStrategy(ProviderStrategy):
                     logger=self._logger,
                     aws_ops=aws_ops,
                     launch_template_manager=self.launch_template_manager,
+                    machine_adapter=machine_adapter,
                 ),
                 "EC2Fleet": EC2FleetHandler(
                     aws_client=self.aws_client,
                     logger=self._logger,
                     aws_ops=aws_ops,
                     launch_template_manager=self.launch_template_manager,
+                    machine_adapter=machine_adapter,
                 ),
                 "RunInstances": RunInstancesHandler(
                     aws_client=self.aws_client,
                     logger=self._logger,
                     aws_ops=aws_ops,
                     launch_template_manager=self.launch_template_manager,
+                    machine_adapter=machine_adapter,
                 ),
             }
         return self._handlers
@@ -192,7 +198,7 @@ class AWSProviderStrategy(ProviderStrategy):
             Result of the operation execution
         """
 
-        self._logger.debug("KBG aws_provider_strategy execute_operation")
+        self._logger.debug(" aws_provider_strategy execute_operation")
         if not self._initialized:
             return ProviderResult.error_result(
                 "AWS provider strategy not initialized", "NOT_INITIALIZED"
@@ -414,7 +420,7 @@ class AWSProviderStrategy(ProviderStrategy):
 
     def _handle_terminate_instances(self, operation: ProviderOperation) -> ProviderResult:
         """Handle instance termination operation."""
-        self._logger.debug("KBG _handle_terminate_instances")
+        self._logger.debug(" _handle_terminate_instances")
         try:
             instance_ids = operation.parameters.get("instance_ids", [])
             self._logger.debug(f"Terminating instances: {instance_ids}")
@@ -598,29 +604,34 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             # Format instance details for consistent output
+            # KBG TODO: review code below.
             formatted_instances = []
             for instance_data in instance_details:
+                self._logger.debug("instance_data: %s", instance_data)
+
+                # Handle both snake_case (from machine adapter) and PascalCase (legacy) formats
                 formatted_instance = {
-                    "InstanceId": instance_data.get("InstanceId"),
-                    "State": instance_data.get("State", "unknown"),
-                    "PrivateIpAddress": instance_data.get("PrivateIpAddress"),
-                    "PublicIpAddress": instance_data.get("PublicIpAddress"),
-                    "LaunchTime": instance_data.get("LaunchTime"),
-                    "InstanceType": instance_data.get("InstanceType"),
-                    "SubnetId": instance_data.get("SubnetId"),
-                    "VpcId": instance_data.get("VpcId"),
+                    "InstanceId": instance_data.get("instance_id") or instance_data.get("InstanceId"),
+                    "State": instance_data.get("status") or instance_data.get("State", "unknown"),
+                    "PrivateIpAddress": instance_data.get("private_ip") or instance_data.get("PrivateIpAddress"),
+                    "PublicIpAddress": instance_data.get("public_ip") or instance_data.get("PublicIpAddress"),
+                    "LaunchTime": instance_data.get("launch_time") or instance_data.get("LaunchTime"),
+                    "InstanceType": instance_data.get("instance_type") or instance_data.get("InstanceType"),
+                    "SubnetId": instance_data.get("subnet_id") or instance_data.get("SubnetId"),
+                    "VpcId": instance_data.get("vpc_id") or instance_data.get("VpcId"),
                 }
                 formatted_instances.append(formatted_instance)
 
+            self._logger.debug("formatted_instances: %s", formatted_instances)
             return ProviderResult.success_result(
-                {"instances": formatted_instances},
-                {
+                data = {"instances": formatted_instances},
+                metadata = {
                     "operation": "describe_resource_instances",
                     "resource_ids": resource_ids,
                     "provider_api": provider_api,
                     "handler_used": provider_api,
                     "instance_count": len(formatted_instances),
-                },
+                }
             )
 
         except Exception as e:

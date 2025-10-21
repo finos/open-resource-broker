@@ -327,7 +327,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                 launch_time = datetime.fromisoformat(launch_time.replace("Z", "+00:00"))
             except ValueError:
                 launch_time = None
-
+        self.logger.debug("_create_machine_aggregate instance_data: [%s]", instance_data)
         return Machine(
             instance_id=InstanceId(value=instance_data["instance_id"]),
             request_id=str(request.request_id),

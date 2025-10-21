@@ -7,6 +7,7 @@ and clean integration with our DI/CQRS system.
 """
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import Any, Callable, Optional, TypeVar
 
 from botocore.exceptions import ClientError
@@ -61,6 +62,7 @@ class AWSHandler(ABC):
         aws_ops,
         launch_template_manager,
         request_adapter=None,
+        machine_adapter=None,
         error_handler: Optional[ErrorHandlingPort] = None,
     ) -> None:
         """
@@ -72,11 +74,13 @@ class AWSHandler(ABC):
             aws_ops: AWS operations utility (required)
             launch_template_manager: Launch template manager (required)
             request_adapter: Request adapter for terminating instances (optional)
+            machine_adapter: Machine adapter for provider-specific instance mapping (optional)
             error_handler: Error handling port for exception management (optional)
         """
         self.aws_client = aws_client
         self._logger = logger
         self.launch_template_manager = launch_template_manager
+        self._machine_adapter = machine_adapter
         self.error_handler = error_handler
         self.max_retries = 3
         self.base_delay = 1  # seconds
@@ -85,7 +89,7 @@ class AWSHandler(ABC):
 
         # Setup required dependencies
         self._setup_aws_operations(aws_ops)
-        self._setup_dependencies(request_adapter)
+        self._setup_dependencies(request_adapter, machine_adapter)
 
     def _setup_aws_operations(self, aws_ops) -> None:
         """Configure AWS operations utility - eliminates duplication across handlers."""
@@ -95,7 +99,7 @@ class AWSHandler(ABC):
         if hasattr(aws_ops, "set_pagination_method"):
             aws_ops.set_pagination_method(self._paginate)
 
-    def _setup_dependencies(self, request_adapter) -> None:
+    def _setup_dependencies(self, request_adapter, machine_adapter) -> None:
         """Configure optional dependencies - eliminates duplication across handlers."""
         self._request_adapter = request_adapter
 
@@ -104,6 +108,9 @@ class AWSHandler(ABC):
             self._logger.debug("Successfully initialized request adapter")
         else:
             self._logger.debug("No request adapter provided, will use EC2 client directly")
+
+        if machine_adapter:
+            self._logger.debug("Machine adapter provided for AWS handler")
 
     @abstractmethod
     def acquire_hosts(self, request: Request, aws_template: AWSTemplate) -> str:
@@ -332,15 +339,87 @@ class AWSHandler(ABC):
 
         return paginate(client_method, result_key, **kwargs)
 
-    def _get_instance_details(self, instance_ids: list[str]) -> list[dict[str, Any]]:
+    def _collect_with_next_token(
+        self,
+        client_method: Callable,
+        result_key: str,
+        request_token_param: str = "NextToken",
+        response_token_key: str = "NextToken",
+        **kwargs,
+    ) -> list[dict[str, Any]]:
         """
-        Get detailed information about EC2 instances.
+        Collect results from an AWS operation that uses NextToken-based pagination
+        but does not expose a paginator in botocore.
+
+        Args:
+            client_method: AWS client method to invoke
+            result_key: Key in the response that contains results
+            request_token_param: Request parameter for pagination token
+            response_token_key: Response key containing the next pagination token
+            **kwargs: Additional arguments for the client method
+
+        Returns:
+            Aggregated list of result items
+        """
+        combined_results: list[dict[str, Any]] = []
+        next_token: str | None = None
+
+        while True:
+            request_kwargs = dict(kwargs)
+            if next_token:
+                request_kwargs[request_token_param] = next_token
+
+            response = client_method(**request_kwargs)
+            combined_results.extend(response.get(result_key, []))
+
+            next_token = response.get(response_token_key)
+            if not next_token:
+                break
+
+        return combined_results
+
+    def _build_fallback_machine_payload(
+        self, inst: dict[str, Any], resource_id: str
+    ) -> dict[str, Any]:
+        """Construct minimal machine payload when machine adapter is unavailable."""
+        state = inst.get("State")
+        status = state.get("Name") if isinstance(state, dict) else state
+
+        launch_time = inst.get("LaunchTime")
+        if isinstance(launch_time, datetime):
+            launch_time = launch_time.isoformat()
+
+        return {
+            "instance_id": inst.get("InstanceId"),
+            "resource_id": resource_id,
+            "status": status,
+            "private_ip": inst.get("PrivateIpAddress"),
+            "public_ip": inst.get("PublicIpAddress"),
+            "launch_time": launch_time,
+            "instance_type": inst.get("InstanceType"),
+            "image_id": inst.get("ImageId"),
+            "subnet_id": inst.get("SubnetId"),
+            "vpc_id": inst.get("VpcId"),
+        }
+
+    def _get_instance_details(
+        self,
+        instance_ids: list[str],
+        request_id: str = None,
+        resource_id: str = None,
+        provider_api: str = "EC2"
+    ) -> list[dict[str, Any]]:
+        """
+        Get detailed information about EC2 instances using machine adapter for proper formatting.
 
         Args:
             instance_ids: List of instance IDs to describe
+            request_id: Request ID for machine adapter context (optional)
+            resource_id: Resource ID (fleet ID, ASG name, etc.) for machine adapter context (optional)
+            provider_api: Provider API type for machine adapter (default: "EC2")
 
         Returns:
-            List of instance details
+            List of instance details in proper snake_case domain format
 
         Raises:
             AWSEntityNotFoundError: If any instance is not found
@@ -357,21 +436,35 @@ class AWSHandler(ABC):
             # Use AWS client's EC2 client for describe_instances
             response = self.aws_client.ec2_client.describe_instances(InstanceIds=instance_ids)
 
-            instances = []
-            for reservation in response.get("Reservations", []):
-                for instance in reservation["Instances"]:
-                    instances.append(
-                        {
-                            "InstanceId": instance["InstanceId"],
-                            "State": instance["State"]["Name"],
-                            "PrivateIpAddress": instance.get("PrivateIpAddress"),
-                            "PublicIpAddress": instance.get("PublicIpAddress"),
-                            "LaunchTime": instance["LaunchTime"].isoformat(),
-                            "Tags": instance.get("Tags", []),
-                            "InstanceType": instance["InstanceType"],
-                        }
-                    )
+            instances: list[dict[str, Any]] = []
+            reservations = response.get("Reservations", [])
+            self._logger.debug("Retrieved %d reservations for %d instance IDs", len(reservations), len(instance_ids))
 
+            for reservation in reservations:
+                for instance in reservation.get("Instances", []):
+                    # Use machine adapter if available for proper snake_case formatting
+                    if self._machine_adapter and request_id and resource_id:
+                        try:
+                            # Let machine adapter handle the conversion to proper snake_case format
+                            machine_data = self._machine_adapter.create_machine_from_aws_instance(
+                                instance,
+                                request_id=request_id,
+                                provider_api=provider_api,
+                                resource_id=resource_id
+                            )
+                            instances.append(machine_data)
+                            self._logger.debug("Successfully converted instance %s using machine adapter", instance.get("InstanceId"))
+                        except Exception as e:
+                            self._logger.warning("Machine adapter failed for instance %s, using fallback: %s", instance.get("InstanceId"), e)
+                            # Fallback to existing method
+                            instances.append(self._build_fallback_machine_payload(instance, resource_id or "unknown"))
+                    else:
+                        # Fallback when machine adapter not available or missing context
+                        self._logger.debug("Using fallback conversion for instance %s (adapter=%s, request_id=%s, resource_id=%s)",
+                                         instance.get("InstanceId"), bool(self._machine_adapter), bool(request_id), bool(resource_id))
+                        instances.append(self._build_fallback_machine_payload(instance, resource_id or "unknown"))
+
+            self._logger.debug("Converted %d instances to domain format", len(instances))
             return instances
 
         except ClientError as e:

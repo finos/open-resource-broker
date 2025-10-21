@@ -10,13 +10,13 @@ def get_test_cases():
         {
             "test_name": "EC2FleetRequest",
             "capacity_to_request": 2,
-            "awsprov_base_template": "awsprov_templates2.base.json",
+            "awsprov_base_template": "awsprov_templates.base.json",
             "overrides": {"fleetType": "request"},
         },
         {
             "test_name": "EC2FleetInstant",
             "capacity_to_request": 2,
-            "awsprov_base_template": "awsprov_templates1.base.json",
+            "awsprov_base_template": "awsprov_templates.base.json",
             "overrides": {"fleetType": "instant"},
         },
         # {

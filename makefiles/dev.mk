@@ -82,7 +82,7 @@ test-report: dev-install  ## Generate comprehensive test report
 
 system-tests: dev-install  ## Run system integration tests (using pytest)
 	@echo "Running system integration tests..."
-	@uv run python -m pytest tests/onaws/test_onaws.py -v --run-manual-aws --no-cov --tb=long
+	@uv run python -m pytest tests/onaws/test_onaws.py -v -m manual_aws --no-cov --tb=long
 
 # @SECTION Development Tools
 generate-pyproject:  ## Update pyproject.toml metadata from .project.yml (preserves dependencies)

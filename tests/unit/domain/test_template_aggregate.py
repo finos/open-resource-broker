@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import pytest
 
 from domain.base.value_objects import InstanceType
-from domain.template.aggregate import Template
+from domain.template.template_aggregate import Template
 from domain.template.exceptions import TemplateNotFoundError, TemplateValidationError
 from domain.template.value_objects import TemplateId
 

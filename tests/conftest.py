@@ -44,7 +44,7 @@ try:
     from domain.base.value_objects import InstanceId, InstanceType, ResourceId
     from domain.machine.aggregate import Machine
     from domain.request.aggregate import Request
-    from domain.template.aggregate import Template
+    from domain.template.template_aggregate import Template
     from infrastructure.di.buses import CommandBus, QueryBus
     from infrastructure.di.container import DIContainer
     from infrastructure.template.services.template_persistence_service import (
