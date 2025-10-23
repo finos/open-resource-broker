@@ -149,7 +149,20 @@ container-build-single: dev-install  ## Build single-platform container image
 		echo "ERROR: PYTHON_VERSION environment variable is required for container builds"; \
 		exit 1; \
 	fi
-	docker build --load -t $(CONTAINER_REGISTRY)/$(CONTAINER_IMAGE):$(VERSION)-python$(PYTHON_VERSION) .
+	@BUILD_DATE=$$(date -u +'%Y-%m-%dT%H:%M:%SZ'); \
+	VCS_REF=$$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown'); \
+	docker build --load \
+		--build-arg BUILD_DATE=$$BUILD_DATE \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg VCS_REF=$$VCS_REF \
+		--build-arg PYTHON_VERSION=$(PYTHON_VERSION) \
+		--build-arg PACKAGE_NAME_SHORT=$(PACKAGE_NAME_SHORT) \
+		--build-arg AUTHOR="$(AUTHOR)" \
+		--build-arg LICENSE="$(LICENSE)" \
+		--build-arg REPO_URL="$(REPO_URL)" \
+		--build-arg BUILDKIT_DOCKERFILE_CHECK=skip=SecretsUsedInArgOrEnv \
+		-t $(CONTAINER_REGISTRY)/$(CONTAINER_IMAGE):$(VERSION)-python$(PYTHON_VERSION) \
+		.
 
 container-build-multi: dev-install  ## Build multi-platform container image
 	@echo "Building multi-platform container image..."
@@ -157,7 +170,19 @@ container-build-multi: dev-install  ## Build multi-platform container image
 		echo "Creating multi-arch builder..."; \
 		docker buildx create --name multi-arch --use; \
 	fi
+	@BUILD_DATE=$$(date -u +'%Y-%m-%dT%H:%M:%SZ'); \
+	VCS_REF=$$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown'); \
+	PYTHON_VERSION=$${PYTHON_VERSION:-$(DEFAULT_PYTHON_VERSION)}; \
 	docker buildx build --platform linux/amd64,linux/arm64 \
+		--build-arg BUILD_DATE=$$BUILD_DATE \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg VCS_REF=$$VCS_REF \
+		--build-arg PYTHON_VERSION=$$PYTHON_VERSION \
+		--build-arg PACKAGE_NAME_SHORT=$(PACKAGE_NAME_SHORT) \
+		--build-arg AUTHOR="$(AUTHOR)" \
+		--build-arg LICENSE="$(LICENSE)" \
+		--build-arg REPO_URL="$(REPO_URL)" \
+		--build-arg BUILDKIT_DOCKERFILE_CHECK=skip=SecretsUsedInArgOrEnv \
 		-t $(CONTAINER_REGISTRY)/$(CONTAINER_IMAGE):$(VERSION) \
 		-t $(CONTAINER_REGISTRY)/$(CONTAINER_IMAGE):latest \
 		--push .
