@@ -494,4 +494,3 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [v0.0.1a1](https://github.com/awslabs/open-hostfactory-plugin/releases/tag/v0.0.1a1) - 2025-03-05
 
 <small>[Compare with first commit](https://github.com/awslabs/open-hostfactory-plugin/compare/0a095188e2424c340db472780731ac3942829c6d...v0.0.1a1)</small>
-
