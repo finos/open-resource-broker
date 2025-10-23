@@ -124,7 +124,7 @@ build_image() {
     fi
 
     # Get values from Makefile if not provided
-    local MAKEFILE_PACKAGE_SHORT="${PACKAGE_NAME_SHORT:ohfp)}"
+    local MAKEFILE_PACKAGE_SHORT="${PACKAGE_NAME_SHORT:-ohfp}"
 
     # Prepare tags with Python version support
     local tags=()
@@ -343,7 +343,7 @@ main() {
     else
         log_info "Image: ${IMAGE_NAME}:${CONTAINER_VERSION}"
     fi
-    
+
     log_info "Python version: ${VERSION} | Container version: ${CONTAINER_VERSION}"
 }
 

@@ -141,6 +141,14 @@ version-bump:  ## Show version bump help
 # @SECTION Container Management
 container-build: dev-install  ## Build container image
 	@echo "Building container image..."
+	@PYTHON_VERSION=$${PYTHON_VERSION:-$(DEFAULT_PYTHON_VERSION)} \
+	IMAGE_NAME=$(CONTAINER_IMAGE) \
+	REGISTRY=$(CONTAINER_REGISTRY) \
+	VERSION=$(VERSION) \
+	PACKAGE_NAME_SHORT=$(PACKAGE_NAME_SHORT) \
+	AUTHOR="$(AUTHOR)" \
+	LICENSE="$(LICENSE)" \
+	REPO_URL="$(REPO_URL)" \
 	./dev-tools/scripts/container_build.sh
 
 container-build-single: dev-install  ## Build single-platform container image
