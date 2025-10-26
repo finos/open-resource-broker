@@ -485,9 +485,18 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin):
         launch_template_version: str,
     ) -> dict[str, Any]:
         """Create Spot Fleet configuration using legacy logic."""
-        # Strip the full ARN for service-linked role
+        # Handle fleet role - convert EC2Fleet role to SpotFleet role if needed
         fleet_role = template.fleet_role
-        if fleet_role == "AWSServiceRoleForEC2SpotFleet":
+
+        # If using EC2Fleet service role, convert to SpotFleet service role
+        if fleet_role and "ec2fleet.amazonaws.com/AWSServiceRoleForEC2Fleet" in fleet_role:
+            account_id = self.aws_client.sts_client.get_caller_identity()["Account"]
+            fleet_role = (
+                f"arn:aws:iam::{account_id}:role/aws-service-role/"
+                f"spotfleet.amazonaws.com/AWSServiceRoleForEC2SpotFleet"
+            )
+            self._logger.info("Converted EC2Fleet role to SpotFleet role: %s", fleet_role)
+        elif fleet_role == "AWSServiceRoleForEC2SpotFleet":
             account_id = self.aws_client.sts_client.get_caller_identity()["Account"]
             fleet_role = (
                 f"arn:aws:iam::{account_id}:role/aws-service-role/"
@@ -528,25 +537,23 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin):
 
         if price_type == "ondemand":
             # For ondemand, set all capacity as on-demand
+            # SpotFleet API: TargetCapacity is total, OnDemandTargetCapacity is on-demand portion
             fleet_config["OnDemandTargetCapacity"] = request.requested_count
-            fleet_config["SpotTargetCapacity"] = 0
-            fleet_config["DefaultTargetCapacity"] = "onDemand"
+            # Note: Remaining capacity (TargetCapacity - OnDemandTargetCapacity) becomes spot capacity automatically
 
         elif price_type == "heterogeneous":
             # For heterogeneous, split capacity based on percent_on_demand
             percent_on_demand = template.percent_on_demand or 0
             on_demand_count = int(request.requested_count * percent_on_demand / 100)
-            spot_count = request.requested_count - on_demand_count
+            # spot_count = request.requested_count - on_demand_count (calculated automatically by AWS)
 
             fleet_config["OnDemandTargetCapacity"] = on_demand_count
-            fleet_config["SpotTargetCapacity"] = spot_count
-            fleet_config["DefaultTargetCapacity"] = "spot"
+            # Note: Spot capacity = TargetCapacity - OnDemandTargetCapacity (automatic)
 
         else:  # "spot" (default)
-            # For spot, set all capacity as spot
-            fleet_config["OnDemandTargetCapacity"] = 0
-            fleet_config["SpotTargetCapacity"] = request.requested_count
-            fleet_config["DefaultTargetCapacity"] = "spot"
+            # For pure spot fleets, don't set OnDemandTargetCapacity
+            # All TargetCapacity becomes spot capacity automatically
+            pass
 
         # Add template tags if any
         if template.tags:

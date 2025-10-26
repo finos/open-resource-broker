@@ -11,7 +11,7 @@ from providers.aws.domain.template.aggregate import AWSTemplate
 
 from config.manager import ConfigurationManager
 from infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings
-from infrastructure.scheduler.hostfactory.strategy import HostFactorySchedulerStrategy
+from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
 from infrastructure.scheduler.hostfactory.transformations import (
     HostFactoryTransformations,
 )

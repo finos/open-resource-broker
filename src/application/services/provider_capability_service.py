@@ -195,7 +195,7 @@ class ProviderCapabilityService:
                         "SpotFleet": {
                             "supported_fleet_types": ["request", "maintain"],
                             "supports_spot": True,
-                            "supports_on_demand": False,
+                            "supports_on_demand": True,
                             "max_instances": 1000,
                         },
                         "RunInstances": {

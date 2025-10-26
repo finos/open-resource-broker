@@ -9,12 +9,14 @@ class TestSchedulerNativeSpecParsing:
     def test_parse_template_with_inline_launch_template_spec(self):
         """Test parsing template with inline launch template spec."""
         # Import here to avoid DI issues
-        from infrastructure.scheduler.hostfactory.strategy import (
+        from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
             HostFactorySchedulerStrategy,
         )
 
         # Mock the dependencies to avoid DI container issues
-        with patch("infrastructure.scheduler.hostfactory.strategy.get_container") as mock_container:
+        with patch(
+            "infrastructure.scheduler.hostfactory.hostfactory_strategy.get_container"
+        ) as mock_container:
             mock_container.return_value.get.return_value = Mock()
 
             config_manager = Mock()
@@ -49,11 +51,13 @@ class TestSchedulerNativeSpecParsing:
 
     def test_parse_template_with_provider_api_spec(self):
         """Test parsing template with provider API spec."""
-        from infrastructure.scheduler.hostfactory.strategy import (
+        from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
             HostFactorySchedulerStrategy,
         )
 
-        with patch("infrastructure.scheduler.hostfactory.strategy.get_container") as mock_container:
+        with patch(
+            "infrastructure.scheduler.hostfactory.hostfactory_strategy.get_container"
+        ) as mock_container:
             mock_container.return_value.get.return_value = Mock()
 
             config_manager = Mock()
@@ -87,11 +91,13 @@ class TestSchedulerNativeSpecParsing:
 
     def test_parse_template_without_native_spec_fields(self):
         """Test parsing template without native spec fields."""
-        from infrastructure.scheduler.hostfactory.strategy import (
+        from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
             HostFactorySchedulerStrategy,
         )
 
-        with patch("infrastructure.scheduler.hostfactory.strategy.get_container") as mock_container:
+        with patch(
+            "infrastructure.scheduler.hostfactory.hostfactory_strategy.get_container"
+        ) as mock_container:
             mock_container.return_value.get.return_value = Mock()
 
             config_manager = Mock()

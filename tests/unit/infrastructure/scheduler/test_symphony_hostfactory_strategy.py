@@ -3,7 +3,7 @@
 from unittest.mock import Mock, patch
 
 from domain.template.aggregate import Template
-from infrastructure.scheduler.hostfactory.strategy import HostFactorySchedulerStrategy
+from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
 
 
 class TestSymphonyHostFactorySchedulerStrategy:

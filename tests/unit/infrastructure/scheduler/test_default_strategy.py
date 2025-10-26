@@ -2,7 +2,7 @@
 
 from unittest.mock import Mock
 
-from infrastructure.scheduler.default.strategy import DefaultSchedulerStrategy
+from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 
 
 class TestDefaultSchedulerStrategy:

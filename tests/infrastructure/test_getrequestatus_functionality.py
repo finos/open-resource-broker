@@ -4,7 +4,7 @@ import pytest
 
 from config.manager import ConfigurationManager
 from infrastructure.logging.logger import get_logger
-from infrastructure.scheduler.hostfactory.strategy import HostFactorySchedulerStrategy
+from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
 
 
 class MockRequestDTO:
