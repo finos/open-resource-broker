@@ -15,12 +15,12 @@ from domain.base.ports import LoggingPort
 from providers.aws.configuration.config import AWSProviderConfig
 from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from providers.aws.infrastructure.aws_client import AWSClient
+from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
 from providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHandler
 from providers.aws.infrastructure.handlers.run_instances_handler import (
     RunInstancesHandler,
 )
 from providers.aws.infrastructure.handlers.spot_fleet_handler import SpotFleetHandler
-from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
 from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
 )

@@ -209,54 +209,56 @@ class ASGHandler(AWSHandler, BaseContextMixin):
                     "Value": f"hostfactory-asg-{request.request_id}",
                     "PropagateAtLaunch": True,
                     "ResourceId": asg_name,
-                    "ResourceType": "auto-scaling-group"
+                    "ResourceType": "auto-scaling-group",
                 },
                 {
                     "Key": "RequestId",
                     "Value": str(request.request_id),
                     "PropagateAtLaunch": True,
                     "ResourceId": asg_name,
-                    "ResourceType": "auto-scaling-group"
+                    "ResourceType": "auto-scaling-group",
                 },
                 {
                     "Key": "TemplateId",
                     "Value": aws_template.template_id,
                     "PropagateAtLaunch": True,
                     "ResourceId": asg_name,
-                    "ResourceType": "auto-scaling-group"
+                    "ResourceType": "auto-scaling-group",
                 },
                 {
                     "Key": "CreatedBy",
                     "Value": created_by,
                     "PropagateAtLaunch": True,
                     "ResourceId": asg_name,
-                    "ResourceType": "auto-scaling-group"
+                    "ResourceType": "auto-scaling-group",
                 },
                 {
                     "Key": "ProviderApi",
                     "Value": "ASG",
                     "PropagateAtLaunch": True,
                     "ResourceId": asg_name,
-                    "ResourceType": "auto-scaling-group"
+                    "ResourceType": "auto-scaling-group",
                 },
             ]
 
             # Add custom tags from template
             if hasattr(aws_template, "tags") and aws_template.tags:
                 for key, value in aws_template.tags.items():
-                    tags.append({
-                        "Key": key,
-                        "Value": str(value),
-                        "PropagateAtLaunch": True,
-                        "ResourceId": asg_name,
-                        "ResourceType": "auto-scaling-group"
-                    })
+                    tags.append(
+                        {
+                            "Key": key,
+                            "Value": str(value),
+                            "PropagateAtLaunch": True,
+                            "ResourceId": asg_name,
+                            "ResourceType": "auto-scaling-group",
+                        }
+                    )
 
             # Create tags for the ASG
             self._retry_with_backoff(
                 self.aws_client.autoscaling_client.create_or_update_tags,
                 operation_type="critical",
-                Tags=tags
+                Tags=tags,
             )
 
             self._logger.info("Successfully tagged ASG %s", asg_name)

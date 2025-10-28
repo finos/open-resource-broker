@@ -615,7 +615,8 @@ def test_sample(setup_host_factory_mock_with_scenario, test_case):
 
     if template_json is None:
         log.warning(
-            "Template %s not found in HostFactory response; defaulting to first template.", template_id
+            "Template %s not found in HostFactory response; defaulting to first template.",
+            template_id,
         )
         template_json = res["templates"][0]
 
