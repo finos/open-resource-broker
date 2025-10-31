@@ -2,8 +2,11 @@
 """Template processor for onaws tests - generates populated templates from base templates and config."""
 
 import json
+import logging
 from pathlib import Path
 from typing import Any, Dict
+
+log = logging.getLogger(__name__)
 
 
 class TemplateProcessor:
@@ -105,6 +108,8 @@ class TemplateProcessor:
         # Set default values for fields that might be overridden
         extracted_config.setdefault("fleetType", "request")  # Default fleet type
         extracted_config.setdefault("providerApi", "EC2Fleet")
+        extracted_config.setdefault("priceType", "ondemand")  # Default price type
+        extracted_config.setdefault("percentOnDemand", 100)  # Default to 100% on-demand
 
         return extracted_config
 
@@ -188,6 +193,21 @@ class TemplateProcessor:
                 config["subnet_ids"] = [overrides["subnetId"]]
             if "securityGroupIds" in overrides:
                 config["security_group_ids"] = overrides["securityGroupIds"]
+
+            # Set percentOnDemand based on priceType (only for provider APIs that support it)
+            if "priceType" in overrides:
+                provider_api = overrides.get("providerApi", config.get("providerApi", "EC2Fleet"))
+
+                if provider_api in ["EC2Fleet", "SpotFleet"]:
+                    # EC2Fleet and SpotFleet support percentOnDemand
+                    if overrides["priceType"] == "spot":
+                        config["percentOnDemand"] = 0  # 100% spot instances
+                    elif overrides["priceType"] == "ondemand":
+                        config["percentOnDemand"] = 100  # 100% on-demand instances
+                elif provider_api in ["RunInstances", "ASG"]:
+                    # RunInstances and ASG don't use percentOnDemand, they use different mechanisms
+                    # For now, we'll skip price type validation for these APIs
+                    log.warning(f"Provider API {provider_api} may not support spot instances in the same way as EC2Fleet")
 
         # Generate each required file
         template_files = [

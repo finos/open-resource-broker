@@ -212,7 +212,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
         # Create the fleet with circuit breaker for critical operation
         try:
             self._logger.debug(
-                "EC2 Fleet create_fleet payload:\n%s",
+                "AWS EC2 Fleet create fleet payload:\n%s",
                 json.dumps(fleet_config, default=str, indent=2, sort_keys=True),
             )
             response = self._retry_with_backoff(
@@ -772,7 +772,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
                     # For maintain fleets, reduce target capacity first
                     current_capacity = fleet["TargetCapacitySpecification"]["TotalTargetCapacity"]
                     new_capacity = max(0, current_capacity - len(instance_ids))
-
+                    # KBG TODO race condition on instance termination detach first.
                     self._retry_with_backoff(
                         self.aws_client.ec2_client.modify_fleet,
                         operation_type="critical",

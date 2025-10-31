@@ -41,14 +41,18 @@ class BaseContextMixin:
     ) -> dict[str, Any]:
         """Standard capacity calculation for all fleet types."""
         total_capacity = request.requested_count
+        price_type = getattr(template, "price_type", None)
+        percent_on_demand = template.percent_on_demand or 0
 
-        if template.price_type == "heterogeneous":
-            percent_on_demand = template.percent_on_demand or 0
+        if price_type == "ondemand":
+            on_demand_count = total_capacity
+        elif price_type == "heterogeneous":
             on_demand_count = int(total_capacity * percent_on_demand / 100)
-            spot_count = total_capacity - on_demand_count
         else:
-            on_demand_count = 0 if template.price_type == "spot" else total_capacity
-            spot_count = total_capacity if template.price_type == "spot" else 0
+            on_demand_count = int(total_capacity * percent_on_demand / 100) if percent_on_demand else 0
+
+        on_demand_count = max(0, min(total_capacity, on_demand_count))
+        spot_count = max(0, total_capacity - on_demand_count)
 
         return {
             "total_capacity": total_capacity,
@@ -56,9 +60,9 @@ class BaseContextMixin:
             "desired_capacity": total_capacity,  # For ASG
             "on_demand_count": on_demand_count,
             "spot_count": spot_count,
-            "is_heterogeneous": template.price_type == "heterogeneous",
-            "is_spot_only": template.price_type == "spot",
-            "is_ondemand_only": template.price_type == "ondemand",
+            "is_heterogeneous": on_demand_count > 0 and spot_count > 0,
+            "is_spot_only": spot_count > 0 and on_demand_count == 0,
+            "is_ondemand_only": on_demand_count > 0 and spot_count == 0,
         }
 
     def _prepare_standard_tags(self, template: AWSTemplate, request: Request) -> dict[str, Any]:

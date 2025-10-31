@@ -308,21 +308,52 @@ class ProviderContext:
 
     async def terminate_resources(
         self, machine_ids: list[str], operation: ProviderOperation
-    ) -> None:
+    ) -> dict[str, Any]:
         """
-        Terminate resources on all strategies.
+        Terminate resources using the current strategy.
 
         Args:
             machine_ids: List of machine IDs to terminate
+            operation: The operation to execute
+
+        Returns:
+            Dictionary with termination results
         """
         operation.parameters.update({"instance_ids": machine_ids})
 
         self._logger.debug(f"terminate_resources: _current_strategy {self._current_strategy}")
         self._logger.debug(f"terminate_resources: _strategies {self._strategies}")
 
-        # strategy = self._strategies.get("aws-aws-default")  # KBG TODO
+        if not self._current_strategy:
+            return {
+                "success": False,
+                "error_message": "No provider strategy available",
+            }
 
-        await self._current_strategy.execute_operation(operation)
+        try:
+            # Execute the operation and get the result
+            result = await self._current_strategy.execute_operation(operation)
+
+            # Convert ProviderResult to dictionary format expected by caller
+            if result.success:
+                return {
+                    "success": True,
+                    "terminated_count": result.data.get("terminated_count", 0),
+                    "error_message": None,
+                    **result.data,  # Include all data from the result
+                }
+            else:
+                return {
+                    "success": False,
+                    "error_message": result.error_message,
+                    "error_code": result.error_code,
+                }
+        except Exception as e:
+            self._logger.error("Error in terminate_resources: %s", e)
+            return {
+                "success": False,
+                "error_message": str(e),
+            }
 
     async def execute_with_strategy(
         self, strategy_type: str, operation: ProviderOperation

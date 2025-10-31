@@ -186,6 +186,10 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin):
         )
 
         # Request spot fleet with circuit breaker for critical operation
+        self._logger.debug(
+            "AWS Spot Fleet create fleet payload:\n%s",
+            json.dumps(fleet_config, default=str, indent=2, sort_keys=True),
+        )
         response = self._retry_with_backoff(
             self.aws_client.ec2_client.request_spot_fleet,
             operation_type="critical",
@@ -506,6 +510,10 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin):
         # Get package name for CreatedBy tag
         created_by = self._get_package_name()
 
+        capacity_distribution = self._calculate_capacity_distribution(template, request)
+        target_capacity = capacity_distribution["target_capacity"]
+        on_demand_capacity = capacity_distribution["on_demand_count"]
+
         # Common tags for both fleet and instances
         common_tags = [
             {"Key": "Name", "Value": f"hf-{request.request_id}"},
@@ -525,7 +533,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin):
                     }
                 }
             ],
-            "TargetCapacity": request.requested_count,
+            "TargetCapacity": target_capacity,
             "IamFleetRole": fleet_role,
             "AllocationStrategy": self._get_allocation_strategy(template.allocation_strategy),
             "Type": template.fleet_type,
@@ -535,25 +543,9 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin):
         # Configure based on price type
         price_type = template.price_type or "spot"  # Default to spot for SpotFleet
 
-        if price_type == "ondemand":
-            # For ondemand, set all capacity as on-demand
+        if price_type in ("ondemand", "heterogeneous") or on_demand_capacity > 0:
             # SpotFleet API: TargetCapacity is total, OnDemandTargetCapacity is on-demand portion
-            fleet_config["OnDemandTargetCapacity"] = request.requested_count
-            # Note: Remaining capacity (TargetCapacity - OnDemandTargetCapacity) becomes spot capacity automatically
-
-        elif price_type == "heterogeneous":
-            # For heterogeneous, split capacity based on percent_on_demand
-            percent_on_demand = template.percent_on_demand or 0
-            on_demand_count = int(request.requested_count * percent_on_demand / 100)
-            # spot_count = request.requested_count - on_demand_count (calculated automatically by AWS)
-
-            fleet_config["OnDemandTargetCapacity"] = on_demand_count
-            # Note: Spot capacity = TargetCapacity - OnDemandTargetCapacity (automatic)
-
-        else:  # "spot" (default)
-            # For pure spot fleets, don't set OnDemandTargetCapacity
-            # All TargetCapacity becomes spot capacity automatically
-            pass
+            fleet_config["OnDemandTargetCapacity"] = on_demand_capacity
 
         # Add template tags if any
         if template.tags:

@@ -532,7 +532,7 @@ def _register_aws_services(container: DIContainer) -> None:
             raise
 
         try:
-            from providers.aws.infrastructure.adapters.provisioning_adapter import (
+            from providers.aws.infrastructure.adapters.aws_provisioning_adapter import (
                 AWSProvisioningAdapter,
             )
         except Exception as e:

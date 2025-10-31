@@ -444,11 +444,13 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
         provider_port: ProviderPort,
+        query_bus: QueryBus,  # Add QueryBus for template lookup
     ) -> None:
         super().__init__(logger, event_publisher, error_handler)
         self.uow_factory = uow_factory
         self._container = container
         self._provider_context = provider_port
+        self._query_bus = query_bus
 
     async def validate_command(self, command: CreateReturnRequestCommand):
         """Validate create return request command."""
@@ -525,36 +527,168 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             raise
 
     async def _execute_deprovisioning(self, machine_ids: list[str], request) -> dict[str, Any]:
-        """Execute De-Provisioning release machines"""
+        """Execute De-Provisioning - handles instances from multiple templates in parallel"""
 
         try:
-            # Import required types (using existing imports)
+            # Step 1: Group instances by their original template
+            from collections import defaultdict
+            template_groups = defaultdict(list)
+
+            for machine_id in machine_ids:
+                try:
+                    with self.uow_factory.create_unit_of_work() as uow:
+                        machine = uow.machines.find_by_id(machine_id)
+                        if not machine:
+                            raise ValueError(f"Machine not found: {machine_id}")
+                        if not machine.template_id:
+                            raise ValueError(f"Machine {machine_id} has no template_id")
+                        template_groups[machine.template_id].append(machine_id)
+                except Exception as e:
+                    self.logger.error("Failed to get template for machine %s: %s", machine_id, e)
+                    raise ValueError(f"Cannot determine template for machine {machine_id}: {e}")
+
+            self.logger.info("Grouped instances by template: %s",
+                            {tid: len(instances) for tid, instances in template_groups.items()})
+
+            # Step 2: Create tasks for parallel execution
+            import asyncio
+            tasks = []
+
+            for template_id, instance_group in template_groups.items():
+                task = asyncio.create_task(
+                    self._process_template_group(template_id, instance_group, request),
+                    name=f"terminate-{template_id}"
+                )
+                tasks.append(task)
+
+            # Step 3: Execute all tasks in parallel
+            self.logger.info("Executing %d termination operations in parallel", len(tasks))
+
+            # Wait for all tasks to complete
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Step 4: Process results and handle exceptions
+            processed_results = []
+            total_success = 0
+
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    template_id = list(template_groups.keys())[i]
+                    instance_group = list(template_groups.values())[i]
+                    self.logger.error("Task for template %s failed: %s", template_id, result)
+                    processed_results.append({
+                        "template_id": template_id,
+                        "instance_count": len(instance_group),
+                        "instance_ids": instance_group,
+                        "success": False,
+                        "error_message": str(result),
+                    })
+                else:
+                    processed_results.append(result)
+                    if result.get("success", False):
+                        total_success += len(result.get("instance_ids", []))
+
+            # Step 5: Return comprehensive results
+            overall_success = total_success == len(machine_ids)
+
+            self.logger.info(
+                "Parallel de-provisioning completed: %d successful, %d failed out of %d total instances",
+                total_success,
+                len(machine_ids) - total_success,
+                len(machine_ids)
+            )
+
+            return {
+                "success": overall_success,
+                "total_instances": len(machine_ids),
+                "successful_instances": total_success,
+                "failed_instances": len(machine_ids) - total_success,
+                "results_by_template": processed_results,
+                "handlers_used": list(set(r.get("provider_api") for r in processed_results if r.get("provider_api"))),
+                "parallel_execution": True,
+                "concurrent_operations": len(tasks),
+            }
+
+        except Exception as e:
+            self.logger.error("Parallel de-provisioning execution failed: %s", e)
+            return {"success": False, "error_message": str(e)}
+
+    async def _process_template_group(self, template_id: str, instance_group: list[str], request) -> dict[str, Any]:
+        """Process a single template group - designed for parallel execution"""
+
+        try:
+            self.logger.info("Processing template group %s with %d instances", template_id, len(instance_group))
+
+            # Get the actual template configuration
+            from application.dto.queries import GetTemplateQuery
+            template_query = GetTemplateQuery(template_id=template_id)
+            template = await self._query_bus.execute(template_query)
+
+            if not template:
+                raise ValueError(f"Template not found: {template_id}")
+
+            template_config = template.to_dict()
+            provider_api = template.provider_api
+            self.logger.info("Using %s handler for template %s", provider_api, template_id)
+
+            # Create operation for this specific template group
             from providers.base.strategy import ProviderOperation, ProviderOperationType
 
-            self.logger.debug(f"De-Provisioning request {request} \n {self._provider_context}")
-            # Create provider operation using existing pattern
             operation = ProviderOperation(
                 operation_type=ProviderOperationType.TERMINATE_INSTANCES,
                 parameters={
-                    # "template_config": template.to_dict(),
-                    # "count": request.requested_count,
+                    "instance_ids": instance_group,
+                    "template_config": template_config,
+                    "template_id": template_id,
+                    "provider_api": provider_api,
                 },
                 context={
-                    # "correlation_id": str(request.request_id),
-                    # "dry_run": request.metadata.get("dry_run", False),
+                    "correlation_id": str(request.request_id),
+                    "template_id": template_id,
+                    "parallel_execution": True,
                 },
             )
 
-            result = await self._provider_context.terminate_resources(machine_ids, operation)
-            self.logger.info(f"De-Provisioning results: {result}")
+            # Execute termination for this group
+            group_result = await self._provider_context.terminate_resources(instance_group, operation)
 
-            pass
-        except Exception as e:
-            self.logger.error("De-Provisioning execution failed: %s", e)
+            # Handle case where terminate_resources returns None
+            if group_result is None:
+                self.logger.error("terminate_resources returned None for template %s", template_id)
+                return {
+                    "template_id": template_id,
+                    "provider_api": provider_api,
+                    "instance_count": len(instance_group),
+                    "instance_ids": instance_group,
+                    "success": False,
+                    "error_message": "terminate_resources returned None - provider context error",
+                }
+
+            success = group_result.get("success", False)
+            self.logger.info(
+                "Template %s (%s): %s - %d instances",
+                template_id,
+                provider_api,
+                "SUCCESS" if success else "FAILED",
+                len(instance_group)
+            )
+
             return {
+                "template_id": template_id,
+                "provider_api": provider_api,
+                "instance_count": len(instance_group),
+                "instance_ids": instance_group,
+                "success": success,
+                "error_message": group_result.get("error_message"),
+            }
+
+        except Exception as e:
+            self.logger.error("Failed to process template group %s: %s", template_id, e)
+            return {
+                "template_id": template_id,
+                "instance_count": len(instance_group),
+                "instance_ids": instance_group,
                 "success": False,
-                "instance_ids": [],
-                "provider_data": {},
                 "error_message": str(e),
             }
 

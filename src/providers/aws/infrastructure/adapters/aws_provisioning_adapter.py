@@ -171,6 +171,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             self._logger.error("Error during resource provisioning: %s", str(e))
             raise InfrastructureError(f"Failed to provision resources: {e!s}")
 
+    # KBG TODO: this function is not used.
     def check_resources_status(self, request: Request) -> list[dict[str, Any]]:
         """
         Check the status of provisioned AWS resources.
@@ -228,55 +229,61 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             self._logger.error("Error during resource status check: %s", str(e))
             raise InfrastructureError(f"Failed to check resource status: {e!s}")
 
-    def release_resources(self, request: Request) -> None:
+    def release_resources(
+        self,
+        machine_ids: list[str],
+        template_id: str,
+        provider_api: str,
+        context: dict = None
+    ) -> None:
         """
-        Release provisioned AWS resources.
+        Release provisioned AWS resources using direct parameters.
 
         Args:
-            request: The request containing resource identifier
+            machine_ids: List of instance IDs to terminate
+            template_id: Template ID used to create the instances
+            provider_api: Provider API type (ASG, EC2Fleet, SpotFleet, RunInstances)
+            context: Context dictionary (unused in new flow)
 
         Raises:
             AWSEntityNotFoundError: If the resource is not found
             InfrastructureError: For other infrastructure errors
         """
-        self._logger.info("Releasing resources for request %s", request.request_id)
+        context = context or {}
 
-        if not request.resource_id:
-            self._logger.error("No resource ID found in request %s", request.request_id)
-            raise AWSEntityNotFoundError(f"No resource ID found in request {request.request_id}")
+        self._logger.info(
+            "Releasing resources: %d instances from template %s using %s handler",
+            len(machine_ids),
+            template_id, #KBG potentially remove alltogether.
+            provider_api
+        )
 
-        # Get the template to determine the handler type
-        if not self._template_config_manager:
-            self._logger.warning(
-                "TemplateConfigurationManager not injected, getting from container"
+        if not machine_ids:
+            self._logger.error("No instance IDs provided for resource release")
+            raise AWSValidationError("Instance IDs are required for resource release")
+
+        if not template_id:
+            self._logger.error("No template ID provided for resource release")
+            raise AWSValidationError("Template ID is required for resource release")
+
+        # Get handler using caching helper method based on provider_api
+        handler = self._get_handler_for_provider_api(provider_api)
+
+        # Call handler with machine_ids - handler will handle any ASG detection internally
+        if provider_api == "ASG":
+            # ASG handler has special release_hosts method that handles ASG detection
+            handler.release_hosts(machine_ids=machine_ids)
+        else:
+            # Other handlers use AWS operations utility for direct termination
+            handler.aws_ops.terminate_instances_with_fallback(
+                machine_ids, handler._request_adapter, f"{provider_api} instances"
             )
-            from infrastructure.di.container import get_container
 
-            container = get_container()
-            self._template_config_manager = container.get(TemplateConfigurationManager)
-
-        # Ensure template_id is not None
-        if not request.template_id:
-            raise AWSValidationError("Template ID is required")
-
-        # Get template using the configuration manager
-        template = self._template_config_manager.get_template(str(request.template_id))
-        if not template:
-            raise EntityNotFoundError("Template", str(request.template_id))
-
-        # Get the appropriate handler for the template
-        handler = self._get_handler_for_template(template)
-
-        try:
-            # Release hosts using the handler
-            handler.release_hosts(request)
-            self._logger.info("Successfully released resources for request %s", request.request_id)
-        except AWSEntityNotFoundError as e:
-            self._logger.error("Resource not found during release: %s", str(e))
-            raise
-        except Exception as e:
-            self._logger.error("Error during resource release: %s", str(e))
-            raise InfrastructureError(f"Failed to release resources: {e!s}")
+        self._logger.info(
+            "Successfully released %d instances using %s handler",
+            len(machine_ids),
+            provider_api
+        )
 
     def get_resource_health(self, resource_id: str) -> dict[str, Any]:
         """
@@ -384,6 +391,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             self._logger.error("Error getting resource health: %s", str(e))
             raise InfrastructureError(f"Failed to get resource health: {e!s}")
 
+
     def _get_handler_for_template(self, template: Template) -> AWSHandler:
         """
         Get the appropriate AWS handler for the template.
@@ -407,4 +415,28 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
 
         # Cache the handler for future use
         self._handlers[handler_type] = handler
+        return handler
+
+    def _get_handler_for_provider_api(self, provider_api: str) -> AWSHandler:
+        """
+        Get the appropriate AWS handler for the provider API.
+
+        Args:
+            provider_api: The provider API type (ASG, EC2Fleet, SpotFleet, RunInstances)
+
+        Returns:
+            AWSHandler: The appropriate handler for the provider API
+
+        Raises:
+            ValidationError: If the provider API has an invalid handler type
+        """
+        # Check if we already have a cached handler for this type
+        if provider_api in self._handlers:
+            return self._handlers[provider_api]
+
+        # Use the handler factory to create the handler
+        handler = self._aws_handler_factory.create_handler(provider_api)
+
+        # Cache the handler for future use
+        self._handlers[provider_api] = handler
         return handler

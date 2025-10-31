@@ -54,13 +54,19 @@ class AWSProviderStrategy(ProviderStrategy):
     - AWS-specific optimizations and features
     """
 
-    def __init__(self, config: AWSProviderConfig, logger: LoggingPort) -> None:
+    def __init__(
+        self,
+        config: AWSProviderConfig,
+        logger: LoggingPort,
+        aws_provisioning_port: Optional["AWSProvisioningAdapter"] = None
+    ) -> None:
         """
         Initialize AWS provider strategy.
 
         Args:
             config: AWS-specific configuration
             logger: Logger for logging messages
+            aws_provisioning_port: Optional AWS provisioning adapter for resource management
 
         Raises:
             ValueError: If configuration is invalid
@@ -75,6 +81,7 @@ class AWSProviderStrategy(ProviderStrategy):
         self._resource_manager: Optional[AWSResourceManager] = None
         self._launch_template_manager: Optional[AWSLaunchTemplateManager] = None
         self._handlers: dict[str, Any] = {}
+        self._aws_provisioning_port = aws_provisioning_port
 
     @property
     def provider_type(self) -> str:
@@ -206,7 +213,7 @@ class AWSProviderStrategy(ProviderStrategy):
             Result of the operation execution
         """
 
-        self._logger.debug(" aws_provider_strategy execute_operation")
+        self._logger.debug(f" aws_provider_strategy execute_operation [{operation.operation_type}, {operation.parameters}, {operation.context}]")
         if not self._initialized:
             return ProviderResult.error_result(
                 "AWS provider strategy not initialized", "NOT_INITIALIZED"
@@ -438,6 +445,37 @@ class AWSProviderStrategy(ProviderStrategy):
                     "Instance IDs are required for termination", "MISSING_INSTANCE_IDS"
                 )
 
+            # Try to use the injected AWS provisioning port first
+            if self._aws_provisioning_port:
+                try:
+                    self._logger.info("Using AWS provisioning port for resource release")
+
+                    # Simple call without ASG context - let adapter/handler handle ASG logic
+                    self._aws_provisioning_port.release_resources(
+                        machine_ids=instance_ids,
+                        template_id=operation.parameters.get("template_id", "termination-template"),
+                        provider_api=operation.parameters.get("provider_api", "RunInstances"),
+                        context={}
+                    )
+
+                    self._logger.info("Successfully released all resources using provisioning port")
+                    return ProviderResult.success_result(
+                        {"success": True, "terminated_count": len(instance_ids)},
+                        {
+                            "operation": "terminate_instances",
+                            "instance_ids": instance_ids,
+                            "method": "provisioning_port"
+                        },
+                    )
+
+                except Exception as e:
+                    self._logger.warning("Failed to use provisioning port, falling back to direct termination: %s", e)
+                    # Fall through to direct termination
+
+            # Fallback to direct termination using AWS client
+            self._logger.info("Using direct AWS client for instance termination")
+
+
             # Use AWS client property (with lazy initialization) for termination
             aws_client = self.aws_client
             if not aws_client:
@@ -452,7 +490,7 @@ class AWSProviderStrategy(ProviderStrategy):
 
                 return ProviderResult.success_result(
                     {"success": success, "terminated_count": terminating_count},
-                    {"operation": "terminate_instances", "instance_ids": instance_ids},
+                    {"operation": "terminate_instances", "instance_ids": instance_ids, "method": "direct_client"},
                 )
 
             except Exception as e:

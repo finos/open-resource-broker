@@ -303,6 +303,7 @@ class ASGHandler(AWSHandler, BaseContextMixin):
             "health_check_type": "EC2",
             "health_check_grace_period": 300,
             "vpc_zone_identifier": ",".join(template.subnet_ids) if template.subnet_ids else None,
+            "new_instances_protected_from_scale_in": True,
             "context": (
                 template.context if hasattr(template, "context") and template.context else None
             ),
@@ -331,6 +332,7 @@ class ASGHandler(AWSHandler, BaseContextMixin):
                     "launch_template_id": launch_template_id,
                     "launch_template_version": launch_template_version,
                     "asg_name": asg_name,
+                    "new_instances_protected_from_scale_in": True,
                 }
             )
 
@@ -344,6 +346,7 @@ class ASGHandler(AWSHandler, BaseContextMixin):
                 native_spec["LaunchTemplate"]["LaunchTemplateId"] = launch_template_id
                 native_spec["LaunchTemplate"]["Version"] = launch_template_version
                 native_spec["AutoScalingGroupName"] = asg_name
+                native_spec.setdefault("NewInstancesProtectedFromScaleIn", True)
                 self._logger.info(
                     "Using native provider API spec with merge for ASG template %s",
                     aws_template.template_id,
@@ -379,6 +382,7 @@ class ASGHandler(AWSHandler, BaseContextMixin):
             "DefaultCooldown": 300,
             "HealthCheckType": "EC2",
             "HealthCheckGracePeriod": 300,
+            "NewInstancesProtectedFromScaleIn": True,
         }
 
         # Add subnet configuration
@@ -446,70 +450,292 @@ class ASGHandler(AWSHandler, BaseContextMixin):
             self._build_fallback_machine_payload(inst, resource_id) for inst in instance_details
         ]
 
-    def release_hosts(self, request: Request) -> None:
-        """Release hosts across all ASGs in the request."""
+    @staticmethod
+    def detect_asg_instances(aws_client, instance_ids: list[str]) -> dict[str, list[str]]:
+        """
+        Detect which instances belong to ASGs and group them.
+
+        Args:
+            aws_client: AWS client instance
+            instance_ids: List of EC2 instance IDs
+
+        Returns:
+            Dictionary mapping ASG names to instance IDs, empty if no ASG instances found
+        """
         try:
-            if not request.resource_ids:
-                raise AWSInfrastructureError("No ASG names found in request")
+            asg_mapping = {}
 
-            # Handle all ASG resource IDs in the request
-            for asg_name in request.resource_ids:
-                # Get instance IDs from machine references
-                instance_ids = []
-                if request.machine_references:
-                    instance_ids = [m.machine_id for m in request.machine_references]
-
-                if instance_ids:
-                    # Get ASG details first
-                    asg_response = self._retry_with_backoff(
-                        self.aws_client.autoscaling_client.describe_auto_scaling_groups,
-                        AutoScalingGroupNames=[asg_name],
+            # Process instances in chunks to avoid API limits
+            for chunk in ASGHandler._chunk_list(instance_ids, 50):
+                try:
+                    response = aws_client.autoscaling_client.describe_auto_scaling_instances(
+                        InstanceIds=chunk
                     )
-                    if not asg_response["AutoScalingGroups"]:
-                        raise AWSInfrastructureError(f"ASG {asg_name} not found")
 
-                    asg = asg_response["AutoScalingGroups"][0]
+                    # Group instances by ASG
+                    for entry in response.get("AutoScalingInstances", []):
+                        instance_id = entry.get("InstanceId")
+                        asg_name = entry.get("AutoScalingGroupName")
 
-                    # Reduce desired capacity first
-                    current_capacity = asg["DesiredCapacity"]
-                    new_capacity = max(0, current_capacity - len(instance_ids))
+                        if instance_id and asg_name:
+                            if asg_name not in asg_mapping:
+                                asg_mapping[asg_name] = []
+                            asg_mapping[asg_name].append(instance_id)
 
-                    self._retry_with_backoff(
-                        self.aws_client.autoscaling_client.update_auto_scaling_group,
-                        operation_type="critical",
-                        AutoScalingGroupName=asg_name,
-                        DesiredCapacity=new_capacity,
-                        MinSize=min(new_capacity, asg["MinSize"]),
-                    )
-                    self._logger.info("Reduced ASG %s capacity to %s", asg_name, new_capacity)
+                except Exception:
+                    # Skip failed chunks
+                    continue
 
-                    # Detach instances from ASG
-                    self._retry_with_backoff(
-                        self.aws_client.autoscaling_client.detach_instances,
-                        operation_type="critical",
-                        AutoScalingGroupName=asg_name,
-                        InstanceIds=instance_ids,
-                        ShouldDecrementDesiredCapacity=True,
-                    )
-                    self._logger.info("Detached instances from ASG: %s", instance_ids)
+            return asg_mapping
 
-                    # Use consolidated AWS operations utility for instance termination
-                    self.aws_ops.terminate_instances_with_fallback(
-                        instance_ids, self._request_adapter, "ASG instances"
-                    )
-                    self._logger.info("Terminated instances: %s", instance_ids)
+        except Exception:
+            return {}
+
+    @staticmethod
+    def _chunk_list(items: list[str], chunk_size: int):
+        """Yield successive chunk-sized lists from items."""
+        for index in range(0, len(items), chunk_size):
+            yield items[index : index + chunk_size]
+
+    def reduce_capacity_for_instance_ids(self, instance_ids: list[str]) -> None:
+        """Reduce ASG capacity ahead of instance termination to avoid replacements."""
+        if not instance_ids:
+            return
+
+        instance_group_map: dict[str, list[str]] = {}
+
+        try:
+            for chunk in self._chunk_list(instance_ids, 50):
+                response = self._retry_with_backoff(
+                    self.aws_client.autoscaling_client.describe_auto_scaling_instances,
+                    operation_type="read_only",
+                    InstanceIds=chunk,
+                )
+
+                for entry in response.get("AutoScalingInstances", []):
+                    group_name = entry.get("AutoScalingGroupName")
+                    instance_id = entry.get("InstanceId")
+                    if group_name and instance_id:
+                        instance_group_map.setdefault(group_name, []).append(instance_id)
+        except Exception as exc:
+            self._logger.warning(
+                "Failed to map instances to ASGs for capacity reduction: %s", exc
+            )
+            return
+
+        if not instance_group_map:
+            return
+
+        for group_name, instances in instance_group_map.items():
+            try:
+                group_response = self._retry_with_backoff(
+                    self.aws_client.autoscaling_client.describe_auto_scaling_groups,
+                    operation_type="read_only",
+                    AutoScalingGroupNames=[group_name],
+                )
+            except Exception as exc:
+                self._logger.warning(
+                    "Failed to describe ASG %s while reducing capacity: %s", group_name, exc
+                )
+                continue
+
+            groups = group_response.get("AutoScalingGroups", [])
+            if not groups:
+                continue
+
+            asg = groups[0]
+            current_desired = asg.get("DesiredCapacity", 0) or 0
+            current_min = asg.get("MinSize", 0) or 0
+
+            new_desired = max(0, current_desired - len(instances))
+            new_min = min(current_min, new_desired)
+
+            if current_desired == new_desired and current_min == new_min:
+                continue
+
+            try:
+                self._retry_with_backoff(
+                    self.aws_client.autoscaling_client.update_auto_scaling_group,
+                    operation_type="critical",
+                    AutoScalingGroupName=group_name,
+                    DesiredCapacity=new_desired,
+                    MinSize=new_min,
+                )
+                self._logger.info(
+                    "Reduced ASG %s capacity from %s to %s before terminating %s instances",
+                    group_name,
+                    current_desired,
+                    new_desired,
+                    len(instances),
+                )
+            except Exception as exc:
+                self._logger.warning(
+                    "Failed to update ASG %s capacity prior to termination: %s",
+                    group_name,
+                    exc,
+                )
+
+    def release_hosts(self, machine_ids: list[str]) -> None:
+        """Release hosts across multiple ASGs by detecting ASG membership."""
+        try:
+            if not machine_ids:
+                raise AWSInfrastructureError("Machine IDs are required")
+
+            self._logger.info(
+                "Releasing hosts for %d instances: %s",
+                len(machine_ids),
+                machine_ids
+            )
+
+            # Group instances by ASG membership
+            asg_instance_groups = self._group_instances_by_asg(machine_ids)
+            self._logger.info(f"Grouped instances by ASG: {asg_instance_groups}")
+
+            # Process each ASG group separately
+            for asg_name, asg_data in asg_instance_groups.items():
+                if asg_name is not None:
+                    # Handle ASG instances using dedicated method (primary case)
+                    self._release_hosts_for_single_asg(asg_name, asg_data["instance_ids"], asg_data["asg_details"])
                 else:
-                    # Delete entire ASG
-                    self._retry_with_backoff(
-                        self.aws_client.autoscaling_client.delete_auto_scaling_group,
-                        operation_type="critical",
-                        AutoScalingGroupName=asg_name,
-                        ForceDelete=True,
-                    )
-                    self._logger.info("Deleted Auto Scaling Group: %s", asg_name)
+                    # Handle non-ASG instances (fallback case)
+                    instance_ids = asg_data["instance_ids"]
+                    if instance_ids:
+                        self._logger.info(f"Terminating {len(instance_ids)} non-ASG instances")
+                        self.aws_ops.terminate_instances_with_fallback(
+                            instance_ids, self._request_adapter, "non-ASG instances"
+                        )
+                        self._logger.info("Terminated non-ASG instances: %s", instance_ids)
+
         except Exception as e:
             self._logger.error("Failed to release ASG hosts: %s", str(e))
             raise AWSInfrastructureError(f"Failed to release ASG hosts: {e!s}")
+
+    def _release_hosts_for_single_asg(self, asg_name: str, asg_instance_ids: list[str], asg_details: dict) -> None:
+        """Release hosts for a single ASG with proper capacity management."""
+        self._logger.info(f"Processing ASG {asg_name} with {len(asg_instance_ids)} instances")
+
+        # ASG details are always provided by _group_instances_by_asg
+        if not asg_details:
+            self._logger.warning(f"ASG details missing for {asg_name}, skipping")
+            return
+
+        # Detach instances from ASG first
+        self._retry_with_backoff(
+            self.aws_client.autoscaling_client.detach_instances,
+            operation_type="critical",
+            AutoScalingGroupName=asg_name,
+            InstanceIds=asg_instance_ids,
+            ShouldDecrementDesiredCapacity=True,
+        )
+        self._logger.info("Detached instances from ASG %s: %s", asg_name, asg_instance_ids)
+
+        # Then reduce desired capacity
+        current_capacity = asg_details["DesiredCapacity"]
+        new_capacity = max(0, current_capacity - len(asg_instance_ids))
+
+        self._retry_with_backoff(
+            self.aws_client.autoscaling_client.update_auto_scaling_group,
+            operation_type="critical",
+            AutoScalingGroupName=asg_name,
+            DesiredCapacity=new_capacity,
+            MinSize=min(new_capacity, asg_details["MinSize"]),
+        )
+        self._logger.info("Reduced ASG %s capacity to %s", asg_name, new_capacity)
+
+        # Use consolidated AWS operations utility for instance termination
+        self.aws_ops.terminate_instances_with_fallback(
+            asg_instance_ids, self._request_adapter, f"ASG {asg_name} instances"
+        )
+        self._logger.info("Terminated ASG %s instances: %s", asg_name, asg_instance_ids)
+
+    def _group_instances_by_asg(self, instance_ids: list[str]) -> dict[Optional[str], dict]:
+        """
+        Group instances by their ASG membership and return full ASG details.
+
+        Args:
+            instance_ids: List of EC2 instance IDs
+
+        Returns:
+            Dictionary mapping ASG names to ASG details dict containing:
+            - 'instance_ids': list of instance IDs
+            - 'asg_details': full ASG configuration (for ASG instances only)
+            Non-ASG instances are grouped under None key with only 'instance_ids'.
+        """
+        asg_groups: dict[Optional[str], dict] = {}
+        asg_names_to_fetch = set()
+
+        try:
+            # First, group instances by ASG name
+            for chunk in self._chunk_list(instance_ids, 50):
+                try:
+                    response = self._retry_with_backoff(
+                        self.aws_client.autoscaling_client.describe_auto_scaling_instances,
+                        operation_type="read_only",
+                        InstanceIds=chunk,
+                    )
+
+                    # Track which instances were found in ASGs
+                    asg_instance_ids = set()
+
+                    # Group instances by ASG
+                    for entry in response.get("AutoScalingInstances", []):
+                        instance_id = entry.get("InstanceId")
+                        asg_name = entry.get("AutoScalingGroupName")
+
+                        if instance_id and asg_name:
+                            if asg_name not in asg_groups:
+                                asg_groups[asg_name] = {"instance_ids": [], "asg_details": None}
+                            asg_groups[asg_name]["instance_ids"].append(instance_id)
+                            asg_instance_ids.add(instance_id)
+                            asg_names_to_fetch.add(asg_name)
+
+                    # Add non-ASG instances to None group
+                    non_asg_instances = [iid for iid in chunk if iid not in asg_instance_ids]
+                    if non_asg_instances:
+                        if None not in asg_groups:
+                            asg_groups[None] = {"instance_ids": []}
+                        asg_groups[None]["instance_ids"].extend(non_asg_instances)
+
+                except Exception as e:
+                    self._logger.warning(f"Failed to describe ASG instances for chunk {chunk}: {e}")
+                    # Add all instances in this chunk to non-ASG group as fallback
+                    if None not in asg_groups:
+                        asg_groups[None] = {"instance_ids": []}
+                    asg_groups[None]["instance_ids"].extend(chunk)
+
+            # Now fetch ASG details for all identified ASGs
+            if asg_names_to_fetch:
+                try:
+                    asg_names_list = list(asg_names_to_fetch)
+                    for asg_chunk in self._chunk_list(asg_names_list, 50):
+                        asg_response = self._retry_with_backoff(
+                            self.aws_client.autoscaling_client.describe_auto_scaling_groups,
+                            operation_type="read_only",
+                            AutoScalingGroupNames=asg_chunk,
+                        )
+
+                        for asg_details in asg_response.get("AutoScalingGroups", []):
+                            asg_name = asg_details.get("AutoScalingGroupName")
+                            if asg_name in asg_groups:
+                                asg_groups[asg_name]["asg_details"] = asg_details
+
+                except Exception as e:
+                    self._logger.warning(f"Failed to fetch ASG details: {e}")
+                    # Continue without ASG details - methods will handle missing details
+
+        except Exception as e:
+            self._logger.error(f"Failed to group instances by ASG: {e}")
+            # Fallback: treat all instances as non-ASG
+            asg_groups = {None: {"instance_ids": instance_ids.copy()}}
+
+        self._logger.debug(f"Grouped {len(instance_ids)} instances into {len(asg_groups)} groups")
+        return asg_groups
+
+    @staticmethod
+    def _chunk_list(items: list[str], chunk_size: int):
+        """Yield successive chunk-sized lists from items."""
+        for index in range(0, len(items), chunk_size):
+            yield items[index : index + chunk_size]
 
     async def check_hosts_status(self, request: Request) -> list[dict[str, Any]]:
         """Check the status of instances across all ASGs in the request."""

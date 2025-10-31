@@ -133,6 +133,47 @@ class TestContextFieldSupport:
         assert "Context" in config
         assert config["Context"] == "development-testing"
 
+    def test_spot_fleet_percent_on_demand_for_spot_price(self):
+        """Ensure percent_on_demand is applied when price_type is spot."""
+        template = Mock()
+        template.context = None
+        template.fleet_role = (
+            "arn:aws:iam::123456789012:role/aws-service-role/spotfleet.amazonaws.com/"
+            "AWSServiceRoleForEC2SpotFleet"
+        )
+        template.fleet_type = "request"
+        template.instance_types = None
+        template.instance_types_ondemand = None
+        template.instance_type = "t3.micro"
+        template.subnet_ids = ["subnet-abc123"]
+        template.tags = None
+        template.allocation_strategy = None
+        template.max_spot_price = None
+        template.max_price = None
+        template.price_type = "spot"
+        template.percent_on_demand = 50
+        template.allocation_strategy_on_demand = None
+        template.template_id = "test-template"
+
+        request = Mock()
+        request.requested_count = 4
+        request.request_id = "req-123"
+
+        aws_client = Mock()
+        aws_client.sts_client.get_caller_identity.return_value = {"Account": "123456789012"}
+
+        handler = SpotFleetHandler(aws_client, Mock(), Mock(), Mock(), Mock())
+        handler.aws_native_spec_service = None
+
+        config = handler._create_spot_fleet_config(
+            template=template,
+            request=request,
+            launch_template_id="lt-123",
+            launch_template_version="1",
+        )
+
+        assert config["OnDemandTargetCapacity"] == 2
+
     def test_handlers_without_context_field(self):
         """Test that handlers work correctly when Context field is not specified."""
         # Mock template without context

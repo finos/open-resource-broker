@@ -112,6 +112,7 @@ def get_instance_details(instance_id):
             "instance_type": instance.get("InstanceType"),
             "state": instance.get("State", {}).get("Name"),
             "launch_time": instance.get("LaunchTime"),
+            "instance_lifecycle": instance.get("InstanceLifecycle"),  # None for on-demand, "spot" for spot instances
         }
 
     except ClientError as e:
@@ -228,6 +229,49 @@ def validate_subnet_id(instance_details, template, instance_id):
         return False
 
 
+def validate_instance_lifecycle(instance_details, expected_price_type, instance_id):
+    """
+    Validate that the instance lifecycle matches the expected price type.
+
+    Args:
+        instance_details: Dict with instance details from AWS
+        expected_price_type: Expected price type ("ondemand" or "spot")
+        instance_id: Instance ID for logging
+
+    Returns:
+        bool: True if validation passes
+    """
+    actual_lifecycle = instance_details.get("instance_lifecycle")
+
+    if expected_price_type == "ondemand":
+        # On-demand instances should not have an instance lifecycle field or it should be None
+        if actual_lifecycle is None:
+            log.info(
+                f"Instance {instance_id}: Price type validation PASSED - Expected: on-demand, Actual: on-demand (no lifecycle field)"
+            )
+            return True
+        else:
+            log.error(
+                f"Instance {instance_id}: Price type validation FAILED - Expected: on-demand, Actual: {actual_lifecycle}"
+            )
+            return False
+    elif expected_price_type == "spot":
+        # Spot instances should have instance lifecycle set to "spot"
+        if actual_lifecycle == "spot":
+            log.info(
+                f"Instance {instance_id}: Price type validation PASSED - Expected: spot, Actual: spot"
+            )
+            return True
+        else:
+            log.error(
+                f"Instance {instance_id}: Price type validation FAILED - Expected: spot, Actual: {actual_lifecycle or 'on-demand'}"
+            )
+            return False
+    else:
+        log.warning(f"Instance {instance_id}: Unknown price type '{expected_price_type}', skipping validation")
+        return True
+
+
 def validate_instance_attributes(instance_id, template):
     """
     Validate all specified instance attributes against the template.
@@ -297,6 +341,59 @@ def validate_random_instance_attributes(status_response, template):
     )
 
     return validate_instance_attributes(instance_id, template)
+
+
+def validate_all_instances_price_type(status_response, test_case):
+    """
+    Validate that all EC2 instances match the expected price type from the test case.
+
+    Args:
+        status_response: Response from get_request_status containing machine info
+        test_case: Test case dict containing overrides with priceType
+
+    Returns:
+        bool: True if all instances match the expected price type
+    """
+    machines = status_response["requests"][0]["machines"]
+    if not machines:
+        log.error("No machines found in status response for price type validation")
+        return False
+
+    # Get expected price type from test case overrides
+    expected_price_type = test_case.get("overrides", {}).get("priceType")
+    if not expected_price_type:
+        log.info("No priceType specified in test case overrides, skipping price type validation")
+        return True
+
+    log.info(f"Validating price type for all {len(machines)} instances - Expected: {expected_price_type}")
+
+    all_validations_passed = True
+
+    for machine in machines:
+        instance_id = machine["machineId"]
+
+        try:
+            # Get instance details from AWS
+            instance_details = get_instance_details(instance_id)
+
+            # Validate price type for this instance
+            validation_passed = validate_instance_lifecycle(
+                instance_details, expected_price_type, instance_id
+            )
+
+            if not validation_passed:
+                all_validations_passed = False
+
+        except Exception as e:
+            log.error(f"Instance {instance_id}: Price type validation failed with exception: {e}")
+            all_validations_passed = False
+
+    if all_validations_passed:
+        log.info(f"Price type validation PASSED for all {len(machines)} instances")
+    else:
+        log.error(f"Price type validation FAILED for one or more instances")
+
+    return all_validations_passed
 
 
 @pytest.fixture
@@ -430,19 +527,21 @@ def _check_all_ec2_hosts_are_being_terminated(ec2_instance_ids):
     return all_are_deallocated
 
 
-def provide_release_control_loop(hfm, template_json, capacity_to_request):
+def provide_release_control_loop(hfm, template_json, capacity_to_request, test_case=None):
     """
     Executes a full lifecycle test of requesting and releasing EC2 instances.
 
     This function performs the following steps:
     1. Requests EC2 capacity based on the provided template
     2. Waits for the instances to be provisioned and validates their status
-    3. Deallocates the instances and verifies they are properly terminated
+    3. Validates that all instances match the expected price type (if specified)
+    4. Deallocates the instances and verifies they are properly terminated
 
     Args:
         hfm (HostFactoryMock): Mock host factory instance to interact with EC2
         template_json (dict): Template containing EC2 instance configuration
         capacity_to_request (int): Number of EC2 instances to request
+        test_case (dict, optional): Test case containing overrides for validation
 
     Raises:
         ValidationError: If the API responses don't match expected schemas
@@ -455,7 +554,27 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request):
     res = hfm.request_machines(template_json["templateId"], capacity_to_request)
     parse_and_print_output(res)
 
-    request_id = res["requestId"]
+    # Debug: Log the full response to understand the structure
+    log.debug(f"Full request_machines response: {json.dumps(res, indent=2)}")
+
+    # Handle different response formats or error responses
+    if "requestId" in res:
+        request_id = res["requestId"]
+    elif "request_id" in res:
+        request_id = res["request_id"]
+    else:
+        # This might be an error response - log more details
+        log.error(f"AWS provider response missing requestId field.")
+        log.error(f"Response keys: {list(res.keys())}")
+        log.error(f"Full response: {json.dumps(res, indent=2)}")
+        log.error(f"Template used: {json.dumps(template_json, indent=2)}")
+
+        # Check if this is an error response
+        if "error" in res or "message" in res:
+            error_msg = res.get("error", res.get("message", "Unknown error"))
+            pytest.fail(f"AWS provider returned error response: {error_msg}. Full response: {res}")
+        else:
+            pytest.fail(f"AWS provider response missing requestId field. Response: {res}")
 
     # log.debug(json.dumps(res, indent=4))
 
@@ -511,6 +630,27 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request):
         log.info(
             "Instance attribute validation PASSED - EC2 instance attributes match template configuration"
         )
+
+    # Validate price type for all instances if test_case is provided
+    if test_case:
+        # Check if this provider API supports spot instance validation
+        provider_api = template_json.get("providerApi", "EC2Fleet")
+        expected_price_type = test_case.get("overrides", {}).get("priceType")
+
+        if provider_api in ["RunInstances", "ASG"] and expected_price_type == "spot":
+            log.warning(f"Skipping price type validation for {provider_api} with spot instances - may not be supported")
+        else:
+            log.info("Starting price type validation for all instances")
+            price_type_validation_passed = validate_all_instances_price_type(status_response, test_case)
+
+            if not price_type_validation_passed:
+                pytest.fail(
+                    "Price type validation failed - EC2 instances do not match expected price type"
+                )
+            else:
+                log.info(
+                    "Price type validation PASSED - All EC2 instances match expected price type"
+                )
 
     # <3.> Deallocate capacity and verify that capacity is released. ###############################
 
@@ -621,5 +761,5 @@ def test_sample(setup_host_factory_mock_with_scenario, test_case):
         template_json = res["templates"][0]
 
     provide_release_control_loop(
-        hfm, template_json=template_json, capacity_to_request=test_case["capacity_to_request"]
+        hfm, template_json=template_json, capacity_to_request=test_case["capacity_to_request"], test_case=test_case
     )

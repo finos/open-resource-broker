@@ -1,76 +1,154 @@
-def get_test_cases():
-    return [
-        # {
-        #     "test_name": "EC2FleetInstant",
-        #     "capacity_to_request": 2,
-        #     "overrides": {
-        #         "fleetType":"instant"
-        #     }
-        # },
-        {
-            "test_name": "SpotRequest",
-            "template_id": "BASE",
-            "capacity_to_request": 2,
-            "awsprov_base_template": "awsprov_templates.base.json",
-            "overrides": {"fleetType": "request", "providerApi": "SpotFleet"},
-        },
-        {
-            "test_name": "EC2FleetRequest",
-            "template_id": "BASE",
-            "capacity_to_request": 2,
-            "awsprov_base_template": "awsprov_templates.base.json",
-            "overrides": {"fleetType": "request", "providerApi": "EC2Fleet"},
-        },
-        {
-            "test_name": "EC2FleetInstant",
-            "template_id": "BASE",
-            "capacity_to_request": 2,
-            "awsprov_base_template": "awsprov_templates.base.json",
-            "overrides": {"fleetType": "instant", "providerApi": "EC2Fleet"},
-        },
-        {
-            "test_name": "RunInstances",
-            "template_id": "BASE",
-            "capacity_to_request": 2,
-            "awsprov_base_template": "awsprov_templates.base.json",
-            "overrides": {"fleetType": "instant", "providerApi": "RunInstances"},
-        },
-        {
-            "test_name": "ASG",
-            "template_id": "BASE",
-            "capacity_to_request": 2,
-            "awsprov_base_template": "awsprov_templates.base.json",
-            "overrides": {"fleetType": "instant", "providerApi": "ASG"},
-        },
-        # {
-        #     "test_name": "EC2FleetRequest",
-        #     "capacity_to_request": 2
-        # }
-        # ,
-        # {
-        #     "test_name": "EC2FleetMaintain",
-        #     "capacity_to_request": 2
-        # },
-        # {
-        #     "test_name": "SpotFleet",
-        #     "capacity_to_request": 2
-        # },
-        # {
-        #     "test_name": "SpotFleetRequest",
-        #     "capacity_to_request": 2
-        # },
-        # {
-        #     "test_name": "SpotFleetMaintain",
-        #     "capacity_to_request": 2
-        # },
-        # {
-        #     "test_name": "ASG",
-        #     "capacity_to_request": 2
-        # }
+import itertools
+from typing import List, Dict, Any, Optional
+
+# Global default attribute combinations
+DEFAULT_ATTRIBUTE_COMBINATIONS = [
+    # {
+    # "providerApi": ["EC2Fleet"],
+    # "fleetType": ["request", "instant"],
+    # "priceType": ["ondemand", "spot"]
+    # },
+
+    # {
+    # "providerApi": ["RunInstances", "ASG"],
+    # "priceType": ["ondemand", "spot"]
+    # }
+
+    {
+    "providerApi": ["EC2Fleet"],
+    "fleetType": ["instant"],
+    "priceType": ["spot"]
+    },
+
     ]
 
 
-def get_test_case_by_name(test_name: str):
+def generate_scenarios_from_attributes(
+    attribute_combinations: Dict[str, List[Any]],
+    base_template: Dict[str, Any] = None,
+    naming_template: str = None
+) -> List[Dict[str, Any]]:
+    """
+    Generate test scenarios from all combinations of provided attributes.
+
+    Args:
+        attribute_combinations: Dictionary where keys are attribute names and values are lists of possible values
+        base_template: Base template to use for all generated scenarios
+        naming_template: Template for generating test names (uses attribute values)
+
+    Returns:
+        List of test scenario dictionaries
+    """
+    if base_template is None:
+        base_template = {
+            "template_id": "BASE",
+            "capacity_to_request": 2,
+            "awsprov_base_template": "awsprov_templates.base.json",
+        }
+
+    scenarios = []
+
+    # Get all attribute names and their possible values
+    attribute_names = list(attribute_combinations.keys())
+    attribute_values = list(attribute_combinations.values())
+
+    # Generate all combinations
+    for combination in itertools.product(*attribute_values):
+        # Create the overrides dictionary from the combination
+        overrides = dict(zip(attribute_names, combination))
+
+        # Generate test name
+        if naming_template:
+            test_name = naming_template.format(**overrides)
+        else:
+            # Default naming: concatenate attribute values with dots as separators
+            name_parts = []
+            for attr_name, attr_value in overrides.items():
+                if attr_name == "providerApi":
+                    name_parts.append(str(attr_value))
+                elif attr_name == "fleetType":
+                    name_parts.append(str(attr_value).title())
+                else:
+                    name_parts.append(str(attr_value))
+            test_name = ".".join(name_parts)
+
+        # Create the scenario
+        scenario = base_template.copy()
+        scenario.update({
+            "test_name": test_name,
+            "overrides": overrides
+        })
+
+        scenarios.append(scenario)
+
+    return scenarios
+
+
+def get_generated_test_cases(attribute_combinations: Dict[str, List[Any]] = None, apply_filters: bool = True) -> List[Dict[str, Any]]:
+    """
+    Generate test cases from attribute combinations.
+    This replaces the hardcoded scenarios with dynamically generated ones.
+
+    Args:
+        attribute_combinations: Dictionary of attributes and their possible values.
+                              If None, uses DEFAULT_ATTRIBUTE_COMBINATIONS.
+        apply_filters: Whether to apply business rule filters to remove invalid combinations.
+    """
+    # Use provided combinations or default
+    if attribute_combinations is None:
+        attribute_combinations = DEFAULT_ATTRIBUTE_COMBINATIONS
+
+    # Generate scenarios
+    generated_scenarios = generate_scenarios_from_attributes(attribute_combinations)
+
+    if not apply_filters:
+        return generated_scenarios
+
+    # Filter out invalid combinations
+    valid_scenarios = []
+    for scenario in generated_scenarios:
+        overrides = scenario["overrides"]
+        provider_api = overrides.get("providerApi")
+        fleet_type = overrides.get("fleetType")
+
+        # Apply business rules to filter invalid combinations
+        if provider_api == "SpotFleet" and fleet_type == "instant":
+            # SpotFleet doesn't support instant type, skip this combination
+            continue
+        elif provider_api == "RunInstances" and fleet_type == "request":
+            # RunInstances doesn't support request type, skip this combination
+            continue
+        elif provider_api == "ASG" and fleet_type == "request":
+            # ASG doesn't support request type, skip this combination
+            continue
+
+        valid_scenarios.append(scenario)
+
+    return valid_scenarios
+
+
+def get_custom_test_cases() -> List[Dict[str, Any]]:
+    """
+    Define custom test cases that don't fit the standard attribute combinations.
+    This allows for special cases and edge scenarios.
+    """
+    return [
+        # Add custom scenarios here as needed
+        # Example:
+        # {
+        #     "test_name": "CustomScenario",
+        #     "template_id": "CUSTOM",
+        #     "capacity_to_request": 5,
+        #     "awsprov_base_template": "awsprov_templates.custom.json",
+        #     "overrides": {"specialAttribute": "specialValue"},
+        # },
+    ]
+
+
+
+
+
+def get_test_case_by_name(test_name: str) -> Dict[str, Any]:
     """Get a specific test case by test name."""
     test_cases = get_test_cases()
     for test_case in test_cases:
@@ -84,3 +162,63 @@ def get_test_case_by_name(test_name: str):
         "capacity_to_request": 2,
         "overrides": {},
     }
+
+
+def add_custom_attribute_combinations(
+    additional_attributes: Dict[str, List[Any]],
+    base_template: Dict[str, Any] = None
+) -> List[Dict[str, Any]]:
+    """
+    Generate additional scenarios with custom attribute combinations.
+    Useful for extending the test matrix with new attributes.
+
+    Args:
+        additional_attributes: Additional attributes to combine
+        base_template: Base template for the new scenarios
+
+    Returns:
+        List of additional test scenarios
+    """
+    return generate_scenarios_from_attributes(additional_attributes, base_template)
+
+
+# Example usage for extending scenarios:
+def get_extended_test_cases() -> List[Dict[str, Any]]:
+    """
+    Example of how to extend test cases with additional attribute combinations.
+    """
+    # Base scenarios
+    scenarios = get_test_cases()
+
+    # Add scenarios with additional attributes (example)
+    # extended_attributes = {
+    #     "providerApi": ["EC2Fleet"],
+    #     "fleetType": ["instant"],
+    #     "instanceType": ["t3.micro", "t3.small", "m5.large"]
+    # }
+    #
+    # extended_scenarios = generate_scenarios_from_attributes(
+    #     extended_attributes,
+    #     naming_template="{providerApi}{fleetType}_{instanceType}"
+    # )
+    #
+    # scenarios.extend(extended_scenarios)
+
+    return scenarios
+
+
+def get_test_cases() -> List[Dict[str, Any]]:
+    """
+    Get all test cases: both generated and custom.
+    """
+    # Combine generated and custom test cases
+    all_scenarios = []
+
+    # Add generated scenarios (set apply_filters=False to get all 12 combinations)
+    for combination_config in DEFAULT_ATTRIBUTE_COMBINATIONS:
+        all_scenarios.extend(get_generated_test_cases(combination_config, apply_filters=False))
+
+    # Add custom scenarios
+    all_scenarios.extend(get_custom_test_cases())
+
+    return all_scenarios

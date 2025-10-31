@@ -4,6 +4,8 @@
       "templateId": "BASE",
       "providerApi": "{{providerApi}}",
       "fleetType": "{{fleetType}}",
+      "priceType": "{{priceType}}",
+      "percentOnDemand": "{{percentOnDemand}}",
       "maxNumber": 2,
       "attributes": {
         "type": ["String", "X86_64"],
