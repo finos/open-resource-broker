@@ -185,7 +185,7 @@ class ASGHandler(AWSHandler, BaseContextMixin):
         self._logger.info("Successfully created Auto Scaling Group: %s", asg_name)
 
         # Add ASG tags
-        self._tag_asg(asg_name, aws_template, request)
+        self._tag_asg(asg_name, aws_template, str(request.request_id))
 
         # Enable instance protection if specified
         if hasattr(aws_template, "instance_protection") and aws_template.instance_protection:
@@ -197,7 +197,7 @@ class ASGHandler(AWSHandler, BaseContextMixin):
 
         return asg_name
 
-    def _tag_asg(self, asg_name: str, aws_template: AWSTemplate, request: Request) -> None:
+    def _tag_asg(self, asg_name: str, aws_template: AWSTemplate, request_id: str) -> None:
         """Add tags to the Auto Scaling Group."""
         try:
             created_by = self._get_package_name()
@@ -206,14 +206,14 @@ class ASGHandler(AWSHandler, BaseContextMixin):
             tags = [
                 {
                     "Key": "Name",
-                    "Value": f"hostfactory-asg-{request.request_id}",
+                    "Value": f"hostfactory-asg-{request_id}",
                     "PropagateAtLaunch": True,
                     "ResourceId": asg_name,
                     "ResourceType": "auto-scaling-group",
                 },
                 {
                     "Key": "RequestId",
-                    "Value": str(request.request_id),
+                    "Value": str(request_id),
                     "PropagateAtLaunch": True,
                     "ResourceId": asg_name,
                     "ResourceType": "auto-scaling-group",
@@ -271,16 +271,20 @@ class ASGHandler(AWSHandler, BaseContextMixin):
         """Prepare context with all computed values for template rendering."""
 
         # Start with base context
-        context = self._prepare_base_context(template, request)
+        context = self._prepare_base_context(
+            template,
+            str(request.request_id),
+            request.requested_count,
+        )
 
         # Add capacity distribution (for consistency, even if not all used)
-        context.update(self._calculate_capacity_distribution(template, request))
+        context.update(self._calculate_capacity_distribution(template, request.requested_count))
 
         # Add standard flags
         context.update(self._prepare_standard_flags(template))
 
         # Add standard tags
-        tag_context = self._prepare_standard_tags(template, request)
+        tag_context = self._prepare_standard_tags(template, str(request.request_id))
         context.update(tag_context)
 
         # Add ASG-specific context

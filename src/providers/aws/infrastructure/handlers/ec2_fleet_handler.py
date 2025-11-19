@@ -300,16 +300,20 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin):
         """Prepare context with all computed values for template rendering."""
 
         # Start with base context
-        context = self._prepare_base_context(template, request)
+        context = self._prepare_base_context(
+            template,
+            str(request.request_id),
+            request.requested_count,
+        )
 
         # Add capacity distribution
-        context.update(self._calculate_capacity_distribution(template, request))
+        context.update(self._calculate_capacity_distribution(template, request.requested_count))
 
         # Add standard flags
         context.update(self._prepare_standard_flags(template))
 
         # Add standard tags
-        tag_context = self._prepare_standard_tags(template, request)
+        tag_context = self._prepare_standard_tags(template, str(request.request_id))
         context.update(tag_context)
 
         # Add EC2Fleet-specific context

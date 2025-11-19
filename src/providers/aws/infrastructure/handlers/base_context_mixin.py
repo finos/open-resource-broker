@@ -10,16 +10,18 @@ from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 class BaseContextMixin:
     """Shared context preparation methods for all AWS handlers."""
 
-    def _prepare_base_context(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
+    def _prepare_base_context(
+        self, template: AWSTemplate, request_id: str, requested_count: int
+    ) -> dict[str, Any]:
         """Base context used by all handlers."""
         return {
             # Standard identifiers
-            "request_id": str(request.request_id),
+            "request_id": str(request_id),
             "template_id": str(template.template_id),
             # Standard capacity values
-            "requested_count": request.requested_count,
+            "requested_count": requested_count,
             "min_count": 1,
-            "max_count": request.requested_count,
+            "max_count": requested_count,
             # Standard timestamps
             "timestamp": datetime.utcnow().isoformat(),
             # Standard package info
@@ -37,10 +39,10 @@ class BaseContextMixin:
         return "open-hostfactory-plugin"
 
     def _calculate_capacity_distribution(
-        self, template: AWSTemplate, request: Request
+        self, template: AWSTemplate, requested_count: int
     ) -> dict[str, Any]:
         """Standard capacity calculation for all fleet types."""
-        total_capacity = request.requested_count
+        total_capacity = requested_count
         price_type = getattr(template, "price_type", None)
         percent_on_demand = template.percent_on_demand or 0
 
@@ -67,12 +69,14 @@ class BaseContextMixin:
             "is_ondemand_only": on_demand_count > 0 and spot_count == 0,
         }
 
-    def _prepare_standard_tags(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
+    def _prepare_standard_tags(
+        self, template: AWSTemplate, request_id: str
+    ) -> dict[str, Any]:
         """Standard tag preparation for all handlers."""
         created_by = self._get_package_name()
 
         base_tags = [
-            {"key": "RequestId", "value": str(request.request_id)},
+            {"key": "RequestId", "value": str(request_id)},
             {"key": "TemplateId", "value": str(template.template_id)},
             {"key": "CreatedBy", "value": created_by},
             {"key": "CreatedAt", "value": datetime.utcnow().isoformat()},
