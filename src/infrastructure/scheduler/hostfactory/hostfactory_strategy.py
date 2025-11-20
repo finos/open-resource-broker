@@ -386,6 +386,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "maxSpotPrice",
             "allocationStrategy",
             "spotFleetRequestExpiry",
+            "abisInstanceRequirements",
         ]
 
         for field in optional_fields:
@@ -409,6 +410,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "keyName": "key_name",
             "securityGroupIds": "security_group_ids",
             "priceType": "price_type",
+            "abisInstanceRequirements": "abis_instance_requirements",
         }
         return mapping.get(hf_field, hf_field)
 

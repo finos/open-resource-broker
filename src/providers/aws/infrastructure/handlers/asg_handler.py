@@ -375,12 +375,8 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         launch_template_version: str,
     ) -> dict[str, Any]:
         """Create Auto Scaling Group configuration using legacy logic."""
-        asg_config = {
+        asg_config: dict[str, Any] = {
             "AutoScalingGroupName": asg_name,
-            "LaunchTemplate": {
-                "LaunchTemplateId": launch_template_id,
-                "Version": launch_template_version,
-            },
             "MinSize": 0,
             "MaxSize": request.requested_count * 2,  # Allow some buffer
             "DesiredCapacity": request.requested_count,
@@ -389,6 +385,23 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             "HealthCheckGracePeriod": 300,
             "NewInstancesProtectedFromScaleIn": True,
         }
+
+        instance_requirements_payload = aws_template.get_instance_requirements_payload()
+        if instance_requirements_payload:
+            asg_config["MixedInstancesPolicy"] = {
+                "LaunchTemplate": {
+                    "LaunchTemplateSpecification": {
+                        "LaunchTemplateId": launch_template_id,
+                        "Version": launch_template_version,
+                    },
+                    "Overrides": [{"InstanceRequirements": instance_requirements_payload}],
+                }
+            }
+        else:
+            asg_config["LaunchTemplate"] = {
+                "LaunchTemplateId": launch_template_id,
+                "Version": launch_template_version,
+            }
 
         # Add subnet configuration
         if aws_template.subnet_ids:

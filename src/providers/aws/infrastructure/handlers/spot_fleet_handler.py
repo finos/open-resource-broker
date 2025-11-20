@@ -492,6 +492,8 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         # Handle fleet role - convert EC2Fleet role to SpotFleet role if needed
         fleet_role = template.fleet_role
 
+        self._logger.debug(f"KBG template {template}")
+
         # If using EC2Fleet service role, convert to SpotFleet service role
         if fleet_role and "ec2fleet.amazonaws.com/AWSServiceRoleForEC2Fleet" in fleet_role:
             account_id = self.aws_client.sts_client.get_caller_identity()["Account"]
@@ -567,126 +569,147 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         if template.max_price:
             fleet_config["SpotPrice"] = str(template.max_price)
 
-        # Add instance type overrides if specified
-        if template.instance_types:
-            # For heterogeneous price type with on-demand instances
-            if template.price_type == "heterogeneous" and template.instance_types_ondemand:
-                # Create spot instance overrides
-                spot_overrides = [
-                    {
-                        "InstanceType": instance_type,
-                        "WeightedCapacity": weight,
-                        "Priority": idx + 1,
-                        "SpotPrice": (str(template.max_price) if template.max_price else None),
-                    }
-                    for idx, (instance_type, weight) in enumerate(template.instance_types.items())
-                ]
+        instance_requirements_payload = template.get_instance_requirements_payload()
 
-                # Create on-demand instance overrides
-                ondemand_overrides = [
-                    {
-                        "InstanceType": instance_type,
-                        "WeightedCapacity": weight,
-                        "Priority": idx + len(template.instance_types) + 1,
-                        # Force this to be on-demand by not specifying SpotPrice
-                    }
-                    for idx, (instance_type, weight) in enumerate(
-                        template.instance_types_ondemand.items()
-                    )
-                ]
-
-                # Combine both types of overrides
-                fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = (
-                    spot_overrides + ondemand_overrides
-                )
-
-                # Log the combined overrides
-                self._logger.debug(
-                    "Created combined overrides for heterogeneous fleet: "
-                    f"{len(spot_overrides)} spot instance types, "
-                    f"{len(ondemand_overrides)} on-demand instance types"
-                )
-            else:
-                # Standard spot instance overrides
-                fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = [
-                    {
-                        "InstanceType": instance_type,
-                        "WeightedCapacity": weight,
-                        "Priority": idx + 1,
-                        "SpotPrice": (str(template.max_price) if template.max_price else None),
-                    }
-                    for idx, (instance_type, weight) in enumerate(template.instance_types.items())
-                ]
-
-        # Add subnet configuration
-        if template.subnet_ids:
-            if "Overrides" not in fleet_config["LaunchTemplateConfigs"][0]:
-                fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = []
-
-            # For heterogeneous price type with on-demand instances
-            if (
-                template.price_type == "heterogeneous"
-                and template.instance_types_ondemand
-                and template.instance_types
-            ):
-                # Create spot instance overrides with subnets
-                spot_overrides = []
+        if instance_requirements_payload:
+            overrides = []
+            if template.subnet_ids:
                 for subnet_id in template.subnet_ids:
-                    for idx, (instance_type, weight) in enumerate(template.instance_types.items()):
-                        override = {
+                    overrides.append(
+                        {
                             "SubnetId": subnet_id,
+                            "InstanceRequirements": instance_requirements_payload,
+                        }
+                    )
+            else:
+                overrides.append({"InstanceRequirements": instance_requirements_payload})
+
+            fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
+        else:
+            # Add instance type overrides if specified
+            if template.instance_types:
+                # For heterogeneous price type with on-demand instances
+                if template.price_type == "heterogeneous" and template.instance_types_ondemand:
+                    # Create spot instance overrides
+                    spot_overrides = [
+                        {
                             "InstanceType": instance_type,
                             "WeightedCapacity": weight,
                             "Priority": idx + 1,
                             "SpotPrice": (str(template.max_price) if template.max_price else None),
                         }
-                        spot_overrides.append(override)
+                        for idx, (instance_type, weight) in enumerate(template.instance_types.items())
+                    ]
 
-                # Create on-demand instance overrides with subnets
-                ondemand_overrides = []
-                for subnet_id in template.subnet_ids:
-                    for idx, (instance_type, weight) in enumerate(
-                        template.instance_types_ondemand.items()
-                    ):
-                        override = {
-                            "SubnetId": subnet_id,
+                    # Create on-demand instance overrides
+                    ondemand_overrides = [
+                        {
                             "InstanceType": instance_type,
                             "WeightedCapacity": weight,
                             "Priority": idx + len(template.instance_types) + 1,
-                            # No SpotPrice for on-demand instances
+                            # Force this to be on-demand by not specifying SpotPrice
                         }
-                        ondemand_overrides.append(override)
+                        for idx, (instance_type, weight) in enumerate(
+                            template.instance_types_ondemand.items()
+                        )
+                    ]
 
-                # Combine both types of overrides
-                fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = (
-                    spot_overrides + ondemand_overrides
-                )
+                    # Combine both types of overrides
+                    fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = (
+                        spot_overrides + ondemand_overrides
+                    )
 
-                # Log the combined overrides
-                self._logger.debug(
-                    "Created combined overrides with subnets for heterogeneous fleet: "
-                    f"{len(spot_overrides)} spot instance overrides, "
-                    f"{len(ondemand_overrides)} on-demand instance overrides"
-                )
-            # If we have both instance types and subnets, create all combinations
-            elif template.instance_types:
-                overrides = []
-                for subnet_id in template.subnet_ids:
-                    for idx, (instance_type, weight) in enumerate(template.instance_types.items()):
-                        override = {
-                            "SubnetId": subnet_id,
+                    # Log the combined overrides
+                    self._logger.debug(
+                        "Created combined overrides for heterogeneous fleet: "
+                        f"{len(spot_overrides)} spot instance types, "
+                        f"{len(ondemand_overrides)} on-demand instance types"
+                    )
+                else:
+                    # Standard spot instance overrides
+                    fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = [
+                        {
                             "InstanceType": instance_type,
                             "WeightedCapacity": weight,
                             "Priority": idx + 1,
+                            "SpotPrice": (str(template.max_price) if template.max_price else None),
                         }
-                        if template.max_price:
-                            override["SpotPrice"] = str(template.max_price)
-                        overrides.append(override)
-                fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
-            else:
-                fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = [
-                    {"SubnetId": subnet_id} for subnet_id in template.subnet_ids
-                ]
+                        for idx, (instance_type, weight) in enumerate(template.instance_types.items())
+                    ]
+
+            # Add subnet configuration
+            if template.subnet_ids:
+                if "Overrides" not in fleet_config["LaunchTemplateConfigs"][0]:
+                    fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = []
+
+                # For heterogeneous price type with on-demand instances
+                if (
+                    template.price_type == "heterogeneous"
+                    and template.instance_types_ondemand
+                    and template.instance_types
+                ):
+                    # Create spot instance overrides with subnets
+                    spot_overrides = []
+                    for subnet_id in template.subnet_ids:
+                        for idx, (instance_type, weight) in enumerate(
+                            template.instance_types.items()
+                        ):
+                            override = {
+                                "SubnetId": subnet_id,
+                                "InstanceType": instance_type,
+                                "WeightedCapacity": weight,
+                                "Priority": idx + 1,
+                                "SpotPrice": (str(template.max_price) if template.max_price else None),
+                            }
+                            spot_overrides.append(override)
+
+                    # Create on-demand instance overrides with subnets
+                    ondemand_overrides = []
+                    for subnet_id in template.subnet_ids:
+                        for idx, (instance_type, weight) in enumerate(
+                            template.instance_types_ondemand.items()
+                        ):
+                            override = {
+                                "SubnetId": subnet_id,
+                                "InstanceType": instance_type,
+                                "WeightedCapacity": weight,
+                                "Priority": idx + len(template.instance_types) + 1,
+                                # No SpotPrice for on-demand instances
+                            }
+                            ondemand_overrides.append(override)
+
+                    # Combine both types of overrides
+                    fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = (
+                        spot_overrides + ondemand_overrides
+                    )
+
+                    # Log the combined overrides
+                    self._logger.debug(
+                        "Created combined overrides with subnets for heterogeneous fleet: "
+                        f"{len(spot_overrides)} spot instance overrides, "
+                        f"{len(ondemand_overrides)} on-demand instance overrides"
+                    )
+                # If we have both instance types and subnets, create all combinations
+                elif template.instance_types:
+                    overrides = []
+                    for subnet_id in template.subnet_ids:
+                        for idx, (instance_type, weight) in enumerate(
+                            template.instance_types.items()
+                        ):
+                            override = {
+                                "SubnetId": subnet_id,
+                                "InstanceType": instance_type,
+                                "WeightedCapacity": weight,
+                                "Priority": idx + 1,
+                            }
+                            if template.max_price:
+                                override["SpotPrice"] = str(template.max_price)
+                            overrides.append(override)
+                    fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
+                else:
+                    fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = [
+                        {"SubnetId": subnet_id} for subnet_id in template.subnet_ids
+                    ]
 
         # Add Context field if specified
         if template.context:

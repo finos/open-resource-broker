@@ -2,7 +2,7 @@
 
 from typing import Any, Optional
 
-from pydantic import ConfigDict, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 from domain.template.template_aggregate import Template
 from providers.aws.domain.template.value_objects import (
@@ -15,6 +15,178 @@ from providers.aws.domain.template.value_objects import (
     AWSTags,
     ProviderApi,
 )
+
+
+class AWSOptionalIntegerRange(BaseModel):
+    """Optional integer range used by AWS instance requirements."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    min: Optional[int] = Field(
+        default=None,
+        alias="Min",
+        validation_alias=AliasChoices("Min", "min"),
+    )
+    max: Optional[int] = Field(
+        default=None,
+        alias="Max",
+        validation_alias=AliasChoices("Max", "max"),
+    )
+
+
+class AWSRequiredIntegerRange(AWSOptionalIntegerRange):
+    """Required integer range used by AWS instance requirements."""
+
+    min: int = Field(alias="Min", validation_alias=AliasChoices("Min", "min"))
+    max: int = Field(alias="Max", validation_alias=AliasChoices("Max", "max"))
+
+
+class AWSOptionalFloatRange(BaseModel):
+    """Optional float range used by AWS instance requirements."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    min: Optional[float] = Field(
+        default=None,
+        alias="Min",
+        validation_alias=AliasChoices("Min", "min"),
+    )
+    max: Optional[float] = Field(
+        default=None,
+        alias="Max",
+        validation_alias=AliasChoices("Max", "max"),
+    )
+
+
+class ABISInstanceRequirements(BaseModel):
+    """Attribute-based instance selection requirements for AWS fleets."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="ignore")
+
+    vcpu_count: AWSRequiredIntegerRange = Field(
+        alias="VCpuCount",
+        validation_alias=AliasChoices("VCpuCount", "vcpu_count"),
+    )
+    memory_mib: AWSRequiredIntegerRange = Field(
+        alias="MemoryMiB",
+        validation_alias=AliasChoices("MemoryMiB", "memory_mib"),
+    )
+
+    cpu_manufacturers: Optional[list[str]] = Field(
+        default=None,
+        alias="CpuManufacturers",
+        validation_alias=AliasChoices("CpuManufacturers", "cpu_manufacturers"),
+    )
+    memory_gib_per_vcpu: Optional[AWSOptionalFloatRange] = Field(
+        default=None,
+        alias="MemoryGiBPerVCpu",
+        validation_alias=AliasChoices("MemoryGiBPerVCpu", "memory_gib_per_vcpu"),
+    )
+    excluded_instance_types: Optional[list[str]] = Field(
+        default=None,
+        alias="ExcludedInstanceTypes",
+        validation_alias=AliasChoices("ExcludedInstanceTypes", "excluded_instance_types"),
+    )
+    instance_generations: Optional[list[str]] = Field(
+        default=None,
+        alias="InstanceGenerations",
+        validation_alias=AliasChoices("InstanceGenerations", "instance_generations"),
+    )
+    spot_max_price_percentage_over_lowest_price: Optional[int] = Field(
+        default=None,
+        alias="SpotMaxPricePercentageOverLowestPrice",
+        validation_alias=AliasChoices(
+            "SpotMaxPricePercentageOverLowestPrice",
+            "spot_max_price_percentage_over_lowest_price",
+        ),
+    )
+    on_demand_max_price_percentage_over_lowest_price: Optional[int] = Field(
+        default=None,
+        alias="OnDemandMaxPricePercentageOverLowestPrice",
+        validation_alias=AliasChoices(
+            "OnDemandMaxPricePercentageOverLowestPrice",
+            "on_demand_max_price_percentage_over_lowest_price",
+        ),
+    )
+    bare_metal: Optional[str] = Field(
+        default=None,
+        alias="BareMetal",
+        validation_alias=AliasChoices("BareMetal", "bare_metal"),
+    )
+    burstable_performance: Optional[str] = Field(
+        default=None,
+        alias="BurstablePerformance",
+        validation_alias=AliasChoices("BurstablePerformance", "burstable_performance"),
+    )
+    require_hibernate_support: Optional[bool] = Field(
+        default=None,
+        alias="RequireHibernateSupport",
+        validation_alias=AliasChoices("RequireHibernateSupport", "require_hibernate_support"),
+    )
+
+    network_interface_count: Optional[AWSOptionalIntegerRange] = Field(
+        default=None,
+        alias="NetworkInterfaceCount",
+        validation_alias=AliasChoices("NetworkInterfaceCount", "network_interface_count"),
+    )
+    local_storage: Optional[str] = Field(
+        default=None,
+        alias="LocalStorage",
+        validation_alias=AliasChoices("LocalStorage", "local_storage"),
+    )
+    local_storage_types: Optional[list[str]] = Field(
+        default=None,
+        alias="LocalStorageTypes",
+        validation_alias=AliasChoices("LocalStorageTypes", "local_storage_types"),
+    )
+    total_local_storage_gb: Optional[AWSOptionalFloatRange] = Field(
+        default=None,
+        alias="TotalLocalStorageGB",
+        validation_alias=AliasChoices("TotalLocalStorageGB", "total_local_storage_gb"),
+    )
+    baseline_ebs_bandwidth_mbps: Optional[AWSOptionalIntegerRange] = Field(
+        default=None,
+        alias="BaselineEbsBandwidthMbps",
+        validation_alias=AliasChoices("BaselineEbsBandwidthMbps", "baseline_ebs_bandwidth_mbps"),
+    )
+
+    accelerator_types: Optional[list[str]] = Field(
+        default=None,
+        alias="AcceleratorTypes",
+        validation_alias=AliasChoices("AcceleratorTypes", "accelerator_types"),
+    )
+    accelerator_count: Optional[AWSOptionalIntegerRange] = Field(
+        default=None,
+        alias="AcceleratorCount",
+        validation_alias=AliasChoices("AcceleratorCount", "accelerator_count"),
+    )
+    accelerator_manufacturers: Optional[list[str]] = Field(
+        default=None,
+        alias="AcceleratorManufacturers",
+        validation_alias=AliasChoices("AcceleratorManufacturers", "accelerator_manufacturers"),
+    )
+    accelerator_names: Optional[list[str]] = Field(
+        default=None,
+        alias="AcceleratorNames",
+        validation_alias=AliasChoices("AcceleratorNames", "accelerator_names"),
+    )
+    accelerator_total_memory_mib: Optional[AWSOptionalIntegerRange] = Field(
+        default=None,
+        alias="AcceleratorTotalMemoryMiB",
+        validation_alias=AliasChoices(
+            "AcceleratorTotalMemoryMiB",
+            "accelerator_total_memory_mib",
+        ),
+    )
+    allowed_instance_types: Optional[list[str]] = Field(
+        default=None,
+        alias="AllowedInstanceTypes",
+        validation_alias=AliasChoices("AllowedInstanceTypes", "allowed_instance_types"),
+    )
+
+    def to_aws_dict(self) -> dict[str, Any]:
+        """Serialize instance requirements to AWS API format."""
+        return self.model_dump(by_alias=True, exclude_none=True)
 
 
 class AWSTemplate(Template):
@@ -54,6 +226,13 @@ class AWSTemplate(Template):
     launch_template_spec_file: Optional[str] = None
     provider_api_spec: Optional[dict[str, Any]] = None
     provider_api_spec_file: Optional[str] = None
+
+    # Attribute-based instance selection (InstanceRequirements payload)
+    abis_instance_requirements: Optional[ABISInstanceRequirements] = Field(
+        default=None,
+        alias="abis_instance_requirements",
+        validation_alias=AliasChoices("abis_instance_requirements", "abisInstanceRequirements"),
+    )
 
     # AWS Context field for fleet operations
     context: Optional[str] = None
@@ -237,6 +416,12 @@ class AWSTemplate(Template):
         if "max_spot_price" in data:
             aws_data["max_price"] = data["max_spot_price"]
 
+        instance_requirements = data.get("abis_instance_requirements") or data.get(
+            "abisInstanceRequirements"
+        )
+        if instance_requirements:
+            aws_data["abis_instance_requirements"] = instance_requirements
+
         return cls.model_validate(aws_data)
 
     @model_validator(mode="after")
@@ -264,3 +449,9 @@ class AWSTemplate(Template):
             subnet_ids=[AWSSubnetId(value=sid) for sid in self.subnet_ids],
             security_group_ids=[AWSSecurityGroupId(value=sgid) for sgid in self.security_group_ids],
         )
+
+    def get_instance_requirements_payload(self) -> Optional[dict[str, Any]]:
+        """Return the InstanceRequirements payload for AWS APIs if provided."""
+        if self.abis_instance_requirements:
+            return self.abis_instance_requirements.to_aws_dict()
+        return None

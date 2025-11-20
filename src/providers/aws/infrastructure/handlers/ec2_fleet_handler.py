@@ -437,6 +437,8 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         # Get package name for CreatedBy tag
         created_by = self._get_package_name()
 
+        self._logger.debug(f"KBG template {template.abis_instance_requirements}")
+
         fleet_config = {
             "LaunchTemplateConfigs": [
                 {
@@ -530,50 +532,53 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     fleet_config["SpotOptions"] = {}
                 fleet_config["SpotOptions"]["MaxTotalPrice"] = str(template.max_price)
 
-        # Add overrides with weighted capacity if multiple instance types are specified
-        if template.instance_types:
+        instance_requirements_payload = template.get_instance_requirements_payload()
+
+        if instance_requirements_payload:
             overrides = []
-            for instance_type, weight in template.instance_types.items():
-                override = {"InstanceType": instance_type, "WeightedCapacity": weight}
-                overrides.append(override)
-            fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
-
-            # Add on-demand instance types for heterogeneous fleets
-            if price_type == "heterogeneous" and template.instance_types_ondemand:
-                on_demand_overrides = []
-                for instance_type, weight in template.instance_types_ondemand.items():
+            if template.subnet_ids:
+                for subnet_id in template.subnet_ids:
                     override = {
-                        "InstanceType": instance_type,
-                        "WeightedCapacity": weight,
+                        "SubnetId": subnet_id,
+                        "InstanceRequirements": instance_requirements_payload,
                     }
-                    on_demand_overrides.append(override)
+                    overrides.append(override)
+            else:
+                overrides.append({"InstanceRequirements": instance_requirements_payload})
 
-                # Add on-demand overrides to the existing overrides
-                fleet_config["LaunchTemplateConfigs"][0]["Overrides"].extend(on_demand_overrides)
-
-        # Add subnet configuration
-        if template.subnet_ids:
-            if "Overrides" not in fleet_config["LaunchTemplateConfigs"][0]:
-                fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = []
-
-            # If we have both instance types and subnets, create all combinations
+            fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
+        else:
+            # Add overrides with weighted capacity if multiple instance types are specified
             if template.instance_types:
                 overrides = []
-                for subnet_id in template.subnet_ids:
-                    for instance_type, weight in template.instance_types.items():
+                for instance_type, weight in template.instance_types.items():
+                    override = {"InstanceType": instance_type, "WeightedCapacity": weight}
+                    overrides.append(override)
+                fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
+
+                # Add on-demand instance types for heterogeneous fleets
+                if price_type == "heterogeneous" and template.instance_types_ondemand:
+                    on_demand_overrides = []
+                    for instance_type, weight in template.instance_types_ondemand.items():
                         override = {
-                            "SubnetId": subnet_id,
                             "InstanceType": instance_type,
                             "WeightedCapacity": weight,
                         }
-                        overrides.append(override)
+                        on_demand_overrides.append(override)
 
-                    # Add on-demand instance types for heterogeneous fleets
-                    if price_type == "heterogeneous" and template.instance_types_ondemand:
-                        for (
-                            instance_type,
-                            weight,
-                        ) in template.instance_types_ondemand.items():
+                    # Add on-demand overrides to the existing overrides
+                    fleet_config["LaunchTemplateConfigs"][0]["Overrides"].extend(on_demand_overrides)
+
+            # Add subnet configuration
+            if template.subnet_ids:
+                if "Overrides" not in fleet_config["LaunchTemplateConfigs"][0]:
+                    fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = []
+
+                # If we have both instance types and subnets, create all combinations
+                if template.instance_types:
+                    overrides = []
+                    for subnet_id in template.subnet_ids:
+                        for instance_type, weight in template.instance_types.items():
                             override = {
                                 "SubnetId": subnet_id,
                                 "InstanceType": instance_type,
@@ -581,11 +586,24 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                             }
                             overrides.append(override)
 
-                fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
-            else:
-                fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = [
-                    {"SubnetId": subnet_id} for subnet_id in template.subnet_ids
-                ]
+                        # Add on-demand instance types for heterogeneous fleets
+                        if price_type == "heterogeneous" and template.instance_types_ondemand:
+                            for (
+                                instance_type,
+                                weight,
+                            ) in template.instance_types_ondemand.items():
+                                override = {
+                                    "SubnetId": subnet_id,
+                                    "InstanceType": instance_type,
+                                    "WeightedCapacity": weight,
+                                }
+                                overrides.append(override)
+
+                    fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
+                else:
+                    fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = [
+                        {"SubnetId": subnet_id} for subnet_id in template.subnet_ids
+                    ]
 
         # Add Context field if specified
         if template.context:
