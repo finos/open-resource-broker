@@ -598,7 +598,9 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                             "Priority": idx + 1,
                             "SpotPrice": (str(template.max_price) if template.max_price else None),
                         }
-                        for idx, (instance_type, weight) in enumerate(template.instance_types.items())
+                        for idx, (instance_type, weight) in enumerate(
+                            template.instance_types.items()
+                        )
                     ]
 
                     # Create on-demand instance overrides
@@ -634,7 +636,9 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                             "Priority": idx + 1,
                             "SpotPrice": (str(template.max_price) if template.max_price else None),
                         }
-                        for idx, (instance_type, weight) in enumerate(template.instance_types.items())
+                        for idx, (instance_type, weight) in enumerate(
+                            template.instance_types.items()
+                        )
                     ]
 
             # Add subnet configuration
@@ -659,7 +663,9 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                                 "InstanceType": instance_type,
                                 "WeightedCapacity": weight,
                                 "Priority": idx + 1,
-                                "SpotPrice": (str(template.max_price) if template.max_price else None),
+                                "SpotPrice": (
+                                    str(template.max_price) if template.max_price else None
+                                ),
                             }
                             spot_overrides.append(override)
 

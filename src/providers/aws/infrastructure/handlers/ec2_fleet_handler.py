@@ -567,7 +567,9 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                         on_demand_overrides.append(override)
 
                     # Add on-demand overrides to the existing overrides
-                    fleet_config["LaunchTemplateConfigs"][0]["Overrides"].extend(on_demand_overrides)
+                    fleet_config["LaunchTemplateConfigs"][0]["Overrides"].extend(
+                        on_demand_overrides
+                    )
 
             # Add subnet configuration
             if template.subnet_ids:
