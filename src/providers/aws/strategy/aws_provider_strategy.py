@@ -93,7 +93,7 @@ class AWSProviderStrategy(ProviderStrategy):
         self._aws_provisioning_port = aws_provisioning_port
         self._aws_provisioning_port_resolver = aws_provisioning_port_resolver
 
-    def _resolve_provisioning_port(self) -> Optional["AWSProvisioningAdapter"]:
+    def _resolve_provisioning_port(self) -> Optional[AWSProvisioningAdapter]:
         """Lazily resolve the AWS provisioning adapter when first needed."""
 
         if self._aws_provisioning_port is None and self._aws_provisioning_port_resolver:

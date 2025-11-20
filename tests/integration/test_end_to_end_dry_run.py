@@ -257,9 +257,7 @@ class TestEndToEndDryRun:
         self.mock_instance_manager.create_instances.return_value = ["i-1234567890abcdef0"]
 
         # Execute provisioning
-        resource_id = asyncio.run(
-            self.provisioning_adapter.provision_resources(request, template)
-        )
+        resource_id = asyncio.run(self.provisioning_adapter.provision_resources(request, template))
 
         # Verify strategy path was used
         assert resource_id == "i-1234567890abcdef0"
@@ -294,9 +292,7 @@ class TestEndToEndDryRun:
         self.mock_handler_factory.get_handler.return_value = mock_handler
 
         # Execute provisioning
-        resource_id = asyncio.run(
-            self.provisioning_adapter.provision_resources(request, template)
-        )
+        resource_id = asyncio.run(self.provisioning_adapter.provision_resources(request, template))
 
         # Verify handler path was used
         assert resource_id == "fleet-12345"

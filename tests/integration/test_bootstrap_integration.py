@@ -30,7 +30,9 @@ class TestBootstrapIntegration:
         mock_get_config_manager.return_value = self.mock_config_manager
 
         # Mock integrated provider configuration - avoid the logging path that causes issues
-        self.mock_config_manager.get_provider_config.side_effect = AttributeError("Method not available")
+        self.mock_config_manager.get_provider_config.side_effect = AttributeError(
+            "Method not available"
+        )
         self.mock_config_manager.get.return_value = {"type": "aws"}
 
         # Mock AppConfig with proper attributes
@@ -47,8 +49,10 @@ class TestBootstrapIntegration:
         mock_provider_context.available_strategies = ["aws-primary"]
         mock_provider_context.current_strategy_type = "aws-primary"
 
-        with patch("infrastructure.di.container.get_container") as mock_get_container, \
-             patch.object(Application, '_preload_templates') as mock_preload:
+        with (
+            patch("infrastructure.di.container.get_container") as mock_get_container,
+            patch.object(Application, "_preload_templates") as mock_preload,
+        ):
             mock_get_container.return_value = self.mock_container
             self.mock_container.get.return_value = mock_provider_context
             self.mock_container.is_lazy_loading_enabled.return_value = False
@@ -220,7 +224,7 @@ class TestBootstrapIntegration:
             async with Application() as app:
                 assert app._initialized is True
                 # Test that we can access provider context through the app
-                assert hasattr(app, '_provider_context')
+                assert hasattr(app, "_provider_context")
 
             # Verify shutdown was called
             assert app._initialized is False
