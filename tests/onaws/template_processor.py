@@ -248,7 +248,7 @@ class TemplateProcessor:
                     log.warning(
                         f"Provider API {provider_api} may not support spot instances in the same way as EC2Fleet"
                     )
-        
+
         # Set scheduler type in config for template replacement (after overrides)
         config["scheduler"] = scheduler_type
         log.info(f"Config scheduler value for template replacement: {config.get('scheduler')}")
@@ -275,7 +275,9 @@ class TemplateProcessor:
                     template_name = base_template
                 else:
                     # Use scheduler-aware template selection
-                    template_name = self.select_base_template_for_scheduler(base_name, scheduler_type)
+                    template_name = self.select_base_template_for_scheduler(
+                        base_name, scheduler_type
+                    )
 
                 # Load base template
                 base_template_data = self.load_base_template(template_name)
@@ -294,7 +296,9 @@ class TemplateProcessor:
                     if template_name.endswith(".base.json")
                     else f"{template_name}.base.json"
                 )
-                log.info(f"Selected base template: {actual_template_name} for scheduler: {scheduler_type}")
+                log.info(
+                    f"Selected base template: {actual_template_name} for scheduler: {scheduler_type}"
+                )
                 print(f"Generated {output_file} from {actual_template_name}")
 
             except Exception as e:

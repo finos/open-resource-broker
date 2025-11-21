@@ -134,7 +134,7 @@ class HostFactoryMock:
 
     def __init__(self, scheduler: str = "hostfactory"):
         """Initialize mock host factory with target configuration.
-        
+
         Args:
             scheduler: Scheduler type - "hostfactory" (camelCase) or "default" (snake_case)
         """

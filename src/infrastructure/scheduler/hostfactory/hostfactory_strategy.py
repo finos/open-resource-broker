@@ -601,9 +601,11 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             req_dict = request.to_dict()
             # Convert machines to camelCase
             if "machines" in req_dict:
-                req_dict["machines"] = [self._convert_machine_to_camel(m) for m in req_dict["machines"]]
+                req_dict["machines"] = [
+                    self._convert_machine_to_camel(m) for m in req_dict["machines"]
+                ]
             formatted_requests.append(req_dict)
-        
+
         return {
             "requests": formatted_requests,
             "message": "Request status retrieved successfully",

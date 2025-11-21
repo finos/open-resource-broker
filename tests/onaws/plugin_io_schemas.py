@@ -257,7 +257,6 @@ expected_request_machines_schema = expected_request_machines_schema_hostfactory
 expected_request_status_schema = expected_request_status_schema_hostfactory
 
 
-
 def get_schema_for_scheduler(operation: str, scheduler_type: str) -> dict:
     """
     Get appropriate schema based on scheduler type.
@@ -274,7 +273,9 @@ def get_schema_for_scheduler(operation: str, scheduler_type: str) -> dict:
     """
     # Validate scheduler type
     if scheduler_type not in ["default", "hostfactory"]:
-        raise ValueError(f"Invalid scheduler_type: {scheduler_type}. Must be 'default' or 'hostfactory'")
+        raise ValueError(
+            f"Invalid scheduler_type: {scheduler_type}. Must be 'default' or 'hostfactory'"
+        )
 
     # Schema mapping
     schema_map = {

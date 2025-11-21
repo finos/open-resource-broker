@@ -577,7 +577,9 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
     # <1.> Request capacity. #######################################################################
     log.debug(f"Requesting capacity for the template \n {json.dumps(template_json, indent=4)}")
 
-    res = hfm.request_machines(template_json.get("templateId") or template_json.get("template_id"), capacity_to_request)
+    res = hfm.request_machines(
+        template_json.get("templateId") or template_json.get("template_id"), capacity_to_request
+    )
     parse_and_print_output(res)
 
     # Debug: Log the full response to understand the structure
@@ -606,12 +608,16 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
 
     # Get scheduler type for validation
     scheduler_type = get_scheduler_from_scenario(test_case) if test_case else "hostfactory"
-    request_machines_schema = plugin_io_schemas.get_schema_for_scheduler("request_machines", scheduler_type)
+    request_machines_schema = plugin_io_schemas.get_schema_for_scheduler(
+        "request_machines", scheduler_type
+    )
 
     try:
         validate_json_schema(instance=res, schema=request_machines_schema)
     except ValidationError as e:
-        pytest.fail(f"JSON validation failed for request_machines response json ({scheduler_type} scheduler): {e}")
+        pytest.fail(
+            f"JSON validation failed for request_machines response json ({scheduler_type} scheduler): {e}"
+        )
 
     # <2.> Wait until request is completed. ########################################################
 
@@ -626,12 +632,16 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
 
         sys.stdout.flush()
 
-        request_status_schema = plugin_io_schemas.get_schema_for_scheduler("request_status", scheduler_type)
+        request_status_schema = plugin_io_schemas.get_schema_for_scheduler(
+            "request_status", scheduler_type
+        )
 
         try:
             validate_json_schema(instance=status_response, schema=request_status_schema)
         except ValidationError as e:
-            pytest.fail(f"JSON validation failed for get_reqest_status response json ({scheduler_type} scheduler): {e}")
+            pytest.fail(
+                f"JSON validation failed for get_reqest_status response json ({scheduler_type} scheduler): {e}"
+            )
 
         if time.time() - start_time > MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC:
             break
@@ -662,7 +672,9 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
     # Validate price type for all instances if test_case is provided
     if test_case:
         # Check if this provider API supports spot instance validation
-        provider_api = template_json.get("providerApi") or template_json.get("provider_api") or "EC2Fleet"
+        provider_api = (
+            template_json.get("providerApi") or template_json.get("provider_api") or "EC2Fleet"
+        )
         expected_price_type = test_case.get("overrides", {}).get("priceType")
 
         if provider_api in ["RunInstances", "ASG"] and expected_price_type == "spot":
@@ -687,7 +699,8 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
     # <3.> Deallocate capacity and verify that capacity is released. ###############################
 
     ec2_instance_ids = [
-        machine.get("machineId") or machine.get("machine_id") for machine in status_response["requests"][0]["machines"]
+        machine.get("machineId") or machine.get("machine_id")
+        for machine in status_response["requests"][0]["machines"]
     ]
     # ec2_instance_ids = [machine["name"] for machine in status_response["requests"][0]["machines"]] #TODO
     log.debug(f"Deallocating instances: {ec2_instance_ids}")
@@ -783,7 +796,12 @@ def test_sample(setup_host_factory_mock_with_scenario, test_case):
 
     template_id = test_case.get("template_id") or test_case["test_name"]
     template_json = next(
-        (template for template in res["templates"] if template.get("templateId") == template_id or template.get("template_id") == template_id),
+        (
+            template
+            for template in res["templates"]
+            if template.get("templateId") == template_id
+            or template.get("template_id") == template_id
+        ),
         None,
     )
 
