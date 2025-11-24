@@ -1,13 +1,13 @@
 """Unit tests for capacity-aware request status resolution."""
 
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
 
+from application.queries.handlers import GetRequestHandler
 from domain.machine.machine_status import MachineStatus
 from domain.request.request_types import RequestStatus, RequestType
-from application.queries.handlers import GetRequestHandler
 
 
 def _request(request_type, status, requested_count, created_at=None):
@@ -44,7 +44,9 @@ def test_fleet_capacity_completed_even_with_few_instances():
     provider_metadata = {"fleet_capacity": {"target": 10, "fulfilled": 10, "state": "active"}}
     machines = _machines(MachineStatus.RUNNING, MachineStatus.RUNNING)  # fewer than target
 
-    new_status, msg = handler._determine_request_status_from_machines([], machines, request, provider_metadata)
+    new_status, msg = handler._determine_request_status_from_machines(
+        [], machines, request, provider_metadata
+    )
     assert new_status == RequestStatus.COMPLETED.value
     assert "Capacity fulfilled" in msg
 
@@ -56,7 +58,9 @@ def test_fleet_capacity_in_progress_when_under_target():
     provider_metadata = {"fleet_capacity": {"target": 10, "fulfilled": 6, "state": "modifying"}}
     machines = _machines(MachineStatus.RUNNING, MachineStatus.PENDING)
 
-    new_status, msg = handler._determine_request_status_from_machines([], machines, request, provider_metadata)
+    new_status, msg = handler._determine_request_status_from_machines(
+        [], machines, request, provider_metadata
+    )
     assert new_status is None  # current status already in-progress; no transition
     assert msg is None
 
@@ -74,7 +78,9 @@ def test_fleet_capacity_partial_with_failures():
         MachineStatus.FAILED,
     )
 
-    new_status, msg = handler._determine_request_status_from_machines([], machines, request, provider_metadata)
+    new_status, msg = handler._determine_request_status_from_machines(
+        [], machines, request, provider_metadata
+    )
     assert new_status == RequestStatus.PARTIAL.value
     assert "Partial success" in msg
 
@@ -91,7 +97,9 @@ def test_fleet_capacity_all_failed():
         MachineStatus.FAILED,
     )
 
-    new_status, msg = handler._determine_request_status_from_machines([], machines, request, provider_metadata)
+    new_status, msg = handler._determine_request_status_from_machines(
+        [], machines, request, provider_metadata
+    )
     assert new_status == RequestStatus.FAILED.value
     assert "failed" in msg.lower()
 
@@ -103,7 +111,9 @@ def test_asg_capacity_completed():
     provider_metadata = {"asg_capacity": {"desired": 6, "in_service": 6, "state": None}}
     machines = _machines(MachineStatus.RUNNING)
 
-    new_status, msg = handler._determine_request_status_from_machines([], machines, request, provider_metadata)
+    new_status, msg = handler._determine_request_status_from_machines(
+        [], machines, request, provider_metadata
+    )
     assert new_status == RequestStatus.COMPLETED.value
     assert "fulfilled" in msg
 
@@ -115,7 +125,9 @@ def test_asg_capacity_in_progress():
     provider_metadata = {"asg_capacity": {"desired": 6, "in_service": 2, "state": None}}
     machines = _machines(MachineStatus.RUNNING, MachineStatus.PENDING)
 
-    new_status, msg = handler._determine_request_status_from_machines([], machines, request, provider_metadata)
+    new_status, msg = handler._determine_request_status_from_machines(
+        [], machines, request, provider_metadata
+    )
     assert new_status is None  # current status already in-progress; no transition
     assert msg is None
 
@@ -135,7 +147,9 @@ def test_runinstances_completed_without_capacity_metadata():
 def test_runinstances_timeout_when_no_instances_after_long_time():
     handler = DummyHandler()
     old_time = datetime.now(UTC) - timedelta(minutes=31)
-    request = _request(RequestType.ACQUIRE, RequestStatus.IN_PROGRESS, requested_count=1, created_at=old_time)
+    request = _request(
+        RequestType.ACQUIRE, RequestStatus.IN_PROGRESS, requested_count=1, created_at=old_time
+    )
 
     new_status, msg = handler._determine_request_status_from_machines([], [], request, {})
     assert new_status is None  # remains in-progress until timeout check is reached

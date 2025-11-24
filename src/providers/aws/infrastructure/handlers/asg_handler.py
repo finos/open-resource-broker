@@ -397,31 +397,30 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     "Overrides": [{"InstanceRequirements": instance_requirements_payload}],
                 }
             }
-        else:
-            # If explicit instance types are provided, emit overrides for ASG
-            if aws_template.instance_types:
-                overrides = []
-                for itype, weight in aws_template.instance_types.items():
-                    override = {"InstanceType": itype}
-                    if weight:
-                        override["WeightedCapacity"] = str(weight)
-                    overrides.append(override)
+        # If explicit instance types are provided, emit overrides for ASG
+        elif aws_template.instance_types:
+            overrides = []
+            for itype, weight in aws_template.instance_types.items():
+                override = {"InstanceType": itype}
+                if weight:
+                    override["WeightedCapacity"] = str(weight)
+                overrides.append(override)
 
-                asg_config["MixedInstancesPolicy"] = {
-                    "LaunchTemplate": {
-                        "LaunchTemplateSpecification": {
-                            "LaunchTemplateId": launch_template_id,
-                            "Version": launch_template_version,
-                        },
-                        "Overrides": overrides,
-                    }
+            asg_config["MixedInstancesPolicy"] = {
+                "LaunchTemplate": {
+                    "LaunchTemplateSpecification": {
+                        "LaunchTemplateId": launch_template_id,
+                        "Version": launch_template_version,
+                    },
+                    "Overrides": overrides,
                 }
-            else:
-                # Single instance type (or none) falls back to plain launch template
-                asg_config["LaunchTemplate"] = {
-                    "LaunchTemplateId": launch_template_id,
-                    "Version": launch_template_version,
-                }
+            }
+        else:
+            # Single instance type (or none) falls back to plain launch template
+            asg_config["LaunchTemplate"] = {
+                "LaunchTemplateId": launch_template_id,
+                "Version": launch_template_version,
+            }
 
         # Add subnet configuration
         if aws_template.subnet_ids:

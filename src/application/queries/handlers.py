@@ -91,9 +91,10 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 )
                 # No machines in storage but we have resource IDs - check provider and
                 # create machines
-                machine_objects_from_provider, provider_metadata = await self._check_provider_and_create_machines(
-                    request
-                )
+                (
+                    machine_objects_from_provider,
+                    provider_metadata,
+                ) = await self._check_provider_and_create_machines(request)
                 self.logger.info(
                     "DEBUG: Provider check returned %s machines", len(machine_obj_from_db)
                 )
@@ -102,9 +103,10 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     "DEBUG: Have %s machines, updating status from AWS", len(machine_obj_from_db)
                 )
                 # We have machines - update their status from AWS
-                machine_objects_from_provider, provider_metadata = await self._update_machine_status_from_aws(
-                    machine_obj_from_db, request
-                )
+                (
+                    machine_objects_from_provider,
+                    provider_metadata,
+                ) = await self._update_machine_status_from_aws(machine_obj_from_db, request)
             else:
                 self.logger.info(
                     "DEBUG: No machines and no resource IDs for request %s",
@@ -281,7 +283,9 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             )
             return [], {}
 
-    async def _update_machine_status_from_aws(self, machines: list, request=None) -> tuple[list, dict]:
+    async def _update_machine_status_from_aws(
+        self, machines: list, request=None
+    ) -> tuple[list, dict]:
         """Update machine status from AWS using existing handler methods."""
         try:
             # Group machines by request to use existing check_hosts_status methods
@@ -844,17 +848,23 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             capacity_target = (
                 fleet_capacity.get("target")
                 if fleet_capacity
-                else asg_capacity.get("desired") if asg_capacity else None
+                else asg_capacity.get("desired")
+                if asg_capacity
+                else None
             )
             capacity_fulfilled = (
                 fleet_capacity.get("fulfilled")
                 if fleet_capacity
-                else asg_capacity.get("in_service") if asg_capacity else None
+                else asg_capacity.get("in_service")
+                if asg_capacity
+                else None
             )
             capacity_state = (
                 fleet_capacity.get("state")
                 if fleet_capacity
-                else asg_capacity.get("state") if asg_capacity else None
+                else asg_capacity.get("state")
+                if asg_capacity
+                else None
             )
 
             # Determine new status based on request type and machine states

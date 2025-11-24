@@ -25,7 +25,6 @@ DEFAULT_ATTRIBUTE_COMBINATIONS = [
         "priceType": ["ondemand", "spot"],
         "scheduler": ["default", "hostfactory"],
     },
-
     # { INTENTIONALLY NOT SUPPORTED
     #     "providerApi": ["RunInstances"],
     #     "priceType": ["spot"]

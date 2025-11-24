@@ -15,6 +15,7 @@ from domain.base.ports import LoggingPort
 
 # Import AWS-specific components
 from providers.aws.configuration.config import AWSProviderConfig
+from providers.aws.domain.template.value_objects import ProviderApi
 from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from providers.aws.infrastructure.aws_client import AWSClient
 from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
@@ -27,7 +28,6 @@ from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
 )
 from providers.aws.managers.aws_resource_manager import AWSResourceManager
-from providers.aws.domain.template.value_objects import ProviderApi
 
 if TYPE_CHECKING:
     from providers.aws.infrastructure.adapters.aws_provisioning_adapter import (
@@ -867,11 +867,9 @@ class AWSProviderStrategy(ProviderStrategy):
                         }
                 else:
                     # Spot Fleet uses a different API
-                    sfr = (
-                        self.aws_client.ec2_client.describe_spot_fleet_requests(
-                            SpotFleetRequestIds=[fleet_id]
-                        ).get("SpotFleetRequestConfigs", [])
-                    )
+                    sfr = self.aws_client.ec2_client.describe_spot_fleet_requests(
+                        SpotFleetRequestIds=[fleet_id]
+                    ).get("SpotFleetRequestConfigs", [])
                     if sfr:
                         cfg = sfr[0].get("SpotFleetRequestConfig", {}) or {}
                         metadata["fleet_capacity"] = {
@@ -892,11 +890,7 @@ class AWSProviderStrategy(ProviderStrategy):
                     group = groups[0]
                     instances = group.get("Instances") or []
                     in_service = len(
-                        [
-                            inst
-                            for inst in instances
-                            if inst.get("LifecycleState") == "InService"
-                        ]
+                        [inst for inst in instances if inst.get("LifecycleState") == "InService"]
                     )
                     metadata["asg_capacity"] = {
                         "desired": group.get("DesiredCapacity"),

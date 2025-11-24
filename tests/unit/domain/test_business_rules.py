@@ -19,8 +19,8 @@ try:
         RequestValidationError,
     )
     from domain.request.value_objects import RequestStatus
-    from domain.template.template_aggregate import Template
     from domain.template.exceptions import TemplateValidationError
+    from domain.template.template_aggregate import Template
 
     IMPORTS_AVAILABLE = True
 except ImportError as e:

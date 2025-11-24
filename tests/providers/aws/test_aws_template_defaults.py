@@ -1,8 +1,8 @@
 """Tests for AWS template fleet_type default assignment."""
 
 import pytest
-from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
+from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.domain.template.value_objects import AWSFleetType, ProviderApi
 
 

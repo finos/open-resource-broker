@@ -167,9 +167,8 @@ def test_method_signatures():
     """Test that all handlers have consistent method signatures."""
     try:
         # Import all handlers
-        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-
         from domain.request.aggregate import Request
+        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
         from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
         from providers.aws.infrastructure.handlers.ec2_fleet_handler import (
             EC2FleetHandler,
@@ -497,7 +496,10 @@ def test_import_consistency():
                 )
                 return False
 
-            if "from providers.aws.domain.template.aws_template_aggregate import AWSTemplate" not in content:
+            if (
+                "from providers.aws.domain.template.aws_template_aggregate import AWSTemplate"
+                not in content
+            ):
                 print(f"   FAIL: {handler_file}: Missing AWSTemplate import")
                 return False
 

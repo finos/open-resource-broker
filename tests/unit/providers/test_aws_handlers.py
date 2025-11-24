@@ -1,7 +1,7 @@
 """Tests for AWS handler implementations."""
 
-from unittest.mock import Mock
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import boto3
 import pytest
@@ -9,6 +9,8 @@ from moto import mock_aws
 
 # Import AWS components
 try:
+    from providers.aws.domain.template.value_objects import AWSFleetType
+    from providers.aws.exceptions.aws_exceptions import AWSValidationError
     from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
     from providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHandler
     from providers.aws.infrastructure.handlers.run_instances_handler import (
@@ -18,8 +20,6 @@ try:
         SpotFleetHandler,
     )
     from providers.aws.utilities.aws_operations import AWSOperations
-    from providers.aws.domain.template.value_objects import AWSFleetType
-    from providers.aws.exceptions.aws_exceptions import AWSValidationError
 
     IMPORTS_AVAILABLE = True
 except ImportError as e:
@@ -1943,7 +1943,9 @@ class TestMultiInstanceOverrides:
         assert instance_types == set(template.instance_types.keys())
 
     def test_spot_fleet_overrides_from_instance_types(self):
-        template = self._multi_type_template(provider_api="EC2Fleet", fleet_type=AWSFleetType.REQUEST)
+        template = self._multi_type_template(
+            provider_api="EC2Fleet", fleet_type=AWSFleetType.REQUEST
+        )
         request = SimpleNamespace(requested_count=3, request_id="req-spot", metadata={})
 
         aws_client = Mock()
@@ -1985,7 +1987,9 @@ class TestMultiInstanceOverrides:
         instance_types = {o["InstanceType"] for o in overrides}
         assert instance_types == set(template.instance_types.keys())
         # WeightedCapacity should be string per AWS API
-        assert all(isinstance(o.get("WeightedCapacity"), str) for o in overrides if "WeightedCapacity" in o)
+        assert all(
+            isinstance(o.get("WeightedCapacity"), str) for o in overrides if "WeightedCapacity" in o
+        )
 
     def test_conflicting_instance_type_and_instance_types_raises(self):
         template = SimpleNamespace(

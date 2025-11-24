@@ -76,7 +76,6 @@ def test_aws_template_basic():
     """Test basic AWSTemplate creation."""
     try:
         from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-
         from providers.aws.domain.template.value_objects import ProviderApi
 
         print("   Testing basic AWSTemplate creation...")
@@ -117,7 +116,6 @@ def test_aws_template_spot_fleet():
     """Test SpotFleet AWSTemplate creation."""
     try:
         from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-
         from providers.aws.domain.template.value_objects import (
             AWSFleetType,
             ProviderApi,
@@ -200,7 +198,6 @@ def test_base_handler_validation():
         from unittest.mock import Mock
 
         from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-
         from providers.aws.domain.template.value_objects import (
             AWSFleetType,
             ProviderApi,

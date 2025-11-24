@@ -176,9 +176,9 @@ def verify_abis_enabled_for_instance(instance_id):
 
     if asg_name:
         try:
-            asgs = asg_client.describe_auto_scaling_groups(
-                AutoScalingGroupNames=[asg_name]
-            ).get("AutoScalingGroups", [])
+            asgs = asg_client.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name]).get(
+                "AutoScalingGroups", []
+            )
             if not asgs:
                 pytest.fail(f"No ASG data found for {asg_name} while verifying ABIS")
             overrides = (

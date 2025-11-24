@@ -12,8 +12,8 @@ import pytest
 try:
     from domain.request.aggregate import Request
     from domain.request.exceptions import RequestValidationError
-    from domain.template.template_aggregate import Template
     from domain.template.exceptions import TemplateValidationError
+    from domain.template.template_aggregate import Template
 
     IMPORTS_AVAILABLE = True
 except ImportError as e:
