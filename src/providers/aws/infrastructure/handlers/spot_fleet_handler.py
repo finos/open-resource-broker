@@ -1090,7 +1090,43 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         )
 
         try:
+            if not fleet_details:
+                fleet_response = self._retry_with_backoff(
+                    self.aws_client.ec2_client.describe_spot_fleet_requests,
+                    operation_type="read_only",
+                    SpotFleetRequestIds=[fleet_id],
+                )
+                fleet_configs = fleet_response.get("SpotFleetRequestConfigs", [])
+                fleet_details = fleet_configs[0] if fleet_configs else {}
+
+            fleet_config = fleet_details.get("SpotFleetRequestConfig", {}) if fleet_details else {}
+            fleet_type = str(fleet_config.get("Type", "maintain")).lower()
+            target_capacity = int(
+                fleet_config.get("TargetCapacity", len(fleet_instance_ids or [])) or 0
+            )
+            on_demand_capacity = int(fleet_config.get("OnDemandTargetCapacity", 0) or 0)
+            new_target_capacity = None
+
             if fleet_instance_ids:
+                if fleet_type == AWSFleetType.MAINTAIN:
+                    new_target_capacity = max(0, target_capacity - len(fleet_instance_ids))
+                    new_on_demand_capacity = min(on_demand_capacity, new_target_capacity)
+
+                    self._logger.info(
+                        "Reducing maintain Spot Fleet %s capacity from %s to %s before terminating instances",
+                        fleet_id,
+                        target_capacity,
+                        new_target_capacity,
+                    )
+
+                    self._retry_with_backoff(
+                        self.aws_client.ec2_client.modify_spot_fleet_request,
+                        operation_type="critical",
+                        SpotFleetRequestId=fleet_id,
+                        TargetCapacity=new_target_capacity,
+                        OnDemandTargetCapacity=new_on_demand_capacity,
+                    )
+
                 # Terminate specific instances using existing utility
                 self.aws_ops.terminate_instances_with_fallback(
                     fleet_instance_ids, self._request_adapter, f"SpotFleet-{fleet_id} instances"
@@ -1098,6 +1134,17 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 self._logger.info(
                     "Terminated Spot Fleet %s instances: %s", fleet_id, fleet_instance_ids
                 )
+
+                if fleet_type == AWSFleetType.MAINTAIN and new_target_capacity == 0:
+                    self._logger.info(
+                        "Maintain Spot Fleet %s capacity is zero, cancelling fleet", fleet_id
+                    )
+                    self._retry_with_backoff(
+                        self.aws_client.ec2_client.cancel_spot_fleet_requests,
+                        operation_type="critical",
+                        SpotFleetRequestIds=[fleet_id],
+                        TerminateInstances=True,
+                    )
             else:
                 # If no specific instances provided, cancel entire spot fleet
                 self._retry_with_backoff(

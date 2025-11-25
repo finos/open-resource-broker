@@ -11,13 +11,13 @@ class TestDockerCompose:
     """Test Docker Compose configurations."""
 
     @pytest.fixture(scope="class")
-    def project_root(self):
+    def project_root(self, request):
         """Get project root directory."""
-        return Path(__file__).parent.parent.parent
+        return Path(request.config.rootpath)
 
     def test_docker_compose_dev_file_valid(self, project_root):
         """Test development Docker Compose file is valid YAML."""
-        compose_path = project_root / "docker-compose.yml"
+        compose_path = project_root / "deployment" / "docker" / "docker-compose.yml"
         assert compose_path.exists(), "docker-compose.yml should exist"
 
         with open(compose_path) as f:
@@ -28,7 +28,7 @@ class TestDockerCompose:
 
     def test_docker_compose_prod_file_valid(self, project_root):
         """Test production Docker Compose file is valid YAML."""
-        compose_path = project_root / "docker-compose.prod.yml"
+        compose_path = project_root / "deployment" / "docker" / "docker-compose.prod.yml"
         assert compose_path.exists(), "docker-compose.prod.yml should exist"
 
         with open(compose_path) as f:
@@ -39,7 +39,7 @@ class TestDockerCompose:
 
     def test_docker_compose_dev_service_configuration(self, project_root):
         """Test development Docker Compose service configuration."""
-        compose_path = project_root / "docker-compose.yml"
+        compose_path = project_root / "deployment" / "docker" / "docker-compose.yml"
 
         with open(compose_path) as f:
             compose_config = yaml.safe_load(f)
@@ -93,7 +93,10 @@ class TestDockerCompose:
 
     def test_docker_compose_prod_service_configuration(self, project_root):
         """Test production Docker Compose service configuration."""
-        compose_path = project_root / "docker-compose.prod.yml"
+        compose_path = project_root / "deployment" / "docker" / "docker-compose.prod.yml"
+        
+        if not compose_path.exists():
+            pytest.skip("docker-compose.prod.yml not found")
 
         with open(compose_path) as f:
             compose_config = yaml.safe_load(f)
@@ -127,7 +130,10 @@ class TestDockerCompose:
 
     def test_docker_compose_volumes_configuration(self, project_root):
         """Test Docker Compose volumes configuration."""
-        compose_path = project_root / "docker-compose.yml"
+        compose_path = project_root / "deployment" / "docker" / "docker-compose.yml"
+        
+        if not compose_path.exists():
+            pytest.skip("docker-compose.yml not found")
 
         with open(compose_path) as f:
             compose_config = yaml.safe_load(f)
@@ -144,7 +150,10 @@ class TestDockerCompose:
 
     def test_docker_compose_networks_configuration(self, project_root):
         """Test Docker Compose networks configuration."""
-        compose_path = project_root / "docker-compose.yml"
+        compose_path = project_root / "deployment" / "docker" / "docker-compose.yml"
+        
+        if not compose_path.exists():
+            pytest.skip("docker-compose.yml not found")
 
         with open(compose_path) as f:
             compose_config = yaml.safe_load(f)
@@ -158,7 +167,10 @@ class TestDockerCompose:
 
     def test_docker_compose_optional_services(self, project_root):
         """Test Docker Compose optional services configuration."""
-        compose_path = project_root / "docker-compose.yml"
+        compose_path = project_root / "deployment" / "docker" / "docker-compose.yml"
+        
+        if not compose_path.exists():
+            pytest.skip("docker-compose.yml not found")
 
         with open(compose_path) as f:
             compose_config = yaml.safe_load(f)
@@ -190,7 +202,7 @@ class TestDockerCompose:
                 [
                     "docker-compose",
                     "-f",
-                    str(project_root / "docker-compose.yml"),
+                    str(project_root / "deployment" / "docker" / "docker-compose.yml"),
                     "config",
                     "--quiet",
                 ],
@@ -207,7 +219,7 @@ class TestDockerCompose:
                 [
                     "docker-compose",
                     "-f",
-                    str(project_root / "docker-compose.prod.yml"),
+                    str(project_root / "deployment" / "docker" / "docker-compose.prod.yml"),
                     "config",
                     "--quiet",
                 ],
@@ -227,7 +239,10 @@ class TestDockerCompose:
     @pytest.mark.slow
     def test_docker_compose_service_dependencies(self, project_root):
         """Test Docker Compose service dependencies."""
-        compose_path = project_root / "docker-compose.yml"
+        compose_path = project_root / "deployment" / "docker" / "docker-compose.yml"
+        
+        if not compose_path.exists():
+            pytest.skip("docker-compose.yml not found")
 
         with open(compose_path) as f:
             compose_config = yaml.safe_load(f)
@@ -243,7 +258,10 @@ class TestDockerCompose:
     def test_environment_file_compatibility(self, project_root):
         """Test that .env.example is compatible with Docker Compose."""
         env_example_path = project_root / ".env.example"
-        compose_path = project_root / "docker-compose.yml"
+        compose_path = project_root / "deployment" / "docker" / "docker-compose.yml"
+        
+        if not compose_path.exists():
+            pytest.skip("docker-compose.yml not found")
 
         # Read environment variables from .env.example
         env_vars = set()

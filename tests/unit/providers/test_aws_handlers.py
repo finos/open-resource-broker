@@ -230,6 +230,41 @@ class TestContextFieldSupport:
 class TestEC2FleetHandler:
     """Test EC2 Fleet handler implementation."""
 
+    def test_ec2_fleet_handler_builds_maintain_config(self):
+        """Ensure maintain fleets add the correct flags to the config."""
+        request = SimpleNamespace(request_id="req-maintain", requested_count=3)
+        template = SimpleNamespace(
+            template_id="tmpl-maintain",
+            fleet_type=AWSFleetType.MAINTAIN,
+            price_type="ondemand",
+            allocation_strategy=None,
+            allocation_strategy_on_demand=None,
+            percent_on_demand=0,
+            max_price=None,
+            instance_types=None,
+            instance_types_ondemand=None,
+            subnet_ids=None,
+            tags=None,
+            context=None,
+            get_instance_requirements_payload=lambda: None,
+            abis_instance_requirements=None,
+        )
+
+        handler = EC2FleetHandler(Mock(), Mock(), Mock(), Mock(), Mock())
+        handler.aws_native_spec_service = None
+
+        config = handler._create_fleet_config(
+            template=template,
+            request=request,
+            launch_template_id="lt-maintain",
+            launch_template_version="1",
+        )
+
+        assert config["Type"] == "maintain"
+        assert config["ReplaceUnhealthyInstances"] is True
+        assert config["ExcessCapacityTerminationPolicy"] == "termination"
+        assert config["TargetCapacitySpecification"]["TotalTargetCapacity"] == 3
+
     @mock_aws
     def test_ec2_fleet_handler_creates_fleet(self):
         """Test that EC2FleetHandler creates fleet successfully."""
@@ -975,6 +1010,48 @@ class TestASGHandler:
 class TestSpotFleetHandler:
     """Test Spot Fleet handler implementation."""
 
+    def test_spot_fleet_handler_builds_maintain_config(self):
+        """Ensure maintain Spot Fleets include the correct configuration flags."""
+        request = SimpleNamespace(request_id="req-spot-maintain", requested_count=2, metadata={})
+        template = SimpleNamespace(
+            template_id="tmpl-spot-maintain",
+            fleet_role="arn:aws:iam::123456789012:role/aws-service-role/spotfleet.amazonaws.com/AWSServiceRoleForEC2SpotFleet",
+            fleet_type=AWSFleetType.MAINTAIN,
+            price_type="spot",
+            allocation_strategy=None,
+            allocation_strategy_on_demand=None,
+            percent_on_demand=0,
+            max_price=None,
+            instance_type="t3.micro",
+            instance_types=None,
+            instance_types_ondemand=None,
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
+            tags=None,
+            context=None,
+            get_instance_requirements_payload=lambda: None,
+            abis_instance_requirements=None,
+        )
+
+        aws_client = Mock()
+        aws_client.sts_client.get_caller_identity.return_value = {"Account": "123456789012"}
+
+        handler = SpotFleetHandler(aws_client, Mock(), Mock(), Mock(), Mock())
+        handler.aws_native_spec_service = None
+
+        config = handler._create_spot_fleet_config(
+            template=template,
+            request=request,
+            launch_template_id="lt-spot-maintain",
+            launch_template_version="1",
+        )
+
+        assert config["Type"] == "maintain"
+        assert config["ReplaceUnhealthyInstances"] is True
+        assert config["TerminateInstancesWithExpiration"] is True
+        assert config["TargetCapacity"] == 2
+        assert config["LaunchTemplateConfigs"][0]["Overrides"][0]["InstanceType"] == "t3.micro"
+
     @mock_aws
     def test_spot_fleet_handler_creates_spot_fleet(self):
         """Test that SpotFleetHandler creates spot fleet."""
@@ -1279,6 +1356,49 @@ class TestSpotFleetHandler:
         assert total_instances_processed == len(instance_ids), (
             f"Expected all {len(instance_ids)} instances to be processed"
         )
+
+    def test_spot_fleet_handler_release_hosts_maintain_reduces_capacity(self):
+        """Ensure maintain Spot Fleet reduces target capacity before termination."""
+        aws_client = Mock()
+        aws_client.ec2_client = Mock()
+        aws_client.ec2_client.modify_spot_fleet_request = Mock()
+        aws_client.ec2_client.cancel_spot_fleet_requests = Mock()
+
+        aws_ops = Mock()
+        aws_ops.terminate_instances_with_fallback = Mock()
+
+        handler = SpotFleetHandler(
+            aws_client=aws_client,
+            logger=Mock(),
+            aws_ops=aws_ops,
+            launch_template_manager=Mock(),
+            request_adapter=Mock(),
+        )
+
+        handler._retry_with_backoff = lambda func, **kwargs: func(
+            **{k: v for k, v in kwargs.items() if k != "operation_type"}
+        )
+
+        fleet_details = {
+            "SpotFleetRequestId": "sfr-12345",
+            "SpotFleetRequestConfig": {
+                "TargetCapacity": 3,
+                "OnDemandTargetCapacity": 1,
+                "Type": "maintain",
+            },
+        }
+
+        handler._release_hosts_for_single_spot_fleet(
+            "sfr-12345", ["i-1", "i-2"], fleet_details
+        )
+
+        aws_client.ec2_client.modify_spot_fleet_request.assert_called_with(
+            SpotFleetRequestId="sfr-12345", TargetCapacity=1, OnDemandTargetCapacity=1
+        )
+        aws_ops.terminate_instances_with_fallback.assert_called_once_with(
+            ["i-1", "i-2"], handler._request_adapter, "SpotFleet-sfr-12345 instances"
+        )
+        aws_client.ec2_client.cancel_spot_fleet_requests.assert_not_called()
 
     @mock_aws
     def test_spot_fleet_handler_release_hosts_spot_instance_detection(self):

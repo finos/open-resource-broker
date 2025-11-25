@@ -1,6 +1,6 @@
 """Infrastructure events - Generic resource and operation tracking."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from pydantic import Field
@@ -23,21 +23,21 @@ class ResourceCreatedEvent(ResourceEvent):
     """Event raised when an infrastructure resource is created."""
 
     resource_id: Optional[str] = None  # Generic resource identifier
-    creation_time: datetime = Field(default_factory=datetime.utcnow)
+    creation_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ResourceUpdatedEvent(ResourceEvent):
     """Event raised when an infrastructure resource is updated."""
 
     changes: dict[str, Any] = Field(default_factory=dict)
-    update_time: datetime = Field(default_factory=datetime.utcnow)
+    update_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ResourceDeletedEvent(ResourceEvent):
     """Event raised when an infrastructure resource is deleted."""
 
     deletion_reason: str
-    deletion_time: datetime = Field(default_factory=datetime.utcnow)
+    deletion_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ResourcesCleanedEvent(ResourceEvent):
@@ -45,7 +45,7 @@ class ResourcesCleanedEvent(ResourceEvent):
 
     resource_count: int
     cleanup_reason: str
-    cleanup_time: datetime = Field(default_factory=datetime.utcnow)
+    cleanup_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ResourceErrorEvent(ResourceEvent):
@@ -53,7 +53,7 @@ class ResourceErrorEvent(ResourceEvent):
 
     error_message: str
     error_code: Optional[str] = None
-    error_time: datetime = Field(default_factory=datetime.utcnow)
+    error_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class OperationStartedEvent(InfrastructureEvent):

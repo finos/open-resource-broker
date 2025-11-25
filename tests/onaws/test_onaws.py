@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import time
+from typing import Optional
 
 import boto3
 import pytest
@@ -20,9 +21,11 @@ pytestmark = [  # Apply default markers to every test in this module
 
 # Set environment variables for local development
 os.environ["USE_LOCAL_DEV"] = "1"
-os.environ["HF_LOGDIR"] = "./logs"  # Set log directory to avoid permission issues
-os.environ["AWS_PROVIDER_LOG_DIR"] = "./logss"
+os.environ.setdefault("HF_LOGDIR", "./logs")  # Set log directory to avoid permission issues
+os.environ.setdefault("AWS_PROVIDER_LOG_DIR", "./logss")
 os.environ["LOG_DESTINATION"] = "file"
+
+
 
 _boto_session = boto3.session.Session()
 _ec2_region = (
@@ -39,13 +42,17 @@ VERIFY_ABIS = os.environ.get("VERIFY_ABIS", "0") in ("1", "true", "True")
 
 log = logging.getLogger("awsome_test")
 log.setLevel(logging.DEBUG)
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+formatter = logging.Formatter(
+    "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s"
+)
 
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(formatter)
 
-file_handler = logging.FileHandler("logs/awsome_test.log")
+log_dir = os.environ.get("HF_LOGDIR", "./logs")
+os.makedirs(log_dir, exist_ok=True)
+file_handler = logging.FileHandler(os.path.join(log_dir, "awsome_test.log"))
 file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(formatter)
 
@@ -196,6 +203,212 @@ def verify_abis_enabled_for_instance(instance_id):
     pytest.fail(
         f"Could not determine parent resource (fleet or ASG) for instance {instance_id} to verify ABIS"
     )
+
+
+def _extract_request_id(response: dict) -> str:
+    """Get request identifier from varied response shapes."""
+    if not isinstance(response, dict):
+        return ""
+    return (
+        response.get("requestId")
+        or response.get("request_id")
+        or (response.get("requests") or [{}])[0].get("requestId")
+        or ""
+        or response.get("result")
+    )
+
+
+def _get_resource_id_from_instance(instance_id: str, provider_api: str) -> Optional[str]:
+    """Discover backing fleet/ASG identifier for a given instance."""
+    try:
+        desc = ec2_client.describe_instances(InstanceIds=[instance_id])
+        instance_details = desc["Reservations"][0]["Instances"][0]
+        tags = instance_details.get("Tags", [])
+    except Exception as e:
+        pytest.fail(f"Failed to describe instance {instance_id} for resource lookup: {e}")
+
+    provider_api = provider_api or ""
+    provider_api_lower = provider_api.lower()
+
+    if "spotfleet" in provider_api_lower:
+        fleet_id = _get_tag_value(tags, "aws:ec2spot:fleet-request-id")
+    elif "ec2fleet" in provider_api_lower:
+        fleet_id = _get_tag_value(tags, "aws:ec2:fleet-id")
+    elif provider_api == "ASG" or "asg" in provider_api_lower:
+        fleet_id = _get_tag_value(tags, "aws:autoscaling:groupName")
+    else:
+        fleet_id = None
+
+    # Cross-check: sometimes SpotFleet scenarios still tag with aws:ec2:fleet-id
+    if not fleet_id:
+        fleet_id = _get_tag_value(tags, "aws:ec2:fleet-id")
+
+    # Fallbacks if tags are missing
+    if not fleet_id and "spotfleet" in provider_api_lower:
+        sir_id = instance_details.get("SpotInstanceRequestId")
+        if sir_id:
+            try:
+                sir_desc = ec2_client.describe_spot_instance_requests(
+                    SpotInstanceRequestIds=[sir_id]
+                )
+                sir_details = (sir_desc.get("SpotInstanceRequests") or [{}])[0]
+                fleet_id = sir_details.get("SpotFleetRequestId") or fleet_id
+            except Exception as e:
+                log.debug("Unable to fetch SpotInstanceRequest %s: %s", sir_id, e)
+        if not fleet_id:
+            try:
+                sir_desc = ec2_client.describe_spot_instance_requests(
+                    Filters=[{"Name": "instance-id", "Values": [instance_id]}]
+                )
+                sir_details = (sir_desc.get("SpotInstanceRequests") or [{}])[0]
+                fleet_id = sir_details.get("SpotFleetRequestId") or fleet_id
+            except Exception as e:
+                log.debug(
+                    "Unable to fetch SpotInstanceRequest via filter for %s: %s",
+                    instance_id,
+                    e,
+                )
+    if not fleet_id:
+        fleet_id = _find_spot_fleet_for_instance(instance_id)
+
+    if not fleet_id and provider_api_lower in ("asg", "autoscaling"):
+        try:
+            asg_instances = asg_client.describe_auto_scaling_instances(
+                InstanceIds=[instance_id]
+            ).get("AutoScalingInstances", [])
+            if asg_instances:
+                fleet_id = asg_instances[0].get("AutoScalingGroupName")
+        except Exception as e:
+            log.debug("Unable to fetch ASG for instance %s: %s", instance_id, e)
+
+    if not fleet_id:
+        log.warning(
+            "Could not determine backing resource for instance %s; tags=%s lifecycle=%s",
+            instance_id,
+            tags,
+            instance_details.get("InstanceLifecycle"),
+        )
+        return None
+    return fleet_id
+
+
+def _get_capacity(provider_api: str, resource_id: str) -> int:
+    """Return target/desired capacity for fleet or ASG."""
+    resource_id = resource_id or ""
+    # Prefer detecting by ID shape to avoid mismatched API calls
+    if resource_id.startswith("fleet-"):
+        provider_api = "EC2Fleet"
+    elif resource_id.startswith("sfr-"):
+        provider_api = "SpotFleet"
+
+    if "spotfleet" in provider_api.lower():
+        try:
+            resp = ec2_client.describe_spot_fleet_requests(SpotFleetRequestIds=[resource_id])
+            configs = resp.get("SpotFleetRequestConfigs") or []
+            if configs:
+                config = configs[0].get("SpotFleetRequestConfig", {})
+                return int(config.get("TargetCapacity", 0))
+        except Exception as e:
+            log.debug("Spot Fleet capacity lookup failed for %s: %s", resource_id, e)
+        # Fallback to EC2 Fleet API if SpotFleet lookup fails
+        try:
+            resp = ec2_client.describe_fleets(FleetIds=[resource_id])
+            fleets = resp.get("Fleets") or [{}]
+            spec = fleets[0].get("TargetCapacitySpecification", {})
+            return int(spec.get("TotalTargetCapacity", 0))
+        except Exception as e:
+            log.debug("EC2 Fleet fallback capacity lookup failed for %s: %s", resource_id, e)
+    if "ec2fleet" in provider_api.lower():
+        resp = ec2_client.describe_fleets(FleetIds=[resource_id])
+        fleets = resp.get("Fleets") or [{}]
+        spec = fleets[0].get("TargetCapacitySpecification", {})
+        return int(spec.get("TotalTargetCapacity", 0))
+    if provider_api == "ASG" or "asg" in provider_api.lower():
+        resp = asg_client.describe_auto_scaling_groups(AutoScalingGroupNames=[resource_id])
+        asgs = resp.get("AutoScalingGroups") or [{}]
+        return int(asgs[0].get("DesiredCapacity", 0))
+    pytest.fail(f"Unsupported provider API for capacity check: {provider_api}")
+
+
+def _wait_for_spot_fleet_stable(resource_id: str, timeout: int = 300) -> None:
+    """Wait until a Spot Fleet is out of modifying state so capacity reflects changes."""
+    start = time.time()
+    while True:
+        try:
+            resp = ec2_client.describe_spot_fleet_requests(SpotFleetRequestIds=[resource_id])
+            configs = resp.get("SpotFleetRequestConfigs") or []
+            state = (configs[0].get("SpotFleetRequestState") or "").lower() if configs else ""
+            if state != "modifying":
+                return
+        except Exception as exc:
+            log.debug("Failed to poll Spot Fleet %s state: %s", resource_id, exc)
+
+        if time.time() - start > timeout:
+            log.warning("Timed out waiting for Spot Fleet %s to stabilize", resource_id)
+            return
+        time.sleep(5)
+
+
+def _wait_for_ec2_fleet_stable(resource_id: str, timeout: int = 300) -> None:
+    """Wait until an EC2 Fleet is out of modifying state so capacity reflects changes."""
+    start = time.time()
+    while True:
+        try:
+            resp = ec2_client.describe_fleets(FleetIds=[resource_id])
+            fleets = resp.get("Fleets") or []
+            state = (fleets[0].get("FleetState") or "").lower() if fleets else ""
+            if state != "modifying":
+                return
+        except Exception as exc:
+            log.debug("Failed to poll EC2 Fleet %s state: %s", resource_id, exc)
+
+        if time.time() - start > timeout:
+            log.warning("Timed out waiting for EC2 Fleet %s to stabilize", resource_id)
+            return
+        time.sleep(5)
+
+
+def _find_spot_fleet_for_instance(instance_id: str) -> Optional[str]:
+    """Search active spot fleets to locate the instance."""
+    try:
+        next_token = None
+        fleets: list[dict] = []
+        while True:
+            if next_token:
+                resp = ec2_client.describe_spot_fleet_requests(NextToken=next_token)
+            else:
+                resp = ec2_client.describe_spot_fleet_requests()
+            fleets.extend(resp.get("SpotFleetRequestConfigs", []))
+            next_token = resp.get("NextToken")
+            if not next_token:
+                break
+
+        for fleet in fleets:
+            fleet_id = fleet.get("SpotFleetRequestId")
+            if not fleet_id:
+                continue
+
+            inst_next = None
+            while True:
+                if inst_next:
+                    inst_resp = ec2_client.describe_spot_fleet_instances(
+                        SpotFleetRequestId=fleet_id, NextToken=inst_next
+                    )
+                else:
+                    inst_resp = ec2_client.describe_spot_fleet_instances(SpotFleetRequestId=fleet_id)
+
+                instances = inst_resp.get("ActiveInstances", [])
+                for inst in instances:
+                    if inst.get("InstanceId") == instance_id:
+                        return fleet_id
+
+                inst_next = inst_resp.get("NextToken")
+                if not inst_next:
+                    break
+
+    except Exception as e:
+        log.debug("Failed to enumerate spot fleets for instance %s: %s", instance_id, e)
+    return None
 
 
 def validate_root_device_volume_size(instance_details, template, instance_id):
@@ -615,6 +828,94 @@ def _check_all_ec2_hosts_are_being_terminated(ec2_instance_ids):
     return all_are_deallocated
 
 
+def _wait_for_request_completion(hfm, request_id: str, scheduler_type: str):
+    """Poll request status until complete or timeout."""
+    request_status_schema = plugin_io_schemas.get_schema_for_scheduler(
+        "request_status", scheduler_type
+    )
+    alt_schema = plugin_io_schemas.expected_request_status_schema_hostfactory
+    start_time = time.time()
+
+    while True:
+        status_response = hfm.get_request_status(request_id)
+        log.debug(json.dumps(status_response, indent=4))
+
+        try:
+            # Use the schema that matches the key style in the response
+            requests = status_response.get("requests") or []
+            first_request = requests[0] if requests else {}
+            machines = first_request.get("machines") or []
+
+            if (
+                scheduler_type == "default"
+                and machines
+                and "machineId" in machines[0]
+                and "machine_id" not in machines[0]
+            ):
+                validate_json_schema(instance=status_response, schema=alt_schema)
+            else:
+                validate_json_schema(instance=status_response, schema=request_status_schema)
+        except ValidationError as e:
+            pytest.fail(
+                f"JSON validation failed for get_reqest_status response json ({scheduler_type} scheduler): {e}"
+            )
+
+        if status_response["requests"][0]["status"] == "complete":
+            return status_response
+
+        if time.time() - start_time > MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC:
+            pytest.fail("Timed out waiting for request to complete")
+
+        time.sleep(5)
+
+
+def _wait_for_return_completion(hfm, machine_ids: list[str], return_request_id: str):
+    """Poll return request until complete using return_request_id."""
+    start_time = time.time()
+    while True:
+        status_response = hfm.get_return_requests([return_request_id])
+        log.debug(json.dumps(status_response, indent=4))
+
+        requests = status_response.get("requests") or []
+        matching_req = None
+        for req in requests:
+            if isinstance(req, dict):
+                rid = req.get("requestId") or req.get("request_id")
+                if return_request_id and rid and rid != return_request_id:
+                    continue
+                matching_req = req
+                break
+            else:
+                # Sometimes the API returns just request IDs as strings; accept them when unambiguous
+                if isinstance(req, str):
+                    if not return_request_id or req == return_request_id:
+                        matching_req = {"request_id": req, "status": status_response.get("status")}
+                        break
+        if not matching_req and requests:
+            first = requests[0]
+            matching_req = first if isinstance(first, dict) else {"request_id": first, "status": None}
+
+        if matching_req and matching_req.get("status") == "complete":
+            return status_response
+
+        if time.time() - start_time > MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC:
+            pytest.fail("Timed out waiting for return request to complete")
+
+        time.sleep(5)
+
+
+def _resolve_request_machines_schema(response: dict, scheduler_type: str):
+    """Pick the schema that matches the response shape without mutating the payload."""
+    has_camel = "requestId" in response
+    has_snake = "request_id" in response
+
+    if has_camel and not has_snake:
+        return plugin_io_schemas.expected_request_machines_schema_hostfactory
+    if has_snake and not has_camel:
+        return plugin_io_schemas.expected_request_machines_schema_default
+    return plugin_io_schemas.get_schema_for_scheduler("request_machines", scheduler_type)
+
+
 def provide_release_control_loop(hfm, template_json, capacity_to_request, test_case=None):
     """
     Executes a full lifecycle test of requesting and releasing EC2 instances.
@@ -707,7 +1008,7 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
 
         if time.time() - start_time > MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC:
             break
-        if status_response["requests"][0]["status"] == "complete":
+        if status_response.get("requests") and status_response["requests"][0]["status"] == "complete":
             break
 
         time.sleep(5)
@@ -860,6 +1161,125 @@ def test_get_available_templates_with_overrides(setup_host_factory_mock):
 #     res = hfm.get_available_templates()
 
 #     provide_release_control_loop(hfm, template_json=res["templates"][0], capacity_to_request=test_case["capacity_to_request"])
+
+
+def _partial_return_cases():
+    """Pick maintain fleets and ASG scenarios with capacity > 1."""
+    cases = []
+    for tc in scenarios.get_test_cases():
+        provider_api = tc.get("overrides", {}).get("providerApi") or tc.get("providerApi")
+        fleet_type = tc.get("overrides", {}).get("fleetType")
+        capacity = tc.get("capacity_to_request", 0)
+        if capacity <= 1:
+            continue
+        if provider_api in ("EC2Fleet", "SpotFleet") and str(fleet_type).lower() == "maintain":
+            cases.append(tc)
+        elif provider_api == "ASG":
+            cases.append(tc)
+    return cases
+
+
+@pytest.mark.aws
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "test_case", _partial_return_cases(), ids=lambda tc: tc["test_name"]
+)
+def test_partial_return_reduces_capacity(setup_host_factory_mock_with_scenario, test_case):
+    """Return one instance and ensure maintain capacity drops by one before draining the rest."""
+    log.info("Partial return test: %s", test_case["test_name"])
+
+    hfm = setup_host_factory_mock_with_scenario
+
+    templates_response = hfm.get_available_templates()
+    log.debug("Templates response: %s", json.dumps(templates_response, indent=2))
+    template_id = test_case.get("template_id") or test_case["test_name"]
+    template_json = next(
+        (
+            template
+            for template in templates_response["templates"]
+            if template.get("templateId") == template_id
+            or template.get("template_id") == template_id
+        ),
+        None,
+    )
+    if template_json is None:
+        pytest.fail(f"Template {template_id} not found for partial return test")
+
+    scheduler_type = get_scheduler_from_scenario(test_case)
+
+    request_response = hfm.request_machines(
+        template_json.get("templateId") or template_json.get("template_id"),
+        test_case["capacity_to_request"],
+    )
+    parse_and_print_output(request_response)
+
+    request_machines_schema = _resolve_request_machines_schema(request_response, scheduler_type)
+    try:
+        validate_json_schema(instance=request_response, schema=request_machines_schema)
+    except ValidationError as e:
+        pytest.fail(
+            f"JSON validation failed for request_machines response json ({scheduler_type} scheduler): {e}"
+        )
+
+    request_id = request_response.get("requestId") or request_response.get("request_id")
+    if not request_id:
+        pytest.fail(f"Request ID missing in response: {json.dumps(request_response, indent=2)}")
+
+    provider_api = (
+        template_json.get("providerApi")
+        or template_json.get("provider_api")
+        or test_case.get("overrides", {}).get("providerApi")
+    )
+    log.info("Provisioning request_id=%s provider_api=%s", request_id, provider_api)
+    status_response = _wait_for_request_completion(hfm, request_id, scheduler_type)
+    _check_request_machines_response_status(status_response)
+    _check_all_ec2_hosts_are_being_provisioned(status_response)
+    log.debug("Final provisioning status: %s", json.dumps(status_response, indent=2))
+
+    machines = status_response["requests"][0]["machines"]
+    machine_ids = [m.get("machineId") or m.get("machine_id") for m in machines]
+    assert len(machine_ids) >= 2, "Partial return test requires capacity > 1"
+
+    first_instance = machine_ids[0]
+    log.info("Attempting to resolve resource for first_instance=%s via provider_api=%s", first_instance, provider_api)
+    resource_id = _get_resource_id_from_instance(first_instance, provider_api)
+    if not resource_id:
+        pytest.skip(f"Could not determine backing resource for instance {first_instance}")
+    capacity_before = _get_capacity(provider_api, resource_id)
+
+    return_response = hfm.request_return_machines([first_instance])
+    log.debug("Return response on instance termination: %s", json.dumps(return_response, indent=2))
+    return_request_id = _extract_request_id(return_response)
+    if not return_request_id:
+        log.warning("Return request ID missing; proceeding with status polling by machine id only")
+
+    # _wait_for_return_completion(hfm, [first_instance], return_request_id)
+    _wait_for_request_completion(hfm, return_request_id, scheduler_type)
+
+    if provider_api and "spotfleet" in provider_api.lower():
+        _wait_for_spot_fleet_stable(resource_id)
+    elif provider_api and "ec2fleet" in provider_api.lower():
+        _wait_for_ec2_fleet_stable(resource_id)
+    elif resource_id.startswith("fleet-"):
+        _wait_for_ec2_fleet_stable(resource_id)
+
+    capacity_after = _get_capacity(provider_api, resource_id)
+    assert capacity_after == max(capacity_before - 1, 0)
+
+    terminate_start = time.time()
+    while True:
+        state_info = get_instance_state(first_instance)
+        if not state_info["exists"] or state_info["state"] in ["terminated", "shutting-down"]:
+            break
+        if time.time() - terminate_start > MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC:
+            pytest.fail(f"Instance {first_instance} failed to terminate in time")
+        time.sleep(5)
+
+    remaining_ids = machine_ids[1:]
+    if remaining_ids:
+        hfm.request_return_machines(remaining_ids)
+        while not _check_all_ec2_hosts_are_being_terminated(remaining_ids):
+            time.sleep(10)
 
 
 @pytest.mark.aws

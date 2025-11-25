@@ -1,6 +1,6 @@
 """Persistence events - Repository and storage monitoring."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from pydantic import Field
@@ -31,7 +31,7 @@ class RepositoryOperationStartedEvent(PersistenceEvent):
     """Event raised when a repository operation starts."""
 
     operation_type: str  # "save", "find", "delete", "update"
-    start_time: datetime = Field(default_factory=datetime.utcnow)
+    start_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class RepositoryOperationCompletedEvent(PersistenceEvent, OperationEvent):
@@ -96,7 +96,7 @@ class StorageStrategyFailoverEvent(StorageEvent, ErrorEvent):
     from_strategy: str
     to_strategy: str
     failure_reason: str
-    failover_time: datetime = Field(default_factory=datetime.utcnow)
+    failover_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ConnectionPoolEvent(InfrastructureEvent):
