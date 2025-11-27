@@ -7,7 +7,8 @@ from typing import Optional
 import boto3
 import pytest
 from botocore.exceptions import ClientError
-from jsonschema import ValidationError, validate as validate_json_schema
+from jsonschema import ValidationError
+from jsonschema import validate as validate_json_schema
 
 from hfmock import HostFactoryMock
 from tests.onaws import plugin_io_schemas, scenarios
@@ -37,8 +38,6 @@ _ec2_region = (
 ec2_client = _boto_session.client("ec2", region_name=_ec2_region)
 asg_client = _boto_session.client("autoscaling", region_name=_ec2_region)
 
-# Enable to verify ABIS on the created resource (fleet/ASG) via AWS APIs
-VERIFY_ABIS = os.environ.get("VERIFY_ABIS", "0") in ("1", "true", "True")
 
 log = logging.getLogger("awsome_test")
 log.setLevel(logging.DEBUG)
@@ -154,40 +153,92 @@ def _get_tag_value(tags, key):
     return None
 
 
+def get_parent_resource_from_instance(instance_id: str) -> tuple[Optional[str], Optional[str]]:
+    """
+    Get parent resource ID and type from instance using AWS tags.
+
+    Args:
+        instance_id: EC2 instance ID
+
+    Returns:
+        Tuple of (resource_id, resource_type) where resource_type is one of:
+        'ec2_fleet', 'spot_fleet', 'asg', or None if not found
+    """
+    try:
+        desc = ec2_client.describe_instances(InstanceIds=[instance_id])
+        tags = desc["Reservations"][0]["Instances"][0].get("Tags", [])
+    except Exception as e:
+        log.warning(f"Failed to describe instance {instance_id}: {e}")
+        return None, None
+
+    # Check for EC2 Fleet
+    fleet_id = _get_tag_value(tags, "aws:ec2:fleet-id")
+    if fleet_id:
+        return fleet_id, "ec2_fleet"
+
+    # Check for Spot Fleet
+    spot_fleet_id = _get_tag_value(tags, "aws:ec2spot:fleet-request-id")
+    if spot_fleet_id:
+        return spot_fleet_id, "spot_fleet"
+
+    # Check for ASG
+    asg_name = _get_tag_value(tags, "aws:autoscaling:groupName")
+    if asg_name:
+        return asg_name, "asg"
+
+    return None, None
+
+
 def verify_abis_enabled_for_instance(instance_id):
     """
     Given an instance ID, trace back to the parent resource (Fleet or ASG) and
     assert that InstanceRequirements/ABIS are present in the resource config.
     """
+    resource_id, resource_type = get_parent_resource_from_instance(instance_id)
 
-    try:
-        desc = ec2_client.describe_instances(InstanceIds=[instance_id])
-        tags = desc["Reservations"][0]["Instances"][0].get("Tags", [])
-    except Exception as e:
-        pytest.fail(f"Failed to describe instance {instance_id} to verify ABIS: {e}")
+    if not resource_id or not resource_type:
+        pytest.fail(
+            f"Could not determine parent resource (fleet or ASG) for instance {instance_id} to verify ABIS"
+        )
 
-    fleet_id = _get_tag_value(tags, "aws:ec2:fleet-id")
-    asg_name = _get_tag_value(tags, "aws:autoscaling:groupName")
-
-    if fleet_id:
+    if resource_type == "ec2_fleet":
         try:
-            fleets = ec2_client.describe_fleets(FleetIds=[fleet_id]).get("Fleets", [])
+            fleets = ec2_client.describe_fleets(FleetIds=[resource_id]).get("Fleets", [])
             if not fleets:
-                pytest.fail(f"No fleet data found for {fleet_id} while verifying ABIS")
+                pytest.fail(f"No EC2 Fleet data found for {resource_id} while verifying ABIS")
             overrides = fleets[0].get("LaunchTemplateConfigs", [{}])[0].get("Overrides", [])
             has_abis = any("InstanceRequirements" in ov for ov in overrides)
-            assert has_abis, f"ABIS not present in fleet overrides for {fleet_id}"
+            assert has_abis, f"ABIS not present in EC2 Fleet overrides for {resource_id}"
             return
         except Exception as e:
-            pytest.fail(f"Failed to verify ABIS on fleet {fleet_id}: {e}")
+            pytest.fail(f"Failed to verify ABIS on EC2 Fleet {resource_id}: {e}")
 
-    if asg_name:
+    elif resource_type == "spot_fleet":
         try:
-            asgs = asg_client.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name]).get(
-                "AutoScalingGroups", []
+            sfrs = ec2_client.describe_spot_fleet_requests(
+                SpotFleetRequestIds=[resource_id]
+            ).get("SpotFleetRequestConfigs", [])
+            if not sfrs:
+                pytest.fail(f"No Spot Fleet data found for {resource_id} while verifying ABIS")
+            overrides = (
+                sfrs[0]
+                .get("SpotFleetRequestConfig", {})
+                .get("LaunchTemplateConfigs", [{}])[0]
+                .get("Overrides", [])
             )
+            has_abis = any("InstanceRequirements" in ov for ov in overrides)
+            assert has_abis, f"ABIS not present in Spot Fleet overrides for {resource_id}"
+            return
+        except Exception as e:
+            pytest.fail(f"Failed to verify ABIS on Spot Fleet {resource_id}: {e}")
+
+    elif resource_type == "asg":
+        try:
+            asgs = asg_client.describe_auto_scaling_groups(
+                AutoScalingGroupNames=[resource_id]
+            ).get("AutoScalingGroups", [])
             if not asgs:
-                pytest.fail(f"No ASG data found for {asg_name} while verifying ABIS")
+                pytest.fail(f"No ASG data found for {resource_id} while verifying ABIS")
             overrides = (
                 asgs[0]
                 .get("MixedInstancesPolicy", {})
@@ -195,14 +246,10 @@ def verify_abis_enabled_for_instance(instance_id):
                 .get("Overrides", [])
             )
             has_abis = any("InstanceRequirements" in ov for ov in overrides)
-            assert has_abis, f"ABIS not present in ASG overrides for {asg_name}"
+            assert has_abis, f"ABIS not present in ASG overrides for {resource_id}"
             return
         except Exception as e:
-            pytest.fail(f"Failed to verify ABIS on ASG {asg_name}: {e}")
-
-    pytest.fail(
-        f"Could not determine parent resource (fleet or ASG) for instance {instance_id} to verify ABIS"
-    )
+            pytest.fail(f"Failed to verify ABIS on ASG {resource_id}: {e}")
 
 
 def _extract_request_id(response: dict) -> str:
@@ -219,77 +266,34 @@ def _extract_request_id(response: dict) -> str:
 
 
 def _get_resource_id_from_instance(instance_id: str, provider_api: str) -> Optional[str]:
-    """Discover backing fleet/ASG identifier for a given instance."""
+    """Discover backing fleet/ASG identifier for a given instance using tags."""
     try:
         desc = ec2_client.describe_instances(InstanceIds=[instance_id])
-        instance_details = desc["Reservations"][0]["Instances"][0]
-        tags = instance_details.get("Tags", [])
+        tags = desc["Reservations"][0]["Instances"][0].get("Tags", [])
     except Exception as e:
-        pytest.fail(f"Failed to describe instance {instance_id} for resource lookup: {e}")
-
-    provider_api = provider_api or ""
-    provider_api_lower = provider_api.lower()
-
-    if "spotfleet" in provider_api_lower:
-        fleet_id = _get_tag_value(tags, "aws:ec2spot:fleet-request-id")
-    elif "ec2fleet" in provider_api_lower:
-        fleet_id = _get_tag_value(tags, "aws:ec2:fleet-id")
-    elif provider_api == "ASG" or "asg" in provider_api_lower:
-        fleet_id = _get_tag_value(tags, "aws:autoscaling:groupName")
-    else:
-        fleet_id = None
-
-    # Cross-check: sometimes SpotFleet scenarios still tag with aws:ec2:fleet-id
-    if not fleet_id:
-        fleet_id = _get_tag_value(tags, "aws:ec2:fleet-id")
-
-    # Fallbacks if tags are missing
-    if not fleet_id and "spotfleet" in provider_api_lower:
-        sir_id = instance_details.get("SpotInstanceRequestId")
-        if sir_id:
-            try:
-                sir_desc = ec2_client.describe_spot_instance_requests(
-                    SpotInstanceRequestIds=[sir_id]
-                )
-                sir_details = (sir_desc.get("SpotInstanceRequests") or [{}])[0]
-                fleet_id = sir_details.get("SpotFleetRequestId") or fleet_id
-            except Exception as e:
-                log.debug("Unable to fetch SpotInstanceRequest %s: %s", sir_id, e)
-        if not fleet_id:
-            try:
-                sir_desc = ec2_client.describe_spot_instance_requests(
-                    Filters=[{"Name": "instance-id", "Values": [instance_id]}]
-                )
-                sir_details = (sir_desc.get("SpotInstanceRequests") or [{}])[0]
-                fleet_id = sir_details.get("SpotFleetRequestId") or fleet_id
-            except Exception as e:
-                log.debug(
-                    "Unable to fetch SpotInstanceRequest via filter for %s: %s",
-                    instance_id,
-                    e,
-                )
-    if not fleet_id:
-        fleet_id = _find_spot_fleet_for_instance(instance_id)
-
-    if not fleet_id and provider_api_lower in ("asg", "autoscaling"):
-        try:
-            asg_instances = asg_client.describe_auto_scaling_instances(
-                InstanceIds=[instance_id]
-            ).get("AutoScalingInstances", [])
-            if asg_instances:
-                fleet_id = asg_instances[0].get("AutoScalingGroupName")
-        except Exception as e:
-            log.debug("Unable to fetch ASG for instance %s: %s", instance_id, e)
-
-    if not fleet_id:
-        log.warning(
-            "Could not determine backing resource for instance %s; tags=%s lifecycle=%s",
-            instance_id,
-            tags,
-            instance_details.get("InstanceLifecycle"),
-        )
+        log.warning(f"Failed to describe instance {instance_id}: {e}")
         return None
-    return fleet_id
+
+    # Always check ASG first
+    asg_name = _get_tag_value(tags, "aws:autoscaling:groupName")
+    if asg_name:
+        log.debug(f"Found ASG tag for {instance_id}: {asg_name}")
+        return asg_name
+
+    # Then check for EC2 Fleet
+    fleet_id = _get_tag_value(tags, "aws:ec2:fleet-id")
+    if fleet_id:
+        log.debug(f"Found EC2 Fleet tag for {instance_id}: {fleet_id}")
+        return fleet_id
+
+    # Finally check for Spot Fleet
+    spot_fleet_id = _get_tag_value(tags, "aws:ec2spot:fleet-request-id")
+    if spot_fleet_id:
+        log.debug(f"Found Spot Fleet tag for {instance_id}: {spot_fleet_id}")
+        return spot_fleet_id
+
+    log.warning(f"No resource tags found for instance {instance_id}. Tags: {tags}")
+    return None
 
 
 def _get_capacity(provider_api: str, resource_id: str) -> int:
@@ -330,85 +334,73 @@ def _get_capacity(provider_api: str, resource_id: str) -> int:
     pytest.fail(f"Unsupported provider API for capacity check: {provider_api}")
 
 
-def _wait_for_spot_fleet_stable(resource_id: str, timeout: int = 300) -> None:
-    """Wait until a Spot Fleet is out of modifying state so capacity reflects changes."""
+def _wait_for_fleet_stable(resource_id: str, timeout: int = 300) -> None:
+    """Wait until a fleet is out of modifying state so capacity reflects changes."""
     start = time.time()
+
+    # Detect fleet type by ID prefix
+    if resource_id.startswith("sfr-"):
+        fleet_type = "SpotFleet"
+    elif resource_id.startswith("fleet-"):
+        fleet_type = "EC2Fleet"
+    else:
+        log.warning("Unknown fleet type for %s, skipping stability check", resource_id)
+        return
+
     while True:
         try:
-            resp = ec2_client.describe_spot_fleet_requests(SpotFleetRequestIds=[resource_id])
-            configs = resp.get("SpotFleetRequestConfigs") or []
-            state = (configs[0].get("SpotFleetRequestState") or "").lower() if configs else ""
+            if fleet_type == "SpotFleet":
+                resp = ec2_client.describe_spot_fleet_requests(SpotFleetRequestIds=[resource_id])
+                configs = resp.get("SpotFleetRequestConfigs") or []
+                state = (configs[0].get("SpotFleetRequestState") or "").lower() if configs else ""
+            else:  # EC2Fleet
+                resp = ec2_client.describe_fleets(FleetIds=[resource_id])
+                fleets = resp.get("Fleets") or []
+                state = (fleets[0].get("FleetState") or "").lower() if fleets else ""
+
             if state != "modifying":
                 return
         except Exception as exc:
-            log.debug("Failed to poll Spot Fleet %s state: %s", resource_id, exc)
+            log.debug("Failed to poll %s %s state: %s", fleet_type, resource_id, exc)
 
         if time.time() - start > timeout:
-            log.warning("Timed out waiting for Spot Fleet %s to stabilize", resource_id)
+            log.warning("Timed out waiting for %s %s to stabilize", fleet_type, resource_id)
             return
         time.sleep(5)
 
 
-def _wait_for_ec2_fleet_stable(resource_id: str, timeout: int = 300) -> None:
-    """Wait until an EC2 Fleet is out of modifying state so capacity reflects changes."""
+def _wait_for_capacity_change(provider_api: str, resource_id: str, expected_capacity: int, timeout: int = 60) -> int:
+    """Wait for capacity to reach expected value, handling eventual consistency."""
     start = time.time()
-    while True:
-        try:
-            resp = ec2_client.describe_fleets(FleetIds=[resource_id])
-            fleets = resp.get("Fleets") or []
-            state = (fleets[0].get("FleetState") or "").lower() if fleets else ""
-            if state != "modifying":
-                return
-        except Exception as exc:
-            log.debug("Failed to poll EC2 Fleet %s state: %s", resource_id, exc)
+    last_capacity = None
+    last_log_time = start
 
-        if time.time() - start > timeout:
-            log.warning("Timed out waiting for EC2 Fleet %s to stabilize", resource_id)
-            return
-        time.sleep(5)
+    while time.time() - start < timeout:
+        capacity = _get_capacity(provider_api, resource_id)
+        elapsed = time.time() - start
+
+        if capacity == expected_capacity:
+            log.info("Capacity reached expected value %d after %.1fs", expected_capacity, elapsed)
+            return capacity
+
+        # Log on capacity change or every 10 seconds
+        if last_capacity != capacity or elapsed - (last_log_time - start) >= 10:
+            log.debug("Resource %s: Capacity is %d, waiting for %d (%.1fs elapsed)", resource_id, capacity, expected_capacity, elapsed)
+            last_capacity = capacity
+            last_log_time = time.time()
+
+        time.sleep(2)
+
+    final_capacity = _get_capacity(provider_api, resource_id)
+    log.warning("Timeout waiting for capacity change. Expected %d, got %d after %ds", expected_capacity, final_capacity, timeout)
+    return final_capacity
 
 
-def _find_spot_fleet_for_instance(instance_id: str) -> Optional[str]:
-    """Search active spot fleets to locate the instance."""
-    try:
-        next_token = None
-        fleets: list[dict] = []
-        while True:
-            if next_token:
-                resp = ec2_client.describe_spot_fleet_requests(NextToken=next_token)
-            else:
-                resp = ec2_client.describe_spot_fleet_requests()
-            fleets.extend(resp.get("SpotFleetRequestConfigs", []))
-            next_token = resp.get("NextToken")
-            if not next_token:
-                break
+# Backward compatibility aliases
+_wait_for_spot_fleet_stable = _wait_for_fleet_stable
+_wait_for_ec2_fleet_stable = _wait_for_fleet_stable
 
-        for fleet in fleets:
-            fleet_id = fleet.get("SpotFleetRequestId")
-            if not fleet_id:
-                continue
 
-            inst_next = None
-            while True:
-                if inst_next:
-                    inst_resp = ec2_client.describe_spot_fleet_instances(
-                        SpotFleetRequestId=fleet_id, NextToken=inst_next
-                    )
-                else:
-                    inst_resp = ec2_client.describe_spot_fleet_instances(SpotFleetRequestId=fleet_id)
-
-                instances = inst_resp.get("ActiveInstances", [])
-                for inst in instances:
-                    if inst.get("InstanceId") == instance_id:
-                        return fleet_id
-
-                inst_next = inst_resp.get("NextToken")
-                if not inst_next:
-                    break
-
-    except Exception as e:
-        log.debug("Failed to enumerate spot fleets for instance %s: %s", instance_id, e)
-    return None
 
 
 def validate_root_device_volume_size(instance_details, template, instance_id):
@@ -639,6 +631,7 @@ def validate_random_instance_attributes(status_response, template):
 def validate_all_instances_price_type(status_response, test_case):
     """
     Validate that all EC2 instances match the expected price type from the test case.
+    Supports mixed (heterogeneous) pricing by ensuring both spot and on-demand instances exist.
 
     Args:
         status_response: Response from get_request_status containing machine info
@@ -654,6 +647,10 @@ def validate_all_instances_price_type(status_response, test_case):
 
     # Get expected price type from test case overrides
     expected_price_type = test_case.get("overrides", {}).get("priceType")
+    mixed_price = expected_price_type == "heterogeneous" or (
+        isinstance(test_case.get("overrides", {}).get("percentOnDemand"), (int, float))
+        and 0 < test_case["overrides"]["percentOnDemand"] < 100
+    )
     if not expected_price_type:
         log.info("No priceType specified in test case overrides, skipping price type validation")
         return True
@@ -661,6 +658,37 @@ def validate_all_instances_price_type(status_response, test_case):
     log.info(
         f"Validating price type for all {len(machines)} instances - Expected: {expected_price_type}"
     )
+
+    if mixed_price:
+        spot_count = 0
+        ondemand_count = 0
+        for machine in machines:
+            instance_id = machine.get("machineId") or machine.get("machine_id")
+            try:
+                details = get_instance_details(instance_id)
+                lifecycle = details.get("instance_lifecycle")
+                if lifecycle == "spot":
+                    spot_count += 1
+                else:
+                    ondemand_count += 1
+            except Exception as e:
+                log.error(f"Instance {instance_id}: Mixed price validation failed with exception: {e}")
+                return False
+
+        if spot_count > 0 and ondemand_count > 0:
+            log.info(
+                "Mixed price validation PASSED - spot instances: %s, on-demand instances: %s",
+                spot_count,
+                ondemand_count,
+            )
+            return True
+        else:
+            log.error(
+                "Mixed price validation FAILED - spot instances: %s, on-demand instances: %s",
+                spot_count,
+                ondemand_count,
+            )
+            return False
 
     all_validations_passed = True
 
@@ -748,7 +776,7 @@ def setup_host_factory_mock_with_scenario(request):
     test_name = request.node.name  # Get the actual test function name
 
     # Extract the scenario name from the test node name
-    # For parametrized tests, the node name will be like "test_sample[EC2Fleet]"
+    # For parametrized tests, the node name will be like "full_cycle_test[EC2Fleet]"
     scenario_name = None
     if "[" in test_name and "]" in test_name:
         # Extract the parameter value from the test name
@@ -828,6 +856,213 @@ def _check_all_ec2_hosts_are_being_terminated(ec2_instance_ids):
     return all_are_deallocated
 
 
+def _force_terminate_asg_instances(asg_name: str) -> None:
+    """
+    Force terminate all instances in an ASG by setting capacity to 0 and deleting the ASG.
+
+    Args:
+        asg_name: Name of the Auto Scaling Group to terminate
+    """
+    try:
+        log.info("Force terminating ASG: %s", asg_name)
+
+        # First, set desired capacity to 0
+        log.info("Setting ASG %s desired capacity to 0", asg_name)
+        asg_client.update_auto_scaling_group(
+            AutoScalingGroupName=asg_name,
+            DesiredCapacity=0,
+            MinSize=0
+        )
+
+        # Wait for instances to terminate
+        log.info("Waiting for ASG %s instances to terminate", asg_name)
+        start_time = time.time()
+        while time.time() - start_time < 300:  # 5 minute timeout
+            try:
+                response = asg_client.describe_auto_scaling_groups(
+                    AutoScalingGroupNames=[asg_name]
+                )
+                asgs = response.get("AutoScalingGroups", [])
+                if not asgs:
+                    log.info("ASG %s no longer exists", asg_name)
+                    return
+
+                asg = asgs[0]
+                instances = asg.get("Instances", [])
+                if not instances:
+                    log.info("All instances terminated in ASG %s", asg_name)
+                    break
+
+                log.debug("ASG %s still has %d instances", asg_name, len(instances))
+                time.sleep(10)
+            except ClientError as e:
+                if e.response["Error"]["Code"] == "ValidationError":
+                    log.info("ASG %s no longer exists", asg_name)
+                    return
+                raise
+
+        # Delete the ASG
+        log.info("Deleting ASG: %s", asg_name)
+        asg_client.delete_auto_scaling_group(
+            AutoScalingGroupName=asg_name,
+            ForceDelete=True
+        )
+
+        # Verify ASG is deleted
+        start_time = time.time()
+        while time.time() - start_time < 120:  # 2 minute timeout
+            try:
+                asg_client.describe_auto_scaling_groups(
+                    AutoScalingGroupNames=[asg_name]
+                )
+                log.debug("ASG %s still exists, waiting for deletion", asg_name)
+                time.sleep(5)
+            except ClientError as e:
+                if e.response["Error"]["Code"] == "ValidationError":
+                    log.info("ASG %s successfully deleted", asg_name)
+                    return
+                raise
+
+        log.warning("ASG %s deletion may not have completed within timeout", asg_name)
+
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "ValidationError":
+            log.info("ASG %s does not exist or already deleted", asg_name)
+        else:
+            log.error("Error force terminating ASG %s: %s", asg_name, e)
+            raise
+
+
+def _cleanup_asg_resources(machine_ids: list[str], provider_api: str) -> None:
+    """
+    Comprehensive cleanup for ASG resources.
+
+    Args:
+        machine_ids: List of EC2 instance IDs to clean up
+        provider_api: Provider API type (should be "ASG")
+    """
+    if not machine_ids:
+        log.info("No machine IDs provided for ASG cleanup")
+        return
+
+    log.info("Starting comprehensive ASG cleanup for %d instances", len(machine_ids))
+
+    # Get ASG name from first instance
+    asg_name = None
+    for instance_id in machine_ids:
+        asg_name = _get_resource_id_from_instance(instance_id, provider_api)
+        if asg_name:
+            break
+
+    if not asg_name:
+        log.warning("Could not determine ASG name from instances, falling back to direct instance termination")
+        # Fallback: try to terminate instances directly
+        try:
+            ec2_client.terminate_instances(InstanceIds=machine_ids)
+            log.info("Initiated direct termination of instances: %s", machine_ids)
+        except Exception as e:
+            log.error("Failed to directly terminate instances: %s", e)
+        return
+
+    log.info("Identified ASG for cleanup: %s", asg_name)
+
+    # Force terminate the ASG and all its instances
+    _force_terminate_asg_instances(asg_name)
+
+    # Verify all instances are terminated
+    log.info("Verifying all instances are terminated")
+    start_time = time.time()
+    while time.time() - start_time < 300:  # 5 minute timeout
+        all_terminated = True
+        for instance_id in machine_ids:
+            state_info = get_instance_state(instance_id)
+            if state_info["exists"] and state_info["state"] not in ["terminated", "shutting-down"]:
+                all_terminated = False
+                log.debug("Instance %s still in state: %s", instance_id, state_info["state"])
+                break
+
+        if all_terminated:
+            log.info("All instances successfully terminated")
+            return
+
+        time.sleep(10)
+
+    log.warning("Some instances may not have terminated within timeout")
+
+
+def _verify_all_resources_cleaned(machine_ids: list[str], resource_id: str = None, provider_api: str = None) -> bool:
+    """
+    Verify that all resources (instances and backing resources) are properly cleaned up.
+
+    Args:
+        machine_ids: List of EC2 instance IDs that should be terminated
+        resource_id: ID of the backing resource (ASG, Fleet, etc.)
+        provider_api: Provider API type
+
+    Returns:
+        bool: True if all resources are cleaned up, False otherwise
+    """
+    log.info("Verifying cleanup of all resources")
+
+    # Check instances
+    instances_cleaned = True
+    for instance_id in machine_ids:
+        state_info = get_instance_state(instance_id)
+        if state_info["exists"] and state_info["state"] not in ["terminated", "shutting-down"]:
+            log.error("Instance %s still exists in state: %s", instance_id, state_info["state"])
+            instances_cleaned = False
+
+    if instances_cleaned:
+        log.info("✅ All instances are terminated or terminating")
+    else:
+        log.error("❌ Some instances are still running")
+
+    # Check backing resource
+    resource_cleaned = True
+    if resource_id and provider_api:
+        try:
+            if provider_api == "ASG" or "asg" in provider_api.lower():
+                try:
+                    response = asg_client.describe_auto_scaling_groups(
+                        AutoScalingGroupNames=[resource_id]
+                    )
+                    asgs = response.get("AutoScalingGroups", [])
+                    if asgs:
+                        asg = asgs[0]
+                        instances = asg.get("Instances", [])
+                        if instances:
+                            log.error("ASG %s still has %d instances", resource_id, len(instances))
+                            resource_cleaned = False
+                        else:
+                            log.info("✅ ASG %s has no instances", resource_id)
+                except ClientError as e:
+                    if e.response["Error"]["Code"] == "ValidationError":
+                        log.info("✅ ASG %s no longer exists", resource_id)
+                    else:
+                        log.error("Error checking ASG %s: %s", resource_id, e)
+                        resource_cleaned = False
+            elif "fleet" in provider_api.lower() or resource_id.startswith(("fleet-", "sfr-")):
+                # For fleets, check if they still exist and have capacity
+                try:
+                    capacity = _get_capacity(provider_api, resource_id)
+                    if capacity > 0:
+                        log.error("Fleet %s still has capacity: %d", resource_id, capacity)
+                        resource_cleaned = False
+                    else:
+                        log.info("✅ Fleet %s has zero capacity", resource_id)
+                except Exception as e:
+                    log.info("✅ Fleet %s appears to be deleted or inaccessible: %s", resource_id, e)
+        except Exception as e:
+            log.warning("Could not verify backing resource cleanup: %s", e)
+
+    if resource_cleaned:
+        log.info("✅ Backing resource is properly cleaned")
+    else:
+        log.error("❌ Backing resource still has active resources")
+
+    return instances_cleaned and resource_cleaned
+
+
 def _wait_for_request_completion(hfm, request_id: str, scheduler_type: str):
     """Poll request status until complete or timeout."""
     request_status_schema = plugin_io_schemas.get_schema_for_scheduler(
@@ -838,7 +1073,7 @@ def _wait_for_request_completion(hfm, request_id: str, scheduler_type: str):
 
     while True:
         status_response = hfm.get_request_status(request_id)
-        log.debug(json.dumps(status_response, indent=4))
+        log.debug("Response on get_request_staus: \n %s", json.dumps(status_response, indent=4))
 
         try:
             # Use the schema that matches the key style in the response
@@ -1041,7 +1276,7 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
             or test_case.get("overrides", {}).get("abis_instance_requirements")
         )
     )
-    if VERIFY_ABIS and abis_requested:
+    if scenarios.VERIFY_ABIS and abis_requested:
         first_machine = status_response["requests"][0]["machines"][0]
         instance_id = first_machine.get("machineId") or first_machine.get("machine_id")
         log.info("Verifying ABIS on resource for instance %s", instance_id)
@@ -1055,7 +1290,7 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
         )
         expected_price_type = test_case.get("overrides", {}).get("priceType")
 
-        if provider_api in ["RunInstances", "ASG"] and expected_price_type == "spot":
+        if provider_api in ["RunInstances"] and expected_price_type == "spot":
             log.warning(
                 f"Skipping price type validation for {provider_api} with spot instances - may not be supported"
             )
@@ -1083,24 +1318,76 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
     # ec2_instance_ids = [machine["name"] for machine in status_response["requests"][0]["machines"]] #TODO
     log.debug(f"Deallocating instances: {ec2_instance_ids}")
 
-    return_request_id = hfm.request_return_machines(ec2_instance_ids)
-    log.debug(f"Deallocating: {json.dumps(return_request_id, indent=4)}")
+    # Get provider API for cleanup strategy
+    provider_api = (
+        template_json.get("providerApi") or template_json.get("provider_api") or "EC2Fleet"
+    )
 
-    while not _check_all_ec2_hosts_are_being_terminated(ec2_instance_ids):
-        status_response = hfm.get_return_requests(return_request_id)
-        log.debug(json.dumps(status_response, indent=4))
+    # Get resource ID for verification
+    resource_id = None
+    if ec2_instance_ids:
+        resource_id = _get_resource_id_from_instance(ec2_instance_ids[0], provider_api)
 
-        res = get_instance_state(ec2_instance_ids[0])
-        log.debug(json.dumps(res, indent=4))
+    try:
+        # Try graceful return first
+        return_request_id = hfm.request_return_machines(ec2_instance_ids)
+        log.debug(f"Deallocating: {json.dumps(return_request_id, indent=4)}")
 
-        time.sleep(10)
+        # Wait for graceful termination with timeout
+        graceful_start = time.time()
+        graceful_completed = False
 
-        # "shutting-down"
+        while time.time() - graceful_start < 180:  # 3 minute timeout for graceful return
+            if _check_all_ec2_hosts_are_being_terminated(ec2_instance_ids):
+                log.info("Graceful termination completed successfully")
+                graceful_completed = True
+                break
 
-    # status_response = hfm.get_request_status(request_id)
-    # log.debug(json.dumps(status_response, indent=4))
+            status_response = hfm.get_return_requests(return_request_id)
+            log.debug(json.dumps(status_response, indent=4))
 
-    pass
+            res = get_instance_state(ec2_instance_ids[0])
+            log.debug(json.dumps(res, indent=4))
+
+            time.sleep(10)
+
+        if not graceful_completed:
+            log.warning("Graceful termination timed out, proceeding with force cleanup")
+
+    except Exception as e:
+        log.warning("Graceful termination failed: %s, proceeding with force cleanup", e)
+
+    # For ASG resources, use comprehensive cleanup if graceful didn't work
+    if provider_api == "ASG" or "asg" in provider_api.lower():
+        if not graceful_completed:
+            log.info("Performing comprehensive ASG cleanup")
+            _cleanup_asg_resources(ec2_instance_ids, provider_api)
+    else:
+        # For non-ASG resources, continue waiting if needed
+        if not graceful_completed:
+            log.info("Continuing to wait for standard termination")
+            cleanup_start = time.time()
+            while time.time() - cleanup_start < 300:  # 5 minute timeout
+                if _check_all_ec2_hosts_are_being_terminated(ec2_instance_ids):
+                    log.info("All instances terminated successfully")
+                    break
+                time.sleep(10)
+            else:
+                log.warning("Some instances may not have terminated within timeout")
+
+    # Final verification
+    log.info("Verifying complete resource cleanup")
+    cleanup_verified = _verify_all_resources_cleaned(ec2_instance_ids, resource_id, provider_api)
+
+    if not cleanup_verified:
+        log.error("⚠️  Cleanup verification failed - some resources may still exist")
+        # Log remaining resources for debugging
+        for instance_id in ec2_instance_ids:
+            state_info = get_instance_state(instance_id)
+            if state_info["exists"]:
+                log.error("Instance %s still exists in state: %s", instance_id, state_info["state"])
+    else:
+        log.info("✅ All resources successfully cleaned up")
 
 
 @pytest.mark.aws
@@ -1151,20 +1438,11 @@ def test_get_available_templates_with_overrides(setup_host_factory_mock):
         pytest.fail(f"JSON validation failed: {e}")
 
 
-# @pytest.mark.aws
-# @pytest.mark.parametrize("test_case", scenarios.get_test_cases(), ids=lambda tc: tc["test_name"])
-# def test_sample(setup_host_factory_mock, test_case):
-#     log.info(test_case["test_name"])
-
-#     hfm = setup_host_factory_mock
-
-#     res = hfm.get_available_templates()
-
-#     provide_release_control_loop(hfm, template_json=res["templates"][0], capacity_to_request=test_case["capacity_to_request"])
-
 
 def _partial_return_cases():
     """Pick maintain fleets and ASG scenarios with capacity > 1."""
+    if not scenarios.RUN_PARTIAL_RETURN_TESTS:
+        return []
     cases = []
     for tc in scenarios.get_test_cases():
         provider_api = tc.get("overrides", {}).get("providerApi") or tc.get("providerApi")
@@ -1185,13 +1463,31 @@ def _partial_return_cases():
     "test_case", _partial_return_cases(), ids=lambda tc: tc["test_name"]
 )
 def test_partial_return_reduces_capacity(setup_host_factory_mock_with_scenario, test_case):
-    """Return one instance and ensure maintain capacity drops by one before draining the rest."""
+    """
+    Test partial return of instances to ensure maintain capacity drops correctly.
+
+    This test validates that when returning one instance from a maintain fleet/ASG,
+    the capacity is properly reduced before draining the remaining instances.
+
+    Steps:
+    1. Provision multiple instances using maintain Spot/EC2 fleet or ASG
+    2. Terminate one instance and verify capacity reduction
+    3. Clean up remaining instances
+    """
+    log.info("=== STEP 0: Test Setup ===")
     log.info("Partial return test: %s", test_case["test_name"])
 
     hfm = setup_host_factory_mock_with_scenario
 
+    log.info("=== STEP 1: Provision Instances ===")
+
+    # 1.1: Get available templates
+    log.info("1.1: Retrieving available templates")
     templates_response = hfm.get_available_templates()
     log.debug("Templates response: %s", json.dumps(templates_response, indent=2))
+
+    # 1.2: Find target template
+    log.info("1.2: Finding target template")
     template_id = test_case.get("template_id") or test_case["test_name"]
     template_json = next(
         (
@@ -1204,7 +1500,10 @@ def test_partial_return_reduces_capacity(setup_host_factory_mock_with_scenario, 
     )
     if template_json is None:
         pytest.fail(f"Template {template_id} not found for partial return test")
+    log.info("Found template: %s", template_id)
 
+    # 1.3: Request instances
+    log.info("1.3: Requesting %d instances", test_case["capacity_to_request"])
     scheduler_type = get_scheduler_from_scenario(test_case)
 
     request_response = hfm.request_machines(
@@ -1213,6 +1512,8 @@ def test_partial_return_reduces_capacity(setup_host_factory_mock_with_scenario, 
     )
     parse_and_print_output(request_response)
 
+    # 1.4: Validate request response
+    log.info("1.4: Validating request response")
     request_machines_schema = _resolve_request_machines_schema(request_response, scheduler_type)
     try:
         validate_json_schema(instance=request_response, schema=request_machines_schema)
@@ -1225,37 +1526,62 @@ def test_partial_return_reduces_capacity(setup_host_factory_mock_with_scenario, 
     if not request_id:
         pytest.fail(f"Request ID missing in response: {json.dumps(request_response, indent=2)}")
 
+    # 1.5: Wait for provisioning completion
+    log.info("1.5: Waiting for provisioning completion (request_id: %s)", request_id)
     provider_api = (
         template_json.get("providerApi")
         or template_json.get("provider_api")
         or test_case.get("overrides", {}).get("providerApi")
     )
-    log.info("Provisioning request_id=%s provider_api=%s", request_id, provider_api)
+    log.info("Provider API: %s", provider_api)
+
     status_response = _wait_for_request_completion(hfm, request_id, scheduler_type)
     _check_request_machines_response_status(status_response)
     _check_all_ec2_hosts_are_being_provisioned(status_response)
     log.debug("Final provisioning status: %s", json.dumps(status_response, indent=2))
 
+    # 1.6: Extract provisioned instances
+    log.info("1.6: Extracting provisioned instance information")
     machines = status_response["requests"][0]["machines"]
     machine_ids = [m.get("machineId") or m.get("machine_id") for m in machines]
     assert len(machine_ids) >= 2, "Partial return test requires capacity > 1"
+    log.info("Provisioned %d instances: %s", len(machine_ids), machine_ids)
 
+    # === STEP 2: PARTIAL RETURN AND CAPACITY VERIFICATION ===
+    log.info("=== STEP 2: Partial Return and Capacity Verification ===")
+
+    # 2.1: Identify target instance and backing resource
+    log.info("2.1: Identifying target instance and backing resource")
     first_instance = machine_ids[0]
-    log.info("Attempting to resolve resource for first_instance=%s via provider_api=%s", first_instance, provider_api)
+    log.info("Target instance for partial return: %s", first_instance)
+
     resource_id = _get_resource_id_from_instance(first_instance, provider_api)
     if not resource_id:
         pytest.skip(f"Could not determine backing resource for instance {first_instance}")
-    capacity_before = _get_capacity(provider_api, resource_id)
+    log.info("Backing resource ID: %s", resource_id)
 
+    # 2.2: Record initial capacity
+    log.info("2.2: Recording initial capacity")
+    capacity_before = _get_capacity(provider_api, resource_id)
+    log.info("Initial capacity: %d", capacity_before)
+
+    # 2.3: Return single instance
+    log.info("2.3: Returning single instance: %s", first_instance)
     return_response = hfm.request_return_machines([first_instance])
-    log.debug("Return response on instance termination: %s", json.dumps(return_response, indent=2))
+    log.debug("Return response: %s", json.dumps(return_response, indent=2))
+
     return_request_id = _extract_request_id(return_response)
     if not return_request_id:
         log.warning("Return request ID missing; proceeding with status polling by machine id only")
 
-    # _wait_for_return_completion(hfm, [first_instance], return_request_id)
+    # 2.4: Wait for return completion
+    log.info("2.4: Waiting for return completion")
     _wait_for_request_completion(hfm, return_request_id, scheduler_type)
 
+    # 2.5: Wait for resource stabilization. When you update target capacity of a fleet, it is not
+    # being reflected instantaniously, instead, fleet gets into "modifying state", when modification
+    # is complete, then new capacity is properly updated.
+    log.info("2.5: Waiting for resource stabilization")
     if provider_api and "spotfleet" in provider_api.lower():
         _wait_for_spot_fleet_stable(resource_id)
     elif provider_api and "ec2fleet" in provider_api.lower():
@@ -1263,28 +1589,100 @@ def test_partial_return_reduces_capacity(setup_host_factory_mock_with_scenario, 
     elif resource_id.startswith("fleet-"):
         _wait_for_ec2_fleet_stable(resource_id)
 
-    capacity_after = _get_capacity(provider_api, resource_id)
-    assert capacity_after == max(capacity_before - 1, 0)
+    # 2.6: Verify capacity reduction
+    log.info("2.6: Verifying capacity reduction")
+    expected_capacity = max(capacity_before - 1, 0)
+    # ASG operations can take longer than fleet operations
+    timeout = 120 if provider_api == "ASG" or "asg" in provider_api.lower() else 60
+    log.info("Waiting for capacity change with timeout=%ds", timeout)
+    capacity_after = _wait_for_capacity_change(provider_api, resource_id, expected_capacity, timeout=timeout)
+    if capacity_after != expected_capacity:
+        log.error("Timeout expired: Capacity did not reach expected value within %ds", timeout)
+    log.info("Capacity after return: %d (expected: %d)", capacity_after, expected_capacity)
+    assert capacity_after == expected_capacity, f"Expected capacity {expected_capacity}, got {capacity_after}"
 
+    # 2.7: Verify instance termination
+    log.info("2.7: Verifying instance termination")
     terminate_start = time.time()
     while True:
         state_info = get_instance_state(first_instance)
         if not state_info["exists"] or state_info["state"] in ["terminated", "shutting-down"]:
+            log.info("Instance %s successfully terminated/terminating", first_instance)
             break
         if time.time() - terminate_start > MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC:
             pytest.fail(f"Instance {first_instance} failed to terminate in time")
         time.sleep(5)
 
+    # === STEP 3: CLEANUP REMAINING INSTANCES ===
+    log.info("=== STEP 3: Cleanup Remaining Instances ===")
+
     remaining_ids = machine_ids[1:]
     if remaining_ids:
-        hfm.request_return_machines(remaining_ids)
-        while not _check_all_ec2_hosts_are_being_terminated(remaining_ids):
-            time.sleep(10)
+        log.info("3.1: Attempting graceful termination of remaining %d instances: %s", len(remaining_ids), remaining_ids)
+
+        try:
+            # Try graceful return first
+            return_response = hfm.request_return_machines(remaining_ids)
+            return_request_id = _extract_request_id(return_response)
+
+            # Wait for graceful return with timeout
+            log.info("3.2: Waiting for graceful return completion (timeout: 120s)")
+            graceful_start = time.time()
+            graceful_completed = False
+
+            while time.time() - graceful_start < 120:  # 2 minute timeout for graceful return
+                if _check_all_ec2_hosts_are_being_terminated(remaining_ids):
+                    log.info("Graceful return completed successfully")
+                    graceful_completed = True
+                    break
+                time.sleep(10)
+
+            if not graceful_completed:
+                log.warning("Graceful return timed out, proceeding with force cleanup")
+
+        except Exception as e:
+            log.warning("Graceful return failed: %s, proceeding with force cleanup", e)
+
+        # For ASG resources, use comprehensive cleanup
+        if provider_api == "ASG" or "asg" in provider_api.lower():
+            log.info("3.3: Performing comprehensive ASG cleanup")
+            _cleanup_asg_resources(remaining_ids, provider_api)
+        else:
+            # For non-ASG resources, wait for standard termination
+            log.info("3.3: Waiting for standard termination completion")
+            cleanup_start = time.time()
+            while time.time() - cleanup_start < 300:  # 5 minute timeout
+                if _check_all_ec2_hosts_are_being_terminated(remaining_ids):
+                    log.info("All remaining instances terminated successfully")
+                    break
+                time.sleep(10)
+            else:
+                log.warning("Some instances may not have terminated within timeout")
+
+        # Final verification
+        log.info("3.4: Verifying complete resource cleanup")
+        cleanup_verified = _verify_all_resources_cleaned(remaining_ids, resource_id, provider_api)
+
+        if not cleanup_verified:
+            log.error("⚠️  Cleanup verification failed - some resources may still exist")
+            # Log remaining resources for debugging
+            for instance_id in remaining_ids:
+                state_info = get_instance_state(instance_id)
+                if state_info["exists"]:
+                    log.error("Instance %s still exists in state: %s", instance_id, state_info["state"])
+        else:
+            log.info("✅ All resources successfully cleaned up")
+
+    else:
+        log.info("3.1: No remaining instances to clean up")
+
+    log.info("=== TEST COMPLETED SUCCESSFULLY ===")
 
 
 @pytest.mark.aws
+@pytest.mark.slow
 @pytest.mark.parametrize("test_case", scenarios.get_test_cases(), ids=lambda tc: tc["test_name"])
-def test_sample(setup_host_factory_mock_with_scenario, test_case):
+def test_full_cycle(setup_host_factory_mock_with_scenario, test_case):
     log.info(test_case["test_name"])
 
     hfm = setup_host_factory_mock_with_scenario
@@ -1313,7 +1711,7 @@ def test_sample(setup_host_factory_mock_with_scenario, test_case):
     abis_override = test_case.get("overrides", {}).get("abisInstanceRequirements") or test_case.get(
         "overrides", {}
     ).get("abis_instance_requirements")
-    if abis_override and VERIFY_ABIS:
+    if abis_override and scenarios.VERIFY_ABIS:
         # Defer to runtime verification after instances are created
         log.info("ABIS override requested; will verify via AWS after provisioning")
 

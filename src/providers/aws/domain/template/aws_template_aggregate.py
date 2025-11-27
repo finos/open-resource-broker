@@ -5,6 +5,7 @@ from typing import Any, Optional
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 from domain.template.template_aggregate import Template
+from domain.base.value_objects import AllocationStrategy
 from providers.aws.domain.template.value_objects import (
     AWSAllocationStrategy,
     AWSConfiguration,
@@ -317,7 +318,7 @@ class AWSTemplate(Template):
         """Get allocation strategy in Auto Scaling Group API format."""
         if isinstance(self.allocation_strategy, AWSAllocationStrategy):
             return self.allocation_strategy.to_asg_format()
-        return AWSAllocationStrategy.LOWEST_PRICE.to_asg_format()
+        return AWSAllocationStrategy.from_core(AllocationStrategy.LOWEST_PRICE).to_asg_format()
 
     def get_ec2_fleet_on_demand_allocation_strategy(self) -> str:
         """Get on-demand allocation strategy in EC2 Fleet API format."""

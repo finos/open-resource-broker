@@ -12,37 +12,32 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from domain.base.dependency_injection import injectable
 from domain.base.ports import LoggingPort
-
 # Import AWS-specific components
 from providers.aws.configuration.config import AWSProviderConfig
 from providers.aws.domain.template.value_objects import ProviderApi
-from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
+from providers.aws.infrastructure.adapters.machine_adapter import \
+    AWSMachineAdapter
 from providers.aws.infrastructure.aws_client import AWSClient
 from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
-from providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHandler
-from providers.aws.infrastructure.handlers.run_instances_handler import (
-    RunInstancesHandler,
-)
-from providers.aws.infrastructure.handlers.spot_fleet_handler import SpotFleetHandler
-from providers.aws.infrastructure.launch_template.manager import (
-    AWSLaunchTemplateManager,
-)
+from providers.aws.infrastructure.handlers.ec2_fleet_handler import \
+    EC2FleetHandler
+from providers.aws.infrastructure.handlers.run_instances_handler import \
+    RunInstancesHandler
+from providers.aws.infrastructure.handlers.spot_fleet_handler import \
+    SpotFleetHandler
+from providers.aws.infrastructure.launch_template.manager import \
+    AWSLaunchTemplateManager
 from providers.aws.managers.aws_resource_manager import AWSResourceManager
 
 if TYPE_CHECKING:
-    from providers.aws.infrastructure.adapters.aws_provisioning_adapter import (
-        AWSProvisioningAdapter,
-    )
+    from providers.aws.infrastructure.adapters.aws_provisioning_adapter import \
+        AWSProvisioningAdapter
 
 # Import strategy pattern interfaces
-from providers.base.strategy import (
-    ProviderCapabilities,
-    ProviderHealthStatus,
-    ProviderOperation,
-    ProviderOperationType,
-    ProviderResult,
-    ProviderStrategy,
-)
+from providers.base.strategy import (ProviderCapabilities,
+                                     ProviderHealthStatus, ProviderOperation,
+                                     ProviderOperationType, ProviderResult,
+                                     ProviderStrategy)
 
 
 @injectable
@@ -260,7 +255,8 @@ class AWSProviderStrategy(ProviderStrategy):
 
         try:
             # Import dry-run context here to avoid circular imports
-            from providers.aws.infrastructure.dry_run_adapter import aws_dry_run_context
+            from providers.aws.infrastructure.dry_run_adapter import \
+                aws_dry_run_context
 
             # Execute operation within appropriate context
             if is_dry_run:
@@ -362,7 +358,8 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             # Convert template_config to AWSTemplate domain object
-            from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+            from providers.aws.domain.template.aws_template_aggregate import \
+                AWSTemplate
 
             # Extract metadata for additional fields
             metadata = template_config.get("metadata", {})
@@ -840,10 +837,10 @@ class AWSProviderStrategy(ProviderStrategy):
         Populate capacity data for fleets/ASGs.
 
         Examples:
-        - EC2 Fleet fulfilled: {"fleet_capacity": {"target": 20, "fulfilled": 20, "state": "active"}}
-        - EC2 Fleet scaling: {"fleet_capacity": {"target": 20, "fulfilled": 8, "state": "modifying"}}
-        - Spot Fleet partial: {"fleet_capacity": {"target": 50, "fulfilled": 23, "state": "active"}}
-        - ASG mixed: {"asg_capacity": {"desired": 10, "in_service": 7, "state": None}}
+        - EC2 Fleet fulfilled: {"fleet_capacity_fulfilment": {"target_capacity_units": 20, "fulfilled_capacity_units": 20, "provisioned_instance_count": 20, "state": "active"}}
+        - EC2 Fleet scaling: {"fleet_capacity_fulfilment": {"target_capacity_units": 20, "fulfilled_capacity_units": 8, "provisioned_instance_count": 8, "state": "modifying"}}
+        - Spot Fleet partial: {"fleet_capacity_fulfilment": {"target_capacity_units": 50, "fulfilled_capacity_units": 23, "provisioned_instance_count": 23, "state": "active"}}
+        - ASG mixed: {"fleet_capacity_fulfilment": {"target_capacity_units": 10, "fulfilled_capacity_units": 7, "provisioned_instance_count": 7, "state": None}}
         """
         if not resource_ids:
             return
@@ -860,9 +857,15 @@ class AWSProviderStrategy(ProviderStrategy):
                         spec = fleet.get("TargetCapacitySpecification", {}) or {}
                         target = spec.get("TotalTargetCapacity")
                         fulfilled = fleet.get("FulfilledCapacity")
-                        metadata["fleet_capacity"] = {
-                            "target": target,
-                            "fulfilled": fulfilled if fulfilled is not None else 0,
+                        fulfilled_capacity_units = fulfilled if fulfilled is not None else 0
+                        try:
+                            provisioned_instance_count = int(fulfilled_capacity_units)
+                        except Exception:
+                            provisioned_instance_count = 0
+                        metadata["fleet_capacity_fulfilment"] = {
+                            "target_capacity_units": target,
+                            "fulfilled_capacity_units": fulfilled_capacity_units,
+                            "provisioned_instance_count": provisioned_instance_count,
                             "state": fleet.get("FleetState"),
                         }
                 else:
@@ -872,9 +875,15 @@ class AWSProviderStrategy(ProviderStrategy):
                     ).get("SpotFleetRequestConfigs", [])
                     if sfr:
                         cfg = sfr[0].get("SpotFleetRequestConfig", {}) or {}
-                        metadata["fleet_capacity"] = {
-                            "target": cfg.get("TargetCapacity"),
-                            "fulfilled": cfg.get("FulfilledCapacity") or 0,
+                        fulfilled_capacity_units = cfg.get("FulfilledCapacity") or 0
+                        try:
+                            provisioned_instance_count = int(fulfilled_capacity_units)
+                        except Exception:
+                            provisioned_instance_count = 0
+                        metadata["fleet_capacity_fulfilment"] = {
+                            "target_capacity_units": cfg.get("TargetCapacity"),
+                            "fulfilled_capacity_units": fulfilled_capacity_units,
+                            "provisioned_instance_count": provisioned_instance_count,
                             "state": sfr[0].get("SpotFleetRequestState"),
                         }
             except Exception as e:
@@ -889,12 +898,19 @@ class AWSProviderStrategy(ProviderStrategy):
                 if groups:
                     group = groups[0]
                     instances = group.get("Instances") or []
-                    in_service = len(
-                        [inst for inst in instances if inst.get("LifecycleState") == "InService"]
+                    # Sum weighted capacity for InService instances
+                    fulfilled_capacity_units = sum(
+                        int(inst.get("WeightedCapacity", 1))
+                        for inst in instances
+                        if inst.get("LifecycleState") == "InService"
                     )
-                    metadata["asg_capacity"] = {
-                        "desired": group.get("DesiredCapacity"),
-                        "in_service": in_service,
+                    provisioned_instance_count = sum(
+                        1 for inst in instances if inst.get("LifecycleState") == "InService"
+                    )
+                    metadata["fleet_capacity_fulfilment"] = {
+                        "target_capacity_units": int(group.get("DesiredCapacity") or 0),
+                        "fulfilled_capacity_units": fulfilled_capacity_units,
+                        "provisioned_instance_count": provisioned_instance_count,
                         "state": group.get("Status"),
                     }
             except Exception as e:
@@ -974,7 +990,8 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             # Check if we're in dry-run mode
-            from infrastructure.mocking.dry_run_context import is_dry_run_active
+            from infrastructure.mocking.dry_run_context import \
+                is_dry_run_active
 
             if is_dry_run_active():
                 # In dry-run mode, return a healthy status without making real AWS calls
@@ -988,9 +1005,8 @@ class AWSProviderStrategy(ProviderStrategy):
             # This is a lightweight operation to verify AWS access
             try:
                 # Import dry-run context here to avoid circular imports
-                from providers.aws.infrastructure.dry_run_adapter import (
-                    aws_dry_run_context,
-                )
+                from providers.aws.infrastructure.dry_run_adapter import \
+                    aws_dry_run_context
 
                 with aws_dry_run_context():
                     # Simple STS call to verify credentials and connectivity
@@ -1065,9 +1081,8 @@ class AWSProviderStrategy(ProviderStrategy):
         """Get available AWS templates using scheduler strategy."""
         try:
             # Use scheduler strategy to load templates from configuration
-            from infrastructure.registry.scheduler_registry import (
-                get_scheduler_registry,
-            )
+            from infrastructure.registry.scheduler_registry import \
+                get_scheduler_registry
 
             scheduler_registry = get_scheduler_registry()
             scheduler_strategy = scheduler_registry.get_active_strategy()

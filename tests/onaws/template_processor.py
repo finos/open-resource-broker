@@ -144,7 +144,8 @@ class TemplateProcessor:
         extracted_config.setdefault("fleetType", "request")  # Default fleet type
         extracted_config.setdefault("providerApi", "EC2Fleet")
         extracted_config.setdefault("priceType", "ondemand")  # Default price type
-        extracted_config.setdefault("percentOnDemand", 100)  # Default to 100% on-demand
+        # Default to 100% on-demand to avoid unintentionally requesting spot capacity
+        extracted_config.setdefault("percentOnDemand", 100)
 
         return extracted_config
 
@@ -231,23 +232,35 @@ class TemplateProcessor:
                 config["subnet_ids"] = [overrides["subnetId"]]
             if "securityGroupIds" in overrides:
                 config["security_group_ids"] = overrides["securityGroupIds"]
+            # Normalize vmTypes to snake_case for default scheduler configs
+            if "vmTypes" in overrides and "vm_types" not in overrides:
+                config["vm_types"] = overrides["vmTypes"]
+                overrides["vm_types"] = overrides["vmTypes"]
+            # Also map to instance_types for default scheduler templates that expect this key
+            if "vm_types" in overrides and "instance_types" not in overrides:
+                config["instance_types"] = overrides["vm_types"]
+                overrides["instance_types"] = overrides["vm_types"]
 
             # Set percentOnDemand based on priceType (only for provider APIs that support it)
             if "priceType" in overrides:
                 provider_api = overrides.get("providerApi", config.get("providerApi", "EC2Fleet"))
 
-                if provider_api in ["EC2Fleet", "SpotFleet"]:
+                # If percentOnDemand is explicitly provided in overrides, use it
+                if "percentOnDemand" in overrides:
+                    config["percentOnDemand"] = overrides["percentOnDemand"]
+                elif provider_api in ["EC2Fleet", "SpotFleet"]:
                     # EC2Fleet and SpotFleet support percentOnDemand
                     if overrides["priceType"] == "spot":
                         config["percentOnDemand"] = 0  # 100% spot instances
                     elif overrides["priceType"] == "ondemand":
                         config["percentOnDemand"] = 100  # 100% on-demand instances
                 elif provider_api in ["RunInstances", "ASG"]:
-                    # RunInstances and ASG don't use percentOnDemand, they use different mechanisms
-                    # For now, we'll skip price type validation for these APIs
-                    log.warning(
-                        f"Provider API {provider_api} may not support spot instances in the same way as EC2Fleet"
-                    )
+                    # RunInstances and ASG don't use percentOnDemand the same way as fleets.
+                    # Ensure on-demand requests stay on-demand; spot explicitly sets 0.
+                    if overrides["priceType"] == "spot":
+                        config["percentOnDemand"] = 0
+                    else:
+                        config["percentOnDemand"] = 100
 
         # Set scheduler type in config for template replacement (after overrides)
         config["scheduler"] = scheduler_type
@@ -289,9 +302,30 @@ class TemplateProcessor:
                 if overrides and isinstance(populated_template, dict):
                     templates_list = populated_template.get("templates", [])
                     for tmpl in templates_list:
+                        # Apply overrides with scheduler-aware key mapping
+                        scheduler_is_default = config.get("scheduler") == "default"
+
+                        # Handle VM types separately to avoid duplicate fields
+                        if any(k in overrides for k in ("vm_types", "vmTypes", "instance_types")):
+                            vm_override = (
+                                overrides.get("instance_types")
+                                or overrides.get("vm_types")
+                                or overrides.get("vmTypes")
+                            )
+                            if scheduler_is_default:
+                                tmpl["instance_types"] = vm_override
+                                tmpl.pop("vm_type", None)
+                                tmpl.pop("vmTypes", None)
+                                tmpl.pop("vm_types", None)
+                            else:
+                                tmpl["vmTypes"] = vm_override
+                                tmpl.pop("vm_type", None)
+                                tmpl.pop("vm_types", None)
+                                tmpl.pop("instance_types", None)
+
+                        # Apply other known override keys directly
                         for key in [
                             "vmType",
-                            "vmTypes",
                             "abisInstanceRequirements",
                             "abis_instance_requirements",
                             "instance_types",

@@ -22,6 +22,26 @@
       "instanceProfile": "{{instanceProfile}}",
       "fleetRole": "{{fleetRole}}",
       "userDataScript": "{{userDataScript}}"
+    },
+    {
+      "templateId": "ASG",
+      "providerApi": "{{providerApi}}",
+      "priceType": "{{priceType}}",
+      "maxNumber": 2,
+      "attributes": {
+        "type": ["String", "X86_64"],
+        "ncores": ["Numeric", "2"],
+        "ncpus": ["Numeric", "1"],
+        "nram": ["Numeric", "4096"]
+      },
+      "imageId": "{{imageId}}",
+      "subnetId": "{{subnetId}}",
+      "vmType": "t2.micro",
+      "rootDeviceVolumeSize": 100,
+      "volumeType": "gp2",
+      "securityGroupIds": "{{securityGroupIds}}",
+      "instanceProfile": "{{instanceProfile}}",
+      "userDataScript": "{{userDataScript}}"
     }
   ]
 }

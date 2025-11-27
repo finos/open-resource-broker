@@ -543,9 +543,6 @@ class AWSHandler(ABC):
         # Validate instance type(s)
         if not (template.instance_type or template.instance_types):
             errors["instanceType"] = "Either instance_type or instance_types must be specified"
-        # if template.instance_type and template.instance_types:
-        #     print(f"KBG [{template.instance_type}] [{template.instance_types}]")
-        #     errors["instanceType"] = "Cannot specify both instance_type and instance_types"
 
         # Validate subnet(s) - subnet_id is a property of subnet_ids, so only
         # check subnet_ids

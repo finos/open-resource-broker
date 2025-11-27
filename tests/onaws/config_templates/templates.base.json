@@ -6,7 +6,7 @@
       "fleet_type": "{{fleetType}}",
       "price_type": "{{priceType}}",
       "percent_on_demand": "{{percentOnDemand}}",
-      "max_number": 2,
+      "max_number": 10,
       "attributes": {
         "type": [
           "String",
@@ -41,7 +41,7 @@
       "fleet_type": "{{fleetType}}",
       "price_type": "{{priceType}}",
       "percent_on_demand": "{{percentOnDemand}}",
-      "max_number": 2,
+      "max_number": 10,
       "attributes": {
         "type": [
           "String",
@@ -72,7 +72,37 @@
       "fleet_type": "{{fleetType}}",
       "price_type": "{{priceType}}",
       "percent_on_demand": "{{percentOnDemand}}",
-      "max_number": 2,
+      "max_number": 10,
+      "attributes": {
+        "type": [
+          "String",
+          "X86_64"
+        ],
+        "ncores": [
+          "Numeric",
+          "2"
+        ],
+        "ncpus": [
+          "Numeric",
+          "1"
+        ],
+        "nram": [
+          "Numeric",
+          "4096"
+        ]
+      },
+      "image_id": "{{imageId}}",
+      "subnet_id": "{{subnetId}}",
+      "vm_type": "t2.micro",
+      "key_name": "HF_SSH_KEY",
+      "security_group_ids": "{{securityGroupIds}}"
+    },
+    {
+      "template_id": "ASG",
+      "provider_api": "{{providerApi}}",
+      "price_type": "{{priceType}}",
+      "percent_on_demand": "{{percentOnDemand}}",
+      "max_number": 10,
       "attributes": {
         "type": [
           "String",
