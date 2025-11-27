@@ -21,9 +21,14 @@ class TestNativeSpecService:
         return Mock()
 
     @pytest.fixture
-    def service(self, config_port, spec_renderer):
+    def logger(self):
+        """Mock logger."""
+        return Mock()
+
+    @pytest.fixture
+    def service(self, config_port, spec_renderer, logger):
         """Create service instance."""
-        return NativeSpecService(config_port, spec_renderer)
+        return NativeSpecService(config_port, spec_renderer, logger)
 
     def test_is_native_spec_enabled_true(self, service, config_port):
         """Test native spec enabled check returns true."""

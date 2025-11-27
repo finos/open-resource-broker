@@ -84,7 +84,7 @@ class TestSpecFileLoading:
 
             # Should use default base path
             assert result == spec_content
-            mock_read.assert_called_once_with("config/specs/aws/test-template.json")
+            mock_read.assert_called_once_with("specs/aws/test-template.json")
 
     @patch("providers.aws.infrastructure.services.aws_native_spec_service.read_json_file")
     def test_load_spec_file_not_found(self, mock_read):
@@ -127,6 +127,9 @@ class TestSpecFileLoading:
             template_id="test-template",
             image_id="ami-12345",
             instance_type="t3.micro",
+            provider_api="EC2Fleet",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
             launch_template_spec=inline_spec,
         )
 
@@ -147,6 +150,9 @@ class TestSpecFileLoading:
             template_id="test-template",
             image_id="ami-12345",
             instance_type="t3.micro",
+            provider_api="EC2Fleet",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
             launch_template_spec_file="lt-spec.json",
         )
 
@@ -163,7 +169,12 @@ class TestSpecFileLoading:
         from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
         template = AWSTemplate(
-            template_id="test-template", image_id="ami-12345", instance_type="t3.micro"
+            template_id="test-template",
+            image_id="ami-12345",
+            instance_type="t3.micro",
+            provider_api="EC2Fleet",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
         )
 
         result = self.service._resolve_launch_template_spec(template)
@@ -183,6 +194,9 @@ class TestSpecFileLoading:
             template_id="test-template",
             image_id="ami-12345",
             instance_type="t3.micro",
+            provider_api="EC2Fleet",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
             provider_api_spec=inline_spec,
         )
 
@@ -203,6 +217,9 @@ class TestSpecFileLoading:
             template_id="test-template",
             image_id="ami-12345",
             instance_type="t3.micro",
+            provider_api="EC2Fleet",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
             provider_api_spec_file="api-spec.json",
         )
 
@@ -219,7 +236,12 @@ class TestSpecFileLoading:
         from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
         template = AWSTemplate(
-            template_id="test-template", image_id="ami-12345", instance_type="t3.micro"
+            template_id="test-template",
+            image_id="ami-12345",
+            instance_type="t3.micro",
+            provider_api="EC2Fleet",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
         )
 
         result = self.service._resolve_provider_api_spec(template)
@@ -312,6 +334,9 @@ class TestSpecFileLoading:
             template_id="test-template",
             image_id="ami-12345",
             instance_type="t3.micro",
+            provider_api="EC2Fleet",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
             provider_api_spec=inline_spec,
         )
 
