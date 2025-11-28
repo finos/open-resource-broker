@@ -16,15 +16,11 @@ import pytest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../..")))
 
 from domain.request.aggregate import Request
-from providers.aws.configuration.config import (
-    AWSProviderConfig,
-    LaunchTemplateConfiguration,
-)
+from providers.aws.configuration.config import (AWSProviderConfig,
+                                                LaunchTemplateConfiguration)
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.infrastructure.launch_template.manager import (
-    AWSLaunchTemplateManager,
-    LaunchTemplateResult,
-)
+    AWSLaunchTemplateManager, LaunchTemplateResult)
 
 
 class TestAWSLaunchTemplateManager:
@@ -35,23 +31,10 @@ class TestAWSLaunchTemplateManager:
         # Mock dependencies
         self.mock_aws_client = Mock()
         self.mock_logger = Mock()
-        self.mock_config = Mock(spec=AWSProviderConfig)
-
-        # Configure launch template config
-        self.mock_lt_config = LaunchTemplateConfiguration(
-            create_per_request=True,
-            naming_strategy="request_based",
-            version_strategy="incremental",
-            reuse_existing=True,
-            cleanup_old_versions=False,
-            max_versions_per_template=10,
-        )
-        self.mock_config.launch_template = self.mock_lt_config
 
         # Create manager instance
         self.manager = AWSLaunchTemplateManager(
             aws_client=self.mock_aws_client,
-            config=self.mock_config,
             logger=self.mock_logger,
         )
 
@@ -71,8 +54,7 @@ class TestAWSLaunchTemplateManager:
     def test_manager_initialization(self):
         """Test that manager initializes correctly."""
         assert self.manager.aws_client == self.mock_aws_client
-        assert self.manager.config == self.mock_config
-        assert self.manager.logger == self.mock_logger
+        assert self.manager._logger == self.mock_logger
 
     def test_create_or_update_launch_template_per_request_enabled(self):
         """Test launch template creation when create_per_request is enabled."""

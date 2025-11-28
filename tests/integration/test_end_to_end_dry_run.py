@@ -5,11 +5,20 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 from application.commands.request_handlers import CreateMachineRequestHandler
 from application.dto.commands import CreateRequestCommand
+from application.services.provider_capability_service import \
+    ProviderCapabilityService
+from application.services.provider_selection_service import \
+    ProviderSelectionService
 from config.manager import ConfigurationManager
+from domain.base import UnitOfWorkFactory
+from domain.base.ports import (ContainerPort, ErrorHandlingPort,
+                               EventPublisherPort, LoggingPort, ProviderPort)
 from domain.request.aggregate import Request
 from domain.request.value_objects import RequestId, RequestType
 from domain.template.template_aggregate import Template
-from infrastructure.adapters.ports.resource_provisioning_port import ResourceProvisioningPort
+from infrastructure.adapters.ports.resource_provisioning_port import \
+    ResourceProvisioningPort
+from infrastructure.di.buses import QueryBus
 from infrastructure.mocking.dry_run_context import dry_run_context
 from providers.aws.configuration.config import AWSProviderConfig
 from providers.aws.infrastructure.adapters import AWSProvisioningAdapter
@@ -23,12 +32,14 @@ class TestEndToEndDryRun:
         """Set up test fixtures."""
         # Mock dependencies
         self.mock_logger = Mock()
-        self.mock_request_repository = Mock()
-        self.mock_machine_repository = Mock()
-        self.mock_template_repository = Mock()
+        self.mock_uow_factory = Mock()
         self.mock_event_publisher = Mock()
+        self.mock_error_handler = Mock()
         self.mock_container = Mock()
         self.mock_query_bus = Mock()
+        self.mock_provider_selection_service = Mock()
+        self.mock_provider_capability_service = Mock()
+        self.mock_provider_port = Mock()
 
         # Create AWS provider strategy
         self.aws_config = AWSProviderConfig(region="us-east-1", profile="default")
@@ -78,15 +89,26 @@ class TestEndToEndDryRun:
 
         self.mock_container.get.side_effect = container_get
 
+        # Mock UoW factory to return mock UoW with repositories
+        mock_uow = Mock()
+        mock_uow.request_repository = Mock()
+        mock_uow.machine_repository = Mock()
+        mock_uow.__enter__ = Mock(return_value=mock_uow)
+        mock_uow.__exit__ = Mock(return_value=False)
+        self.mock_uow_factory.create_unit_of_work.return_value = mock_uow
+        self.mock_uow = mock_uow
+
         # Create command handler
         self.command_handler = CreateMachineRequestHandler(
-            request_repository=self.mock_request_repository,
-            machine_repository=self.mock_machine_repository,
-            template_repository=self.mock_template_repository,
-            event_publisher=self.mock_event_publisher,
+            uow_factory=self.mock_uow_factory,
             logger=self.mock_logger,
             container=self.mock_container,
+            event_publisher=self.mock_event_publisher,
+            error_handler=self.mock_error_handler,
             query_bus=self.mock_query_bus,
+            provider_selection_service=self.mock_provider_selection_service,
+            provider_capability_service=self.mock_provider_capability_service,
+            provider_port=self.mock_provider_port,
         )
 
     @patch("providers.aws.infrastructure.dry_run_adapter.aws_dry_run_context")
@@ -115,12 +137,12 @@ class TestEndToEndDryRun:
         mock_dry_run_context.return_value = mock_context_manager
 
         # Mock request repository save
-        self.mock_request_repository.save.return_value = []
+        self.mock_uow.request_repository.save.return_value = []
 
         # Create command with dry-run enabled
         command = CreateRequestCommand(
             template_id="test-template",
-            machine_count=1,
+            requested_count=1,
             metadata={"test": "data"},
             dry_run=True,  # Enable dry-run
         )
@@ -132,8 +154,8 @@ class TestEndToEndDryRun:
         assert request_id is not None
 
         # Verify request repository was called with dry-run in metadata
-        self.mock_request_repository.save.assert_called_once()
-        saved_request = self.mock_request_repository.save.call_args[0][0]
+        self.mock_uow.request_repository.save.assert_called_once()
+        saved_request = self.mock_uow.request_repository.save.call_args[0][0]
         assert saved_request.metadata["dry_run"] is True
 
         # Verify dry-run context was used in provider strategy
@@ -161,12 +183,12 @@ class TestEndToEndDryRun:
         self.mock_handler_factory.get_handler.return_value = mock_handler
 
         # Mock request repository save
-        self.mock_request_repository.save.return_value = []
+        self.mock_uow.request_repository.save.return_value = []
 
         # Create command without dry-run
         command = CreateRequestCommand(
             template_id="test-template",
-            machine_count=1,
+            requested_count=1,
             metadata={"test": "data"},
             dry_run=False,  # Normal operation
         )
@@ -178,8 +200,8 @@ class TestEndToEndDryRun:
         assert request_id is not None
 
         # Verify request repository was called without dry-run in metadata
-        self.mock_request_repository.save.assert_called_once()
-        saved_request = self.mock_request_repository.save.call_args[0][0]
+        self.mock_uow.request_repository.save.assert_called_once()
+        saved_request = self.mock_uow.request_repository.save.call_args[0][0]
         assert saved_request.metadata["dry_run"] is False
 
         # Verify legacy handler was used (not provider strategy)
@@ -208,12 +230,12 @@ class TestEndToEndDryRun:
         mock_dry_run_context.return_value = mock_context_manager
 
         # Mock request repository save
-        self.mock_request_repository.save.return_value = []
+        self.mock_uow.request_repository.save.return_value = []
 
         # Create command with dry-run enabled
         command = CreateRequestCommand(
             template_id="test-template",
-            machine_count=1,
+            requested_count=1,
             metadata={"test": "data"},
             dry_run=True,
         )
@@ -226,8 +248,8 @@ class TestEndToEndDryRun:
         assert request_id is not None
 
         # Verify both global and command dry-run contexts are respected
-        self.mock_request_repository.save.assert_called_once()
-        saved_request = self.mock_request_repository.save.call_args[0][0]
+        self.mock_uow.request_repository.save.assert_called_once()
+        saved_request = self.mock_uow.request_repository.save.call_args[0][0]
         assert saved_request.metadata["dry_run"] is True
 
         # Verify provider strategy dry-run context was used
