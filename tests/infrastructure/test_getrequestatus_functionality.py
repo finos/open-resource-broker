@@ -1,8 +1,8 @@
 """Test suite for getRequestStatus functionality."""
 
-import pytest
-from datetime import datetime
 from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 from application.request.dto import MachineReferenceDTO
 from application.services.provider_selection_service import ProviderSelectionResult
@@ -20,8 +20,8 @@ class MockRequestDTO:
         self.status = status
         self.machines = machines or []
         self.machine_references = []
-        
-        for m in (machines or []):
+
+        for m in machines or []:
             machine_ref = MachineReferenceDTO(
                 machine_id=m.get("instance_id", ""),
                 name="",
@@ -30,10 +30,10 @@ class MockRequestDTO:
                 private_ip_address=m.get("private_ip", ""),
                 public_ip_address=m.get("public_ip"),
                 launch_time=m.get("launch_time_timestamp"),
-                message=""
+                message="",
             )
             self.machine_references.append(machine_ref)
-    
+
     def to_dict(self):
         """Convert to dictionary format."""
         return {
@@ -45,10 +45,10 @@ class MockRequestDTO:
                     "status": m.status,
                     "private_ip": m.private_ip_address,
                     "public_ip": m.public_ip_address,
-                    "launch_time_timestamp": m.launch_time or 0
+                    "launch_time_timestamp": m.launch_time or 0,
                 }
                 for m in self.machine_references
-            ]
+            ],
         }
 
 
@@ -62,13 +62,11 @@ class TestGetRequestStatusFunctionality:
             mock_container = Mock()
             mock_provider_service = Mock()
             mock_provider_service.select_active_provider.return_value = ProviderSelectionResult(
-                provider_type="aws",
-                provider_instance="aws-default",
-                selection_reason="test"
+                provider_type="aws", provider_instance="aws-default", selection_reason="test"
             )
             mock_container.get.return_value = mock_provider_service
             mock_get_container.return_value = mock_container
-            
+
             config_manager = MagicMock(spec=ConfigurationPort)
             logger = MagicMock(spec=LoggingPort)
             return HostFactorySchedulerStrategy(config_manager, logger)

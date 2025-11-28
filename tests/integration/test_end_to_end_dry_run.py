@@ -5,20 +5,11 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 from application.commands.request_handlers import CreateMachineRequestHandler
 from application.dto.commands import CreateRequestCommand
-from application.services.provider_capability_service import \
-    ProviderCapabilityService
-from application.services.provider_selection_service import \
-    ProviderSelectionService
 from config.manager import ConfigurationManager
-from domain.base import UnitOfWorkFactory
-from domain.base.ports import (ContainerPort, ErrorHandlingPort,
-                               EventPublisherPort, LoggingPort, ProviderPort)
 from domain.request.aggregate import Request
 from domain.request.value_objects import RequestId, RequestType
 from domain.template.template_aggregate import Template
-from infrastructure.adapters.ports.resource_provisioning_port import \
-    ResourceProvisioningPort
-from infrastructure.di.buses import QueryBus
+from infrastructure.adapters.ports.resource_provisioning_port import ResourceProvisioningPort
 from infrastructure.mocking.dry_run_context import dry_run_context
 from providers.aws.configuration.config import AWSProviderConfig
 from providers.aws.infrastructure.adapters import AWSProvisioningAdapter

@@ -32,9 +32,7 @@ class TestDockerfile:
         assert "FROM python:" in content, "Should use Python base image"
 
         # Check for security best practices
-        assert "groupadd -r" in content and "useradd -r" in content, (
-            "Should create non-root user"
-        )
+        assert "groupadd -r" in content and "useradd -r" in content, "Should create non-root user"
         assert "USER" in content, "Should switch to non-root user"
 
         # Check for virtual environment
@@ -244,10 +242,10 @@ class TestDockerfile:
     def test_entrypoint_script_structure(self, project_root):
         """Test entrypoint script structure."""
         entrypoint_path = project_root / "deployment" / "docker" / "docker-entrypoint.sh"
-        
+
         if not entrypoint_path.exists():
             pytest.skip(f"Entrypoint script not found at {entrypoint_path}")
-        
+
         content = entrypoint_path.read_text()
 
         # Check for correct shebang
@@ -285,10 +283,10 @@ class TestDockerfile:
 
         # Test development compose file
         dev_compose_path = project_root / "deployment" / "docker" / "docker-compose.yml"
-        
+
         if not dev_compose_path.exists():
             pytest.skip(f"Docker Compose file not found at {dev_compose_path}")
-        
+
         with open(dev_compose_path) as f:
             dev_compose = yaml.safe_load(f)
 

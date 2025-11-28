@@ -71,7 +71,7 @@ class TestLazyLoadingIntegration:
     async def test_query_bus_access(self, app):
         """Test that query bus can be accessed and cached."""
         await app.initialize()
-        
+
         # First access
         query_bus1 = app.get_query_bus()
         assert query_bus1 is not None
@@ -84,7 +84,7 @@ class TestLazyLoadingIntegration:
     async def test_command_bus_access(self, app):
         """Test that command bus can be accessed and cached."""
         await app.initialize()
-        
+
         # First access
         command_bus1 = app.get_command_bus()
         assert command_bus1 is not None
@@ -145,12 +145,13 @@ class TestLazyLoadingIntegration:
 
     def test_async_context_manager(self):
         """Test that async context manager works correctly."""
+
         async def run_test():
             async with Application() as app:
                 assert app._initialized
                 provider_info = app.get_provider_info()
                 assert isinstance(provider_info, dict)
-        
+
         asyncio.run(run_test())
 
     def test_shutdown_functionality(self, app):
@@ -183,6 +184,7 @@ class TestLazyLoadingErrorHandling:
 
     def test_lazy_component_failure_handling(self):
         """Test handling of lazy component creation failures."""
+
         async def run_test():
             app = Application()
             await app.initialize()
@@ -191,7 +193,7 @@ class TestLazyLoadingErrorHandling:
             with patch.object(app._container, "get", side_effect=Exception("Component error")):
                 with pytest.raises(Exception, match="Component error"):
                     app.get_query_bus()
-        
+
         asyncio.run(run_test())
 
 
@@ -242,6 +244,7 @@ class TestLazyLoadingCompatibility:
 
     def test_provider_strategy_compatibility(self):
         """Test that provider strategy system works with lazy loading."""
+
         async def run_test():
             app = Application()
             await app.initialize()
@@ -251,7 +254,7 @@ class TestLazyLoadingCompatibility:
             # Should have provider information
             assert isinstance(provider_info, dict)
             # Should not crash when accessing provider info
-        
+
         asyncio.run(run_test())
 
 

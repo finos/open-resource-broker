@@ -41,7 +41,9 @@ class TestSpecFileLoading:
             "TargetCapacitySpecification": {"TotalTargetCapacity": "{{ requested_count }}"},
         }
 
-        with patch("providers.aws.infrastructure.services.aws_native_spec_service.read_json_file") as mock_read:
+        with patch(
+            "providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
+        ) as mock_read:
             mock_read.return_value = spec_content
 
             result = self.service._load_spec_file("examples/ec2fleet-price-capacity-optimized.json")
@@ -62,7 +64,9 @@ class TestSpecFileLoading:
 
         spec_content = {"Type": "maintain"}
 
-        with patch("providers.aws.infrastructure.services.aws_native_spec_service.read_json_file") as mock_read:
+        with patch(
+            "providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
+        ) as mock_read:
             mock_read.return_value = spec_content
 
             result = self.service._load_spec_file("custom-template.json")
@@ -77,7 +81,9 @@ class TestSpecFileLoading:
 
         spec_content = {"Type": "instant"}
 
-        with patch("providers.aws.infrastructure.services.aws_native_spec_service.read_json_file") as mock_read:
+        with patch(
+            "providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
+        ) as mock_read:
             mock_read.return_value = spec_content
 
             result = self.service._load_spec_file("test-template.json")
@@ -277,7 +283,9 @@ class TestSpecFileLoading:
                 }
             }
 
-            with patch("providers.aws.infrastructure.services.aws_native_spec_service.read_json_file") as mock_read:
+            with patch(
+                "providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
+            ) as mock_read:
                 mock_read.return_value = {"test": "data"}
 
                 self.service._load_spec_file(case["file_name"])
@@ -294,7 +302,9 @@ class TestSpecFileLoading:
 
         spec_content = {"Type": "instant"}
 
-        with patch("providers.aws.infrastructure.services.aws_native_spec_service.read_json_file") as mock_read:
+        with patch(
+            "providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
+        ) as mock_read:
             mock_read.return_value = spec_content
 
             # Load same file twice
@@ -315,7 +325,9 @@ class TestSpecFileLoading:
         }
 
         # Note: This test assumes YAML support is added to the file utilities
-        with patch("providers.aws.infrastructure.services.aws_native_spec_service.read_json_file") as mock_read:
+        with patch(
+            "providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
+        ) as mock_read:
             mock_read.return_value = {"Type": "maintain"}
 
             result = self.service._load_spec_file("test.yaml")

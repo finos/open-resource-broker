@@ -1388,9 +1388,7 @@ class TestSpotFleetHandler:
             },
         }
 
-        handler._release_hosts_for_single_spot_fleet(
-            "sfr-12345", ["i-1", "i-2"], fleet_details
-        )
+        handler._release_hosts_for_single_spot_fleet("sfr-12345", ["i-1", "i-2"], fleet_details)
 
         aws_client.ec2_client.modify_spot_fleet_request.assert_called_with(
             SpotFleetRequestId="sfr-12345", TargetCapacity=1, OnDemandTargetCapacity=1

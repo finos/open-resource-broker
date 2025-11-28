@@ -6,20 +6,25 @@ from typing import Any, TypeVar
 
 from application.base.handlers import BaseQueryHandler
 from application.decorators import query_handler
-from application.dto.queries import (GetMachineQuery, GetRequestQuery,
-                                     GetRequestStatusQuery, GetTemplateQuery,
-                                     ListActiveRequestsQuery,
-                                     ListMachinesQuery,
-                                     ListReturnRequestsQuery,
-                                     ListTemplatesQuery, ValidateTemplateQuery)
+from application.dto.queries import (
+    GetMachineQuery,
+    GetRequestQuery,
+    GetRequestStatusQuery,
+    GetTemplateQuery,
+    ListActiveRequestsQuery,
+    ListMachinesQuery,
+    ListReturnRequestsQuery,
+    ListTemplatesQuery,
+    ValidateTemplateQuery,
+)
 from application.dto.responses import MachineDTO, RequestDTO
 from application.dto.system import ValidationDTO
 from domain.base import UnitOfWorkFactory
+
 # Exception handling through BaseQueryHandler (Clean Architecture compliant)
 from domain.base.exceptions import EntityNotFoundError
 from domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
-from domain.template.factory import (TemplateFactory,
-                                     get_default_template_factory)
+from domain.template.factory import TemplateFactory, get_default_template_factory
 from domain.template.template_aggregate import Template
 
 T = TypeVar("T")
@@ -195,8 +200,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
             # Create operation for resource-to-instance discovery using stored
             # provider API
-            from providers.base.strategy import (ProviderOperation,
-                                                 ProviderOperationType)
+            from providers.base.strategy import ProviderOperation, ProviderOperationType
 
             operation = ProviderOperation(
                 operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
@@ -302,8 +306,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             provider_context = self._get_provider_context()
 
             # Create operation to check instance status using instance IDs
-            from providers.base.strategy import (ProviderOperation,
-                                                 ProviderOperationType)
+            from providers.base.strategy import ProviderOperation, ProviderOperationType
 
             # Extract instance IDs from machines
             instance_ids = [str(machine.instance_id.value) for machine in machines]
@@ -499,8 +502,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             # Create a simple AWS client call to get ASG details
             # This is a simplified approach - in production you might want to use
             # the provider context more directly
-            from providers.aws.infrastructure.adapters.aws_client import \
-                AWSClient
+            from providers.aws.infrastructure.adapters.aws_client import AWSClient
 
             aws_client = self._container.get(AWSClient)
 
@@ -521,8 +523,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
     def _get_provider_context(self):
         """Get provider context for AWS operations."""
         try:
-            from providers.base.strategy.provider_context import \
-                ProviderContext
+            from providers.base.strategy.provider_context import ProviderContext
 
             return self._container.get(ProviderContext)
         except Exception:
@@ -540,8 +541,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
             async def execute_with_strategy(self, strategy_identifier: str, operation):
                 """Execute operation with strategy - simplified implementation."""
-                from providers.base.strategy import (ProviderOperationType,
-                                                     ProviderResult)
+                from providers.base.strategy import ProviderOperationType, ProviderResult
 
                 try:
                     if (
@@ -598,23 +598,25 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             def _get_aws_handler_for_resource_id(self, resource_id: str):
                 """Get appropriate AWS handler based on resource ID."""
                 if resource_id.startswith("fleet-"):
-                    from providers.aws.infrastructure.handlers.ec2_fleet_handler import \
-                        EC2FleetHandler
+                    from providers.aws.infrastructure.handlers.ec2_fleet_handler import (
+                        EC2FleetHandler,
+                    )
 
                     return self.container.get(EC2FleetHandler)
                 elif resource_id.startswith("sfr-"):
-                    from providers.aws.infrastructure.handlers.spot_fleet_handler import \
-                        SpotFleetHandler
+                    from providers.aws.infrastructure.handlers.spot_fleet_handler import (
+                        SpotFleetHandler,
+                    )
 
                     return self.container.get(SpotFleetHandler)
                 elif resource_id.startswith("run-instances-"):
-                    from providers.aws.infrastructure.handlers.run_instances_handler import \
-                        RunInstancesHandler
+                    from providers.aws.infrastructure.handlers.run_instances_handler import (
+                        RunInstancesHandler,
+                    )
 
                     return self.container.get(RunInstancesHandler)
                 else:
-                    from providers.aws.infrastructure.handlers.asg_handler import \
-                        ASGHandler
+                    from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
 
                     return self.container.get(ASGHandler)
 
@@ -626,8 +628,9 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     return self._get_aws_handler_for_resource_id(resource_id)
 
                 # Fallback to RunInstances
-                from providers.aws.infrastructure.handlers.run_instances_handler import \
-                    RunInstancesHandler
+                from providers.aws.infrastructure.handlers.run_instances_handler import (
+                    RunInstancesHandler,
+                )
 
                 return self.container.get(RunInstancesHandler)
 
@@ -741,8 +744,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
         """Get cache service for request caching."""
         try:
             from domain.base.ports import ConfigurationPort
-            from infrastructure.caching.request_cache_service import \
-                RequestCacheService
+            from infrastructure.caching.request_cache_service import RequestCacheService
 
             config_manager = self._container.get(ConfigurationPort)
             cache_service = RequestCacheService(
@@ -841,8 +843,12 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
             # Capacity info from provider metadata (e.g., fleets/ASGs)
             fleet_capacity_fulfilment = provider_metadata.get("fleet_capacity_fulfilment") or {}
-            providers_target_capacity_units = fleet_capacity_fulfilment.get("target_capacity_units", None)
-            providers_fulfilled_capacity_units = fleet_capacity_fulfilment.get("fulfilled_capacity_units", None)
+            providers_target_capacity_units = fleet_capacity_fulfilment.get(
+                "target_capacity_units", None
+            )
+            providers_fulfilled_capacity_units = fleet_capacity_fulfilment.get(
+                "fulfilled_capacity_units", None
+            )
             providers_capacity_state = fleet_capacity_fulfilment.get("state", None)
 
             # Determine new status based on request type and machine states
@@ -1124,8 +1130,7 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, Template]):
 
     async def execute_query(self, query: GetTemplateQuery) -> Template:
         """Execute get template query."""
-        from infrastructure.template.configuration_manager import \
-            TemplateConfigurationManager
+        from infrastructure.template.configuration_manager import TemplateConfigurationManager
 
         self.logger.info("Getting template: %s", query.template_id)
 
@@ -1199,8 +1204,7 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[Template]])
 
     async def execute_query(self, query: ListTemplatesQuery) -> list[Template]:
         """Execute list templates query."""
-        from infrastructure.template.configuration_manager import \
-            TemplateConfigurationManager
+        from infrastructure.template.configuration_manager import TemplateConfigurationManager
 
         self.logger.info("Listing templates")
 
@@ -1280,8 +1284,7 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
 
         try:
             # Get template configuration port for validation
-            from domain.base.ports.template_configuration_port import \
-                TemplateConfigurationPort
+            from domain.base.ports.template_configuration_port import TemplateConfigurationPort
 
             template_port = self.container.get(TemplateConfigurationPort)
 

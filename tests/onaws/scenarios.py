@@ -47,21 +47,17 @@ DEFAULT_ATTRIBUTE_COMBINATIONS = [
         "priceType": ["ondemand", "spot"],
         "scheduler": ["default", "hostfactory"],
     },
-
-
     # {
     #     "providerApi": ["ASG"],
     #     "priceType": ["spot"],
     #     "scheduler": ["default"],
     # },
-
     # {
     #     "providerApi": ["EC2Fleet"],
     #     "fleetType": ["maintain"],
     #     "priceType": ["ondemand", "spot"],
     #     "scheduler": ["default", "hostfactory"],
     # },
-
     # { INTENTIONALLY NOT SUPPORTED
     #     "providerApi": ["RunInstances"],
     #     "priceType": ["spot"]
@@ -135,11 +131,15 @@ def generate_scenarios_from_attributes(
         # Ensure partial-return scenarios have enough capacity to terminate one host and
         # still have machines running. Maintain fleets/ASGs need >=4 requested units.
         if provider_api in ("EC2Fleet", "SpotFleet") and str(fleet_type).lower() == "maintain":
-            scenario_capacity = overrides.get("capacity_to_request", base_template["capacity_to_request"])
+            scenario_capacity = overrides.get(
+                "capacity_to_request", base_template["capacity_to_request"]
+            )
             if scenario_capacity < 4:
                 overrides["capacity_to_request"] = 4
         if provider_api == "ASG":
-            scenario_capacity = overrides.get("capacity_to_request", base_template["capacity_to_request"])
+            scenario_capacity = overrides.get(
+                "capacity_to_request", base_template["capacity_to_request"]
+            )
             if scenario_capacity < 4:
                 overrides["capacity_to_request"] = 4
 
@@ -203,7 +203,6 @@ def get_custom_test_cases() -> List[Dict[str, Any]]:
     This allows for special cases and edge scenarios.
     """
     return [
-
         # SpotFleet with ABIS
         {
             "test_name": "hostfactory.SpotFleetRequest.ABIS",
@@ -251,12 +250,10 @@ def get_custom_test_cases() -> List[Dict[str, Any]]:
                 },
             },
         },
-
         ###############################################################################################################
         ###############################################################################################################
         ###############################################################################################################
         ###############################################################################################################
-
         # SpotFleet with multiTypes
         {
             "test_name": "hostfactory.SpotFleetRequest.MultiTypes",

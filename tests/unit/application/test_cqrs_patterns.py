@@ -48,8 +48,8 @@ class GetMachinesByRequestHandler:
 
 class GetRequestStatusHandler:
     def __init__(self, **kwargs):
-        self.request_repository = kwargs.get('request_repository')
-    
+        self.request_repository = kwargs.get("request_repository")
+
     def handle(self, query):
         return self.request_repository.find_by_id(query.request_id)
 
@@ -61,9 +61,7 @@ class TestCommandQuerySeparation:
     def test_commands_do_not_return_business_data(self):
         """Test that commands only return acknowledgment, not business data."""
         # Commands should only return success/failure indicators or IDs
-        command = CreateRequestCommand(
-            template_id="test-template", requested_count=2
-        )
+        command = CreateRequestCommand(template_id="test-template", requested_count=2)
 
         # Command should not contain query-like methods
         command_methods = [
@@ -111,23 +109,23 @@ class TestCommandQuerySeparation:
         mock_repository = Mock()
         mock_uow.requests = mock_repository
         mock_repository.save.return_value = []
-        
+
         mock_uow_factory = Mock()
         mock_uow_factory.create_unit_of_work.return_value.__enter__ = Mock(return_value=mock_uow)
         mock_uow_factory.create_unit_of_work.return_value.__exit__ = Mock(return_value=False)
-        
+
         mock_logger = Mock()
         mock_container = Mock()
         mock_event_publisher = Mock()
         mock_error_handler = Mock()
-        
+
         mock_query_bus = AsyncMock()
         mock_template = Mock()
         mock_template.template_id = "test-template"
         mock_template.provider_api = "RunInstances"
         mock_template.to_dict.return_value = {"template_id": "test-template"}
         mock_query_bus.execute.return_value = mock_template
-        
+
         mock_provider_selection = Mock()
         mock_selection_result = Mock()
         mock_selection_result.provider_instance = "test-provider"
@@ -135,13 +133,15 @@ class TestCommandQuerySeparation:
         mock_selection_result.selection_reason = "test"
         mock_selection_result.confidence = 1.0
         mock_provider_selection.select_provider_for_template.return_value = mock_selection_result
-        
+
         mock_provider_capability = Mock()
         mock_validation_result = Mock()
         mock_validation_result.is_valid = True
         mock_validation_result.supported_features = []
-        mock_provider_capability.validate_template_requirements.return_value = mock_validation_result
-        
+        mock_provider_capability.validate_template_requirements.return_value = (
+            mock_validation_result
+        )
+
         mock_provider_port = Mock()
         mock_provider_port.available_strategies = ["test-strategy"]
 
@@ -198,30 +198,38 @@ class TestCommandBusImplementation:
     async def test_command_bus_routes_to_correct_handler(self):
         """Test that command bus routes commands to correct handlers."""
         from unittest.mock import patch
-        
+
         # Mock handlers
         create_handler = AsyncMock()
         update_handler = AsyncMock()
-        
+
         # Mock handler discovery to return handler class names
-        with patch('infrastructure.di.buses.get_command_handler_for_type') as mock_get_handler:
+        with patch("infrastructure.di.buses.get_command_handler_for_type") as mock_get_handler:
             # Mock container to return handler instances
             mock_container = Mock()
-            mock_container.get.side_effect = lambda cls: create_handler if cls == "CreateRequestHandler" else update_handler
-            
+            mock_container.get.side_effect = (
+                lambda cls: create_handler if cls == "CreateRequestHandler" else update_handler
+            )
+
             # Setup handler routing
-            mock_get_handler.side_effect = lambda cmd_type: "CreateRequestHandler" if cmd_type == CreateRequestCommand else "UpdateRequestHandler"
-            
+            mock_get_handler.side_effect = (
+                lambda cmd_type: "CreateRequestHandler"
+                if cmd_type == CreateRequestCommand
+                else "UpdateRequestHandler"
+            )
+
             # Create command bus
             command_bus = CommandBus(container=mock_container, logger=Mock())
-            
+
             # Execute commands
             create_command = CreateRequestCommand(template_id="test-template", requested_count=2)
-            update_command = UpdateRequestStatusCommand(request_id="test-request", status="in_progress")
-            
+            update_command = UpdateRequestStatusCommand(
+                request_id="test-request", status="in_progress"
+            )
+
             await command_bus.execute(create_command)
             await command_bus.execute(update_command)
-            
+
             # Verify correct routing
             create_handler.handle.assert_called_once_with(create_command)
             update_handler.handle.assert_called_once_with(update_command)
@@ -233,9 +241,7 @@ class TestCommandBusImplementation:
         mock_logger = Mock()
         command_bus = CommandBus(container=mock_container, logger=mock_logger)
 
-        unregistered_command = CreateRequestCommand(
-            template_id="test-template", requested_count=2
-        )
+        unregistered_command = CreateRequestCommand(template_id="test-template", requested_count=2)
 
         # Should raise appropriate exception for unregistered command
         with pytest.raises(Exception):  # Specific exception type depends on implementation
@@ -257,24 +263,24 @@ class TestCommandBusImplementation:
     async def test_command_bus_handles_async_commands(self):
         """Test that command bus can handle async commands."""
         from unittest.mock import patch
-        
+
         # Mock async handler
         async_handler = AsyncMock()
-        
+
         # Mock handler discovery
-        with patch('infrastructure.di.buses.get_command_handler_for_type') as mock_get_handler:
+        with patch("infrastructure.di.buses.get_command_handler_for_type") as mock_get_handler:
             mock_container = Mock()
             mock_container.get.return_value = async_handler
             mock_logger = Mock()
-            
+
             mock_get_handler.return_value = "CreateRequestHandler"
-            
+
             command_bus = CommandBus(container=mock_container, logger=mock_logger)
-            
+
             # Execute async command
             command = CreateRequestCommand(template_id="test-template", requested_count=2)
             await command_bus.execute(command)
-            
+
             # Verify async handler was called
             async_handler.handle.assert_called_once_with(command)
 
@@ -287,30 +293,38 @@ class TestQueryBusImplementation:
     async def test_query_bus_routes_to_correct_handler(self):
         """Test that query bus routes queries to correct handlers."""
         from unittest.mock import patch
-        
+
         # Mock handlers
         status_handler = AsyncMock()
         templates_handler = AsyncMock()
-        
+
         status_handler.handle.return_value = Mock()
         templates_handler.handle.return_value = []
-        
+
         # Mock handler discovery
-        with patch('infrastructure.di.buses.get_query_handler_for_type') as mock_get_handler:
+        with patch("infrastructure.di.buses.get_query_handler_for_type") as mock_get_handler:
             mock_container = Mock()
-            mock_container.get.side_effect = lambda cls: status_handler if cls == "GetRequestStatusHandler" else templates_handler
-            
-            mock_get_handler.side_effect = lambda query_type: "GetRequestStatusHandler" if query_type == GetRequestStatusQuery else "GetAvailableTemplatesHandler"
-            
+            mock_container.get.side_effect = (
+                lambda cls: status_handler
+                if cls == "GetRequestStatusHandler"
+                else templates_handler
+            )
+
+            mock_get_handler.side_effect = (
+                lambda query_type: "GetRequestStatusHandler"
+                if query_type == GetRequestStatusQuery
+                else "GetAvailableTemplatesHandler"
+            )
+
             query_bus = QueryBus(container=mock_container, logger=Mock())
-            
+
             # Execute queries
             status_query = GetRequestStatusQuery(request_id="test-request")
             templates_query = GetAvailableTemplatesQuery()
-            
+
             await query_bus.execute(status_query)
             await query_bus.execute(templates_query)
-            
+
             # Verify correct routing
             status_handler.handle.assert_called_once_with(status_query)
             templates_handler.handle.assert_called_once_with(templates_query)
@@ -319,29 +333,29 @@ class TestQueryBusImplementation:
     async def test_query_bus_supports_caching(self):
         """Test that query bus supports result caching through handlers."""
         from unittest.mock import patch
-        
+
         # Mock handler with caching capability
         cached_handler = AsyncMock()
         cached_result = Mock()
         cached_result.request_id = "test-request"
         cached_result.status = "PENDING"
         cached_handler.handle.return_value = cached_result
-        
+
         # Mock handler discovery
-        with patch('infrastructure.di.buses.get_query_handler_for_type') as mock_get_handler:
+        with patch("infrastructure.di.buses.get_query_handler_for_type") as mock_get_handler:
             mock_container = Mock()
             mock_container.get.return_value = cached_handler
             mock_logger = Mock()
-            
+
             mock_get_handler.return_value = "GetRequestStatusHandler"
-            
+
             query_bus = QueryBus(container=mock_container, logger=mock_logger)
-            
+
             # Execute same query twice
             query = GetRequestStatusQuery(request_id="test-request")
             result1 = await query_bus.execute(query)
             result2 = await query_bus.execute(query)
-            
+
             # Verify handler was called (caching is handler's responsibility)
             assert cached_handler.handle.call_count == 2
             assert result1 == cached_result
@@ -351,17 +365,17 @@ class TestQueryBusImplementation:
     async def test_query_bus_handles_query_parameters(self):
         """Test that query bus properly handles parameterized queries."""
         from unittest.mock import patch
-        
+
         handler = AsyncMock()
         handler.handle.return_value = []
-        
-        with patch('infrastructure.di.buses.get_query_handler_for_type') as mock_get_handler:
+
+        with patch("infrastructure.di.buses.get_query_handler_for_type") as mock_get_handler:
             mock_container = Mock()
             mock_container.get.return_value = handler
             mock_logger = Mock()
-            
+
             mock_get_handler.return_value = "GetMachinesByRequestHandler"
-            
+
             query_bus = QueryBus(container=mock_container, logger=mock_logger)
 
             # Parameterized query
@@ -417,16 +431,16 @@ class TestCommandHandlerImplementation:
         mock_repository = Mock()
         mock_uow.requests = mock_repository
         mock_repository.save.return_value = []
-        
+
         mock_uow_factory = Mock()
         mock_uow_factory.create_unit_of_work.return_value.__enter__ = Mock(return_value=mock_uow)
         mock_uow_factory.create_unit_of_work.return_value.__exit__ = Mock(return_value=False)
-        
+
         mock_logger = Mock()
         mock_container = Mock()
         mock_event_publisher = Mock()
         mock_error_handler = Mock()
-        
+
         mock_query_bus = AsyncMock()
         mock_provider_selection = Mock()
         mock_provider_capability = Mock()
@@ -446,9 +460,7 @@ class TestCommandHandlerImplementation:
         )
 
         # Valid command
-        valid_command = CreateRequestCommand(
-            template_id="test-template", requested_count=2
-        )
+        valid_command = CreateRequestCommand(template_id="test-template", requested_count=2)
 
         # Mock template exists
         mock_template = Mock()
@@ -456,18 +468,20 @@ class TestCommandHandlerImplementation:
         mock_template.provider_api = "RunInstances"
         mock_template.to_dict.return_value = {"template_id": "test-template"}
         mock_query_bus.execute.return_value = mock_template
-        
+
         mock_selection_result = Mock()
         mock_selection_result.provider_instance = "test-provider"
         mock_selection_result.provider_type = "aws"
         mock_selection_result.selection_reason = "test"
         mock_selection_result.confidence = 1.0
         mock_provider_selection.select_provider_for_template.return_value = mock_selection_result
-        
+
         mock_validation_result = Mock()
         mock_validation_result.is_valid = True
         mock_validation_result.supported_features = []
-        mock_provider_capability.validate_template_requirements.return_value = mock_validation_result
+        mock_provider_capability.validate_template_requirements.return_value = (
+            mock_validation_result
+        )
 
         # Should handle valid command
         result = await handler.handle(valid_command)
@@ -492,23 +506,23 @@ class TestCommandHandlerImplementation:
         mock_repository = Mock()
         mock_uow.requests = mock_repository
         mock_repository.save.return_value = []
-        
+
         mock_uow_factory = Mock()
         mock_uow_factory.create_unit_of_work.return_value.__enter__ = Mock(return_value=mock_uow)
         mock_uow_factory.create_unit_of_work.return_value.__exit__ = Mock(return_value=False)
-        
+
         mock_logger = Mock()
         mock_container = Mock()
         mock_event_publisher = Mock()
         mock_error_handler = Mock()
-        
+
         mock_query_bus = AsyncMock()
         mock_template = Mock()
         mock_template.template_id = "test-template"
         mock_template.provider_api = "RunInstances"
         mock_template.to_dict.return_value = {"template_id": "test-template"}
         mock_query_bus.execute.return_value = mock_template
-        
+
         mock_provider_selection = Mock()
         mock_selection_result = Mock()
         mock_selection_result.provider_instance = "test-provider"
@@ -516,13 +530,15 @@ class TestCommandHandlerImplementation:
         mock_selection_result.selection_reason = "test"
         mock_selection_result.confidence = 1.0
         mock_provider_selection.select_provider_for_template.return_value = mock_selection_result
-        
+
         mock_provider_capability = Mock()
         mock_validation_result = Mock()
         mock_validation_result.is_valid = True
         mock_validation_result.supported_features = []
-        mock_provider_capability.validate_template_requirements.return_value = mock_validation_result
-        
+        mock_provider_capability.validate_template_requirements.return_value = (
+            mock_validation_result
+        )
+
         mock_provider_port = Mock()
         mock_provider_port.available_strategies = ["test-strategy"]
 
@@ -553,16 +569,16 @@ class TestCommandHandlerImplementation:
         mock_repository = Mock()
         mock_uow.requests = mock_repository
         mock_repository.save.return_value = []
-        
+
         mock_uow_factory = Mock()
         mock_uow_factory.create_unit_of_work.return_value.__enter__ = Mock(return_value=mock_uow)
         mock_uow_factory.create_unit_of_work.return_value.__exit__ = Mock(return_value=False)
-        
+
         mock_logger = Mock()
         mock_container = Mock()
         mock_event_publisher = Mock()
         mock_error_handler = Mock()
-        
+
         mock_query_bus = AsyncMock()
         mock_provider_selection = Mock()
         mock_provider_capability = Mock()

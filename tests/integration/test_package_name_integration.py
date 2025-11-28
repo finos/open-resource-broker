@@ -20,11 +20,12 @@ class TestPackageNameIntegration:
     def test_end_to_end_package_name_flow(self):
         """Test complete package name flow from configuration to template rendering."""
         # Arrange - patch _package module attributes
-        with patch("_package.PACKAGE_NAME", "test-plugin"), \
-             patch("_package.__version__", "2.0.0"), \
-             patch("_package.DESCRIPTION", "Test plugin"), \
-             patch("_package.AUTHOR", "Test Author"):
-            
+        with (
+            patch("_package.PACKAGE_NAME", "test-plugin"),
+            patch("_package.__version__", "2.0.0"),
+            patch("_package.DESCRIPTION", "Test plugin"),
+            patch("_package.AUTHOR", "Test Author"),
+        ):
             # Act - get package info
             package_info = self.config_adapter.get_package_info()
 
@@ -35,10 +36,10 @@ class TestPackageNameIntegration:
     def test_package_name_fallback_integration(self):
         """Test that fallback works when package info is incomplete."""
         # Arrange - mock get_package_info to return empty dict (simulating missing data)
-        with patch.object(self.config_adapter, 'get_package_info', return_value={}):
+        with patch.object(self.config_adapter, "get_package_info", return_value={}):
             # Act - get package info
             package_info = self.config_adapter.get_package_info()
-            
+
             # Assert - verify fallback behavior
             # When package_info is empty, consumers should use fallback values
             assert package_info.get("version", "unknown") == "unknown"
@@ -46,11 +47,12 @@ class TestPackageNameIntegration:
 
     def test_native_spec_service_uses_package_info(self):
         """Test that native spec service correctly uses package info in context."""
-        with patch("_package.PACKAGE_NAME", "integration-test-plugin"), \
-             patch("_package.__version__", "3.0.0"), \
-             patch("_package.DESCRIPTION", "Test"), \
-             patch("_package.AUTHOR", "Test"):
-            
+        with (
+            patch("_package.PACKAGE_NAME", "integration-test-plugin"),
+            patch("_package.__version__", "3.0.0"),
+            patch("_package.DESCRIPTION", "Test"),
+            patch("_package.AUTHOR", "Test"),
+        ):
             # Mock native spec service
             mock_native_spec = Mock()
             aws_native_spec = AWSNativeSpecService(

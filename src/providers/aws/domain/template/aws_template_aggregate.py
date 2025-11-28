@@ -4,8 +4,8 @@ from typing import Any, Optional
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
-from domain.template.template_aggregate import Template
 from domain.base.value_objects import AllocationStrategy
+from domain.template.template_aggregate import Template
 from providers.aws.domain.template.value_objects import (
     AWSAllocationStrategy,
     AWSConfiguration,

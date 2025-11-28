@@ -37,7 +37,9 @@ class TestConfigDrivenProviderRegistration:
                 return_value=mock_config_manager,
             ),
             patch("providers.aws.registration.register_aws_provider") as mock_aws_register,
-            patch("infrastructure.registry.provider_registry.get_provider_registry") as mock_registry,
+            patch(
+                "infrastructure.registry.provider_registry.get_provider_registry"
+            ) as mock_registry,
             patch("infrastructure.di.provider_services.get_logger") as mock_logger,
         ):
             from infrastructure.di.provider_services import _register_providers
@@ -47,7 +49,7 @@ class TestConfigDrivenProviderRegistration:
 
             # Verify AWS provider was registered
             mock_aws_register.assert_called_once()
-            
+
             # Verify logging occurred
             mock_logger.return_value.info.assert_called()
 
@@ -142,7 +144,9 @@ class TestConfigDrivenProviderRegistration:
                 return_value=mock_config_manager,
             ),
             patch("providers.aws.registration.register_aws_provider") as mock_aws_register,
-            patch("infrastructure.registry.provider_registry.get_provider_registry") as mock_registry,
+            patch(
+                "infrastructure.registry.provider_registry.get_provider_registry"
+            ) as mock_registry,
             patch("infrastructure.logging.logger.get_logger"),
         ):
             from infrastructure.di.provider_services import _register_providers

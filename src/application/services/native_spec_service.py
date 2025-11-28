@@ -25,7 +25,7 @@ class NativeSpecService:
             config = self.config_port.get_native_spec_config() or {}
             enabled = config.get("enabled")
             return bool(enabled) if isinstance(enabled, bool) else False
-        except Exception as exc:
+        except Exception:
             # Surface unexpected config errors to callers
             raise
 

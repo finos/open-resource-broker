@@ -94,7 +94,7 @@ class TestDockerCompose:
     def test_docker_compose_prod_service_configuration(self, project_root):
         """Test production Docker Compose service configuration."""
         compose_path = project_root / "deployment" / "docker" / "docker-compose.prod.yml"
-        
+
         if not compose_path.exists():
             pytest.skip("docker-compose.prod.yml not found")
 
@@ -131,7 +131,7 @@ class TestDockerCompose:
     def test_docker_compose_volumes_configuration(self, project_root):
         """Test Docker Compose volumes configuration."""
         compose_path = project_root / "deployment" / "docker" / "docker-compose.yml"
-        
+
         if not compose_path.exists():
             pytest.skip("docker-compose.yml not found")
 
@@ -151,7 +151,7 @@ class TestDockerCompose:
     def test_docker_compose_networks_configuration(self, project_root):
         """Test Docker Compose networks configuration."""
         compose_path = project_root / "deployment" / "docker" / "docker-compose.yml"
-        
+
         if not compose_path.exists():
             pytest.skip("docker-compose.yml not found")
 
@@ -168,7 +168,7 @@ class TestDockerCompose:
     def test_docker_compose_optional_services(self, project_root):
         """Test Docker Compose optional services configuration."""
         compose_path = project_root / "deployment" / "docker" / "docker-compose.yml"
-        
+
         if not compose_path.exists():
             pytest.skip("docker-compose.yml not found")
 
@@ -240,7 +240,7 @@ class TestDockerCompose:
     def test_docker_compose_service_dependencies(self, project_root):
         """Test Docker Compose service dependencies."""
         compose_path = project_root / "deployment" / "docker" / "docker-compose.yml"
-        
+
         if not compose_path.exists():
             pytest.skip("docker-compose.yml not found")
 
@@ -259,7 +259,7 @@ class TestDockerCompose:
         """Test that .env.example is compatible with Docker Compose."""
         env_example_path = project_root / ".env.example"
         compose_path = project_root / "deployment" / "docker" / "docker-compose.yml"
-        
+
         if not compose_path.exists():
             pytest.skip("docker-compose.yml not found")
 

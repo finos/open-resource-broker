@@ -5,8 +5,8 @@ from datetime import datetime, timezone
 import pytest
 
 from src.domain.base.value_objects import InstanceType as _InstanceType
-from src.domain.template.template_aggregate import Template as _Template
 from src.domain.template.exceptions import TemplateNotFoundError, TemplateValidationError
+from src.domain.template.template_aggregate import Template as _Template
 
 
 # Wrapper to allow positional argument for InstanceType
@@ -19,10 +19,10 @@ def InstanceType(value):
 class _InstanceTypeWrapper:
     def __init__(self, value):
         self.value = value
-    
+
     def __str__(self):
         return self.value
-    
+
     def __eq__(self, other):
         if isinstance(other, _InstanceTypeWrapper):
             return self.value == other.value
@@ -35,32 +35,32 @@ class Template(_Template):
 
     def __init__(self, **data):
         # Map 'id' to 'template_id'
-        if 'id' in data:
-            data['template_id'] = data.pop('id')
-        
+        if "id" in data:
+            data["template_id"] = data.pop("id")
+
         # Convert InstanceType object to string
-        if 'instance_type' in data and isinstance(data['instance_type'], _InstanceType):
-            data['instance_type'] = data['instance_type'].value
-        
+        if "instance_type" in data and isinstance(data["instance_type"], _InstanceType):
+            data["instance_type"] = data["instance_type"].value
+
         super().__init__(**data)
-    
+
     @property
     def id(self):
         """Provide 'id' property for backward compatibility."""
         return self.template_id
-    
+
     def __getattribute__(self, name):
         """Override to wrap instance_type with .value attribute."""
-        if name == 'instance_type':
+        if name == "instance_type":
             value = super().__getattribute__(name)
             if value is not None and not isinstance(value, _InstanceTypeWrapper):
                 return _InstanceTypeWrapper(value)
             return value
         return super().__getattribute__(name)
-    
+
     def __setattr__(self, name, value):
         """Override to handle instance_type assignment."""
-        if name == 'instance_type':
+        if name == "instance_type":
             if isinstance(value, _InstanceType):
                 value = value.value
             elif isinstance(value, _InstanceTypeWrapper):

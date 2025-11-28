@@ -69,7 +69,7 @@ class TestCQRSArchitectureIntegration:
     def mock_query_bus(self):
         """Create mock query bus."""
         from unittest.mock import AsyncMock
-        
+
         bus = Mock(spec=QueryBus)
 
         # Mock template query response
@@ -277,6 +277,7 @@ class TestCQRSArchitectureIntegration:
     async def test_provider_context_integration(self, mock_provider_context):
         """Test provider context integration."""
         from unittest.mock import AsyncMock
+
         from providers.base.strategy import ProviderOperation, ProviderOperationType
         from providers.base.strategy.provider_strategy import ProviderResult
 

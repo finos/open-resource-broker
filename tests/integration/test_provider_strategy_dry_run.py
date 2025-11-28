@@ -1,7 +1,8 @@
 """Integration tests for provider strategy dry-run functionality."""
 
-import pytest
 from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 from providers.aws.configuration.config import AWSProviderConfig
 from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy

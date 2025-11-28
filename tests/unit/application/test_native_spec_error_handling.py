@@ -20,7 +20,9 @@ class TestNativeSpecErrorHandling:
         self.mock_spec_renderer = Mock(spec=SpecRenderingPort)
         self.mock_logger = Mock(spec=LoggingPort)
         self.service = NativeSpecService(
-            config_port=self.mock_config_port, spec_renderer=self.mock_spec_renderer, logger=self.mock_logger
+            config_port=self.mock_config_port,
+            spec_renderer=self.mock_spec_renderer,
+            logger=self.mock_logger,
         )
 
     def test_native_spec_disabled(self):

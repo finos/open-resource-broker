@@ -12,32 +12,33 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from domain.base.dependency_injection import injectable
 from domain.base.ports import LoggingPort
+
 # Import AWS-specific components
 from providers.aws.configuration.config import AWSProviderConfig
 from providers.aws.domain.template.value_objects import ProviderApi
-from providers.aws.infrastructure.adapters.machine_adapter import \
-    AWSMachineAdapter
+from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from providers.aws.infrastructure.aws_client import AWSClient
 from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
-from providers.aws.infrastructure.handlers.ec2_fleet_handler import \
-    EC2FleetHandler
-from providers.aws.infrastructure.handlers.run_instances_handler import \
-    RunInstancesHandler
-from providers.aws.infrastructure.handlers.spot_fleet_handler import \
-    SpotFleetHandler
-from providers.aws.infrastructure.launch_template.manager import \
-    AWSLaunchTemplateManager
+from providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHandler
+from providers.aws.infrastructure.handlers.run_instances_handler import RunInstancesHandler
+from providers.aws.infrastructure.handlers.spot_fleet_handler import SpotFleetHandler
+from providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
 from providers.aws.managers.aws_resource_manager import AWSResourceManager
 
 if TYPE_CHECKING:
-    from providers.aws.infrastructure.adapters.aws_provisioning_adapter import \
-        AWSProvisioningAdapter
+    from providers.aws.infrastructure.adapters.aws_provisioning_adapter import (
+        AWSProvisioningAdapter,
+    )
 
 # Import strategy pattern interfaces
-from providers.base.strategy import (ProviderCapabilities,
-                                     ProviderHealthStatus, ProviderOperation,
-                                     ProviderOperationType, ProviderResult,
-                                     ProviderStrategy)
+from providers.base.strategy import (
+    ProviderCapabilities,
+    ProviderHealthStatus,
+    ProviderOperation,
+    ProviderOperationType,
+    ProviderResult,
+    ProviderStrategy,
+)
 
 
 @injectable
@@ -255,8 +256,7 @@ class AWSProviderStrategy(ProviderStrategy):
 
         try:
             # Import dry-run context here to avoid circular imports
-            from providers.aws.infrastructure.dry_run_adapter import \
-                aws_dry_run_context
+            from providers.aws.infrastructure.dry_run_adapter import aws_dry_run_context
 
             # Execute operation within appropriate context
             if is_dry_run:
@@ -358,8 +358,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             # Convert template_config to AWSTemplate domain object
-            from providers.aws.domain.template.aws_template_aggregate import \
-                AWSTemplate
+            from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
             # Extract metadata for additional fields
             metadata = template_config.get("metadata", {})
@@ -990,8 +989,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             # Check if we're in dry-run mode
-            from infrastructure.mocking.dry_run_context import \
-                is_dry_run_active
+            from infrastructure.mocking.dry_run_context import is_dry_run_active
 
             if is_dry_run_active():
                 # In dry-run mode, return a healthy status without making real AWS calls
@@ -1005,8 +1003,7 @@ class AWSProviderStrategy(ProviderStrategy):
             # This is a lightweight operation to verify AWS access
             try:
                 # Import dry-run context here to avoid circular imports
-                from providers.aws.infrastructure.dry_run_adapter import \
-                    aws_dry_run_context
+                from providers.aws.infrastructure.dry_run_adapter import aws_dry_run_context
 
                 with aws_dry_run_context():
                     # Simple STS call to verify credentials and connectivity
@@ -1081,8 +1078,7 @@ class AWSProviderStrategy(ProviderStrategy):
         """Get available AWS templates using scheduler strategy."""
         try:
             # Use scheduler strategy to load templates from configuration
-            from infrastructure.registry.scheduler_registry import \
-                get_scheduler_registry
+            from infrastructure.registry.scheduler_registry import get_scheduler_registry
 
             scheduler_registry = get_scheduler_registry()
             scheduler_strategy = scheduler_registry.get_active_strategy()

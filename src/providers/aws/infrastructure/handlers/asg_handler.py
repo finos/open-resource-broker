@@ -31,22 +31,17 @@ from typing import Any, Optional
 from domain.base.dependency_injection import injectable
 from domain.base.ports import LoggingPort
 from domain.request.aggregate import Request
-from infrastructure.adapters.ports.request_adapter_port import \
-    RequestAdapterPort
+from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from infrastructure.error.decorators import handle_infrastructure_exceptions
 from infrastructure.utilities.common.resource_naming import get_resource_prefix
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
-from providers.aws.infrastructure.adapters.machine_adapter import \
-    AWSMachineAdapter
+from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from providers.aws.infrastructure.aws_client import AWSClient
-from providers.aws.infrastructure.handlers.base_context_mixin import \
-    BaseContextMixin
+from providers.aws.infrastructure.handlers.base_context_mixin import BaseContextMixin
 from providers.aws.infrastructure.handlers.base_handler import AWSHandler
-from providers.aws.infrastructure.handlers.fleet_grouping_mixin import \
-    FleetGroupingMixin
-from providers.aws.infrastructure.launch_template.manager import \
-    AWSLaunchTemplateManager
+from providers.aws.infrastructure.handlers.fleet_grouping_mixin import FleetGroupingMixin
+from providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
 from providers.aws.utilities.aws_operations import AWSOperations
 
 
@@ -88,8 +83,9 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
         container = get_container()
         try:
-            from providers.aws.infrastructure.services.aws_native_spec_service import \
-                AWSNativeSpecService
+            from providers.aws.infrastructure.services.aws_native_spec_service import (
+                AWSNativeSpecService,
+            )
 
             self.aws_native_spec_service = container.get(AWSNativeSpecService)
             # Get config port for package info
@@ -98,8 +94,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             self.config_port = container.get(ConfigurationPort)
 
             if self._machine_adapter is None:
-                from providers.aws.infrastructure.adapters.machine_adapter import \
-                    AWSMachineAdapter
+                from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 
                 self._machine_adapter = container.get(AWSMachineAdapter)
         except Exception:
@@ -408,31 +403,30 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     "Overrides": [{"InstanceRequirements": instance_requirements_payload}],
                 }
             }
-        else:
-            # Otherwise, emit explicit instance type overrides when we have a type map
-            if instance_types_map:
-                overrides = []
-                for itype, weight in instance_types_map.items():
-                    override = {"InstanceType": itype}
-                    if weight:
-                        override["WeightedCapacity"] = str(weight)
-                    overrides.append(override)
+        # Otherwise, emit explicit instance type overrides when we have a type map
+        elif instance_types_map:
+            overrides = []
+            for itype, weight in instance_types_map.items():
+                override = {"InstanceType": itype}
+                if weight:
+                    override["WeightedCapacity"] = str(weight)
+                overrides.append(override)
 
-                asg_config["MixedInstancesPolicy"] = {
-                    "LaunchTemplate": {
-                        "LaunchTemplateSpecification": {
-                            "LaunchTemplateId": launch_template_id,
-                            "Version": launch_template_version,
-                        },
-                        "Overrides": overrides,
-                    }
+            asg_config["MixedInstancesPolicy"] = {
+                "LaunchTemplate": {
+                    "LaunchTemplateSpecification": {
+                        "LaunchTemplateId": launch_template_id,
+                        "Version": launch_template_version,
+                    },
+                    "Overrides": overrides,
                 }
-            else:
-                # Fallback: single instance type (or none) uses plain launch template
-                asg_config["LaunchTemplate"] = {
-                    "LaunchTemplateId": launch_template_id,
-                    "Version": launch_template_version,
-                }
+            }
+        else:
+            # Fallback: single instance type (or none) uses plain launch template
+            asg_config["LaunchTemplate"] = {
+                "LaunchTemplateId": launch_template_id,
+                "Version": launch_template_version,
+            }
 
         # Add spot/on-demand distribution when spot pricing or mixed capacity requested
         price_type = getattr(aws_template, "price_type", "ondemand") or "ondemand"
@@ -454,9 +448,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     }
                 }
 
-            ondemand_pct = (
-                int(percent_on_demand) if percent_on_demand is not None else 0
-            )
+            ondemand_pct = int(percent_on_demand) if percent_on_demand is not None else 0
             asg_config["MixedInstancesPolicy"]["InstancesDistribution"] = {
                 "OnDemandBaseCapacity": 0,
                 "OnDemandPercentageAboveBaseCapacity": ondemand_pct,
