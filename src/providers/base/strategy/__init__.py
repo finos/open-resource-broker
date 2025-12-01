@@ -74,7 +74,7 @@ from .load_balancing_strategy import (
 )
 
 # Strategy context and management
-from .provider_context import ProviderContext, StrategyMetrics
+from .provider_context import ProviderContext
 
 # Strategy selection algorithms
 from .provider_selector import (
@@ -136,7 +136,6 @@ __all__: list[str] = [
     "SelectionResult",
     "SelectorFactory",
     "StrategyExecutionResult",
-    "StrategyMetrics",
     "StrategyStats",
 ]
 

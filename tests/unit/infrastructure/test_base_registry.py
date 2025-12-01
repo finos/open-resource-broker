@@ -35,8 +35,7 @@ class TestSchedulerRegistry:
         """Set up test fixtures."""
         self.registry = SchedulerRegistry()
         # Clear any existing registrations
-        with self.registry._registry_lock:
-            self.registry._registrations.clear()
+        self.registry.clear_registrations()
 
     def test_scheduler_registry_singleton(self):
         """Test scheduler registry singleton behavior."""

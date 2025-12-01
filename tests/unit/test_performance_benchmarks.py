@@ -13,7 +13,7 @@ import pytest
 # Import components for performance testing
 try:
     from domain.request.aggregate import Request
-    from domain.template.aggregate import Template
+    from domain.template.template_aggregate import Template
     from infrastructure.persistence.repositories.request_repository import (
         RequestRepository,
     )

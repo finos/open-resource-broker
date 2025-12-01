@@ -83,6 +83,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
             # Update machine status if needed
             machine_objects_from_provider = []
+            provider_metadata = {}
             if not machine_obj_from_db and request.resource_ids:
                 self.logger.info(
                     "DEBUG: No machines in storage but have resource IDs %s, checking provider",
@@ -90,9 +91,10 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 )
                 # No machines in storage but we have resource IDs - check provider and
                 # create machines
-                machine_objects_from_provider = await self._check_provider_and_create_machines(
-                    request
-                )
+                (
+                    machine_objects_from_provider,
+                    provider_metadata,
+                ) = await self._check_provider_and_create_machines(request)
                 self.logger.info(
                     "DEBUG: Provider check returned %s machines", len(machine_obj_from_db)
                 )
@@ -101,9 +103,10 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     "DEBUG: Have %s machines, updating status from AWS", len(machine_obj_from_db)
                 )
                 # We have machines - update their status from AWS
-                machine_objects_from_provider = await self._update_machine_status_from_aws(
-                    machine_obj_from_db
-                )
+                (
+                    machine_objects_from_provider,
+                    provider_metadata,
+                ) = await self._update_machine_status_from_aws(machine_obj_from_db, request)
             else:
                 self.logger.info(
                     "DEBUG: No machines and no resource IDs for request %s",
@@ -114,7 +117,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
             # Determine if request status needs updating based on machine states
             new_status, status_message = self._determine_request_status_from_machines(
-                machine_obj_from_db, machine_objects_from_provider, request
+                machine_obj_from_db, machine_objects_from_provider, request, provider_metadata
             )
 
             # Update request status if needed
@@ -186,14 +189,14 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             )
             return []
 
-    async def _check_provider_and_create_machines(self, request) -> list:
+    async def _check_provider_and_create_machines(self, request) -> tuple[list, dict]:
         """Check provider status and create machine aggregates using provider strategy pattern."""
         try:
             # Get provider context from container
             provider_context = self._get_provider_context()
             if not provider_context:
                 self.logger.error("Provider context not available")
-                return []
+                return [], {}
 
             # Create operation for resource-to-instance discovery using stored
             # provider API
@@ -234,7 +237,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     "Failed to discover instances from resources: %s",
                     result.error_message,
                 )
-                return []
+                return [], result.metadata or {}
 
             # Get instance details from result
             instance_details = result.data.get("instances", [])
@@ -243,7 +246,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 instance_details = await instance_details
             if not instance_details:
                 self.logger.info("No instances found for request %s", request.request_id)
-                return []
+                return [], result.metadata or {}
 
             # Create machine aggregates from instance details
             machines = []
@@ -272,29 +275,32 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     request.request_id,
                 )
 
-            return machines
+            return machines, result.metadata or {}
 
         except Exception as e:
             self.logger.exception(
                 "Failed to check provider and create machines: %s", e, exc_info=True
             )
-            return []
+            return [], {}
 
-    async def _update_machine_status_from_aws(self, machines: list) -> list:
+    async def _update_machine_status_from_aws(
+        self, machines: list, request=None
+    ) -> tuple[list, dict]:
         """Update machine status from AWS using existing handler methods."""
         try:
             # Group machines by request to use existing check_hosts_status methods
             if not machines:
-                return []
+                return [], {}
 
             # Get the request for the first machine (all should be same request)
-            request_id = str(machines[0].request_id)
-            with self.uow_factory.create_unit_of_work() as uow:
-                from domain.request.value_objects import RequestId
+            if not request:
+                request_id = str(machines[0].request_id)
+                with self.uow_factory.create_unit_of_work() as uow:
+                    from domain.request.value_objects import RequestId
 
-                request = uow.requests.get_by_id(RequestId(value=request_id))
-                if not request:
-                    return machines
+                    request = uow.requests.get_by_id(RequestId(value=request_id))
+                    if not request:
+                        return machines, {}
 
             # Get provider context and check AWS status
             provider_context = self._get_provider_context()
@@ -322,7 +328,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             result = await provider_context.execute_with_strategy(strategy_identifier, operation)
             if not result.success:
                 self.logger.warning("Failed to check resource status: %s", result.error_message)
-                return machines
+                return machines, {}
 
             # Extract domain machine entities from result (provider strategy already
             # converted AWS data)
@@ -385,11 +391,32 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             if request.metadata.get("provider_api") == "ASG":
                 await self._update_asg_metadata_if_needed(request, updated_machines)
 
-            return updated_machines
+            # Fetch capacity metadata (fleet/ASG) via describe operation when resource_ids exist
+            provider_metadata: dict = {}
+            if request.resource_ids:
+                try:
+                    describe_op = ProviderOperation(
+                        operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
+                        parameters={
+                            "resource_ids": request.resource_ids,
+                            "provider_api": request.metadata.get("provider_api"),
+                            "template_id": request.template_id,
+                        },
+                        context={"correlation_id": str(request.request_id)},
+                    )
+                    describe_result = await provider_context.execute_with_strategy(
+                        strategy_identifier, describe_op
+                    )
+                    if describe_result.success and describe_result.metadata:
+                        provider_metadata = describe_result.metadata
+                except Exception as e:
+                    self.logger.warning("Failed to fetch capacity metadata: %s", e)
+
+            return updated_machines, provider_metadata
 
         except Exception as e:
             self.logger.warning("Failed to update machine status from AWS: %s", e)
-            return machines
+            return machines, {}
 
     async def _update_asg_metadata_if_needed(self, request, machines):
         """Update ASG-specific metadata when capacity changes are detected."""
@@ -589,9 +616,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
                     return self.container.get(RunInstancesHandler)
                 else:
-                    from providers.aws.infrastructure.handlers.asg_handler import (
-                        ASGHandler,
-                    )
+                    from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
 
                     return self.container.get(ASGHandler)
 
@@ -751,19 +776,20 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             return NoOpEventPublisher()
 
     def _determine_request_status_from_machines(
-        self, machine_objects_from_database: list, machine_objects_from_provider: list, request
+        self,
+        machine_objects_from_database: list,
+        machine_objects_from_provider: list,
+        request,
+        provider_metadata: dict | None = None,
     ) -> tuple[str, str]:
         """
-        Compare machine objects from database and provider to determine if request status needs updating.
-        Handles both ACQUIRE and RETURN request types with different logic.
-
-        Args:
-            machine_objects_from_database: List of machine objects from local database
-            machine_objects_from_provider: List of machine objects from cloud provider
-            request: The request object containing requested_count, current status, and request_type
-
-        Returns:
-            Tuple of (new_status, status_message) or (None, None) if no change needed
+        KBG: TODO this function need to be simplified, DB status is not so important when we get fulfillment information from provider API.
+        Derive status/message from machines and provider metadata for all AWS handlers.
+        ACQUIRE: uses capacity when available (fleet_capacity_fulfilment for EC2/Spot Fleet/ASG);
+           RunInstances falls back to running/pending counts. Handles complete, partial, failed, in-progress, timeout.
+        RETURN: checks termination/shutdown vs running/failed to decide completed, in-progress, or failed.
+        provider_metadata differences: EC2/Spot Fleet/ASG report target_capacity_units/fulfilled_capacity_units/provisioned_instance_count/state (fleet_capacity_fulfilment); others rely solely on instance counts.
+        Per handler: EC2/Spot Fleet/ASG use fleet_capacity_fulfilment target_capacity_units vs fulfilled_capacity_units; RunInstances uses only running/pending vs requested_count. RETURN logic ignores capacity and uses termination/shutdown states.
         """
         from domain.machine.machine_status import MachineStatus
         from domain.request.request_types import RequestStatus, RequestType
@@ -772,6 +798,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             requested_count = request.requested_count
             current_status = request.status
             request_type = request.request_type
+            provider_metadata = provider_metadata or {}
 
             # Count machines by status from provider data (most up-to-date)
             provider_machine_count = len(machine_objects_from_provider)
@@ -814,6 +841,16 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 shutting_down_count,
             )
 
+            # Capacity info from provider metadata (e.g., fleets/ASGs)
+            fleet_capacity_fulfilment = provider_metadata.get("fleet_capacity_fulfilment") or {}
+            providers_target_capacity_units = fleet_capacity_fulfilment.get(
+                "target_capacity_units", None
+            )
+            providers_fulfilled_capacity_units = fleet_capacity_fulfilment.get(
+                "fulfilled_capacity_units", None
+            )
+            providers_capacity_state = fleet_capacity_fulfilment.get("state", None)
+
             # Determine new status based on request type and machine states
             new_status = None
             status_message = None
@@ -854,35 +891,49 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                         status_message = f"Return request failed: {failed_count} machines failed to terminate properly (total in DB: {database_machine_count})"
 
             elif request_type == RequestType.ACQUIRE:
-                # ACQUIRE REQUEST LOGIC (original logic)
+                # ACQUIRE REQUEST LOGIC (capacity-aware)
 
-                # Case 1: All requested machines are running successfully
-                if running_count == requested_count and failed_count == 0:
+                # Use capacity metrics when available (fleets/ASGs), otherwise fall back to instance counts.
+                effective_target = providers_target_capacity_units or requested_count
+                effective_fulfilled = (
+                    providers_fulfilled_capacity_units
+                    if providers_fulfilled_capacity_units is not None
+                    else running_count + pending_count
+                )
+
+                # Case 1: Target capacity reached
+                if effective_fulfilled >= effective_target and failed_count == 0:
                     if current_status != RequestStatus.COMPLETED:
                         new_status = RequestStatus.COMPLETED.value
-                        status_message = f"All {requested_count} machines are running successfully (total in DB: {database_machine_count})"
+                        status_message = (
+                            f"Capacity fulfilled ({effective_fulfilled}/{effective_target}); "
+                            f"state={providers_capacity_state or 'n/a'}; running={running_count}, pending={pending_count}"
+                        )
 
-                # Case 2: Some machines running, some failed (partial success)
+                # Case 2: Partial success with failures
                 elif (
                     running_count > 0
                     and failed_count > 0
-                    and (running_count + failed_count) >= requested_count
+                    and (running_count + failed_count) >= effective_target
                 ):
                     if current_status != RequestStatus.PARTIAL:
                         new_status = RequestStatus.PARTIAL.value
-                        status_message = f"Partial success: {running_count}/{requested_count} machines running, {failed_count} failed (total in DB: {database_machine_count})"
+                        status_message = f"Partial success: {running_count}/{effective_target} running, {failed_count} failed (provider total {provider_machine_count})"
 
                 # Case 3: All machines failed
-                elif failed_count >= requested_count and running_count == 0:
+                elif failed_count >= effective_target and running_count == 0:
                     if current_status != RequestStatus.FAILED:
                         new_status = RequestStatus.FAILED.value
-                        status_message = f"All {requested_count} machines failed to start (total in DB: {database_machine_count})"
+                        status_message = f"All {effective_target} machines failed to start (total in DB: {database_machine_count})"
 
-                # Case 4: Still have pending machines (in progress)
-                elif pending_count > 0 and failed_count < requested_count:
+                # Case 4: Still progressing toward capacity
+                elif effective_fulfilled < effective_target and failed_count < effective_target:
                     if current_status not in [RequestStatus.IN_PROGRESS, RequestStatus.PENDING]:
                         new_status = RequestStatus.IN_PROGRESS.value
-                        status_message = f"Processing: {running_count} running, {pending_count} pending, {failed_count} failed (total in DB: {database_machine_count})"
+                        status_message = (
+                            f"Processing: fulfilled={effective_fulfilled}/{effective_target}, "
+                            f"running={running_count}, pending={pending_count}, failed={failed_count}"
+                        )
 
                 # Case 5: No machines found but request expects them (potential timeout or provider issue)
                 elif provider_machine_count == 0 and requested_count > 0:
@@ -890,9 +941,14 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                         request, "created_at"
                     ):
                         # Check if request has been in progress too long (e.g., 30 minutes)
-                        from datetime import datetime, timedelta
+                        from datetime import datetime, timedelta, timezone
 
-                        time_elapsed = datetime.utcnow() - request.created_at
+                        created_at = (
+                            request.created_at
+                            if request.created_at.tzinfo
+                            else request.created_at.replace(tzinfo=timezone.utc)
+                        )
+                        time_elapsed = datetime.now(timezone.utc) - created_at
                         if time_elapsed > timedelta(minutes=30):
                             new_status = RequestStatus.TIMEOUT.value
                             status_message = f"Request timed out - no machines found after 30 minutes (total in DB: {database_machine_count})"
@@ -1074,9 +1130,7 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, Template]):
 
     async def execute_query(self, query: GetTemplateQuery) -> Template:
         """Execute get template query."""
-        from infrastructure.template.configuration_manager import (
-            TemplateConfigurationManager,
-        )
+        from infrastructure.template.configuration_manager import TemplateConfigurationManager
 
         self.logger.info("Getting template: %s", query.template_id)
 
@@ -1150,9 +1204,7 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[Template]])
 
     async def execute_query(self, query: ListTemplatesQuery) -> list[Template]:
         """Execute list templates query."""
-        from infrastructure.template.configuration_manager import (
-            TemplateConfigurationManager,
-        )
+        from infrastructure.template.configuration_manager import TemplateConfigurationManager
 
         self.logger.info("Listing templates")
 
@@ -1232,9 +1284,7 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
 
         try:
             # Get template configuration port for validation
-            from domain.base.ports.template_configuration_port import (
-                TemplateConfigurationPort,
-            )
+            from domain.base.ports.template_configuration_port import TemplateConfigurationPort
 
             template_port = self.container.get(TemplateConfigurationPort)
 

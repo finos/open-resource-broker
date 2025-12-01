@@ -169,7 +169,7 @@ class TestCleanArchitecture:
         from domain.base import entity
         from domain.machine import aggregate as machine_agg
         from domain.request import aggregate as request_agg
-        from domain.template import aggregate
+        from domain.template import template_aggregate as aggregate
 
         # Domain modules should not have infrastructure dependencies
         domain_modules = [entity, aggregate, request_agg, machine_agg]

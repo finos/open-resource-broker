@@ -24,11 +24,9 @@
       "userDataScript": "{{userDataScript}}"
     },
     {
-      "templateId": "EC2FleetMaintain",
+      "templateId": "ASG",
       "providerApi": "{{providerApi}}",
-      "fleetType": "{{fleetType}}",
       "priceType": "{{priceType}}",
-      "percentOnDemand": "{{percentOnDemand}}",
       "maxNumber": 2,
       "attributes": {
         "type": ["String", "X86_64"],
@@ -39,27 +37,11 @@
       "imageId": "{{imageId}}",
       "subnetId": "{{subnetId}}",
       "vmType": "t2.micro",
-      "keyName": "HF_SSH_KEY",
-      "securityGroupIds": "{{securityGroupIds}}"
-    },
-    {
-      "templateId": "EC2FleetRequest",
-      "providerApi": "{{providerApi}}",
-      "fleetType": "{{fleetType}}",
-      "priceType": "{{priceType}}",
-      "percentOnDemand": "{{percentOnDemand}}",
-      "maxNumber": 2,
-      "attributes": {
-        "type": ["String", "X86_64"],
-        "ncores": ["Numeric", "2"],
-        "ncpus": ["Numeric", "1"],
-        "nram": ["Numeric", "4096"]
-      },
-      "imageId": "{{imageId}}",
-      "subnetId": "{{subnetId}}",
-      "vmType": "t2.micro",
-      "keyName": "HF_SSH_KEY",
-      "securityGroupIds": "{{securityGroupIds}}"
+      "rootDeviceVolumeSize": 100,
+      "volumeType": "gp2",
+      "securityGroupIds": "{{securityGroupIds}}",
+      "instanceProfile": "{{instanceProfile}}",
+      "userDataScript": "{{userDataScript}}"
     }
   ]
 }

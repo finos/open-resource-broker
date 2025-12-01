@@ -127,7 +127,7 @@ class TestOCPComplianceIntegration:
 
     def test_template_services_integration(self):
         """Test template services integration with registry."""
-        from domain.template.aggregate import Template
+        from domain.template.template_aggregate import Template
         from domain.template.value_objects import TemplateId
         from infrastructure.template.template_resolver_service import (
             TemplateResolverService,

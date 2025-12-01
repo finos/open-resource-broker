@@ -282,8 +282,10 @@ class TestLoggingFixes:
             # Call batch resolution
             result = template_manager._batch_resolve_amis(template_dicts)
 
-            # Verify batch resolution log was called
-            logger.info.assert_called_with("Batch resolved 1 unique SSM parameters for 2 templates")
+            # Verify batch resolution log was called with format arguments
+            logger.info.assert_called_with(
+                "Batch resolved %s unique SSM parameters for %s templates", 1, 2
+            )
 
             # Verify templates were processed correctly
             assert len(result) == 2

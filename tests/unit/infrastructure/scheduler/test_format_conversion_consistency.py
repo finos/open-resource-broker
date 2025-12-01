@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 from domain.base.ports import SchedulerPort
+from domain.template import Template
 from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
 
@@ -17,32 +18,35 @@ class TestFormatConversionConsistency:
 
         # Create scheduler strategies
         self.default_strategy = DefaultSchedulerStrategy(self.config_manager, self.logger)
-        self.symphony_strategy = HostFactorySchedulerStrategy(self.config_manager, self.logger)
+
+        # Mock the container to avoid DI issues
+        mock_container = MagicMock()
+        mock_provider_service = MagicMock()
+        mock_container.get.return_value = mock_provider_service
+
+        with patch("infrastructure.di.container.get_container", return_value=mock_container):
+            self.symphony_strategy = HostFactorySchedulerStrategy(self.config_manager, self.logger)
 
         # Sample data for testing
         self.sample_templates = [
-            {
-                "id": "template1",
-                "name": "Template 1",
-                "description": "Test template 1",
-                "provider_api": "aws",
-                "instance_type": "t2.micro",
-                "image_id": "ami-12345",
-                "subnet_ids": ["subnet-1", "subnet-2"],
-                "security_group_ids": ["sg-1", "sg-2"],
-                "tags": {"Name": "Test", "Environment": "Dev"},
-            },
-            {
-                "id": "template2",
-                "name": "Template 2",
-                "description": "Test template 2",
-                "provider_api": "aws",
-                "instance_type": "t2.small",
-                "image_id": "ami-67890",
-                "subnet_ids": ["subnet-3"],
-                "security_group_ids": ["sg-3"],
-                "tags": {"Name": "Test2", "Environment": "Prod"},
-            },
+            Template(
+                template_id="template1",
+                name="Template 1",
+                description="Test template 1",
+                instance_type="t2.micro",
+                image_id="ami-12345",
+                subnet_ids=["subnet-1", "subnet-2"],
+                security_group_ids=["sg-1", "sg-2"],
+            ),
+            Template(
+                template_id="template2",
+                name="Template 2",
+                description="Test template 2",
+                instance_type="t2.small",
+                image_id="ami-67890",
+                subnet_ids=["subnet-3"],
+                security_group_ids=["sg-3"],
+            ),
         ]
 
         self.sample_request = {
@@ -84,7 +88,7 @@ class TestFormatConversionConsistency:
             assert set(default_template.keys()) == set(symphony_template.keys())
 
             # Check that both strategies include the required fields
-            required_fields = ["id", "name", "description", "provider_api"]
+            required_fields = ["template_id", "name", "description"]
             for field in required_fields:
                 assert field in default_template
                 assert field in symphony_template

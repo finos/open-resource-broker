@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from api.server import create_fastapi_app
 from config.schemas.server_schema import AuthConfig, ServerConfig
-from infrastructure.auth.strategies import BearerTokenStrategy
+from infrastructure.auth.strategy.bearer_token_strategy import BearerTokenStrategy
 
 
 class TestAuthenticationSecurity:

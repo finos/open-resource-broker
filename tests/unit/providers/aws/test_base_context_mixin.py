@@ -2,9 +2,8 @@
 
 from unittest.mock import Mock, patch
 
-from providers.aws.domain.template.aggregate import AWSTemplate
-
 from domain.request.aggregate import Request
+from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.infrastructure.handlers.base_context_mixin import BaseContextMixin
 
 

@@ -1,6 +1,6 @@
 """Tests for scheduler native spec parsing."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 
 class TestSchedulerNativeSpecParsing:
@@ -14,10 +14,10 @@ class TestSchedulerNativeSpecParsing:
         )
 
         # Mock the dependencies to avoid DI container issues
-        with patch(
-            "infrastructure.scheduler.hostfactory.hostfactory_strategy.get_container"
-        ) as mock_container:
-            mock_container.return_value.get.return_value = Mock()
+        with patch("infrastructure.di.container.get_container") as mock_get_container:
+            mock_container = MagicMock()
+            mock_get_container.return_value = mock_container
+            mock_container.get.return_value = Mock()
 
             config_manager = Mock()
             logger = Mock()
@@ -55,10 +55,10 @@ class TestSchedulerNativeSpecParsing:
             HostFactorySchedulerStrategy,
         )
 
-        with patch(
-            "infrastructure.scheduler.hostfactory.hostfactory_strategy.get_container"
-        ) as mock_container:
-            mock_container.return_value.get.return_value = Mock()
+        with patch("infrastructure.di.container.get_container") as mock_get_container:
+            mock_container = MagicMock()
+            mock_get_container.return_value = mock_container
+            mock_container.get.return_value = Mock()
 
             config_manager = Mock()
             logger = Mock()
@@ -95,10 +95,10 @@ class TestSchedulerNativeSpecParsing:
             HostFactorySchedulerStrategy,
         )
 
-        with patch(
-            "infrastructure.scheduler.hostfactory.hostfactory_strategy.get_container"
-        ) as mock_container:
-            mock_container.return_value.get.return_value = Mock()
+        with patch("infrastructure.di.container.get_container") as mock_get_container:
+            mock_container = MagicMock()
+            mock_get_container.return_value = mock_container
+            mock_container.get.return_value = Mock()
 
             config_manager = Mock()
             logger = Mock()

@@ -20,6 +20,8 @@ class TestProviderRegistry:
         """Set up test fixtures."""
         # Create a fresh registry for each test
         self.registry = ProviderRegistry()
+        # Clear any existing registrations from previous tests (singleton pattern)
+        self.registry.clear_registrations()
 
         # Mock factories
         self.mock_strategy_factory = Mock(return_value="mock_strategy")

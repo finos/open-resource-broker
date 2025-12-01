@@ -242,6 +242,24 @@ Data persistence strategy configuration.
 Any configuration value can be overridden using environment variables with the format:
 `HF_<SECTION>_<FIELD>`
 
+### Scheduler-Specific Variables
+
+Different scheduler strategies use specific environment variables for directory paths:
+
+**HostFactory Scheduler:**
+```bash
+export HF_PROVIDER_WORKDIR=/path/to/working/directory
+export HF_PROVIDER_CONFDIR=/path/to/config/directory
+export HF_PROVIDER_LOGDIR=/path/to/logs/directory
+```
+
+**Default Scheduler:**
+```bash
+export DEFAULT_PROVIDER_WORKDIR=/path/to/working/directory
+export DEFAULT_PROVIDER_CONFDIR=/path/to/config/directory
+export DEFAULT_PROVIDER_LOGDIR=/path/to/logs/directory
+```
+
 ### Examples
 
 ```bash

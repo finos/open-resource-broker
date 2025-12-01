@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 from domain.machine.aggregate import Machine
 from domain.request.aggregate import Request
-from domain.request.value_objects import RequestStatus
+from domain.request.request_types import RequestStatus
 from infrastructure.persistence.repositories.machine_repository import (
     MachineRepositoryImpl,
 )

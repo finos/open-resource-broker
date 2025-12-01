@@ -41,6 +41,15 @@ class ConcreteSchedulerStrategy(BaseSchedulerStrategy):
     def get_working_directory(self) -> str:
         return "/test/workdir"
 
+    def get_config_directory(self) -> str:
+        return "/test/confdir"
+
+    def get_logs_directory(self) -> str:
+        return "/test/logsdir"
+
+    def get_directory(self, file_type: str) -> str | None:
+        return f"/test/{file_type}dir"
+
     def get_storage_base_path(self) -> str:
         return "/test/storage"
 

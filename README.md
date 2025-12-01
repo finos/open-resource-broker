@@ -290,6 +290,17 @@ API_PORT=8000
 # Storage configuration
 STORAGE_TYPE=dynamodb
 STORAGE_TABLE_PREFIX=hostfactory
+
+# Scheduler directory configuration
+# HostFactory scheduler
+HF_PROVIDER_WORKDIR=/path/to/working/directory
+HF_PROVIDER_CONFDIR=/path/to/config/directory
+HF_PROVIDER_LOGDIR=/path/to/logs/directory
+
+# Default scheduler
+DEFAULT_PROVIDER_WORKDIR=/path/to/working/directory
+DEFAULT_PROVIDER_CONFDIR=/path/to/config/directory
+DEFAULT_PROVIDER_LOGDIR=/path/to/logs/directory
 ```
 
 ### Provider Configuration

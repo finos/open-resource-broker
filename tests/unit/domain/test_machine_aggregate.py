@@ -57,11 +57,11 @@ class TestMachineAggregate:
         """Test basic machine creation."""
         machine = Machine(
             id="machine-001",
-            instance_id=InstanceId("i-1234567890abcdef0"),
+            instance_id=InstanceId(value="i-1234567890abcdef0"),
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType("t2.micro"),
+            instance_type=InstanceType(value="t2.micro"),
             availability_zone="us-east-1a",
             private_ip="10.0.1.100",
             public_ip="54.123.45.67",
@@ -88,11 +88,11 @@ class TestMachineAggregate:
         """Test machine creation with minimal required data."""
         machine = Machine(
             id="machine-002",
-            instance_id=InstanceId("i-abcdef1234567890"),
+            instance_id=InstanceId(value="i-abcdef1234567890"),
             template_id="template-002",
             request_id="request-002",
             status="pending",
-            instance_type=InstanceType("t3.small"),
+            instance_type=InstanceType(value="t3.small"),
             availability_zone="us-west-2b",
         )
 
@@ -111,11 +111,11 @@ class TestMachineAggregate:
         """Test valid machine status transitions."""
         machine = Machine(
             id="machine-003",
-            instance_id=InstanceId("i-1111222233334444"),
+            instance_id=InstanceId(value="i-1111222233334444"),
             template_id="template-001",
             request_id="request-001",
             status="pending",
-            instance_type=InstanceType("t2.micro"),
+            instance_type=InstanceType(value="t2.micro"),
             availability_zone="us-east-1a",
         )
 
@@ -145,11 +145,11 @@ class TestMachineAggregate:
         """Test machine failure transitions."""
         machine = Machine(
             id="machine-004",
-            instance_id=InstanceId("i-5555666677778888"),
+            instance_id=InstanceId(value="i-5555666677778888"),
             template_id="template-001",
             request_id="request-001",
             status="launching",
-            instance_type=InstanceType("t2.micro"),
+            instance_type=InstanceType(value="t2.micro"),
             availability_zone="us-east-1a",
         )
 
@@ -165,11 +165,11 @@ class TestMachineAggregate:
         """Test machine termination."""
         machine = Machine(
             id="machine-005",
-            instance_id=InstanceId("i-9999aaaabbbbcccc"),
+            instance_id=InstanceId(value="i-9999aaaabbbbcccc"),
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType("t2.micro"),
+            instance_type=InstanceType(value="t2.micro"),
             availability_zone="us-east-1a",
         )
 
@@ -188,11 +188,11 @@ class TestMachineAggregate:
         """Test invalid machine status transitions."""
         machine = Machine(
             id="machine-006",
-            instance_id=InstanceId("i-ddddeeeeffffaaaa"),
+            instance_id=InstanceId(value="i-ddddeeeeffffaaaa"),
             template_id="template-001",
             request_id="request-001",
             status="terminated",
-            instance_type=InstanceType("t2.micro"),
+            instance_type=InstanceType(value="t2.micro"),
             availability_zone="us-east-1a",
         )
 
@@ -210,11 +210,11 @@ class TestMachineAggregate:
         """Test machine health monitoring."""
         machine = Machine(
             id="machine-007",
-            instance_id=InstanceId("i-1234abcd5678efgh"),
+            instance_id=InstanceId(value="i-1234abcd5678efgh"),
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType("t2.micro"),
+            instance_type=InstanceType(value="t2.micro"),
             availability_zone="us-east-1a",
         )
 
@@ -245,11 +245,11 @@ class TestMachineAggregate:
         """Test machine performance metrics."""
         machine = Machine(
             id="machine-008",
-            instance_id=InstanceId("i-abcd1234efgh5678"),
+            instance_id=InstanceId(value="i-abcd1234efgh5678"),
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType("t2.micro"),
+            instance_type=InstanceType(value="t2.micro"),
             availability_zone="us-east-1a",
         )
 
@@ -284,11 +284,11 @@ class TestMachineAggregate:
 
         machine = Machine(
             id="machine-009",
-            instance_id=InstanceId("i-network123456789"),
+            instance_id=InstanceId(value="i-network123456789"),
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType("t2.micro"),
+            instance_type=InstanceType(value="t2.micro"),
             availability_zone="us-east-1a",
             network_configuration=network_config,
         )
@@ -309,11 +309,11 @@ class TestMachineAggregate:
 
         machine = Machine(
             id="machine-010",
-            instance_id=InstanceId("i-uptime123456789"),
+            instance_id=InstanceId(value="i-uptime123456789"),
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType("t2.micro"),
+            instance_type=InstanceType(value="t2.micro"),
             availability_zone="us-east-1a",
             running_since=start_time,
         )
@@ -331,11 +331,11 @@ class TestMachineAggregate:
         """Test machine cost tracking."""
         machine = Machine(
             id="machine-011",
-            instance_id=InstanceId("i-cost123456789abc"),
+            instance_id=InstanceId(value="i-cost123456789abc"),
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType("t2.micro"),
+            instance_type=InstanceType(value="t2.micro"),
             availability_zone="us-east-1a",
             hourly_cost=0.0116,  # t2.micro cost per hour
         )
@@ -368,11 +368,11 @@ class TestMachineAggregate:
 
         base_machine_data = {
             "id": "machine-001",
-            "instance_id": InstanceId("i-1234567890abcdef0"),
+            "instance_id": InstanceId(value="i-1234567890abcdef0"),
             "template_id": "template-001",
             "request_id": "request-001",
             "status": "running",
-            "instance_type": InstanceType("t2.micro"),
+            "instance_type": InstanceType(value="t2.micro"),
             "availability_zone": "us-east-1a",
         }
 
@@ -390,11 +390,11 @@ class TestMachineAggregate:
         with pytest.raises((ValueError, MachineValidationError)):
             Machine(
                 id="machine-invalid",
-                instance_id=InstanceId("invalid-instance-id"),
+                instance_id=InstanceId(value="invalid-instance-id"),
                 template_id="template-001",
                 request_id="request-001",
                 status="running",
-                instance_type=InstanceType("t2.micro"),
+                instance_type=InstanceType(value="t2.micro"),
                 availability_zone="us-east-1a",
             )
 
@@ -406,11 +406,11 @@ class TestMachineAggregate:
         for ip in valid_ips:
             machine = Machine(
                 id="machine-valid-ip",
-                instance_id=InstanceId("i-1234567890abcdef0"),
+                instance_id=InstanceId(value="i-1234567890abcdef0"),
                 template_id="template-001",
                 request_id="request-001",
                 status="running",
-                instance_type=InstanceType("t2.micro"),
+                instance_type=InstanceType(value="t2.micro"),
                 availability_zone="us-east-1a",
                 private_ip=ip,
                 public_ip=ip,
@@ -425,11 +425,11 @@ class TestMachineAggregate:
             with pytest.raises((ValueError, MachineValidationError)):
                 Machine(
                     id="machine-invalid-ip",
-                    instance_id=InstanceId("i-1234567890abcdef0"),
+                    instance_id=InstanceId(value="i-1234567890abcdef0"),
                     template_id="template-001",
                     request_id="request-001",
                     status="running",
-                    instance_type=InstanceType("t2.micro"),
+                    instance_type=InstanceType(value="t2.micro"),
                     availability_zone="us-east-1a",
                     private_ip=ip,
                 )
@@ -438,11 +438,11 @@ class TestMachineAggregate:
         """Test machine tags operations."""
         machine = Machine(
             id="machine-tags",
-            instance_id=InstanceId("i-tags123456789abc"),
+            instance_id=InstanceId(value="i-tags123456789abc"),
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType("t2.micro"),
+            instance_type=InstanceType(value="t2.micro"),
             availability_zone="us-east-1a",
             tags={"Environment": "test"},
         )
@@ -469,31 +469,31 @@ class TestMachineAggregate:
         """Test machine equality based on ID."""
         machine1 = Machine(
             id="machine-001",
-            instance_id=InstanceId("i-1234567890abcdef0"),
+            instance_id=InstanceId(value="i-1234567890abcdef0"),
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType("t2.micro"),
+            instance_type=InstanceType(value="t2.micro"),
             availability_zone="us-east-1a",
         )
 
         machine2 = Machine(
             id="machine-001",  # Same ID
-            instance_id=InstanceId("i-abcdef1234567890"),  # Different instance ID
+            instance_id=InstanceId(value="i-abcdef1234567890"),  # Different instance ID
             template_id="template-002",  # Different template
             request_id="request-002",  # Different request
             status="stopped",  # Different status
-            instance_type=InstanceType("t2.small"),  # Different instance type
+            instance_type=InstanceType(value="t2.small"),  # Different instance type
             availability_zone="us-west-2a",  # Different AZ
         )
 
         machine3 = Machine(
             id="machine-002",  # Different ID
-            instance_id=InstanceId("i-1234567890abcdef0"),
+            instance_id=InstanceId(value="i-1234567890abcdef0"),
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType("t2.micro"),
+            instance_type=InstanceType(value="t2.micro"),
             availability_zone="us-east-1a",
         )
 
@@ -505,21 +505,21 @@ class TestMachineAggregate:
         """Test machine hashing."""
         machine1 = Machine(
             id="machine-001",
-            instance_id=InstanceId("i-1234567890abcdef0"),
+            instance_id=InstanceId(value="i-1234567890abcdef0"),
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType("t2.micro"),
+            instance_type=InstanceType(value="t2.micro"),
             availability_zone="us-east-1a",
         )
 
         machine2 = Machine(
             id="machine-001",  # Same ID
-            instance_id=InstanceId("i-different123456"),
+            instance_id=InstanceId(value="i-different123456"),
             template_id="template-different",
             request_id="request-different",
             status="stopped",
-            instance_type=InstanceType("t2.large"),
+            instance_type=InstanceType(value="t2.large"),
             availability_zone="us-west-2b",
         )
 
@@ -529,11 +529,11 @@ class TestMachineAggregate:
         """Test machine serialization to dict."""
         machine = Machine(
             id="machine-001",
-            instance_id=InstanceId("i-1234567890abcdef0"),
+            instance_id=InstanceId(value="i-1234567890abcdef0"),
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType("t2.micro"),
+            instance_type=InstanceType(value="t2.micro"),
             availability_zone="us-east-1a",
             private_ip="10.0.1.100",
             public_ip="54.123.45.67",
@@ -591,11 +591,11 @@ class TestMachineAggregate:
         """Test machine string representation."""
         machine = Machine(
             id="machine-001",
-            instance_id=InstanceId("i-1234567890abcdef0"),
+            instance_id=InstanceId(value="i-1234567890abcdef0"),
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType("t2.micro"),
+            instance_type=InstanceType(value="t2.micro"),
             availability_zone="us-east-1a",
         )
 

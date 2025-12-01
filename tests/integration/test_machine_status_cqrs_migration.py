@@ -35,9 +35,28 @@ class TestMachineStatusCQRSMigration:
         return context
 
     @pytest.fixture
-    def convert_handler(self, mock_provider_context):
+    def mock_logger(self):
+        """Create mock logger."""
+        return Mock()
+
+    @pytest.fixture
+    def mock_event_publisher(self):
+        """Create mock event publisher."""
+        return Mock()
+
+    @pytest.fixture
+    def mock_error_handler(self):
+        """Create mock error handler."""
+        return Mock()
+
+    @pytest.fixture
+    def convert_handler(
+        self, mock_provider_context, mock_logger, mock_event_publisher, mock_error_handler
+    ):
         """Create ConvertMachineStatusCommandHandler."""
-        return ConvertMachineStatusCommandHandler(mock_provider_context)
+        return ConvertMachineStatusCommandHandler(
+            mock_provider_context, mock_logger, mock_event_publisher, mock_error_handler
+        )
 
     @pytest.fixture
     def batch_convert_handler(self, convert_handler):
@@ -45,9 +64,13 @@ class TestMachineStatusCQRSMigration:
         return ConvertBatchMachineStatusCommandHandler(convert_handler)
 
     @pytest.fixture
-    def validate_handler(self, mock_provider_context):
+    def validate_handler(
+        self, mock_provider_context, mock_logger, mock_event_publisher, mock_error_handler
+    ):
         """Create ValidateProviderStateCommandHandler."""
-        return ValidateProviderStateCommandHandler(mock_provider_context)
+        return ValidateProviderStateCommandHandler(
+            mock_provider_context, mock_logger, mock_event_publisher, mock_error_handler
+        )
 
     def test_convert_machine_status_handler(self, convert_handler):
         """Test ConvertMachineStatusCommandHandler functionality."""
@@ -70,12 +93,16 @@ class TestMachineStatusCQRSMigration:
         assert result.provider_type == "aws"
         assert result.metadata["test"] == "migration"
 
-    def test_convert_machine_status_fallback(self, mock_provider_context):
+    def test_convert_machine_status_fallback(
+        self, mock_provider_context, mock_logger, mock_event_publisher, mock_error_handler
+    ):
         """Test ConvertMachineStatusCommandHandler fallback behavior."""
         # Configure provider context to fail
         mock_provider_context.set_strategy.side_effect = Exception("Provider error")
 
-        handler = ConvertMachineStatusCommandHandler(mock_provider_context)
+        handler = ConvertMachineStatusCommandHandler(
+            mock_provider_context, mock_logger, mock_event_publisher, mock_error_handler
+        )
 
         command = ConvertMachineStatusCommand(provider_state="running", provider_type="aws")
 
@@ -157,9 +184,13 @@ class TestMachineStatusCQRSMigration:
         assert validate_handler.can_handle(batch_command) is False
         assert validate_handler.can_handle(validate_command)
 
-    def test_fallback_conversion_mapping(self, mock_provider_context):
+    def test_fallback_conversion_mapping(
+        self, mock_provider_context, mock_logger, mock_event_publisher, mock_error_handler
+    ):
         """Test fallback conversion mapping matches original service."""
-        handler = ConvertMachineStatusCommandHandler(mock_provider_context)
+        handler = ConvertMachineStatusCommandHandler(
+            mock_provider_context, mock_logger, mock_event_publisher, mock_error_handler
+        )
 
         # Test various state mappings
         test_cases = [
@@ -176,12 +207,16 @@ class TestMachineStatusCQRSMigration:
             result = handler._fallback_conversion(provider_state)
             assert result == expected_status, f"Failed for state: {provider_state}"
 
-    def test_error_handling(self, mock_provider_context):
+    def test_error_handling(
+        self, mock_provider_context, mock_logger, mock_event_publisher, mock_error_handler
+    ):
         """Test error handling in handlers."""
         # Create handler with failing provider context
         mock_provider_context.set_strategy.side_effect = Exception("Critical error")
 
-        handler = ConvertMachineStatusCommandHandler(mock_provider_context)
+        handler = ConvertMachineStatusCommandHandler(
+            mock_provider_context, mock_logger, mock_event_publisher, mock_error_handler
+        )
 
         command = ConvertMachineStatusCommand(provider_state="running", provider_type="invalid")
 

@@ -2,10 +2,9 @@
 
 from unittest.mock import Mock
 
-from providers.aws.domain.template.aggregate import AWSTemplate
-
 from domain.request.aggregate import Request
 from domain.request.value_objects import RequestId
+from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.infrastructure.services.aws_native_spec_service import (
     AWSNativeSpecService,
 )

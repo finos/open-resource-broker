@@ -31,21 +31,18 @@ class TestCLIIntegration:
         return self.config_path
 
     @pytest.mark.asyncio
-    @patch("src.infrastructure.di.container.get_container")
+    @patch("interface.system_command_handlers.get_container")
     async def test_get_provider_config_cli_e2e(self, mock_get_container):
         """Test getProviderConfig CLI operation end-to-end."""
         # Setup mocks
         mock_container = Mock()
         mock_query_bus = Mock()
 
-        expected_result = {
-            "config": {"type": "aws", "region": "us-east-1"},
-            "message": "Provider configuration retrieved successfully",
-        }
+        expected_config = {"type": "aws", "region": "us-east-1"}
 
         # Make execute return an awaitable
         async def mock_execute(query):
-            return expected_result
+            return expected_config
 
         mock_query_bus.execute = mock_execute
         mock_container.get.return_value = mock_query_bus
@@ -55,12 +52,11 @@ class TestCLIIntegration:
         from interface.command_handlers import handle_provider_config
 
         mock_command = Mock()
-        mock_command.file = None
-        mock_command.data = None
 
         result = await handle_provider_config(mock_command)
 
         assert result["message"] == "Provider configuration retrieved successfully"
+        assert result["config"] == expected_config
 
     @pytest.mark.asyncio
     @patch("src.infrastructure.di.services.register_all_services")
@@ -241,20 +237,18 @@ class TestCLIIntegration:
             "status": "configured",
         }
 
-        # Mock the application service to return expected provider info
-        with patch("src.application.service.ApplicationService") as mock_app_service:
-            mock_instance = Mock()
-            mock_instance.get_provider_info.return_value = expected_provider_info
-            mock_app_service.return_value = mock_instance
+        # Test provider info retrieval directly without non-existent module
+        mock_instance = Mock()
+        mock_instance.get_provider_info.return_value = expected_provider_info
 
-            # Test provider info retrieval through application service
-            provider_info = mock_instance.get_provider_info()
+        # Test provider info retrieval
+        provider_info = mock_instance.get_provider_info()
 
-            assert provider_info["mode"] == "multi"
-            assert provider_info["selection_policy"] == "ROUND_ROBIN"
-            assert provider_info["active_providers"] == 2
-            assert "aws-primary" in provider_info["provider_names"]
-            assert "aws-backup" in provider_info["provider_names"]
+        assert provider_info["mode"] == "multi"
+        assert provider_info["selection_policy"] == "ROUND_ROBIN"
+        assert provider_info["active_providers"] == 2
+        assert "aws-primary" in provider_info["provider_names"]
+        assert "aws-backup" in provider_info["provider_names"]
 
     def test_cli_template_operations_integration_e2e(self):
         """Test CLI template operations with provider strategy integration."""
@@ -279,15 +273,13 @@ class TestCLIIntegration:
             },
         }
 
-        # Mock template operations functionality
-        with patch("src.application.service.ApplicationService") as mock_app_service:
-            mock_instance = Mock()
-            mock_instance.list_templates.return_value = expected_result
-            mock_app_service.return_value = mock_instance
+        # Test template operations directly without non-existent module
+        mock_instance = Mock()
+        mock_instance.list_templates.return_value = expected_result
 
-            # Test template operations through application service
-            result = mock_instance.list_templates()
+        # Test template operations
+        result = mock_instance.list_templates()
 
-            assert result == expected_result
-            assert result["provider_info"]["mode"] == "multi"
-            assert len(result["provider_info"]["active_providers"]) == 2
+        assert result == expected_result
+        assert result["provider_info"]["mode"] == "multi"
+        assert len(result["provider_info"]["active_providers"]) == 2

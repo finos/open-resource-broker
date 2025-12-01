@@ -7,7 +7,6 @@ through the scheduler strategy to the AWS template creation.
 from unittest.mock import Mock
 
 import pytest
-from providers.aws.domain.template.aggregate import AWSTemplate
 
 from config.manager import ConfigurationManager
 from infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings
@@ -15,6 +14,7 @@ from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactor
 from infrastructure.scheduler.hostfactory.transformations import (
     HostFactoryTransformations,
 )
+from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
 
 class TestFieldMappingIntegration:
@@ -54,6 +54,7 @@ class TestFieldMappingIntegration:
         assert mappings["percentOnDemand"] == "percent_on_demand"
         assert "fleetRole" in mappings
         assert mappings["fleetRole"] == "fleet_role"
+        assert mappings["abisInstanceRequirements"] == "abis_instance_requirements"
 
     def test_field_transformations(self):
         """Test field transformation utilities."""
@@ -87,6 +88,10 @@ class TestFieldMappingIntegration:
             "priceType": "ondemand",
             "keyName": "my-key",
             "instanceTags": "env=test;team=dev",
+            "abisInstanceRequirements": {
+                "VCpuCount": {"Min": 1, "Max": 2},
+                "MemoryMiB": {"Min": 1024, "Max": 2048},
+            },
         }
 
         # Map fields using scheduler strategy
@@ -101,6 +106,7 @@ class TestFieldMappingIntegration:
         assert mapped["security_group_ids"] == ["sg-12345678"]
         assert mapped["price_type"] == "ondemand"
         assert mapped["key_name"] == "my-key"
+        assert mapped["abis_instance_requirements"]["VCpuCount"]["Min"] == 1
 
         # Verify tag transformation
         expected_tags = {"env": "test", "team": "dev"}

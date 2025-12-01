@@ -15,7 +15,7 @@ def test_template_repository_enhancements():
     print("=== Storage Strategy: Template Repository Enhancement Test ===")
 
     try:
-        from domain.template.aggregate import Template
+        from domain.template.template_aggregate import Template
         from infrastructure.persistence.repositories.template_repository import (
             TemplateSerializer,
         )

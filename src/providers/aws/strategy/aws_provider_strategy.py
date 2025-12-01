@@ -15,17 +15,14 @@ from domain.base.ports import LoggingPort
 
 # Import AWS-specific components
 from providers.aws.configuration.config import AWSProviderConfig
+from providers.aws.domain.template.value_objects import ProviderApi
 from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from providers.aws.infrastructure.aws_client import AWSClient
 from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
 from providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHandler
-from providers.aws.infrastructure.handlers.run_instances_handler import (
-    RunInstancesHandler,
-)
+from providers.aws.infrastructure.handlers.run_instances_handler import RunInstancesHandler
 from providers.aws.infrastructure.handlers.spot_fleet_handler import SpotFleetHandler
-from providers.aws.infrastructure.launch_template.manager import (
-    AWSLaunchTemplateManager,
-)
+from providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
 from providers.aws.managers.aws_resource_manager import AWSResourceManager
 
 if TYPE_CHECKING:
@@ -708,6 +705,17 @@ class AWSProviderStrategy(ProviderStrategy):
         try:
             resource_ids = operation.parameters.get("resource_ids", [])
             provider_api = operation.parameters.get("provider_api", "RunInstances")
+            provider_api_value = (
+                provider_api.value if hasattr(provider_api, "value") else provider_api
+            )
+            try:
+                provider_api_enum = (
+                    provider_api
+                    if isinstance(provider_api, ProviderApi)
+                    else ProviderApi(provider_api_value)
+                )
+            except Exception:
+                provider_api_enum = None
 
             if not resource_ids:
                 return ProviderResult.error_result(
@@ -716,7 +724,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 )
 
             # Get the appropriate handler based on provider_api
-            handler = self.handlers.get(provider_api)
+            handler = self.handlers.get(provider_api_value)
             if not handler:
                 # Fallback to RunInstances handler
                 handler = self.handlers.get("RunInstances")
@@ -785,15 +793,21 @@ class AWSProviderStrategy(ProviderStrategy):
                 formatted_instances.append(formatted_instance)
 
             self._logger.debug("formatted_instances: %s", formatted_instances)
+
+            metadata = {
+                "operation": "describe_resource_instances",
+                "resource_ids": resource_ids,
+                "provider_api": provider_api_value,
+                "handler_used": provider_api,
+                "instance_count": len(formatted_instances),
+            }
+
+            # Fleet/ASG capacity info if applicable
+            self._augment_capacity_metadata(metadata, provider_api_enum, resource_ids)
+
             return ProviderResult.success_result(
                 data={"instances": formatted_instances},
-                metadata={
-                    "operation": "describe_resource_instances",
-                    "resource_ids": resource_ids,
-                    "provider_api": provider_api,
-                    "handler_used": provider_api,
-                    "instance_count": len(formatted_instances),
-                },
+                metadata=metadata,
             )
 
         except Exception as e:
@@ -814,6 +828,92 @@ class AWSProviderStrategy(ProviderStrategy):
             },
             {"operation": "health_check"},
         )
+
+    def _augment_capacity_metadata(
+        self, metadata: dict, provider_api_enum: ProviderApi | None, resource_ids: list[str]
+    ) -> None:
+        """
+        Populate capacity data for fleets/ASGs.
+
+        Examples:
+        - EC2 Fleet fulfilled: {"fleet_capacity_fulfilment": {"target_capacity_units": 20, "fulfilled_capacity_units": 20, "provisioned_instance_count": 20, "state": "active"}}
+        - EC2 Fleet scaling: {"fleet_capacity_fulfilment": {"target_capacity_units": 20, "fulfilled_capacity_units": 8, "provisioned_instance_count": 8, "state": "modifying"}}
+        - Spot Fleet partial: {"fleet_capacity_fulfilment": {"target_capacity_units": 50, "fulfilled_capacity_units": 23, "provisioned_instance_count": 23, "state": "active"}}
+        - ASG mixed: {"fleet_capacity_fulfilment": {"target_capacity_units": 10, "fulfilled_capacity_units": 7, "provisioned_instance_count": 7, "state": None}}
+        """
+        if not resource_ids:
+            return
+
+        if provider_api_enum in [ProviderApi.EC2_FLEET, ProviderApi.SPOT_FLEET]:
+            fleet_id = resource_ids[0]
+            try:
+                if provider_api_enum == ProviderApi.EC2_FLEET:
+                    fleets = self.aws_client.ec2_client.describe_fleets(FleetIds=[fleet_id]).get(
+                        "Fleets", []
+                    )
+                    if fleets:
+                        fleet = fleets[0]
+                        spec = fleet.get("TargetCapacitySpecification", {}) or {}
+                        target = spec.get("TotalTargetCapacity")
+                        fulfilled = fleet.get("FulfilledCapacity")
+                        fulfilled_capacity_units = fulfilled if fulfilled is not None else 0
+                        try:
+                            provisioned_instance_count = int(fulfilled_capacity_units)
+                        except Exception:
+                            provisioned_instance_count = 0
+                        metadata["fleet_capacity_fulfilment"] = {
+                            "target_capacity_units": target,
+                            "fulfilled_capacity_units": fulfilled_capacity_units,
+                            "provisioned_instance_count": provisioned_instance_count,
+                            "state": fleet.get("FleetState"),
+                        }
+                else:
+                    # Spot Fleet uses a different API
+                    sfr = self.aws_client.ec2_client.describe_spot_fleet_requests(
+                        SpotFleetRequestIds=[fleet_id]
+                    ).get("SpotFleetRequestConfigs", [])
+                    if sfr:
+                        cfg = sfr[0].get("SpotFleetRequestConfig", {}) or {}
+                        fulfilled_capacity_units = cfg.get("FulfilledCapacity") or 0
+                        try:
+                            provisioned_instance_count = int(fulfilled_capacity_units)
+                        except Exception:
+                            provisioned_instance_count = 0
+                        metadata["fleet_capacity_fulfilment"] = {
+                            "target_capacity_units": cfg.get("TargetCapacity"),
+                            "fulfilled_capacity_units": fulfilled_capacity_units,
+                            "provisioned_instance_count": provisioned_instance_count,
+                            "state": sfr[0].get("SpotFleetRequestState"),
+                        }
+            except Exception as e:
+                self._logger.warning("Could not fetch fleet capacity for %s: %s", fleet_id, e)
+        elif provider_api_enum == ProviderApi.ASG:
+            asg_name = resource_ids[0]
+            try:
+                resp = self.aws_client.autoscaling_client.describe_auto_scaling_groups(
+                    AutoScalingGroupNames=[asg_name]
+                )
+                groups = resp.get("AutoScalingGroups") or []
+                if groups:
+                    group = groups[0]
+                    instances = group.get("Instances") or []
+                    # Sum weighted capacity for InService instances
+                    fulfilled_capacity_units = sum(
+                        int(inst.get("WeightedCapacity", 1))
+                        for inst in instances
+                        if inst.get("LifecycleState") == "InService"
+                    )
+                    provisioned_instance_count = sum(
+                        1 for inst in instances if inst.get("LifecycleState") == "InService"
+                    )
+                    metadata["fleet_capacity_fulfilment"] = {
+                        "target_capacity_units": int(group.get("DesiredCapacity") or 0),
+                        "fulfilled_capacity_units": fulfilled_capacity_units,
+                        "provisioned_instance_count": provisioned_instance_count,
+                        "state": group.get("Status"),
+                    }
+            except Exception as e:
+                self._logger.warning("Could not fetch ASG capacity for %s: %s", asg_name, e)
 
     def get_capabilities(self) -> ProviderCapabilities:
         """
@@ -903,9 +1003,7 @@ class AWSProviderStrategy(ProviderStrategy):
             # This is a lightweight operation to verify AWS access
             try:
                 # Import dry-run context here to avoid circular imports
-                from providers.aws.infrastructure.dry_run_adapter import (
-                    aws_dry_run_context,
-                )
+                from providers.aws.infrastructure.dry_run_adapter import aws_dry_run_context
 
                 with aws_dry_run_context():
                     # Simple STS call to verify credentials and connectivity
@@ -943,10 +1041,17 @@ class AWSProviderStrategy(ProviderStrategy):
         validation_warnings = []
 
         # Required fields validation
-        required_fields = ["image_id", "instance_type"]
-        for field in required_fields:
-            if field not in template_config:
-                validation_errors.append(f"Missing required field: {field}")
+        if "image_id" not in template_config:
+            validation_errors.append("Missing required field: image_id")
+
+        has_primary_type = "instance_type" in template_config
+        has_multi_types = "instance_types" in template_config
+        has_abis = "abis_instance_requirements" in template_config
+
+        if not (has_primary_type or has_multi_types or has_abis):
+            validation_errors.append(
+                "Missing instance configuration: provide instance_type, instance_types, or abis_instance_requirements"
+            )
 
         # AWS-specific validations
         if "image_id" in template_config:
@@ -973,9 +1078,7 @@ class AWSProviderStrategy(ProviderStrategy):
         """Get available AWS templates using scheduler strategy."""
         try:
             # Use scheduler strategy to load templates from configuration
-            from infrastructure.registry.scheduler_registry import (
-                get_scheduler_registry,
-            )
+            from infrastructure.registry.scheduler_registry import get_scheduler_registry
 
             scheduler_registry = get_scheduler_registry()
             scheduler_strategy = scheduler_registry.get_active_strategy()

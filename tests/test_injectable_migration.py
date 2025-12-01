@@ -28,6 +28,14 @@ class MockConfigurationPort(ConfigurationPort):
             "storage": {"strategy": "memory"},
             "events": {"enabled": True},
             "logging": {"level": "INFO", "console_enabled": True},
+            "providers": [
+                {
+                    "name": "aws-test",
+                    "type": "aws",
+                    "enabled": True,
+                    "config": {"region": "us-east-1", "profile": "default"},
+                }
+            ],
         }
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -83,6 +91,14 @@ class MockConfigurationPort(ConfigurationPort):
         """Get logging configuration."""
         return self._config.get("logging", {})
 
+    def get_native_spec_config(self) -> dict[str, Any]:
+        """Get native spec configuration."""
+        return self._config.get("native_spec", {})
+
+    def get_package_info(self) -> dict[str, Any]:
+        """Get package information."""
+        return {"name": "test", "version": "0.0.1"}
+
 
 class TestInjectableMigration(unittest.TestCase):
     """Test case for verifying the injectable decorator migration."""
@@ -94,24 +110,25 @@ class TestInjectableMigration(unittest.TestCase):
         # Register basic dependencies
         from infrastructure.logging.logger import get_logger
 
-        self.container.register_factory(LoggingPort, lambda c: get_logger("test"))
+        logger = get_logger("test")
+        self.container.register_factory(LoggingPort, lambda c: logger)
 
         # Register configuration
-        self.container.register_singleton(ConfigurationPort, lambda c: MockConfigurationPort())
+        mock_config = MockConfigurationPort()
+        self.container.register_singleton(ConfigurationPort, lambda c: mock_config)
 
         # Register AWS config with valid authentication
-        from providers.aws.configuration.config import AWSConfig
+        from providers.aws.configuration.config import AWSProviderConfig
 
-        self.container.register_singleton(
-            AWSConfig, lambda c: AWSConfig(region="us-east-1", profile="default")
-        )
+        aws_config = AWSProviderConfig(region="us-east-1", profile="default")
+        self.container.register_singleton(AWSProviderConfig, lambda c: aws_config)
 
         # Register AWS client manually
         from providers.aws.infrastructure.aws_client import AWSClient
 
         self.container.register_singleton(
             AWSClient,
-            lambda c: AWSClient(config=c.get(ConfigurationPort), logger=c.get(LoggingPort)),
+            lambda c: AWSClient(config=mock_config, logger=logger),
         )
 
         # Register AWS handler factory manually
@@ -121,8 +138,8 @@ class TestInjectableMigration(unittest.TestCase):
             AWSHandlerFactory,
             lambda c: AWSHandlerFactory(
                 aws_client=c.get(AWSClient),
-                logger=c.get(LoggingPort),
-                config=c.get(AWSConfig),
+                logger=logger,
+                config=aws_config,
             ),
         )
 

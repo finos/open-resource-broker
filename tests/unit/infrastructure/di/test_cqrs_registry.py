@@ -247,35 +247,29 @@ class TestCQRSHandlerRegistry:
     def test_thread_safety(self):
         """Test thread safety of registry operations."""
 
-        class TestCommand:
-            pass
-
-        class TestQuery:
-            pass
-
-        class TestEvent:
-            pass
-
         results = []
         errors = []
 
         def register_handlers(thread_id: int):
             try:
-                # Create thread-specific handler classes
+                # Create thread-specific command, query, event, and handler classes
+                command_type = type(f"Command_{thread_id}", (), {})
+                query_type = type(f"Query_{thread_id}", (), {})
+                event_type = type(f"Event_{thread_id}", (), {})
                 command_handler = type(f"CommandHandler_{thread_id}", (), {})
                 query_handler = type(f"QueryHandler_{thread_id}", (), {})
                 event_handler = type(f"EventHandler_{thread_id}", (), {})
 
                 # Register handlers
-                self.registry.register_command_handler(f"Command_{thread_id}", command_handler)
-                self.registry.register_query_handler(f"Query_{thread_id}", query_handler)
-                self.registry.register_event_handler(f"Event_{thread_id}", event_handler)
+                self.registry.register_command_handler(command_type, command_handler)
+                self.registry.register_query_handler(query_type, query_handler)
+                self.registry.register_event_handler(event_type, event_handler)
 
                 # Verify registrations
                 if (
-                    self.registry.has_command_handler(f"Command_{thread_id}")
-                    and self.registry.has_query_handler(f"Query_{thread_id}")
-                    and self.registry.has_event_handlers(f"Event_{thread_id}")
+                    self.registry.has_command_handler(command_type)
+                    and self.registry.has_query_handler(query_type)
+                    and self.registry.has_event_handlers(event_type)
                 ):
                     results.append(thread_id)
                 else:

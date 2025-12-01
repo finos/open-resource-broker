@@ -29,6 +29,41 @@ class TemplateProcessor:
         self.config_source_dir = base_dir.parent.parent / "config"
         self.run_templates_dir = base_dir / "run_templates"
 
+    def detect_scheduler_type(self, overrides: dict) -> str:
+        """
+        Detect scheduler type from overrides.
+
+        Args:
+            overrides: Dictionary containing test overrides
+
+        Returns:
+            Scheduler type: "default" or "hostfactory"
+            Defaults to "hostfactory" for backward compatibility
+        """
+        scheduler_type = overrides.get("scheduler", "hostfactory") if overrides else "hostfactory"
+        log.info(f"Detected scheduler type: {scheduler_type}")
+        return scheduler_type
+
+    def select_base_template_for_scheduler(self, base_name: str, scheduler_type: str) -> str:
+        """
+        Select appropriate base template based on scheduler type.
+
+        Args:
+            base_name: Base template name (e.g., "awsprov_templates")
+            scheduler_type: "default" or "hostfactory"
+
+        Returns:
+            Template filename to use
+
+        Mapping:
+            - templates + default → templates.base.json (snake_case fields)
+            - awsprov_templates + hostfactory → awsprov_templates.base.json (camelCase fields)
+            - default_config/config → corresponding *.base.json files
+        """
+        if base_name == "awsprov_templates" and scheduler_type == "default":
+            return "templates"
+        return base_name
+
     def load_config_source(self) -> Dict[str, Any]:
         """Load configuration values from the main config directory."""
         # Load from config.json
@@ -109,7 +144,8 @@ class TemplateProcessor:
         extracted_config.setdefault("fleetType", "request")  # Default fleet type
         extracted_config.setdefault("providerApi", "EC2Fleet")
         extracted_config.setdefault("priceType", "ondemand")  # Default price type
-        extracted_config.setdefault("percentOnDemand", 100)  # Default to 100% on-demand
+        # Default to 100% on-demand to avoid unintentionally requesting spot capacity
+        extracted_config.setdefault("percentOnDemand", 100)
 
         return extracted_config
 
@@ -176,6 +212,9 @@ class TemplateProcessor:
             awsprov_base_template: Optional base template name for awsprov_templates (e.g., "awsprov_templates1", "awsprov_templates2")
             overrides: Optional dictionary of configuration overrides
         """
+        # Detect scheduler type from overrides
+        scheduler_type = self.detect_scheduler_type(overrides)
+
         # Create test directory
         test_dir = self.run_templates_dir / test_name
         test_dir.mkdir(parents=True, exist_ok=True)
@@ -193,30 +232,50 @@ class TemplateProcessor:
                 config["subnet_ids"] = [overrides["subnetId"]]
             if "securityGroupIds" in overrides:
                 config["security_group_ids"] = overrides["securityGroupIds"]
+            # Normalize vmTypes to snake_case for default scheduler configs
+            if "vmTypes" in overrides and "vm_types" not in overrides:
+                config["vm_types"] = overrides["vmTypes"]
+                overrides["vm_types"] = overrides["vmTypes"]
+            # Also map to instance_types for default scheduler templates that expect this key
+            if "vm_types" in overrides and "instance_types" not in overrides:
+                config["instance_types"] = overrides["vm_types"]
+                overrides["instance_types"] = overrides["vm_types"]
 
             # Set percentOnDemand based on priceType (only for provider APIs that support it)
             if "priceType" in overrides:
                 provider_api = overrides.get("providerApi", config.get("providerApi", "EC2Fleet"))
 
-                if provider_api in ["EC2Fleet", "SpotFleet"]:
+                # If percentOnDemand is explicitly provided in overrides, use it
+                if "percentOnDemand" in overrides:
+                    config["percentOnDemand"] = overrides["percentOnDemand"]
+                elif provider_api in ["EC2Fleet", "SpotFleet"]:
                     # EC2Fleet and SpotFleet support percentOnDemand
                     if overrides["priceType"] == "spot":
                         config["percentOnDemand"] = 0  # 100% spot instances
                     elif overrides["priceType"] == "ondemand":
                         config["percentOnDemand"] = 100  # 100% on-demand instances
                 elif provider_api in ["RunInstances", "ASG"]:
-                    # RunInstances and ASG don't use percentOnDemand, they use different mechanisms
-                    # For now, we'll skip price type validation for these APIs
-                    log.warning(
-                        f"Provider API {provider_api} may not support spot instances in the same way as EC2Fleet"
-                    )
+                    # RunInstances and ASG don't use percentOnDemand the same way as fleets.
+                    # Ensure on-demand requests stay on-demand; spot explicitly sets 0.
+                    if overrides["priceType"] == "spot":
+                        config["percentOnDemand"] = 0
+                    else:
+                        config["percentOnDemand"] = 100
+
+        # Set scheduler type in config for template replacement (after overrides)
+        config["scheduler"] = scheduler_type
+        log.info(f"Config scheduler value for template replacement: {config.get('scheduler')}")
 
         # Generate each required file
+        # Note: awsprov_templates.json is only for hostfactory scheduler
         template_files = [
-            ("awsprov_templates", "awsprov_templates.json"),
             ("config", "config.json"),
-            ("default_config", "default_config.json"),
         ]
+
+        if scheduler_type == "hostfactory":
+            template_files.insert(0, ("awsprov_templates", "awsprov_templates.json"))
+        elif scheduler_type == "default":
+            template_files.insert(0, ("templates", "templates.json"))
 
         for base_name, output_name in template_files:
             try:
@@ -228,14 +287,52 @@ class TemplateProcessor:
                     # Use specified config base template
                     template_name = base_template
                 else:
-                    # Use default base template
-                    template_name = base_name
+                    # Use scheduler-aware template selection
+                    template_name = self.select_base_template_for_scheduler(
+                        base_name, scheduler_type
+                    )
 
                 # Load base template
                 base_template_data = self.load_base_template(template_name)
 
                 # Replace placeholders
                 populated_template = self.replace_placeholders(base_template_data, config)
+
+                # Apply explicit overrides for fields not covered by placeholders
+                if overrides and isinstance(populated_template, dict):
+                    templates_list = populated_template.get("templates", [])
+                    for tmpl in templates_list:
+                        # Apply overrides with scheduler-aware key mapping
+                        scheduler_is_default = config.get("scheduler") == "default"
+
+                        # Handle VM types separately to avoid duplicate fields
+                        if any(k in overrides for k in ("vm_types", "vmTypes", "instance_types")):
+                            vm_override = (
+                                overrides.get("instance_types")
+                                or overrides.get("vm_types")
+                                or overrides.get("vmTypes")
+                            )
+                            if scheduler_is_default:
+                                tmpl["instance_types"] = vm_override
+                                tmpl.pop("vm_type", None)
+                                tmpl.pop("vmTypes", None)
+                                tmpl.pop("vm_types", None)
+                            else:
+                                tmpl["vmTypes"] = vm_override
+                                tmpl.pop("vm_type", None)
+                                tmpl.pop("vm_types", None)
+                                tmpl.pop("instance_types", None)
+
+                        # Apply other known override keys directly
+                        for key in [
+                            "vmType",
+                            "abisInstanceRequirements",
+                            "abis_instance_requirements",
+                            "instance_types",
+                            "instanceTypes",
+                        ]:
+                            if key in overrides:
+                                tmpl[key] = overrides[key]
 
                 # Write populated template (always use standard output name)
                 output_file = test_dir / output_name
@@ -247,6 +344,9 @@ class TemplateProcessor:
                     template_name
                     if template_name.endswith(".base.json")
                     else f"{template_name}.base.json"
+                )
+                log.info(
+                    f"Selected base template: {actual_template_name} for scheduler: {scheduler_type}"
                 )
                 print(f"Generated {output_file} from {actual_template_name}")
 

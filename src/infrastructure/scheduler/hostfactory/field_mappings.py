@@ -38,6 +38,7 @@ class HostFactoryFieldMappings:
             # AWS instance type configurations
             "vmTypesOnDemand": "instance_types_ondemand",
             "vmTypesPriority": "instance_types_priority",
+            "abisInstanceRequirements": "abis_instance_requirements",
             # AWS pricing configurations
             "percentOnDemand": "percent_on_demand",
             "allocationStrategyOnDemand": "allocation_strategy_ondemand",

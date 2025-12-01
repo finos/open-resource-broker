@@ -375,12 +375,8 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         launch_template_version: str,
     ) -> dict[str, Any]:
         """Create Auto Scaling Group configuration using legacy logic."""
-        asg_config = {
+        asg_config: dict[str, Any] = {
             "AutoScalingGroupName": asg_name,
-            "LaunchTemplate": {
-                "LaunchTemplateId": launch_template_id,
-                "Version": launch_template_version,
-            },
             "MinSize": 0,
             "MaxSize": request.requested_count * 2,  # Allow some buffer
             "DesiredCapacity": request.requested_count,
@@ -389,6 +385,84 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             "HealthCheckGracePeriod": 300,
             "NewInstancesProtectedFromScaleIn": True,
         }
+
+        # Prefer multi-instance maps (including legacy vm_types) over a single instance_type
+        instance_types_map = getattr(aws_template, "instance_types", None) or getattr(
+            aws_template, "vm_types", {}
+        )
+
+        # Prefer ABIS/InstanceRequirements payload when present (no explicit types)
+        instance_requirements_payload = aws_template.get_instance_requirements_payload()
+        if instance_requirements_payload:
+            asg_config["MixedInstancesPolicy"] = {
+                "LaunchTemplate": {
+                    "LaunchTemplateSpecification": {
+                        "LaunchTemplateId": launch_template_id,
+                        "Version": launch_template_version,
+                    },
+                    "Overrides": [{"InstanceRequirements": instance_requirements_payload}],
+                }
+            }
+        # Otherwise, emit explicit instance type overrides when we have a type map
+        elif instance_types_map:
+            overrides = []
+            for itype, weight in instance_types_map.items():
+                override = {"InstanceType": itype}
+                if weight:
+                    override["WeightedCapacity"] = str(weight)
+                overrides.append(override)
+
+            asg_config["MixedInstancesPolicy"] = {
+                "LaunchTemplate": {
+                    "LaunchTemplateSpecification": {
+                        "LaunchTemplateId": launch_template_id,
+                        "Version": launch_template_version,
+                    },
+                    "Overrides": overrides,
+                }
+            }
+        else:
+            # Fallback: single instance type (or none) uses plain launch template
+            asg_config["LaunchTemplate"] = {
+                "LaunchTemplateId": launch_template_id,
+                "Version": launch_template_version,
+            }
+
+        # Add spot/on-demand distribution when spot pricing or mixed capacity requested
+        price_type = getattr(aws_template, "price_type", "ondemand") or "ondemand"
+        percent_on_demand = getattr(aws_template, "percent_on_demand", None)
+        needs_spot_distribution = percent_on_demand is not None or price_type in (
+            "spot",
+            "heterogeneous",
+        )
+
+        if needs_spot_distribution:
+            # Ensure MixedInstancesPolicy exists so we can attach distribution
+            if "MixedInstancesPolicy" not in asg_config:
+                asg_config["MixedInstancesPolicy"] = {
+                    "LaunchTemplate": {
+                        "LaunchTemplateSpecification": {
+                            "LaunchTemplateId": launch_template_id,
+                            "Version": launch_template_version,
+                        }
+                    }
+                }
+
+            ondemand_pct = int(percent_on_demand) if percent_on_demand is not None else 0
+            asg_config["MixedInstancesPolicy"]["InstancesDistribution"] = {
+                "OnDemandBaseCapacity": 0,
+                "OnDemandPercentageAboveBaseCapacity": ondemand_pct,
+            }
+
+            if getattr(aws_template, "allocation_strategy", None):
+                asg_config["MixedInstancesPolicy"]["InstancesDistribution"][
+                    "SpotAllocationStrategy"
+                ] = aws_template.get_asg_allocation_strategy()
+
+            # When MixedInstancesPolicy is present, AWS requires launch settings to live there.
+            # Remove top-level LaunchTemplate to avoid API validation errors.
+            if "LaunchTemplate" in asg_config:
+                asg_config.pop("LaunchTemplate", None)
 
         # Add subnet configuration
         if aws_template.subnet_ids:

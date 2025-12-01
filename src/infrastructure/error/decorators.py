@@ -22,7 +22,7 @@ def handle_exceptions(
     preserve_types: Optional[list[type[Exception]]] = None,
     additional_context: Optional[dict[str, Any]] = None,
     handler: Optional[ExceptionHandler] = None,
-) -> None:
+):
     """
     Provide consistent exception handling across all layers.
 
@@ -61,8 +61,13 @@ def handle_exceptions(
                     # Build rich context
                     context_data = _build_context_data(func, args, kwargs, additional_context)
 
+                    # Filter out 'layer' from context_data to avoid duplicate parameter
+                    filtered_context = {k: v for k, v in context_data.items() if k != "layer"}
+
                     # Create exception context
-                    exc_context = ExceptionContext(operation=context, layer=layer, **context_data)
+                    exc_context = ExceptionContext(
+                        operation=context, layer=layer, **filtered_context
+                    )
 
                     # Handle exception
                     handled_exception = exception_handler.handle(e, exc_context)
@@ -85,8 +90,13 @@ def handle_exceptions(
                     # Build rich context
                     context_data = _build_context_data(func, args, kwargs, additional_context)
 
+                    # Filter out 'layer' from context_data to avoid duplicate parameter
+                    filtered_context = {k: v for k, v in context_data.items() if k != "layer"}
+
                     # Create exception context
-                    exc_context = ExceptionContext(operation=context, layer=layer, **context_data)
+                    exc_context = ExceptionContext(
+                        operation=context, layer=layer, **filtered_context
+                    )
 
                     # Handle exception
                     handled_exception = exception_handler.handle(e, exc_context)
@@ -166,7 +176,7 @@ def handle_infrastructure_exceptions(
 
 def handle_provider_exceptions(
     context: str, provider: str, additional_context: Optional[dict[str, Any]] = None
-) -> None:
+):
     """
     Specialized decorator for provider-specific exception handling.
 
@@ -314,7 +324,7 @@ def handle_rest_exceptions(
         async def list_templates(self):
             # REST endpoint logic
     """
-    rest_context = {"endpoint": endpoint, "method": method, "layer": "api"}
+    rest_context = {"endpoint": endpoint, "method": method}
 
     if additional_context:
         rest_context.update(additional_context)

@@ -25,8 +25,9 @@
           "security_group_ids": "{{security_group_ids}}",
           "subnet_ids": "{{subnet_ids}}",
           "key_name": "",
-          "provider_api": "EC2Fleet",
-          "price_type": "ondemand",
+          "provider_api": "{{providerApi}}",
+          "price_type": "{{priceType}}",
+          "percent_on_demand": "{{percentOnDemand}}",
           "tags": {
             "Environment": "development",
             "Project": "hostfactory"
@@ -41,7 +42,7 @@
     }
   },
   "scheduler": {
-    "type": "hostfactory",
+    "type": "{{scheduler}}",
     "config_root": "$HF_PROVIDER_CONFDIR"
   },
   "logging": {

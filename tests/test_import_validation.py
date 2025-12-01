@@ -85,11 +85,11 @@ class TestCriticalImports:
         """Test that deprecated import paths fail as expected."""
         # These imports should fail after value object decomposition
         with pytest.raises(ImportError, match="cannot import name 'MachineStatus'"):
-            pass
+            from domain.request.value_objects import MachineStatus  # noqa: F401
 
         # BaseCommandHandler should not be available from interface layer
         with pytest.raises(ImportError, match="cannot import name 'BaseCommandHandler'"):
-            pass
+            from interface.command_handlers import BaseCommandHandler  # noqa: F401
 
     def test_bootstrap_application(self):
         """Test that the main Application class can be instantiated."""

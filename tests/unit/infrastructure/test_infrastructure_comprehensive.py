@@ -116,7 +116,7 @@ class TestDependencyInjectionComprehensive:
                 assert command_bus is not None
             except TypeError:
                 # Might require dependencies
-                command_bus = CommandBus(Mock())
+                command_bus = CommandBus(Mock(), Mock())
                 assert command_bus is not None
 
             # Test QueryBus
@@ -125,7 +125,7 @@ class TestDependencyInjectionComprehensive:
                 assert query_bus is not None
             except TypeError:
                 # Might require dependencies
-                query_bus = QueryBus(Mock())
+                query_bus = QueryBus(Mock(), Mock())
                 assert query_bus is not None
 
         except ImportError:
@@ -141,7 +141,7 @@ class TestDependencyInjectionComprehensive:
             try:
                 command_bus = CommandBus()
             except TypeError:
-                command_bus = CommandBus(Mock())
+                command_bus = CommandBus(Mock(), Mock())
 
             if hasattr(command_bus, "send"):
                 try:
@@ -155,7 +155,7 @@ class TestDependencyInjectionComprehensive:
             try:
                 query_bus = QueryBus()
             except TypeError:
-                query_bus = QueryBus(Mock())
+                query_bus = QueryBus(Mock(), Mock())
 
             if hasattr(query_bus, "send"):
                 try:

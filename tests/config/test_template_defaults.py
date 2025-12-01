@@ -107,8 +107,8 @@ class TestTemplateDefaultsService:
         # Verify hierarchical resolution
         assert result["template_id"] == "test-template"
         assert result["image_id"] == "ami-specific"  # Template value (highest priority)
-        assert result["provider_api"] == "SpotFleet"  # Provider instance default
-        assert result["instance_type"] == "t3.medium"  # Provider instance default
+        assert result["provider_api"] == "EC2Fleet"  # Provider type default
+        assert result["instance_type"] == "t2.micro"  # Provider type default
         assert result["security_group_ids"] == ["sg-aws-default"]  # Provider type default
         assert result["price_type"] == "ondemand"  # Global default
 
@@ -160,7 +160,7 @@ class TestTemplateDefaultsService:
         result = template_defaults_service.resolve_provider_api_default(
             template_dict, "aws-primary"
         )
-        assert result == "SpotFleet"  # From provider instance defaults
+        assert result == "EC2Fleet"  # From provider type defaults
 
         # Provider instance has no override, use provider type default
         result = template_defaults_service.resolve_provider_api_default(
@@ -186,8 +186,8 @@ class TestTemplateDefaultsService:
         # Should have merged defaults with correct precedence
         assert result["price_type"] == "ondemand"  # Global default
         assert result["image_id"] == "ami-aws-default"  # Provider type default
-        assert result["provider_api"] == "SpotFleet"  # Provider instance override
-        assert result["instance_type"] == "t3.medium"  # Provider instance override
+        assert result["provider_api"] == "EC2Fleet"  # Provider type default
+        assert result["instance_type"] == "t2.micro"  # Provider type default
         assert result["security_group_ids"] == ["sg-aws-default"]  # Provider type default
 
     def test_validate_template_defaults(

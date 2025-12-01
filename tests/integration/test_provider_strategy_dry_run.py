@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, Mock, patch
 
+import pytest
+
 from providers.aws.configuration.config import AWSProviderConfig
 from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 from providers.base.strategy import ProviderOperation, ProviderOperationType
@@ -28,28 +30,41 @@ class TestProviderStrategyDryRun:
         # Set initialized flag manually
         self.aws_strategy._initialized = True
 
-        # Mock the internal managers
-        self.mock_instance_manager = Mock()
-        self.aws_strategy._instance_manager = self.mock_instance_manager
+        # Mock the handler
+        self.mock_handler = Mock()
+        self.mock_handler.acquire_hosts.return_value = {
+            "resource_ids": ["i-1234567890abcdef0"],
+            "instances": [],
+            "success": True,
+        }
+        self.aws_strategy._handlers = {"RunInstances": self.mock_handler}
 
+        # Ensure provisioning port is None to use handler fallback
+        self.aws_strategy._provisioning_port = None
+
+    @pytest.mark.asyncio
     @patch("providers.aws.infrastructure.dry_run_adapter.aws_dry_run_context")
-    def test_provider_operation_without_dry_run_context(self, mock_dry_run_context):
+    async def test_provider_operation_without_dry_run_context(self, mock_dry_run_context):
         """Test provider operation execution without dry-run context."""
-        # Mock instance manager response
-        self.mock_instance_manager.create_instances.return_value = ["i-1234567890abcdef0"]
-
         # Create operation without dry-run context
         operation = ProviderOperation(
             operation_type=ProviderOperationType.CREATE_INSTANCES,
             parameters={
-                "template_config": {"vm_type": "t2.micro", "image_id": "ami-12345678"},
+                "template_config": {
+                    "template_id": "test-template",
+                    "instance_type": "t2.micro",
+                    "image_id": "ami-12345678",
+                    "provider_api": "RunInstances",
+                    "subnet_ids": ["subnet-12345"],
+                    "security_group_ids": ["sg-12345"],
+                },
                 "count": 1,
             },
             context=None,
         )
 
         # Execute operation
-        result = self.aws_strategy.execute_operation(operation)
+        result = await self.aws_strategy.execute_operation(operation)
 
         # Verify result
         assert result.success is True
@@ -60,15 +75,13 @@ class TestProviderStrategyDryRun:
         # Verify dry-run context was not used
         mock_dry_run_context.assert_not_called()
 
-        # Verify instance manager was called
-        self.mock_instance_manager.create_instances.assert_called_once()
+        # Verify handler was called
+        self.mock_handler.acquire_hosts.assert_called_once()
 
+    @pytest.mark.asyncio
     @patch("providers.aws.infrastructure.dry_run_adapter.aws_dry_run_context")
-    def test_provider_operation_with_dry_run_context(self, mock_dry_run_context):
+    async def test_provider_operation_with_dry_run_context(self, mock_dry_run_context):
         """Test provider operation execution with dry-run context."""
-        # Mock instance manager response
-        self.mock_instance_manager.create_instances.return_value = ["i-1234567890abcdef0"]
-
         # Mock the context manager
         mock_context_manager = MagicMock()
         mock_dry_run_context.return_value = mock_context_manager
@@ -77,14 +90,21 @@ class TestProviderStrategyDryRun:
         operation = ProviderOperation(
             operation_type=ProviderOperationType.CREATE_INSTANCES,
             parameters={
-                "template_config": {"vm_type": "t2.micro", "image_id": "ami-12345678"},
+                "template_config": {
+                    "template_id": "test-template",
+                    "instance_type": "t2.micro",
+                    "image_id": "ami-12345678",
+                    "provider_api": "RunInstances",
+                    "subnet_ids": ["subnet-12345"],
+                    "security_group_ids": ["sg-12345"],
+                },
                 "count": 1,
             },
             context={"dry_run": True},
         )
 
         # Execute operation
-        result = self.aws_strategy.execute_operation(operation)
+        result = await self.aws_strategy.execute_operation(operation)
 
         # Verify result
         assert result.success is True
@@ -97,26 +117,34 @@ class TestProviderStrategyDryRun:
         mock_context_manager.__enter__.assert_called_once()
         mock_context_manager.__exit__.assert_called_once()
 
-        # Verify instance manager was called (within dry-run context)
-        self.mock_instance_manager.create_instances.assert_called_once()
+        # Verify handler was called (within dry-run context)
+        self.mock_handler.acquire_hosts.assert_called_once()
 
-    def test_provider_operation_error_handling_with_dry_run(self):
+    @pytest.mark.asyncio
+    async def test_provider_operation_error_handling_with_dry_run(self):
         """Test provider operation error handling with dry-run context."""
-        # Mock instance manager to raise exception
-        self.mock_instance_manager.create_instances.side_effect = Exception("Test error")
+        # Mock handler to raise exception
+        self.mock_handler.acquire_hosts.side_effect = Exception("Test error")
 
         # Create operation with dry-run context
         operation = ProviderOperation(
             operation_type=ProviderOperationType.CREATE_INSTANCES,
             parameters={
-                "template_config": {"vm_type": "t2.micro", "image_id": "ami-12345678"},
+                "template_config": {
+                    "template_id": "test-template",
+                    "instance_type": "t2.micro",
+                    "image_id": "ami-12345678",
+                    "provider_api": "RunInstances",
+                    "subnet_ids": ["subnet-12345"],
+                    "security_group_ids": ["sg-12345"],
+                },
                 "count": 1,
             },
             context={"dry_run": True},
         )
 
         # Execute operation
-        result = self.aws_strategy.execute_operation(operation)
+        result = await self.aws_strategy.execute_operation(operation)
 
         # Verify error result
         assert result.success is False
@@ -125,7 +153,8 @@ class TestProviderStrategyDryRun:
         assert "execution_time_ms" in result.metadata
         assert "Test error" in result.error_message
 
-    def test_unsupported_operation_with_dry_run(self):
+    @pytest.mark.asyncio
+    async def test_unsupported_operation_with_dry_run(self):
         """Test unsupported operation handling with dry-run context."""
         # Create operation with unsupported type
         operation = ProviderOperation(
@@ -135,7 +164,7 @@ class TestProviderStrategyDryRun:
         )
 
         # Execute operation
-        result = self.aws_strategy.execute_operation(operation)
+        result = await self.aws_strategy.execute_operation(operation)
 
         # Verify error result
         assert result.success is False
@@ -143,22 +172,35 @@ class TestProviderStrategyDryRun:
         assert result.metadata["provider"] == "aws"
         assert "Unsupported operation" in result.error_message
 
+    @pytest.mark.asyncio
     @patch("providers.aws.infrastructure.dry_run_adapter.aws_dry_run_context")
-    def test_multiple_operations_with_mixed_dry_run_contexts(self, mock_dry_run_context):
+    async def test_multiple_operations_with_mixed_dry_run_contexts(self, mock_dry_run_context):
         """Test multiple operations with different dry-run contexts."""
-        # Mock instance manager responses
-        self.mock_instance_manager.create_instances.return_value = ["i-1234567890abcdef0"]
-        self.mock_instance_manager.terminate_instances.return_value = True
-
         # Mock the context manager
         mock_context_manager = MagicMock()
         mock_dry_run_context.return_value = mock_context_manager
+
+        # Mock AWS client for terminate operation
+        mock_ec2_client = Mock()
+        mock_ec2_client.terminate_instances.return_value = {
+            "TerminatingInstances": [{"InstanceId": "i-1234567890abcdef0"}]
+        }
+        mock_aws_client = Mock()
+        mock_aws_client.ec2_client = mock_ec2_client
+        self.aws_strategy._aws_client = mock_aws_client
 
         # Create operations with different dry-run contexts
         create_operation = ProviderOperation(
             operation_type=ProviderOperationType.CREATE_INSTANCES,
             parameters={
-                "template_config": {"vm_type": "t2.micro", "image_id": "ami-12345678"},
+                "template_config": {
+                    "template_id": "test-template",
+                    "instance_type": "t2.micro",
+                    "image_id": "ami-12345678",
+                    "provider_api": "RunInstances",
+                    "subnet_ids": ["subnet-12345"],
+                    "security_group_ids": ["sg-12345"],
+                },
                 "count": 1,
             },
             context={"dry_run": True},
@@ -171,8 +213,8 @@ class TestProviderStrategyDryRun:
         )
 
         # Execute operations
-        create_result = self.aws_strategy.execute_operation(create_operation)
-        terminate_result = self.aws_strategy.execute_operation(terminate_operation)
+        create_result = await self.aws_strategy.execute_operation(create_operation)
+        terminate_result = await self.aws_strategy.execute_operation(terminate_operation)
 
         # Verify results
         assert create_result.success is True
@@ -184,6 +226,6 @@ class TestProviderStrategyDryRun:
         # Verify dry-run context was used only once (for create operation)
         mock_dry_run_context.assert_called_once()
 
-        # Verify both managers were called
-        self.mock_instance_manager.create_instances.assert_called_once()
-        self.mock_instance_manager.terminate_instances.assert_called_once()
+        # Verify handlers were called
+        self.mock_handler.acquire_hosts.assert_called_once()
+        mock_ec2_client.terminate_instances.assert_called_once()

@@ -4,11 +4,11 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from config.schemas.provider_strategy_schema import (
+from src.config.schemas.provider_strategy_schema import (
     ProviderConfig,
     ProviderInstanceConfig,
 )
-from infrastructure.registry.provider_registry import ProviderRegistry
+from src.infrastructure.registry.provider_registry import ProviderRegistry
 
 
 class TestMultiInstanceProviderSupport:
@@ -186,7 +186,7 @@ class TestMultiInstanceProviderSupport:
 
     def test_provider_strategy_factory_with_instances(self):
         """Test ProviderStrategyFactory with named instances."""
-        from infrastructure.factories.provider_strategy_factory import (
+        from src.infrastructure.factories.provider_strategy_factory import (
             ProviderStrategyFactory,
         )
 
@@ -228,7 +228,7 @@ class TestMultiInstanceProviderSupport:
 
     def test_provider_strategy_factory_fallback_to_type(self):
         """Test ProviderStrategyFactory fallback to provider type."""
-        from infrastructure.factories.provider_strategy_factory import (
+        from src.infrastructure.factories.provider_strategy_factory import (
             ProviderStrategyFactory,
         )
 

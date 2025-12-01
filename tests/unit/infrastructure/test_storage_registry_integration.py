@@ -32,36 +32,38 @@ class TestStorageRegistryIntegration:
         mock_config_manager.get_storage_strategy.return_value = "json"
         mock_config_manager.get_app_config.return_value = Mock()
 
-        # Mock storage registry
-        mock_registry = Mock()
-        mock_strategy = Mock()
-        mock_registry.create_strategy.return_value = mock_strategy
+        # Mock logger
+        mock_logger = Mock()
+
+        # Mock storage port from DI container
+        mock_storage_port = Mock()
 
         # Mock repository class
         mock_repository = Mock()
 
+        # Mock DI container
+        mock_container = Mock()
+        mock_container.get.return_value = mock_storage_port
+
         with (
+            patch("infrastructure.di.container.get_container") as mock_get_container,
             patch(
-                "src.infrastructure.utilities.factories.repository_factory.get_storage_registry"
-            ) as mock_get_registry,
-            patch(
-                "src.infrastructure.persistence.repositories.request_repository.RequestRepository"
+                "infrastructure.persistence.repositories.request_repository.RequestRepositoryImpl"
             ) as mock_repo_class,
         ):
-            mock_get_registry.return_value = mock_registry
+            mock_get_container.return_value = mock_container
             mock_repo_class.return_value = mock_repository
 
             # Create repository factory
-            factory = RepositoryFactory(mock_config_manager)
+            factory = RepositoryFactory(mock_config_manager, mock_logger)
 
             # Create repository
             result = factory.create_request_repository()
 
-            # Verify storage registry was used
-            mock_registry.create_strategy.assert_called_once_with(
-                "json", mock_config_manager.get_app_config.return_value
-            )
-            mock_repo_class.assert_called_once_with(mock_strategy)
+            # Verify DI container was used to get storage port
+            mock_container.get.assert_called_once()
+            # Verify repository was created with storage port
+            mock_repo_class.assert_called_once_with(mock_storage_port)
             assert result == mock_repository
 
     def test_di_container_uses_repository_factory(self):
@@ -213,7 +215,7 @@ class TestStorageRegistryIntegration:
         mock_repository = Mock()
 
         with patch(
-            "src.infrastructure.persistence.repositories.request_repository.RequestRepository"
+            "src.infrastructure.persistence.repositories.request_repository.RequestRepositoryImpl"
         ) as mock_repo_class:
             mock_repo_class.return_value = mock_repository
 

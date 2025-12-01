@@ -135,6 +135,7 @@ class TestConfigurationIntegration:
         # Create configuration
         config_data = {
             "provider": {
+                "type": "aws",  # Add legacy type field for bootstrap compatibility
                 "active_provider": "aws-test",
                 "providers": [
                     {
@@ -156,6 +157,9 @@ class TestConfigurationIntegration:
         # Test that application was created with configuration
         assert app.config_path == config_path
         assert not app._initialized
+
+        # Access config_manager to trigger provider_type initialization
+        _ = app.config_manager()
 
         # Test that provider type is set (may default to mock in test environment)
         assert app.provider_type in ["aws", "mock"]

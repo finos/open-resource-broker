@@ -5,8 +5,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from application.services.native_spec_service import NativeSpecService
 from domain.base.ports.configuration_port import ConfigurationPort
+from domain.base.ports.spec_rendering_port import SpecRenderingPort
 from providers.aws.infrastructure.services.aws_native_spec_service import (
     AWSNativeSpecService,
 )
@@ -18,7 +18,9 @@ class TestSpecFileLoading:
     def setup_method(self):
         """Set up test fixtures."""
         self.mock_config_port = Mock(spec=ConfigurationPort)
-        self.mock_native_spec_service = Mock(spec=NativeSpecService)
+        self.mock_spec_renderer = Mock(spec=SpecRenderingPort)
+        self.mock_native_spec_service = Mock()
+        self.mock_native_spec_service.spec_renderer = self.mock_spec_renderer
         self.service = AWSNativeSpecService(
             config_port=self.mock_config_port,
             native_spec_service=self.mock_native_spec_service,
@@ -39,7 +41,9 @@ class TestSpecFileLoading:
             "TargetCapacitySpecification": {"TotalTargetCapacity": "{{ requested_count }}"},
         }
 
-        with patch("infrastructure.utilities.file.json_utils.read_json_file") as mock_read:
+        with patch(
+            "providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
+        ) as mock_read:
             mock_read.return_value = spec_content
 
             result = self.service._load_spec_file("examples/ec2fleet-price-capacity-optimized.json")
@@ -60,7 +64,9 @@ class TestSpecFileLoading:
 
         spec_content = {"Type": "maintain"}
 
-        with patch("infrastructure.utilities.file.json_utils.read_json_file") as mock_read:
+        with patch(
+            "providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
+        ) as mock_read:
             mock_read.return_value = spec_content
 
             result = self.service._load_spec_file("custom-template.json")
@@ -75,16 +81,18 @@ class TestSpecFileLoading:
 
         spec_content = {"Type": "instant"}
 
-        with patch("infrastructure.utilities.file.json_utils.read_json_file") as mock_read:
+        with patch(
+            "providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
+        ) as mock_read:
             mock_read.return_value = spec_content
 
             result = self.service._load_spec_file("test-template.json")
 
             # Should use default base path
             assert result == spec_content
-            mock_read.assert_called_once_with("config/specs/aws/test-template.json")
+            mock_read.assert_called_once_with("specs/aws/test-template.json")
 
-    @patch("infrastructure.utilities.file.json_utils.read_json_file")
+    @patch("providers.aws.infrastructure.services.aws_native_spec_service.read_json_file")
     def test_load_spec_file_not_found(self, mock_read):
         """Test spec file loading when file doesn't exist."""
         mock_read.side_effect = FileNotFoundError("File not found")
@@ -98,7 +106,7 @@ class TestSpecFileLoading:
         with pytest.raises(FileNotFoundError):
             self.service._load_spec_file("nonexistent.json")
 
-    @patch("infrastructure.utilities.file.json_utils.read_json_file")
+    @patch("providers.aws.infrastructure.services.aws_native_spec_service.read_json_file")
     def test_load_spec_file_invalid_json(self, mock_read):
         """Test spec file loading with invalid JSON."""
         mock_read.side_effect = json.JSONDecodeError("Invalid JSON", "doc", 0)
@@ -114,7 +122,7 @@ class TestSpecFileLoading:
 
     def test_resolve_launch_template_spec_inline(self):
         """Test resolving inline launch template spec."""
-        from providers.aws.domain.template.aggregate import AWSTemplate
+        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
         inline_spec = {
             "LaunchTemplateName": "test-lt",
@@ -125,6 +133,9 @@ class TestSpecFileLoading:
             template_id="test-template",
             image_id="ami-12345",
             instance_type="t3.micro",
+            provider_api="EC2Fleet",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
             launch_template_spec=inline_spec,
         )
 
@@ -134,7 +145,7 @@ class TestSpecFileLoading:
 
     def test_resolve_launch_template_spec_file(self):
         """Test resolving launch template spec from file."""
-        from providers.aws.domain.template.aggregate import AWSTemplate
+        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
         file_spec = {
             "LaunchTemplateName": "file-lt",
@@ -145,6 +156,9 @@ class TestSpecFileLoading:
             template_id="test-template",
             image_id="ami-12345",
             instance_type="t3.micro",
+            provider_api="EC2Fleet",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
             launch_template_spec_file="lt-spec.json",
         )
 
@@ -158,10 +172,15 @@ class TestSpecFileLoading:
 
     def test_resolve_launch_template_spec_none(self):
         """Test resolving launch template spec when none specified."""
-        from providers.aws.domain.template.aggregate import AWSTemplate
+        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
         template = AWSTemplate(
-            template_id="test-template", image_id="ami-12345", instance_type="t3.micro"
+            template_id="test-template",
+            image_id="ami-12345",
+            instance_type="t3.micro",
+            provider_api="EC2Fleet",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
         )
 
         result = self.service._resolve_launch_template_spec(template)
@@ -170,7 +189,7 @@ class TestSpecFileLoading:
 
     def test_resolve_provider_api_spec_inline(self):
         """Test resolving inline provider API spec."""
-        from providers.aws.domain.template.aggregate import AWSTemplate
+        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
         inline_spec = {
             "Type": "instant",
@@ -181,6 +200,9 @@ class TestSpecFileLoading:
             template_id="test-template",
             image_id="ami-12345",
             instance_type="t3.micro",
+            provider_api="EC2Fleet",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
             provider_api_spec=inline_spec,
         )
 
@@ -190,7 +212,7 @@ class TestSpecFileLoading:
 
     def test_resolve_provider_api_spec_file(self):
         """Test resolving provider API spec from file."""
-        from providers.aws.domain.template.aggregate import AWSTemplate
+        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
         file_spec = {
             "Type": "maintain",
@@ -201,6 +223,9 @@ class TestSpecFileLoading:
             template_id="test-template",
             image_id="ami-12345",
             instance_type="t3.micro",
+            provider_api="EC2Fleet",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
             provider_api_spec_file="api-spec.json",
         )
 
@@ -214,10 +239,15 @@ class TestSpecFileLoading:
 
     def test_resolve_provider_api_spec_none(self):
         """Test resolving provider API spec when none specified."""
-        from providers.aws.domain.template.aggregate import AWSTemplate
+        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
         template = AWSTemplate(
-            template_id="test-template", image_id="ami-12345", instance_type="t3.micro"
+            template_id="test-template",
+            image_id="ami-12345",
+            instance_type="t3.micro",
+            provider_api="EC2Fleet",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
         )
 
         result = self.service._resolve_provider_api_spec(template)
@@ -253,7 +283,9 @@ class TestSpecFileLoading:
                 }
             }
 
-            with patch("infrastructure.utilities.file.json_utils.read_json_file") as mock_read:
+            with patch(
+                "providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
+            ) as mock_read:
                 mock_read.return_value = {"test": "data"}
 
                 self.service._load_spec_file(case["file_name"])
@@ -270,7 +302,9 @@ class TestSpecFileLoading:
 
         spec_content = {"Type": "instant"}
 
-        with patch("infrastructure.utilities.file.json_utils.read_json_file") as mock_read:
+        with patch(
+            "providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
+        ) as mock_read:
             mock_read.return_value = spec_content
 
             # Load same file twice
@@ -291,7 +325,9 @@ class TestSpecFileLoading:
         }
 
         # Note: This test assumes YAML support is added to the file utilities
-        with patch("infrastructure.utilities.file.json_utils.read_json_file") as mock_read:
+        with patch(
+            "providers.aws.infrastructure.services.aws_native_spec_service.read_json_file"
+        ) as mock_read:
             mock_read.return_value = {"Type": "maintain"}
 
             result = self.service._load_spec_file("test.yaml")
@@ -301,7 +337,7 @@ class TestSpecFileLoading:
 
     def test_spec_resolution_priority(self):
         """Test that inline specs take priority over file specs."""
-        from providers.aws.domain.template.aggregate import AWSTemplate
+        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
         # This should not be possible due to validation, but test the resolution logic
         inline_spec = {"Type": "instant"}
@@ -310,6 +346,9 @@ class TestSpecFileLoading:
             template_id="test-template",
             image_id="ami-12345",
             instance_type="t3.micro",
+            provider_api="EC2Fleet",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
             provider_api_spec=inline_spec,
         )
 

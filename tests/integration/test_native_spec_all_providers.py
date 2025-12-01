@@ -1,13 +1,17 @@
 """Integration tests for native spec support across all AWS providers."""
 
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
+from application.services.native_spec_service import NativeSpecService
+from domain.base.ports import ConfigurationPort, LoggingPort
+from domain.base.ports.spec_rendering_port import SpecRenderingPort
 from domain.request.aggregate import Request
 from domain.request.request_identifiers import RequestId
-from infrastructure.di.container import DIContainer
+from domain.request.request_types import RequestType
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from providers.aws.domain.template.value_objects import ProviderApi
 from providers.aws.infrastructure.services.aws_native_spec_service import (
     AWSNativeSpecService,
 )
@@ -18,8 +22,51 @@ class TestNativeSpecAllProviders:
 
     def setup_method(self):
         """Set up test fixtures."""
-        self.container = DIContainer()
-        self.aws_native_spec_service = self.container.get(AWSNativeSpecService)
+        # Create mock dependencies
+        mock_config_port = Mock(spec=ConfigurationPort)
+        mock_config_port.get_native_spec_config.return_value = {"enabled": True}
+        mock_config_port.get_package_info.return_value = {
+            "name": "open-hostfactory-plugin",
+            "version": "1.0.0",
+        }
+
+        mock_logger = Mock(spec=LoggingPort)
+        mock_spec_renderer = Mock(spec=SpecRenderingPort)
+
+        # Default renderer behavior: render string placeholders using provided context
+        def _render(spec, ctx):
+            if isinstance(spec, dict):
+                # shallow render for simple test fixtures
+                rendered = {}
+                for k, v in spec.items():
+                    if isinstance(v, str):
+                        rendered[k] = (
+                            v.replace("{{ requested_count }}", str(ctx.get("requested_count", "")))
+                            .replace("{{ request_id }}", str(ctx.get("request_id", "")))
+                            .replace("{{ template_id }}", str(ctx.get("template_id", "")))
+                            .replace("{{ image_id }}", str(ctx.get("image_id", "")))
+                            .replace("{{ instance_type }}", str(ctx.get("instance_type", "")))
+                            .replace("{{ package_name }}", str(ctx.get("package_name", "")))
+                            .replace("{{ package_version }}", str(ctx.get("package_version", "")))
+                        )
+                    else:
+                        rendered[k] = v
+                return rendered
+            return spec
+
+        mock_spec_renderer.render_spec.side_effect = _render
+        mock_spec_renderer.render_spec_from_file = Mock(
+            side_effect=lambda path, ctx: _render({}, ctx)
+        )
+
+        # Create real service instances with mocked dependencies
+        native_spec_service = NativeSpecService(
+            config_port=mock_config_port, spec_renderer=mock_spec_renderer, logger=mock_logger
+        )
+
+        self.aws_native_spec_service = AWSNativeSpecService(
+            native_spec_service=native_spec_service, config_port=mock_config_port
+        )
 
     def test_ec2fleet_native_spec_integration(self):
         """Test EC2Fleet with native spec integration."""
@@ -28,6 +75,9 @@ class TestNativeSpecAllProviders:
             template_id="ec2fleet-test",
             image_id="ami-12345",
             instance_type="t3.micro",
+            provider_api=ProviderApi.EC2_FLEET,
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
             provider_api_spec={
                 "Type": "instant",
                 "TargetCapacitySpecification": {
@@ -47,7 +97,9 @@ class TestNativeSpecAllProviders:
         )
 
         request = Request(
-            request_id=RequestId.generate(),
+            request_id=RequestId.generate(RequestType.ACQUIRE),
+            request_type=RequestType.ACQUIRE,
+            provider_type="aws",
             requested_count=3,
             template_id="ec2fleet-test",
         )
@@ -74,6 +126,9 @@ class TestNativeSpecAllProviders:
             template_id="spotfleet-test",
             image_id="ami-67890",
             instance_type="t3.small",
+            provider_api=ProviderApi.SPOT_FLEET,
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
             provider_api_spec={
                 "IamFleetRole": "arn:aws:iam::123456789012:role/aws-ec2-spot-fleet-tagging-role",
                 "AllocationStrategy": "lowestPrice",
@@ -100,7 +155,9 @@ class TestNativeSpecAllProviders:
         )
 
         request = Request(
-            request_id=RequestId.generate(),
+            request_id=RequestId.generate(RequestType.ACQUIRE),
+            request_type=RequestType.ACQUIRE,
+            provider_type="aws",
             requested_count=5,
             template_id="spotfleet-test",
         )
@@ -131,6 +188,9 @@ class TestNativeSpecAllProviders:
             template_id="asg-test",
             image_id="ami-asg123",
             instance_type="m5.large",
+            provider_api=ProviderApi.ASG,
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
             provider_api_spec={
                 "AutoScalingGroupName": "asg-{{ request_id }}",
                 "MinSize": 1,
@@ -152,7 +212,11 @@ class TestNativeSpecAllProviders:
         )
 
         request = Request(
-            request_id=RequestId.generate(), requested_count=4, template_id="asg-test"
+            request_id=RequestId.generate(RequestType.ACQUIRE),
+            request_type=RequestType.ACQUIRE,
+            provider_type="aws",
+            requested_count=4,
+            template_id="asg-test",
         )
 
         result = self.aws_native_spec_service.process_provider_api_spec(template, request)
@@ -175,6 +239,9 @@ class TestNativeSpecAllProviders:
             template_id="lt-test",
             image_id="ami-lt456",
             instance_type="t3.medium",
+            provider_api=ProviderApi.RUN_INSTANCES,
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
             launch_template_spec={
                 "LaunchTemplateName": "lt-{{ request_id }}",
                 "LaunchTemplateData": {
@@ -197,7 +264,13 @@ class TestNativeSpecAllProviders:
             },
         )
 
-        request = Request(request_id=RequestId.generate(), requested_count=2, template_id="lt-test")
+        request = Request(
+            request_id=RequestId.generate(RequestType.ACQUIRE),
+            request_type=RequestType.ACQUIRE,
+            provider_type="aws",
+            requested_count=2,
+            template_id="lt-test",
+        )
 
         result = self.aws_native_spec_service.process_launch_template_spec(template, request)
 
@@ -226,6 +299,9 @@ class TestNativeSpecAllProviders:
             template_id="mixed-test",
             image_id="ami-mixed789",
             instance_type="c5.xlarge",
+            provider_api=ProviderApi.EC2_FLEET,
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
             launch_template_spec={
                 "LaunchTemplateName": "mixed-lt-{{ request_id }}",
                 "LaunchTemplateData": {
@@ -246,7 +322,9 @@ class TestNativeSpecAllProviders:
         )
 
         request = Request(
-            request_id=RequestId.generate(),
+            request_id=RequestId.generate(RequestType.ACQUIRE),
+            request_type=RequestType.ACQUIRE,
+            provider_type="aws",
             requested_count=10,
             template_id="mixed-test",
         )
@@ -300,12 +378,19 @@ class TestNativeSpecAllProviders:
             template_id="file-test",
             image_id="ami-file123",
             instance_type="t3.large",
+            provider_api=ProviderApi.EC2_FLEET,
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
             launch_template_spec_file="lt-spec.json",
             provider_api_spec_file="api-spec.json",
         )
 
         request = Request(
-            request_id=RequestId.generate(), requested_count=6, template_id="file-test"
+            request_id=RequestId.generate(RequestType.ACQUIRE),
+            request_type=RequestType.ACQUIRE,
+            provider_type="aws",
+            requested_count=6,
+            template_id="file-test",
         )
 
         # Test launch template spec from file
@@ -326,6 +411,9 @@ class TestNativeSpecAllProviders:
             template_id="disabled-test",
             image_id="ami-disabled",
             instance_type="t3.micro",
+            provider_api=ProviderApi.EC2_FLEET,
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
             provider_api_spec={
                 "Type": "instant",
                 "TargetCapacitySpecification": {"TotalTargetCapacity": "{{ requested_count }}"},
@@ -333,7 +421,7 @@ class TestNativeSpecAllProviders:
         )
 
         request = Request(
-            request_id=RequestId.generate(),
+            request_id=RequestId.generate(RequestType.ACQUIRE),
             requested_count=1,
             template_id="disabled-test",
         )
@@ -356,6 +444,9 @@ class TestNativeSpecAllProviders:
             template_id="complex-test",
             image_id="ami-complex",
             instance_type="t3.micro",
+            provider_api=ProviderApi.EC2_FLEET,
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
             provider_api_spec={
                 "Type": "maintain",
                 "TargetCapacitySpecification": {
@@ -372,7 +463,9 @@ class TestNativeSpecAllProviders:
 
         # Test with small request count
         request_small = Request(
-            request_id=RequestId.generate(),
+            request_id=RequestId.generate(RequestType.ACQUIRE),
+            request_type=RequestType.ACQUIRE,
+            provider_type="aws",
             requested_count=4,
             template_id="complex-test",
         )
@@ -389,7 +482,9 @@ class TestNativeSpecAllProviders:
 
         # Test with large request count
         request_large = Request(
-            request_id=RequestId.generate(),
+            request_id=RequestId.generate(RequestType.ACQUIRE),
+            request_type=RequestType.ACQUIRE,
+            provider_type="aws",
             requested_count=20,
             template_id="complex-test",
         )
@@ -411,6 +506,9 @@ class TestNativeSpecAllProviders:
             template_id="invalid-test",
             image_id="ami-invalid",
             instance_type="t3.micro",
+            provider_api=ProviderApi.EC2_FLEET,
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
             provider_api_spec={
                 "Type": "instant",
                 "InvalidField": "{{ unclosed_variable",  # Invalid syntax
@@ -418,7 +516,9 @@ class TestNativeSpecAllProviders:
         )
 
         request = Request(
-            request_id=RequestId.generate(),
+            request_id=RequestId.generate(RequestType.ACQUIRE),
+            request_type=RequestType.ACQUIRE,
+            provider_type="aws",
             requested_count=1,
             template_id="invalid-test",
         )
@@ -433,6 +533,9 @@ class TestNativeSpecAllProviders:
             template_id="context-test",
             image_id="ami-context",
             instance_type="t3.micro",
+            provider_api=ProviderApi.EC2_FLEET,
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
             provider_api_spec={
                 "Type": "instant",
                 "ContextTest": {
@@ -448,7 +551,9 @@ class TestNativeSpecAllProviders:
         )
 
         request = Request(
-            request_id=RequestId.generate(),
+            request_id=RequestId.generate(RequestType.ACQUIRE),
+            request_type=RequestType.ACQUIRE,
+            provider_type="aws",
             requested_count=3,
             template_id="context-test",
         )

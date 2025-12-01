@@ -386,6 +386,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "maxSpotPrice",
             "allocationStrategy",
             "spotFleetRequestExpiry",
+            "abisInstanceRequirements",
         ]
 
         for field in optional_fields:
@@ -409,6 +410,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "keyName": "key_name",
             "securityGroupIds": "security_group_ids",
             "priceType": "price_type",
+            "abisInstanceRequirements": "abis_instance_requirements",
         }
         return mapping.get(hf_field, hf_field)
 
@@ -588,6 +590,51 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
                 for template in templates
             ]
         }
+
+    def format_request_status_response(self, requests: list["Request"]) -> dict[str, Any]:
+        """
+        Format domain Requests to HostFactory response format.
+        Converts machine fields from snake_case to camelCase.
+        """
+        formatted_requests = []
+        for request in requests:
+            req_dict = request.to_dict()
+            # Convert machines to camelCase
+            if "machines" in req_dict:
+                req_dict["machines"] = [
+                    self._convert_machine_to_camel(m) for m in req_dict["machines"]
+                ]
+            formatted_requests.append(req_dict)
+
+        return {
+            "requests": formatted_requests,
+            "message": "Request status retrieved successfully",
+            "count": len(requests),
+        }
+
+    def _convert_machine_to_camel(self, machine: dict[str, Any]) -> dict[str, Any]:
+        """Convert machine dict from snake_case to camelCase for HostFactory."""
+        result = {
+            "machineId": machine.get("machine_id"),
+            "name": machine.get("name"),
+            "result": machine.get("result"),
+            "status": machine.get("status"),
+            "privateIpAddress": machine.get("private_ip_address"),
+            "message": machine.get("message", ""),
+        }
+        if machine.get("public_ip_address"):
+            result["publicIpAddress"] = machine["public_ip_address"]
+        if machine.get("instance_type"):
+            result["instanceType"] = machine["instance_type"]
+        if machine.get("price_type"):
+            result["priceType"] = machine["price_type"]
+        if machine.get("instance_tags"):
+            result["instanceTags"] = machine["instance_tags"]
+        if machine.get("cloud_host_id"):
+            result["cloudHostId"] = machine["cloud_host_id"]
+        if machine.get("launch_time"):
+            result["launchtime"] = str(machine["launch_time"])
+        return result
 
     def format_machine_status_response(self, machines: list[Machine]) -> dict[str, Any]:
         """

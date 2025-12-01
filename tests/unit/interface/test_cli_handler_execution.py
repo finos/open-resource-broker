@@ -3,6 +3,8 @@
 import argparse
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from domain.base.ports import SchedulerPort
 from infrastructure.di.buses import QueryBus
 from infrastructure.di.container import DIContainer
@@ -17,6 +19,7 @@ from interface.template_command_handlers import handle_list_templates
 class TestCLIHandlerExecution:
     """Test CLI handler execution."""
 
+    @pytest.mark.asyncio
     @patch("src.interface.template_command_handlers.get_container")
     async def test_handle_list_templates(self, mock_get_container):
         """Test that handle_list_templates executes correctly."""
@@ -62,6 +65,7 @@ class TestCLIHandlerExecution:
         # Verify that the scheduler strategy was used for format conversion
         scheduler_strategy.format_templates_response.assert_called_once_with(templates)
 
+    @pytest.mark.asyncio
     @patch("src.interface.scheduler_command_handlers.get_container")
     async def test_handle_list_scheduler_strategies(self, mock_get_container):
         """Test that handle_list_scheduler_strategies executes correctly."""
@@ -99,6 +103,7 @@ class TestCLIHandlerExecution:
         # Verify that the query bus was called
         query_bus.execute.assert_called_once()
 
+    @pytest.mark.asyncio
     @patch("src.interface.storage_command_handlers.get_container")
     async def test_handle_list_storage_strategies(self, mock_get_container):
         """Test that handle_list_storage_strategies executes correctly."""
@@ -136,6 +141,7 @@ class TestCLIHandlerExecution:
         # Verify that the query bus was called
         query_bus.execute.assert_called_once()
 
+    @pytest.mark.asyncio
     @patch("src.interface.request_command_handlers.get_container")
     async def test_handle_get_request_status(self, mock_get_container):
         """Test that handle_get_request_status executes correctly."""
@@ -173,6 +179,7 @@ class TestCLIHandlerExecution:
 class TestFormatConversionConsistency:
     """Test format conversion consistency."""
 
+    @pytest.mark.asyncio
     @patch("src.interface.template_command_handlers.get_container")
     async def test_format_conversion_in_template_handler(self, mock_get_container):
         """Test that format conversion is done using the scheduler strategy in template handlers."""

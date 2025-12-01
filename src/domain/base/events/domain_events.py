@@ -1,6 +1,6 @@
 """Domain events - Request, Machine, and Template business events."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from pydantic import Field
@@ -39,7 +39,7 @@ class RequestCompletedEvent(RequestEvent):
 
     completion_status: str
     machine_ids: list[str] = Field(default_factory=list)
-    completion_time: datetime = Field(default_factory=datetime.utcnow)
+    completion_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class RequestFailedEvent(RequestEvent):
@@ -89,14 +89,14 @@ class MachineProvisionedEvent(MachineEvent):
     instance_id: str
     private_ip: Optional[str] = None
     public_ip: Optional[str] = None
-    provisioning_time: datetime = Field(default_factory=datetime.utcnow)
+    provisioning_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class MachineTerminatedEvent(MachineEvent):
     """Event raised when a machine is terminated."""
 
     termination_reason: str
-    termination_time: datetime = Field(default_factory=datetime.utcnow)
+    termination_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class MachineHealthCheckEvent(MachineEvent):
@@ -104,7 +104,7 @@ class MachineHealthCheckEvent(MachineEvent):
 
     health_status: str
     health_details: dict[str, Any] = Field(default_factory=dict)
-    check_time: datetime = Field(default_factory=datetime.utcnow)
+    check_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # =============================================================================
@@ -144,4 +144,4 @@ class TemplateDeletedEvent(TemplateEvent):
     """Event raised when a template is deleted."""
 
     deletion_reason: str
-    deletion_time: datetime = Field(default_factory=datetime.utcnow)
+    deletion_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -1,8 +1,8 @@
 """Tests for AWS template fleet_type default assignment."""
 
 import pytest
-from providers.aws.domain.template.aggregate import AWSTemplate
 
+from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.domain.template.value_objects import AWSFleetType, ProviderApi
 
 
@@ -90,6 +90,55 @@ class TestAWSTemplateDefaults:
 
         # Should preserve explicitly provided fleet_type
         assert template.fleet_type == AWSFleetType.MAINTAIN
+
+    def test_template_accepts_snake_case_abis_requirements(self):
+        """Ensure snake_case configs hydrate ABIS instance requirements."""
+        template_data = {
+            "template_id": "test-template",
+            "provider_api": ProviderApi.EC2_FLEET,
+            "image_id": "ami-12345678",
+            "subnet_ids": ["subnet-12345"],
+            "instance_type": "t2.micro",
+            "abis_instance_requirements": {
+                "vcpu_count": {"min": 2, "max": 4},
+                "memory_mib": {"min": 4096, "max": 8192},
+                "cpu_manufacturers": ["intel"],
+                "local_storage": "required",
+            },
+        }
+
+        template = AWSTemplate(**template_data)
+
+        assert template.abis_instance_requirements is not None
+        assert template.abis_instance_requirements.vcpu_count.min == 2
+        payload = template.get_instance_requirements_payload()
+        assert payload == {
+            "VCpuCount": {"Min": 2, "Max": 4},
+            "MemoryMiB": {"Min": 4096, "Max": 8192},
+            "CpuManufacturers": ["intel"],
+            "LocalStorage": "required",
+        }
+
+    def test_template_accepts_camel_case_abis_requirements(self):
+        """Ensure HostFactory camelCase configs hydrate ABIS requirements."""
+        template_data = {
+            "template_id": "test-template",
+            "provider_api": ProviderApi.SPOT_FLEET,
+            "image_id": "ami-12345678",
+            "subnet_ids": ["subnet-12345"],
+            "instance_type": "t2.micro",
+            "abisInstanceRequirements": {
+                "VCpuCount": {"Min": 1, "Max": 2},
+                "MemoryMiB": {"Min": 2048, "Max": 4096},
+                "LocalStorage": "required",
+            },
+        }
+
+        template = AWSTemplate(**template_data)
+
+        assert template.abis_instance_requirements is not None
+        assert template.abis_instance_requirements.memory_mib.max == 4096
+        assert template.abis_instance_requirements.local_storage == "required"
 
 
 class TestAWSTemplateExtensionConfig:

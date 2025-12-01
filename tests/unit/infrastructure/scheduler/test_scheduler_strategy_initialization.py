@@ -2,8 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
-from config.manager import ConfigurationManager
 from domain.base.ports import LoggingPort, SchedulerPort
+from domain.base.ports.configuration_port import ConfigurationPort
 from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
 from infrastructure.scheduler.registration import create_default_strategy
@@ -15,7 +15,7 @@ class TestSchedulerStrategyInitialization:
     def test_default_scheduler_strategy_initialization(self):
         """Test that DefaultSchedulerStrategy can be initialized with config_manager and logger."""
         # Arrange
-        config_manager = MagicMock(spec=ConfigurationManager)
+        config_manager = MagicMock(spec=ConfigurationPort)
         logger = MagicMock(spec=LoggingPort)
 
         # Act
@@ -28,7 +28,7 @@ class TestSchedulerStrategyInitialization:
     def test_symphony_hostfactory_strategy_initialization(self):
         """Test that HostFactorySchedulerStrategy can be initialized with config_manager and logger."""
         # Arrange
-        config_manager = MagicMock(spec=ConfigurationManager)
+        config_manager = MagicMock(spec=ConfigurationPort)
         logger = MagicMock(spec=LoggingPort)
 
         # Act
@@ -42,10 +42,10 @@ class TestSchedulerStrategyInitialization:
         """Test that create_default_strategy creates a DefaultSchedulerStrategy with config_manager and logger."""
         # Arrange
         container = MagicMock()
-        config_manager = MagicMock(spec=ConfigurationManager)
+        config_manager = MagicMock(spec=ConfigurationPort)
         logger = MagicMock(spec=LoggingPort)
         container.get.side_effect = lambda x: {
-            ConfigurationManager: config_manager,
+            ConfigurationPort: config_manager,
             LoggingPort: logger,
         }.get(x)
 
@@ -56,7 +56,7 @@ class TestSchedulerStrategyInitialization:
         assert isinstance(strategy, DefaultSchedulerStrategy)
         assert strategy.config_manager == config_manager
         assert strategy._logger == logger
-        container.get.assert_any_call(ConfigurationManager)
+        container.get.assert_any_call(ConfigurationPort)
         container.get.assert_any_call(LoggingPort)
 
 

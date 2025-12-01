@@ -1,9 +1,13 @@
 """Test suite for getRequestStatus functionality."""
 
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
 
-from config.manager import ConfigurationManager
-from infrastructure.logging.logger import get_logger
+from application.request.dto import MachineReferenceDTO
+from application.services.provider_selection_service import ProviderSelectionResult
+from domain.base.ports import LoggingPort
+from domain.base.ports.configuration_port import ConfigurationPort
 from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
 
 
@@ -15,6 +19,37 @@ class MockRequestDTO:
         self.request_id = request_id
         self.status = status
         self.machines = machines or []
+        self.machine_references = []
+
+        for m in machines or []:
+            machine_ref = MachineReferenceDTO(
+                machine_id=m.get("instance_id", ""),
+                name="",
+                result="succeed" if m.get("status") == "running" else "executing",
+                status=m.get("status", ""),
+                private_ip_address=m.get("private_ip", ""),
+                public_ip_address=m.get("public_ip"),
+                launch_time=m.get("launch_time_timestamp"),
+                message="",
+            )
+            self.machine_references.append(machine_ref)
+
+    def to_dict(self):
+        """Convert to dictionary format."""
+        return {
+            "request_id": self.request_id,
+            "status": self.status,
+            "machines": [
+                {
+                    "instance_id": m.machine_id,
+                    "status": m.status,
+                    "private_ip": m.private_ip_address,
+                    "public_ip": m.public_ip_address,
+                    "launch_time_timestamp": m.launch_time or 0,
+                }
+                for m in self.machine_references
+            ],
+        }
 
 
 class TestGetRequestStatusFunctionality:
@@ -23,9 +58,18 @@ class TestGetRequestStatusFunctionality:
     @pytest.fixture
     def scheduler_strategy(self):
         """Create scheduler strategy for testing."""
-        config_manager = ConfigurationManager()
-        logger = get_logger(__name__)
-        return HostFactorySchedulerStrategy(config_manager, logger)
+        with patch("infrastructure.di.container.get_container") as mock_get_container:
+            mock_container = Mock()
+            mock_provider_service = Mock()
+            mock_provider_service.select_active_provider.return_value = ProviderSelectionResult(
+                provider_type="aws", provider_instance="aws-default", selection_reason="test"
+            )
+            mock_container.get.return_value = mock_provider_service
+            mock_get_container.return_value = mock_container
+
+            config_manager = MagicMock(spec=ConfigurationPort)
+            logger = MagicMock(spec=LoggingPort)
+            return HostFactorySchedulerStrategy(config_manager, logger)
 
     def test_hostfactory_format_basic(self, scheduler_strategy):
         """Test basic HostFactory formatting for getRequestStatus."""

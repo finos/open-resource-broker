@@ -32,10 +32,13 @@ class TestMCPServerHandler:
     @pytest.mark.asyncio
     async def test_handle_mcp_serve_stdio_mode(self, stdio_args, mock_app):
         """Test MCP serve handler in stdio mode."""
-        with patch("src.interface.mcp.server.handler._run_stdio_server") as mock_stdio:
+        with (
+            patch("interface.mcp.server.handler._run_stdio_server") as mock_stdio,
+            patch("interface.mcp.server.handler.get_container", return_value=mock_app),
+        ):
             mock_stdio.return_value = None
 
-            result = await handle_mcp_serve(stdio_args, mock_app)
+            result = await handle_mcp_serve(stdio_args)
 
             assert result["message"] == "MCP server started in stdio mode"
             mock_stdio.assert_called_once()
@@ -43,13 +46,19 @@ class TestMCPServerHandler:
     @pytest.mark.asyncio
     async def test_handle_mcp_serve_tcp_mode(self, tcp_args, mock_app):
         """Test MCP serve handler in TCP mode."""
-        with patch("src.interface.mcp.server.handler._run_tcp_server") as mock_tcp:
+        with (
+            patch("interface.mcp.server.handler._run_tcp_server") as mock_tcp,
+            patch("interface.mcp.server.handler.get_container", return_value=mock_app),
+        ):
             mock_tcp.return_value = None
 
-            result = await handle_mcp_serve(tcp_args, mock_app)
+            result = await handle_mcp_serve(tcp_args)
 
             assert result["message"] == "MCP server started on localhost:3000"
-            mock_tcp.assert_called_once_with(mock_app, "localhost", 3000)
+            assert mock_tcp.call_count == 1
+            call_args = mock_tcp.call_args[0]
+            assert call_args[1] == "localhost"
+            assert call_args[2] == 3000
 
     @pytest.mark.asyncio
     async def test_stdio_server_message_handling(self, mock_app):
@@ -66,10 +75,10 @@ class TestMCPServerHandler:
             patch("asyncio.get_event_loop") as mock_loop,
         ):
             # Mock readline to return a test message then EOF
-            mock_executor = Mock()
+            mock_executor = AsyncMock()
             mock_loop.return_value.run_in_executor = mock_executor
             mock_executor.side_effect = [
-                '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}',
+                '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}\n',
                 "",  # EOF
             ]
 
@@ -124,9 +133,12 @@ class TestMCPServerHandler:
     @pytest.mark.asyncio
     async def test_error_handling_in_handler(self, stdio_args, mock_app):
         """Test error handling in MCP serve handler."""
-        with patch("src.interface.mcp.server.handler._run_stdio_server") as mock_stdio:
+        with (
+            patch("interface.mcp.server.handler._run_stdio_server") as mock_stdio,
+            patch("interface.mcp.server.handler.get_container", return_value=mock_app),
+        ):
             mock_stdio.side_effect = Exception("Test error")
 
             # Should raise the exception (not caught in handler)
             with pytest.raises(Exception, match="Test error"):
-                await handle_mcp_serve(stdio_args, mock_app)
+                await handle_mcp_serve(stdio_args)

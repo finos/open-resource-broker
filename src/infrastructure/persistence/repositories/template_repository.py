@@ -126,6 +126,16 @@ class TemplateSerializer:
             if not template_id:
                 raise ValueError(f"No template_id found in data: {list(processed_data.keys())}")
 
+            # Normalize instance type mappings across legacy and new schemas.
+            # Prefer explicit instance_types, then camelCase vmTypes/instanceTypes, then legacy vm_types.
+            normalized_instance_types = (
+                processed_data.get("instance_types")
+                or processed_data.get("vmTypes")
+                or processed_data.get("instanceTypes")
+                or processed_data.get("vm_types")
+                or {}
+            )
+
             # Build template data with complete field support
             template_data = {
                 # Core template fields
@@ -138,7 +148,7 @@ class TemplateSerializer:
                     "maxNumber", processed_data.get("max_instances", 1)
                 ),
                 # Instance configuration
-                "instance_types": processed_data.get("instance_types", {}),
+                "instance_types": normalized_instance_types,
                 "primary_instance_type": processed_data.get("primary_instance_type"),
                 # Network configuration
                 "subnet_ids": (
@@ -177,7 +187,7 @@ class TemplateSerializer:
                 "provider_api": data.get("providerApi", data.get("provider_api")),
                 # Legacy HF fields (for backward compatibility)
                 "vm_type": data.get("vmType", data.get("vm_type")),
-                "vm_types": data.get("vm_types", {}),
+                "vm_types": normalized_instance_types,
                 "key_name": data.get("keyName", data.get("key_name")),
                 # Status and timestamps
                 "is_active": data.get("is_active", True),

@@ -35,8 +35,10 @@ fi
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# Check if Python is available
-if command -v python3 &> /dev/null; then
+# Prefer project virtualenv if present, otherwise fall back to system python
+if [ -x "${PROJECT_ROOT}/.venv/bin/python" ]; then
+    PYTHON_CMD="${PROJECT_ROOT}/.venv/bin/python"
+elif command -v python3 &> /dev/null; then
     PYTHON_CMD=python3
 elif command -v python &> /dev/null; then
     PYTHON_CMD=python

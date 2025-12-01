@@ -35,12 +35,17 @@ class TestBootstrapIntegration:
         )
         self.mock_config_manager.get.return_value = {"type": "aws"}
 
-        # Mock AppConfig with proper attributes
+        # Mock AppConfig with complete LoggingConfig attributes
         mock_app_config = Mock()
-        mock_app_config.logging = Mock()
-        mock_app_config.logging.level = "DEBUG"
-        mock_app_config.logging.file_path = "logs/test.log"
-        mock_app_config.logging.console_enabled = True
+        mock_logging_config = Mock()
+        mock_logging_config.level = "DEBUG"
+        mock_logging_config.format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        mock_logging_config.file_path = "logs/test.log"
+        mock_logging_config.max_size = 10485760
+        mock_logging_config.backup_count = 5
+        mock_logging_config.console_enabled = True
+        mock_logging_config.accept_propagated_setting = False
+        mock_app_config.logging = mock_logging_config
         self.mock_config_manager.get_typed.return_value = mock_app_config
 
         # Mock container and provider context
@@ -91,9 +96,17 @@ class TestBootstrapIntegration:
         self.mock_config_manager.is_provider_strategy_enabled.return_value = False
         self.mock_config_manager.get.return_value = {"type": "aws"}
 
-        # Mock AppConfig
+        # Mock AppConfig with complete LoggingConfig attributes
         mock_app_config = Mock()
-        mock_app_config.logging = Mock()
+        mock_logging_config = Mock()
+        mock_logging_config.level = "INFO"
+        mock_logging_config.format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        mock_logging_config.file_path = "logs/test.log"
+        mock_logging_config.max_size = 10485760
+        mock_logging_config.backup_count = 5
+        mock_logging_config.console_enabled = True
+        mock_logging_config.accept_propagated_setting = False
+        mock_app_config.logging = mock_logging_config
         self.mock_config_manager.get_typed.return_value = mock_app_config
 
         # Mock container and provider context
@@ -154,9 +167,17 @@ class TestBootstrapIntegration:
 
         self.mock_config_manager.get.return_value = {"type": "aws"}
 
-        # Mock AppConfig
+        # Mock AppConfig with complete LoggingConfig attributes
         mock_app_config = Mock()
-        mock_app_config.logging = Mock()
+        mock_logging_config = Mock()
+        mock_logging_config.level = "INFO"
+        mock_logging_config.format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        mock_logging_config.file_path = "logs/test.log"
+        mock_logging_config.max_size = 10485760
+        mock_logging_config.backup_count = 5
+        mock_logging_config.console_enabled = True
+        mock_logging_config.accept_propagated_setting = False
+        mock_app_config.logging = mock_logging_config
         self.mock_config_manager.get_typed.return_value = mock_app_config
 
         # Mock provider context with provider info
@@ -203,10 +224,21 @@ class TestBootstrapIntegration:
         mock_get_config_manager.return_value = self.mock_config_manager
 
         self.mock_config_manager.get.return_value = {"type": "aws"}
+        self.mock_config_manager.get_provider_config.side_effect = AttributeError(
+            "Method not available"
+        )
 
-        # Mock AppConfig
+        # Mock AppConfig with complete LoggingConfig attributes
         mock_app_config = Mock()
-        mock_app_config.logging = Mock()
+        mock_logging_config = Mock()
+        mock_logging_config.level = "INFO"
+        mock_logging_config.format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        mock_logging_config.file_path = "logs/test.log"
+        mock_logging_config.max_size = 10485760
+        mock_logging_config.backup_count = 5
+        mock_logging_config.console_enabled = True
+        mock_logging_config.accept_propagated_setting = False
+        mock_app_config.logging = mock_logging_config
         self.mock_config_manager.get_typed.return_value = mock_app_config
 
         # Mock provider context
@@ -215,10 +247,14 @@ class TestBootstrapIntegration:
         mock_provider_context.available_strategies = ["aws"]
         mock_provider_context.current_strategy_type = "aws"
 
-        with patch("infrastructure.di.container.get_container") as mock_get_container:
+        with (
+            patch("infrastructure.di.container.get_container") as mock_get_container,
+            patch.object(Application, "_preload_templates") as mock_preload,
+        ):
             mock_get_container.return_value = self.mock_container
             self.mock_container.get.return_value = mock_provider_context
             self.mock_container.is_lazy_loading_enabled.return_value = False
+            mock_preload.return_value = None
 
             # Execute
             async with Application() as app:

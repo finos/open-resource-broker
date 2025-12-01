@@ -1,9 +1,20 @@
 """Tests for storage command handlers."""
 
 from argparse import Namespace
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
+
+import application.commands.system
+import application.queries.storage
+
+# Import modules and add missing classes before importing handlers
+import application.queries.system
+
+# Mock the missing queries/commands
+application.queries.system.GetStorageConfigQuery = MagicMock()
+application.queries.system.ValidateStorageConfigQuery = MagicMock()
+application.commands.system.TestStorageCommand = MagicMock()
 
 from interface.storage_command_handlers import (
     handle_list_storage_strategies,

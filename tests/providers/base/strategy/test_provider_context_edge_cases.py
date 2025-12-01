@@ -45,7 +45,7 @@ class FlakyProviderStrategy(ProviderStrategy):
         """Check if initialized."""
         return self._initialized
 
-    def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
+    async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
         """Execute operation with potential failure."""
         self.operation_count += 1
 
@@ -114,7 +114,7 @@ class SlowProviderStrategy(ProviderStrategy):
         """Check if initialized."""
         return self._initialized
 
-    def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
+    async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
         """Execute operation with delay."""
         time.sleep(self.delay_seconds)
         return ProviderResult.success_result({"delayed": True})
@@ -152,7 +152,8 @@ class TestProviderContextEdgeCases:
         """Create provider context instance."""
         return ProviderContext(mock_logger)
 
-    def test_flaky_provider_behavior(self, provider_context):
+    @pytest.mark.asyncio
+    async def test_flaky_provider_behavior(self, provider_context):
         """Test handling of flaky provider behavior."""
         # Set seed for reproducible results
         import random
@@ -171,7 +172,7 @@ class TestProviderContextEdgeCases:
 
         results = []
         for _ in range(20):
-            result = provider_context.execute_operation(operation)
+            result = await provider_context.execute_operation(operation)
             results.append(result.success)
 
         # Should have mix of successes and failures
@@ -187,7 +188,8 @@ class TestProviderContextEdgeCases:
         assert metrics.successful_operations == successes
         assert metrics.failed_operations == failures
 
-    def test_slow_provider_operations(self, provider_context):
+    @pytest.mark.asyncio
+    async def test_slow_provider_operations(self, provider_context):
         """Test handling of slow provider operations."""
         slow_strategy = SlowProviderStrategy("slow", delay_seconds=0.1)
         provider_context.register_strategy(slow_strategy)
@@ -206,7 +208,7 @@ class TestProviderContextEdgeCases:
         )
 
         start_time = time.time()
-        result = provider_context.execute_operation(operation)
+        result = await provider_context.execute_operation(operation)
         operation_time = time.time() - start_time
 
         assert result.success is True
@@ -465,6 +467,10 @@ class TestProviderContextEdgeCases:
         with provider_context as ctx:
             assert ctx.is_initialized is True
 
+        # Re-register strategy after cleanup
+        strategy = FlakyProviderStrategy("exception-test", failure_rate=0.0)
+        provider_context.register_strategy(strategy)
+
         # Test context manager with exception
         try:
             with provider_context as ctx:
@@ -509,17 +515,17 @@ class TestProviderContextEdgeCases:
         assert metrics.success_rate == 100.0
         assert metrics.average_response_time_ms > 0  # Should be greater than 0
 
-    def test_strategy_capabilities_edge_cases(self, provider_context):
+    @pytest.mark.asyncio
+    async def test_strategy_capabilities_edge_cases(self, provider_context):
         """Test edge cases in strategy capabilities handling."""
         # Strategy with no supported operations
-        empty_strategy = Mock()
+        empty_strategy = Mock(spec=ProviderStrategy)
         empty_strategy.provider_type = "empty"
         empty_strategy.initialize.return_value = True
         empty_strategy.is_initialized.return_value = True
         empty_strategy.get_capabilities.return_value = ProviderCapabilities(
+            provider_type="empty",
             supported_operations=[],  # No operations supported
-            max_concurrent_operations=0,
-            supports_dry_run=False,
         )
 
         provider_context.register_strategy(empty_strategy)
@@ -531,7 +537,7 @@ class TestProviderContextEdgeCases:
             parameters={"count": 1},
         )
 
-        result = provider_context.execute_operation(operation)
+        result = await provider_context.execute_operation(operation)
 
         # Should fail due to unsupported operation
         assert result.success is False

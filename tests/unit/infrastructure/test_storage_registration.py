@@ -21,7 +21,7 @@ class TestJSONStorageRegistration:
         """Clean up after tests."""
         reset_storage_registry()
 
-    @patch("src.infrastructure.persistence.json.registration.JSONStorageStrategy")
+    @patch("infrastructure.persistence.json.strategy.JSONStorageStrategy")
     def test_create_json_strategy(self, mock_strategy_class):
         """Test creating JSON storage strategy."""
         from infrastructure.persistence.json.registration import create_json_strategy
@@ -58,7 +58,7 @@ class TestJSONStorageRegistration:
         mock_config_class.assert_called_once_with(**data)
 
     @patch("src.infrastructure.persistence.repositories.request_repository.RequestRepository")
-    @patch("src.infrastructure.persistence.json.registration.JSONStorageStrategy")
+    @patch("src.infrastructure.persistence.json.strategy.JSONStorageStrategy")
     def test_create_json_request_repository(self, mock_strategy_class, mock_repo_class):
         """Test creating JSON request repository."""
         from infrastructure.persistence.json.registration import (
@@ -93,7 +93,7 @@ class TestJSONStorageRegistration:
 
         # Mock the imports to avoid dependency issues
         with (
-            patch("src.infrastructure.persistence.json.registration.JSONStorageStrategy"),
+            patch("src.infrastructure.persistence.json.strategy.JSONStorageStrategy"),
             patch(
                 "src.infrastructure.persistence.repositories.request_repository.RequestRepository"
             ),
@@ -103,7 +103,7 @@ class TestJSONStorageRegistration:
             patch(
                 "src.infrastructure.persistence.repositories.template_repository.TemplateRepository"
             ),
-            patch("src.infrastructure.persistence.json.registration.JSONUnitOfWork"),
+            patch("src.infrastructure.persistence.json.unit_of_work.JSONUnitOfWork"),
         ):
             register_json_storage()
 

@@ -103,8 +103,7 @@ def test_launch_template_edge_cases():
 
         # Import required classes
         try:
-            from providers.aws.domain.template.aggregate import AWSTemplate
-
+            from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
             from providers.aws.domain.template.value_objects import ProviderApi
         except ImportError as e:
             print(f"   Could not import required classes: {e}")

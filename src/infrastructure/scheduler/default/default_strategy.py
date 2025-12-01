@@ -86,7 +86,17 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
         if "requests" in raw_data:
             return [{"request_id": req.get("request_id")} for req in raw_data["requests"]]
 
-        # Request Machines
+        # Request Machines - handle nested format: {"template": {"template_id": ..., "machine_count": ...}}
+        if "template" in raw_data:
+            template_data = raw_data["template"]
+            return {
+                "template_id": template_data.get("template_id"),
+                "requested_count": template_data.get("machine_count", 1),
+                "request_type": template_data.get("request_type", "provision"),
+                "metadata": raw_data.get("metadata", {}),
+            }
+
+        # Request Machines - flat format
         # Return as-is since it's already in domain format
         return {
             "template_id": raw_data.get("template_id"),
@@ -100,10 +110,10 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
         """
         Format domain Templates to native domain response format.
 
-        Uses the Template's to_dict() method to serialize to native format.
+        Uses the Template's model_dump() method to serialize to native format.
         """
         return {
-            "templates": [template.to_dict() for template in templates],
+            "templates": [template.model_dump() for template in templates],
             "message": "Templates retrieved successfully",
             "count": len(templates),
         }
@@ -112,30 +122,36 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
         """
         Format domain Machines to native domain response format.
 
-        Uses the Machine's to_dict() method to serialize to native format.
+        Uses the Machine's model_dump() method to serialize to native format.
         """
         return {
-            "machines": [machine.to_dict() for machine in machines],
+            "machines": [machine.model_dump() for machine in machines],
             "message": "Machine status retrieved successfully",
             "count": len(machines),
         }
 
     def get_working_directory(self) -> str:
-        """Get working directory - use current directory."""
+        """Get working directory from DEFAULT_PROVIDER_WORKDIR or current directory."""
         import os
 
-        return os.getcwd()
+        return os.environ.get("DEFAULT_PROVIDER_WORKDIR", os.getcwd())
 
     def get_config_directory(self) -> str:
-        """Get config directory - use working_dir/config."""
+        """Get config directory from DEFAULT_PROVIDER_CONFDIR or working_dir/config."""
         import os
 
+        confdir = os.environ.get("DEFAULT_PROVIDER_CONFDIR")
+        if confdir:
+            return confdir
         return os.path.join(self.get_working_directory(), "config")
 
     def get_logs_directory(self) -> str:
-        """Get logs directory - use working_dir/logs."""
+        """Get logs directory from DEFAULT_PROVIDER_LOGDIR or working_dir/logs."""
         import os
 
+        logdir = os.environ.get("DEFAULT_PROVIDER_LOGDIR")
+        if logdir:
+            return logdir
         return os.path.join(self.get_working_directory(), "logs")
 
     def get_storage_base_path(self) -> str:
@@ -163,7 +179,7 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
     def format_request_response(self, request_data: dict[str, Any]) -> dict[str, Any]:
         """Format request creation response to native domain format."""
         return {
-            "requestId": request_data.get("request_id", request_data.get("requestId")),
+            "request_id": request_data.get("request_id", request_data.get("requestId")),
             "message": request_data.get("message", "Request submitted successfully"),
             "template_id": request_data.get("template_id"),
             "count": request_data.get("count"),

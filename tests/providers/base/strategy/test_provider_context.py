@@ -7,7 +7,7 @@ from unittest.mock import Mock
 import pytest
 
 from domain.base.ports import LoggingPort
-from providers.base.strategy.provider_context import ProviderContext, StrategyMetrics
+from providers.base.strategy.provider_context import ProviderContext
 from providers.base.strategy.provider_strategy import (
     ProviderCapabilities,
     ProviderHealthStatus,
@@ -44,7 +44,7 @@ class MockProviderStrategy(ProviderStrategy):
         """Check if strategy is initialized."""
         return self._initialized
 
-    def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
+    async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
         """Execute an operation."""
         self.execute_count += 1
         if operation.operation_type in self._supports_operations:
@@ -197,7 +197,8 @@ class TestProviderContext:
         assert result.success is False
         assert result.error_code == "NO_STRATEGY_AVAILABLE"
 
-    def test_execute_operation_unsupported(self, provider_context):
+    @pytest.mark.asyncio
+    async def test_execute_operation_unsupported(self, provider_context):
         """Test operation execution with unsupported operation."""
         strategy = MockProviderStrategy(
             "test-provider",
@@ -210,12 +211,13 @@ class TestProviderContext:
             parameters={"count": 2},
         )
 
-        result = provider_context.execute_operation(operation)
+        result = await provider_context.execute_operation(operation)
 
         assert result.success is False
         assert result.error_code == "OPERATION_NOT_SUPPORTED"
 
-    def test_execute_with_strategy(self, provider_context):
+    @pytest.mark.asyncio
+    async def test_execute_with_strategy(self, provider_context):
         """Test executing operation with specific strategy."""
         strategy1 = MockProviderStrategy("provider-1")
         strategy2 = MockProviderStrategy("provider-2")
@@ -228,20 +230,21 @@ class TestProviderContext:
             parameters={"count": 2},
         )
 
-        result = provider_context.execute_with_strategy("provider-2", operation)
+        result = await provider_context.execute_with_strategy("provider-2", operation)
 
         assert result.success is True
         assert strategy1.execute_count == 0
         assert strategy2.execute_count == 1
 
-    def test_execute_with_nonexistent_strategy(self, provider_context):
+    @pytest.mark.asyncio
+    async def test_execute_with_nonexistent_strategy(self, provider_context):
         """Test executing with nonexistent strategy."""
         operation = ProviderOperation(
             operation_type=ProviderOperationType.CREATE_INSTANCES,
             parameters={"count": 2},
         )
 
-        result = provider_context.execute_with_strategy("nonexistent", operation)
+        result = await provider_context.execute_with_strategy("nonexistent", operation)
 
         assert result.success is False
         assert result.error_code == "STRATEGY_NOT_FOUND"
@@ -448,74 +451,8 @@ class TestProviderContext:
         assert strategy.is_initialized() is False
 
 
-class TestStrategyMetrics:
-    """Test StrategyMetrics functionality."""
+class Testdict:
+    """dict removed in favor of MetricsCollector."""
 
-    def test_metrics_initialization(self):
-        """Test metrics initialization."""
-        metrics = StrategyMetrics()
-
-        assert metrics.total_operations == 0
-        assert metrics.successful_operations == 0
-        assert metrics.failed_operations == 0
-        assert metrics.success_rate == 0.0
-        assert metrics.average_response_time_ms == 0.0
-        assert metrics.last_used_time is None
-        assert metrics.health_check_count == 0
-        assert metrics.last_health_check is None
-
-    def test_record_successful_operation(self):
-        """Test recording successful operation."""
-        metrics = StrategyMetrics()
-
-        metrics.record_operation(True, 100.0)
-
-        assert metrics.total_operations == 1
-        assert metrics.successful_operations == 1
-        assert metrics.failed_operations == 0
-        assert metrics.success_rate == 100.0
-        assert metrics.average_response_time_ms == 100.0
-
-    def test_record_failed_operation(self):
-        """Test recording failed operation."""
-        metrics = StrategyMetrics()
-
-        metrics.record_operation(False, 50.0)
-
-        assert metrics.total_operations == 1
-        assert metrics.successful_operations == 0
-        assert metrics.failed_operations == 1
-        assert metrics.success_rate == 0.0
-        assert metrics.average_response_time_ms == 50.0
-
-    def test_record_multiple_operations(self):
-        """Test recording multiple operations."""
-        metrics = StrategyMetrics()
-
-        metrics.record_operation(True, 100.0)
-        metrics.record_operation(True, 200.0)
-        metrics.record_operation(False, 50.0)
-
-        assert metrics.total_operations == 3
-        assert metrics.successful_operations == 2
-        assert metrics.failed_operations == 1
-        assert metrics.success_rate == pytest.approx(66.67, rel=1e-2)
-        assert metrics.average_response_time_ms == pytest.approx(116.67, rel=1e-2)
-
-    def test_success_rate_calculation(self):
-        """Test success rate calculation edge cases."""
-        metrics = StrategyMetrics()
-
-        # No operations
-        assert metrics.success_rate == 0.0
-
-        # All successful
-        metrics.record_operation(True, 100.0)
-        metrics.record_operation(True, 100.0)
-        assert metrics.success_rate == 100.0
-
-        # All failed
-        metrics = StrategyMetrics()
-        metrics.record_operation(False, 100.0)
-        metrics.record_operation(False, 100.0)
-        assert metrics.success_rate == 0.0
+    def test_metrics_collector_used(self, provider_context):
+        assert provider_context.get_all_metrics() is not None

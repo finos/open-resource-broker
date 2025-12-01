@@ -132,8 +132,13 @@ def run_bash_script(script_path: str, argument: str, timeout: int = 300) -> dict
 class HostFactoryMock:
     """Mock implementation of Host Factory functionality."""
 
-    def __init__(self):
-        """Initialize mock host factory with target configuration."""
+    def __init__(self, scheduler: str = "hostfactory"):
+        """Initialize mock host factory with target configuration.
+
+        Args:
+            scheduler: Scheduler type - "hostfactory" (camelCase) or "default" (snake_case)
+        """
+        self.scheduler = scheduler
         # TARGET="IBM_SYMPHONY"
         TARGET = "AWS_PLUGIN"
 
@@ -222,7 +227,10 @@ class HostFactoryMock:
 
     def request_machines(self, template_name: str, machine_count: int) -> dict[str, Any]:
         """Request machines using specified template."""
-        request = {"template": {"templateId": template_name, "machineCount": machine_count}}
+        if self.scheduler == "default":
+            request = {"template": {"template_id": template_name, "machine_count": machine_count}}
+        else:  # hostfactory
+            request = {"template": {"templateId": template_name, "machineCount": machine_count}}
         log.debug(f"input_request: {json.dumps(request, indent=4)}")
 
         request_file_name = write_request_json_to_a_tmp_file(request)
@@ -276,7 +284,10 @@ class HostFactoryMock:
 
     def get_request_status(self, request_id: str) -> dict[str, Any]:
         """Get status of a request."""
-        request = {"requests": [{"requestId": f"{request_id}"}]}
+        if self.scheduler == "default":
+            request = {"requests": [{"request_id": f"{request_id}"}]}
+        else:  # hostfactory
+            request = {"requests": [{"requestId": f"{request_id}"}]}
         log.debug(f"input_request: {json.dumps(request, indent=4)}")
 
         request_file_name = write_request_json_to_a_tmp_file(request)
@@ -330,7 +341,10 @@ class HostFactoryMock:
 
     def request_return_machines(self, machine_names: list[str]) -> dict[str, Any]:
         """Request machines to be returned."""
-        mn_list = [{"machineId": machine_name} for machine_name in machine_names]
+        if self.scheduler == "default":
+            mn_list = [{"machine_id": machine_name} for machine_name in machine_names]
+        else:  # hostfactory
+            mn_list = [{"machineId": machine_name} for machine_name in machine_names]
         request = {"machines": mn_list}
         log.debug(f"input_request: {json.dumps(request, indent=4)}")
 

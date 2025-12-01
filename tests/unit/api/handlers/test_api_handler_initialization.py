@@ -126,7 +126,7 @@ class TestAPIHandlerInitialization:
 class TestAPIHandlerRegistration:
     """Test API handler registration in server_services.py."""
 
-    @patch("src.infrastructure.di.server_services._register_api_handlers")
+    @patch("infrastructure.di.server_services._register_api_handlers")
     def test_register_server_services(self, mock_register_api_handlers):
         """Test that register_server_services calls _register_api_handlers when server is enabled."""
         # Arrange
@@ -146,7 +146,7 @@ class TestAPIHandlerRegistration:
         # Assert
         mock_register_api_handlers.assert_called_once_with(container)
 
-    @patch("src.infrastructure.di.server_services._register_api_handlers")
+    @patch("infrastructure.di.server_services._register_api_handlers")
     def test_register_server_services_disabled(self, mock_register_api_handlers):
         """Test that register_server_services doesn't call _register_api_handlers when server is disabled."""
         # Arrange

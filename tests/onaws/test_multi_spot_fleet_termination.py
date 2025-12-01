@@ -204,9 +204,6 @@ def setup_multi_spot_fleet_templates():
     import shutil
 
     shutil.copy2(first_template_dir / "config.json", combined_config_dir / "config.json")
-    shutil.copy2(
-        first_template_dir / "default_config.json", combined_config_dir / "default_config.json"
-    )
 
     # Combine awsprov_templates.json from both directories
     combined_templates = {"templates": []}

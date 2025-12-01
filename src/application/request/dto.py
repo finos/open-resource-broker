@@ -57,41 +57,13 @@ class MachineReferenceDTO(BaseDTO):
 
     def to_dict(self) -> dict[str, Any]:
         """
-        Convert to dictionary format matching the expected API format.
+        Convert to dictionary using snake_case (domain format).
+        Scheduler strategies handle format conversion as needed.
 
         Returns:
-            Dictionary representation with expected field names
+            Dictionary with snake_case field names
         """
-        # Create a dictionary with the expected field names
-        result = {
-            "machineId": self.machine_id,
-            "name": self.name,
-            "result": self.result,
-            "status": self.status,
-            "privateIpAddress": self.private_ip_address,
-            "message": self.message,
-        }
-
-        # Add optional fields if they exist
-        if self.public_ip_address:
-            result["publicIpAddress"] = self.public_ip_address
-
-        if self.instance_type:
-            result["instanceType"] = self.instance_type
-
-        if self.price_type:
-            result["priceType"] = self.price_type
-
-        if self.instance_tags:
-            result["instanceTags"] = self.instance_tags
-
-        if self.cloud_host_id:
-            result["cloudHostId"] = self.cloud_host_id
-
-        if self.launch_time:
-            result["launchtime"] = str(self.launch_time)
-
-        return result
+        return self.model_dump(exclude_none=True)
 
 
 class RequestDTO(BaseDTO):

@@ -1,26 +1,63 @@
 import itertools
+import os
 from typing import Any, Dict, List
+
+# Standard VM mix used for spot scenarios to improve placement success and avoid
+# single-instance-type shortages.
+SPOT_VM_TYPES = {
+    "t2.micro": 1,
+    "t2.small": 2,
+    "t2.nano": 1,
+    "t3.micro": 1,
+    "t3.small": 2,
+    "t3.nano": 1,
+}
+
+# Central flag to enable/disable partial return scenarios
+RUN_PARTIAL_RETURN_TESTS = os.environ.get("RUN_PARTIAL_RETURN_TESTS", "1").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
+# Enable to verify ABIS on the created resource (fleet/ASG) via AWS APIs
+VERIFY_ABIS = os.environ.get("VERIFY_ABIS", "1") in ("1", "true", "True")
 
 # Global default attribute combinations
 DEFAULT_ATTRIBUTE_COMBINATIONS = [
-    # {
-    #     "providerApi": ["EC2Fleet", "SpotFleet"],
-    #     "fleetType": ["request", "instant"],
-    #     "priceType": ["ondemand", "spot"],
-    # },
-    # {
-    #     "providerApi": ["ASG"],
-    #     "priceType": ["ondemand"]
-    # },
-    # {
-    #     "providerApi": ["RunInstances"],
-    #     "priceType": ["ondemand"]
-    # },
+    {
+        "providerApi": ["EC2Fleet"],
+        "fleetType": ["request", "instant", "maintain"],
+        "priceType": ["ondemand", "spot"],
+        "scheduler": ["default", "hostfactory"],
+    },
+    {
+        "providerApi": ["ASG"],
+        "priceType": ["ondemand", "spot"],
+        "scheduler": ["default", "hostfactory"],
+    },
+    {
+        "providerApi": ["RunInstances"],
+        "priceType": ["ondemand"],
+        "scheduler": ["default", "hostfactory"],
+    },
     {
         "providerApi": ["SpotFleet"],
-        "fleetType": ["request"],
+        "fleetType": ["request", "maintain"],
         "priceType": ["ondemand", "spot"],
+        "scheduler": ["default", "hostfactory"],
     },
+    # {
+    #     "providerApi": ["ASG"],
+    #     "priceType": ["spot"],
+    #     "scheduler": ["default"],
+    # },
+    # {
+    #     "providerApi": ["EC2Fleet"],
+    #     "fleetType": ["maintain"],
+    #     "priceType": ["ondemand", "spot"],
+    #     "scheduler": ["default", "hostfactory"],
+    # },
     # { INTENTIONALLY NOT SUPPORTED
     #     "providerApi": ["RunInstances"],
     #     "priceType": ["spot"]
@@ -47,7 +84,7 @@ def generate_scenarios_from_attributes(
     if base_template is None:
         base_template = {
             "template_id": "BASE",
-            "capacity_to_request": 2,
+            "capacity_to_request": 4,
             "awsprov_base_template": "awsprov_templates.base.json",
         }
 
@@ -69,13 +106,42 @@ def generate_scenarios_from_attributes(
             # Default naming: concatenate attribute values with dots as separators
             name_parts = []
             for attr_name, attr_value in overrides.items():
-                if attr_name == "providerApi":
+                if attr_name == "scheduler":
+                    # Add scheduler at the beginning
+                    name_parts.insert(0, str(attr_value))
+                elif attr_name == "providerApi":
                     name_parts.append(str(attr_value))
                 elif attr_name == "fleetType":
                     name_parts.append(str(attr_value).title())
                 else:
                     name_parts.append(str(attr_value))
             test_name = ".".join(name_parts)
+
+        # For spot priceType we supply multiple vmTypes to improve capacity placement.
+        provider_api = overrides.get("providerApi")
+        price_type = overrides.get("priceType")
+        fleet_type = overrides.get("fleetType")
+        if (
+            price_type == "spot"
+            and provider_api in ("EC2Fleet", "SpotFleet", "ASG")
+            and "vmTypes" not in overrides
+        ):
+            overrides["vmTypes"] = SPOT_VM_TYPES
+
+        # Ensure partial-return scenarios have enough capacity to terminate one host and
+        # still have machines running. Maintain fleets/ASGs need >=4 requested units.
+        if provider_api in ("EC2Fleet", "SpotFleet") and str(fleet_type).lower() == "maintain":
+            scenario_capacity = overrides.get(
+                "capacity_to_request", base_template["capacity_to_request"]
+            )
+            if scenario_capacity < 4:
+                overrides["capacity_to_request"] = 4
+        if provider_api == "ASG":
+            scenario_capacity = overrides.get(
+                "capacity_to_request", base_template["capacity_to_request"]
+            )
+            if scenario_capacity < 4:
+                overrides["capacity_to_request"] = 4
 
         # Create the scenario
         scenario = base_template.copy()
@@ -137,15 +203,181 @@ def get_custom_test_cases() -> List[Dict[str, Any]]:
     This allows for special cases and edge scenarios.
     """
     return [
-        # Add custom scenarios here as needed
-        # Example:
-        # {
-        #     "test_name": "CustomScenario",
-        #     "template_id": "CUSTOM",
-        #     "capacity_to_request": 5,
-        #     "awsprov_base_template": "awsprov_templates.custom.json",
-        #     "overrides": {"specialAttribute": "specialValue"},
-        # },
+        # SpotFleet with ABIS
+        {
+            "test_name": "hostfactory.SpotFleetRequest.ABIS",
+            "template_id": "SpotFleetRequest",
+            "capacity_to_request": 4,
+            "awsprov_base_template": "awsprov_templates.base.json",
+            "overrides": {
+                "providerApi": "SpotFleet",
+                "fleetType": "request",
+                "scheduler": "hostfactory",
+                "abisInstanceRequirements": {
+                    "VCpuCount": {"Min": 1, "Max": 2},
+                    "MemoryMiB": {"Min": 1024, "Max": 2048},
+                },
+            },
+        },
+        # EC2Fleet with ABIS
+        {
+            "test_name": "hostfactory.EC2FleetRequest.ABIS",
+            "template_id": "EC2FleetRequest",
+            "capacity_to_request": 4,
+            "awsprov_base_template": "awsprov_templates.base.json",
+            "overrides": {
+                "providerApi": "EC2Fleet",
+                "fleetType": "request",
+                "scheduler": "hostfactory",
+                "abisInstanceRequirements": {
+                    "VCpuCount": {"Min": 1, "Max": 2},
+                    "MemoryMiB": {"Min": 1024, "Max": 2048},
+                },
+            },
+        },
+        # ASG with ABIS
+        {
+            "test_name": "hostfactory.ASG.ABIS",
+            "template_id": "ASG",
+            "capacity_to_request": 2,
+            "awsprov_base_template": "awsprov_templates.base.json",
+            "overrides": {
+                "providerApi": "ASG",
+                "scheduler": "hostfactory",
+                "abisInstanceRequirements": {
+                    "VCpuCount": {"Min": 1, "Max": 2},
+                    "MemoryMiB": {"Min": 1024, "Max": 2048},
+                },
+            },
+        },
+        ###############################################################################################################
+        ###############################################################################################################
+        ###############################################################################################################
+        ###############################################################################################################
+        # SpotFleet with multiTypes
+        {
+            "test_name": "hostfactory.SpotFleetRequest.MultiTypes",
+            "template_id": "SpotFleetRequest",
+            "capacity_to_request": 4,
+            "awsprov_base_template": "awsprov_templates.base.json",
+            "overrides": {
+                "providerApi": "SpotFleet",
+                "fleetType": "request",
+                "scheduler": "hostfactory",
+                "vmTypes": {
+                    "t2.micro": 1,
+                    "t2.small": 2,
+                    "t2.medium": 4,
+                    "t3.micro": 1,
+                    "t3.small": 2,
+                    "t3.medium": 4,
+                },
+            },
+        },
+        # EC2Fleet with multiTypes
+        {
+            "test_name": "hostfactory.EC2FleetRequest.MultiTypes",
+            "template_id": "EC2FleetRequest",
+            "capacity_to_request": 4,
+            "awsprov_base_template": "awsprov_templates.base.json",
+            "overrides": {
+                "providerApi": "EC2Fleet",
+                "fleetType": "request",
+                "scheduler": "hostfactory",
+                "vmTypes": {
+                    "t2.micro": 1,
+                    "t2.small": 2,
+                    "t2.medium": 4,
+                    "t3.micro": 1,
+                    "t3.small": 2,
+                    "t3.medium": 4,
+                },
+            },
+        },
+        # ASG with multiTypes
+        {
+            "test_name": "hostfactory.ASG.MultiTypes",
+            "template_id": "ASG",
+            "capacity_to_request": 4,
+            "awsprov_base_template": "awsprov_templates.base.json",
+            "overrides": {
+                "providerApi": "ASG",
+                "scheduler": "hostfactory",
+                "vmTypes": {
+                    "t2.micro": 1,
+                    "t2.small": 2,
+                    "t2.medium": 4,
+                    "t3.micro": 1,
+                    "t3.small": 2,
+                    "t3.medium": 4,
+                },
+            },
+        },
+        # Mixed price 50/50 - EC2Fleet
+        {
+            "test_name": "hostfactory.EC2Fleet.Mixed50",
+            "template_id": "EC2FleetRequest",
+            "capacity_to_request": 4,
+            "awsprov_base_template": "awsprov_templates.base.json",
+            "overrides": {
+                "providerApi": "EC2Fleet",
+                "fleetType": "request",
+                "scheduler": "hostfactory",
+                "priceType": "heterogeneous",
+                "percentOnDemand": 50,
+                "vmTypes": {
+                    "t2.micro": 1,
+                    "t2.small": 2,
+                    "t2.medium": 4,
+                    "t3.micro": 1,
+                    "t3.small": 2,
+                    "t3.medium": 4,
+                },
+            },
+        },
+        # Mixed price 50/50 - SpotFleet
+        {
+            "test_name": "hostfactory.SpotFleet.Mixed50",
+            "template_id": "SpotFleetRequest",
+            "capacity_to_request": 4,
+            "awsprov_base_template": "awsprov_templates.base.json",
+            "overrides": {
+                "providerApi": "SpotFleet",
+                "fleetType": "request",
+                "scheduler": "hostfactory",
+                "priceType": "heterogeneous",
+                "percentOnDemand": 50,
+                "vmTypes": {
+                    "t2.micro": 1,
+                    "t2.small": 2,
+                    "t2.medium": 4,
+                    "t3.micro": 1,
+                    "t3.small": 2,
+                    "t3.medium": 4,
+                },
+            },
+        },
+        # Mixed price 50/50 - ASG
+        {
+            "test_name": "hostfactory.ASG.Mixed50",
+            "template_id": "ASG",
+            "capacity_to_request": 4,
+            "awsprov_base_template": "awsprov_templates.base.json",
+            "overrides": {
+                "providerApi": "ASG",
+                "scheduler": "hostfactory",
+                "priceType": "heterogeneous",
+                "percentOnDemand": 50,
+                "vmTypes": {
+                    "t2.micro": 1,
+                    "t2.small": 2,
+                    "t2.medium": 4,
+                    "t3.micro": 1,
+                    "t3.small": 2,
+                    "t3.medium": 4,
+                },
+            },
+        },
     ]
 
 

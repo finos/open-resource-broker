@@ -411,6 +411,7 @@ class AWSOperations:
 
         try:
             self.log_operation_start(operation_name, context)
+            self._logger.debug("Operation %s called with arguments: %s", operation_name, kwargs)
             result = operation(**kwargs)
             self.log_operation_success(operation_name, context, result)
             return result

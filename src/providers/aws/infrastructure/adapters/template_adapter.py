@@ -197,10 +197,20 @@ class AWSTemplateAdapter(TemplateAdapterPort):
             errors["image_id"] = f"Invalid AMI ID format: {template.image_id}"
 
         # Validate instance type(s)
-        if not (template.instance_type or getattr(template, "instance_types", None)):
-            errors["instance_type"] = "Either instance_type or instance_types must be specified"
-        elif template.instance_type and not self._is_valid_instance_type(template.instance_type):
-            errors["instance_type"] = f"Invalid instance type: {template.instance_type}"
+        instance_types_map = getattr(template, "instance_types", None)
+        abis = getattr(template, "abis_instance_requirements", None)
+        if not (template.instance_type or instance_types_map or abis):
+            errors["instance_type"] = (
+                "Either instance_type, instance_types, or abis_instance_requirements must be specified"
+            )
+        elif template.instance_type:
+            if not self._is_valid_instance_type(template.instance_type):
+                errors["instance_type"] = f"Invalid instance type: {template.instance_type}"
+        elif instance_types_map:
+            for itype in instance_types_map.keys():
+                if not self._is_valid_instance_type(itype):
+                    errors["instance_type"] = f"Invalid instance type in instance_types: {itype}"
+                    break
 
         # Validate subnet IDs
         if not template.subnet_ids or len(template.subnet_ids) == 0:

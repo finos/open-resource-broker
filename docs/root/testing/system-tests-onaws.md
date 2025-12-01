@@ -131,7 +131,7 @@ tests/onaws/
 ├── test_multi_ec2_fleet_termination.py    # Multi-EC2Fleet termination tests
 ├── test_multi_resource_termination.py     # Cross-resource termination tests
 └── run_templates/             # Generated test configs
-    └── test_sample[ScenarioName]/
+    └── full_cycle_test[ScenarioName]/
         ├── awsprov_templates.json
         ├── config.json
         └── default_config.json
@@ -148,11 +148,18 @@ tests/onaws/
 ```bash
 make system-tests
 
-# Run all onaws tests
-pytest tests/onaws/ -m aws
+# Run all tests, stop on the first failure
+python -m pytest tests/onaws/test_onaws.py -v -x
+
+#Run a specific parameterized configuration of a test
+pytest "tests/onaws/test_onaws.py::full_cycle_test[hostfactory.SpotFleetRequest.ABIS]" -v -x
+
+#Execute all system tests in parallel
+uv run python -m pytest tests/onaws/test_onaws.py -v -m manual_aws --no-cov --tb=long -n 10
+
 
 # Run specific scenario
-pytest tests/onaws/test_onaws.py::test_sample[EC2FleetRequest] -m aws
+pytest tests/onaws/test_onaws.py::full_cycle_test[EC2FleetRequest] -m aws
 
 
 ```

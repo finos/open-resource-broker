@@ -1,6 +1,6 @@
 """Integration tests for ProviderContext with real provider strategies."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
@@ -27,54 +27,54 @@ class TestProviderContextIntegration:
 
     def test_provider_context_with_aws_strategy(self, provider_context):
         """Test provider context with AWS strategy integration."""
-        # Mock AWS provider strategy
-        with patch(
-            "src.providers.aws.strategy.aws_provider_strategy.AWSProviderStrategy"
-        ) as MockAWSStrategy:
-            mock_aws_strategy = Mock()
-            mock_aws_strategy.provider_type = "aws"
-            mock_aws_strategy.initialize.return_value = True
-            mock_aws_strategy.is_initialized.return_value = True
+        from providers.base.strategy.provider_strategy import (
+            ProviderCapabilities,
+            ProviderStrategy,
+        )
 
-            # Mock capabilities
-            from providers.base.strategy.provider_strategy import ProviderCapabilities
+        # Mock AWS provider strategy with proper spec
+        mock_aws_strategy = Mock(spec=ProviderStrategy)
+        mock_aws_strategy.provider_type = "aws"
+        mock_aws_strategy.initialize.return_value = True
+        mock_aws_strategy.is_initialized.return_value = True
 
-            mock_capabilities = ProviderCapabilities(
-                supported_operations=[
-                    ProviderOperationType.CREATE_INSTANCES,
-                    ProviderOperationType.TERMINATE_INSTANCES,
-                    ProviderOperationType.GET_INSTANCE_STATUS,
-                ],
-                provider_type="test",
-                features={},
-                limitations={},
-                performance_metrics={},
-            )
-            mock_aws_strategy.get_capabilities.return_value = mock_capabilities
+        # Mock capabilities
+        mock_capabilities = ProviderCapabilities(
+            supported_operations=[
+                ProviderOperationType.CREATE_INSTANCES,
+                ProviderOperationType.TERMINATE_INSTANCES,
+                ProviderOperationType.GET_INSTANCE_STATUS,
+            ],
+            provider_type="test",
+            features={},
+            limitations={},
+            performance_metrics={},
+        )
+        mock_aws_strategy.get_capabilities.return_value = mock_capabilities
 
-            MockAWSStrategy.return_value = mock_aws_strategy
+        # Register strategy
+        provider_context.register_strategy(mock_aws_strategy)
 
-            # Register strategy
-            provider_context.register_strategy(mock_aws_strategy)
+        # Test initialization
+        assert provider_context.initialize() is True
+        assert provider_context.current_strategy_type == "aws"
 
-            # Test initialization
-            assert provider_context.initialize() is True
-            assert provider_context.current_strategy_type == "aws"
-
-            # Test capabilities
-            capabilities = provider_context.get_strategy_capabilities("aws")
-            assert capabilities is not None
-            assert ProviderOperationType.CREATE_INSTANCES in capabilities.supported_operations
+        # Test capabilities
+        capabilities = provider_context.get_strategy_capabilities("aws")
+        assert capabilities is not None
+        assert ProviderOperationType.CREATE_INSTANCES in capabilities.supported_operations
 
     def test_multi_provider_context_scenario(self, provider_context):
         """Test multi-provider context scenario."""
+        from providers.base.strategy.provider_strategy import ProviderStrategy
+
         # Create mock strategies for different providers
-        aws_strategy = Mock()
+        aws_strategy = Mock(spec=ProviderStrategy)
         aws_strategy.provider_type = "aws"
         aws_strategy.initialize.return_value = True
         aws_strategy.is_initialized.return_value = True
 
-        provider1_strategy = Mock()
+        provider1_strategy = Mock(spec=ProviderStrategy)
         provider1_strategy.provider_type = "provider1"
         provider1_strategy.initialize.return_value = True
         provider1_strategy.is_initialized.return_value = True
@@ -97,8 +97,10 @@ class TestProviderContextIntegration:
 
     def test_provider_context_error_handling(self, provider_context):
         """Test provider context error handling scenarios."""
+        from providers.base.strategy.provider_strategy import ProviderStrategy
+
         # Test with strategy that fails initialization
-        failing_strategy = Mock()
+        failing_strategy = Mock(spec=ProviderStrategy)
         failing_strategy.provider_type = "failing"
         failing_strategy.initialize.return_value = False
         failing_strategy.is_initialized.return_value = False
@@ -110,10 +112,13 @@ class TestProviderContextIntegration:
 
     def test_provider_context_with_health_monitoring(self, provider_context):
         """Test provider context with health monitoring."""
-        from providers.base.strategy.provider_strategy import ProviderHealthStatus
+        from providers.base.strategy.provider_strategy import (
+            ProviderHealthStatus,
+            ProviderStrategy,
+        )
 
         # Create strategy with health status
-        strategy = Mock()
+        strategy = Mock(spec=ProviderStrategy)
         strategy.provider_type = "monitored"
         strategy.initialize.return_value = True
         strategy.is_initialized.return_value = True
@@ -132,15 +137,17 @@ class TestProviderContextIntegration:
         assert metrics is not None
         assert metrics.health_check_count == 1
 
-    def test_provider_context_operation_routing(self, provider_context):
+    @pytest.mark.asyncio
+    async def test_provider_context_operation_routing(self, provider_context):
         """Test operation routing to specific providers."""
         from providers.base.strategy.provider_strategy import (
             ProviderCapabilities,
             ProviderResult,
+            ProviderStrategy,
         )
 
         # Create strategies with different capabilities
-        compute_strategy = Mock()
+        compute_strategy = Mock(spec=ProviderStrategy)
         compute_strategy.provider_type = "compute"
         compute_strategy.initialize.return_value = True
         compute_strategy.is_initialized.return_value = True
@@ -155,7 +162,7 @@ class TestProviderContextIntegration:
             {"provider": "compute"}
         )
 
-        storage_strategy = Mock()
+        storage_strategy = Mock(spec=ProviderStrategy)
         storage_strategy.provider_type = "storage"
         storage_strategy.initialize.return_value = True
         storage_strategy.is_initialized.return_value = True
@@ -180,7 +187,7 @@ class TestProviderContextIntegration:
             parameters={"count": 2},
         )
 
-        result = provider_context.execute_with_strategy("compute", launch_operation)
+        result = await provider_context.execute_with_strategy("compute", launch_operation)
         assert result.success is True
         assert result.data["provider"] == "compute"
 
@@ -189,21 +196,23 @@ class TestProviderContextIntegration:
             parameters={"instance_id": "i-123"},
         )
 
-        result = provider_context.execute_with_strategy("storage", status_operation)
+        result = await provider_context.execute_with_strategy("storage", status_operation)
         assert result.success is True
         assert result.data["provider"] == "storage"
 
-    def test_provider_context_metrics_aggregation(self, provider_context):
+    @pytest.mark.asyncio
+    async def test_provider_context_metrics_aggregation(self, provider_context):
         """Test metrics aggregation across multiple providers."""
         from providers.base.strategy.provider_strategy import (
             ProviderCapabilities,
             ProviderResult,
+            ProviderStrategy,
         )
 
         # Create multiple strategies
         strategies = []
         for i in range(3):
-            strategy = Mock()
+            strategy = Mock(spec=ProviderStrategy)
             strategy.provider_type = f"provider-{i}"
             strategy.initialize.return_value = True
             strategy.is_initialized.return_value = True
@@ -228,7 +237,7 @@ class TestProviderContextIntegration:
 
         for i, _strategy in enumerate(strategies):
             for _ in range(i + 1):  # Execute 1, 2, 3 operations respectively
-                provider_context.execute_with_strategy(f"provider-{i}", operation)
+                await provider_context.execute_with_strategy(f"provider-{i}", operation)
 
         # Test metrics aggregation
         all_metrics = provider_context.get_all_metrics()
@@ -241,16 +250,18 @@ class TestProviderContextIntegration:
             assert metrics.success_rate == 100.0
 
     def test_provider_context_concurrent_operations(self, provider_context):
-        """Test concurrent operations across multiple providers."""
+        """Test concurrent operations across multiple providers with thread-safety."""
+        import asyncio
         import threading
 
         from providers.base.strategy.provider_strategy import (
             ProviderCapabilities,
             ProviderResult,
+            ProviderStrategy,
         )
 
         # Create thread-safe strategy
-        strategy = Mock()
+        strategy = Mock(spec=ProviderStrategy)
         strategy.provider_type = "concurrent"
         strategy.initialize.return_value = True
         strategy.is_initialized.return_value = True
@@ -263,40 +274,51 @@ class TestProviderContextIntegration:
         )
 
         # Thread-safe operation counter
-        operation_count = threading.local()
-        operation_count.value = 0
+        operation_lock = threading.Lock()
+        operation_count = 0
 
-        def execute_operation_mock(operation):
-            operation_count.value += 1
-            return ProviderResult.success_result({"count": operation_count.value})
+        async def execute_operation_mock(operation):
+            nonlocal operation_count
+            with operation_lock:
+                operation_count += 1
+                count = operation_count
+            return ProviderResult.success_result({"count": count})
 
         strategy.execute_operation.side_effect = execute_operation_mock
 
         provider_context.register_strategy(strategy)
         provider_context.initialize()
 
-        # Execute concurrent operations
+        # Execute operations in separate threads
         results = []
-        threads = []
+        errors = []
 
-        def execute_operations():
-            for _ in range(10):
-                operation = ProviderOperation(
-                    operation_type=ProviderOperationType.CREATE_INSTANCES,
-                    parameters={"count": 1},
-                )
-                result = provider_context.execute_operation(operation)
-                results.append(result)
+        def thread_worker():
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                thread_results = []
+                for _ in range(10):
+                    operation = ProviderOperation(
+                        operation_type=ProviderOperationType.CREATE_INSTANCES,
+                        parameters={"count": 1},
+                    )
+                    result = loop.run_until_complete(provider_context.execute_operation(operation))
+                    thread_results.append(result)
+                results.extend(thread_results)
+                loop.close()
+            except Exception as e:
+                errors.append(e)
 
         # Create and start threads
-        for _ in range(5):
-            thread = threading.Thread(target=execute_operations)
-            threads.append(thread)
+        threads = [threading.Thread(target=thread_worker) for _ in range(5)]
+        for thread in threads:
             thread.start()
-
-        # Wait for completion
         for thread in threads:
             thread.join()
+
+        # Verify no errors occurred
+        assert len(errors) == 0, f"Errors occurred: {errors}"
 
         # Verify results
         assert len(results) == 50
@@ -307,16 +329,18 @@ class TestProviderContextIntegration:
         assert metrics.total_operations == 50
         assert metrics.successful_operations == 50
 
-    def test_provider_context_failover_scenario(self, provider_context):
+    @pytest.mark.asyncio
+    async def test_provider_context_failover_scenario(self, provider_context):
         """Test provider failover scenario."""
         from providers.base.strategy.provider_strategy import (
             ProviderCapabilities,
             ProviderHealthStatus,
             ProviderResult,
+            ProviderStrategy,
         )
 
         # Create primary and backup strategies
-        primary_strategy = Mock()
+        primary_strategy = Mock(spec=ProviderStrategy)
         primary_strategy.provider_type = "primary"
         primary_strategy.initialize.return_value = True
         primary_strategy.is_initialized.return_value = True
@@ -329,7 +353,7 @@ class TestProviderContextIntegration:
         )
         primary_strategy.check_health.return_value = ProviderHealthStatus.unhealthy("Service down")
 
-        backup_strategy = Mock()
+        backup_strategy = Mock(spec=ProviderStrategy)
         backup_strategy.provider_type = "backup"
         backup_strategy.initialize.return_value = True
         backup_strategy.is_initialized.return_value = True
@@ -363,6 +387,6 @@ class TestProviderContextIntegration:
             parameters={"count": 1},
         )
 
-        result = provider_context.execute_with_strategy("backup", operation)
+        result = await provider_context.execute_with_strategy("backup", operation)
         assert result.success is True
         assert result.data["provider"] == "backup"

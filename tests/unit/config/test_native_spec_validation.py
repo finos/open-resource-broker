@@ -1,10 +1,11 @@
 """Comprehensive tests for native spec validation."""
 
 import pytest
-from providers.aws.domain.template.aggregate import AWSTemplate
 from pydantic import ValidationError
 
 from config.schemas.native_spec_schema import NativeSpecConfig
+from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+from providers.aws.domain.template.value_objects import ProviderApi
 
 
 class TestNativeSpecValidation:
@@ -48,6 +49,9 @@ class TestNativeSpecValidation:
             template_id="test-template",
             image_id="ami-12345",
             instance_type="t3.micro",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
+            provider_api=ProviderApi.EC2_FLEET,
             launch_template_spec={"LaunchTemplateName": "test-lt"},
             provider_api_spec={"Type": "instant"},
         )
@@ -62,6 +66,9 @@ class TestNativeSpecValidation:
                 template_id="test-template",
                 image_id="ami-12345",
                 instance_type="t3.micro",
+                subnet_ids=["subnet-123"],
+                security_group_ids=["sg-123"],
+                provider_api=ProviderApi.EC2_FLEET,
                 launch_template_spec={"LaunchTemplateName": "test-lt"},
                 launch_template_spec_file="test-file.json",
             )
@@ -77,6 +84,9 @@ class TestNativeSpecValidation:
                 template_id="test-template",
                 image_id="ami-12345",
                 instance_type="t3.micro",
+                subnet_ids=["subnet-123"],
+                security_group_ids=["sg-123"],
+                provider_api=ProviderApi.EC2_FLEET,
                 provider_api_spec={"Type": "instant"},
                 provider_api_spec_file="test-file.json",
             )
@@ -92,6 +102,9 @@ class TestNativeSpecValidation:
             template_id="test1",
             image_id="ami-12345",
             instance_type="t3.micro",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
+            provider_api=ProviderApi.EC2_FLEET,
             launch_template_spec={"LaunchTemplateName": "test-lt"},
             provider_api_spec={"Type": "instant"},
         )
@@ -103,6 +116,9 @@ class TestNativeSpecValidation:
             template_id="test2",
             image_id="ami-12345",
             instance_type="t3.micro",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
+            provider_api=ProviderApi.EC2_FLEET,
             launch_template_spec_file="lt-spec.json",
             provider_api_spec_file="api-spec.json",
         )
@@ -114,6 +130,9 @@ class TestNativeSpecValidation:
             template_id="test3",
             image_id="ami-12345",
             instance_type="t3.micro",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
+            provider_api=ProviderApi.EC2_FLEET,
             launch_template_spec={"LaunchTemplateName": "test-lt"},
             provider_api_spec_file="api-spec.json",
         )
@@ -126,6 +145,9 @@ class TestNativeSpecValidation:
             template_id="legacy-template",
             image_id="ami-12345",
             instance_type="t3.micro",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
+            provider_api=ProviderApi.EC2_FLEET,
         )
 
         assert template.launch_template_spec is None
@@ -170,6 +192,9 @@ class TestNativeSpecValidation:
             template_id="test-template",
             image_id="ami-12345",
             instance_type="t3.micro",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
+            provider_api=ProviderApi.EC2_FLEET,
             launch_template_spec={"key": "value"},
             provider_api_spec={"Type": "instant"},
         )
@@ -183,6 +208,9 @@ class TestNativeSpecValidation:
             template_id="test-template",
             image_id="ami-12345",
             instance_type="t3.micro",
+            subnet_ids=["subnet-123"],
+            security_group_ids=["sg-123"],
+            provider_api=ProviderApi.EC2_FLEET,
             launch_template_spec_file="lt-spec.json",
             provider_api_spec_file="api-spec.json",
         )

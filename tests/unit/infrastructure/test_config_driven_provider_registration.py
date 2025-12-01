@@ -33,11 +33,14 @@ class TestConfigDrivenProviderRegistration:
         # Mock AWS registration
         with (
             patch(
-                "src.infrastructure.di.provider_services.get_config_manager",
+                "config.manager.get_config_manager",
                 return_value=mock_config_manager,
             ),
-            patch("src.providers.aws.registration.register_aws_provider") as mock_aws_register,
-            patch("src.infrastructure.di.provider_services.get_logger") as mock_logger,
+            patch("providers.aws.registration.register_aws_provider") as mock_aws_register,
+            patch(
+                "infrastructure.registry.provider_registry.get_provider_registry"
+            ) as mock_registry,
+            patch("infrastructure.di.provider_services.get_logger") as mock_logger,
         ):
             from infrastructure.di.provider_services import _register_providers
 
@@ -47,7 +50,7 @@ class TestConfigDrivenProviderRegistration:
             # Verify AWS provider was registered
             mock_aws_register.assert_called_once()
 
-            # Verify logging
+            # Verify logging occurred
             mock_logger.return_value.info.assert_called()
 
     def test_register_providers_with_no_config(self):
@@ -58,11 +61,11 @@ class TestConfigDrivenProviderRegistration:
 
         with (
             patch(
-                "src.infrastructure.di.provider_services.get_config_manager",
+                "config.manager.get_config_manager",
                 return_value=mock_config_manager,
             ),
-            patch("src.providers.aws.registration.register_aws_provider") as mock_aws_register,
-            patch("src.infrastructure.di.provider_services.get_logger") as mock_logger,
+            patch("providers.aws.registration.register_aws_provider") as mock_aws_register,
+            patch("infrastructure.logging.logger.get_logger") as mock_logger,
         ):
             from infrastructure.di.provider_services import _register_providers
 
@@ -96,11 +99,11 @@ class TestConfigDrivenProviderRegistration:
 
         with (
             patch(
-                "src.infrastructure.di.provider_services.get_config_manager",
+                "config.manager.get_config_manager",
                 return_value=mock_config_manager,
             ),
-            patch("src.providers.aws.registration.register_aws_provider") as mock_aws_register,
-            patch("src.infrastructure.di.provider_services.get_logger"),
+            patch("providers.aws.registration.register_aws_provider") as mock_aws_register,
+            patch("infrastructure.logging.logger.get_logger"),
         ):
             from infrastructure.di.provider_services import _register_providers
 
@@ -137,11 +140,14 @@ class TestConfigDrivenProviderRegistration:
 
         with (
             patch(
-                "src.infrastructure.di.provider_services.get_config_manager",
+                "config.manager.get_config_manager",
                 return_value=mock_config_manager,
             ),
-            patch("src.providers.aws.registration.register_aws_provider") as mock_aws_register,
-            patch("src.infrastructure.di.provider_services.get_logger"),
+            patch("providers.aws.registration.register_aws_provider") as mock_aws_register,
+            patch(
+                "infrastructure.registry.provider_registry.get_provider_registry"
+            ) as mock_registry,
+            patch("infrastructure.logging.logger.get_logger"),
         ):
             from infrastructure.di.provider_services import _register_providers
 
@@ -158,7 +164,7 @@ class TestConfigDrivenProviderRegistration:
             providers=[ProviderInstanceConfig(name="aws-test", type="aws", enabled=True)],
         )
 
-        with patch("src.infrastructure.di.provider_services.get_logger"):
+        with patch("infrastructure.logging.logger.get_logger"):
             from infrastructure.di.provider_services import _validate_provider_config
 
             result = _validate_provider_config(provider_config)
@@ -171,7 +177,7 @@ class TestConfigDrivenProviderRegistration:
             providers=[],  # No providers
         )
 
-        with patch("src.infrastructure.di.provider_services.get_logger"):
+        with patch("infrastructure.logging.logger.get_logger"):
             from infrastructure.di.provider_services import _validate_provider_config
 
             result = _validate_provider_config(provider_config)

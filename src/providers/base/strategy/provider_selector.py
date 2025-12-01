@@ -14,7 +14,6 @@ from typing import Callable, Optional
 
 from domain.base.dependency_injection import injectable
 from domain.base.ports import LoggingPort
-from providers.base.strategy.provider_context import StrategyMetrics
 from providers.base.strategy.provider_strategy import (
     ProviderOperation,
     ProviderStrategy,
@@ -47,7 +46,7 @@ class SelectionCriteria:
     require_healthy: bool = True
     exclude_strategies: list[str] = None
     prefer_strategies: list[str] = None
-    custom_filter: Optional[Callable[[ProviderStrategy, StrategyMetrics], bool]] = None
+    custom_filter: Optional[Callable[[ProviderStrategy, dict], bool]] = None
 
     def __post_init__(self) -> None:
         """Initialize default values."""
@@ -97,7 +96,7 @@ class ProviderSelector(ABC):
     def select_strategy(
         self,
         strategies: dict[str, ProviderStrategy],
-        metrics: dict[str, StrategyMetrics],
+        metrics: dict[str, dict],
         operation: ProviderOperation,
         criteria: SelectionCriteria = None,
     ) -> SelectionResult:
@@ -122,7 +121,7 @@ class FirstAvailableSelector(ProviderSelector):
     def select_strategy(
         self,
         strategies: dict[str, ProviderStrategy],
-        metrics: dict[str, StrategyMetrics],
+        metrics: dict[str, dict],
         operation: ProviderOperation,
         criteria: SelectionCriteria = None,
     ) -> SelectionResult:
@@ -149,7 +148,7 @@ class FirstAvailableSelector(ProviderSelector):
     def _is_strategy_suitable(
         self,
         strategy: ProviderStrategy,
-        metrics: Optional[StrategyMetrics],
+        metrics: Optional[dict],
         criteria: SelectionCriteria,
     ) -> bool:
         """Check if strategy meets the criteria."""
@@ -202,7 +201,7 @@ class RoundRobinSelector(ProviderSelector):
     def select_strategy(
         self,
         strategies: dict[str, ProviderStrategy],
-        metrics: dict[str, StrategyMetrics],
+        metrics: dict[str, dict],
         operation: ProviderOperation,
         criteria: SelectionCriteria = None,
     ) -> SelectionResult:
@@ -239,7 +238,7 @@ class RoundRobinSelector(ProviderSelector):
     def _is_strategy_suitable(
         self,
         strategy: ProviderStrategy,
-        metrics: Optional[StrategyMetrics],
+        metrics: Optional[dict],
         criteria: SelectionCriteria,
     ) -> bool:
         """Reuse the suitability check from FirstAvailableSelector."""
@@ -253,7 +252,7 @@ class PerformanceBasedSelector(ProviderSelector):
     def select_strategy(
         self,
         strategies: dict[str, ProviderStrategy],
-        metrics: dict[str, StrategyMetrics],
+        metrics: dict[str, dict],
         operation: ProviderOperation,
         criteria: SelectionCriteria = None,
     ) -> SelectionResult:
@@ -289,7 +288,7 @@ class PerformanceBasedSelector(ProviderSelector):
             selection_time_ms=selection_time,
         )
 
-    def _calculate_performance_score(self, metrics: Optional[StrategyMetrics]) -> float:
+    def _calculate_performance_score(self, metrics: Optional[dict]) -> float:
         """Calculate performance score for a strategy."""
         if not metrics or metrics.total_operations == 0:
             return 0.0
@@ -313,7 +312,7 @@ class PerformanceBasedSelector(ProviderSelector):
     def _is_strategy_suitable(
         self,
         strategy: ProviderStrategy,
-        metrics: Optional[StrategyMetrics],
+        metrics: Optional[dict],
         criteria: SelectionCriteria,
     ) -> bool:
         """Reuse the suitability check from FirstAvailableSelector."""
@@ -327,7 +326,7 @@ class RandomSelector(ProviderSelector):
     def select_strategy(
         self,
         strategies: dict[str, ProviderStrategy],
-        metrics: dict[str, StrategyMetrics],
+        metrics: dict[str, dict],
         operation: ProviderOperation,
         criteria: SelectionCriteria = None,
     ) -> SelectionResult:
@@ -363,7 +362,7 @@ class RandomSelector(ProviderSelector):
     def _is_strategy_suitable(
         self,
         strategy: ProviderStrategy,
-        metrics: Optional[StrategyMetrics],
+        metrics: Optional[dict],
         criteria: SelectionCriteria,
     ) -> bool:
         """Reuse the suitability check from FirstAvailableSelector."""

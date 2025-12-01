@@ -137,6 +137,7 @@ class TestLazyLoadingPerformance:
 
     def test_handler_discovery_performance(self):
         """Test handler discovery performance."""
+        from application.decorators import get_handler_registry_stats
         from infrastructure.di.container import get_container
         from infrastructure.di.handler_discovery import HandlerDiscoveryService
 
@@ -144,8 +145,10 @@ class TestLazyLoadingPerformance:
         discovery_service = HandlerDiscoveryService(container)
 
         start_time = time.time()
-        results = discovery_service.discover_and_register_handlers("src.application")
+        discovery_service.discover_and_register_handlers("src.application")
         discovery_time = (time.time() - start_time) * 1000
+
+        results = get_handler_registry_stats()
 
         assert discovery_time < 500, (
             f"Handler discovery took {discovery_time:.1f}ms, expected <500ms"

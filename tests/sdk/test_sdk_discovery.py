@@ -98,21 +98,22 @@ class TestSDKMethodDiscovery:
     async def test_discover_sdk_methods_success(self):
         """Test successful method discovery."""
         discovery = SDKMethodDiscovery()
-        mock_service = Mock()
+        mock_query_bus = Mock()
+        mock_command_bus = Mock()
 
         # Mock the handler registries
         mock_query_handlers = {MockQuery: MockHandler}
         mock_command_handlers = {MockCommand: MockHandler}
 
         with patch(
-            "src.sdk.discovery.get_registered_query_handlers",
+            "sdk.discovery.get_registered_query_handlers",
             return_value=mock_query_handlers,
         ):
             with patch(
-                "src.sdk.discovery.get_registered_command_handlers",
+                "sdk.discovery.get_registered_command_handlers",
                 return_value=mock_command_handlers,
             ):
-                methods = await discovery.discover_sdk_methods(mock_service)
+                methods = await discovery.discover_cqrs_methods(mock_query_bus, mock_command_bus)
 
                 assert "list_templates" in methods
                 assert "create_request" in methods
@@ -126,15 +127,16 @@ class TestSDKMethodDiscovery:
     async def test_discover_sdk_methods_failure(self):
         """Test method discovery failure handling."""
         discovery = SDKMethodDiscovery()
-        mock_service = Mock()
+        mock_query_bus = Mock()
+        mock_command_bus = Mock()
 
         # Mock handler registry to raise exception
         with patch(
-            "src.sdk.discovery.get_registered_query_handlers",
+            "sdk.discovery.get_registered_query_handlers",
             side_effect=Exception("Registry error"),
         ):
             with pytest.raises(HandlerDiscoveryError, match="Failed to discover SDK methods"):
-                await discovery.discover_sdk_methods(mock_service)
+                await discovery.discover_cqrs_methods(mock_query_bus, mock_command_bus)
 
     def test_get_method_info_existing(self):
         """Test getting method info for existing method."""
@@ -184,8 +186,8 @@ class TestSDKMethodDiscovery:
     async def test_query_method_execution_success(self):
         """Test successful query method execution."""
         discovery = SDKMethodDiscovery()
-        mock_service = Mock()
-        mock_service.execute_query = AsyncMock(return_value="query_result")
+        mock_query_bus = Mock()
+        mock_query_bus.execute = AsyncMock(return_value="query_result")
 
         # Create method info
         method_info = MethodInfo(
@@ -199,20 +201,20 @@ class TestSDKMethodDiscovery:
         )
 
         # Create query method
-        method = discovery._create_query_method(mock_service, MockQuery, method_info)
+        method = discovery._create_query_method_cqrs(mock_query_bus, MockQuery, method_info)
 
         # Execute method
         result = await method(test_param="value")
 
         assert result == "query_result"
-        mock_service.execute_query.assert_called_once()
+        mock_query_bus.execute.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_query_method_execution_failure(self):
         """Test query method execution failure."""
         discovery = SDKMethodDiscovery()
-        mock_service = Mock()
-        mock_service.execute_query = AsyncMock(side_effect=Exception("Execution error"))
+        mock_query_bus = Mock()
+        mock_query_bus.execute = AsyncMock(side_effect=Exception("Execution error"))
 
         # Create method info
         method_info = MethodInfo(
@@ -226,7 +228,7 @@ class TestSDKMethodDiscovery:
         )
 
         # Create query method
-        method = discovery._create_query_method(mock_service, MockQuery, method_info)
+        method = discovery._create_query_method_cqrs(mock_query_bus, MockQuery, method_info)
 
         # Execute method should raise MethodExecutionError
         with pytest.raises(MethodExecutionError, match="Failed to execute test_query"):
@@ -236,8 +238,8 @@ class TestSDKMethodDiscovery:
     async def test_command_method_execution_success(self):
         """Test successful command method execution."""
         discovery = SDKMethodDiscovery()
-        mock_service = Mock()
-        mock_service.execute_command = AsyncMock(return_value="command_result")
+        mock_command_bus = Mock()
+        mock_command_bus.execute = AsyncMock(return_value="command_result")
 
         # Create method info
         method_info = MethodInfo(
@@ -251,20 +253,20 @@ class TestSDKMethodDiscovery:
         )
 
         # Create command method
-        method = discovery._create_command_method(mock_service, MockCommand, method_info)
+        method = discovery._create_command_method_cqrs(mock_command_bus, MockCommand, method_info)
 
         # Execute method
         result = await method(test_param="value")
 
         assert result == "command_result"
-        mock_service.execute_command.assert_called_once()
+        mock_command_bus.execute.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_command_method_execution_failure(self):
         """Test command method execution failure."""
         discovery = SDKMethodDiscovery()
-        mock_service = Mock()
-        mock_service.execute_command = AsyncMock(side_effect=Exception("Execution error"))
+        mock_command_bus = Mock()
+        mock_command_bus.execute = AsyncMock(side_effect=Exception("Execution error"))
 
         # Create method info
         method_info = MethodInfo(
@@ -278,7 +280,7 @@ class TestSDKMethodDiscovery:
         )
 
         # Create command method
-        method = discovery._create_command_method(mock_service, MockCommand, method_info)
+        method = discovery._create_command_method_cqrs(mock_command_bus, MockCommand, method_info)
 
         # Execute method should raise MethodExecutionError
         with pytest.raises(MethodExecutionError, match="Failed to execute test_command"):

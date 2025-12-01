@@ -21,8 +21,16 @@ class NativeSpecService:
 
     def is_native_spec_enabled(self) -> bool:
         """Check if native specs are enabled."""
-        return self.config_port.get_native_spec_config()["enabled"]
+        try:
+            config = self.config_port.get_native_spec_config() or {}
+            enabled = config.get("enabled")
+            return bool(enabled) if isinstance(enabled, bool) else False
+        except Exception:
+            # Surface unexpected config errors to callers
+            raise
 
     def render_spec(self, spec: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
         """Render spec with context - provider agnostic."""
+        if spec is None or context is None:
+            raise TypeError("spec and context must not be None")
         return self.spec_renderer.render_spec(spec, context)

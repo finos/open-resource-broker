@@ -1,5 +1,6 @@
 """Advanced tests for Jinja2 spec rendering."""
 
+import base64
 from unittest.mock import Mock
 
 from domain.base.ports.logging_port import LoggingPort
@@ -13,6 +14,9 @@ class TestJinjaAdvancedRendering:
         """Set up test fixtures."""
         self.mock_logger = Mock(spec=LoggingPort)
         self.renderer = JinjaSpecRenderer(self.mock_logger)
+        self.renderer.jinja_env.filters["b64encode"] = lambda s: base64.b64encode(
+            s.encode()
+        ).decode()
 
     def test_simple_variable_substitution(self):
         """Test basic variable substitution."""

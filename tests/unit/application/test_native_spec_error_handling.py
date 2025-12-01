@@ -7,6 +7,7 @@ from jinja2 import TemplateError, UndefinedError
 
 from application.services.native_spec_service import NativeSpecService
 from domain.base.ports.configuration_port import ConfigurationPort
+from domain.base.ports.logging_port import LoggingPort
 from domain.base.ports.spec_rendering_port import SpecRenderingPort
 
 
@@ -17,8 +18,11 @@ class TestNativeSpecErrorHandling:
         """Set up test fixtures."""
         self.mock_config_port = Mock(spec=ConfigurationPort)
         self.mock_spec_renderer = Mock(spec=SpecRenderingPort)
+        self.mock_logger = Mock(spec=LoggingPort)
         self.service = NativeSpecService(
-            config_port=self.mock_config_port, spec_renderer=self.mock_spec_renderer
+            config_port=self.mock_config_port,
+            spec_renderer=self.mock_spec_renderer,
+            logger=self.mock_logger,
         )
 
     def test_native_spec_disabled(self):
@@ -85,7 +89,7 @@ class TestNativeSpecErrorHandling:
         """Test error handling during spec renderer initialization."""
         # Test with None renderer
         service_with_none_renderer = NativeSpecService(
-            config_port=self.mock_config_port, spec_renderer=None
+            config_port=self.mock_config_port, spec_renderer=None, logger=self.mock_logger
         )
 
         spec = {"InstanceType": "t3.micro"}

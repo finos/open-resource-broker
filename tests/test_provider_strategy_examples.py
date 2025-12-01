@@ -7,6 +7,8 @@ including new provider creation, runtime switching, load balancing, and fallback
 
 import time
 
+import pytest
+
 from providers.base.strategy import (
     CompositeProviderStrategy,
     CompositionConfig,
@@ -25,6 +27,99 @@ from providers.base.strategy import (
     ProviderStrategy,
     create_provider_context,
 )
+
+
+# Mock logger for testing
+class MockLogger:
+    """Simple mock logger for testing."""
+
+    def debug(self, message, *args, **kwargs):
+        pass
+
+    def info(self, message, *args, **kwargs):
+        pass
+
+    def warning(self, message, *args, **kwargs):
+        pass
+
+    def error(self, message, *args, **kwargs):
+        pass
+
+    def critical(self, message, *args, **kwargs):
+        pass
+
+    def exception(self, message, *args, **kwargs):
+        pass
+
+    def log(self, level, message, *args, **kwargs):
+        pass
+
+
+# Mock wrappers for testing
+class MockLoadBalancingProviderStrategy(LoadBalancingProviderStrategy):
+    """Mock wrapper for LoadBalancingProviderStrategy with required abstract methods."""
+
+    def initialize(self) -> bool:
+        """Initialize all strategies."""
+        for strategy in self._strategies.values():
+            if not strategy.initialize():
+                return False
+        self._initialized = True
+        return True
+
+    def check_health(self) -> ProviderHealthStatus:
+        """Check health of all strategies."""
+        return self.get_health_status()
+
+    def cleanup(self) -> None:
+        """Cleanup all strategies."""
+        for strategy in self._strategies.values():
+            strategy.cleanup()
+
+
+class MockFallbackProviderStrategy(FallbackProviderStrategy):
+    """Mock wrapper for FallbackProviderStrategy with required abstract methods."""
+
+    def initialize(self) -> bool:
+        """Initialize primary and fallback strategies."""
+        if not self._primary_strategy.initialize():
+            return False
+        for strategy in self._fallback_strategies:
+            strategy.initialize()
+        self._initialized = True
+        return True
+
+    def check_health(self) -> ProviderHealthStatus:
+        """Check health of primary strategy."""
+        return self._primary_strategy.check_health()
+
+    def cleanup(self) -> None:
+        """Cleanup all strategies."""
+        self._primary_strategy.cleanup()
+        for strategy in self._fallback_strategies:
+            strategy.cleanup()
+
+
+class MockCompositeProviderStrategy(CompositeProviderStrategy):
+    """Mock wrapper for CompositeProviderStrategy with required abstract methods."""
+
+    def initialize(self) -> bool:
+        """Initialize all strategies."""
+        for strategy in self._strategies:
+            if not strategy.initialize():
+                return False
+        self._initialized = True
+        return True
+
+    def check_health(self) -> ProviderHealthStatus:
+        """Check health of all strategies."""
+        healthy_count = sum(1 for s in self._strategies if s.check_health().is_healthy)
+        return ProviderHealthStatus.healthy(f"{healthy_count}/{len(self._strategies)} healthy")
+
+    def cleanup(self) -> None:
+        """Cleanup all strategies."""
+        for strategy in self._strategies:
+            strategy.cleanup()
 
 
 class MockProvider1Strategy(ProviderStrategy):
@@ -49,9 +144,11 @@ class MockProvider1Strategy(ProviderStrategy):
         self._initialized = True
         return True
 
-    def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
+    async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
+        import asyncio
+
         self.operation_count += 1
-        time.sleep(self.response_time_ms / 1000.0)  # Simulate response time
+        await asyncio.sleep(self.response_time_ms / 1000.0)  # Simulate response time
 
         if self.should_fail:
             return ProviderResult.error_result("Provider1 simulated failure", "PROVIDER1_ERROR")
@@ -89,6 +186,9 @@ class MockProvider1Strategy(ProviderStrategy):
             return ProviderHealthStatus.unhealthy("Provider1 is down")
         return ProviderHealthStatus.healthy("Provider1 is healthy", self.response_time_ms)
 
+    def cleanup(self) -> None:
+        pass
+
 
 class MockProvider2Strategy(ProviderStrategy):
     """Mock implementation of Provider2 for testing."""
@@ -111,9 +211,11 @@ class MockProvider2Strategy(ProviderStrategy):
         self._initialized = True
         return True
 
-    def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
+    async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
+        import asyncio
+
         self.operation_count += 1
-        time.sleep(self.response_time_ms / 1000.0)  # Simulate response time
+        await asyncio.sleep(self.response_time_ms / 1000.0)  # Simulate response time
 
         if self.should_fail:
             return ProviderResult.error_result("Provider2 simulated failure", "PROVIDER2_ERROR")
@@ -158,6 +260,9 @@ class MockProvider2Strategy(ProviderStrategy):
         if self.should_fail:
             return ProviderHealthStatus.unhealthy("Provider2 is down")
         return ProviderHealthStatus.healthy("Provider2 is healthy", self.response_time_ms)
+
+    def cleanup(self) -> None:
+        pass
 
 
 class TestProviderStrategyBasics:
@@ -226,7 +331,7 @@ class TestProviderContextAndSwitching:
 
     def setup_method(self):
         """Set up test fixtures."""
-        self.context = create_provider_context()
+        self.context = create_provider_context(logger=MockLogger())
         self.provider1 = MockProvider1Strategy(response_time_ms=100)
         self.provider2 = MockProvider2Strategy(response_time_ms=200)
 
@@ -697,9 +802,11 @@ class TestIntegrationScenarios:
         # Fast provider should get more requests
         assert fast_provider.operation_count >= slow_provider.operation_count
 
-    def test_provider_switching_under_load(self):
+    @pytest.mark.asyncio
+    async def test_provider_switching_under_load(self):
         """Test provider switching while under load."""
-        context = create_provider_context()
+        logger = MockLogger()
+        context = create_provider_context(logger=logger)
 
         provider1 = MockProvider1Strategy(response_time_ms=100)
         provider2 = MockProvider2Strategy(response_time_ms=200)
@@ -718,7 +825,7 @@ class TestIntegrationScenarios:
                 # Switch provider halfway through
                 context.set_strategy("provider2")
 
-            result = context.execute_operation(operation)
+            result = await context.execute_operation(operation)
             assert result.success
 
         # Both providers should have been used

@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from domain.request.aggregate import Request
-from domain.template.aggregate import Template
+from domain.template.template_aggregate import Template
 from providers.aws.utilities.fleet_tag_builder import FleetTagBuilder
 
 

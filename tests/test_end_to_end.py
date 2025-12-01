@@ -14,14 +14,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 def test_application_service_instantiation():
     """Test that ApplicationService can be imported."""
-    from application.service import ApplicationService
+    from application.services.template_defaults_service import TemplateDefaultsService
 
     # Just test that the class can be imported
-    assert ApplicationService is not None
-    assert hasattr(ApplicationService, "__init__")
+    assert TemplateDefaultsService is not None
+    assert hasattr(TemplateDefaultsService, "__init__")
 
     # Test that it's a class
-    assert isinstance(ApplicationService, type)
+    assert isinstance(TemplateDefaultsService, type)
 
 
 def test_configuration_loading():
@@ -117,7 +117,7 @@ def test_machine_operations():
     assert machine_data["status"] == "running"
 
 
-@patch("src.infrastructure.logging.logger.get_logger")
+@patch("infrastructure.logging.logger.get_logger")
 def test_logging_functionality(mock_get_logger):
     """Test that logging functionality works."""
     mock_logger = MagicMock()

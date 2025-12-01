@@ -1,6 +1,6 @@
 """Request aggregate - core request domain logic."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from pydantic import ConfigDict, Field
@@ -59,7 +59,7 @@ class Request(AggregateRoot):
     failed_count: int = 0
 
     # Lifecycle timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
@@ -77,11 +77,11 @@ class Request(AggregateRoot):
         """Initialize the instance."""
         # Set default ID if not provided
         if "id" not in data:
-            data["id"] = data.get("request_id", f"request-{datetime.utcnow().isoformat()}")
+            data["id"] = data.get("request_id", f"request-{datetime.now(timezone.utc).isoformat()}")
 
         # Set default timestamps if not provided
         if "created_at" not in data:
-            data["created_at"] = datetime.utcnow()
+            data["created_at"] = datetime.now(timezone.utc)
 
         super().__init__(**data)
 
@@ -344,7 +344,7 @@ class Request(AggregateRoot):
             provider_instance=provider_instance,
             status=RequestStatus.PENDING,
             metadata=metadata or {},
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
             version=0,
         )
 
@@ -504,6 +504,6 @@ class Request(AggregateRoot):
             RequestStatus.FAILED,
             RequestStatus.CANCELLED,
         ]:
-            data["completed_at"] = datetime.utcnow()
+            data["completed_at"] = datetime.now(timezone.utc)
 
         return Request.model_validate(data)

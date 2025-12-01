@@ -216,9 +216,9 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> dict[str
         raw_request_data = args.input_data
         if "machines" in raw_request_data:
             machine_ids = [
-                machine.get("machineId")
+                machine.get("machineId") or machine.get("machine_id")
                 for machine in raw_request_data["machines"]
-                if machine.get("machineId")
+                if machine.get("machineId") or machine.get("machine_id")
             ]
     else:
         # Use positional arguments

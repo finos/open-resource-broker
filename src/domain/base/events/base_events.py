@@ -1,6 +1,6 @@
 """Base event classes and protocols - foundation for event-driven architecture."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Callable, Optional, Protocol
 from uuid import uuid4
 
@@ -13,7 +13,7 @@ class DomainEvent(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     event_id: str = Field(default_factory=lambda: str(uuid4()))
-    occurred_at: datetime = Field(default_factory=datetime.utcnow)
+    occurred_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     event_type: str = Field(default="")
     aggregate_id: str
     aggregate_type: str
