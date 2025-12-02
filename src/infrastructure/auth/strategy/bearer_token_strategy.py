@@ -57,7 +57,23 @@ class BearerTokenStrategy(AuthPort):
                 error_message="Missing or invalid Authorization header",
             )
 
-        token = auth_header[7:]  # Remove "Bearer " prefix
+        token = auth_header[7:].strip()  # Remove "Bearer " prefix and sanitize
+        
+        # Reject empty tokens
+        if not token:
+            return AuthResult(
+                status=AuthStatus.INVALID,
+                error_message="Empty token",
+            )
+        
+        # Reject tokens with invalid characters (header injection attempts)
+        # JWT tokens should only contain Base64URL characters: A-Za-z0-9_-.
+        if not all(c.isalnum() or c in '._-' for c in token):
+            return AuthResult(
+                status=AuthStatus.INVALID,
+                error_message="Invalid token format",
+            )
+        
         return await self.validate_token(token)
 
     async def validate_token(self, token: str) -> AuthResult:

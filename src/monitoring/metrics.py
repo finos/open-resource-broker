@@ -77,7 +77,7 @@ class MetricsCollector:
         self.config = config
         self.metrics: dict[str, Metric] = {}
         self.timers: dict[str, list[float]] = {}
-        self._lock = threading.Lock()
+        self._lock = threading.RLock() # Same thread can re-aquire the lock
 
         # Create metrics directory
         self.metrics_dir = Path(config.get("METRICS_DIR", "./metrics"))
@@ -204,28 +204,45 @@ class MetricsCollector:
             """Write metrics to file periodically in background thread."""
             while True:
                 try:
-                    metrics = self.get_metrics()
-
-                    # Write to JSON file
-                    metrics_file = self.metrics_dir / "metrics.json"
-                    with metrics_file.open("w") as f:
-                        json.dump(metrics, f, indent=2)
-
-                    # Write to Prometheus format
-                    prom_file = self.metrics_dir / "metrics.prom"
-                    with prom_file.open("w") as f:
-                        for name, metric in metrics.items():
-                            labels = ",".join(f'{k}="{v}"' for k, v in metric["labels"].items())
-                            f.write(f"{name}{{{labels}}} {metric['value']}\n")
-
-                    time.sleep(self.config.get("METRICS_INTERVAL", 60))
-
+                    self._write_metrics_snapshot()
+                    time.sleep(self.config.get("METRICS_INTERVAL", 10))
                 except Exception as e:
                     logger.error("Error writing metrics: %s", e)
                     time.sleep(5)  # Shorter sleep on error
 
         thread = threading.Thread(target=write_metrics, daemon=True)
         thread.start()
+
+    def _write_metrics_snapshot(self) -> None:
+        """Write the current metrics snapshot to disk."""
+        metrics = self.get_metrics()
+
+        # Write to JSON file
+        metrics_file = self.metrics_dir / "metrics.json"
+        with metrics_file.open("w") as f:
+            json.dump(metrics, f, indent=2)
+
+        # Write to Prometheus format
+        prom_file = self.metrics_dir / "metrics.prom"
+        with prom_file.open("w") as f:
+            for name, metric in metrics.items():
+                labels = ",".join(f'{k}="{v}"' for k, v in metric["labels"].items())
+                f.write(f"{name}{{{labels}}} {metric['value']}\n")
+
+    def flush(self) -> None:
+        """Flush metrics to disk immediately."""
+        try:
+            self._write_metrics_snapshot()
+        except Exception as e:
+            logger.error("Error flushing metrics: %s", e)
+
+    def __del__(self) -> None:
+        """Best-effort flush on collector destruction."""
+        try:
+            self.flush()
+        except Exception:
+            # Avoid raising during interpreter shutdown
+            pass
 
     def check_thresholds(self) -> list[dict[str, Any]]:
         """Check metrics against configured thresholds."""

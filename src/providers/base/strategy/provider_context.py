@@ -6,56 +6,16 @@ provider strategies while handling strategy selection, switching, and lifecycle.
 """
 
 import time
-from dataclasses import dataclass
 from threading import Lock
 from typing import Any, Optional
 
 from domain.base.ports import LoggingPort
-from providers.base.strategy.provider_strategy import (
-    ProviderCapabilities,
-    ProviderHealthStatus,
-    ProviderOperation,
-    ProviderResult,
-    ProviderStrategy,
-)
-
-
-@dataclass
-class StrategyMetrics:
-    """Metrics for tracking strategy performance and usage."""
-
-    total_operations: int = 0
-    successful_operations: int = 0
-    failed_operations: int = 0
-    average_response_time_ms: float = 0.0
-    last_used_time: Optional[float] = None
-    health_check_count: int = 0
-    last_health_check: Optional[float] = None
-
-    @property
-    def success_rate(self) -> float:
-        """Calculate success rate percentage."""
-        if self.total_operations == 0:
-            return 0.0
-        return (self.successful_operations / self.total_operations) * 100.0
-
-    def record_operation(self, success: bool, response_time_ms: float) -> None:
-        """Record an operation execution."""
-        self.total_operations += 1
-        if success:
-            self.successful_operations += 1
-        else:
-            self.failed_operations += 1
-
-        # Update average response time
-        if self.total_operations == 1:
-            self.average_response_time_ms = response_time_ms
-        else:
-            self.average_response_time_ms = (
-                self.average_response_time_ms * (self.total_operations - 1) + response_time_ms
-            ) / self.total_operations
-
-        self.last_used_time = time.time()
+from monitoring.metrics import MetricsCollector
+from providers.base.strategy.provider_strategy import (ProviderCapabilities,
+                                                       ProviderHealthStatus,
+                                                       ProviderOperation,
+                                                       ProviderResult,
+                                                       ProviderStrategy)
 
 
 class ProviderContext:
@@ -76,16 +36,18 @@ class ProviderContext:
     - Context manager support
     """
 
-    def __init__(self, logger: LoggingPort) -> None:
+    def __init__(self, logger: LoggingPort, metrics: Optional[MetricsCollector] = None) -> None:
         """
         Initialize the provider context.
 
         Args:
             logger: Logging port for dependency injection
+            metrics: Optional metrics collector for recording provider metrics
         """
         self._logger = logger
         self._strategies: dict[str, ProviderStrategy] = {}
-        self._strategy_metrics: dict[str, StrategyMetrics] = {}
+        # Use shared MetricsCollector when provided; otherwise create a local one.
+        self._metrics = metrics or MetricsCollector(config={"METRICS_ENABLED": True})
         self._current_strategy: Optional[ProviderStrategy] = None
         self._default_strategy_type: Optional[str] = None
         self._lock = Lock()
@@ -145,7 +107,6 @@ class ProviderContext:
                 self._logger.debug("Strategy %s already registered, replacing", strategy_type)
 
             self._strategies[strategy_type] = strategy
-            self._strategy_metrics[strategy_type] = StrategyMetrics()
 
             # Set as default if it's the first strategy
             if self._default_strategy_type is None:
@@ -182,7 +143,6 @@ class ProviderContext:
 
             # Remove from registry
             del self._strategies[strategy_type]
-            del self._strategy_metrics[strategy_type]
 
             # Update current strategy if needed
             if self._current_strategy == strategy:
@@ -261,9 +221,7 @@ class ProviderContext:
             if not capabilities.supports_operation(operation.operation_type):
                 # Record failed operation for unsupported operation
                 response_time_ms = (time.time() - start_time) * 1000
-                with self._lock:
-                    metrics = self._strategy_metrics[strategy_type]
-                    metrics.record_operation(False, response_time_ms)
+                self._record_metrics(strategy_type, operation.operation_type.name, False, response_time_ms)
 
                 return ProviderResult.error_result(
                     f"Strategy {strategy_type} does not support operation {operation.operation_type}",
@@ -275,9 +233,7 @@ class ProviderContext:
 
             # Record metrics
             response_time_ms = (time.time() - start_time) * 1000
-            with self._lock:
-                metrics = self._strategy_metrics[strategy_type]
-                metrics.record_operation(result.success, response_time_ms)
+            self._record_metrics(strategy_type, operation.operation_type.name, result.success, response_time_ms)
 
             self._logger.debug(
                 "Operation %s executed by %s: success=%s, time=%.2fms",
@@ -292,9 +248,7 @@ class ProviderContext:
         except Exception as e:
             # Record failed operation
             response_time_ms = (time.time() - start_time) * 1000
-            with self._lock:
-                metrics = self._strategy_metrics[strategy_type]
-                metrics.record_operation(False, response_time_ms)
+            self._record_metrics(strategy_type, operation.operation_type.name, False, response_time_ms)
 
             self._logger.error(
                 "Error executing operation %s with %s: %s",
@@ -396,9 +350,7 @@ class ProviderContext:
             if not capabilities.supports_operation(operation.operation_type):
                 # Record failed operation for unsupported operation
                 response_time_ms = (time.time() - start_time) * 1000
-                with self._lock:
-                    metrics = self._strategy_metrics[strategy_type]
-                    metrics.record_operation(False, response_time_ms)
+                self._record_metrics(strategy_type, operation.operation_type.name, False, response_time_ms)
 
                 return ProviderResult.error_result(
                     f"Strategy {strategy_type} does not support operation {operation.operation_type}",
@@ -410,9 +362,7 @@ class ProviderContext:
 
             # Record metrics
             response_time_ms = (time.time() - start_time) * 1000
-            with self._lock:
-                metrics = self._strategy_metrics[strategy_type]
-                metrics.record_operation(result.success, response_time_ms)
+            self._record_metrics(strategy_type, operation.operation_type.name, result.success, response_time_ms)
 
             self._logger.debug(
                 "Operation %s executed by %s: success=%s, time=%.2fms",
@@ -427,9 +377,7 @@ class ProviderContext:
         except Exception as e:
             # Record failed operation
             response_time_ms = (time.time() - start_time) * 1000
-            with self._lock:
-                metrics = self._strategy_metrics[strategy_type]
-                metrics.record_operation(False, response_time_ms)
+            self._record_metrics(strategy_type, operation.operation_type.name, False, response_time_ms)
 
             self._logger.error(
                 "Error executing operation %s with %s: %s",
@@ -490,14 +438,11 @@ class ProviderContext:
 
         try:
             health_status = strategy.check_health()
-
-            # Update health check metrics using the correct strategy identifier
-            if strategy_type and strategy_type in self._strategy_metrics:
-                with self._lock:
-                    metrics = self._strategy_metrics[strategy_type]
-                    metrics.health_check_count += 1
-                    metrics.last_health_check = time.time()
-
+            if strategy_type:
+                self._metrics.increment_counter(
+                    "provider_strategy_health_checks_total",
+                    1.0,
+                )
             return health_status
 
         except Exception as e:
@@ -506,18 +451,8 @@ class ProviderContext:
                 f"Health check failed: {e!s}", {"exception": str(e)}
             )
 
-    def get_strategy_metrics(
-        self, strategy_type: Optional[str] = None
-    ) -> Optional[StrategyMetrics]:
-        """
-        Get metrics for a specific strategy or current strategy.
-
-        Args:
-            strategy_type: Optional strategy type, uses current if None
-
-        Returns:
-            Strategy metrics or None if strategy not found
-        """
+    def get_strategy_metrics(self, strategy_type: Optional[str] = None) -> Optional[dict[str, Any]]:
+        """Get metrics snapshot for a specific strategy or current strategy."""
         if strategy_type is None:
             if not self._current_strategy:
                 return None
@@ -525,12 +460,22 @@ class ProviderContext:
             # identifier
             strategy_type = self.current_strategy_type
 
-        return self._strategy_metrics.get(strategy_type)
+        return self._metrics.get_metrics()
 
-    def get_all_metrics(self) -> dict[str, StrategyMetrics]:
+    def get_all_metrics(self) -> dict[str, Any]:
         """Get metrics for all registered strategies."""
-        with self._lock:
-            return self._strategy_metrics.copy()
+        return self._metrics.get_metrics()
+
+    def _record_metrics(self, strategy_type: str, operation: str, success: bool, response_time_ms: float) -> None:
+        """Record operation metrics via MetricsCollector."""
+        op_base = f"provider.{strategy_type}.{operation.lower()}"
+        if success:
+            self._metrics.increment_counter(f"{op_base}.success_total")
+        else:
+            self._metrics.increment_counter(f"{op_base}.error_total")
+        # record_time expects seconds
+        self._metrics.record_time(f"{op_base}.duration", response_time_ms / 1000.0)
+        # self._metrics.flush()
 
     def initialize(self) -> bool:
         """
@@ -612,7 +557,6 @@ class ProviderContext:
                     self._logger.warning("Error cleaning up strategy %s: %s", strategy_type, e)
 
             self._strategies.clear()
-            self._strategy_metrics.clear()
             self._current_strategy = None
             self._default_strategy_type = None
             self._initialized = False

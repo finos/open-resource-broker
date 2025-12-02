@@ -17,7 +17,10 @@ def register_core_services(container: DIContainer) -> None:
     """Register core application services."""
 
     # Register metrics collector
-    container.register_singleton(MetricsCollector)
+    container.register_singleton(
+        MetricsCollector,
+        lambda c: MetricsCollector({"METRICS_ENABLED": True, "METRICS_DIR": "./metrics"}),
+    )
 
     # Register template format converter
 

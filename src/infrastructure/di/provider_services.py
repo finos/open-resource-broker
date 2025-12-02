@@ -1,11 +1,14 @@
 """Provider service registrations for dependency injection."""
 
+from typing import Optional
+
 from application.services.provider_capability_service import ProviderCapabilityService
 from application.services.provider_selection_service import ProviderSelectionService
 from domain.base.ports import ConfigurationPort, LoggingPort
 from infrastructure.di.container import DIContainer
 from infrastructure.factories.provider_strategy_factory import ProviderStrategyFactory
 from infrastructure.logging.logger import get_logger
+from monitoring.metrics import MetricsCollector
 from providers.base.strategy import ProviderContext
 
 
@@ -316,29 +319,33 @@ def create_configured_provider_context(container: DIContainer) -> ProviderContex
     """Create provider context using configuration-driven factory with lazy loading support."""
     try:
         logger = container.get(LoggingPort)
+        metrics = container.get_optional(MetricsCollector) if hasattr(container, "get_optional") else None
         config_manager = container.get(ConfigurationPort)
 
         # Check if lazy loading is enabled
         if container.is_lazy_loading_enabled():
-            return _create_lazy_provider_context(container, logger, config_manager)
+            return _create_lazy_provider_context(container, logger, config_manager, metrics)
         else:
-            return _create_eager_provider_context(container, logger, config_manager)
+            return _create_eager_provider_context(container, logger, config_manager, metrics)
 
     except Exception as e:
         logger = container.get(LoggingPort)
         logger.error("Failed to create configured provider context, using fallback: %s", e)
         # Create minimal provider context as fallback
-        return ProviderContext(logger)
+        return ProviderContext(logger, metrics=metrics)
 
 
 def _create_lazy_provider_context(
-    container: DIContainer, logger: LoggingPort, config_manager: ConfigurationPort
+    container: DIContainer,
+    logger: LoggingPort,
+    config_manager: ConfigurationPort,
+    metrics: Optional[MetricsCollector],
 ) -> ProviderContext:
     """Create provider context with immediate provider registration (lazy loading fixed)."""
     logger.info("Creating provider context with lazy loading enabled")
 
     # Create provider context
-    provider_context = ProviderContext(logger)
+    provider_context = ProviderContext(logger, metrics=metrics)
 
     try:
         # IMMEDIATE LOADING instead of broken lazy loading
@@ -377,7 +384,10 @@ def _create_lazy_provider_context(
 
 
 def _create_eager_provider_context(
-    container: DIContainer, logger: LoggingPort, config_manager: ConfigurationPort
+    container: DIContainer,
+    logger: LoggingPort,
+    config_manager: ConfigurationPort,
+    metrics: Optional[MetricsCollector],
 ) -> ProviderContext:
     """Create provider context with immediate provider registration (fallback mode)."""
     logger.info("Creating provider context with eager loading (fallback mode)")
@@ -392,14 +402,14 @@ def _create_eager_provider_context(
             # Use configuration-driven approach
             from providers.base.strategy import create_provider_context
 
-            return create_provider_context(logger=logger)
+            return create_provider_context(logger=logger, metrics=metrics)
     except (AttributeError, Exception) as e:
         logger.warning("Failed to create provider context: %s", e)
 
     # Fallback to basic provider context
     from providers.base.strategy import create_provider_context
 
-    return create_provider_context(logger)
+    return create_provider_context(logger, metrics=metrics)
 
 
 def _register_provider_to_context(
