@@ -22,11 +22,6 @@ from domain.request.value_objects import RequestStatus
 from infrastructure.logging.logger import get_logger
 
 
-def convert_to_legacy_args(args: argparse.Namespace) -> dict:
-    """Convert modern CLI args to legacy format for backward compatibility."""
-    return vars(args)
-
-
 def parse_args() -> tuple[argparse.Namespace, dict]:
     """Parse command line arguments with resource-action structure.
 
@@ -561,52 +556,32 @@ async def execute_command(args, app) -> dict[str, Any]:
     try:
         # Import function handlers - all are now async functions with decorators
         from interface.mcp.server.handler import handle_mcp_serve
-        from interface.mcp_command_handlers import (
-            handle_mcp_tools_call,
-            handle_mcp_tools_info,
-            handle_mcp_tools_list,
-            handle_mcp_validate,
-        )
+        from interface.mcp_command_handlers import (handle_mcp_tools_call,
+                                                    handle_mcp_tools_info,
+                                                    handle_mcp_tools_list,
+                                                    handle_mcp_validate)
         from interface.request_command_handlers import (
-            handle_get_request_status,
-            handle_get_return_requests,
-            handle_request_machines,
-            handle_request_return_machines,
-        )
+            handle_get_request_status, handle_get_return_requests,
+            handle_request_machines, handle_request_return_machines)
         from interface.scheduler_command_handlers import (
-            handle_list_scheduler_strategies,
-            handle_show_scheduler_config,
-            handle_validate_scheduler_config,
-        )
+            handle_list_scheduler_strategies, handle_show_scheduler_config,
+            handle_validate_scheduler_config)
         from interface.serve_command_handler import handle_serve_api
         from interface.storage_command_handlers import (
-            handle_list_storage_strategies,
-            handle_show_storage_config,
-            handle_storage_health,
-            handle_storage_metrics,
-            handle_test_storage,
-            handle_validate_storage_config,
-        )
+            handle_list_storage_strategies, handle_show_storage_config,
+            handle_storage_health, handle_storage_metrics, handle_test_storage,
+            handle_validate_storage_config)
         from interface.system_command_handlers import (
-            handle_execute_provider_operation,
-            handle_list_providers,
-            handle_provider_config,
-            handle_provider_health,
-            handle_provider_metrics,
-            handle_reload_provider_config,
-            handle_select_provider_strategy,
-            handle_system_metrics,
-            handle_validate_provider_config,
-        )
+            handle_execute_provider_operation, handle_list_providers,
+            handle_provider_config, handle_provider_health,
+            handle_provider_metrics, handle_reload_provider_config,
+            handle_select_provider_strategy, handle_system_metrics,
+            handle_validate_provider_config)
         from interface.template_command_handlers import (
-            handle_create_template,
-            handle_delete_template,
-            handle_get_template,
-            handle_list_templates,
-            handle_refresh_templates,
-            handle_update_template,
-            handle_validate_template,
-        )
+            handle_create_template, handle_delete_template,
+            handle_get_template, handle_list_templates,
+            handle_refresh_templates, handle_update_template,
+            handle_validate_template)
 
         # Command handler mapping - all handlers are now async functions
         COMMAND_HANDLERS = {
