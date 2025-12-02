@@ -3,6 +3,7 @@
 import json
 import threading
 import time
+import traceback
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -80,14 +81,14 @@ class MetricsCollector:
         self._lock = threading.RLock() # Same thread can re-aquire the lock
 
         # Create metrics directory
-        self.metrics_dir = Path(config.get("METRICS_DIR", "./metrics"))
+        self.metrics_dir = Path(config.get("metrics_dir", "./metrics"))
         self.metrics_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize default metrics
         self._initialize_metrics()
 
         # Start background metrics writer if enabled
-        if config.get("METRICS_ENABLED", True):
+        if config.get("metrics_enabled", False):
             self._start_metrics_writer()
 
     def _initialize_metrics(self) -> None:
@@ -205,7 +206,7 @@ class MetricsCollector:
             while True:
                 try:
                     self._write_metrics_snapshot()
-                    time.sleep(self.config.get("METRICS_INTERVAL", 10))
+                    time.sleep(self.config.get("metrics_interval", 10))
                 except Exception as e:
                     logger.error("Error writing metrics: %s", e)
                     time.sleep(5)  # Shorter sleep on error
@@ -247,7 +248,8 @@ class MetricsCollector:
     def check_thresholds(self) -> list[dict[str, Any]]:
         """Check metrics against configured thresholds."""
         alerts = []
-        thresholds = self.config.get("ALERT_THRESHOLDS", {})
+        # TODO: unimplemented.
+        thresholds = self.config.get("alert_thresholds", {})
 
         with self._lock:
             for name, threshold in thresholds.items():

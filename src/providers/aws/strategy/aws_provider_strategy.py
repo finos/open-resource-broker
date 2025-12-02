@@ -64,6 +64,7 @@ class AWSProviderStrategy(ProviderStrategy):
         logger: LoggingPort,
         aws_provisioning_port: Optional[Any] = None,
         aws_provisioning_port_resolver: Optional[Callable[[], Any]] = None,
+        aws_client_resolver: Optional[Callable[[], "AWSClient"]] = None,
     ) -> None:
         """
         Initialize AWS provider strategy.
@@ -84,6 +85,7 @@ class AWSProviderStrategy(ProviderStrategy):
         self._logger = logger
         self._aws_config = config
         self._aws_client: Optional[AWSClient] = None
+        self._aws_client_resolver = aws_client_resolver
         self._resource_manager: Optional[AWSResourceManager] = None
         self._launch_template_manager: Optional[AWSLaunchTemplateManager] = None
         self._handlers: dict[str, Any] = {}
@@ -122,21 +124,15 @@ class AWSProviderStrategy(ProviderStrategy):
         if self._aws_client is None:
             self._logger.debug("Creating AWS client on first access")
 
-            # Create a configuration port that provides the instance-specific AWS config
-            class AWSInstanceConfigPort:
-                """Configuration port that provides instance-specific AWS configuration."""
-
-                def __init__(self, aws_config: AWSProviderConfig) -> None:
-                    self._aws_config = aws_config
-
-                def get_typed(self, config_type):
-                    """Return the instance-specific AWS config."""
-                    if config_type == AWSProviderConfig:
-                        return self._aws_config
-                    return None
-
-            config_port = AWSInstanceConfigPort(self._aws_config)
-            self._aws_client = AWSClient(config=config_port, logger=self._logger)
+            # Prefer resolver (from DI) so metrics and config wiring are consistent
+            if self._aws_client_resolver:
+                try:
+                    self._aws_client = self._aws_client_resolver()
+                except Exception as exc:  # nosec B110 - diagnostic only
+                    self._logger.warning("Failed to resolve AWSClient lazily: %s", exc)
+                    self._aws_client = None
+            else:
+                self._logger.warning("AWSClient resolver not provided; AWS metrics may be disabled")
         return self._aws_client
 
     @property

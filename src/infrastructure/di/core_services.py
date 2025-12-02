@@ -1,13 +1,8 @@
 """Core service registrations for dependency injection."""
 
-from domain.base.ports import (
-    ConfigurationPort,
-    EventPublisherPort,
-    LoggingPort,
-    ProviderPort,
-    SchedulerPort,
-    StoragePort,
-)
+from domain.base.ports import (ConfigurationPort, EventPublisherPort,
+                               LoggingPort, ProviderPort, SchedulerPort,
+                               StoragePort)
 from infrastructure.di.buses import CommandBus, QueryBus
 from infrastructure.di.container import DIContainer
 from monitoring.metrics import MetricsCollector
@@ -16,11 +11,14 @@ from monitoring.metrics import MetricsCollector
 def register_core_services(container: DIContainer) -> None:
     """Register core application services."""
 
-    # Register metrics collector
-    container.register_singleton(
-        MetricsCollector,
-        lambda c: MetricsCollector({"METRICS_ENABLED": True, "METRICS_DIR": "./metrics"}),
-    )
+    # Register metrics collector with configuration from ConfigurationPort
+    def create_metrics_collector(c):
+        config_port = c.get(ConfigurationPort)
+        metrics_config = config_port.get_metrics_config()
+        return MetricsCollector(metrics_config)
+
+    # Register as singleton so the same collector instance is shared
+    container.register_singleton(MetricsCollector, create_metrics_collector)
 
     # Register template format converter
 
@@ -65,9 +63,8 @@ def register_core_services(container: DIContainer) -> None:
 
 def _create_scheduler_strategy(container: DIContainer) -> SchedulerPort:
     """Create scheduler strategy using factory."""
-    from infrastructure.factories.scheduler_strategy_factory import (
-        SchedulerStrategyFactory,
-    )
+    from infrastructure.factories.scheduler_strategy_factory import \
+        SchedulerStrategyFactory
 
     factory = container.get(SchedulerStrategyFactory)
     config = container.get(ConfigurationPort)
@@ -77,7 +74,8 @@ def _create_scheduler_strategy(container: DIContainer) -> SchedulerPort:
 
 def _create_storage_strategy(container: DIContainer) -> StoragePort:
     """Create storage strategy using factory."""
-    from infrastructure.factories.storage_strategy_factory import StorageStrategyFactory
+    from infrastructure.factories.storage_strategy_factory import \
+        StorageStrategyFactory
 
     factory = container.get(StorageStrategyFactory)
     config = container.get(ConfigurationPort)
@@ -87,7 +85,8 @@ def _create_storage_strategy(container: DIContainer) -> StoragePort:
 
 def _create_provider_strategy(container: DIContainer) -> ProviderPort:
     """Create provider strategy using adapter pattern."""
-    from infrastructure.adapters.provider_context_adapter import ProviderContextAdapter
+    from infrastructure.adapters.provider_context_adapter import \
+        ProviderContextAdapter
     from providers.base.strategy.provider_context import ProviderContext
 
     provider_context = container.get(ProviderContext)
