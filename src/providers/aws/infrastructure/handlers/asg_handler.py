@@ -31,22 +31,17 @@ from typing import Any, Optional
 from domain.base.dependency_injection import injectable
 from domain.base.ports import LoggingPort
 from domain.request.aggregate import Request
-from infrastructure.adapters.ports.request_adapter_port import \
-    RequestAdapterPort
+from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from infrastructure.error.decorators import handle_infrastructure_exceptions
 from infrastructure.utilities.common.resource_naming import get_resource_prefix
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
-from providers.aws.infrastructure.adapters.machine_adapter import \
-    AWSMachineAdapter
+from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from providers.aws.infrastructure.aws_client import AWSClient
-from providers.aws.infrastructure.handlers.base_context_mixin import \
-    BaseContextMixin
+from providers.aws.infrastructure.handlers.base_context_mixin import BaseContextMixin
 from providers.aws.infrastructure.handlers.base_handler import AWSHandler
-from providers.aws.infrastructure.handlers.fleet_grouping_mixin import \
-    FleetGroupingMixin
-from providers.aws.infrastructure.launch_template.manager import \
-    AWSLaunchTemplateManager
+from providers.aws.infrastructure.handlers.fleet_grouping_mixin import FleetGroupingMixin
+from providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
 from providers.aws.utilities.aws_operations import AWSOperations
 
 
@@ -88,8 +83,9 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
         container = get_container()
         try:
-            from providers.aws.infrastructure.services.aws_native_spec_service import \
-                AWSNativeSpecService
+            from providers.aws.infrastructure.services.aws_native_spec_service import (
+                AWSNativeSpecService,
+            )
 
             self.aws_native_spec_service = container.get(AWSNativeSpecService)
             # Get config port for package info
@@ -98,8 +94,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             self.config_port = container.get(ConfigurationPort)
 
             if self._machine_adapter is None:
-                from providers.aws.infrastructure.adapters.machine_adapter import \
-                    AWSMachineAdapter
+                from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 
                 self._machine_adapter = container.get(AWSMachineAdapter)
         except Exception:

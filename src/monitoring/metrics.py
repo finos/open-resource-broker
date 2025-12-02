@@ -3,7 +3,6 @@
 import json
 import threading
 import time
-import traceback
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -78,7 +77,7 @@ class MetricsCollector:
         self.config = config
         self.metrics: dict[str, Metric] = {}
         self.timers: dict[str, list[float]] = {}
-        self._lock = threading.RLock() # Same thread can re-aquire the lock
+        self._lock = threading.RLock()  # Same thread can re-aquire the lock
 
         # Create metrics directory
         self.metrics_dir = Path(config.get("metrics_dir", "./metrics"))

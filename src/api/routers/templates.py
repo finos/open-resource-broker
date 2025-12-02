@@ -1,6 +1,5 @@
 """Template management API routes."""
 
-import json
 from datetime import datetime
 from typing import Any, Optional
 
@@ -8,11 +7,12 @@ from fastapi import APIRouter, Body, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from application.dto.queries import (GetTemplateQuery, ListTemplatesQuery,
-                                     ValidateTemplateQuery)
-from application.template.commands import (CreateTemplateCommand,
-                                           DeleteTemplateCommand,
-                                           UpdateTemplateCommand)
+from application.dto.queries import GetTemplateQuery, ListTemplatesQuery, ValidateTemplateQuery
+from application.template.commands import (
+    CreateTemplateCommand,
+    DeleteTemplateCommand,
+    UpdateTemplateCommand,
+)
 from infrastructure.di.buses import CommandBus, QueryBus
 from infrastructure.di.container import get_container
 from infrastructure.error.decorators import handle_rest_exceptions

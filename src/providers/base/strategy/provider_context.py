@@ -11,11 +11,13 @@ from typing import Any, Optional
 
 from domain.base.ports import LoggingPort
 from monitoring.metrics import MetricsCollector
-from providers.base.strategy.provider_strategy import (ProviderCapabilities,
-                                                       ProviderHealthStatus,
-                                                       ProviderOperation,
-                                                       ProviderResult,
-                                                       ProviderStrategy)
+from providers.base.strategy.provider_strategy import (
+    ProviderCapabilities,
+    ProviderHealthStatus,
+    ProviderOperation,
+    ProviderResult,
+    ProviderStrategy,
+)
 
 
 class ProviderContext:
@@ -221,7 +223,9 @@ class ProviderContext:
             if not capabilities.supports_operation(operation.operation_type):
                 # Record failed operation for unsupported operation
                 response_time_ms = (time.time() - start_time) * 1000
-                self._record_metrics(strategy_type, operation.operation_type.name, False, response_time_ms)
+                self._record_metrics(
+                    strategy_type, operation.operation_type.name, False, response_time_ms
+                )
 
                 return ProviderResult.error_result(
                     f"Strategy {strategy_type} does not support operation {operation.operation_type}",
@@ -233,7 +237,9 @@ class ProviderContext:
 
             # Record metrics
             response_time_ms = (time.time() - start_time) * 1000
-            self._record_metrics(strategy_type, operation.operation_type.name, result.success, response_time_ms)
+            self._record_metrics(
+                strategy_type, operation.operation_type.name, result.success, response_time_ms
+            )
 
             self._logger.debug(
                 "Operation %s executed by %s: success=%s, time=%.2fms",
@@ -248,7 +254,9 @@ class ProviderContext:
         except Exception as e:
             # Record failed operation
             response_time_ms = (time.time() - start_time) * 1000
-            self._record_metrics(strategy_type, operation.operation_type.name, False, response_time_ms)
+            self._record_metrics(
+                strategy_type, operation.operation_type.name, False, response_time_ms
+            )
 
             self._logger.error(
                 "Error executing operation %s with %s: %s",
@@ -350,7 +358,9 @@ class ProviderContext:
             if not capabilities.supports_operation(operation.operation_type):
                 # Record failed operation for unsupported operation
                 response_time_ms = (time.time() - start_time) * 1000
-                self._record_metrics(strategy_type, operation.operation_type.name, False, response_time_ms)
+                self._record_metrics(
+                    strategy_type, operation.operation_type.name, False, response_time_ms
+                )
 
                 return ProviderResult.error_result(
                     f"Strategy {strategy_type} does not support operation {operation.operation_type}",
@@ -362,7 +372,9 @@ class ProviderContext:
 
             # Record metrics
             response_time_ms = (time.time() - start_time) * 1000
-            self._record_metrics(strategy_type, operation.operation_type.name, result.success, response_time_ms)
+            self._record_metrics(
+                strategy_type, operation.operation_type.name, result.success, response_time_ms
+            )
 
             self._logger.debug(
                 "Operation %s executed by %s: success=%s, time=%.2fms",
@@ -377,7 +389,9 @@ class ProviderContext:
         except Exception as e:
             # Record failed operation
             response_time_ms = (time.time() - start_time) * 1000
-            self._record_metrics(strategy_type, operation.operation_type.name, False, response_time_ms)
+            self._record_metrics(
+                strategy_type, operation.operation_type.name, False, response_time_ms
+            )
 
             self._logger.error(
                 "Error executing operation %s with %s: %s",
@@ -466,7 +480,9 @@ class ProviderContext:
         """Get metrics for all registered strategies."""
         return self._metrics.get_metrics()
 
-    def _record_metrics(self, strategy_type: str, operation: str, success: bool, response_time_ms: float) -> None:
+    def _record_metrics(
+        self, strategy_type: str, operation: str, success: bool, response_time_ms: float
+    ) -> None:
         """Record operation metrics via MetricsCollector."""
         op_base = f"provider.{strategy_type}.{operation.lower()}"
         if success:

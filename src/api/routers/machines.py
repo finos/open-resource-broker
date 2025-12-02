@@ -63,9 +63,7 @@ async def request_machines(
 
     result = await handler.handle(request_model)
 
-    return JSONResponse(
-        content=result.model_dump() if hasattr(result, "model_dump") else result
-    )
+    return JSONResponse(content=result.model_dump() if hasattr(result, "model_dump") else result)
 
 
 @router.post("/return", summary="Return Machines", description="Return machines to the provider")

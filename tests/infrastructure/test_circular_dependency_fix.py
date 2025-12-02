@@ -111,11 +111,12 @@ class TestCircularDependencyFix:
 
         assert provider_context is not None
 
-    @patch('infrastructure.di.provider_services._register_provider_to_context')
-    def test_aws_provider_registration_with_none_provisioning_adapter(self, mock_register, container):
+    @patch("infrastructure.di.provider_services._register_provider_to_context")
+    def test_aws_provider_registration_with_none_provisioning_adapter(
+        self, mock_register, container
+    ):
         """Test that AWS provider can be registered with None provisioning adapter."""
-        from infrastructure.di.provider_services import \
-            _register_aws_provider_to_context
+        from infrastructure.di.provider_services import _register_aws_provider_to_context
 
         # Mock provider instance
         mock_provider_instance = Mock()
@@ -131,9 +132,7 @@ class TestCircularDependencyFix:
         try:
             # This should work without throwing circular dependency error
             result = _register_aws_provider_to_context(
-                mock_provider_instance,
-                mock_provider_context,
-                container
+                mock_provider_instance, mock_provider_context, container
             )
 
             # Should succeed (True) or fail gracefully (False), but not throw recursion error
@@ -170,7 +169,9 @@ class TestCircularDependencyFix:
                 # Should fail due to AWS config issues, not circular dependency
                 assert "circular" not in str(e).lower()
                 assert "recursion" not in str(e).lower()
-                print(f"✓ Failed as expected due to AWS config (not circular dependency): {type(e).__name__}")
+                print(
+                    f"✓ Failed as expected due to AWS config (not circular dependency): {type(e).__name__}"
+                )
 
         except ImportError:
             # AWS provider not available, skip test
@@ -178,7 +179,7 @@ class TestCircularDependencyFix:
 
     def test_container_get_optional_method(self, container):
         """Test container.get_optional method if available."""
-        if hasattr(container, 'get_optional'):
+        if hasattr(container, "get_optional"):
             # Test that get_optional returns None for non-existent service
             result = container.get_optional(MetricsCollector)
             assert result is None or isinstance(result, MetricsCollector)
@@ -195,7 +196,7 @@ class TestCircularDependencyDetection:
         container = DIContainer()
 
         # Check if circular dependency detection is implemented
-        if hasattr(container, '_resolution_stack'):
+        if hasattr(container, "_resolution_stack"):
             # Test that circular dependency is detected
             # This is a placeholder - actual implementation would depend on container design
             pass
@@ -204,5 +205,5 @@ class TestCircularDependencyDetection:
             pytest.skip("Circular dependency detection not implemented")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     pytest.main([__file__])

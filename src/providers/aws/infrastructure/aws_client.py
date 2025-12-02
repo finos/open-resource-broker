@@ -10,11 +10,12 @@ from botocore.exceptions import ClientError
 from domain.base.dependency_injection import injectable
 from domain.base.ports import ConfigurationPort, LoggingPort
 from monitoring.metrics import MetricsCollector
-from providers.aws.exceptions.aws_exceptions import (AuthorizationError,
-                                                     AWSConfigurationError,
-                                                     NetworkError)
-from providers.aws.infrastructure.instrumentation.botocore_metrics import \
-    BotocoreMetricsHandler
+from providers.aws.exceptions.aws_exceptions import (
+    AuthorizationError,
+    AWSConfigurationError,
+    NetworkError,
+)
+from providers.aws.infrastructure.instrumentation.botocore_metrics import BotocoreMetricsHandler
 
 if TYPE_CHECKING:
     pass
@@ -27,7 +28,12 @@ T = TypeVar("T")
 class AWSClient:
     """Wrapper for AWS service clients with additional functionality."""
 
-    def __init__(self, config: ConfigurationPort, logger: LoggingPort, metrics: Optional[MetricsCollector] = None) -> None:
+    def __init__(
+        self,
+        config: ConfigurationPort,
+        logger: LoggingPort,
+        metrics: Optional[MetricsCollector] = None,
+    ) -> None:
         """
         Initialize AWS client wrapper with optional metrics collection.
 
@@ -92,12 +98,16 @@ class AWSClient:
             # Initialize metrics handler if metrics collector is available and AWS metrics are enabled
             self._metrics_handler: Optional[BotocoreMetricsHandler] = None
             if metrics and self._should_enable_aws_metrics():
-                aws_metrics_cfg = metrics.config.get("aws_metrics", {}) if hasattr(metrics, "config") else {}
+                aws_metrics_cfg = (
+                    metrics.config.get("aws_metrics", {}) if hasattr(metrics, "config") else {}
+                )
                 self._metrics_handler = BotocoreMetricsHandler(metrics, logger, aws_metrics_cfg)
                 self._metrics_handler.register_events(self.session)
                 logger.info("AWS API metrics collection enabled")
             else:
-                logger.debug("AWS API metrics collection disabled - no MetricsCollector provided or AWS_METRICS_ENABLED=false")
+                logger.debug(
+                    "AWS API metrics collection disabled - no MetricsCollector provided or AWS_METRICS_ENABLED=false"
+                )
 
             # Single comprehensive INFO log with all important details
             self._logger.info(
@@ -155,8 +165,7 @@ class AWSClient:
         """
         try:
             # Use provider selection service from DI container
-            from application.services.provider_selection_service import \
-                ProviderSelectionService
+            from application.services.provider_selection_service import ProviderSelectionService
             from infrastructure.di.container import get_container
 
             container = get_container()
@@ -339,7 +348,9 @@ class AWSClient:
         try:
             # Get metrics configuration from ConfigurationPort
             metrics_config = self._config_manager.get_metrics_config()
-            aws_cfg = metrics_config.get("aws_metrics", {}) if isinstance(metrics_config, dict) else {}
+            aws_cfg = (
+                metrics_config.get("aws_metrics", {}) if isinstance(metrics_config, dict) else {}
+            )
             aws_metrics_enabled = aws_cfg.get(
                 "aws_metrics_enabled", metrics_config.get("aws_metrics_enabled", True)
             )
@@ -353,6 +364,6 @@ class AWSClient:
         """Get metrics collection statistics."""
         if self._metrics_handler:
             stats = self._metrics_handler.get_stats()
-            stats['metrics_enabled'] = True
+            stats["metrics_enabled"] = True
             return stats
-        return {'metrics_enabled': False}
+        return {"metrics_enabled": False}

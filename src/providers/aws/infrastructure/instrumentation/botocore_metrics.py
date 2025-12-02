@@ -20,18 +20,24 @@ from monitoring.metrics import MetricsCollector
 @dataclass
 class RequestContext:
     """Context information for tracking AWS API requests."""
+
     service: str
     operation: str
     start_time: float
     retry_count: int = 0
-    region: str = 'unknown'
+    region: str = "unknown"
     request_size: int = 0
 
 
 class BotocoreMetricsHandler:
     """Centralized AWS API metrics collection using botocore events."""
 
-    def __init__(self, metrics_collector: MetricsCollector, logger: LoggingPort, aws_metrics_config: Optional[dict[str, Any]] = None):
+    def __init__(
+        self,
+        metrics_collector: MetricsCollector,
+        logger: LoggingPort,
+        aws_metrics_config: Optional[dict[str, Any]] = None,
+    ):
         self.metrics = metrics_collector
         self.logger = logger
 
@@ -54,13 +60,16 @@ class BotocoreMetricsHandler:
         self._sample_counter = 0  # Dedicated counter for sampling decisions
 
         # Performance optimizations
-        self._event_pattern = re.compile(r'(before|after)-call\.([^.]+)\.([^.]+)')
+        self._event_pattern = re.compile(r"(before|after)-call\.([^.]+)\.([^.]+)")
         self._event_cache: Dict[str, tuple] = {}
 
         # Error classification
         self._throttling_errors = {
-            'Throttling', 'ThrottlingException', 'RequestLimitExceeded',
-            'TooManyRequestsException', 'ProvisionedThroughputExceededException'
+            "Throttling",
+            "ThrottlingException",
+            "RequestLimitExceeded",
+            "TooManyRequestsException",
+            "ProvisionedThroughputExceededException",
         }
 
     def register_events(self, session) -> None:
@@ -86,7 +95,7 @@ class BotocoreMetricsHandler:
         try:
             service, operation = self._parse_event_name(event_name)
 
-            if service == 'unknown' or operation == 'unknown':
+            if service == "unknown" or operation == "unknown":
                 self.logger.warning(f"Unrecognized event name for metrics: {event_name}")
                 return
 
@@ -109,20 +118,24 @@ class BotocoreMetricsHandler:
             request_id = self._generate_request_id()
 
             # Propagate request ID and context via request_context if available
-            request_context = kwargs.get('context')
+            request_context = kwargs.get("context")
             if isinstance(request_context, dict):
-                request_context['metrics_request_id'] = request_id
+                request_context["metrics_request_id"] = request_id
             else:
                 request_context = {}
-                kwargs['context'] = request_context
-            request_dict = kwargs.get('request_dict')
+                kwargs["context"] = request_context
+            request_dict = kwargs.get("request_dict")
             if isinstance(request_dict, dict):
-                request_dict['metrics_request_id'] = request_id
+                request_dict["metrics_request_id"] = request_id
 
             # Extract request metadata
-            endpoint = kwargs.get('endpoint', {})
-            region = getattr(endpoint, 'region_name', 'unknown')
-            request_size = self._estimate_request_size(kwargs.get('params', {})) if self.track_payload_sizes else 0
+            endpoint = kwargs.get("endpoint", {})
+            region = getattr(endpoint, "region_name", "unknown")
+            request_size = (
+                self._estimate_request_size(kwargs.get("params", {}))
+                if self.track_payload_sizes
+                else 0
+            )
 
             # Create request context
             context = RequestContext(
@@ -130,21 +143,21 @@ class BotocoreMetricsHandler:
                 operation=operation,
                 start_time=time.perf_counter(),
                 region=region,
-                request_size=request_size
+                request_size=request_size,
             )
 
             # Store context thread-safely and attach to request_context for after-call handlers
             with self._request_lock:
                 self._active_requests[request_id] = context
-            request_context['metrics_context'] = context
+            request_context["metrics_context"] = context
 
             # Record metrics (align with current MetricsCollector API: no labels/histograms)
             self.metrics.increment_counter(f"aws.{service}.{operation}.calls_total")
             self.metrics.increment_counter("aws_api_calls_total")
 
             # Store request ID for correlation
-            if 'request_dict' in kwargs:
-                kwargs['request_dict']['metrics_request_id'] = request_id
+            if "request_dict" in kwargs:
+                kwargs["request_dict"]["metrics_request_id"] = request_id
 
         except Exception as e:
             self.logger.warning(f"Error in before_call handler: {e}")
@@ -153,9 +166,9 @@ class BotocoreMetricsHandler:
         """Handle successful API call completion."""
         try:
             context = None
-            request_context = kwargs.get('context')
+            request_context = kwargs.get("context")
             if isinstance(request_context, dict):
-                context = request_context.get('metrics_context')
+                context = request_context.get("metrics_context")
 
             if not context:
                 request_id = self._extract_request_id(kwargs)
@@ -170,11 +183,11 @@ class BotocoreMetricsHandler:
 
             # Calculate metrics
             duration_ms = (time.perf_counter() - context.start_time) * 1000
-            response_size = self._estimate_response_size(kwargs.get('parsed', {}))
+            response_size = self._estimate_response_size(kwargs.get("parsed", {}))
 
             # Determine status code if available
-            http_response = kwargs.get('http_response')
-            status_code = getattr(http_response, 'status_code', 200)
+            http_response = kwargs.get("http_response")
+            status_code = getattr(http_response, "status_code", 200)
 
             # Record metrics (using current collector)
             self.metrics.record_time(
@@ -183,15 +196,21 @@ class BotocoreMetricsHandler:
             )
 
             if status_code and status_code >= 400:
-                self.metrics.increment_counter(f"aws.{context.service}.{context.operation}.errors_total")
+                self.metrics.increment_counter(
+                    f"aws.{context.service}.{context.operation}.errors_total"
+                )
                 self.metrics.increment_counter("aws_api_errors_total")
             else:
-                self.metrics.increment_counter(f"aws.{context.service}.{context.operation}.success_total")
+                self.metrics.increment_counter(
+                    f"aws.{context.service}.{context.operation}.success_total"
+                )
                 self.metrics.increment_counter("aws_api_success_total")
 
             # Record retry metrics if retries occurred
             if context.retry_count > 0:
-                self.metrics.increment_counter(f"aws.{context.service}.{context.operation}.retries_total")
+                self.metrics.increment_counter(
+                    f"aws.{context.service}.{context.operation}.retries_total"
+                )
 
         except Exception as e:
             self.logger.warning(f"Error in after_call_success handler: {e}")
@@ -200,9 +219,9 @@ class BotocoreMetricsHandler:
         """Handle failed API call completion."""
         try:
             context = None
-            request_context = kwargs.get('context')
+            request_context = kwargs.get("context")
             if isinstance(request_context, dict):
-                context = request_context.get('metrics_context')
+                context = request_context.get("metrics_context")
 
             if not context:
                 request_id = self._extract_request_id(kwargs)
@@ -219,18 +238,20 @@ class BotocoreMetricsHandler:
             duration_ms = (time.perf_counter() - context.start_time) * 1000
 
             # Extract error information
-            exception = kwargs.get('exception')
+            exception = kwargs.get("exception")
             if exception:
                 error_code, error_type = self._parse_error(exception)
             else:
-                error_code, error_type = 'Unknown', 'Unknown'
+                error_code, error_type = "Unknown", "Unknown"
 
             # Record error metrics (using current collector)
             self.metrics.record_time(
                 f"aws.{context.service}.{context.operation}.duration",
                 duration_ms / 1000.0,
             )
-            self.metrics.increment_counter(f"aws.{context.service}.{context.operation}.errors_total")
+            self.metrics.increment_counter(
+                f"aws.{context.service}.{context.operation}.errors_total"
+            )
             self.metrics.increment_counter("aws_api_errors_total")
 
             # Special handling for throttling
@@ -247,9 +268,9 @@ class BotocoreMetricsHandler:
         """Handle retry decision events."""
         try:
             context = None
-            request_context = kwargs.get('request_context')
+            request_context = kwargs.get("request_context")
             if isinstance(request_context, dict):
-                context = request_context.get('metrics_context')
+                context = request_context.get("metrics_context")
             if not context:
                 request_id = self._extract_request_id(kwargs)
                 if request_id:
@@ -274,11 +295,11 @@ class BotocoreMetricsHandler:
     def _register_client_events(self, client) -> None:
         """Register handlers on a specific boto3 client emitter."""
         events = client.meta.events
-        events.register('before-call', self._before_call)
-        events.register('after-call', self._after_call_success)
-        events.register('after-call-error', self._after_call_error)
-        events.register('needs-retry', self._on_retry_needed)
-        events.register('before-retry', self._before_retry)
+        events.register("before-call", self._before_call)
+        events.register("after-call", self._after_call_success)
+        events.register("after-call-error", self._after_call_error)
+        events.register("needs-retry", self._on_retry_needed)
+        events.register("before-retry", self._before_retry)
 
     # Helper methods
 
@@ -295,19 +316,20 @@ class BotocoreMetricsHandler:
             return service, operation
 
         # Fallback parsing
-        parts = event_name.split('.')
+        parts = event_name.split(".")
         if len(parts) >= 3:
             service, operation = parts[1], parts[2]
             operation = self._normalize_operation_name(operation)
             self._event_cache[event_name] = (service, operation)
             return service, operation
 
-        return 'unknown', 'unknown'
+        return "unknown", "unknown"
 
     def _normalize_operation_name(self, operation: str) -> str:
         """Normalize operation name to snake_case for metric consistency."""
         import re as _re
-        snake = _re.sub(r'(?<!^)(?=[A-Z])', '_', operation).lower()
+
+        snake = _re.sub(r"(?<!^)(?=[A-Z])", "_", operation).lower()
         return snake
 
     def _generate_request_id(self) -> str:
@@ -318,15 +340,15 @@ class BotocoreMetricsHandler:
 
     def _extract_request_id(self, kwargs: dict) -> Optional[str]:
         """Extract request ID from event kwargs."""
-        request_dict = kwargs.get('request_dict', {}) or {}
+        request_dict = kwargs.get("request_dict", {}) or {}
         if isinstance(request_dict, dict):
-            rid = request_dict.get('metrics_request_id')
+            rid = request_dict.get("metrics_request_id")
             if rid:
                 return rid
 
-        request_context = kwargs.get('context', {}) or {}
+        request_context = kwargs.get("context", {}) or {}
         if isinstance(request_context, dict):
-            rid = request_context.get('metrics_request_id')
+            rid = request_context.get("metrics_request_id")
             if rid:
                 return rid
 
@@ -340,11 +362,11 @@ class BotocoreMetricsHandler:
     def _parse_error(self, exception: Exception) -> tuple[str, str]:
         """Parse exception to extract error code and type."""
         if isinstance(exception, ClientError):
-            error_code = exception.response.get('Error', {}).get('Code', 'Unknown')
-            error_type = 'ClientError'
+            error_code = exception.response.get("Error", {}).get("Code", "Unknown")
+            error_type = "ClientError"
         else:
-            error_code = 'Unknown'
-            error_type = type(exception).__name__ if exception else 'Unknown'
+            error_code = "Unknown"
+            error_type = type(exception).__name__ if exception else "Unknown"
 
         return error_code, error_type
 
@@ -358,6 +380,7 @@ class BotocoreMetricsHandler:
             return 0
         try:
             import json
+
             return len(json.dumps(params, default=str))
         except:
             return 0
@@ -368,6 +391,7 @@ class BotocoreMetricsHandler:
             return 0
         try:
             import json
+
             return len(json.dumps(response, default=str))
         except:
             return 0
@@ -388,7 +412,7 @@ class BotocoreMetricsHandler:
         """Get handler statistics for monitoring."""
         with self._request_lock:
             return {
-                'active_requests': len(self._active_requests),
-                'event_cache_size': len(self._event_cache),
-                'total_requests_processed': self._request_counter
+                "active_requests": len(self._active_requests),
+                "event_cache_size": len(self._event_cache),
+                "total_requests_processed": self._request_counter,
             }

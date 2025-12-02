@@ -11,8 +11,8 @@ from application.dto.commands import CreateRequestCommand
 from application.request.dto import RequestMachinesResponse
 from domain.base.dependency_injection import injectable
 from domain.base.ports import ErrorHandlingPort, LoggingPort
-from infrastructure.error.decorators import handle_interface_exceptions
 from infrastructure.di.buses import CommandBus, QueryBus
+from infrastructure.error.decorators import handle_interface_exceptions
 from monitoring.metrics import MetricsCollector
 
 
@@ -125,7 +125,9 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
 
             # Record metrics if available
             if self._metrics_collector:
-                self._metrics_collector.record_api_success("request_machines", request.machine_count)
+                self._metrics_collector.record_api_success(
+                    "request_machines", request.machine_count
+                )
 
             return response
 

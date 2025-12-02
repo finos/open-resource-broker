@@ -141,13 +141,16 @@ class ConfigurationAdapter(ConfigurationPort):
             raw = self._config_manager._ensure_raw_config()  # type: ignore[attr-defined]
             metrics_config = raw.get("metrics", {}) if isinstance(raw, dict) else {}
 
-
             result: dict[str, Any] = defaults.copy()
             result["aws_metrics"] = defaults["aws_metrics"].copy()
 
             if isinstance(metrics_config, dict):
-                result.update({k: metrics_config.get(k, v) for k, v in defaults.items() if k != "aws_metrics"})
-                if "aws_metrics" in metrics_config and isinstance(metrics_config["aws_metrics"], dict):
+                result.update(
+                    {k: metrics_config.get(k, v) for k, v in defaults.items() if k != "aws_metrics"}
+                )
+                if "aws_metrics" in metrics_config and isinstance(
+                    metrics_config["aws_metrics"], dict
+                ):
                     result["aws_metrics"].update(metrics_config["aws_metrics"])
 
             return result

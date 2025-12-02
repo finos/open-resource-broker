@@ -64,7 +64,7 @@ class AWSProviderStrategy(ProviderStrategy):
         logger: LoggingPort,
         aws_provisioning_port: Optional[Any] = None,
         aws_provisioning_port_resolver: Optional[Callable[[], Any]] = None,
-        aws_client_resolver: Optional[Callable[[], "AWSClient"]] = None,
+        aws_client_resolver: Optional[Callable[[], AWSClient]] = None,
     ) -> None:
         """
         Initialize AWS provider strategy.

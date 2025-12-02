@@ -165,7 +165,10 @@ async def handle_system_metrics(args) -> dict[str, Any]:
         return {"metrics": {}, "message": "MetricsCollector not available"}
 
     try:
-        return {"metrics": metrics.get_metrics(), "message": "System metrics retrieved successfully"}
+        return {
+            "metrics": metrics.get_metrics(),
+            "message": "System metrics retrieved successfully",
+        }
     except Exception as e:
         # Gracefully handle any issues retrieving metrics
         return {"metrics": {}, "error": str(e), "message": "Failed to retrieve system metrics"}

@@ -2,14 +2,11 @@
 
 from typing import Optional
 
-from application.services.provider_capability_service import \
-    ProviderCapabilityService
-from application.services.provider_selection_service import \
-    ProviderSelectionService
+from application.services.provider_capability_service import ProviderCapabilityService
+from application.services.provider_selection_service import ProviderSelectionService
 from domain.base.ports import ConfigurationPort, LoggingPort
 from infrastructure.di.container import DIContainer
-from infrastructure.factories.provider_strategy_factory import \
-    ProviderStrategyFactory
+from infrastructure.factories.provider_strategy_factory import ProviderStrategyFactory
 from infrastructure.logging.logger import get_logger
 from monitoring.metrics import MetricsCollector
 from providers.base.strategy import ProviderContext
@@ -278,8 +275,7 @@ def _register_provider_instance(provider_instance) -> bool:
         )
 
         if provider_instance.type == "aws":
-            from infrastructure.registry.provider_registry import \
-                get_provider_registry
+            from infrastructure.registry.provider_registry import get_provider_registry
             from providers.aws.registration import register_aws_provider
 
             # Get provider registry
@@ -323,11 +319,13 @@ def create_configured_provider_context(container: DIContainer) -> ProviderContex
     """Create provider context using configuration-driven factory with lazy loading support."""
     try:
         logger = container.get(LoggingPort)
-        metrics = container.get_optional(MetricsCollector) if hasattr(container, "get_optional") else None
+        metrics = (
+            container.get_optional(MetricsCollector) if hasattr(container, "get_optional") else None
+        )
         config_manager = container.get(ConfigurationPort)
 
         # Check if lazy loading is enabled
-        if hasattr(container, 'is_lazy_loading_enabled') and container.is_lazy_loading_enabled():
+        if hasattr(container, "is_lazy_loading_enabled") and container.is_lazy_loading_enabled():
             return _create_lazy_provider_context(container, logger, config_manager, metrics)
         else:
             return _create_eager_provider_context(container, logger, config_manager, metrics)
@@ -344,10 +342,15 @@ def create_configured_provider_context(container: DIContainer) -> ProviderContex
         # Create minimal provider context as fallback
         try:
             logger = container.get(LoggingPort)
-            metrics = container.get_optional(MetricsCollector) if hasattr(container, "get_optional") else None
+            metrics = (
+                container.get_optional(MetricsCollector)
+                if hasattr(container, "get_optional")
+                else None
+            )
         except Exception:
             # If we can't get dependencies, create a basic context
             from infrastructure.logging.logger import get_logger
+
             logger = get_logger(__name__)
             metrics = None
 
@@ -464,9 +467,8 @@ def _register_aws_provider_to_context(
     try:
         # Create AWS provider configuration for this instance
         from providers.aws.configuration.config import AWSProviderConfig
-        from providers.aws.strategy.aws_provider_strategy import \
-            AWSProviderStrategy
         from providers.aws.infrastructure.aws_client import AWSClient
+        from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
         aws_config = AWSProviderConfig(
             region=provider_instance.config.get("region", "us-east-1"),
@@ -489,7 +491,9 @@ def _register_aws_provider_to_context(
         return True
 
     except Exception as e:
-        logger.error("Failed to register AWS provider '%s' to context: %s", provider_instance.name, str(e))
+        logger.error(
+            "Failed to register AWS provider '%s' to context: %s", provider_instance.name, str(e)
+        )
         return False
 
 
@@ -503,8 +507,7 @@ def _register_provider_specific_services(container: DIContainer) -> None:
 
         # Check if AWS provider is available
         if importlib.util.find_spec("src.providers.aws"):
-            from providers.aws.registration import \
-                register_aws_services_with_di
+            from providers.aws.registration import register_aws_services_with_di
 
             register_aws_services_with_di(container)
 
@@ -531,8 +534,7 @@ def _register_aws_services(container: DIContainer) -> None:
             raise
 
         try:
-            from providers.aws.infrastructure.aws_handler_factory import \
-                AWSHandlerFactory
+            from providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
         except Exception as e:
             logger.debug("Failed to import AWSHandlerFactory: %s", e)
             raise
@@ -544,82 +546,77 @@ def _register_aws_services(container: DIContainer) -> None:
             raise
 
         try:
-            from providers.aws.infrastructure.handlers.spot_fleet_handler import \
-                SpotFleetHandler
+            from providers.aws.infrastructure.handlers.spot_fleet_handler import SpotFleetHandler
         except Exception as e:
             logger.debug("Failed to import SpotFleetHandler: %s", e)
             raise
 
         try:
-            from providers.aws.infrastructure.adapters.template_adapter import \
-                AWSTemplateAdapter
+            from providers.aws.infrastructure.adapters.template_adapter import AWSTemplateAdapter
         except Exception as e:
             logger.debug("Failed to import AWSTemplateAdapter: %s", e)
             raise
 
         try:
-            from providers.aws.infrastructure.adapters.machine_adapter import \
-                AWSMachineAdapter
+            from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
         except Exception as e:
             logger.debug("Failed to import AWSMachineAdapter: %s", e)
             raise
 
         try:
-            from providers.aws.infrastructure.adapters.aws_provisioning_adapter import \
-                AWSProvisioningAdapter
+            from providers.aws.infrastructure.adapters.aws_provisioning_adapter import (
+                AWSProvisioningAdapter,
+            )
         except Exception as e:
             logger.debug("Failed to import AWSProvisioningAdapter: %s", e)
             raise
 
         try:
-            from providers.aws.infrastructure.adapters.request_adapter import \
-                AWSRequestAdapter
+            from providers.aws.infrastructure.adapters.request_adapter import AWSRequestAdapter
         except Exception as e:
             logger.debug("Failed to import AWSRequestAdapter: %s", e)
             raise
 
         try:
-            from providers.aws.infrastructure.adapters.resource_manager_adapter import \
-                AWSResourceManagerAdapter
+            from providers.aws.infrastructure.adapters.resource_manager_adapter import (
+                AWSResourceManagerAdapter,
+            )
         except Exception as e:
             logger.debug("Failed to import AWSResourceManagerAdapter: %s", e)
             raise
 
         try:
-            from providers.aws.strategy.aws_provider_adapter import \
-                AWSProviderAdapter
+            from providers.aws.strategy.aws_provider_adapter import AWSProviderAdapter
         except Exception as e:
             logger.debug("Failed to import AWSProviderAdapter: %s", e)
             raise
 
         try:
-            from providers.aws.strategy.aws_provider_strategy import \
-                AWSProviderStrategy
+            from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
         except Exception as e:
             logger.debug("Failed to import AWSProviderStrategy: %s", e)
             raise
 
         try:
-            from providers.aws.managers.aws_instance_manager import \
-                AWSInstanceManager
+            from providers.aws.managers.aws_instance_manager import AWSInstanceManager
         except Exception as e:
             logger.debug("Failed to import AWSInstanceManager: %s", e)
             raise
 
         try:
-            from providers.aws.managers.aws_resource_manager import \
-                AWSResourceManagerImpl
+            from providers.aws.managers.aws_resource_manager import AWSResourceManagerImpl
         except Exception as e:
             logger.debug("Failed to import AWSResourceManagerImpl: %s", e)
             raise
 
         try:
-            from infrastructure.adapters.ports.cloud_resource_manager_port import \
-                CloudResourceManagerPort
-            from infrastructure.adapters.ports.request_adapter_port import \
-                RequestAdapterPort
-            from infrastructure.adapters.ports.resource_provisioning_port import \
-                ResourceProvisioningPort
+            from infrastructure.adapters.ports.cloud_resource_manager_port import (
+                CloudResourceManagerPort,
+            )
+            from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
+            from infrastructure.adapters.ports.resource_provisioning_port import (
+                ResourceProvisioningPort,
+            )
         except Exception as e:
             logger.debug("Failed to import infrastructure ports: %s", e)
             raise
@@ -676,6 +673,7 @@ def _create_aws_client(container: DIContainer):
     except Exception:
         # Fallback to basic logger if DI resolution fails
         from infrastructure.logging.logger import get_logger
+
         logger = get_logger(__name__)
 
     try:
@@ -683,19 +681,25 @@ def _create_aws_client(container: DIContainer):
     except Exception:
         # Fallback to basic config if DI resolution fails
         from unittest.mock import Mock
+
         config = Mock()
         config.get.return_value = {}
 
     # Get metrics collector safely (avoid recursion); warn if unavailable
-    metrics = container.get_optional(MetricsCollector) if hasattr(container, "get_optional") else None
+    metrics = (
+        container.get_optional(MetricsCollector) if hasattr(container, "get_optional") else None
+    )
     if metrics is None:
         try:
             metrics = container.get(MetricsCollector)
         except Exception as e:
-            if hasattr(logger, 'warning'):
-                logger.warning("MetricsCollector not available; AWS API metrics will be disabled: %s", e)
+            if hasattr(logger, "warning"):
+                logger.warning(
+                    "MetricsCollector not available; AWS API metrics will be disabled: %s", e
+                )
             metrics = None
 
     # Create fresh AWSClient - don't try to get from ProviderContext
     from providers.aws.infrastructure.aws_client import AWSClient
+
     return AWSClient(config=config, logger=logger, metrics=metrics)
