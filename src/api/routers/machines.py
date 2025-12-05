@@ -3,6 +3,7 @@
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -63,7 +64,15 @@ async def request_machines(
 
     result = await handler.handle(request_model)
 
-    return JSONResponse(content=result.model_dump() if hasattr(result, "model_dump") else result)
+    # Use to_dict() method for proper response formatting (requestId vs request_id)
+    if hasattr(result, "to_dict"):
+        response_content = result.to_dict()
+    elif hasattr(result, "model_dump"):
+        response_content = result.model_dump()
+    else:
+        response_content = result
+
+    return JSONResponse(content=response_content)
 
 
 @router.post("/return", summary="Return Machines", description="Return machines to the provider")
@@ -76,12 +85,14 @@ async def return_machines(
 
     - **machine_ids**: List of machine IDs to return
     """
-    result = await handler.handle(
-        machine_ids=request_data.machine_ids,
-        context={"endpoint": "/machines/return", "method": "POST"},
-    )
+    api_request = {
+        "input_data": {"machines": [{"machineId": mid} for mid in request_data.machine_ids]},
+        "all_flag": False,
+        "clean": False,
+    }
+    result = await handler.handle(api_request)
 
-    return JSONResponse(content=result)
+    return JSONResponse(content=jsonable_encoder(result))
 
 
 @router.get("/", summary="List Machines", description="List machines with optional filtering")

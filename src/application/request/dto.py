@@ -215,7 +215,8 @@ class RequestMachinesResponse(BaseDTO):
         Returns:
             Dictionary with requestId and message fields
         """
-        return {"requestId": self.request_id, "message": self.message}
+        # Clients must use the full prefixed ID for subsequent requests
+        return {"request_id": self.request_id, "message": self.message}
 
 
 class RequestReturnMachinesResponse(BaseDTO):
@@ -233,7 +234,7 @@ class RequestReturnMachinesResponse(BaseDTO):
             Dictionary with requestId and message fields
         """
         return {
-            "requestId": self.request_id if self.request_id else "",
+            "request_id": self.request_id if self.request_id else "",
             "message": self.message,
         }
 

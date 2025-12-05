@@ -47,10 +47,10 @@ try:
     from domain.template.template_aggregate import Template
     from infrastructure.di.buses import CommandBus, QueryBus
     from infrastructure.di.container import DIContainer
-    from infrastructure.template.services.template_persistence_service import (
-        TemplatePersistenceService,
-    )
-    from providers.aws.configuration.config import AWSProviderConfig as AWSConfig
+    from infrastructure.template.services.template_persistence_service import \
+        TemplatePersistenceService
+    from providers.aws.configuration.config import \
+        AWSProviderConfig as AWSConfig
 
     IMPORTS_AVAILABLE = True
 except ImportError as e:
@@ -493,7 +493,8 @@ def generate_instance_id() -> str:
 
 
 def generate_request_id() -> str:
-    """Generate a unique request ID."""
+    """Generate a unique request ID for testing (defaults to ACQUIRE type)."""
+    # For tests, default to ACQUIRE type unless specified otherwise
     return f"req-{uuid.uuid4().hex[:8]}"
 
 

@@ -3,8 +3,9 @@
 import json
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -83,6 +84,13 @@ class MetricsCollector:
         self.metrics_dir = Path(config.get("metrics_dir", "./metrics"))
         self.metrics_dir.mkdir(parents=True, exist_ok=True)
 
+        # Initialize tracing buffer
+        self.trace_enabled = bool(config.get("trace_enabled", False))
+        self.trace_file_max_size_mb = int(config.get("trace_file_max_size_mb", 10))
+        self._trace_buffer = (
+            deque(maxlen=int(config.get("trace_buffer_size", 1000))) if self.trace_enabled else None
+        )
+
         # Initialize default metrics
         self._initialize_metrics()
 
@@ -156,6 +164,16 @@ class MetricsCollector:
             avg_time = sum(self.timers[name]) / len(self.timers[name])
             self.set_gauge(f"{name}_seconds", avg_time)
 
+            # Add trace entry if tracing is enabled
+            if self.trace_enabled and self._trace_buffer is not None:
+                self._trace_buffer.append(
+                    {
+                        "name": name,
+                        "duration": duration,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    }
+                )
+
     def record_success(
         self,
         operation: str,
@@ -197,6 +215,36 @@ class MetricsCollector:
         with self._lock:
             return {name: metric.to_dict() for name, metric in self.metrics.items()}
 
+    def get_traces(self) -> list[dict]:
+        """Return a snapshot of current traces."""
+        with self._lock:
+            return list(self._trace_buffer) if self._trace_buffer is not None else []
+
+    def flush_traces(self) -> None:
+        """Append traces to a single file and clear buffer."""
+        if not self._trace_buffer:
+            return
+
+        # Copy traces under lock, write outside lock to avoid blocking
+        with self._lock:
+            traces_to_write = list(self._trace_buffer)
+            self._trace_buffer.clear()
+
+        # Write without holding lock
+        try:
+            # Always append to a single trace file
+            trace_file = self.metrics_dir / "traces.jsonl"
+
+            with trace_file.open("a") as f:
+                for trace in traces_to_write:
+                    f.write(json.dumps(trace) + "\n")
+
+            logger.debug("Flushed %d traces to %s", len(traces_to_write), trace_file)
+
+        except Exception as e:
+            logger.error("Failed to flush traces: %s", e)
+            # Don't re-raise - tracing failures shouldn't crash the application
+
     def _start_metrics_writer(self) -> None:
         """Start background metrics writer thread."""
 
@@ -228,6 +276,10 @@ class MetricsCollector:
             for name, metric in metrics.items():
                 labels = ",".join(f'{k}="{v}"' for k, v in metric["labels"].items())
                 f.write(f"{name}{{{labels}}} {metric['value']}\n")
+
+        # Flush traces if tracing is enabled
+        if self.trace_enabled and self._trace_buffer:
+            self.flush_traces()
 
     def flush(self) -> None:
         """Flush metrics to disk immediately."""

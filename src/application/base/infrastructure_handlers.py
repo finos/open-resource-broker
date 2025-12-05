@@ -166,6 +166,10 @@ class BaseInfrastructureHandler(
 
     def _record_success_metrics(self, request_type: str, duration: float) -> None:
         """Record success metrics for monitoring."""
+        # Defensive check: initialize _metrics if None
+        if self._metrics is None:
+            self._metrics = {}
+
         if request_type not in self._metrics:
             self._metrics[request_type] = {
                 "success_count": 0,
@@ -184,6 +188,10 @@ class BaseInfrastructureHandler(
 
     def _record_failure_metrics(self, request_type: str, duration: float, error: Exception) -> None:
         """Record failure metrics for monitoring."""
+        # Defensive check: initialize _metrics if None
+        if self._metrics is None:
+            self._metrics = {}
+
         if request_type not in self._metrics:
             self._metrics[request_type] = {
                 "success_count": 0,

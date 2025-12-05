@@ -1,8 +1,9 @@
 """Request models for API handlers."""
 
+import re
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 def to_camel(snake_str: str) -> str:
@@ -52,6 +53,19 @@ class RequestStatusModel(BaseRequestModel):
     """Model for request status API."""
 
     requests: list[dict[str, Any]]
+
+    @field_validator("requests")
+    @classmethod
+    def validate_request_ids(cls, v: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Validate that all request IDs have proper req-/ret- prefix."""
+        for request_dict in v:
+            request_id = request_dict.get("requestId", "")
+            if request_id and not re.match(r"^(req-|ret-)[a-f0-9\-]{36}$", request_id):
+                raise ValueError(
+                    f"Invalid request ID format: '{request_id}'. "
+                    "Request IDs must start with 'req-' or 'ret-' followed by a UUID."
+                )
+        return v
 
     @property
     def request_ids(self) -> list[str]:

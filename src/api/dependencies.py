@@ -99,12 +99,7 @@ def get_return_requests_handler():
 def get_return_machines_handler():
     """Get return machines API handler from DI container."""
 
-    def _get_handler():
-        container = get_di_container()
-        from api.handlers.request_return_machines_handler import (
-            RequestReturnMachinesRESTHandler,
-        )
+    container = get_di_container()
+    from api.handlers.request_return_machines_handler import RequestReturnMachinesRESTHandler
 
-        return container.get(RequestReturnMachinesRESTHandler)
-
-    return _get_handler
+    return container.get(RequestReturnMachinesRESTHandler)

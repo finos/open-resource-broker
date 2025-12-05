@@ -6,6 +6,10 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
+from application.dto.queries import GetRequestQuery, GetRequestStatusQuery, ListActiveRequestsQuery
+from application.request.dto import RequestStatusResponse
+
 
 @pytest.mark.unit
 @pytest.mark.api
@@ -186,6 +190,113 @@ class TestAPIHandlersComprehensive:
 
                     # Either has common dependencies or has some dependencies
                     assert has_common_dep or len(params) > 0
+
+
+@pytest.mark.unit
+@pytest.mark.api
+class TestRequestStatusHandlerBehaviour:
+    """Focused tests covering REST request status handler edge cases."""
+
+    @pytest.mark.asyncio
+    async def test_handles_request_status_response_with_scheduler_formatting(self):
+        query_bus = Mock()
+        command_bus = Mock()
+
+        # Query bus returns basic status for the request_id
+        query_bus.execute = AsyncMock(return_value="complete")
+
+        # Scheduler strategy formats the response dict
+        scheduler = Mock()
+        scheduler.format_request_response = AsyncMock(
+            return_value={"requests": [{"requestId": "req-1", "status": "complete"}]}
+        )
+
+        handler = GetRequestStatusRESTHandler(
+            query_bus=query_bus,
+            command_bus=command_bus,
+            scheduler_strategy=scheduler,
+            logger=Mock(),
+            error_handler=Mock(),
+            metrics=None,
+        )
+
+        api_request = {
+            "input_data": {"requests": [{"requestId": "req-1"}]},
+            "all_flag": False,
+            "long": False,
+        }
+
+        result = await handler.handle(api_request)
+
+        scheduler.format_request_response.assert_awaited_once()
+        assert result["requests"][0]["requestId"] == "req-1"
+        assert result["requests"][0]["status"] == "complete"
+
+        # Ensure the correct query type was used
+        query_bus.execute.assert_awaited_once()
+        assert isinstance(query_bus.execute.call_args.args[0], GetRequestStatusQuery)
+
+    @pytest.mark.asyncio
+    async def test_all_flag_uses_list_active_requests(self):
+        query_bus = Mock()
+        command_bus = Mock()
+
+        mock_req = Mock()
+        mock_req.to_dict.return_value = {"requestId": "req-2", "status": "running"}
+        query_bus.execute = AsyncMock(return_value=[mock_req])
+
+        scheduler = Mock()
+        scheduler.format_request_response = AsyncMock(
+            return_value={"requests": [{"requestId": "req-2", "status": "running"}]}
+        )
+
+        handler = GetRequestStatusRESTHandler(
+            query_bus=query_bus,
+            command_bus=command_bus,
+            scheduler_strategy=scheduler,
+            logger=Mock(),
+            error_handler=Mock(),
+            metrics=None,
+        )
+
+        api_request = {"all_flag": True, "long": False}
+        result = await handler.handle(api_request)
+
+        query_bus.execute.assert_awaited_once()
+        assert isinstance(query_bus.execute.call_args.args[0], ListActiveRequestsQuery)
+        assert result["requests"][0]["requestId"] == "req-2"
+
+    @pytest.mark.asyncio
+    async def test_long_requests_use_get_request_query(self):
+        query_bus = Mock()
+        command_bus = Mock()
+        scheduler = Mock()
+        scheduler.format_request_response = AsyncMock(
+            return_value={"requests": [{"requestId": "req-3", "status": "complete"}]}
+        )
+
+        query_bus.execute = AsyncMock(return_value=RequestStatusResponse(requests=[]))
+
+        handler = GetRequestStatusRESTHandler(
+            query_bus=query_bus,
+            command_bus=command_bus,
+            scheduler_strategy=scheduler,
+            logger=Mock(),
+            error_handler=Mock(),
+            metrics=None,
+        )
+
+        api_request = {
+            "input_data": {"requests": [{"requestId": "req-3"}]},
+            "all_flag": False,
+            "long": True,
+        }
+
+        await handler.handle(api_request)
+
+        # First execute corresponds to the long=True request
+        executed_query = query_bus.execute.call_args.args[0]
+        assert isinstance(executed_query, GetRequestQuery)
 
 
 @pytest.mark.unit

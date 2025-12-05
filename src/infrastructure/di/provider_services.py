@@ -467,6 +467,9 @@ def _register_aws_provider_to_context(
     try:
         # Create AWS provider configuration for this instance
         from providers.aws.configuration.config import AWSProviderConfig
+        from providers.aws.infrastructure.adapters.aws_provisioning_adapter import (
+            AWSProvisioningAdapter,
+        )
         from providers.aws.infrastructure.aws_client import AWSClient
         from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
@@ -480,8 +483,9 @@ def _register_aws_provider_to_context(
         aws_strategy = AWSProviderStrategy(
             config=aws_config,
             logger=logger,
-            aws_provisioning_port=None,  # ← Set to None initially
+            aws_provisioning_port=None,  # Lazily resolved via resolver below
             aws_client_resolver=lambda: container.get(AWSClient),
+            aws_provisioning_port_resolver=lambda: container.get(AWSProvisioningAdapter),
         )
 
         # Register strategy with provider context

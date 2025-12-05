@@ -132,6 +132,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                     "provider_selection_reason": selection_result.selection_reason,
                     "provider_confidence": selection_result.confidence,
                 },
+                request_id=command.request_id,  # Use the provided request_id (None if not provided)
             )
 
             # Check if this is a dry-run request

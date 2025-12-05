@@ -1,7 +1,6 @@
 """API handler for requesting machines."""
 
 import time
-import uuid
 from typing import Optional
 
 from api.models import RequestMachinesModel
@@ -91,29 +90,28 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
             )
 
         try:
-            # Generate request ID
-            request_id = str(uuid.uuid4())
+            # Generate prefixed request ID using centralized utility
+            from api.utils.request_id_generator import generate_request_id
+            from domain.request.value_objects import RequestType
+
+            # This is a machine request, so it's always ACQUIRE type
+            request_id = generate_request_id(RequestType.ACQUIRE)
 
             # Create CQRS command
             command = CreateRequestCommand(
                 request_id=request_id,
                 template_id=request.template_id,
                 requested_count=request.machine_count,
-                priority=getattr(request, "priority", "normal"),
                 metadata=getattr(request, "metadata", {}),
             )
 
             # Execute command through CQRS command bus
-            await self._command_bus.execute(command)
+            result_request_id = await self._command_bus.execute(command)
 
             # Create response
             response = RequestMachinesResponse(
-                request_id=request_id,
-                template_id=request.template_id,
-                requested_count=request.machine_count,
-                status="submitted",
-                correlation_id=context.correlation_id,
-                submitted_at=time.time(),
+                request_id=result_request_id,
+                metadata={"correlation_id": context.correlation_id, "submitted_at": time.time()},
             )
 
             if self.logger:

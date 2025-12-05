@@ -693,12 +693,6 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 self._logger.info(
                     f"Grouped instances by ASG using resource mapping: {asg_instance_groups}"
                 )
-                asg_instance_groups = self._group_instances_by_asg_from_mapping(
-                    complete_resource_mapping
-                )
-                self._logger.info(
-                    f"Grouped instances by ASG using resource mapping: {asg_instance_groups}"
-                )
             else:
                 # Fallback to AWS API calls when no resource mapping is provided
                 self._logger.info("No resource mapping provided, falling back to AWS API calls")
@@ -745,9 +739,6 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 asg_instance_ids,
                 self._request_adapter,
                 f"ASG {asg_name} instances (no ASG details)",
-                asg_instance_ids,
-                self._request_adapter,
-                f"ASG {asg_name} instances (no ASG details)",
             )
             self._logger.info(
                 "Terminated ASG %s instances without ASG operations: %s", asg_name, asg_instance_ids
@@ -757,14 +748,16 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             )
             return
 
-        # Detach instances from ASG first
-        self._retry_with_backoff(
-            self.aws_client.autoscaling_client.detach_instances,
-            operation_type="critical",
-            AutoScalingGroupName=asg_name,
-            InstanceIds=asg_instance_ids,
-            ShouldDecrementDesiredCapacity=True,
-        )
+        # Detach instances from ASG first (API limit: 50 instance IDs per call, use 20 for safety)
+        for chunk in self._chunk_list(asg_instance_ids, 20):
+            self._retry_with_backoff(
+                self.aws_client.autoscaling_client.detach_instances,
+                operation_type="critical",
+                AutoScalingGroupName=asg_name,
+                InstanceIds=chunk,
+                ShouldDecrementDesiredCapacity=True,
+            )
+            self._logger.debug("Detached chunk from ASG %s: %s", asg_name, chunk)
         self._logger.info("Detached instances from ASG %s: %s", asg_name, asg_instance_ids)
 
         # Then reduce desired capacity
@@ -829,7 +822,11 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
     def _classify_mapping_entry(
         self, resource_id: Optional[str], desired_capacity: int
     ) -> tuple[str, Optional[str]]:
-        if resource_id and desired_capacity > 0:
+        # If we know the ASG name (resource_id), treat it as an ASG group even if
+        # desired_capacity isn't populated. Missing desired_capacity should not
+        # downgrade the instance to non-group handling, otherwise we skip ASG
+        # capacity updates and replacements continue.
+        if resource_id:
             return "group", resource_id
         if resource_id is None and desired_capacity == 0:
             return "non_group", None
