@@ -10,13 +10,10 @@ from typing import List, Optional
 import boto3
 import pytest
 import requests
-from botocore.exceptions import ClientError
-from jsonschema import ValidationError
-from jsonschema import validate as validate_json_schema
 
-from tests.onaws import plugin_io_schemas, scenarios_rest_api
-from tests.onaws.parse_output import parse_and_print_output
+from tests.onaws import scenarios_rest_api
 from tests.onaws.template_processor import TemplateProcessor
+
 # Import AWS validation functions from test_onaws (guarded to allow skip on import failures)
 try:
     from tests.onaws.test_onaws import (
@@ -26,13 +23,10 @@ try:
         _get_capacity,
         _get_resource_id_from_instance,
         _verify_all_resources_cleaned,
-        _wait_for_fleet_stable,
         _wait_for_capacity_change,
-        get_instance_details,
+        _wait_for_fleet_stable,
         get_instance_state,
-        get_scheduler_from_scenario,
         validate_all_instances_price_type,
-        validate_instance_attributes,
         validate_random_instance_attributes,
         verify_abis_enabled_for_instance,
     )
@@ -206,8 +200,7 @@ class RestApiClient:
             except ValueError:
                 message = response.text
             raise requests.HTTPError(
-                f"API error {response.status_code}: {message}",
-                response=response
+                f"API error {response.status_code}: {message}", response=response
             )
         return response.json()
 
@@ -275,9 +268,7 @@ def setup_rest_api_environment(request):
         scenario_name = test_name.split("[")[1].split("]")[0]
 
     # Get test case configuration
-    test_case = (
-        scenarios_rest_api.get_test_case_by_name(scenario_name) if scenario_name else {}
-    )
+    test_case = scenarios_rest_api.get_test_case_by_name(scenario_name) if scenario_name else {}
 
     overrides = test_case.get("overrides", {})
     awsprov_base_template = test_case.get("awsprov_base_template")
@@ -287,6 +278,7 @@ def setup_rest_api_environment(request):
     test_config_dir = processor.run_templates_dir / test_name
     if test_config_dir.exists():
         import shutil
+
         shutil.rmtree(test_config_dir)
         log.info(f"Cleared existing test directory: {test_config_dir}")
 
@@ -324,9 +316,9 @@ def ohfp_server(setup_rest_api_environment):
 
     server = OhfpServerManager(log_path=server_log_path)
     server.start(timeout=REST_TIMEOUTS["server_start"])
-    
+
     yield server
-    
+
     server.stop()
 
 
@@ -364,9 +356,7 @@ def _wait_for_request_completion_rest(
             return status_response
 
         if time.time() - start_time > timeout:
-            raise TimeoutError(
-                f"Request {request_id} did not complete within {timeout}s"
-            )
+            raise TimeoutError(f"Request {request_id} did not complete within {timeout}s")
 
         time.sleep(poll_interval)
 
@@ -394,9 +384,7 @@ def _wait_for_return_completion_rest(
             log.debug(f"Error checking return status: {e}")
 
         if time.time() - start_time > timeout:
-            log.warning(
-                f"Return request {return_request_id} did not complete within {timeout}s"
-            )
+            log.warning(f"Return request {return_request_id} did not complete within {timeout}s")
             return {}
 
         time.sleep(poll_interval)
@@ -424,7 +412,9 @@ def _partial_return_cases_rest():
 @pytest.mark.slow
 @pytest.mark.rest_api
 @pytest.mark.parametrize("test_case", _partial_return_cases_rest(), ids=lambda tc: tc["test_name"])
-def test_rest_api_partial_return_reduces_capacity(rest_api_client, setup_rest_api_environment, test_case):
+def test_rest_api_partial_return_reduces_capacity(
+    rest_api_client, setup_rest_api_environment, test_case
+):
     """
     REST API partial return test: ensure maintain fleet/ASG capacity drops after returning one instance.
     """
@@ -487,7 +477,11 @@ def test_rest_api_partial_return_reduces_capacity(rest_api_client, setup_rest_ap
         _wait_for_return_completion_rest(rest_api_client, return_request_id)
 
     # Wait for fleet/ASG to stabilize
-    if provider_api and "fleet" in provider_api.lower() and resource_id.startswith(("sfr-", "fleet-")):
+    if (
+        provider_api
+        and "fleet" in provider_api.lower()
+        and resource_id.startswith(("sfr-", "fleet-"))
+    ):
         _wait_for_fleet_stable(resource_id)
 
     expected_capacity = max(capacity_before - 1, 0)
@@ -499,7 +493,9 @@ def test_rest_api_partial_return_reduces_capacity(rest_api_client, setup_rest_ap
     capacity_after = _wait_for_capacity_change(
         provider_api, resource_id, expected_capacity, timeout=capacity_timeout
     )
-    assert capacity_after == expected_capacity, f"Expected capacity {expected_capacity}, got {capacity_after}"
+    assert capacity_after == expected_capacity, (
+        f"Expected capacity {expected_capacity}, got {capacity_after}"
+    )
 
     # Ensure returned instance is terminating/terminated
     terminate_start = time.time()
@@ -535,6 +531,8 @@ def test_rest_api_partial_return_reduces_capacity(rest_api_client, setup_rest_ap
         cleanup_verified = _verify_all_resources_cleaned(remaining_ids, resource_id, provider_api)
         if not cleanup_verified:
             pytest.fail("Cleanup verification failed - some resources may still exist")
+
+
 def test_00_rest_api_server_health(setup_rest_api_environment):
     """
     Smoke test: start the REST API server, verify /health responds, then stop and
@@ -550,9 +548,7 @@ def test_00_rest_api_server_health(setup_rest_api_environment):
 
     try:
         log.info("Checking API health at %s", server.base_url)
-        resp = requests.get(
-            f"{server.base_url}/health", timeout=REST_TIMEOUTS["health_check"]
-        )
+        resp = requests.get(f"{server.base_url}/health", timeout=REST_TIMEOUTS["health_check"])
         assert resp.status_code == 200, f"Unexpected health status: {resp.status_code}"
         log.info("Health check passed: %s", resp.json())
 
@@ -560,9 +556,9 @@ def test_00_rest_api_server_health(setup_rest_api_environment):
         templates_resp = requests.get(
             f"{server.base_url}/api/v1/templates/", timeout=REST_TIMEOUTS["templates"]
         )
-        assert (
-            templates_resp.status_code == 200
-        ), f"Templates endpoint failed: {templates_resp.status_code}"
+        assert templates_resp.status_code == 200, (
+            f"Templates endpoint failed: {templates_resp.status_code}"
+        )
         log.info("Templates response: %s", json.dumps(templates_resp.json(), indent=2))
     except Exception as exc:
         log.error("Health/templates check failed: %s", exc, exc_info=True)
@@ -650,9 +646,7 @@ def test_rest_api_control_loop(rest_api_client, setup_rest_api_environment, test
     )
 
     if template_json is None:
-        log.warning(
-            f"Template {template_id} not found, using first available template"
-        )
+        log.warning(f"Template {template_id} not found, using first available template")
         template_json = templates_response["templates"][0]
 
     log.info(f"Using template: {template_json.get('template_id')}")
@@ -677,7 +671,9 @@ def test_rest_api_control_loop(rest_api_client, setup_rest_api_environment, test
     log.info("=== STEP 2: Wait for Fulfillment ===")
 
     # 2.1: Poll request status via REST API
-    log.info(f"2.1: Polling request status (timeout: {MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC}s)")
+    log.info(
+        f"2.1: Polling request status (timeout: {MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC}s)"
+    )
     status_response = _wait_for_request_completion_rest(
         rest_api_client,
         request_id,
@@ -714,9 +710,7 @@ def test_rest_api_control_loop(rest_api_client, setup_rest_api_environment, test
         )
 
         if provider_api == "RunInstances" and expected_price_type == "spot":
-            log.warning(
-                f"Skipping price type validation for {provider_api} with spot instances"
-            )
+            log.warning(f"Skipping price type validation for {provider_api} with spot instances")
         else:
             price_type_validation_passed = validate_all_instances_price_type(
                 status_response, test_case
@@ -741,10 +735,7 @@ def test_rest_api_control_loop(rest_api_client, setup_rest_api_environment, test
 
     # 3.1: Extract instance IDs
     log.info("3.1: Extracting instance IDs")
-    machine_ids = [
-        machine["machine_id"]
-        for machine in status_response["requests"][0]["machines"]
-    ]
+    machine_ids = [machine["machine_id"] for machine in status_response["requests"][0]["machines"]]
     log.info(f"Machine IDs to return: {machine_ids}")
 
     # 3.2: Request return via REST API
@@ -824,9 +815,7 @@ def test_rest_api_control_loop(rest_api_client, setup_rest_api_environment, test
         for instance_id in machine_ids:
             state_info = get_instance_state(instance_id)
             if state_info["exists"]:
-                log.error(
-                    f"Instance {instance_id} still exists in state: {state_info['state']}"
-                )
+                log.error(f"Instance {instance_id} still exists in state: {state_info['state']}")
     else:
         log.info("✅ All resources successfully cleaned up")
 

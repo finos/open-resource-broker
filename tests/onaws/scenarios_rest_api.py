@@ -28,11 +28,11 @@ REST_API_METRICS_CONFIG: dict[str, Any] | None = {
 REST_API_SERVER = {
     "host": "0.0.0.0",
     "port": 8000,
-    "start_probe_timeout": 2,       # timeout for each health probe during startup
-    "start_probe_interval": 1,      # seconds between health probes during startup
-    "start_capture_timeout": 5,     # timeout when capturing stdout/stderr on failed start
-    "stop_wait_timeout": 10,        # graceful stop wait
-    "stop_kill_timeout": 10,        # kill wait after terminate timeout
+    "start_probe_timeout": 2,  # timeout for each health probe during startup
+    "start_probe_interval": 1,  # seconds between health probes during startup
+    "start_capture_timeout": 5,  # timeout when capturing stdout/stderr on failed start
+    "stop_wait_timeout": 10,  # graceful stop wait
+    "stop_kill_timeout": 10,  # kill wait after terminate timeout
 }
 
 # Centralized timeouts/constants for REST API tests
@@ -89,6 +89,7 @@ DEFAULT_ATTRIBUTE_COMBINATIONS = [
     #     "scheduler": ["default", "hostfactory"],
     # },
 ]
+
 
 def get_custom_test_cases() -> List[Dict[str, Any]]:
     """
