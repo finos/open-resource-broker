@@ -127,6 +127,9 @@ class ConfigurationAdapter(ConfigurationPort):
             "metrics_enabled": False,
             "metrics_dir": "./metrics",
             "metrics_interval": 60,
+            "trace_enabled": False,
+            "trace_buffer_size": 1000,
+            "trace_file_max_size_mb": 10,
             "aws_metrics": {
                 "aws_metrics_enabled": False,
                 "sample_rate": 1.0,

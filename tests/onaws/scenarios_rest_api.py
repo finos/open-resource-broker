@@ -3,11 +3,22 @@
 import itertools
 from typing import Any, Dict, List
 
+from tests.onaws.scenarios import CUSTOM_TEST_CASES as CUSTOM_TEST_CASES
+from tests.onaws.scenarios import \
+    DEFAULT_ATTRIBUTE_COMBINATIONS as _DEFAULT_ATTRIBUTE_COMBINATIONS
+
+REST_API_RUN_DEFAULT_COMBINATIONS = False
+REST_API_RUN_CUSTOM_CASES = False
+
+DEFAULT_ATTRIBUTE_COMBINATIONS = (
+    _DEFAULT_ATTRIBUTE_COMBINATIONS if REST_API_RUN_DEFAULT_COMBINATIONS else []
+)
+CUSTOM_TEST_CASES = CUSTOM_TEST_CASES if REST_API_RUN_CUSTOM_CASES else []
+
+
 # REST API specific configuration
 REST_API_BASE_URL = "http://localhost:8000"  # versioned in RestApiClient
 REST_API_PREFIX = "/api/v1"
-REST_API_TIMEOUT = 10
-REST_API_RETRY_ATTEMPTS = 3
 REST_API_METRICS_CONFIG: dict[str, Any] | None = {
     "metrics_enabled": True,
     "metrics_dir": None,  # Filled by TemplateProcessor per test
@@ -24,6 +35,12 @@ REST_API_METRICS_CONFIG: dict[str, Any] | None = {
     },
 }
 
+# Resource history capture configuration
+# Global flag to enable/disable resource history capture for all tests
+CAPTURE_RESOURCE_HISTORY = True  # Set to False to disable globally
+# Resource history is captured by default for EC2Fleet, SpotFleet, and ASG
+# History is saved to {METRICS_DIR}/{test_name}_history.json
+
 # Server/runtime settings for REST API tests
 REST_API_SERVER = {
     "host": "0.0.0.0",
@@ -33,25 +50,32 @@ REST_API_SERVER = {
     "start_capture_timeout": 5,  # timeout when capturing stdout/stderr on failed start
     "stop_wait_timeout": 10,  # graceful stop wait
     "stop_kill_timeout": 10,  # kill wait after terminate timeout
+    "start_probe_timeout": 2,  # timeout for each health probe during startup
+    "start_probe_interval": 1,  # seconds between health probes during startup
+    "start_capture_timeout": 5,  # timeout when capturing stdout/stderr on failed start
+    "stop_wait_timeout": 10,  # graceful stop wait
+    "stop_kill_timeout": 10,  # kill wait after terminate timeout
 }
 
 # Centralized timeouts/constants for REST API tests
 REST_API_TIMEOUTS = {
-    "server_start": 30,
-    "health_check": 5,
-    "templates": 60,
-    "request_status_poll_interval": 5,
-    "request_status_timeout": 300,
-    "return_status_poll_interval": 5,
-    "return_status_timeout": 300,
-    "server_shutdown_check_interval": 2,
-    "server_shutdown_attempts": 5,
-    "graceful_termination_timeout": 180,
-    "cleanup_wait_timeout": 300,
-    "termination_poll_interval": 10,
-    "shutdown_check_sleep": 1,
-    "capacity_change_timeout_fleet": 60,
-    "capacity_change_timeout_asg": 120,
+    "rest_api_timeout": 60,  # Per-request HTTP timeout for REST calls
+    "rest_api_retry_attempts": 3,  # Retry attempts for REST calls (when implemented)
+    "server_start": 30,  # How long to wait for the server to start responding to health
+    "health_check": 5,  # Health endpoint timeout
+    "templates": 60,  # Timeout for fetching templates
+    "request_status_poll_interval": 5,  # Poll interval for request status
+    "request_status_timeout": 600,  # Max wait for request fulfillment
+    "return_status_poll_interval": 5,  # Poll interval for return status
+    "return_status_timeout": 300,  # Max wait for return completion
+    "server_shutdown_check_interval": 2,  # Interval between shutdown health probes
+    "server_shutdown_attempts": 5,  # How many shutdown probes to attempt
+    "graceful_termination_timeout": 180,  # Max time to wait for graceful termination
+    "cleanup_wait_timeout": 300,  # Max time to wait for cleanup after graceful fails
+    "termination_poll_interval": 30,  # Poll interval while waiting for termination
+    "shutdown_check_sleep": 1,  # Sleep between shutdown probes
+    "capacity_change_timeout_fleet": 60,  # Max wait for capacity change on fleets
+    "capacity_change_timeout_asg": 120,  # Max wait for capacity change on ASG
 }
 
 # Standard VM mix for spot scenarios
@@ -64,55 +88,149 @@ SPOT_VM_TYPES = {
     "t3.nano": 1,
 }
 
-# REST API test attribute combinations
-DEFAULT_ATTRIBUTE_COMBINATIONS = [
-    # {
-    #     "providerApi": ["EC2Fleet"],
-    #     "fleetType": ["request", "instant", "maintain"],
-    #     "priceType": ["ondemand", "spot"],
-    #     "scheduler": ["default", "hostfactory"],
-    # },
-    # {
-    #     "providerApi": ["ASG"],
-    #     "priceType": ["ondemand", "spot"],
-    #     "scheduler": ["default", "hostfactory"],
-    # },
-    # {
-    #     "providerApi": ["RunInstances"],
-    #     "priceType": ["ondemand"],
-    #     "scheduler": ["default", "hostfactory"],
-    # },
-    # {
-    #     "providerApi": ["SpotFleet"],
-    #     "fleetType": ["request", "maintain"],
-    #     "priceType": ["ondemand", "spot"],
-    #     "scheduler": ["default", "hostfactory"],
-    # },
-]
 
+# Large-scale R-series instance types for high-capacity scenarios
+LARGE_SCALE_VM_TYPES_1 = {
+    "r5.12xlarge": 3,
+    "r5.16xlarge": 4,
+    "r5.4xlarge": 1,
+    "r5.8xlarge": 2,
+    "r5a.12xlarge": 3,
+    "r5a.4xlarge": 1,
+    "r5a.8xlarge": 2,
+    "r5ad.12xlarge": 3,
+    "r5ad.4xlarge": 1,
+    "r5ad.8xlarge": 2,
+    "r5b.12xlarge": 3,
+    "r5b.16xlarge": 4,
+    "r5b.4xlarge": 1,
+    "r5b.8xlarge": 2,
+    "r5d.12xlarge": 3,
+    "r5d.16xlarge": 4,
+    "r5d.4xlarge": 1,
+    "r5d.8xlarge": 2,
+    "r5n.12xlarge": 3,
+    "r5n.16xlarge": 4,
+    "r5n.4xlarge": 1,
+    "r5n.8xlarge": 2,
+    "r6a.12xlarge": 3,
+    "r6a.4xlarge": 1,
+    "r6a.8xlarge": 2,
+    "r6i.12xlarge": 3,
+    "r6i.16xlarge": 4,
+    "r6i.4xlarge": 1,
+    "r6i.8xlarge": 2,
+    "r7a.12xlarge": 3,
+    "r7a.4xlarge": 1,
+    "r7a.8xlarge": 2,
+    "r7i.12xlarge": 3,
+    "r7i.16xlarge": 4,
+    "r7i.4xlarge": 1,
+    "r7i.8xlarge": 2,
+}
 
-def get_custom_test_cases() -> List[Dict[str, Any]]:
-    """
-    Define custom test cases that don't fit the standard attribute combinations.
-    This allows for special cases and edge scenarios.
-    """
-    return [
-        # SpotFleet with ABIS
-        {
-            "test_name": "hostfactory.ASG.ABIS",
-            "template_id": "ASG",
-            "capacity_to_request": 100,
-            "awsprov_base_template": "awsprov_templates.base.json",
-            "overrides": {
-                "providerApi": "ASG",
-                "scheduler": "hostfactory",
-                "abisInstanceRequirements": {
-                    "VCpuCount": {"Min": 1, "Max": 128},
-                    "MemoryMiB": {"Min": 1024, "Max": 257000},
-                },
+LARGE_SCALE_TESTS = [
+    # SpotFleet with ABIS
+    # {
+    #     "test_name": "hostfactory.SpotFleet.ABIS.SIZE.1000",
+    #     "template_id": "SpotFleetRequest",
+    #     "capacity_to_request": 100,
+    #     "awsprov_base_template": "awsprov_templates.base.json",
+    #     "overrides": {
+    #         "providerApi": "SpotFleet",
+    #         "fleetType": "request",
+    #         "scheduler": "hostfactory",
+    #         "abisInstanceRequirements": {
+    #             "VCpuCount": {"Min": 1, "Max": 128},
+    #             "MemoryMiB": {"Min": 1024, "Max": 257000},
+    #         },
+    #     },
+    # },
+    # {
+    #     "test_name": "hostfactory.EC2Fleet.ABIS.SIZE.1000",
+    #     "template_id": "EC2FleetRequest",
+    #     "capacity_to_request": 100,
+    #     "awsprov_base_template": "awsprov_templates.base.json",
+    #     "overrides": {
+    #         "providerApi": "EC2Fleet",
+    #         "scheduler": "hostfactory",
+    #         "fleetType": "request",
+    #         "abisInstanceRequirements": {
+    #             "VCpuCount": {"Min": 1, "Max": 128},
+    #             "MemoryMiB": {"Min": 1024, "Max": 257000},
+    #         },
+    #     },
+    # },
+    # {
+    #     "test_name": "hostfactory.ASG.ABIS.SIZE.1000",
+    #     "template_id": "ASG",
+    #     "capacity_to_request": 100,
+    #     "awsprov_base_template": "awsprov_templates.base.json",
+    #     "overrides": {
+    #         "providerApi": "ASG",
+    #         "scheduler": "hostfactory",
+    #         "abisInstanceRequirements": {
+    #             "VCpuCount": {"Min": 1, "Max": 128},
+    #             "MemoryMiB": {"Min": 1024, "Max": 257000},
+    #         },
+    #     },
+    # },
+    {
+        "test_name": "hostfactory.SpoEC2FleettFleet.ABIS.SIZE.1000",
+        "template_id": "EC2FleetInstant",
+        "capacity_to_request": 100,
+        "awsprov_base_template": "awsprov_templates.base.json",
+        "overrides": {
+            "providerApi": "Ec2Fleet",
+            "fleetType": "instant",
+            "scheduler": "hostfactory",
+            "abisInstanceRequirements": {
+                "VCpuCount": {"Min": 1, "Max": 128},
+                "MemoryMiB": {"Min": 1024, "Max": 257000},
             },
-        }
-    ]
+        },
+    },
+    # ############################################################
+    # ############################################################
+    # # SpotFleet with multiTypes
+    # {
+    #     "test_name": "hostfactory.SpotFleetRequest.MultiTypes",
+    #     "template_id": "SpotFleetRequest",
+    #     "capacity_to_request": 4,
+    #     "awsprov_base_template": "awsprov_templates.base.json",
+    #     "overrides": {
+    #         "providerApi": "SpotFleet",
+    #         "fleetType": "request",
+    #         "scheduler": "hostfactory",
+    #         "vmTypes": LARGE_SCALE_VM_TYPES_1
+    #     },
+    # },
+    # # EC2Fleet with multiTypes
+    #     {
+    #         "test_name": "hostfactory.EC2FleetRequest.MultiTypes",
+    #         "template_id": "EC2FleetRequest",
+    #         "capacity_to_request": 4,
+    #         "awsprov_base_template": "awsprov_templates.base.json",
+    #         "overrides": {
+    #             "providerApi": "EC2Fleet",
+    #             "fleetType": "request",
+    #             "scheduler": "hostfactory",
+    #             "vmTypes": LARGE_SCALE_VM_TYPES_1
+    #         },
+    #     },
+    #     # ASG with multiTypes
+    #     {
+    #         "test_name": "hostfactory.ASG.MultiTypes",
+    #         "template_id": "ASG",
+    #         "capacity_to_request": 4,
+    #         "awsprov_base_template": "awsprov_templates.base.json",
+    #         "overrides": {
+    #             "providerApi": "ASG",
+    #             "scheduler": "hostfactory",
+    #             "vmTypes": LARGE_SCALE_VM_TYPES_1
+    #         },
+    #     },
+]
 
 
 def generate_scenarios_from_attributes(
@@ -209,12 +327,14 @@ def get_rest_api_test_cases() -> List[Dict[str, Any]]:
         scenarios.extend(generate_scenarios_from_attributes(combination_config))
 
     # Add custom scenarios from shared onaws definitions
-    scenarios.extend(get_custom_test_cases())
+    scenarios.extend(CUSTOM_TEST_CASES)
+
+    scenarios.extend(LARGE_SCALE_TESTS)
 
     # Add REST API specific metadata to all scenarios
     for scenario in scenarios:
         scenario["api_base_url"] = REST_API_BASE_URL
-        scenario["api_timeout"] = REST_API_TIMEOUT
+        scenario["api_timeout"] = REST_API_TIMEOUTS["rest_api_timeout"]
         scenario["api_prefix"] = REST_API_PREFIX
         if REST_API_METRICS_CONFIG:
             scenario["metrics_config"] = REST_API_METRICS_CONFIG
@@ -244,6 +364,11 @@ def get_test_case_by_name(test_name: str) -> Dict[str, Any]:
         "capacity_to_request": 2,
         "overrides": {},
         "api_base_url": REST_API_BASE_URL,
-        "api_timeout": REST_API_TIMEOUT,
+        "api_timeout": REST_API_TIMEOUTS["rest_api_timeout"],
         "api_prefix": REST_API_PREFIX,
     }
+
+
+# Example: Control resource history capture globally
+# Set CAPTURE_RESOURCE_HISTORY = True (default) to enable for all tests
+# Set CAPTURE_RESOURCE_HISTORY = False to disable for all tests
