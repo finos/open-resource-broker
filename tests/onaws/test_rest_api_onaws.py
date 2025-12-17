@@ -23,13 +23,18 @@ from tests.onaws.template_processor import TemplateProcessor
 # Import AWS validation functions from test_onaws (guarded to allow skip on import failures)
 try:
     from tests.onaws.test_onaws import (
-        MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC,
-        _check_all_ec2_hosts_are_being_terminated, _cleanup_asg_resources,
-        _get_capacity, _get_resource_id_from_instance,
-        _verify_all_resources_cleaned, _wait_for_capacity_change,
-        _wait_for_fleet_stable, get_instance_state,
-        validate_all_instances_price_type, validate_random_instance_attributes,
-        verify_abis_enabled_for_instance)
+        _check_all_ec2_hosts_are_being_terminated,
+        _cleanup_asg_resources,
+        _get_capacity,
+        _get_resource_id_from_instance,
+        _verify_all_resources_cleaned,
+        _wait_for_capacity_change,
+        _wait_for_fleet_stable,
+        get_instance_state,
+        validate_all_instances_price_type,
+        validate_random_instance_attributes,
+        verify_abis_enabled_for_instance,
+    )
 except Exception as exc:  # pragma: no cover - defensive guard for env/creds issues
     import pytest
 
