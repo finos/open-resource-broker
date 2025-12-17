@@ -1,6 +1,6 @@
 # Troubleshooting
 
-This guide helps you diagnose and resolve common issues with the Open Host Factory Plugin.
+This guide helps you diagnose and resolve common issues with the Open Resource Broker.
 
 ## Common Issues
 

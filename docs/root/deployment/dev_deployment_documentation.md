@@ -1,8 +1,8 @@
 # ORB Provider Deployment Documentation
 
-This document describes how to configure the Open Host Factory Plugin (ORB) as a provider in IBM Spectrum Symphony Host Factory.
+This document describes how to configure the Open Resource Broker (ORB) as a provider in IBM Spectrum Symphony Host Factory.
 
-## Installation of the Open Host Factory Plugin
+## Installation of the Open Resource Broker
 
 ### Prerequisites
 - Python 3.9+
@@ -19,7 +19,7 @@ cd /opt/ibm/spectrumcomputing/hostfactory/1.2/providerplugins
 2. **Clone the repository:**
 ```bash
 mkdir -p orb
-git clone https://github.com/awslabs/open-hostfactory-plugin.git ./orb
+git clone https://github.com/awslabs/open-resource-broker.git ./orb
 cd orb
 ```
 

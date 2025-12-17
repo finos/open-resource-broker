@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Code formatting script for Open Host Factory Plugin.
+Code formatting script for Open Resource Broker.
 
 Runs autoflake, autopep8, black, and isort to format Python code using the run-tool function.
 """

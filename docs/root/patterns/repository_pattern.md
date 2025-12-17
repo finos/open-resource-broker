@@ -1,6 +1,6 @@
 # Repository Pattern Implementation
 
-This document describes the implementation of the Repository pattern in the Open Host Factory Plugin, which provides a clean abstraction layer for data access operations while supporting multiple storage backends.
+This document describes the implementation of the Repository pattern in the Open Resource Broker, which provides a clean abstraction layer for data access operations while supporting multiple storage backends.
 
 ## Repository Pattern Overview
 
@@ -33,7 +33,7 @@ class Repository(ABC, Generic[T]):
         pass
 
     @abstractmethod
-    async def get_all(self, 
+    async def get_all(self,
                      filters: Optional[Dict[str, Any]] = None,
                      limit: Optional[int] = None,
                      offset: Optional[int] = None) -> List[T]:
@@ -68,7 +68,7 @@ class TemplateRepository(ABC):
     """Repository interface for template entities."""
 
     @abstractmethod
-    async def get_all(self, 
+    async def get_all(self,
                      filters: Optional[Dict[str, Any]] = None,
                      limit: Optional[int] = None,
                      offset: Optional[int] = None) -> List[Template]:
@@ -114,7 +114,7 @@ class RequestRepository(ABC):
     """Repository interface for request entities."""
 
     @abstractmethod
-    async def get_all(self, 
+    async def get_all(self,
                      filters: Optional[Dict[str, Any]] = None,
                      limit: Optional[int] = None,
                      offset: Optional[int] = None) -> List[Request]:
@@ -165,7 +165,7 @@ class MachineRepository(ABC):
     """Repository interface for machine entities."""
 
     @abstractmethod
-    async def get_all(self, 
+    async def get_all(self,
                      filters: Optional[Dict[str, Any]] = None,
                      limit: Optional[int] = None,
                      offset: Optional[int] = None) -> List[Machine]:
@@ -226,7 +226,7 @@ from src.domain.base.ports import LoggingPort
 class DynamoDBTemplateRepository(TemplateRepository):
     """DynamoDB implementation of template repository."""
 
-    def __init__(self, 
+    def __init__(self,
                  table_name: str,
                  region: str,
                  profile: Optional[str] = None,
@@ -241,7 +241,7 @@ class DynamoDBTemplateRepository(TemplateRepository):
         self._dynamodb = session.resource('dynamodb', region_name=region)
         self._table = self._dynamodb.Table(table_name)
 
-    async def get_all(self, 
+    async def get_all(self,
                      filters: Optional[Dict[str, Any]] = None,
                      limit: Optional[int] = None,
                      offset: Optional[int] = None) -> List[Template]:
@@ -441,7 +441,7 @@ class InMemoryTemplateRepository(TemplateRepository):
         self._templates: Dict[str, Template] = {}
         self._logger = logger
 
-    async def get_all(self, 
+    async def get_all(self,
                      filters: Optional[Dict[str, Any]] = None,
                      limit: Optional[int] = None,
                      offset: Optional[int] = None) -> List[Template]:
@@ -571,8 +571,8 @@ def register_repository_services(container: DIContainer) -> None:
     else:
         raise ValueError(f"Unsupported storage type: {storage_type}")
 
-def _register_dynamodb_repositories(container: DIContainer, 
-                                   config: ConfigurationPort, 
+def _register_dynamodb_repositories(container: DIContainer,
+                                   config: ConfigurationPort,
                                    logger: LoggingPort) -> None:
     """Register DynamoDB repository implementations."""
 
@@ -637,7 +637,7 @@ def _register_memory_repositories(container: DIContainer, logger: LoggingPort) -
 class GetTemplatesHandler:
     """Handler for retrieving templates."""
 
-    def __init__(self, 
+    def __init__(self,
                  template_repo: TemplateRepository,
                  logger: LoggingPort):
         self._template_repo = template_repo
@@ -685,4 +685,4 @@ class GetTemplatesHandler:
 - Centralized data access logic
 - Easy modification of storage implementations
 
-This Repository pattern implementation provides a solid foundation for data access operations while maintaining clean architecture principles and supporting multiple storage backends in the Open Host Factory Plugin.
+This Repository pattern implementation provides a solid foundation for data access operations while maintaining clean architecture principles and supporting multiple storage backends in the Open Resource Broker.

@@ -1,6 +1,6 @@
 # Clean Architecture Implementation
 
-This document describes how the Open Host Factory Plugin implements Clean Architecture principles, ensuring separation of concerns, testability, and maintainability.
+This document describes how the Open Resource Broker implements Clean Architecture principles, ensuring separation of concerns, testability, and maintainability.
 
 ## Clean Architecture Principles
 
@@ -89,7 +89,7 @@ The application layer orchestrates domain objects and implements use cases.
 class ApplicationService:
     """Main application orchestrator."""
 
-    def __init__(self, 
+    def __init__(self,
                  command_bus: CommandBus,
                  query_bus: QueryBus,
                  provider_context: ProviderContext):
@@ -239,10 +239,10 @@ class TemplateCommandHandler:
 ### Dependency Direction
 ```
 Interface Layer  ->  Application Layer  ->  Domain Layer
-      ^                      ^                 ^ 
+      ^                      ^                 ^
 Infrastructure Layer ---- ->                |
       ^                                    |
-External Systems ---------------------- -> 
+External Systems ---------------------- ->
 ```
 
 ### Dependency Inversion Examples
@@ -328,7 +328,7 @@ def test_create_request_handler():
 ```python
 @injectable
 class ApplicationService:
-    def __init__(self, 
+    def __init__(self,
                  template_repo: TemplateRepository,      # Abstraction, not implementation
                  logger: LoggingPort):                   # Abstraction, not implementation
         self._template_repo = template_repo
@@ -434,4 +434,4 @@ class JSONTemplateRepository(TemplateRepository):
 Unit Tests (Domain + Application)
 ```
 
-This Clean Architecture implementation ensures that the Open Host Factory Plugin maintains clear separation of concerns, high testability, and flexibility for future changes while adhering to established software engineering principles.
+This Clean Architecture implementation ensures that the Open Resource Broker maintains clear separation of concerns, high testability, and flexibility for future changes while adhering to established software engineering principles.

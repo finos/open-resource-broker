@@ -26,7 +26,7 @@ class TestNativeSpecAllProviders:
         mock_config_port = Mock(spec=ConfigurationPort)
         mock_config_port.get_native_spec_config.return_value = {"enabled": True}
         mock_config_port.get_package_info.return_value = {
-            "name": "open-hostfactory-plugin",
+            "name": "open-resource-broker",
             "version": "1.0.0",
         }
 
@@ -118,7 +118,7 @@ class TestNativeSpecAllProviders:
         created_by_tag = next(tag for tag in fleet_tags if tag["Key"] == "CreatedBy")
 
         assert str(request.request_id) in name_tag["Value"]
-        assert created_by_tag["Value"] == "open-hostfactory-plugin"
+        assert created_by_tag["Value"] == "open-resource-broker"
 
     def test_spotfleet_native_spec_integration(self):
         """Test SpotFleet with native spec integration."""
@@ -291,7 +291,7 @@ class TestNativeSpecAllProviders:
 
         assert str(request.request_id) in name_tag["Value"]
         assert template_tag["Value"] == "lt-test"
-        assert created_by_tag["Value"] == "open-hostfactory-plugin"
+        assert created_by_tag["Value"] == "open-resource-broker"
 
     def test_mixed_native_specs_integration(self):
         """Test template with both launch template and provider API specs."""
@@ -566,5 +566,5 @@ class TestNativeSpecAllProviders:
         assert context_test["TemplateId"] == "context-test"
         assert context_test["ImageId"] == "ami-context"
         assert context_test["InstanceType"] == "t3.micro"
-        assert context_test["PackageName"] == "open-hostfactory-plugin"
+        assert context_test["PackageName"] == "open-resource-broker"
         assert "PackageVersion" in context_test  # Version may vary

@@ -28,16 +28,16 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 RELEASE_NOTES=$("$SCRIPT_DIR/release_notes.sh" "$TO_COMMIT" "$TO_COMMIT" "$RELEASE_VERSION")
 
 # Create GitHub release
-if [ -f "dist/open_hostfactory_plugin-${RELEASE_VERSION}-py3-none-any.whl" ]; then
+if [ -f "dist/open_resource_broker-${RELEASE_VERSION}-py3-none-any.whl" ]; then
     gh release create "v${RELEASE_VERSION}" \
         --title "v${RELEASE_VERSION}" \
         --notes "$RELEASE_NOTES" \
         --target "$TO_COMMIT" \
         --prerelease \
-        "dist/open_hostfactory_plugin-${RELEASE_VERSION}-py3-none-any.whl"
+        "dist/open_resource_broker-${RELEASE_VERSION}-py3-none-any.whl"
     echo "Release v${RELEASE_VERSION} created"
 else
-    echo "ERROR: Package not found: dist/open_hostfactory_plugin-${RELEASE_VERSION}-py3-none-any.whl"
+    echo "ERROR: Package not found: dist/open_resource_broker-${RELEASE_VERSION}-py3-none-any.whl"
     exit 1
 fi
 

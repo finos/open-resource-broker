@@ -2,7 +2,7 @@
 
 ## Overview
 
-Comprehensive testing guide for the Open Host Factory Plugin, including unit tests, integration tests, and Docker containerization testing.
+Comprehensive testing guide for the Open Resource Broker, including unit tests, integration tests, and Docker containerization testing.
 
 ## Test Categories
 

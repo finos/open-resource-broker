@@ -1,6 +1,6 @@
 # SOLID Principles Implementation
 
-This document describes how the Open Host Factory Plugin implements the SOLID principles of object-oriented design, demonstrating practical applications of these fundamental design principles.
+This document describes how the Open Resource Broker implements the SOLID principles of object-oriented design, demonstrating practical applications of these fundamental design principles.
 
 ## SOLID Principles Overview
 

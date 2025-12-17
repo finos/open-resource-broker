@@ -1,6 +1,6 @@
 # Testing Guide
 
-This guide covers testing strategies, frameworks, and best practices for the Open Host Factory Plugin.
+This guide covers testing strategies, frameworks, and best practices for the Open Resource Broker.
 
 ## Testing Strategy
 

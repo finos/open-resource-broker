@@ -2,7 +2,7 @@
 
 ## Overview
 
-Security best practices for deploying the Open Host Factory Plugin in production environments.
+Security best practices for deploying the Open Resource Broker in production environments.
 
 ## Authentication
 

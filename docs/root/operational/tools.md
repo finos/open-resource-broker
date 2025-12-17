@@ -1,6 +1,6 @@
 # Operational Tools and Utilities
 
-The Open Host Factory Plugin includes a comprehensive suite of operational tools for migration, backup, monitoring, and maintenance. These tools enable seamless operations and provide scalable operational capabilities.
+The Open Resource Broker includes a comprehensive suite of operational tools for migration, backup, monitoring, and maintenance. These tools enable seamless operations and provide scalable operational capabilities.
 
 ## Overview
 
@@ -148,7 +148,7 @@ print(f'Backup created: {backup_path}')
 
 # backup_script.sh
 #!/bin/bash
-cd /path/to/open-hostfactory-plugin
+cd /path/to/open-resource-broker
 source .venv/bin/activate
 
 BACKUP_DIR="backups/$(date +%Y%m%d)"
@@ -232,8 +232,8 @@ class BatchProcessor:
         self.parallel_workers = parallel_workers
         self.logger = get_logger(__name__)
 
-    def process_in_batches(self, 
-                          items: List[Any], 
+    def process_in_batches(self,
+                          items: List[Any],
                           processor: Callable[[List[Any]], None],
                           progress_callback: Callable[[int, int], None] = None) -> Dict[str, Any]:
         """Process items in batches."""
@@ -280,7 +280,7 @@ def batch_update_requests():
 
     # Get all pending requests
     pending_requests = request_repo.query_entities(
-        "requests", 
+        "requests",
         filters={"status": "PENDING"}
     )
 
@@ -300,8 +300,8 @@ def batch_update_requests():
     # Process in batches
     processor = BatchProcessor(batch_size=50)
     result = processor.process_in_batches(
-        pending_requests, 
-        update_batch, 
+        pending_requests,
+        update_batch,
         progress_callback
     )
 
@@ -322,7 +322,7 @@ templates = get_all_templates()
 
 # Validate in batches
 validation_results = batch_validate_templates(
-    templates, 
+    templates,
     batch_size=25,
     parallel=True
 )
@@ -402,7 +402,7 @@ requests_by_status = grouping.group_by_field(requests, 'status')
 
 # Filter active machines
 active_machines = filtering.filter_by_criteria(
-    machines, 
+    machines,
     lambda m: m['status'] in ['RUNNING', 'PENDING']
 )
 
@@ -418,7 +418,7 @@ transformed_machines = transforming.transform_collection(
 
 # Validate collection consistency
 validation_errors = validation.validate_collection_consistency(
-    requests, 
+    requests,
     machines,
     relationship_field='request_id'
 )

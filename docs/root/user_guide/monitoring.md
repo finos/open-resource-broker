@@ -1,10 +1,10 @@
 # Monitoring and Logging
 
-This guide covers the logging, basic health checks, and monitoring capabilities of the Open Host Factory Plugin.
+This guide covers the logging, basic health checks, and monitoring capabilities of the Open Resource Broker.
 
 ## Overview
 
-The Open Host Factory Plugin provides basic monitoring capabilities through:
+The Open Resource Broker provides basic monitoring capabilities through:
 
 - **Application Logging**: Detailed operation logs
 - **Health Checks**: Basic system health monitoring

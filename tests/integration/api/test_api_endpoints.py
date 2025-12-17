@@ -67,7 +67,7 @@ class TestAPIEndpoints:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
-        assert data["service"] == "open-hostfactory-plugin"
+        assert data["service"] == "open-resource-broker"
         assert data["version"] == __version__
 
     def test_info_endpoint(self, client):
@@ -76,7 +76,7 @@ class TestAPIEndpoints:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["service"] == "open-hostfactory-plugin"
+        assert data["service"] == "open-resource-broker"
         assert data["version"] == __version__
         assert "description" in data
         assert "auth_enabled" in data
@@ -87,7 +87,7 @@ class TestAPIEndpoints:
 
         assert response.status_code == 200
         schema = response.json()
-        assert schema["info"]["title"] == "Open Host Factory Plugin API"
+        assert schema["info"]["title"] == "Open Resource Broker API"
         assert schema["info"]["version"] == __version__
         assert "paths" in schema
         assert "components" in schema

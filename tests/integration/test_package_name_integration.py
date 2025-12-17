@@ -43,7 +43,7 @@ class TestPackageNameIntegration:
             # Assert - verify fallback behavior
             # When package_info is empty, consumers should use fallback values
             assert package_info.get("version", "unknown") == "unknown"
-            assert package_info.get("name", "open-hostfactory-plugin") == "open-hostfactory-plugin"
+            assert package_info.get("name", "open-resource-broker") == "open-resource-broker"
 
     def test_native_spec_service_uses_package_info(self):
         """Test that native spec service correctly uses package info in context."""

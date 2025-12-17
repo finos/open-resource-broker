@@ -212,7 +212,7 @@ class TestOpenHFPluginMCPServer:
         prompt = mcp_server._generate_provision_prompt(arguments)
 
         assert "5 ec2 instance(s)" in prompt
-        assert "Open Host Factory Plugin" in prompt
+        assert "Open Resource Broker" in prompt
         assert "List available templates" in prompt
 
     def test_generate_troubleshoot_prompt(self, mcp_server):

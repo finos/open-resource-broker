@@ -1,6 +1,6 @@
 # Scheduler Management Commands
 
-The scheduler management commands allow you to list, configure, and validate scheduler strategies in the Open Host Factory Plugin.
+The scheduler management commands allow you to list, configure, and validate scheduler strategies in the Open Resource Broker.
 
 ## Available Commands
 

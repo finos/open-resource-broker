@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Example Node.js MCP client for Open Host Factory Plugin.
+ * Example Node.js MCP client for Open Resource Broker.
  *
  * This example demonstrates how to connect to the MCP server and perform
  * common infrastructure provisioning tasks.

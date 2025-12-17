@@ -1,10 +1,10 @@
 # Installation Guide
 
-This guide covers the installation and setup of the Open Host Factory Plugin for IBM Spectrum Symphony integration with cloud providers.
+This guide covers the installation and setup of the Open Resource Broker for IBM Spectrum Symphony integration with cloud providers.
 
 ## Overview
 
-The Open Host Factory Plugin is a command-line tool that integrates with IBM Spectrum Symphony Host Factory through shell scripts. Symphony calls the shell scripts, which in turn execute the Python application.
+The Open Resource Broker is a command-line tool that integrates with IBM Spectrum Symphony Host Factory through shell scripts. Symphony calls the shell scripts, which in turn execute the Python application.
 
 ## Prerequisites
 
@@ -29,8 +29,8 @@ The Open Host Factory Plugin is a command-line tool that integrates with IBM Spe
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/open-hostfactory-plugin.git
-cd open-hostfactory-plugin
+git clone https://github.com/your-org/open-resource-broker.git
+cd open-resource-broker
 
 # Create virtual environment
 python -m venv .venv
@@ -53,9 +53,9 @@ python run.py getAvailableTemplates --help
 
 ```bash
 # Download and extract
-wget https://github.com/your-org/open-hostfactory-plugin/archive/main.zip
+wget https://github.com/your-org/open-resource-broker/archive/main.zip
 unzip main.zip
-cd open-hostfactory-plugin-main
+cd open-resource-broker-main
 
 # Follow same steps as Method 1
 python -m venv .venv
@@ -96,7 +96,7 @@ Configure Symphony Host Factory to call the shell scripts:
 
 ```bash
 # Example Symphony configuration (adjust paths for your installation)
-PROVIDER_SCRIPT_DIR=/path/to/open-hostfactory-plugin/scripts
+PROVIDER_SCRIPT_DIR=/path/to/open-resource-broker/scripts
 
 # Symphony will call:
 # $PROVIDER_SCRIPT_DIR/getAvailableTemplates.sh
@@ -265,7 +265,7 @@ mkdir -p data logs
 After installation, your directory structure should look like:
 
 ```
-open-hostfactory-plugin/
+open-resource-broker/
 +--- config/
 |   +--- config.json              # Main configuration
 |   +--- templates.json           # Template definitions

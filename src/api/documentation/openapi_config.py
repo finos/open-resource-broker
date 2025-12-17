@@ -28,7 +28,7 @@ def configure_openapi(app: FastAPI, server_config: ServerConfig):
 
         # Generate base OpenAPI schema
         openapi_schema = get_openapi(
-            title="Open Host Factory Plugin API",
+            title="Open Resource Broker API",
             version=__version__,
             description=_get_api_description(),
             routes=app.routes,
@@ -102,7 +102,7 @@ def configure_openapi(app: FastAPI, server_config: ServerConfig):
 def _get_api_description() -> str:
     """Get comprehensive API description."""
     return """
-## Open Host Factory Plugin REST API
+## Open Resource Broker REST API
 
 This API provides dynamic cloud resource provisioning capabilities for IBM Spectrum Symphony Host Factory.
 

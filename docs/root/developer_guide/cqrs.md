@@ -7,7 +7,7 @@ Before implementing CQRS patterns, ensure you understand:
 - Command and Query separation principles
 - [Domain-Driven Design concepts](../architecture/clean_architecture.md)
 
-This guide provides practical implementation guidance for using CQRS in the Open Host Factory Plugin. For comprehensive technical details and pattern theory, see the [Architecture Reference](../architecture/cqrs_pattern.md).
+This guide provides practical implementation guidance for using CQRS in the Open Resource Broker. For comprehensive technical details and pattern theory, see the [Architecture Reference](../architecture/cqrs_pattern.md).
 
 ## Next Steps
 
@@ -199,7 +199,7 @@ Command handlers execute business logic and modify domain state:
 class CreateRequestCommandHandler:
     """Handles request creation commands."""
 
-    def __init__(self, 
+    def __init__(self,
                  request_repository: RequestRepository,
                  template_repository: TemplateRepository,
                  event_publisher: EventPublisher):
@@ -438,7 +438,7 @@ class RequestReadModel:
             self._logger.error(f"Failed to get request {request_id}: {str(e)}")
             raise
 
-    async def list_requests(self, 
+    async def list_requests(self,
                           filters: Dict[str, Any] = None,
                           limit: int = 50,
                           offset: int = 0) -> List[Dict[str, Any]]:

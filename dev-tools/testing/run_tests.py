@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test runner script for the Open Host Factory Plugin."""
+"""Test runner script for the Open Resource Broker."""
 
 import argparse
 import logging
@@ -30,7 +30,7 @@ def run_command(cmd: list[str], description: str) -> bool:
 
 def main():
     """Main test runner function."""
-    parser = argparse.ArgumentParser(description="Run tests for Open Host Factory Plugin")
+    parser = argparse.ArgumentParser(description="Run tests for Open Resource Broker")
     parser.add_argument("--unit", action="store_true", help="Run unit tests only")
     parser.add_argument("--integration", action="store_true", help="Run integration tests only")
     parser.add_argument("--e2e", action="store_true", help="Run end-to-end tests only")

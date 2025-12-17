@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Example Python MCP client for Open Host Factory Plugin.
+Example Python MCP client for Open Resource Broker.
 
 This example demonstrates how to connect to the MCP server and perform
 common infrastructure provisioning tasks.
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class HostFactoryMCPClient:
-    """MCP client for Open Host Factory Plugin."""
+    """MCP client for Open Resource Broker."""
 
     def __init__(self):
         """Initialize the MCP client."""

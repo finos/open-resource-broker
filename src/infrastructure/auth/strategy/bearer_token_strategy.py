@@ -229,7 +229,7 @@ class BearerTokenStrategy(AuthPort):
             "type": "access",
             "iat": now,
             "exp": now + self.token_expiry,
-            "iss": "open-hostfactory-plugin",
+            "iss": "open-resource-broker",
         }
 
         return jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
@@ -254,7 +254,7 @@ class BearerTokenStrategy(AuthPort):
             "type": "refresh",
             "iat": now,
             "exp": now + (self.token_expiry * 24),  # Refresh tokens last 24x longer
-            "iss": "open-hostfactory-plugin",
+            "iss": "open-resource-broker",
         }
 
         return jwt.encode(payload, self.secret_key, algorithm=self.algorithm)

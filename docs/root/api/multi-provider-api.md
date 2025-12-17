@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the REST API endpoints and CLI commands for multi-provider functionality in the Open Host Factory Plugin.
+This document describes the REST API endpoints and CLI commands for multi-provider functionality in the Open Resource Broker.
 
 ## REST API Endpoints
 

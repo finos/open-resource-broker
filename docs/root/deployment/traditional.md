@@ -2,7 +2,7 @@
 
 ## Overview
 
-Deploy the Open Host Factory Plugin directly on servers using traditional installation methods.
+Deploy the Open Resource Broker directly on servers using traditional installation methods.
 
 ## Direct Installation
 
@@ -21,11 +21,11 @@ source orb-env/bin/activate
 
 ```bash
 # Install from PyPI
-pip install open-hostfactory-plugin
+pip install open-resource-broker
 
 # Or install from source
 git clone <repository-url>
-cd open-hostfactory-plugin
+cd open-resource-broker
 pip install -e .
 ```
 
@@ -48,7 +48,7 @@ Create `/etc/systemd/system/orb-api.service`:
 
 ```ini
 [Unit]
-Description=Open Host Factory Plugin REST API
+Description=Open Resource Broker REST API
 After=network.target
 
 [Service]

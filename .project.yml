@@ -3,7 +3,7 @@
 # Single source of truth for versions, names, and build parameters
 
 project:
-  name: open-hostfactory-plugin
+  name: open-resource-broker
   short_name: orb # CLI command name
   version: 0.1.1
   description: "Cloud provider integration plugin for IBM Spectrum Symphony Host Factory"
@@ -15,7 +15,7 @@ python:
   default_version: 3.13
 repository:
   org: awslabs
-  name: open-hostfactory-plugin
+  name: open-resource-broker
   registry: ghcr.io # Container registry
 build:
   platforms: [linux/amd64, linux/arm64] # Container platforms

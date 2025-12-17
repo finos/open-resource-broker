@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Open Host Factory Plugin REST API provides comprehensive Docker support for containerized deployment with:
+The Open Resource Broker REST API provides comprehensive Docker support for containerized deployment with:
 
 - **Multi-stage Dockerfile** for optimized production images
 - **Docker Compose** configurations for development and production
@@ -18,7 +18,7 @@ The Open Host Factory Plugin REST API provides comprehensive Docker support for 
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd open-hostfactory-plugin
+cd open-resource-broker
 
 # Copy environment template
 cp .env.example .env

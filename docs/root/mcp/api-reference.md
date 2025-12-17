@@ -1,13 +1,13 @@
 # MCP API Reference
 
-This document provides a complete reference for the Open Host Factory Plugin MCP server API.
+This document provides a complete reference for the Open Resource Broker MCP server API.
 
 ## Protocol Information
 
 - **Protocol**: Model Context Protocol (MCP)
 - **Version**: 2024-11-05
 - **Transport**: JSON-RPC 2.0
-- **Server Name**: open-hostfactory-plugin
+- **Server Name**: open-resource-broker
 - **Server Version**: 1.0.0
 
 ## Server Capabilities
@@ -64,9 +64,9 @@ Initialize the MCP session.
       "prompts": {"listChanged": true}
     },
     "serverInfo": {
-      "name": "open-hostfactory-plugin",
+      "name": "open-resource-broker",
       "version": "1.0.0",
-      "description": "MCP server for Open Host Factory Plugin - Cloud infrastructure provisioning"
+      "description": "MCP server for Open Resource Broker - Cloud infrastructure provisioning"
     }
   }
 }
@@ -302,7 +302,7 @@ Get a specific prompt.
         "role": "user",
         "content": {
           "type": "text",
-          "text": "I need to provision 3 ec2 instance(s) using the Open Host Factory Plugin..."
+          "text": "I need to provision 3 ec2 instance(s) using the Open Resource Broker..."
         }
       }
     ]

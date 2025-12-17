@@ -1,6 +1,6 @@
 # Data Models and Validation
 
-The Open Host Factory Plugin implements comprehensive data validation using Pydantic models throughout all layers, ensuring type safety, data integrity, and consistent validation across the entire system.
+The Open Resource Broker implements comprehensive data validation using Pydantic models throughout all layers, ensuring type safety, data integrity, and consistent validation across the entire system.
 
 ## Data Model Architecture
 
@@ -58,7 +58,7 @@ from src.domain.machine.value_objects import MachineStatus, PriceType, MachineId
 
 # Direct imports from decomposed modules
 from src.domain.machine.machine_status import MachineStatus
-from src.domain.machine.machine_identifiers import MachineId, MachineType  
+from src.domain.machine.machine_identifiers import MachineId, MachineType
 from src.domain.machine.machine_metadata import PriceType, MachineConfiguration
 ```
 

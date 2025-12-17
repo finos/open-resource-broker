@@ -1,6 +1,6 @@
 # Factory Pattern Implementation
 
-This document describes the implementation of various Factory patterns in the Open Host Factory Plugin, including Simple Factory, Factory Method, and Abstract Factory patterns for creating objects based on configuration and runtime conditions.
+This document describes the implementation of various Factory patterns in the Open Resource Broker, including Simple Factory, Factory Method, and Abstract Factory patterns for creating objects based on configuration and runtime conditions.
 
 ## Factory Pattern Overview
 
@@ -28,7 +28,7 @@ from src.providers.aws.configuration.config import AWSProviderConfig
 class ProviderStrategyFactory:
     """Factory for creating provider strategies from configuration."""
 
-    def __init__(self, 
+    def __init__(self,
                  config_manager: ConfigurationPort,
                  logger: LoggingPort):
         self._config_manager = config_manager
@@ -250,7 +250,7 @@ from src.domain.machine.repository import MachineRepository
 class RepositoryFactory:
     """Factory for creating repository implementations based on storage type."""
 
-    def __init__(self, 
+    def __init__(self,
                  config: ConfigurationPort,
                  logger: LoggingPort):
         self._config = config
@@ -386,7 +386,7 @@ class ProviderComponentFactory(ABC):
 class AWSComponentFactory(ProviderComponentFactory):
     """Concrete factory for AWS components."""
 
-    def __init__(self, 
+    def __init__(self,
                  config: ConfigurationPort,
                  logger: LoggingPort):
         self._config = config
@@ -503,4 +503,4 @@ def register_factory_services(container: DIContainer) -> None:
 - Clear separation between creation and usage
 - Consistent object creation patterns
 
-This comprehensive factory pattern implementation provides flexible, configurable, and maintainable object creation throughout the Open Host Factory Plugin.
+This comprehensive factory pattern implementation provides flexible, configurable, and maintainable object creation throughout the Open Resource Broker.

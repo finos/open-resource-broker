@@ -1,5 +1,5 @@
 #  Provider Strategy Guide
-## Open Host Factory Plugin - Multi-Cloud Provider Management
+## Open Resource Broker - Multi-Cloud Provider Management
 ## Updated: 2025-07-02
 
 ---
@@ -78,7 +78,7 @@ Execute operation with specific provider:
 python run.py executeProviderOperation --data '{
   "operation_type": "CREATE_INSTANCES",
   "parameters": {
-    "template_id": "web-server", 
+    "template_id": "web-server",
     "count": 2
   },
   "strategy_override": "aws-primary"
@@ -358,4 +358,4 @@ python run.py executeProviderOperation --data '{"operation_type": "HEALTH_CHECK"
 - Specify operation type and parameters
 - Include provider health status
 
-The Provider Strategy system transforms the Open Host Factory Plugin into a scalable and robust multi-cloud platform while maintaining full backward compatibility with existing operations.
+The Provider Strategy system transforms the Open Resource Broker into a scalable and robust multi-cloud platform while maintaining full backward compatibility with existing operations.

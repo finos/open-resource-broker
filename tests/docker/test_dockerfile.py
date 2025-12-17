@@ -138,7 +138,7 @@ class TestDockerfile:
             )
 
             assert result.returncode == 0, f"Container version command failed: {result.stderr}"
-            assert "Open Host Factory Plugin REST API" in result.stdout
+            assert "Open Resource Broker REST API" in result.stdout
             assert "Version:" in result.stdout
 
         except subprocess.TimeoutExpired:

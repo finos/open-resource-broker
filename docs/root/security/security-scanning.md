@@ -1,6 +1,6 @@
 # Security Scanning Guide
 
-This document provides comprehensive guidance on the security scanning tools and processes implemented in the Open Host Factory Plugin project.
+This document provides comprehensive guidance on the security scanning tools and processes implemented in the Open Resource Broker project.
 
 ## Overview
 

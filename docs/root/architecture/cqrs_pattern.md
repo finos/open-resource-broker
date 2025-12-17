@@ -1,6 +1,6 @@
 # CQRS Pattern Implementation
 
-This document provides the comprehensive technical reference for the Command Query Responsibility Segregation (CQRS) pattern implementation in the Open Host Factory Plugin, including pattern structure, implementation details, and architectural considerations.
+This document provides the comprehensive technical reference for the Command Query Responsibility Segregation (CQRS) pattern implementation in the Open Resource Broker, including pattern structure, implementation details, and architectural considerations.
 
 ## Related Documentation
 
@@ -67,7 +67,7 @@ from src.domain.base.ports import LoggingPort
 class ValidateTemplateHandler:
     """Handle template validation commands."""
 
-    def __init__(self, 
+    def __init__(self,
                  template_repo: TemplateRepository,
                  logger: LoggingPort):
         self._template_repo = template_repo

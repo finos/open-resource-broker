@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Comprehensive changelog manager for Open Host Factory Plugin.
+Comprehensive changelog manager for Open Resource Broker.
 Handles generation, updates, backfills, deletions, and validation.
 """
 

@@ -12,7 +12,7 @@ for arg in "$@"; do
 done
 
 if [ "$QUIET" = false ]; then
-    echo "INFO: Building open-hostfactory-plugin package..."
+    echo "INFO: Building open-resource-broker package..."
 fi
 
 # Get to project root

@@ -1,6 +1,6 @@
 # Development Guide
 
-This guide covers setting up a development environment, understanding the codebase structure, and contributing to the Open Host Factory Plugin.
+This guide covers setting up a development environment, understanding the codebase structure, and contributing to the Open Resource Broker.
 
 ## Development Environment Setup
 
@@ -16,7 +16,7 @@ This guide covers setting up a development environment, understanding the codeba
 1. **Clone the Repository**
    ```bash
    git clone <repository-url>
-   cd open-hostfactory-plugin
+   cd open-resource-broker
    ```
 
 2. **Create Virtual Environment**
@@ -112,7 +112,7 @@ Create a `config/dev-config.json` file for development:
 The project follows Domain-Driven Design (DDD) with clean architecture principles:
 
 ```
-open-hostfactory-plugin/
+open-resource-broker/
 +--- src/                     # Source code
 |   +--- domain/              # Domain layer (business logic)
 |   +--- application/         # Application layer (use cases)
@@ -583,7 +583,7 @@ For complete release documentation, see [Release Management Guide](releases.md).
 1. **Fork the Repository**
    ```bash
    git clone <your-fork-url>
-   cd open-hostfactory-plugin
+   cd open-resource-broker
    ```
 
 2. **Create Feature Branch**

@@ -1,6 +1,6 @@
 # Storage Strategies
 
-The Open Host Factory Plugin implements a sophisticated storage architecture with multiple strategies, generic repository patterns, and built-in migration capabilities. This guide covers all storage options and their advanced features.
+The Open Resource Broker implements a sophisticated storage architecture with multiple strategies, generic repository patterns, and built-in migration capabilities. This guide covers all storage options and their advanced features.
 
 ## Overview
 
@@ -333,7 +333,7 @@ requests = storage.query_entities(
 ```python
 # Transaction support varies by storage strategy
 # JSON: File-level atomic operations
-# SQL: Full ACID transaction support  
+# SQL: Full ACID transaction support
 # DynamoDB: Limited transaction support
 
 # SQL storage transaction example
@@ -446,7 +446,7 @@ class RepositoryInterface:
         """Retrieve an entity by ID."""
         pass
 
-    def update_entity(self, collection: str, entity_id: str, 
+    def update_entity(self, collection: str, entity_id: str,
                      entity_data: Dict[str, Any]) -> None:
         """Update an existing entity."""
         pass
@@ -455,7 +455,7 @@ class RepositoryInterface:
         """Delete an entity."""
         pass
 
-    def query_entities(self, collection: str, 
+    def query_entities(self, collection: str,
                       filters: Dict[str, Any] = None,
                       order_by: str = None,
                       limit: int = None) -> List[Dict[str, Any]]:
@@ -626,9 +626,9 @@ All strategies support optimistic locking:
 # Version-based concurrency control
 try:
     storage.update_entity(
-        "requests", 
-        request_id, 
-        updated_data, 
+        "requests",
+        request_id,
+        updated_data,
         expected_version=current_version
     )
 except ConcurrencyConflictError as e:

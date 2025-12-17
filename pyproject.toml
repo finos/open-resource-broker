@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "open-hostfactory-plugin"
+name = "open-resource-broker"
 version = "0.1.1"
 description = "Cloud provider integration plugin for IBM Spectrum Symphony Host Factory"
 readme = "README.md"
@@ -141,10 +141,10 @@ orb = "run:cli_main"
 open-resource-broker = "run:cli_main"
 
 [project.urls]
-Homepage = "https://github.com/awslabs/open-hostfactory-plugin"
-Documentation = "https://awslabs.github.io/open-hostfactory-plugin/"
-Repository = "https://github.com/awslabs/open-hostfactory-plugin"
-"Bug Reports" = "https://github.com/awslabs/open-hostfactory-plugin/issues"
+Homepage = "https://github.com/awslabs/open-resource-broker"
+Documentation = "https://awslabs.github.io/open-resource-broker/"
+Repository = "https://github.com/awslabs/open-resource-broker"
+"Bug Reports" = "https://github.com/awslabs/open-resource-broker/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

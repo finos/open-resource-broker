@@ -1,6 +1,6 @@
 # Source Code Architecture
 
-This directory contains the complete source code for the Open Host Factory Plugin, implementing Clean Architecture principles with Domain-Driven Design (DDD) and Command Query Responsibility Segregation (CQRS) patterns.
+This directory contains the complete source code for the Open Resource Broker, implementing Clean Architecture principles with Domain-Driven Design (DDD) and Command Query Responsibility Segregation (CQRS) patterns.
 
 ## Architecture Overview
 
@@ -9,7 +9,7 @@ The codebase follows Clean Architecture with four distinct layers:
 ```
 src/
 ├── domain/          # Domain Layer - Core business logic
-├── application/     # Application Layer - Use cases and CQRS handlers  
+├── application/     # Application Layer - Use cases and CQRS handlers
 ├── infrastructure/  # Infrastructure Layer - External integrations
 └── interface/       # Interface Layer - CLI and external interfaces
 ```
@@ -20,7 +20,7 @@ src/
 - **Purpose**: Core business logic and domain models
 - **Dependencies**: None (dependency-free)
 - **Contains**: Aggregates, Value Objects, Domain Events, Ports (interfaces)
-- **Key Principles**: 
+- **Key Principles**:
   - No dependencies on other layers
   - Pure business logic
   - Domain-driven design patterns
@@ -55,7 +55,7 @@ src/
 
 ### CQRS Implementation
 - **Commands**: Modify state, handled by CommandHandlers
-- **Queries**: Read data, handled by QueryHandlers  
+- **Queries**: Read data, handled by QueryHandlers
 - **Events**: Domain events for side effects
 - **Automatic Discovery**: Handlers registered via decorators
 
@@ -107,7 +107,7 @@ class MyCommandHandler(BaseCommandHandler[MyCommand, MyResponse]):
     async def execute_command(self, command: MyCommand) -> MyResponse:
         # Implementation
 
-# Query Handler  
+# Query Handler
 @query_handler(MyQuery)
 class MyQueryHandler(BaseQueryHandler[MyQuery, MyResult]):
     async def execute_query(self, query: MyQuery) -> MyResult:
@@ -140,7 +140,7 @@ class MyRepositoryPort(ABC):
 
 Each layer contains its own README with specific details:
 - [Domain Layer README](domain/README.md)
-- [Application Layer README](application/README.md)  
+- [Application Layer README](application/README.md)
 - [Infrastructure Layer README](infrastructure/README.md)
 
 ## Contributing

@@ -149,6 +149,6 @@ class AWSNativeSpecService:
             "template_id": template.template_id,
             "image_id": template.image_id,
             "instance_type": template.instance_type,
-            "package_name": package_info.get("name", "open-hostfactory-plugin"),
+            "package_name": package_info.get("name", "open-resource-broker"),
             "package_version": package_info.get("version", "unknown"),
         }

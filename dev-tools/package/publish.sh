@@ -3,7 +3,7 @@ set -e
 
 ENVIRONMENT=${1:-testpypi}
 
-echo "Publishing open-hostfactory-plugin to $ENVIRONMENT..."
+echo "Publishing open-resource-broker to $ENVIRONMENT..."
 
 # Get to project root
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
@@ -47,8 +47,8 @@ echo "Published to $ENVIRONMENT successfully!"
 echo ""
 if [ "$ENVIRONMENT" = "testpypi" ]; then
     echo "INFO Test installation:"
-    echo "  pip install --index-url https://test.pypi.org/simple/ open-hostfactory-plugin"
+    echo "  pip install --index-url https://test.pypi.org/simple/ open-resource-broker"
 else
     echo "Production installation:"
-    echo "  pip install open-hostfactory-plugin"
+    echo "  pip install open-resource-broker"
 fi

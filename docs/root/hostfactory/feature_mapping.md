@@ -1,6 +1,6 @@
 # HostFactory Feature Mapping
 
-This document maps IBM Spectrum Symphony Host Factory features to Open Host Factory Plugin capabilities, showing how each HostFactory requirement is implemented.
+This document maps IBM Spectrum Symphony Host Factory features to Open Resource Broker capabilities, showing how each HostFactory requirement is implemented.
 
 ## Core Feature Mapping
 
@@ -384,7 +384,7 @@ New providers can be added while maintaining HostFactory compatibility:
       "type": "aws"
     },
     {
-      "name": "azure-secondary", 
+      "name": "azure-secondary",
       "type": "azure"
     }
   ]

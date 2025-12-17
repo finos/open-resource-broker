@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Open Host Factory Plugin implements a sophisticated multi-provider architecture that enables dynamic provisioning of compute resources across multiple cloud providers and provider instances. This document describes the design, implementation, and usage patterns of the multi-provider system.
+The Open Resource Broker implements a sophisticated multi-provider architecture that enables dynamic provisioning of compute resources across multiple cloud providers and provider instances. This document describes the design, implementation, and usage patterns of the multi-provider system.
 
 ## Architecture Components
 

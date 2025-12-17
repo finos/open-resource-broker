@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Get up and running with the Open Host Factory Plugin in minutes. This guide covers the essential steps to start provisioning cloud resources through IBM Spectrum Symphony Host Factory.
+Get up and running with the Open Resource Broker in minutes. This guide covers the essential steps to start provisioning cloud resources through IBM Spectrum Symphony Host Factory.
 
 ## Prerequisites
 
@@ -19,7 +19,7 @@ Before starting, ensure you have:
 docker run -it --rm \
   -v ~/.aws:/root/.aws:ro \
   -v $(pwd)/config:/app/config \
-  your-registry/open-hostfactory-plugin:latest \
+  your-registry/open-resource-broker:latest \
   getAvailableTemplates
 ```
 
@@ -28,7 +28,7 @@ docker run -it --rm \
 ```bash
 # Clone and install
 git clone <repository-url>
-cd open-hostfactory-plugin
+cd open-resource-broker
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -125,7 +125,7 @@ Expected output:
       "status": "pending"
     },
     {
-      "machineId": "i-0987654321fedcba0", 
+      "machineId": "i-0987654321fedcba0",
       "status": "pending"
     }
   ]

@@ -1,6 +1,6 @@
 # Ports and Adapters Pattern Implementation
 
-This document describes the implementation of the Ports and Adapters pattern (also known as Hexagonal Architecture) in the Open Host Factory Plugin, which enables clean separation between business logic and external concerns.
+This document describes the implementation of the Ports and Adapters pattern (also known as Hexagonal Architecture) in the Open Resource Broker, which enables clean separation between business logic and external concerns.
 
 ## Ports and Adapters Overview
 
@@ -120,7 +120,7 @@ class TemplateRepository(ABC):
     """Abstract interface for template data access."""
 
     @abstractmethod
-    async def get_all(self, 
+    async def get_all(self,
                      filters: Optional[Dict[str, Any]] = None,
                      limit: Optional[int] = None,
                      offset: Optional[int] = None) -> List[Template]:
@@ -288,9 +288,9 @@ from typing import Dict, Any, List
 class AWSTemplateAdapter:
     """AWS-specific template operations adapter."""
 
-    def __init__(self, 
-                 aws_client: AWSClient, 
-                 logger: LoggingPort, 
+    def __init__(self,
+                 aws_client: AWSClient,
+                 logger: LoggingPort,
                  config: ConfigurationPort):
         self._aws_client = aws_client
         self._logger = logger
@@ -340,8 +340,8 @@ from typing import List, Dict, Any
 class AWSProviderStrategy(ProviderStrategy):
     """AWS implementation of provider strategy."""
 
-    def __init__(self, 
-                 config: AWSProviderConfig, 
+    def __init__(self,
+                 config: AWSProviderConfig,
                  logger: LoggingPort):
         self._config = config
         self._logger = logger
@@ -395,7 +395,7 @@ import boto3
 class DynamoDBTemplateRepository(TemplateRepository):
     """DynamoDB implementation of template repository."""
 
-    def __init__(self, 
+    def __init__(self,
                  table_name: str,
                  region: str,
                  logger: LoggingPort):
@@ -405,7 +405,7 @@ class DynamoDBTemplateRepository(TemplateRepository):
         self._dynamodb = boto3.resource('dynamodb', region_name=region)
         self._table = self._dynamodb.Table(table_name)
 
-    async def get_all(self, 
+    async def get_all(self,
                      filters: Optional[Dict[str, Any]] = None,
                      limit: Optional[int] = None,
                      offset: Optional[int] = None) -> List[Template]:
@@ -608,4 +608,4 @@ container.register_factory(
 )
 ```
 
-This Ports and Adapters implementation provides clean separation between business logic and external concerns, enabling high testability, maintainability, and flexibility in the Open Host Factory Plugin.
+This Ports and Adapters implementation provides clean separation between business logic and external concerns, enabling high testability, maintainability, and flexibility in the Open Resource Broker.

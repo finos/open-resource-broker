@@ -1,4 +1,4 @@
-# Docker Compose for Open Host Factory Plugin REST API
+# Docker Compose for Open Resource Broker REST API
 # Development and testing configuration
 
 version: '3.8'

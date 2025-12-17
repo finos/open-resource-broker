@@ -1,4 +1,4 @@
-name: "Open Host Factory Plugin CodeQL Config"
+name: "Open Resource Broker CodeQL Config"
 
 disable-default-queries: false
 

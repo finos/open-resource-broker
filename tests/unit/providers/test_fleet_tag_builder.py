@@ -136,7 +136,7 @@ class TestFleetTagBuilder:
             "Key": "TemplateId",
             "Value": str(self.mock_template.template_id),
         } in tags
-        assert {"Key": "CreatedBy", "Value": "open-hostfactory-plugin"} in tags
+        assert {"Key": "CreatedBy", "Value": "open-resource-broker"} in tags
 
     def test_build_fleet_tags_legacy(self):
         """Test legacy build_fleet_tags method."""

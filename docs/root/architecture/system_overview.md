@@ -2,7 +2,7 @@
 
 *Last updated: 2025-07-12 12:07:07 (Auto-generated)*
 
-This document provides a high-level overview of the Open Host Factory Plugin's system architecture, focusing on the overall structure, key components, and architectural decisions.
+This document provides a high-level overview of the Open Resource Broker's system architecture, focusing on the overall structure, key components, and architectural decisions.
 
 > **Related Documentation:**
 > - [Developer Guide: Architecture](../developer_guide/architecture.md) - Development-focused architectural guidance
@@ -17,7 +17,7 @@ This document provides a high-level overview of the Open Host Factory Plugin's s
 
 ### File Size Distribution
 - **Small files** (< 100 lines): 108 files
-- **Medium files** (100-300 lines): 146 files  
+- **Medium files** (100-300 lines): 146 files
 - **Large files** (300-600 lines): 63 files
 - **Extra large files** (> 600 lines): 7 files
 
@@ -39,7 +39,7 @@ This document provides a high-level overview of the Open Host Factory Plugin's s
 The plugin implements Clean Architecture principles with clear separation of concerns across four distinct layers:
 
 1. **Domain Layer**: Core business logic and entities
-2. **Application Layer**: Use cases and application services  
+2. **Application Layer**: Use cases and application services
 3. **Infrastructure Layer**: External integrations and technical concerns
 4. **Interface Layer**: External interfaces (CLI, REST API)
 
@@ -79,7 +79,7 @@ The domain layer contains the core business logic and is independent of external
 
 #### Core Aggregates
 - **Template**: Represents VM template configurations
-- **Machine**: Represents provisioned compute instances  
+- **Machine**: Represents provisioned compute instances
 - **Request**: Represents provisioning requests
 
 ### Application Layer (`src/application/`)

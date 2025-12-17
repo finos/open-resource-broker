@@ -287,11 +287,11 @@ class AWSLaunchTemplateManager:
         """Prepare context with all computed values for template rendering."""
 
         # Get package name for CreatedBy tag
-        created_by = "open-hostfactory-plugin"
+        created_by = "open-resource-broker"
         if self.config_port:
             try:
                 package_info = self.config_port.get_package_info()
-                created_by = package_info.get("name", "open-hostfactory-plugin")
+                created_by = package_info.get("name", "open-resource-broker")
             except Exception:  # nosec B110
                 pass
 
@@ -553,11 +553,11 @@ class AWSLaunchTemplateManager:
         instance_name = get_instance_name(request.request_id)
 
         # Get package name for CreatedBy tag
-        created_by = "open-hostfactory-plugin"  # fallback
+        created_by = "open-resource-broker"  # fallback
         if self.config_port:
             try:
                 package_info = self.config_port.get_package_info()
-                created_by = package_info.get("name", "open-hostfactory-plugin")
+                created_by = package_info.get("name", "open-resource-broker")
             except Exception:  # nosec B110
                 # Intentionally silent fallback for package info retrieval
                 pass
@@ -592,11 +592,11 @@ class AWSLaunchTemplateManager:
         template_name = get_launch_template_name(request.request_id)
 
         # Get package name for CreatedBy tag
-        created_by = "open-hostfactory-plugin"  # fallback
+        created_by = "open-resource-broker"  # fallback
         if self.config_port:
             try:
                 package_info = self.config_port.get_package_info()
-                created_by = package_info.get("name", "open-hostfactory-plugin")
+                created_by = package_info.get("name", "open-resource-broker")
             except Exception:  # nosec B110
                 # Intentionally silent fallback for package info retrieval
                 pass

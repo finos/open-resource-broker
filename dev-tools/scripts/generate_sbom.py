@@ -82,7 +82,7 @@ def generate_spdx_fallback(output_file: str) -> bool:
             "spdxVersion": "SPDX-2.3",
             "dataLicense": "CC0-1.0",
             "SPDXID": "SPDXRef-DOCUMENT",
-            "name": "open-hostfactory-plugin",
+            "name": "open-resource-broker",
             "documentNamespace": REPO_URL,
             "creationInfo": {
                 "created": datetime.now(timezone.utc).isoformat(),

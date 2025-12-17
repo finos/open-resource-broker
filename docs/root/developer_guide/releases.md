@@ -1,6 +1,6 @@
 # Release Management Guide
 
-This guide covers the complete release management system for the Open Host Factory Plugin.
+This guide covers the complete release management system for the Open Resource Broker.
 
 ## Release Process Overview
 
@@ -53,7 +53,7 @@ Developer workflow → Scheduled releases → Manual stable release
 ### Local Testing Commands
 ```bash
 make release-alpha-if-needed    # Check if alpha release needed
-make release-beta-if-needed     # Check if beta release needed  
+make release-beta-if-needed     # Check if beta release needed
 make release-rc-if-needed       # Check if RC release needed
 ```
 
@@ -68,7 +68,7 @@ make release                    # Create stable release
 ### Version Increment Options
 ```bash
 make release-patch              # 1.0.0 → 1.0.1
-make release-minor              # 1.0.0 → 1.1.0  
+make release-minor              # 1.0.0 → 1.1.0
 make release-major              # 1.0.0 → 2.0.0
 ```
 
@@ -78,11 +78,11 @@ make release-major              # 1.0.0 → 2.0.0
 - Alpha releases: `1.0.1-alpha.1`
 - Beta releases: `1.0.1-beta.1`
 - RC releases: `1.0.1-rc.1`
-- Installation: `pip install --index-url https://test.pypi.org/simple/ open-hostfactory-plugin`
+- Installation: `pip install --index-url https://test.pypi.org/simple/ open-resource-broker`
 
 ### PyPI (Production Environment)
 - Stable releases: `1.0.1`
-- Installation: `pip install open-hostfactory-plugin`
+- Installation: `pip install open-resource-broker`
 
 ## Release Schedule
 

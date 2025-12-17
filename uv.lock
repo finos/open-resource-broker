@@ -2602,7 +2602,7 @@ wheels = [
 ]
 
 [[package]]
-name = "open-hostfactory-plugin"
+name = "open-resource-broker"
 version = "0.1.1"
 source = { editable = "." }
 dependencies = [

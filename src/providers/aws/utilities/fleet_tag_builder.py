@@ -19,7 +19,7 @@ class FleetTagBuilder:
     def build_base_tags(
         request: Request,
         template: Template,
-        package_name: str = "open-hostfactory-plugin",
+        package_name: str = "open-resource-broker",
     ) -> dict[str, str]:
         """Build base tags used across all AWS resources.
 
@@ -43,7 +43,7 @@ class FleetTagBuilder:
         request: Request,
         template: Template,
         resource_type: str,
-        package_name: str = "open-hostfactory-plugin",
+        package_name: str = "open-resource-broker",
     ) -> dict[str, str]:
         """Build complete tags for a specific resource type.
 
@@ -85,7 +85,7 @@ class FleetTagBuilder:
         request: Request,
         template: Template,
         resource_types: list[str],
-        package_name: str = "open-hostfactory-plugin",
+        package_name: str = "open-resource-broker",
     ) -> list[dict[str, Any]]:
         """Build AWS TagSpecifications for multiple resource types.
 

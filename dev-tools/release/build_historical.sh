@@ -65,7 +65,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "open-hostfactory-plugin"
+name = "open-resource-broker"
 version = "$VERSION"
 description = "Cloud provider integration plugin for IBM Spectrum Symphony Host Factory"
 authors = [{name = "AWS Professional Services", email = "aws-proserve@amazon.com"}]
@@ -75,8 +75,8 @@ requires-python = ">=3.9"
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/awslabs/open-hostfactory-plugin"
-Repository = "https://github.com/awslabs/open-hostfactory-plugin"
+Homepage = "https://github.com/awslabs/open-resource-broker"
+Repository = "https://github.com/awslabs/open-resource-broker"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -103,8 +103,8 @@ python -m build --wheel --outdir dist/ || {
 if [ "${KEEP_ARTIFACTS:-false}" = "true" ]; then
     log_info "Keeping build artifacts (KEEP_ARTIFACTS=true)"
     # Move wheel to temp location before cleanup
-    if [ -f "dist/open_hostfactory_plugin-${VERSION}-py3-none-any.whl" ]; then
-        mv "dist/open_hostfactory_plugin-${VERSION}-py3-none-any.whl" "/tmp/wheel-${VERSION}.whl"
+    if [ -f "dist/open_resource_broker-${VERSION}-py3-none-any.whl" ]; then
+        mv "dist/open_resource_broker-${VERSION}-py3-none-any.whl" "/tmp/wheel-${VERSION}.whl"
     fi
     git clean -fd  # Remove untracked files including pyproject.toml
     git reset --hard HEAD  # Reset any tracked file changes
@@ -113,7 +113,7 @@ if [ "${KEEP_ARTIFACTS:-false}" = "true" ]; then
     # Restore wheel
     mkdir -p dist
     if [ -f "/tmp/wheel-${VERSION}.whl" ]; then
-        mv "/tmp/wheel-${VERSION}.whl" "dist/open_hostfactory_plugin-${VERSION}-py3-none-any.whl"
+        mv "/tmp/wheel-${VERSION}.whl" "dist/open_resource_broker-${VERSION}-py3-none-any.whl"
     fi
 else
     log_info "Cleaning up temporary branch"

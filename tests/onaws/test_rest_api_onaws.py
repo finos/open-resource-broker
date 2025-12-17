@@ -1,4 +1,4 @@
-"""REST API-based AWS integration tests for Open Host Factory Plugin."""
+"""REST API-based AWS integration tests for Open Resource Broker."""
 
 import json
 import logging
@@ -196,7 +196,7 @@ class ORBServerManager:
 
 
 class RestApiClient:
-    """HTTP client for Open Host Factory Plugin REST API."""
+    """HTTP client for Open Resource Broker REST API."""
 
     def __init__(
         self,

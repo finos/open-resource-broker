@@ -570,7 +570,7 @@ class AWSOperations:
         if self._config_port:
             try:
                 package_info = self._config_port.get_package_info()
-                return package_info.get("name", "open-hostfactory-plugin")
+                return package_info.get("name", "open-resource-broker")
             except Exception:  # nosec B110 - Intentional fallback to default package name
                 pass
-        return "open-hostfactory-plugin"
+        return "open-resource-broker"

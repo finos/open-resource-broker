@@ -26,8 +26,8 @@ def create_fastapi_app(server_config: ServerConfig) -> FastAPI:
     """
     # Create FastAPI app with configuration
     app = FastAPI(
-        title="Open Host Factory Plugin API",
-        description="REST API for Open Host Factory Plugin - Dynamic cloud resource provisioning",
+        title="Open Resource Broker API",
+        description="REST API for Open Resource Broker - Dynamic cloud resource provisioning",
         version=__version__,
         docs_url=server_config.docs_url if server_config.docs_enabled else None,
         redoc_url=server_config.redoc_url if server_config.docs_enabled else None,
@@ -113,7 +113,7 @@ def create_fastapi_app(server_config: ServerConfig) -> FastAPI:
         """Health check endpoint."""
         return {
             "status": "healthy",
-            "service": "open-hostfactory-plugin",
+            "service": "open-resource-broker",
             "version": __version__,
         }
 
@@ -122,9 +122,9 @@ def create_fastapi_app(server_config: ServerConfig) -> FastAPI:
     async def info():
         """Service information endpoint."""
         return {
-            "service": "open-hostfactory-plugin",
+            "service": "open-resource-broker",
             "version": __version__,
-            "description": "REST API for Open Host Factory Plugin",
+            "description": "REST API for Open Resource Broker",
             "auth_enabled": server_config.auth.enabled,
             "auth_strategy": (server_config.auth.strategy if server_config.auth.enabled else None),
         }

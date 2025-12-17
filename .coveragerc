@@ -47,7 +47,7 @@ ignore_errors = True
 
 [html]
 directory = htmlcov
-title = Open Host Factory Plugin Coverage Report
+title = Open Resource Broker Coverage Report
 
 [xml]
 output = coverage.xml

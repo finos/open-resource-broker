@@ -1,10 +1,10 @@
-# Open Host Factory Plugin
+# Open Resource Broker
 
 A cloud provider integration plugin for IBM Spectrum Symphony Host Factory, enabling dynamic provisioning of compute resources with a REST API interface and structured architecture implementation.
 
 ## Overview
 
-The Open Host Factory Plugin provides integration between IBM Spectrum Symphony Host Factory and cloud providers, implementing industry-standard patterns including Domain-Driven Design (DDD), Command Query Responsibility Segregation (CQRS), and structured architecture principles.
+The Open Resource Broker provides integration between IBM Spectrum Symphony Host Factory and cloud providers, implementing industry-standard patterns including Domain-Driven Design (DDD), Command Query Responsibility Segregation (CQRS), and structured architecture principles.
 
 **Currently Supported Providers:**
 - **AWS** - Amazon Web Services (RunInstances, EC2Fleet, SpotFleet, Auto Scaling Groups)
@@ -38,8 +38,8 @@ The Open Host Factory Plugin provides integration between IBM Spectrum Symphony 
 
 ```bash
 # Clone repository
-git clone https://github.com/awslabs/open-hostfactory-plugin.git
-cd open-hostfactory-plugin
+git clone https://github.com/awslabs/open-resource-broker.git
+cd open-resource-broker
 
 # Configure environment
 cp .env.example .env
@@ -56,7 +56,7 @@ curl http://localhost:8000/health
 
 ```bash
 # Install from PyPI
-pip install open-hostfactory-plugin
+pip install open-resource-broker
 
 # Verify installation
 orb --version
@@ -72,8 +72,8 @@ For faster dependency resolution and installation, use [uv](https://github.com/a
 pip install uv
 
 # Clone repository
-git clone https://github.com/awslabs/open-hostfactory-plugin.git
-cd open-hostfactory-plugin
+git clone https://github.com/awslabs/open-resource-broker.git
+cd open-resource-broker
 
 # Fast development setup with uv
 make dev-install-uv
@@ -92,8 +92,8 @@ make uv-sync-dev
 
 ```bash
 # Clone repository
-git clone https://github.com/awslabs/open-hostfactory-plugin.git
-cd open-hostfactory-plugin
+git clone https://github.com/awslabs/open-resource-broker.git
+cd open-resource-broker
 
 # Traditional setup with pip
 make dev-install-pip
@@ -334,8 +334,8 @@ providers:
 
 ```bash
 # Clone repository
-git clone https://github.com/awslabs/open-hostfactory-plugin.git
-cd open-hostfactory-plugin
+git clone https://github.com/awslabs/open-resource-broker.git
+cd open-resource-broker
 
 # Create virtual environment
 python -m venv .venv

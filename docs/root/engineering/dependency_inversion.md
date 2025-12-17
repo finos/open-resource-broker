@@ -1,10 +1,10 @@
 # Dependency Inversion Principle
 
 > **Note:** This content has been consolidated into the comprehensive SOLID Principles documentation.
-> 
+>
 > **See:** [SOLID Principles Implementation](./solid_principles.md#dependency-inversion-principle-dip)
 
-The Dependency Inversion Principle (DIP) is one of the five SOLID principles of object-oriented design. For detailed implementation examples and explanations of how the Open Host Factory Plugin implements DIP, please refer to the SOLID Principles documentation.
+The Dependency Inversion Principle (DIP) is one of the five SOLID principles of object-oriented design. For detailed implementation examples and explanations of how the Open Resource Broker implements DIP, please refer to the SOLID Principles documentation.
 
 ## Quick Reference
 

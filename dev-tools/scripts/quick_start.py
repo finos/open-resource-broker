@@ -139,7 +139,7 @@ def main():
 
     args = parser.parse_args()
 
-    logger.info("Open Host Factory Plugin - Quick Start Setup")
+    logger.info("Open Resource Broker - Quick Start Setup")
     logger.info("=" * 50)
 
     success = True

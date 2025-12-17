@@ -1,6 +1,6 @@
 # Event System
 
-The Open Host Factory Plugin implements a sophisticated event-driven architecture with 47+ specialized event handlers, domain events, and event sourcing capabilities. This system enables loose coupling, audit trails, and reactive programming patterns.
+The Open Resource Broker implements a sophisticated event-driven architecture with 47+ specialized event handlers, domain events, and event sourcing capabilities. This system enables loose coupling, audit trails, and reactive programming patterns.
 
 ## Event Architecture Overview
 
@@ -117,7 +117,7 @@ The `TemplateConfigurationManager` supports optional event publishing for templa
 
 ```python
 class TemplateConfigurationManager:
-    def __init__(self, 
+    def __init__(self,
                  config_manager: ConfigurationManager,
                  scheduler_strategy: SchedulerPort,
                  logger: LoggingPort,
@@ -645,8 +645,8 @@ class EventStore:
         self._storage = storage_strategy
         self._logger = get_logger(__name__)
 
-    async def append_events(self, 
-                          aggregate_id: str, 
+    async def append_events(self,
+                          aggregate_id: str,
                           events: List[DomainEvent],
                           expected_version: int) -> None:
         """Append events to the store with optimistic concurrency control."""
@@ -670,8 +670,8 @@ class EventStore:
             self._logger.error(f"Failed to append events: {str(e)}")
             raise
 
-    async def get_events(self, 
-                        aggregate_id: str, 
+    async def get_events(self,
+                        aggregate_id: str,
                         from_version: int = 0) -> List[DomainEvent]:
         """Retrieve events for an aggregate from a specific version."""
         try:
@@ -685,7 +685,7 @@ class EventStore:
             self._logger.error(f"Failed to get events for {aggregate_id}: {str(e)}")
             raise
 
-    async def get_all_events(self, 
+    async def get_all_events(self,
                            from_timestamp: Optional[datetime] = None) -> List[DomainEvent]:
         """Retrieve all events from a specific timestamp."""
         try:
@@ -708,7 +708,7 @@ class EventReplayer:
         self._event_handlers = event_handlers
         self._logger = get_logger(__name__)
 
-    async def replay_events(self, 
+    async def replay_events(self,
                           from_timestamp: datetime,
                           to_timestamp: Optional[datetime] = None,
                           event_types: Optional[List[str]] = None) -> None:

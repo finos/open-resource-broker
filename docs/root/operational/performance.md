@@ -1,6 +1,6 @@
 # Performance Tuning and Optimization
 
-This guide covers performance optimization strategies for the Open Host Factory Plugin, including configuration tuning, monitoring, and troubleshooting performance issues.
+This guide covers performance optimization strategies for the Open Resource Broker, including configuration tuning, monitoring, and troubleshooting performance issues.
 
 ## Performance Overview
 
@@ -291,7 +291,7 @@ class PerformanceMetrics:
     def get_average_response_time(self, operation: str = None) -> float:
         """Calculate average response time."""
         if operation:
-            times = [r['duration'] for r in self.request_times 
+            times = [r['duration'] for r in self.request_times
                     if r['operation'] == operation]
         else:
             times = [r['duration'] for r in self.request_times]
@@ -381,7 +381,7 @@ python scripts/performance_test.py
 # - Average response time: 0.15s
 # - 95th percentile: 0.25s
 # - Throughput: 67 requests/second
-# 
+#
 # Storage Strategy: SQL
 # - Average response time: 0.08s
 # - 95th percentile: 0.12s

@@ -1,10 +1,10 @@
 # Deployment Guide
 
-This guide covers deploying the Open Host Factory Plugin in production environments with IBM Spectrum Symphony.
+This guide covers deploying the Open Resource Broker in production environments with IBM Spectrum Symphony.
 
 ## Overview
 
-The Open Host Factory Plugin is deployed as a **command-line tool** that IBM Spectrum Symphony Host Factory calls to manage cloud resources. This guide covers production deployment scenarios and best practices.
+The Open Resource Broker is deployed as a **command-line tool** that IBM Spectrum Symphony Host Factory calls to manage cloud resources. This guide covers production deployment scenarios and best practices.
 
 ## Deployment Architecture
 

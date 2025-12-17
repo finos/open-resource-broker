@@ -26,8 +26,8 @@ ARG LICENSE
 ARG REPO_URL
 
 # Add metadata labels and set environment variables in single layer
-LABEL org.opencontainers.image.title="Open Host Factory Plugin API" \
-      org.opencontainers.image.description="REST API for Open Host Factory Plugin - Dynamic cloud resource provisioning" \
+LABEL org.opencontainers.image.title="Open Resource Broker API" \
+      org.opencontainers.image.description="REST API for Open Resource Broker - Dynamic cloud resource provisioning" \
       org.opencontainers.image.source="${REPO_URL}" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.created="${BUILD_DATE}" \

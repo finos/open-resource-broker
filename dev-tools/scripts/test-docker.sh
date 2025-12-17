@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Docker Testing Script for Open Host Factory Plugin
+# Docker Testing Script for Open Resource Broker
 # Comprehensive testing of Docker containerization
 
 # Colors for output
@@ -143,7 +143,7 @@ test_container_startup() {
         return 1
     fi
 
-    if ! echo "${version_output}" | grep -q "Open Host Factory Plugin REST API"; then
+    if ! echo "${version_output}" | grep -q "Open Resource Broker REST API"; then
         log_error "Version output doesn't contain expected text"
         return 1
     fi

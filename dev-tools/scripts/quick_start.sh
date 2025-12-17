@@ -1,5 +1,5 @@
 #!/bin/bash
-# Quick start script for Open Host Factory Plugin development
+# Quick start script for Open Resource Broker development
 
 set -e
 
@@ -32,7 +32,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 cd "$PROJECT_ROOT"
 
-print_status "Open Host Factory Plugin - Quick Start"
+print_status "Open Resource Broker - Quick Start"
 echo ""
 
 # Check if Python is available

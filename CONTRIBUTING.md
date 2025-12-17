@@ -1,6 +1,6 @@
-# Contributing to Open Host Factory Plugin
+# Contributing to Open Resource Broker
 
-Thank you for your interest in contributing to the Open Host Factory Plugin! This guide will help you get started with development and testing.
+Thank you for your interest in contributing to the Open Resource Broker! This guide will help you get started with development and testing.
 
 ## Development Setup
 
@@ -14,8 +14,8 @@ Thank you for your interest in contributing to the Open Host Factory Plugin! Thi
 
 ```bash
 # Clone repository
-git clone https://github.com/awslabs/open-hostfactory-plugin.git
-cd open-hostfactory-plugin
+git clone https://github.com/awslabs/open-resource-broker.git
+cd open-resource-broker
 
 # Fast development setup with uv
 make dev-install-uv
@@ -62,7 +62,7 @@ You can trigger CI/CD actions by commenting on pull requests:
 The trigger words are configurable via environment variables in each workflow:
 
 - **CI Pipeline**: `CI_TRIGGERS="/test,/build,/ci"`
-- **Publishing**: `PUBLISH_TRIGGERS="/package"`  
+- **Publishing**: `PUBLISH_TRIGGERS="/package"`
 - **Security Scans**: `SECURITY_TRIGGERS="/security"`
 - **Container Builds**: `CONTAINER_TRIGGERS="/container"`
 
@@ -79,7 +79,7 @@ To modify trigger words, update the `env` section in the respective workflow fil
 - **`/package`** - Build and publish to TestPyPI only (never production PyPI)
   - Creates a dev version: `0.1.0.dev20250818125457+abc1234`
   - Publishes to https://test.pypi.org for installation testing
-  - Use: `pip install --index-url https://test.pypi.org/simple/ open-hostfactory-plugin`
+  - Use: `pip install --index-url https://test.pypi.org/simple/ open-resource-broker`
 
 **Security Note**: Comment triggers can never publish to production PyPI. Only GitHub releases publish to PyPI.
 
@@ -95,7 +95,7 @@ Package and container versions are aligned:
 ### Container Security
 
 - **Comment triggers** (`/container`) - Build only, no registry push
-- **Branch pushes** - Build and push with dev tags  
+- **Branch pushes** - Build and push with dev tags
 - **Releases** - Build and push with release tags (`latest`, `v0.1.0`)
 
 ### Automated Publishing
@@ -103,7 +103,7 @@ Package and container versions are aligned:
 The project uses a secure three-tier publishing strategy:
 
 1. **PR Comments** (`/package`) → TestPyPI only with dev versions
-2. **Merge to main/develop** → TestPyPI with dev versions  
+2. **Merge to main/develop** → TestPyPI with dev versions
 3. **GitHub Releases** → Production PyPI with release versions
 
 **Security**: Comment triggers and branch pushes can never publish to production PyPI.

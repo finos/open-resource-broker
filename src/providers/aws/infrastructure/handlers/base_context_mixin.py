@@ -33,10 +33,10 @@ class BaseContextMixin:
         if hasattr(self, "config_port") and self.config_port:
             try:
                 package_info = self.config_port.get_package_info()
-                return package_info.get("name", "open-hostfactory-plugin")
+                return package_info.get("name", "open-resource-broker")
             except Exception:  # nosec B110
                 pass
-        return "open-hostfactory-plugin"
+        return "open-resource-broker"
 
     def _calculate_capacity_distribution(
         self, template: AWSTemplate, requested_count: int

@@ -18,7 +18,7 @@ All handlers now provide consistent template variables through the BaseContextMi
 | `min_count` | integer | Minimum instance count (always 1) | `1` |
 | `max_count` | integer | Maximum instance count (same as requested) | `5` |
 | `timestamp` | string | ISO timestamp of creation | `"2025-01-15T10:30:00Z"` |
-| `created_by` | string | Package name that created the resource | `"open-hostfactory-plugin"` |
+| `created_by` | string | Package name that created the resource | `"open-resource-broker"` |
 
 ### Capacity Distribution Variables
 
@@ -144,8 +144,8 @@ All handlers now provide consistent template variables through the BaseContextMi
 #### Package Metadata Variables
 - `{{ package_name }}`: Package name for resource tagging
   - **Type**: `str`
-  - **Default**: `"open-hostfactory-plugin"`
-  - **Example**: `"open-hostfactory-plugin"`
+  - **Default**: `"open-resource-broker"`
+  - **Example**: `"open-resource-broker"`
 
 - `{{ package_version }}`: Package version for metadata
   - **Type**: `str`

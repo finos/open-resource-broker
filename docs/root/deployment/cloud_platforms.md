@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Open Host Factory Plugin supports deployment on major cloud platforms with containerized and serverless options.
+The Open Resource Broker supports deployment on major cloud platforms with containerized and serverless options.
 
 ## Kubernetes Deployment
 

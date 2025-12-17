@@ -26,7 +26,7 @@ class TestAWSNativeSpecPackageContext:
         """Test that AWS context includes package information."""
         # Arrange
         self.mock_config_port.get_package_info.return_value = {
-            "name": "open-hostfactory-plugin",
+            "name": "open-resource-broker",
             "version": "1.0.0",
         }
 
@@ -44,7 +44,7 @@ class TestAWSNativeSpecPackageContext:
         context = self.service._build_aws_context(template, request)
 
         # Assert
-        assert context["package_name"] == "open-hostfactory-plugin"
+        assert context["package_name"] == "open-resource-broker"
         assert context["package_version"] == "1.0.0"
         assert context["request_id"] == str(request.request_id)
         assert context["requested_count"] == 2
@@ -69,7 +69,7 @@ class TestAWSNativeSpecPackageContext:
         context = self.service._build_aws_context(template, request)
 
         # Assert - should use fallback values
-        assert context["package_name"] == "open-hostfactory-plugin"
+        assert context["package_name"] == "open-resource-broker"
         assert context["package_version"] == "unknown"
 
     def test_build_aws_context_partial_package_info(self):

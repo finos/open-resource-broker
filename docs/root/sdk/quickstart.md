@@ -14,10 +14,10 @@ The OpenHFPlugin SDK (orbsdk) provides a clean, async-first programmatic interfa
 
 ```bash
 # Install the base package
-pip install open-hostfactory-plugin
+pip install open-resource-broker
 
 # Or install with SDK support
-pip install open-hostfactory-plugin[sdk]
+pip install open-resource-broker[sdk]
 ```
 
 ## Basic Usage

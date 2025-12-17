@@ -1,6 +1,6 @@
 # Template Management Commands
 
-The template management commands provide CRUD (Create, Read, Update, Delete) operations for compute templates in the Open Host Factory Plugin. These commands use the TemplateConfigurationManager as the single source of truth.
+The template management commands provide CRUD (Create, Read, Update, Delete) operations for compute templates in the Open Resource Broker. These commands use the TemplateConfigurationManager as the single source of truth.
 
 ## Available Commands
 

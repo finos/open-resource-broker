@@ -1,5 +1,5 @@
 """
-ORB (Open Host Factory Plugin) - Main package namespace.
+ORB (Open Resource Broker) - Main package namespace.
 
 This package provides the orb namespace for importing package components.
 Users can import as: from orb.domain import ... or import orb.cli

@@ -1,4 +1,4 @@
-"""Open Host Factory Plugin - Cloud provider integration for IBM Spectrum Symphony Host Factory.
+"""Open Resource Broker - Cloud provider integration for IBM Spectrum Symphony Host Factory.
 
 This plugin provides dynamic provisioning of compute resources with a REST API interface
 and structured architecture implementation supporting multiple cloud providers.

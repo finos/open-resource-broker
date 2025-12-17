@@ -1,6 +1,6 @@
 # DRY Principle Implementation
 
-This document describes how the Open Host Factory Plugin implements the DRY (Don't Repeat Yourself) principle, showing examples of code reuse, abstraction, and configuration-driven behavior that eliminate duplication throughout the codebase.
+This document describes how the Open Resource Broker implements the DRY (Don't Repeat Yourself) principle, showing examples of code reuse, abstraction, and configuration-driven behavior that eliminate duplication throughout the codebase.
 
 ## DRY Principle Overview
 
@@ -318,7 +318,7 @@ class ConfigurationUtils:
     """Shared configuration utilities - eliminates duplication."""
 
     @staticmethod
-    def merge_configurations(base_config: Dict[str, Any], 
+    def merge_configurations(base_config: Dict[str, Any],
                            override_config: Dict[str, Any]) -> Dict[str, Any]:
         """Common configuration merging - used throughout the system."""
         merged = base_config.copy()
@@ -332,8 +332,8 @@ class ConfigurationUtils:
         return merged
 
     @staticmethod
-    def validate_required_fields(config: Dict[str, Any], 
-                                required_fields: List[str], 
+    def validate_required_fields(config: Dict[str, Any],
+                                required_fields: List[str],
                                 config_name: str) -> None:
         """Common validation - used by all configuration classes."""
         missing_fields = []
@@ -348,8 +348,8 @@ class ConfigurationUtils:
             )
 
     @staticmethod
-    def get_nested_value(config: Dict[str, Any], 
-                        key_path: str, 
+    def get_nested_value(config: Dict[str, Any],
+                        key_path: str,
                         default: Any = None) -> Any:
         """Common nested value retrieval - used throughout configuration system."""
         keys = key_path.split('.')
@@ -368,8 +368,8 @@ class AWSProviderConfig:
     def __init__(self, config_data: Dict[str, Any]):
         # Uses shared validation instead of duplicating
         ConfigurationUtils.validate_required_fields(
-            config_data, 
-            ['region'], 
+            config_data,
+            ['region'],
             'AWS Provider'
         )
 
@@ -399,7 +399,7 @@ Instead of duplicating similar patterns, the plugin uses templates and generator
 class CommandHandlerTemplate:
     """Template for command handlers - eliminates duplication."""
 
-    def __init__(self, 
+    def __init__(self,
                  repository: Repository,
                  logger: LoggingPort,
                  validator: Validator = None):
@@ -407,7 +407,7 @@ class CommandHandlerTemplate:
         self._logger = logger
         self._validator = validator
 
-    async def handle_command(self, 
+    async def handle_command(self,
                            command: Any,
                            entity_factory: Callable,
                            success_message: str) -> Any:
@@ -567,4 +567,4 @@ class MachineFormatter:
 - **Centralized improvements**: Performance improvements benefit the entire system
 - **Reduced maintenance burden**: Less code to maintain and update
 
-The DRY principle implementation in the Open Host Factory Plugin creates a maintainable, efficient, and reliable codebase by eliminating duplication through abstraction, configuration-driven behavior, and shared utilities.
+The DRY principle implementation in the Open Resource Broker creates a maintainable, efficient, and reliable codebase by eliminating duplication through abstraction, configuration-driven behavior, and shared utilities.

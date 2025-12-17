@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Open Host Factory Plugin implements a comprehensive format system that handles both field selection and field naming through a single, cohesive approach. This eliminates the previous dual-system complexity while maintaining full compatibility with IBM Symphony Host Factory requirements.
+The Open Resource Broker implements a comprehensive format system that handles both field selection and field naming through a single, cohesive approach. This eliminates the previous dual-system complexity while maintaining full compatibility with IBM Symphony Host Factory requirements.
 
 ## Architecture
 
@@ -24,8 +24,8 @@ The Open Host Factory Plugin implements a comprehensive format system that handl
 
 ```python
 def convert_templates(
-    templates: list[Template], 
-    include_full_config: bool = False, 
+    templates: list[Template],
+    include_full_config: bool = False,
     use_camel_case: bool = False
 ) -> Dict[str, Any]:
     """

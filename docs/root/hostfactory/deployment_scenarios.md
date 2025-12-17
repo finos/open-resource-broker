@@ -1,6 +1,6 @@
 # HostFactory Deployment Scenarios
 
-This document outlines various deployment scenarios for integrating the Open Host Factory Plugin with IBM Spectrum Symphony Host Factory, covering different environments, scales, and requirements.
+This document outlines various deployment scenarios for integrating the Open Resource Broker with IBM Spectrum Symphony Host Factory, covering different environments, scales, and requirements.
 
 ## Deployment Architecture Overview
 
@@ -24,7 +24,7 @@ The plugin can be deployed in multiple configurations depending on your infrastr
 ### Architecture
 ```
 [Symphony Host Factory]  ->  [Plugin Scripts]  ->  [Plugin Core]  ->  [AWS]
-                                 | 
+                                 |
                          [Local JSON Storage]
 ```
 
@@ -85,9 +85,9 @@ The plugin can be deployed in multiple configurations depending on your infrastr
 ### Architecture
 ```
 [Symphony Cluster]  ->  [Plugin on Master]  ->  [AWS Region]
-                             | 
+                             |
                     [RDS/DynamoDB Storage]
-                             | 
+                             |
                     [CloudWatch Monitoring]
 ```
 
@@ -174,11 +174,11 @@ The plugin can be deployed in multiple configurations depending on your infrastr
 ### Architecture
 ```
 [Symphony Cluster]  ->  [Plugin HA Setup]
-                            | 
+                            |
     [AWS US-East-1]  <-   ->  [AWS US-West-2]  <-   ->  [AWS EU-West-1]
-            |                      |                      | 
+            |                      |                      |
     [Regional Storage]   [Regional Storage]   [Regional Storage]
-            |                      |                      | 
+            |                      |                      |
     [Regional Monitoring] [Regional Monitoring] [Regional Monitoring]
 ```
 
@@ -284,11 +284,11 @@ The plugin can be deployed in multiple configurations depending on your infrastr
 ### Architecture
 ```
 [Symphony K8s Cluster]
-         | 
+         |
 [HostFactory Plugin Pod]  ->  [AWS]
-         | 
+         |
 [ConfigMap/Secrets]  ->  [Persistent Volume]
-         | 
+         |
 [Service Mesh/Ingress]
 ```
 
@@ -368,9 +368,9 @@ spec:
 ### Architecture
 ```
 [Symphony Host Factory]
-         | 
+         |
 [Plugin with Multi-Provider Support]
-         | 
+         |
 [AWS]  <-   ->  [Azure]  <-   ->  [On-Premises]
 ```
 

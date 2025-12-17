@@ -1,6 +1,6 @@
 # Dependency Injection Implementation
 
-This document provides the comprehensive technical reference for the dependency injection system implemented in the Open Host Factory Plugin, including container management, service registration, dependency resolution patterns, and Clean Architecture compliance.
+This document provides the comprehensive technical reference for the dependency injection system implemented in the Open Resource Broker, including container management, service registration, dependency resolution patterns, and Clean Architecture compliance.
 
 ## Related Documentation
 
@@ -111,7 +111,7 @@ def injectable(cls):
 # Usage example
 @injectable
 class ApplicationService:
-    def __init__(self, 
+    def __init__(self,
                  command_bus: CommandBus,
                  query_bus: QueryBus,
                  logger: LoggingPort):
@@ -406,7 +406,7 @@ The DI container supports factory patterns for complex object creation:
 class ProviderStrategyFactory:
     """Factory for creating provider strategies."""
 
-    def __init__(self, 
+    def __init__(self,
                  config_manager: ConfigurationPort,
                  logger: LoggingPort):
         self._config_manager = config_manager
@@ -649,4 +649,4 @@ class RegistrationError(DependencyInjectionError):
 - Easy addition of new implementations
 - Support for different deployment scenarios
 
-This comprehensive dependency injection system provides the foundation for clean, testable, and maintainable code throughout the Open Host Factory Plugin.
+This comprehensive dependency injection system provides the foundation for clean, testable, and maintainable code throughout the Open Resource Broker.

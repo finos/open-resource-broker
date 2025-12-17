@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Docker entrypoint script for Open Host Factory Plugin REST API
+# Docker entrypoint script for Open Resource Broker REST API
 # Handles configuration, environment setup, and service startup
 
 # Colors for output
@@ -42,7 +42,7 @@ print_banner() {
                             Plugin REST API
 EOF
     echo ""
-    log_info "Open Host Factory Plugin REST API"
+    log_info "Open Resource Broker REST API"
     log_info "Version: ${VERSION:-dev}"
     log_info "Build: ${BUILD_DATE:-unknown}"
     echo ""
@@ -162,7 +162,7 @@ wait_for_dependencies() {
 
 # Start the application
 start_application() {
-    log_info "Starting Open Host Factory Plugin REST API..."
+    log_info "Starting Open Resource Broker REST API..."
 
     # Build command arguments
     cmd_args=()
@@ -235,7 +235,7 @@ handle_command() {
             ;;
         "version")
             # Show version
-            echo "Open Host Factory Plugin REST API"
+            echo "Open Resource Broker REST API"
             echo "Version: ${VERSION:-dev}"
             echo "Build: ${BUILD_DATE:-unknown}"
             echo "Revision: ${VCS_REF:-unknown}"

@@ -1,6 +1,6 @@
 # Architecture - Developer Guide
 
-This guide provides development-focused architectural guidance for working with the Open Host Factory Plugin. For high-level system overview, see the [Architecture Overview](../architecture/system_overview.md).
+This guide provides development-focused architectural guidance for working with the Open Resource Broker. For high-level system overview, see the [Architecture Overview](../architecture/system_overview.md).
 
 ## Development Architecture Perspective
 

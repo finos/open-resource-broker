@@ -1,4 +1,4 @@
-# Makefile for Open Host Factory Plugin
+# Makefile for Open Resource Broker
 # This is the main Makefile that includes all modular makefiles
 
 .DEFAULT_GOAL := help

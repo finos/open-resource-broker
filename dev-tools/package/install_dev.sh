@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "INFO: Installing open-hostfactory-plugin in development mode..."
+echo "INFO: Installing open-resource-broker in development mode..."
 
 # Get to project root
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"

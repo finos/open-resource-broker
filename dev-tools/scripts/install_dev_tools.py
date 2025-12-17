@@ -2,7 +2,7 @@
 """
 Development Tools Installation Script
 
-Installs all development prerequisites for the Open Host Factory Plugin project.
+Installs all development prerequisites for the Open Resource Broker project.
 
 Detects the operating system and installs tools using the appropriate package manager:
 - macOS: Homebrew

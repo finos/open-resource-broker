@@ -44,7 +44,7 @@ def main() -> int:
 
     # Build Docker image for security scan
     logger.info("Building Docker image for security scan...")
-    project_name = "open-hostfactory-plugin"  # Could be made configurable
+    project_name = "open-resource-broker"  # Could be made configurable
     if run_command(["docker", "build", "-t", f"{project_name}:security-scan", "."]) != 0:
         return 1
 

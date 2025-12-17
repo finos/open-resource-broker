@@ -1,6 +1,6 @@
 # API Reference
 
-This section contains comprehensive API documentation for the Open Host Factory Plugin.
+This section contains comprehensive API documentation for the Open Resource Broker.
 
 ## REST API Documentation
 

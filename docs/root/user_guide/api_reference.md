@@ -1,6 +1,6 @@
 # API Reference
 
-The Open Host Factory Plugin provides a command-line interface that integrates with IBM Spectrum Symphony Host Factory. This reference covers all available commands and their usage.
+The Open Resource Broker provides a command-line interface that integrates with IBM Spectrum Symphony Host Factory. This reference covers all available commands and their usage.
 
 ## Command Line Interface
 

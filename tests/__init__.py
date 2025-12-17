@@ -1,1 +1,1 @@
-"""Test package for Open Host Factory Plugin."""
+"""Test package for Open Resource Broker."""

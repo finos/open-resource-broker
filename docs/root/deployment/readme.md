@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Open Host Factory Plugin supports multiple deployment methods, with Docker containerization being the recommended approach for production deployments.
+The Open Resource Broker supports multiple deployment methods, with Docker containerization being the recommended approach for production deployments.
 
 ## Deployment Methods
 
@@ -116,11 +116,11 @@ gcloud run deploy orb-api \
 #### Direct Installation
 ```bash
 # Install from PyPI
-pip install open-hostfactory-plugin
+pip install open-resource-broker
 
 # Or install from source
 git clone <repository-url>
-cd open-hostfactory-plugin
+cd open-resource-broker
 pip install -e .
 
 # Configure
@@ -135,7 +135,7 @@ orb system serve --host 0.0.0.0 --port 8000 --config config/production.json
 ```ini
 # /etc/systemd/system/orb-api.service
 [Unit]
-Description=Open Host Factory Plugin REST API
+Description=Open Resource Broker REST API
 After=network.target
 
 [Service]
@@ -547,4 +547,4 @@ docker-compose up -d --no-deps orb-api
 kubectl set image deployment/orb-api orb-api=orb-api:latest
 ```
 
-This comprehensive deployment guide covers all major deployment scenarios and operational concerns for the Open Host Factory Plugin REST API.
+This comprehensive deployment guide covers all major deployment scenarios and operational concerns for the Open Resource Broker REST API.

@@ -134,7 +134,7 @@ docs/
 
 ### **URL Structure:**
 ```
-https://your-org.github.io/open-hostfactory-plugin/
+https://your-org.github.io/open-resource-broker/
 +--- /                   # Latest version (redirects)
 +--- /0.1.0/            # Version 0.1.0
 +--- /1.0.0/            # Version 1.0.0
@@ -252,4 +252,4 @@ jobs:
 4. **Document Migration**: Create upgrade guides between versions
 5. **Monitor Usage**: Track which versions are most accessed
 
-**Your documentation is now professionally versioned and ready for production releases!** 
+**Your documentation is now professionally versioned and ready for production releases!**

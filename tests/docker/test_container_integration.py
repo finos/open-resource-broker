@@ -79,7 +79,7 @@ class TestContainerIntegration:
             )
 
             assert result.returncode == 0, f"Container failed: {result.stderr}"
-            assert "Open Host Factory Plugin REST API" in result.stdout
+            assert "Open Resource Broker REST API" in result.stdout
 
         except subprocess.TimeoutExpired:
             pytest.fail("Container command timed out")

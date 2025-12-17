@@ -1,6 +1,6 @@
 # PyPI Publishing Setup Guide
 
-This guide explains how to configure PyPI publishing for the Open Host Factory Plugin using **Trusted Publishing** (OIDC-based authentication).
+This guide explains how to configure PyPI publishing for the Open Resource Broker using **Trusted Publishing** (OIDC-based authentication).
 
 ## Trusted Publishing Overview
 
@@ -13,9 +13,9 @@ Trusted Publishing uses OpenID Connect (OIDC) to authenticate with PyPI without 
 1. Go to [PyPI Publishing Settings](https://pypi.org/manage/account/publishing/)
 2. Click "Add a new pending publisher"
 3. Fill in the details:
-   - **PyPI Project Name:** `open-hostfactory-plugin`
+   - **PyPI Project Name:** `open-resource-broker`
    - **Owner:** `awslabs` (your GitHub organization/username)
-   - **Repository name:** `open-hostfactory-plugin`
+   - **Repository name:** `open-resource-broker`
    - **Workflow name:** `publish.yml`
    - **Environment name:** `pypi`
 4. Click "Add"
@@ -49,17 +49,17 @@ The workflow uses GitHub environments for additional security:
 # Test PyPI
 gh workflow run publish.yml -f environment=testpypi
 
-# Production PyPI  
+# Production PyPI
 gh workflow run publish.yml -f environment=pypi
 ```
 
 ## Security Benefits
 
-**No API tokens to manage** - eliminates secret rotation concerns  
-**OIDC-based authentication** - more secure than static tokens  
-**Automatic attestations** - digital signatures for all packages  
-**Scoped permissions** - `id-token: write` only in publishing job  
-**Environment protection** - optional approval workflows  
+**No API tokens to manage** - eliminates secret rotation concerns
+**OIDC-based authentication** - more secure than static tokens
+**Automatic attestations** - digital signatures for all packages
+**Scoped permissions** - `id-token: write` only in publishing job
+**Environment protection** - optional approval workflows
 
 ## Migration from API Tokens
 
@@ -119,10 +119,10 @@ To verify trusted publishing is working:
 3. **Verify Package:**
    ```bash
    # Test installation from Test PyPI
-   pip install --index-url https://test.pypi.org/simple/ open-hostfactory-plugin
+   pip install --index-url https://test.pypi.org/simple/ open-resource-broker
 
    # Test installation from Production PyPI
-   pip install open-hostfactory-plugin
+   pip install open-resource-broker
    ```
 
 ## Security Best Practices
@@ -179,7 +179,7 @@ The publish workflow supports:
 ```yaml
 env:
   PYTHON_VERSION: '3.11'
-  PACKAGE_NAME: 'open-hostfactory-plugin'
+  PACKAGE_NAME: 'open-resource-broker'
 ```
 
 ## Monitoring

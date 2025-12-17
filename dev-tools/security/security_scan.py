@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Comprehensive security scanning script for Open Host Factory Plugin.
+Comprehensive security scanning script for Open Resource Broker.
 
 This script orchestrates multiple security tools to provide comprehensive
 security analysis including SAST, dependency scanning, container security,
@@ -220,7 +220,7 @@ class SecurityScanner:
 
         report = {
             "scan_timestamp": subprocess.check_output(["date", "-u"]).decode().strip(),
-            "project": "Open Host Factory Plugin",
+            "project": "Open Resource Broker",
             "scans_performed": [],
             "sarif_files": self.sarif_files,
             "results": self.results,

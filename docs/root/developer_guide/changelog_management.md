@@ -136,7 +136,7 @@ Configuration in `.git-changelog.toml`:
 
 ```toml
 [tool.git-changelog]
-repository = "awslabs/open-hostfactory-plugin"
+repository = "awslabs/open-resource-broker"
 template = ".changelog-template.md"
 output = "CHANGELOG.md"
 convention = "conventional"

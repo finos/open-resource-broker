@@ -4,7 +4,7 @@ This document provides detailed procedures for migrating between different stora
 
 ## Overview
 
-The Open Host Factory Plugin supports migration between different storage backends and configuration formats. This guide covers:
+The Open Resource Broker supports migration between different storage backends and configuration formats. This guide covers:
 
 - Storage strategy migration
 - Configuration format migration

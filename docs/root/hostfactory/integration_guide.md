@@ -1,10 +1,10 @@
 # HostFactory Integration Guide
 
-This guide covers the integration of the Open Host Factory Plugin with IBM Spectrum Symphony Host Factory, including configuration, deployment, and operational considerations.
+This guide covers the integration of the Open Resource Broker with IBM Spectrum Symphony Host Factory, including configuration, deployment, and operational considerations.
 
 ## Overview
 
-The Open Host Factory Plugin integrates with IBM Spectrum Symphony Host Factory through shell script interfaces that conform to the HostFactory API specification. The plugin acts as a bridge between HostFactory and cloud providers, enabling dynamic provisioning of compute resources.
+The Open Resource Broker integrates with IBM Spectrum Symphony Host Factory through shell script interfaces that conform to the HostFactory API specification. The plugin acts as a bridge between HostFactory and cloud providers, enabling dynamic provisioning of compute resources.
 
 ## Integration Architecture
 
@@ -15,11 +15,11 @@ IBM Spectrum Symphony Host Factory
            |
            | (Shell Script Calls)
            v
-Open Host Factory Plugin Shell Scripts
+Open Resource Broker Shell Scripts
            |
            | (Python Execution)
            v
-Open Host Factory Plugin Core
+Open Resource Broker Core
            |
            | (API Calls)
            v
@@ -505,4 +505,4 @@ provider:
 - Monitor AWS service limits and quotas
 - Implement automated backup and recovery procedures
 
-This integration guide provides comprehensive coverage of integrating the Open Host Factory Plugin with IBM Spectrum Symphony Host Factory. For specific deployment scenarios or troubleshooting, refer to the related documentation sections.
+This integration guide provides comprehensive coverage of integrating the Open Resource Broker with IBM Spectrum Symphony Host Factory. For specific deployment scenarios or troubleshooting, refer to the related documentation sections.

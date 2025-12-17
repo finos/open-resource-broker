@@ -67,7 +67,7 @@
     "strategy": "json",
     "json_strategy": {
       "storage_type": "single_file",
-      "base_path": "/var/lib/open-hostfactory-plugin/data",
+      "base_path": "/var/lib/open-resource-broker/data",
       "filenames": {
         "single_file": "production_database.json"
       }

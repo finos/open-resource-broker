@@ -1,6 +1,6 @@
 # Provider Architecture
 
-The Open Host Factory Plugin implements a sophisticated provider-agnostic architecture that enables seamless integration with multiple cloud providers while maintaining zero cloud dependencies in the core domain layer.
+The Open Resource Broker implements a sophisticated provider-agnostic architecture that enables seamless integration with multiple cloud providers while maintaining zero cloud dependencies in the core domain layer.
 
 ## Provider Architecture Overview
 
@@ -277,7 +277,7 @@ class BaseAWSHandler(ABC):
         pass
 
     @abstractmethod
-    def provision_machines(self, template: Dict[str, Any], 
+    def provision_machines(self, template: Dict[str, Any],
                           machine_count: int) -> List[Dict[str, Any]]:
         """Provision machines using this handler."""
         pass
@@ -315,7 +315,7 @@ class EC2FleetHandler(BaseAWSHandler):
     def get_handler_type(self) -> str:
         return "EC2Fleet"
 
-    def provision_machines(self, template: Dict[str, Any], 
+    def provision_machines(self, template: Dict[str, Any],
                           machine_count: int) -> List[Dict[str, Any]]:
         """Provision machines using EC2 Fleet."""
         try:
@@ -347,7 +347,7 @@ class EC2FleetHandler(BaseAWSHandler):
             self.logger.error(f"Failed to provision machines with EC2 Fleet: {e}")
             raise
 
-    def _build_fleet_config(self, template: Dict[str, Any], 
+    def _build_fleet_config(self, template: Dict[str, Any],
                            machine_count: int) -> Dict[str, Any]:
         """Build EC2 Fleet configuration."""
         return {
@@ -380,7 +380,7 @@ class ASGHandler(BaseAWSHandler):
     def get_handler_type(self) -> str:
         return "ASG"
 
-    def provision_machines(self, template: Dict[str, Any], 
+    def provision_machines(self, template: Dict[str, Any],
                           machine_count: int) -> List[Dict[str, Any]]:
         """Provision machines using Auto Scaling Group."""
         try:
@@ -389,7 +389,7 @@ class ASGHandler(BaseAWSHandler):
 
             # Create Auto Scaling Group
             asg_name = f"hostfactory-{template['template_id']}-{int(time.time())}"
-            asg_config = self._build_asg_config(template, machine_count, 
+            asg_config = self._build_asg_config(template, machine_count,
                                               launch_template['LaunchTemplateName'])
 
             self.aws_operations.create_auto_scaling_group(asg_name, asg_config)
@@ -464,7 +464,7 @@ class AWSOperations:
             # Check for termination errors
             terminating_instances = response.get('TerminatingInstances', [])
             failed_instances = [
-                inst for inst in terminating_instances 
+                inst for inst in terminating_instances
                 if inst.get('CurrentState', {}).get('Name') not in ['shutting-down', 'terminated']
             ]
 

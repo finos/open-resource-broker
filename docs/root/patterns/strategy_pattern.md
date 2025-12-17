@@ -1,6 +1,6 @@
 # Strategy Pattern Implementation
 
-This document describes the implementation of the Strategy pattern in the Open Host Factory Plugin, which enables pluggable provider implementations and runtime behavior selection.
+This document describes the implementation of the Strategy pattern in the Open Resource Broker, which enables pluggable provider implementations and runtime behavior selection.
 
 ## Strategy Pattern Overview
 
@@ -178,7 +178,7 @@ class AWSProviderStrategy(ProviderStrategy):
             "initialized": self._initialized,
             "supported_handlers": [
                 "ec2_fleet",
-                "spot_fleet", 
+                "spot_fleet",
                 "auto_scaling_group",
                 "run_instances"
             ]
@@ -292,7 +292,7 @@ from src.providers.aws.configuration.config import AWSProviderConfig
 class ProviderStrategyFactory:
     """Factory for creating provider strategies."""
 
-    def __init__(self, 
+    def __init__(self,
                  config_manager: ConfigurationPort,
                  logger: LoggingPort):
         self._config_manager = config_manager
@@ -398,7 +398,7 @@ from src.domain.machine.aggregate import Machine
 class AWSHandler(ABC):
     """Abstract base class for AWS handlers."""
 
-    def __init__(self, 
+    def __init__(self,
                  aws_client: AWSClient,
                  logger: LoggingPort,
                  config: ConfigurationPort):
@@ -551,4 +551,4 @@ class AWSHandlerFactory:
 - Dynamic strategy switching possible
 - Multiple strategies can coexist
 
-This Strategy pattern implementation provides a flexible and extensible foundation for supporting multiple cloud providers and provisioning methods in the Open Host Factory Plugin.
+This Strategy pattern implementation provides a flexible and extensible foundation for supporting multiple cloud providers and provisioning methods in the Open Resource Broker.

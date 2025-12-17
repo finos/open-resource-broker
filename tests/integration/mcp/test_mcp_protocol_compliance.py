@@ -195,7 +195,7 @@ class TestMCPProtocolCompliance:
 
         prompt_text = message["content"]["text"]
         assert "3 ec2 instance(s)" in prompt_text
-        assert "Open Host Factory Plugin" in prompt_text
+        assert "Open Resource Broker" in prompt_text
 
     @pytest.mark.asyncio
     async def test_error_handling_compliance(self, mcp_server):

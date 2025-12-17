@@ -27,12 +27,12 @@ def _get_from_package_metadata() -> Optional[dict]:
     try:
         from importlib.metadata import metadata, version
 
-        meta = metadata("open-hostfactory-plugin")
+        meta = metadata("open-resource-broker")
         return {
             "project": {
                 "name": meta["Name"],
                 "short_name": "orb",  # Not in package metadata, hardcode this one
-                "version": version("open-hostfactory-plugin"),
+                "version": version("open-resource-broker"),
                 "description": meta["Summary"],
                 "author": meta["Author"],
                 "email": meta["Author-email"],
@@ -40,7 +40,7 @@ def _get_from_package_metadata() -> Optional[dict]:
             },
             "repository": {
                 "org": "awslabs",  # Not in package metadata
-                "name": "open-hostfactory-plugin",  # Not in package metadata
+                "name": "open-resource-broker",  # Not in package metadata
                 "registry": "ghcr.io",  # Not in package metadata
             },
         }
@@ -58,7 +58,7 @@ if not config:
     # missing dependencies (PyYAML), or constrained deployment environments
     config = {
         "project": {
-            "name": "open-hostfactory-plugin",
+            "name": "open-resource-broker",
             "short_name": "orb",
             # PEP 440 compliant development version - prevents PyPI normalization from "0.1.0-dev" to "0.1.0.dev0"
             # CI builds will override this with dynamic versions like "0.1.0.dev20250822145030+abc1234"
@@ -70,7 +70,7 @@ if not config:
         },
         "repository": {
             "org": "awslabs",
-            "name": "open-hostfactory-plugin",
+            "name": "open-resource-broker",
             "registry": "ghcr.io",
         },
     }

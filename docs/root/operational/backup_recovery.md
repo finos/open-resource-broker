@@ -1,6 +1,6 @@
 # Backup and Recovery
 
-This guide covers comprehensive backup and recovery procedures for the Open Host Factory Plugin, including data protection strategies, automated backup procedures, and disaster recovery planning.
+This guide covers comprehensive backup and recovery procedures for the Open Resource Broker, including data protection strategies, automated backup procedures, and disaster recovery planning.
 
 ## Backup Overview
 
@@ -376,13 +376,13 @@ gunzip -c backups/sqlite/backup_20250630_120000.db.gz > request_database.db
 
 # Verify restored database
 sqlite3 request_database.db "
-SELECT 
+SELECT
     'templates' as table_name, COUNT(*) as count FROM templates
 UNION ALL
-SELECT 
+SELECT
     'requests' as table_name, COUNT(*) as count FROM requests
 UNION ALL
-SELECT 
+SELECT
     'machines' as table_name, COUNT(*) as count FROM machines;
 "
 ```

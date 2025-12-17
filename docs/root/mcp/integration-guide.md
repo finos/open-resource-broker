@@ -1,10 +1,10 @@
 # MCP Integration Guide
 
-This guide explains how to integrate the Open Host Factory Plugin with AI assistants using the Model Context Protocol (MCP).
+This guide explains how to integrate the Open Resource Broker with AI assistants using the Model Context Protocol (MCP).
 
 ## Overview
 
-The Open Host Factory Plugin provides direct MCP integration through its tools implementation, allowing AI assistants to:
+The Open Resource Broker provides direct MCP integration through its tools implementation, allowing AI assistants to:
 
 1. Discover available cloud infrastructure operations
 2. Execute infrastructure provisioning commands
@@ -15,7 +15,7 @@ The Open Host Factory Plugin provides direct MCP integration through its tools i
 
 ### Direct Tools Integration
 
-The Open Host Factory Plugin implements direct MCP tools integration without requiring a separate server process:
+The Open Resource Broker implements direct MCP tools integration without requiring a separate server process:
 
 ```python
 from orbsdk.mcp import OpenHFPluginMCPTools

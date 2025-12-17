@@ -1,6 +1,6 @@
-# Open Host Factory Plugin
+# Open Resource Broker
 
-Welcome to the Open Host Factory Plugin documentation! This plugin provides integration between IBM Spectrum Symphony Host Factory and cloud providers, enabling dynamic provisioning of compute resources with a REST API interface.
+Welcome to the Open Resource Broker documentation! This plugin provides integration between IBM Spectrum Symphony Host Factory and cloud providers, enabling dynamic provisioning of compute resources with a REST API interface.
 
 ## Documentation Navigation
 
@@ -32,7 +32,7 @@ The fastest way to get started:
 ```bash
 # Clone repository
 git clone <repository-url>
-cd open-hostfactory-plugin
+cd open-resource-broker
 
 # Copy environment template
 cp .env.example .env
@@ -48,7 +48,7 @@ open http://localhost:8000/docs
 
 ```bash
 # Install from PyPI
-pip install open-hostfactory-plugin
+pip install open-resource-broker
 
 # Verify installation
 orb --help

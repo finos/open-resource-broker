@@ -48,7 +48,7 @@ jobs:
     needs: [get-config]
     environment:
       name: ${{ needs.get-config.outputs.is-release == 'true' && 'pypi' || github.event.inputs.environment || 'testpypi' }}
-      url: ${{ needs.get-config.outputs.is-release == 'true' && 'https://pypi.org/p/open-hostfactory-plugin' || 'https://test.pypi.org/p/open-hostfactory-plugin' }}
+      url: ${{ needs.get-config.outputs.is-release == 'true' && 'https://pypi.org/p/open-resource-broker' || 'https://test.pypi.org/p/open-resource-broker' }}
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
       contents: read   # needed to checkout code
@@ -111,16 +111,16 @@ jobs:
           echo ""
           if [ "$TARGET" = "pypi" ]; then
             echo "**Environment:** Production PyPI"
-            echo "**Installation:** \`pip install open-hostfactory-plugin\`"
+            echo "**Installation:** \`pip install open-resource-broker\`"
           else
             echo "**Environment:** Test PyPI"
-            echo "**Installation:** \`pip install --index-url https://test.pypi.org/simple/ open-hostfactory-plugin\`"
+            echo "**Installation:** \`pip install --index-url https://test.pypi.org/simple/ open-resource-broker\`"
           fi
           echo ""
           echo "**Version:** $VERSION"
           echo "**Commands:**"
           echo "- \`orb --help\`"
-          echo "- \`open-hostfactory-plugin --help\`"
+          echo "- \`open-resource-broker --help\`"
         } >> "$GITHUB_STEP_SUMMARY"
 
   generate-sbom:

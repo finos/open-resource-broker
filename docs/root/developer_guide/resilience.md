@@ -1,6 +1,6 @@
 # Resilience and Reliability Patterns
 
-The Open Host Factory Plugin implements sophisticated resilience patterns to handle failures gracefully and maintain system reliability in the face of transient errors, network issues, and cloud service disruptions.
+The Open Resource Broker implements sophisticated resilience patterns to handle failures gracefully and maintain system reliability in the face of transient errors, network issues, and cloud service disruptions.
 
 ## Resilience Architecture Overview
 
@@ -76,7 +76,7 @@ class CircuitBreakerStrategy:
     # Class-level storage for circuit states (shared across instances)
     _circuit_states: Dict[str, Dict[str, Any]] = {}
 
-    def __init__(self, 
+    def __init__(self,
                  service_name: str,
                  failure_threshold: int = 5,
                  reset_timeout: int = 60,
@@ -141,7 +141,7 @@ class CircuitBreakerStrategy:
 
         if current_state == CircuitState.OPEN:
             # Check if reset timeout has elapsed
-            if (state_info['last_failure_time'] and 
+            if (state_info['last_failure_time'] and
                 current_time - state_info['last_failure_time'] >= self.reset_timeout):
                 self._transition_to_half_open()
 
@@ -165,7 +165,7 @@ class CircuitBreakerStrategy:
         state_info['failure_count'] += 1
         state_info['last_failure_time'] = time.time()
 
-        if (state_info['state'] == CircuitState.CLOSED and 
+        if (state_info['state'] == CircuitState.CLOSED and
             state_info['failure_count'] >= self.failure_threshold):
             self._transition_to_open()
         elif state_info['state'] == CircuitState.HALF_OPEN:
@@ -295,7 +295,7 @@ class ExponentialBackoffStrategy:
         if not self.retryable_exceptions:
             return True  # Retry all exceptions if none specified
 
-        return any(isinstance(exception, exc_type) 
+        return any(isinstance(exception, exc_type)
                   for exc_type in self.retryable_exceptions)
 
     def _calculate_delay(self, attempt: int) -> float:
@@ -523,7 +523,7 @@ class TimeoutManager:
         """Get timeout for specific operation."""
         return self.operation_timeouts.get(operation, self.default_timeout)
 
-    def execute_with_timeout(self, func: Callable, operation: str, 
+    def execute_with_timeout(self, func: Callable, operation: str,
                            *args, **kwargs) -> Any:
         """Execute function with timeout."""
         timeout = self.get_operation_timeout(operation)
@@ -559,7 +559,7 @@ from typing import Awaitable, TypeVar
 
 T = TypeVar('T')
 
-async def execute_with_async_timeout(coro: Awaitable[T], 
+async def execute_with_async_timeout(coro: Awaitable[T],
                                    timeout: float) -> T:
     """Execute coroutine with timeout."""
     try:
@@ -700,7 +700,7 @@ class ResilientAWSProvider(AWSProvider):
 
         # Apply timeout
         return self.timeout_manager.execute_with_timeout(
-            _with_retry, 
+            _with_retry,
             "ec2_run_instances"
         )
 ```

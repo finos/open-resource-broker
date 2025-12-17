@@ -19,7 +19,7 @@ class TestConfigurationAdapterPackageInfo:
     def test_get_package_info_success(self, mock_package):
         """Test successful package info retrieval."""
         # Arrange
-        mock_package.PACKAGE_NAME = "open-hostfactory-plugin"
+        mock_package.PACKAGE_NAME = "open-resource-broker"
         mock_package.__version__ = "1.0.0"
         mock_package.DESCRIPTION = "Test description"
         mock_package.AUTHOR = "Test Author"
@@ -29,7 +29,7 @@ class TestConfigurationAdapterPackageInfo:
 
         # Assert
         assert result == {
-            "name": "open-hostfactory-plugin",
+            "name": "open-resource-broker",
             "version": "1.0.0",
             "description": "Test description",
             "author": "Test Author",

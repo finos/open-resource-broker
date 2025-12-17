@@ -2,7 +2,7 @@
 
 ## Overview
 
-Comprehensive monitoring and observability for the Open Host Factory Plugin in production environments.
+Comprehensive monitoring and observability for the Open Resource Broker in production environments.
 
 ## Health Checks
 
@@ -15,7 +15,7 @@ curl http://localhost:8000/health
 # Expected response
 {
   "status": "healthy",
-  "service": "open-hostfactory-plugin",
+  "service": "open-resource-broker",
   "version": "1.0.0",
   "timestamp": "2025-01-07T10:00:00Z"
 }

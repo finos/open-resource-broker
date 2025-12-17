@@ -1,6 +1,6 @@
 # Monitoring Setup
 
-This document provides guidance on setting up monitoring and alerting for the Open Host Factory Plugin.
+This document provides guidance on setting up monitoring and alerting for the Open Resource Broker.
 
 ## Overview
 

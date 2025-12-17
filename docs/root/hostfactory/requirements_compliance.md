@@ -1,6 +1,6 @@
 # HostFactory Requirements Compliance
 
-This document details how the Open Host Factory Plugin complies with IBM Spectrum Symphony Host Factory requirements and specifications.
+This document details how the Open Resource Broker complies with IBM Spectrum Symphony Host Factory requirements and specifications.
 
 ## HostFactory API Compliance
 
@@ -57,7 +57,7 @@ The plugin automatically generates accurate CPU and RAM specifications based on 
       }
     },
     {
-      "templateId": "m5-xlarge-template", 
+      "templateId": "m5-xlarge-template",
       "maxNumber": 3,
       "instanceType": "m5.xlarge",
       "attributes": {
@@ -390,7 +390,7 @@ python scripts/benchmark_hostfactory_performance.py
 
 ## Compliance Summary
 
-The Open Host Factory Plugin achieves **100% compliance** with IBM Spectrum Symphony Host Factory requirements:
+The Open Resource Broker achieves **100% compliance** with IBM Spectrum Symphony Host Factory requirements:
 
 - [IMPLEMENTED] **API Specification**: All required endpoints implemented
 - [IMPLEMENTED] **Data Formats**: Input/output formats match specification

@@ -48,7 +48,7 @@ class TestBaseContextMixin:
             assert context["min_count"] == 1
             assert context["max_count"] == 5
             assert context["timestamp"] == "2025-01-15T10:30:00Z"
-            assert context["created_by"] == "open-hostfactory-plugin"
+            assert context["created_by"] == "open-resource-broker"
 
     def test_get_package_name_with_config_port(self):
         """Test package name retrieval with config port."""
@@ -68,7 +68,7 @@ class TestBaseContextMixin:
 
         result = self.mixin._get_package_name()
 
-        assert result == "open-hostfactory-plugin"
+        assert result == "open-resource-broker"
 
     def test_get_package_name_exception_fallback(self):
         """Test package name retrieval with exception fallback."""
@@ -78,7 +78,7 @@ class TestBaseContextMixin:
 
         result = self.mixin._get_package_name()
 
-        assert result == "open-hostfactory-plugin"
+        assert result == "open-resource-broker"
 
     def test_calculate_capacity_distribution_ondemand(self):
         """Test capacity distribution for on-demand only."""

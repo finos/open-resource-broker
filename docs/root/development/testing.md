@@ -1,6 +1,6 @@
-# Testing Guide for Open Host Factory Plugin
+# Testing Guide for Open Resource Broker
 
-This document provides comprehensive information about the testing ecosystem for the Open Host Factory Plugin.
+This document provides comprehensive information about the testing ecosystem for the Open Resource Broker.
 
 ## Table of Contents
 
@@ -16,7 +16,7 @@ This document provides comprehensive information about the testing ecosystem for
 
 ## Overview
 
-The Open Host Factory Plugin uses a comprehensive testing strategy that includes:
+The Open Resource Broker uses a comprehensive testing strategy that includes:
 
 - **Unit Tests**: Fast, isolated tests for individual components
 - **Integration Tests**: Tests for component interactions and workflows

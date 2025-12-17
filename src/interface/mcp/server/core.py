@@ -1,4 +1,4 @@
-"""Core MCP Server implementation for Open Host Factory Plugin."""
+"""Core MCP Server implementation for Open Resource Broker."""
 
 import json
 from dataclasses import dataclass
@@ -31,7 +31,7 @@ class MCPMessage:
 
 class OpenHFPluginMCPServer:
     """
-    Full MCP Server implementation for Open Host Factory Plugin.
+    Full MCP Server implementation for Open Resource Broker.
 
     Provides Model Context Protocol server functionality, exposing
     CLI commands as MCP tools and domain objects as MCP resources.
@@ -225,7 +225,7 @@ class OpenHFPluginMCPServer:
             "serverInfo": {
                 "name": PACKAGE_NAME,
                 "version": __version__,
-                "description": "MCP server for Open Host Factory Plugin - Cloud infrastructure provisioning",
+                "description": "MCP server for Open Resource Broker - Cloud infrastructure provisioning",
             },
         }
 
@@ -414,7 +414,7 @@ class OpenHFPluginMCPServer:
         template_type = arguments.get("template_type", "ec2")
         instance_count = arguments.get("instance_count", 1)
 
-        return f"""I need to provision {instance_count} {template_type} instance(s) using the Open Host Factory Plugin.
+        return f"""I need to provision {instance_count} {template_type} instance(s) using the Open Resource Broker.
 
 Please help me:
 1. List available templates for {template_type}
@@ -442,7 +442,7 @@ Use the available MCP tools to diagnose the issue."""
         """Generate best practices prompt."""
         provider = arguments.get("provider", "aws")
 
-        return f"""Please provide infrastructure deployment best practices for {provider} using the Open Host Factory Plugin.
+        return f"""Please provide infrastructure deployment best practices for {provider} using the Open Resource Broker.
 
 Cover topics like:
 1. Template selection and configuration

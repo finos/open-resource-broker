@@ -1,6 +1,6 @@
 # Separation of Concerns Implementation
 
-This document describes how the Open Host Factory Plugin implements Separation of Concerns (SoC), demonstrating clear boundaries between different responsibilities and how the Single Responsibility Principle (SRP) is applied throughout the architecture.
+This document describes how the Open Resource Broker implements Separation of Concerns (SoC), demonstrating clear boundaries between different responsibilities and how the Single Responsibility Principle (SRP) is applied throughout the architecture.
 
 ## Separation of Concerns Overview
 
@@ -278,8 +278,8 @@ class TemplateFormatter:
     def __init__(self, field_mapper: FieldMapper):
         self._field_mapper = field_mapper
 
-    def format_templates(self, 
-                        templates: List[Dict[str, Any]], 
+    def format_templates(self,
+                        templates: List[Dict[str, Any]],
                         output_format: str,
                         long_format: bool = False) -> str:
         """Interface concern: CLI output formatting logic."""
@@ -529,4 +529,4 @@ class TemplateSearchHandler:
 - **Reduced complexity**: Separation reduces overall system complexity
 - **Better abstraction**: Clear separation leads to better abstractions
 
-The Separation of Concerns implementation in the Open Host Factory Plugin creates a well-structured, maintainable system where each component has a clear, single responsibility and dependencies flow in the correct direction according to Clean Architecture principles.
+The Separation of Concerns implementation in the Open Resource Broker creates a well-structured, maintainable system where each component has a clear, single responsibility and dependencies flow in the correct direction according to Clean Architecture principles.

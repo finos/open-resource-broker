@@ -9,7 +9,7 @@ Before working with the DI system, you should understand:
 
 ## Overview
 
-This guide provides practical implementation guidance for using the dependency injection system in the Open Host Factory Plugin. For comprehensive technical details, see the [Architecture Reference](../architecture/dependency_injection.md).
+This guide provides practical implementation guidance for using the dependency injection system in the Open Resource Broker. For comprehensive technical details, see the [Architecture Reference](../architecture/dependency_injection.md).
 
 The plugin uses a comprehensive dependency injection system that follows Clean Architecture principles, with DI abstractions moved to the domain layer while maintaining backward compatibility.
 
@@ -51,7 +51,7 @@ The domain DI layer provides these decorators:
 - `@injectable` - Mark a class for automatic dependency injection
 - `@singleton` - Mark a class as singleton (single instance)
 
-#### CQRS Decorators  
+#### CQRS Decorators
 - `@command_handler(command_type)` - Register CQRS command handler
 - `@query_handler(query_type)` - Register CQRS query handler
 - `@event_handler(event_type)` - Register domain event handler
@@ -149,7 +149,7 @@ class CreateMachineRequestHandler:
         self.repository = repository
         self.logger = logger
 
-# From src/application/commands/template_handlers.py  
+# From src/application/commands/template_handlers.py
 @injectable
 class CreateTemplateHandler:
     def handle(self, command):
@@ -205,7 +205,7 @@ class UpdateRequestStatusCommand(Command, BaseModel):
     status: str
     # ... other fields
 
-# From src/application/dto/queries.py  
+# From src/application/dto/queries.py
 class GetRequestQuery(Query, BaseModel):
     request_id: str
     # ... other fields
@@ -291,7 +291,7 @@ Based on actual codebase analysis:
   - `GetActiveMachineCountHandler`
   - And many more...
 
-### Provider Layer  
+### Provider Layer
 - `AWSInstanceManager` - AWS instance management [[]] Injectable
 - `AWSOperations` - AWS operations wrapper [[]] Injectable
 - Various AWS adapters and handlers throughout `src/providers/aws/`
@@ -399,7 +399,7 @@ class Service:
     def __init__(self, dependency):  # No type annotation
         pass
 
-# Solution  
+# Solution
 @injectable
 class Service:
     def __init__(self, dependency: DependencyType):
@@ -423,11 +423,11 @@ Use lazy loading or break the dependency cycle by introducing an interface.
 
 The DI architecture provides:
 
-[[]] **Clean Architecture Compliance** - Correct dependency direction  
-[[]] **Improved DI Features** - Singleton, CQRS, optional dependencies  
-[[]] **Backward Compatibility** - All existing code continues to work  
-[[]] **Performance Optimized** - Minimal overhead with intelligent caching  
-[[]] **Type Safe** - Full generic type support  
+[[]] **Clean Architecture Compliance** - Correct dependency direction
+[[]] **Improved DI Features** - Singleton, CQRS, optional dependencies
+[[]] **Backward Compatibility** - All existing code continues to work
+[[]] **Performance Optimized** - Minimal overhead with intelligent caching
+[[]] **Type Safe** - Full generic type support
 [[]] **Testing Friendly** - Easy mocking and testing patterns
 
 This architecture establishes a solid foundation for scalable, maintainable dependency injection throughout the application while maintaining Clean Architecture principles.
