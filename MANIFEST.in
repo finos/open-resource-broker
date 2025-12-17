@@ -1,1 +1,1 @@
-recursive-include src/ohfp/providers/aws/specs *.json
+recursive-include src/orb/providers/aws/specs *.json

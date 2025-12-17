@@ -4,7 +4,7 @@
 
 project:
   name: open-hostfactory-plugin
-  short_name: ohfp # CLI command name
+  short_name: orb # CLI command name
   version: 0.1.1
   description: "Cloud provider integration plugin for IBM Spectrum Symphony Host Factory"
   author: "AWS Professional Services"

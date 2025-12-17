@@ -1,8 +1,8 @@
 """
-OHFP (Open Host Factory Plugin) - Main package namespace.
+ORB (Open Host Factory Plugin) - Main package namespace.
 
-This package provides the ohfp namespace for importing package components.
-Users can import as: from ohfp.domain import ... or import ohfp.cli
+This package provides the orb namespace for importing package components.
+Users can import as: from orb.domain import ... or import orb.cli
 """
 
 __version__ = "0.1.0"

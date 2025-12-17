@@ -46,9 +46,9 @@ readinessProbe:
 ```yaml
 # prometheus.yml
 scrape_configs:
-  - job_name: 'ohfp-api'
+  - job_name: 'orb-api'
     static_configs:
-      - targets: ['ohfp-api:8000']
+      - targets: ['orb-api:8000']
     metrics_path: /metrics
     scrape_interval: 30s
 ```
@@ -90,7 +90,7 @@ filebeat.inputs:
   paths:
     - /app/logs/*.log
   fields:
-    service: ohfp-api
+    service: orb-api
   fields_under_root: true
 
 output.elasticsearch:
@@ -103,16 +103,16 @@ output.elasticsearch:
 <source>
   @type tail
   path /app/logs/app.log
-  pos_file /var/log/fluentd/ohfp.log.pos
-  tag ohfp.api
+  pos_file /var/log/fluentd/orb.log.pos
+  tag orb.api
   format json
 </source>
 
-<match ohfp.**>
+<match orb.**>
   @type elasticsearch
   host elasticsearch
   port 9200
-  index_name ohfp-logs
+  index_name orb-logs
 </match>
 ```
 
@@ -122,17 +122,17 @@ output.elasticsearch:
 
 ```yaml
 groups:
-- name: ohfp-api
+- name: orb-api
   rules:
-  - alert: OHFPAPIDown
-    expr: up{job="ohfp-api"} == 0
+  - alert: ORBAPIDown
+    expr: up{job="orb-api"} == 0
     for: 1m
     labels:
       severity: critical
     annotations:
-      summary: "OHFP API is down"
+      summary: "ORB API is down"
 
-  - alert: OHFPHighErrorRate
+  - alert: ORBHighErrorRate
     expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
     for: 2m
     labels:
@@ -146,11 +146,11 @@ groups:
 ```json
 {
   "MetricName": "APIErrors",
-  "Namespace": "OHFP/API",
+  "Namespace": "ORB/API",
   "Dimensions": [
     {
       "Name": "Service",
-      "Value": "ohfp-api"
+      "Value": "orb-api"
     }
   ],
   "Value": 1,

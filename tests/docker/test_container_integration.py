@@ -19,7 +19,7 @@ class TestContainerIntegration:
     @pytest.fixture(scope="class")
     def test_image_name(self):
         """Get test image name."""
-        return "ohfp-api:integration-test"
+        return "orb-api:integration-test"
 
     @pytest.fixture(scope="class")
     def built_image(self, project_root, test_image_name):
@@ -191,7 +191,7 @@ class TestContainerIntegration:
                     "run",
                     "-d",
                     "--name",
-                    "ohfp-integration-test",
+                    "orb-integration-test",
                     "-p",
                     "8003:8000",
                     "-e",
@@ -328,7 +328,7 @@ class TestContainerIntegration:
     def test_container_file_permissions(self, built_image):
         """Test container file permissions and ownership."""
         try:
-            # Check that files are owned by ohfp user
+            # Check that files are owned by orb user
             result = subprocess.run(
                 [
                     "docker",
@@ -346,8 +346,8 @@ class TestContainerIntegration:
             )
 
             assert result.returncode == 0, f"Permission check failed: {result.stderr}"
-            # Should show ohfp ownership
-            assert "ohfp" in result.stdout
+            # Should show orb ownership
+            assert "orb" in result.stdout
 
         except subprocess.TimeoutExpired:
             pytest.fail("Container permission check timed out")

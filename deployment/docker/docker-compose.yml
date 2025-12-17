@@ -5,7 +5,7 @@ version: '3.8'
 
 services:
   # Main REST API service
-  ohfp-api:
+  orb-api:
     build:
       context: .
       dockerfile: Dockerfile
@@ -13,8 +13,8 @@ services:
         BUILD_DATE: ${BUILD_DATE:-}
         VERSION: ${VERSION:-dev}
         VCS_REF: ${VCS_REF:-}
-    image: ohfp-api:${VERSION:-latest}
-    container_name: ohfp-api
+    image: orb-api:${VERSION:-latest}
+    container_name: orb-api
     restart: unless-stopped
 
     # Port mapping
@@ -64,11 +64,11 @@ services:
       # Configuration files
       - ./config:/app/config:ro
       # Data persistence
-      - ohfp-data:/app/data
+      - orb-data:/app/data
       # Logs
-      - ohfp-logs:/app/logs
+      - orb-logs:/app/logs
       # AWS credentials (optional)
-      - ${HOME}/.aws:/home/ohfp/.aws:ro
+      - ${HOME}/.aws:/home/orb/.aws:ro
 
     # Health check
     healthcheck:
@@ -97,18 +97,18 @@ services:
 
     # Network
     networks:
-      - ohfp-network
+      - orb-network
 
   # Optional: Redis for caching/session storage
   redis:
     image: redis:7-alpine
-    container_name: ohfp-redis
+    container_name: orb-redis
     restart: unless-stopped
     command: redis-server --appendonly yes
     volumes:
-      - ohfp-redis-data:/data
+      - orb-redis-data:/data
     networks:
-      - ohfp-network
+      - orb-network
     profiles:
       - redis
       - full
@@ -116,16 +116,16 @@ services:
   # Optional: PostgreSQL for advanced storage
   postgres:
     image: postgres:15-alpine
-    container_name: ohfp-postgres
+    container_name: orb-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-ohfp}
-      POSTGRES_USER: ${POSTGRES_USER:-ohfp}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ohfp_password}
+      POSTGRES_DB: ${POSTGRES_DB:-orb}
+      POSTGRES_USER: ${POSTGRES_USER:-orb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orb_password}
     volumes:
-      - ohfp-postgres-data:/var/lib/postgresql/data
+      - orb-postgres-data:/var/lib/postgresql/data
     networks:
-      - ohfp-network
+      - orb-network
     profiles:
       - postgres
       - full
@@ -133,7 +133,7 @@ services:
   # Optional: Nginx reverse proxy
   nginx:
     image: nginx:alpine
-    container_name: ohfp-nginx
+    container_name: orb-nginx
     restart: unless-stopped
     ports:
       - "80:80"
@@ -142,25 +142,25 @@ services:
       - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./docker/ssl:/etc/nginx/ssl:ro
     depends_on:
-      - ohfp-api
+      - orb-api
     networks:
-      - ohfp-network
+      - orb-network
     profiles:
       - nginx
       - full
 
 # Named volumes for data persistence
 volumes:
-  ohfp-data:
+  orb-data:
     driver: local
-  ohfp-logs:
+  orb-logs:
     driver: local
-  ohfp-redis-data:
+  orb-redis-data:
     driver: local
-  ohfp-postgres-data:
+  orb-postgres-data:
     driver: local
 
 # Network configuration
 networks:
-  ohfp-network:
+  orb-network:
     driver: bridge

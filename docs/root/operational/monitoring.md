@@ -20,10 +20,10 @@ The plugin provides built-in health check endpoints:
 
 ```bash
 # Check provider health
-ohfp providers health
+orb providers health
 
 # Check system status
-ohfp system status
+orb system status
 ```
 
 ### Metrics Collection

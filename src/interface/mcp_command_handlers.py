@@ -16,7 +16,7 @@ from mcp.tools import OpenHFPluginMCPTools
 @handle_interface_exceptions(context="mcp_tools_list", interface_type="cli")
 async def handle_mcp_tools_list(args) -> dict[str, Any]:
     """
-    Handle 'ohfp mcp tools list' command.
+    Handle 'orb mcp tools list' command.
 
     Args:
         args: Parsed command line arguments
@@ -49,7 +49,7 @@ async def handle_mcp_tools_list(args) -> dict[str, Any]:
 @handle_interface_exceptions(context="mcp_tools_call", interface_type="cli")
 async def handle_mcp_tools_call(args) -> dict[str, Any]:
     """
-    Handle 'ohfp mcp tools call' command.
+    Handle 'orb mcp tools call' command.
 
     Args:
         args: Parsed command line arguments
@@ -94,7 +94,7 @@ async def handle_mcp_tools_call(args) -> dict[str, Any]:
 @handle_interface_exceptions(context="mcp_tools_info", interface_type="cli")
 async def handle_mcp_tools_info(args) -> dict[str, Any]:
     """
-    Handle 'ohfp mcp tools info' command.
+    Handle 'orb mcp tools info' command.
 
     Args:
         args: Parsed command line arguments
@@ -133,7 +133,7 @@ async def handle_mcp_tools_info(args) -> dict[str, Any]:
 @handle_interface_exceptions(context="mcp_validate", interface_type="cli")
 async def handle_mcp_validate(args) -> dict[str, Any]:
     """
-    Handle 'ohfp mcp validate' command.
+    Handle 'orb mcp validate' command.
 
     Args:
         args: Parsed command line arguments

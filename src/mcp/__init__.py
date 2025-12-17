@@ -13,14 +13,14 @@ Key Features:
 
 Usage:
     # Direct tool integration
-    from ohfpsdk.mcp import OpenHFPluginMCPTools
+    from orbsdk.mcp import OpenHFPluginMCPTools
 
     tools = OpenHFPluginMCPTools()
     await tools.initialize()
     result = await tools.call_tool("list_templates", {"active_only": True})
 
     # Standalone server mode
-    from ohfpsdk.mcp import OpenHFPluginMCPServer
+    from orbsdk.mcp import OpenHFPluginMCPServer
 
     server = OpenHFPluginMCPServer()
     await server.start_stdio()

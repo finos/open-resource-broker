@@ -83,11 +83,11 @@ Security best practices for deploying the Open Host Factory Plugin in production
 
 ### Non-Root Execution
 
-The Docker container runs as a non-root user (`ohfp`) for security:
+The Docker container runs as a non-root user (`orb`) for security:
 
 ```dockerfile
-RUN groupadd -r ohfp && useradd -r -g ohfp -s /bin/false ohfp
-USER ohfp
+RUN groupadd -r orb && useradd -r -g orb -s /bin/false orb
+USER orb
 ```
 
 ### Security Options
@@ -95,7 +95,7 @@ USER ohfp
 ```yaml
 # Docker Compose
 services:
-  ohfp-api:
+  orb-api:
     security_opt:
       - no-new-privileges:true
     read_only: true
@@ -119,7 +119,7 @@ AWS_SECRET_ACCESS_KEY=your-secret-key
 ```yaml
 # Docker Compose with secrets
 services:
-  ohfp-api:
+  orb-api:
     secrets:
       - jwt-secret
     environment:
@@ -136,7 +136,7 @@ secrets:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: ohfp-secrets
+  name: orb-secrets
 type: Opaque
 data:
   jwt-secret: <base64-encoded-secret>

@@ -418,16 +418,16 @@ POST /api/v1/providers/select
 #### List Providers
 ```bash
 # List all providers
-ohfp providers list
+orb providers list
 
 # List providers with details
-ohfp providers list --long
+orb providers list --long
 
 # List only enabled providers
-ohfp providers list --enabled-only
+orb providers list --enabled-only
 
 # Filter by provider type
-ohfp providers list --type aws
+orb providers list --type aws
 ```
 
 **Output:**
@@ -441,25 +441,25 @@ azure-east-us   azure   false    3         3       disabled
 #### Show Provider Details
 ```bash
 # Show provider details
-ohfp providers show aws-us-east-1
+orb providers show aws-us-east-1
 
 # Show with capabilities
-ohfp providers show aws-us-east-1 --capabilities
+orb providers show aws-us-east-1 --capabilities
 
 # Show with statistics
-ohfp providers show aws-us-east-1 --stats
+orb providers show aws-us-east-1 --stats
 ```
 
 #### Validate Providers
 ```bash
 # Validate all providers
-ohfp providers validate
+orb providers validate
 
 # Validate specific provider
-ohfp providers validate aws-us-east-1
+orb providers validate aws-us-east-1
 
 # Validate configuration file
-ohfp providers validate --config config/providers.yml
+orb providers validate --config config/providers.yml
 ```
 
 ### Template Management
@@ -467,22 +467,22 @@ ohfp providers validate --config config/providers.yml
 #### List Templates by Provider
 ```bash
 # List templates for provider type
-ohfp templates list --provider-type aws
+orb templates list --provider-type aws
 
 # List templates for provider instance
-ohfp templates list --provider-name aws-us-east-1
+orb templates list --provider-name aws-us-east-1
 
 # List templates for specific API
-ohfp templates list --provider-api EC2Fleet
+orb templates list --provider-api EC2Fleet
 ```
 
 #### Show Template Source Information
 ```bash
 # Show template with source info
-ohfp templates show web-server --source-info
+orb templates show web-server --source-info
 
 # Show template override chain
-ohfp templates show web-server --override-chain
+orb templates show web-server --override-chain
 ```
 
 **Output:**
@@ -508,16 +508,16 @@ Fields by Source:
 #### Validate Templates
 ```bash
 # Validate template against provider
-ohfp templates validate web-server --provider aws-us-east-1
+orb templates validate web-server --provider aws-us-east-1
 
 # Validate with strict mode
-ohfp templates validate web-server --provider aws-us-east-1 --strict
+orb templates validate web-server --provider aws-us-east-1 --strict
 
 # Validate against multiple providers
-ohfp templates validate web-server --providers aws-us-east-1,aws-us-west-2
+orb templates validate web-server --providers aws-us-east-1,aws-us-west-2
 
 # Validate all templates
-ohfp templates validate --all --provider aws-us-east-1
+orb templates validate --all --provider aws-us-east-1
 ```
 
 ### Request Management
@@ -525,28 +525,28 @@ ohfp templates validate --all --provider aws-us-east-1
 #### Create Requests with Provider Selection
 ```bash
 # Create request with explicit provider
-ohfp requests create --template web-server --count 5 --provider aws-us-east-1
+orb requests create --template web-server --count 5 --provider aws-us-east-1
 
 # Create request with provider type (load balanced)
-ohfp requests create --template web-server --count 5 --provider-type aws
+orb requests create --template web-server --count 5 --provider-type aws
 
 # Create request with API-based selection
-ohfp requests create --template web-server --count 5 --provider-api EC2Fleet
+orb requests create --template web-server --count 5 --provider-api EC2Fleet
 
 # Create request with default selection
-ohfp requests create --template web-server --count 5
+orb requests create --template web-server --count 5
 ```
 
 #### Test Provider Selection
 ```bash
 # Test provider selection for template
-ohfp providers select --template web-server
+orb providers select --template web-server
 
 # Test with specific strategy
-ohfp providers select --template web-server --strategy load_balanced
+orb providers select --template web-server --strategy load_balanced
 
 # Test with provider type filter
-ohfp providers select --template web-server --provider-type aws
+orb providers select --template web-server --provider-type aws
 ```
 
 **Output:**
@@ -572,22 +572,22 @@ Provider Selection Result:
 #### Refresh Template Cache
 ```bash
 # Refresh template cache
-ohfp templates refresh
+orb templates refresh
 
 # Refresh with verbose output
-ohfp templates refresh --verbose
+orb templates refresh --verbose
 ```
 
 #### Migrate Templates
 ```bash
 # Migrate templates to provider-specific files
-ohfp templates migrate --from templates.json --to-provider aws-us-east-1
+orb templates migrate --from templates.json --to-provider aws-us-east-1
 
 # Migrate with backup
-ohfp templates migrate --from templates.json --to-provider aws-us-east-1 --backup
+orb templates migrate --from templates.json --to-provider aws-us-east-1 --backup
 
 # Dry run migration
-ohfp templates migrate --from templates.json --to-provider aws-us-east-1 --dry-run
+orb templates migrate --from templates.json --to-provider aws-us-east-1 --dry-run
 ```
 
 ## Error Responses
@@ -654,10 +654,10 @@ Authorization: Bearer <api-key>
 ### CLI Authentication
 ```bash
 # Set API key
-export OHFP_API_KEY=<api-key>
+export ORB_API_KEY=<api-key>
 
 # Or use config file
-ohfp config set api-key <api-key>
+orb config set api-key <api-key>
 ```
 
 ## Pagination

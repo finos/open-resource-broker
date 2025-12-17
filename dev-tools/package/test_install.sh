@@ -30,32 +30,21 @@ python -m pip install dist/*.whl
 
 # Test commands
 echo "Testing commands..."
-if command -v ohfp &> /dev/null; then
-    echo "PASS ohfp command available"
-    if ohfp --help > /dev/null 2>&1; then
-        echo "PASS ohfp --help works"
+if command -v orb &> /dev/null; then
+    echo "PASS orb command available"
+    if orb --help > /dev/null 2>&1; then
+        echo "PASS orb --help works"
     else
-        echo "FAIL ohfp --help failed"
+        echo "FAIL orb --help failed"
     fi
 else
-    echo "FAIL ohfp command not found"
-fi
-
-if command -v open-hostfactory-plugin &> /dev/null; then
-    echo "PASS open-hostfactory-plugin command available"
-    if open-hostfactory-plugin --help > /dev/null 2>&1; then
-        echo "PASS open-hostfactory-plugin --help works"
-    else
-        echo "FAIL open-hostfactory-plugin --help failed"
-    fi
-else
-    echo "FAIL open-hostfactory-plugin command not found"
+    echo "FAIL orb command not found"
 fi
 
 # Test basic functionality
 echo "INFO Testing basic functionality..."
-if ohfp --version 2>/dev/null; then
-    echo "PASS ohfp --version works"
+if orb --version 2>/dev/null; then
+    echo "PASS orb --version works"
 else
     echo "WARNING --version not implemented yet"
 fi

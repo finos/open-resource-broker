@@ -91,13 +91,13 @@ setup_builder() {
     log_info "Setting up Docker Buildx builder..."
 
     # Create builder if it doesn't exist
-    if ! docker buildx inspect ohfp-builder &> /dev/null; then
-        log_info "Creating new buildx builder: ohfp-builder"
-        docker buildx create --name ohfp-builder --driver docker-container --bootstrap
+    if ! docker buildx inspect orb-builder &> /dev/null; then
+        log_info "Creating new buildx builder: orb-builder"
+        docker buildx create --name orb-builder --driver docker-container --bootstrap
     fi
 
     # Use the builder
-    docker buildx use ohfp-builder
+    docker buildx use orb-builder
 
     log_info "Buildx builder ready"
 }
@@ -124,7 +124,7 @@ build_image() {
     fi
 
     # Get values from Makefile if not provided
-    local MAKEFILE_PACKAGE_SHORT="${PACKAGE_NAME_SHORT:-ohfp}"
+    local MAKEFILE_PACKAGE_SHORT="${PACKAGE_NAME_SHORT:-orb}"
 
     # Prepare tags with Python version support
     local tags=()

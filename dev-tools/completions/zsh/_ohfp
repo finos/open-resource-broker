@@ -1,8 +1,8 @@
-#compdef ohfp open-hostfactory-plugin
+#compdef orb
 
-_ohfp() {
+_orb() {
     local context state line
-    
+
     _arguments -C \
         '--config[Configuration file path]:file:_files' \
         '--log-level[Logging level]:(DEBUG INFO WARNING ERROR CRITICAL)' \
@@ -16,7 +16,7 @@ _ohfp() {
         '--help[Show help message]' \
         '1:resource:(templates machines requests providers storage system config)' \
         '*::arg:->args'
-    
+
     case $state in
         args)
             case $words[1] in
@@ -73,5 +73,4 @@ _ohfp() {
     esac
 }
 
-_ohfp "$@"
-
+_orb "$@"

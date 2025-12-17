@@ -193,7 +193,6 @@ def update_pyproject_selective(pyproject_path: Path) -> None:
                 [
                     "[project.scripts]",
                     f'{package_name_short} = "run:cli_main"',
-                    f'{package_name} = "run:cli_main"',
                     "",
                 ]
             )

@@ -1,13 +1,13 @@
 #!/bin/bash
 # shellcheck disable=SC2207  # Bash completion uses array assignment patterns
 
-_ohfp_completion() {
+_orb_completion() {
     local cur prev words
     _init_completion || return
 
     local resources="templates machines requests providers storage system config"
     local global_opts="--config --log-level --format --output --quiet --verbose --dry-run --completion --version --help"
-    
+
     # Handle global options with values
     case $prev in
         --log-level)
@@ -27,7 +27,7 @@ _ohfp_completion() {
             return
             ;;
     esac
-    
+
     # Resource-specific completion logic
     case ${words[1]} in
         templates)
@@ -133,5 +133,4 @@ _ohfp_completion() {
     esac
 }
 
-complete -F _ohfp_completion ohfp open-hostfactory-plugin
-
+complete -F _orb_completion orb

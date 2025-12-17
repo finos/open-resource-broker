@@ -40,7 +40,7 @@ docker-compose -f docker-compose.prod.yml up -d
 aws ecs register-task-definition --cli-input-json file://ecs-task-definition.json
 
 # Deploy service
-aws ecs update-service --cluster production --service ohfp-api --force-new-deployment
+aws ecs update-service --cluster production --service orb-api --force-new-deployment
 ```
 
 #### Kubernetes
@@ -48,20 +48,20 @@ aws ecs update-service --cluster production --service ohfp-api --force-new-deplo
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ohfp-api
+  name: orb-api
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: ohfp-api
+      app: orb-api
   template:
     metadata:
       labels:
-        app: ohfp-api
+        app: orb-api
     spec:
       containers:
-      - name: ohfp-api
-        image: your-registry.com/ohfp-api:1.0.0
+      - name: orb-api
+        image: your-registry.com/orb-api:1.0.0
         ports:
         - containerPort: 8000
         env:
@@ -74,7 +74,7 @@ spec:
         - name: HF_AUTH_BEARER_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              name: ohfp-secrets
+              name: orb-secrets
               key: jwt-secret
         resources:
           requests:
@@ -100,12 +100,12 @@ spec:
 #### Google Cloud Run
 ```bash
 # Build and push to Google Container Registry
-docker build -t gcr.io/your-project/ohfp-api:latest .
-docker push gcr.io/your-project/ohfp-api:latest
+docker build -t gcr.io/your-project/orb-api:latest .
+docker push gcr.io/your-project/orb-api:latest
 
 # Deploy to Cloud Run
-gcloud run deploy ohfp-api \
-  --image gcr.io/your-project/ohfp-api:latest \
+gcloud run deploy orb-api \
+  --image gcr.io/your-project/orb-api:latest \
   --platform managed \
   --region us-central1 \
   --set-env-vars HF_SERVER_ENABLED=true,HF_AUTH_ENABLED=true
@@ -128,24 +128,24 @@ cp config/default_config.json config/production.json
 # Edit config/production.json
 
 # Start server
-ohfp system serve --host 0.0.0.0 --port 8000 --config config/production.json
+orb system serve --host 0.0.0.0 --port 8000 --config config/production.json
 ```
 
 #### Systemd Service
 ```ini
-# /etc/systemd/system/ohfp-api.service
+# /etc/systemd/system/orb-api.service
 [Unit]
 Description=Open Host Factory Plugin REST API
 After=network.target
 
 [Service]
 Type=simple
-User=ohfp
-Group=ohfp
-WorkingDirectory=/opt/ohfp
+User=orb
+Group=orb
+WorkingDirectory=/opt/orb
 Environment=HF_SERVER_ENABLED=true
 Environment=HF_AUTH_ENABLED=true
-ExecStart=/opt/ohfp/.venv/bin/python src/run.py system serve --config config/production.json
+ExecStart=/opt/orb/.venv/bin/python src/run.py system serve --config config/production.json
 Restart=always
 RestartSec=10
 
@@ -209,15 +209,15 @@ HF_SERVER_TRUSTED_HOSTS=your-domain.com,api.your-domain.com
 #### Docker Secrets
 ```bash
 # Create secret
-echo "your-jwt-secret" | docker secret create ohfp-jwt-secret -
+echo "your-jwt-secret" | docker secret create orb-jwt-secret -
 
 # Use in Docker Compose
 services:
-  ohfp-api:
+  orb-api:
     secrets:
-      - ohfp-jwt-secret
+      - orb-jwt-secret
     environment:
-      HF_AUTH_BEARER_SECRET_KEY_FILE: /run/secrets/ohfp-jwt-secret
+      HF_AUTH_BEARER_SECRET_KEY_FILE: /run/secrets/orb-jwt-secret
 ```
 
 #### Kubernetes Secrets
@@ -225,7 +225,7 @@ services:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: ohfp-secrets
+  name: orb-secrets
 type: Opaque
 data:
   jwt-secret: <base64-encoded-secret>
@@ -237,7 +237,7 @@ data:
 ```bash
 # Store secret
 aws secretsmanager create-secret \
-  --name ohfp/jwt-secret \
+  --name orb/jwt-secret \
   --secret-string "your-jwt-secret"
 
 # Use in ECS task definition
@@ -245,7 +245,7 @@ aws secretsmanager create-secret \
   "secrets": [
     {
       "name": "HF_AUTH_BEARER_SECRET_KEY",
-      "valueFrom": "arn:aws:secretsmanager:region:account:secret:ohfp/jwt-secret"
+      "valueFrom": "arn:aws:secretsmanager:region:account:secret:orb/jwt-secret"
     }
   ]
 }
@@ -260,7 +260,7 @@ aws secretsmanager create-secret \
 - [ ] **HTTPS required**: `HF_SERVER_REQUIRE_HTTPS=true`
 - [ ] **Trusted hosts configured**: Limit to your domains
 - [ ] **API docs disabled**: `HF_SERVER_DOCS_ENABLED=false`
-- [ ] **Non-root execution**: Container runs as `ohfp` user
+- [ ] **Non-root execution**: Container runs as `orb` user
 - [ ] **Resource limits**: Set CPU and memory limits
 - [ ] **Network isolation**: Use private networks where possible
 - [ ] **Regular updates**: Keep base images and dependencies updated
@@ -270,18 +270,18 @@ aws secretsmanager create-secret \
 
 ```bash
 # Docker network isolation
-docker network create --driver bridge ohfp-private
-docker run --network ohfp-private ohfp-api:latest
+docker network create --driver bridge orb-private
+docker run --network orb-private orb-api:latest
 
 # Kubernetes network policies
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: ohfp-api-policy
+  name: orb-api-policy
 spec:
   podSelector:
     matchLabels:
-      app: ohfp-api
+      app: orb-api
   policyTypes:
   - Ingress
   - Egress
@@ -340,9 +340,9 @@ livenessProbe:
 ```yaml
 # prometheus.yml
 scrape_configs:
-  - job_name: 'ohfp-api'
+  - job_name: 'orb-api'
     static_configs:
-      - targets: ['ohfp-api:8000']
+      - targets: ['orb-api:8000']
     metrics_path: /metrics
     scrape_interval: 30s
 ```
@@ -354,7 +354,7 @@ scrape_configs:
 #### Docker Compose
 ```bash
 # Scale to 3 replicas
-docker-compose up -d --scale ohfp-api=3
+docker-compose up -d --scale orb-api=3
 ```
 
 #### Kubernetes
@@ -375,7 +375,7 @@ spec:
 # Update service desired count
 aws ecs update-service \
   --cluster production \
-  --service ohfp-api \
+  --service orb-api \
   --desired-count 5
 ```
 
@@ -383,10 +383,10 @@ aws ecs update-service \
 
 #### Nginx Configuration
 ```nginx
-upstream ohfp_backend {
-    server ohfp-api-1:8000;
-    server ohfp-api-2:8000;
-    server ohfp-api-3:8000;
+upstream orb_backend {
+    server orb-api-1:8000;
+    server orb-api-2:8000;
+    server orb-api-3:8000;
 }
 
 server {
@@ -394,7 +394,7 @@ server {
     server_name api.your-domain.com;
 
     location / {
-        proxy_pass http://ohfp_backend;
+        proxy_pass http://orb_backend;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -402,7 +402,7 @@ server {
     }
 
     location /health {
-        proxy_pass http://ohfp_backend;
+        proxy_pass http://orb_backend;
         access_log off;
     }
 }
@@ -414,8 +414,8 @@ server {
 
 ```bash
 # Backup data volumes
-docker run --rm -v ohfp-data:/data -v $(pwd):/backup alpine \
-  tar czf /backup/ohfp-data-backup-$(date +%Y%m%d).tar.gz -C /data .
+docker run --rm -v orb-data:/data -v $(pwd):/backup alpine \
+  tar czf /backup/orb-data-backup-$(date +%Y%m%d).tar.gz -C /data .
 
 # Backup configuration
 cp -r config/ backups/config-$(date +%Y%m%d)/
@@ -425,10 +425,10 @@ cp -r config/ backups/config-$(date +%Y%m%d)/
 
 ```bash
 # PostgreSQL backup
-docker exec ohfp-postgres pg_dump -U ohfp ohfp > backup-$(date +%Y%m%d).sql
+docker exec orb-postgres pg_dump -U orb orb > backup-$(date +%Y%m%d).sql
 
 # Restore
-docker exec -i ohfp-postgres psql -U ohfp ohfp < backup-20250107.sql
+docker exec -i orb-postgres psql -U orb orb < backup-20250107.sql
 ```
 
 ## Troubleshooting
@@ -444,7 +444,7 @@ docker logs container-name
 docker exec container-name env | grep HF_
 
 # Test configuration
-docker run --rm -it ohfp-api:latest bash
+docker run --rm -it orb-api:latest bash
 ```
 
 **Performance issues:**
@@ -456,7 +456,7 @@ docker stats
 curl http://localhost:8000/metrics
 
 # Increase workers
-docker run -e HF_SERVER_WORKERS=4 ohfp-api:latest
+docker run -e HF_SERVER_WORKERS=4 orb-api:latest
 ```
 
 **Authentication problems:**
@@ -476,10 +476,10 @@ print(config.get_typed(ServerConfig).auth.enabled)
 
 ```bash
 # Enable debug mode
-docker run -e HF_DEBUG=true -e HF_LOGGING_LEVEL=DEBUG ohfp-api:latest
+docker run -e HF_DEBUG=true -e HF_LOGGING_LEVEL=DEBUG orb-api:latest
 
 # Interactive debugging
-docker run -it --rm ohfp-api:latest bash
+docker run -it --rm orb-api:latest bash
 ```
 
 ## Performance Optimization
@@ -538,13 +538,13 @@ HF_SERVER_WORKER_CONNECTIONS=1000
 
 ```bash
 # Pull new image
-docker pull ohfp-api:latest
+docker pull orb-api:latest
 
 # Rolling update
-docker-compose up -d --no-deps ohfp-api
+docker-compose up -d --no-deps orb-api
 
 # Kubernetes rolling update
-kubectl set image deployment/ohfp-api ohfp-api=ohfp-api:latest
+kubectl set image deployment/orb-api orb-api=orb-api:latest
 ```
 
 This comprehensive deployment guide covers all major deployment scenarios and operational concerns for the Open Host Factory Plugin REST API.

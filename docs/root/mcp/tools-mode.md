@@ -19,7 +19,7 @@ MCP Tools Mode automatically discovers all SDK methods and exposes them as MCP t
 ### Direct Integration in AI Assistants
 
 ```python
-from ohfpsdk.mcp import OpenHFPluginMCPTools
+from orbsdk.mcp import OpenHFPluginMCPTools
 
 # Initialize MCP tools
 async with OpenHFPluginMCPTools(provider="aws") as tools:
@@ -43,16 +43,16 @@ async with OpenHFPluginMCPTools(provider="aws") as tools:
 
 ```bash
 # List all available MCP tools
-ohfp mcp tools list
+orb mcp tools list
 
 # List only query tools
-ohfp mcp tools list --type query
+orb mcp tools list --type query
 
-# List only command tools  
-ohfp mcp tools list --type command
+# List only command tools
+orb mcp tools list --type command
 
 # Get information about a specific tool
-ohfp mcp tools info list_templates
+orb mcp tools info list_templates
 ```
 
 ## Complete Examples
@@ -68,13 +68,13 @@ These examples demonstrate:
 - Multiple tool usage
 
 # Call a tool directly for testing
-ohfp mcp tools call list_templates --args '{"active_only": true}'
+orb mcp tools call list_templates --args '{"active_only": true}'
 
 # Call a tool with arguments from file
-ohfp mcp tools call create_request --file request_args.json
+orb mcp tools call create_request --file request_args.json
 
 # Validate MCP configuration
-ohfp mcp validate
+orb mcp validate
 ```
 
 ## Tool Discovery
@@ -135,7 +135,7 @@ Each tool includes a JSON schema for parameter validation:
         "description": "Only return active templates"
       },
       "provider_api": {
-        "type": "string", 
+        "type": "string",
         "description": "Filter by provider API type"
       }
     },
@@ -182,9 +182,9 @@ Tool responses follow a consistent format:
 
 ### Environment Variables
 ```bash
-export OHFP_PROVIDER=aws
-export OHFP_REGION=us-east-1
-export OHFP_PROFILE=default
+export ORB_PROVIDER=aws
+export ORB_REGION=us-east-1
+export ORB_PROFILE=default
 ```
 
 ### Configuration File
@@ -240,7 +240,7 @@ async with OpenHFPluginMCPTools() as tools:
     "hostfactory": {
       "command": "python",
       "args": ["-c", "
-        from ohfpsdk.mcp import OpenHFPluginMCPTools
+        from orbsdk.mcp import OpenHFPluginMCPTools
         import asyncio
         import json
 

@@ -82,39 +82,25 @@ echo ""
 echo "INFO Testing installation..."
 
 # Test commands
-if command -v ohfp &> /dev/null; then
-    echo "SUCCESS ohfp command available"
+if command -v orb &> /dev/null; then
+    echo "SUCCESS orb command available"
     # Test the command works
-    if ohfp --help > /dev/null 2>&1; then
-        echo "SUCCESS ohfp --help works"
+    if orb --help > /dev/null 2>&1; then
+        echo "SUCCESS orb --help works"
     else
-        echo "WARNING ohfp command found but --help failed"
+        echo "WARNING orb command found but --help failed"
     fi
 else
-    echo "ERROR ohfp command not found"
-fi
-
-if command -v open-hostfactory-plugin &> /dev/null; then
-    echo "SUCCESS open-hostfactory-plugin command available"
-    # Test the command works
-    if open-hostfactory-plugin --help > /dev/null 2>&1; then
-        echo "SUCCESS open-hostfactory-plugin --help works"
-    else
-        echo "WARNING open-hostfactory-plugin command found but --help failed"
-    fi
-else
-    echo "ERROR open-hostfactory-plugin command not found"
+    echo "ERROR orb command not found"
 fi
 
 echo ""
 echo "INFO: Available commands:"
-echo "  ohfp --help                        # Short command"
-echo "  open-hostfactory-plugin --help     # Long command"
+echo "  orb --help                        # Short command"
 echo ""
 echo "INFO: Example usage:"
-echo "  ohfp templates list"
-echo "  ohfp machines request basic-template 2"
-echo "  open-hostfactory-plugin providers health"
+echo "  orb templates list"
+echo "  orb machines request basic-template 2"
 echo ""
 echo "INFO: Host Factory integration:"
 echo "  USE_LOCAL_DEV=true ./scripts/requestMachines.sh basic-template 2"

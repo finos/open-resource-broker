@@ -7,8 +7,8 @@ export LOG_SCRIPTS="true"
 SCRIPTS_LOG_FILE="${HF_LOGDIR}/scripts.log"
 
 USE_LOCAL_DEV=${USE_LOCAL_DEV:-false}
-PACKAGE_NAME=${OHFP_PACKAGE_NAME:-"open-hostfactory-plugin"}
-PACKAGE_COMMAND=${OHFP_COMMAND:-"ohfp"}
+PACKAGE_NAME=${ORB_PACKAGE_NAME:-"open-hostfactory-plugin"}
+PACKAGE_COMMAND=${ORB_COMMAND:-"orb"}
 
 if [ "$LOG_SCRIPTS" = "true" ] || [ "$LOG_SCRIPTS" = "1" ]; then
 {

@@ -12,9 +12,9 @@ Key Features:
 - Async/await support throughout
 
 Usage:
-    from ohfpsdk import OHFPSDK
+    from orbsdk import ORBSDK
 
-    async with OHFPSDK(provider="aws") as sdk:
+    async with ORBSDK(provider="aws") as sdk:
         templates = await sdk.list_templates(active_only=True)
         request = await sdk.create_request(template_id="basic", machine_count=5)
         status = await sdk.get_request_status(request_id=request.id)
@@ -25,10 +25,10 @@ from .config import SDKConfig
 from .exceptions import ConfigurationError, ProviderError, SDKError
 
 # Convenient alias
-OHFPSDK = OpenHFPluginSDK
+ORBSDK = OpenHFPluginSDK
 
 __all__: list[str] = [
-    "OHFPSDK",
+    "ORBSDK",
     "ConfigurationError",
     "OpenHFPluginSDK",
     "ProviderError",

@@ -27,10 +27,10 @@ Use the built-in migration command:
 
 ```bash
 # Migrate from JSON to SQLite
-ohfp storage migrate --source json --target sqlite
+orb storage migrate --source json --target sqlite
 
 # Migrate with backup
-ohfp storage migrate --source json --target sqlite --backup
+orb storage migrate --source json --target sqlite --backup
 ```
 
 ### Pre-Migration Checklist
@@ -49,7 +49,7 @@ Before starting migration:
 
 3. **Verify source data integrity**
    ```bash
-   ohfp storage test
+   orb storage test
    ```
 
 ### Migration Steps
@@ -57,28 +57,28 @@ Before starting migration:
 1. **Prepare target storage**
    ```bash
    # Initialize target storage
-   ohfp storage init --type sqlite
+   orb storage init --type sqlite
    ```
 
 2. **Run migration**
    ```bash
    # Execute migration
-   ohfp storage migrate --source json --target sqlite --verify
+   orb storage migrate --source json --target sqlite --verify
    ```
 
 3. **Verify migration**
    ```bash
    # Test target storage
-   ohfp storage test --type sqlite
+   orb storage test --type sqlite
 
    # Compare data counts
-   ohfp requests list --count
+   orb requests list --count
    ```
 
 4. **Update configuration**
    ```bash
    # Update config to use new storage
-   ohfp config update --storage-type sqlite
+   orb config update --storage-type sqlite
    ```
 
 ### Post-Migration Verification
@@ -87,18 +87,18 @@ After migration:
 
 1. **Test basic operations**
    ```bash
-   ohfp templates list
-   ohfp requests list
+   orb templates list
+   orb requests list
    ```
 
 2. **Verify data integrity**
    ```bash
-   ohfp storage validate
+   orb storage validate
    ```
 
 3. **Test provider operations**
    ```bash
-   ohfp providers health
+   orb providers health
    ```
 
 ## Configuration Migration
@@ -113,10 +113,10 @@ Use configuration migration tools:
 
 ```bash
 # Convert legacy config
-ohfp config migrate --from legacy --to current
+orb config migrate --from legacy --to current
 
 # Validate migrated config
-ohfp config validate
+orb config validate
 ```
 
 ## Rollback Procedures

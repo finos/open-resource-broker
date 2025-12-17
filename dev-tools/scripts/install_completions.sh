@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install shell completions for ohfp command
+# Install shell completions for orb command
 
 set -e
 
@@ -31,7 +31,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 cd "$PROJECT_ROOT"
 
-# Check if ohfp command is available
+# Check if orb command is available
 if ! command -v python &> /dev/null; then
     print_error "Python is required but not installed"
     exit 1
@@ -42,7 +42,7 @@ if [ ! -f "src/run.py" ]; then
     exit 1
 fi
 
-print_status "Installing shell completions for ohfp command"
+print_status "Installing shell completions for orb command"
 echo ""
 
 # Detect shell
@@ -59,8 +59,8 @@ case "$1" in
         ;;
     --uninstall)
         print_status "Uninstalling completions..."
-        rm -f ~/.local/share/bash-completion/completions/ohfp
-        rm -f ~/.local/share/zsh/site-functions/_ohfp
+        rm -f ~/.local/share/bash-completion/completions/orb
+        rm -f ~/.local/share/zsh/site-functions/_orb
         print_success "Completions uninstalled"
         exit 0
         ;;
@@ -86,16 +86,16 @@ if [ "$INSTALL_BASH" = true ]; then
     mkdir -p ~/.local/share/bash-completion/completions
 
     # Generate and install completion
-    python src/run.py --completion bash > ~/.local/share/bash-completion/completions/ohfp
+    python src/run.py --completion bash > ~/.local/share/bash-completion/completions/orb
 
-    print_success "Bash completions installed to ~/.local/share/bash-completion/completions/ohfp"
+    print_success "Bash completions installed to ~/.local/share/bash-completion/completions/orb"
 
     # Check if bash-completion is sourced
     if ! grep -q "bash-completion" ~/.bashrc 2>/dev/null; then
         print_warning "You may need to add this to your ~/.bashrc:"
         echo "  # Enable bash completion"
-        echo "  if [ -f ~/.local/share/bash-completion/completions/ohfp ]; then"
-        echo "      source ~/.local/share/bash-completion/completions/ohfp"
+        echo "  if [ -f ~/.local/share/bash-completion/completions/orb ]; then"
+        echo "      source ~/.local/share/bash-completion/completions/orb"
         echo "  fi"
         echo ""
     fi
@@ -109,9 +109,9 @@ if [ "$INSTALL_ZSH" = true ]; then
     mkdir -p ~/.local/share/zsh/site-functions
 
     # Generate and install completion
-    python src/run.py --completion zsh > ~/.local/share/zsh/site-functions/_ohfp
+    python src/run.py --completion zsh > ~/.local/share/zsh/site-functions/_orb
 
-    print_success "Zsh completions installed to ~/.local/share/zsh/site-functions/_ohfp"
+    print_success "Zsh completions installed to ~/.local/share/zsh/site-functions/_orb"
 
     # Check if fpath is configured
     if ! grep -q "$HOME/.local/share/zsh/site-functions" ~/.zshrc 2>/dev/null; then
@@ -134,14 +134,14 @@ if [ "$INSTALL_ZSH" = true ]; then
 fi
 echo ""
 print_status "🎯 Test completions:"
-echo "  ohfp <TAB>                    # Show available resources"
-echo "  ohfp templates <TAB>          # Show template actions"
-echo "  ohfp --format <TAB>           # Show format options"
+echo "  orb <TAB>                    # Show available resources"
+echo "  orb templates <TAB>          # Show template actions"
+echo "  orb --format <TAB>           # Show format options"
 echo ""
 print_status "Manual installation commands:"
 if [ "$INSTALL_BASH" = true ]; then
-    echo "  Bash: python src/run.py --completion bash > ~/.local/share/bash-completion/completions/ohfp"
+    echo "  Bash: python src/run.py --completion bash > ~/.local/share/bash-completion/completions/orb"
 fi
 if [ "$INSTALL_ZSH" = true ]; then
-    echo "  Zsh:  python src/run.py --completion zsh > ~/.local/share/zsh/site-functions/_ohfp"
+    echo "  Zsh:  python src/run.py --completion zsh > ~/.local/share/zsh/site-functions/_orb"
 fi

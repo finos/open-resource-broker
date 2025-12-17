@@ -31,7 +31,7 @@ def _get_from_package_metadata() -> Optional[dict]:
         return {
             "project": {
                 "name": meta["Name"],
-                "short_name": "ohfp",  # Not in package metadata, hardcode this one
+                "short_name": "orb",  # Not in package metadata, hardcode this one
                 "version": version("open-hostfactory-plugin"),
                 "description": meta["Summary"],
                 "author": meta["Author"],
@@ -59,7 +59,7 @@ if not config:
     config = {
         "project": {
             "name": "open-hostfactory-plugin",
-            "short_name": "ohfp",
+            "short_name": "orb",
             # PEP 440 compliant development version - prevents PyPI normalization from "0.1.0-dev" to "0.1.0.dev0"
             # CI builds will override this with dynamic versions like "0.1.0.dev20250822145030+abc1234"
             "version": "0.1.0.dev0",
@@ -77,7 +77,7 @@ if not config:
 
 # Export the same interface
 PACKAGE_NAME = config["project"]["name"]
-PACKAGE_NAME_SHORT = config["project"].get("short_name", "ohfp")
+PACKAGE_NAME_SHORT = config["project"]["short_name"]
 __version__ = config["project"]["version"]
 VERSION = __version__
 DESCRIPTION = config["project"]["description"]

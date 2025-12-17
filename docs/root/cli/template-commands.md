@@ -9,28 +9,28 @@ The template management commands provide CRUD (Create, Read, Update, Delete) ope
 List all available templates:
 
 ```bash
-ohfp templates list
+orb templates list
 ```
 
 List with detailed configuration fields:
 
 ```bash
-ohfp templates list --long
+orb templates list --long
 ```
 
 Filter by provider API:
 
 ```bash
-ohfp templates list --provider-api aws
+orb templates list --provider-api aws
 ```
 
 Output formats:
 
 ```bash
-ohfp templates list --format table
-ohfp templates list --format yaml
-ohfp templates list --format json
-ohfp templates list --format list
+orb templates list --format table
+orb templates list --format yaml
+orb templates list --format json
+orb templates list --format list
 ```
 
 ### Show Template Details
@@ -38,14 +38,14 @@ ohfp templates list --format list
 Show detailed information about a specific template:
 
 ```bash
-ohfp templates show TEMPLATE_ID
+orb templates show TEMPLATE_ID
 ```
 
 Show with different output formats:
 
 ```bash
-ohfp templates show my-template --format yaml
-ohfp templates show my-template --format table
+orb templates show my-template --format yaml
+orb templates show my-template --format table
 ```
 
 ### Create Template
@@ -53,13 +53,13 @@ ohfp templates show my-template --format table
 Create a new template from a configuration file:
 
 ```bash
-ohfp templates create --file template.json
+orb templates create --file template.json
 ```
 
 Create with validation only (don't save):
 
 ```bash
-ohfp templates create --file template.json --validate-only
+orb templates create --file template.json --validate-only
 ```
 
 #### Template Configuration File Format
@@ -112,7 +112,7 @@ version: "1.0"
 Update an existing template:
 
 ```bash
-ohfp templates update TEMPLATE_ID --file updated-template.json
+orb templates update TEMPLATE_ID --file updated-template.json
 ```
 
 ### Delete Template
@@ -120,13 +120,13 @@ ohfp templates update TEMPLATE_ID --file updated-template.json
 Delete a template:
 
 ```bash
-ohfp templates delete TEMPLATE_ID
+orb templates delete TEMPLATE_ID
 ```
 
 Force deletion without confirmation:
 
 ```bash
-ohfp templates delete TEMPLATE_ID --force
+orb templates delete TEMPLATE_ID --force
 ```
 
 ### Validate Template
@@ -134,7 +134,7 @@ ohfp templates delete TEMPLATE_ID --force
 Validate a template configuration file:
 
 ```bash
-ohfp templates validate --file template.json
+orb templates validate --file template.json
 ```
 
 ### Refresh Templates
@@ -142,13 +142,13 @@ ohfp templates validate --file template.json
 Refresh the template cache and reload from files:
 
 ```bash
-ohfp templates refresh
+orb templates refresh
 ```
 
 Force complete refresh:
 
 ```bash
-ohfp templates refresh --force
+orb templates refresh --force
 ```
 
 ## Template File Hierarchy
@@ -156,7 +156,7 @@ ohfp templates refresh --force
 The system supports provider-specific template files with hierarchical loading:
 
 1. **Instance Files**: `{provider}inst_templates.json` (Priority 1)
-2. **Type Files**: `{provider}type_templates.json` (Priority 2)  
+2. **Type Files**: `{provider}type_templates.json` (Priority 2)
 3. **Main Files**: `{provider}prov_templates.json` (Priority 3)
 4. **Legacy Files**: `templates.json` (Priority 4)
 
@@ -168,7 +168,7 @@ Templates are merged with higher priority files overriding lower priority ones.
 
 ```bash
 # List all templates
-$ ohfp templates list
+$ orb templates list
 {
   "success": true,
   "templates": [
@@ -185,7 +185,7 @@ $ ohfp templates list
 }
 
 # Show specific template
-$ ohfp templates show aws-basic
+$ orb templates show aws-basic
 {
   "success": true,
   "template": {
@@ -209,7 +209,7 @@ $ ohfp templates show aws-basic
 
 ```bash
 # Create template from file
-$ ohfp templates create --file new-template.json
+$ orb templates create --file new-template.json
 {
   "success": true,
   "message": "Template created successfully",
@@ -217,7 +217,7 @@ $ ohfp templates create --file new-template.json
 }
 
 # Validate template without creating
-$ ohfp templates create --file new-template.json --validate-only
+$ orb templates create --file new-template.json --validate-only
 {
   "success": true,
   "message": "Template validation successful",
@@ -229,7 +229,7 @@ $ ohfp templates create --file new-template.json --validate-only
 
 ```bash
 # Validate template file
-$ ohfp templates validate --file template.json
+$ orb templates validate --file template.json
 {
   "success": true,
   "valid": true,
@@ -240,7 +240,7 @@ $ ohfp templates validate --file template.json
 }
 
 # Validation with errors
-$ ohfp templates validate --file invalid-template.json
+$ orb templates validate --file invalid-template.json
 {
   "success": false,
   "valid": false,
@@ -259,7 +259,7 @@ $ ohfp templates validate --file invalid-template.json
 
 ```bash
 # Update template
-$ ohfp templates update aws-basic --file updated-template.json
+$ orb templates update aws-basic --file updated-template.json
 {
   "success": true,
   "message": "Template updated successfully",
@@ -267,7 +267,7 @@ $ ohfp templates update aws-basic --file updated-template.json
 }
 
 # Delete template
-$ ohfp templates delete old-template
+$ orb templates delete old-template
 {
   "success": true,
   "message": "Template deleted successfully",
@@ -275,7 +275,7 @@ $ ohfp templates delete old-template
 }
 
 # Refresh template cache
-$ ohfp templates refresh
+$ orb templates refresh
 {
   "success": true,
   "message": "Templates refreshed successfully",
@@ -291,7 +291,7 @@ $ ohfp templates refresh
 ### Table Format Output
 
 ```bash
-$ ohfp templates list --format table
+$ orb templates list --format table
 +---------------+--------------------+------------+---------------+-------------+
 │ Template ID     │ Name                 │ Provider API │ Image ID        │ Instance Type │
 +---------------+--------------------+------------+---------------+-------------+
@@ -308,7 +308,7 @@ The template commands provide detailed error messages for common issues:
 ### Template Not Found
 
 ```bash
-$ ohfp templates show nonexistent-template
+$ orb templates show nonexistent-template
 {
   "success": false,
   "error": "Template not found: nonexistent-template",
@@ -319,7 +319,7 @@ $ ohfp templates show nonexistent-template
 ### Invalid Template Configuration
 
 ```bash
-$ ohfp templates create --file invalid.json
+$ orb templates create --file invalid.json
 {
   "success": false,
   "error": "Invalid template configuration: Missing required field 'template_id'"
@@ -329,7 +329,7 @@ $ ohfp templates create --file invalid.json
 ### File Access Issues
 
 ```bash
-$ ohfp templates create --file missing-file.json
+$ orb templates create --file missing-file.json
 {
   "success": false,
   "error": "Template file not found: missing-file.json"
@@ -348,8 +348,8 @@ Template commands integrate seamlessly with other CLI operations:
 
 ```bash
 # Use different scheduler for template operations
-ohfp --scheduler default templates list
-ohfp --scheduler hostfactory templates show aws-basic
+orb --scheduler default templates list
+orb --scheduler hostfactory templates show aws-basic
 ```
 
 ## Additional Features

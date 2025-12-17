@@ -1,16 +1,16 @@
 """
 Shell completion scripts for the CLI.
 
-This module provides bash and zsh completion scripts for the ohfp command,
+This module provides bash and zsh completion scripts for the orb command,
 enabling tab completion for commands, options, and arguments.
 """
 
 
 def generate_bash_completion() -> str:
-    """Generate bash completion script for ohfp command."""
+    """Generate bash completion script for orb command."""
     return """#!/bin/bash
 
-_ohfp_completion() {
+_orb_completion() {
     local cur prev words cword
     _init_completion || return
 
@@ -93,23 +93,22 @@ _ohfp_completion() {
     COMPREPLY=($(compgen -W "$global_opts" -- "$cur"))
 }
 
-complete -F _ohfp_completion ohfp
-complete -F _ohfp_completion open-hostfactory-plugin
+complete -F _orb_completion orb
 """
 
 
 def generate_zsh_completion() -> str:
-    """Generate zsh completion script for ohfp command."""
-    return """#compdef ohfp open-hostfactory-plugin
+    """Generate zsh completion script for orb command."""
+    return """#compdef orb
 
-_ohfp() {
+_orb() {
     local context state line
     typeset -A opt_args
 
     _arguments -C \
-        '1: :_ohfp_resources' \
-        '2: :_ohfp_actions' \
-        '*: :_ohfp_options' \
+        '1: :_orb_resources' \
+        '2: :_orb_actions' \
+        '*: :_orb_options' \
         '--config[Configuration file]:file:_files' \
         '--log-level[Log level]:(DEBUG INFO WARNING ERROR CRITICAL)' \
         '--format[Output format]:(json yaml table list)' \
@@ -122,7 +121,7 @@ _ohfp() {
         '--help[Show help]'
 }
 
-_ohfp_resources() {
+_orb_resources() {
     local resources
     resources=(
         'templates:Manage compute templates'
@@ -136,7 +135,7 @@ _ohfp_resources() {
     _describe 'resources' resources
 }
 
-_ohfp_actions() {
+_orb_actions() {
     case $words[2] in
         templates)
             local actions=(
@@ -211,7 +210,7 @@ _ohfp_actions() {
     esac
 }
 
-_ohfp_options() {
+_orb_options() {
     case "$words[2] $words[3]" in
         "templates list")
             _arguments \
@@ -238,5 +237,5 @@ _ohfp_options() {
     esac
 }
 
-_ohfp "$@"
+_orb "$@"
 """

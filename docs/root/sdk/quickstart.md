@@ -1,6 +1,6 @@
 # OpenHFPlugin SDK Quickstart
 
-The OpenHFPlugin SDK (ohfpsdk) provides a clean, async-first programmatic interface for cloud resource provisioning operations.
+The OpenHFPlugin SDK (orbsdk) provides a clean, async-first programmatic interface for cloud resource provisioning operations.
 
 ## Key Features
 
@@ -25,9 +25,9 @@ pip install open-hostfactory-plugin[sdk]
 ### Context Manager (Recommended)
 
 ```python
-from ohfpsdk import OHFPSDK
+from orbsdk import ORBSDK
 
-async with OHFPSDK(provider="aws") as sdk:
+async with ORBSDK(provider="aws") as sdk:
     # List available templates
     templates = await sdk.list_templates(active_only=True)
     print(f"Found {len(templates)} templates")
@@ -48,9 +48,9 @@ async with OHFPSDK(provider="aws") as sdk:
 ### Manual Initialization
 
 ```python
-from ohfpsdk import OHFPSDK
+from orbsdk import ORBSDK
 
-sdk = OHFPSDK(provider="aws")
+sdk = ORBSDK(provider="aws")
 await sdk.initialize()
 
 try:
@@ -66,11 +66,11 @@ finally:
 ### Environment Variables
 
 ```bash
-export OHFP_PROVIDER=aws
-export OHFP_REGION=us-east-1
-export OHFP_PROFILE=default
-export OHFP_TIMEOUT=300
-export OHFP_LOG_LEVEL=INFO
+export ORB_PROVIDER=aws
+export ORB_REGION=us-east-1
+export ORB_PROFILE=default
+export ORB_TIMEOUT=300
+export ORB_LOG_LEVEL=INFO
 ```
 
 ### Configuration Dictionary
@@ -78,12 +78,12 @@ export OHFP_LOG_LEVEL=INFO
 ```python
 config = {
     "provider": "aws",
-    "region": "us-west-2", 
+    "region": "us-west-2",
     "timeout": 600,
     "log_level": "DEBUG"
 }
 
-async with OHFPSDK(config=config) as sdk:
+async with ORBSDK(config=config) as sdk:
     # Use SDK with custom configuration
     pass
 ```
@@ -92,7 +92,7 @@ async with OHFPSDK(config=config) as sdk:
 
 ```python
 # Load from JSON file
-async with OHFPSDK(config_path="config.json") as sdk:
+async with ORBSDK(config_path="config.json") as sdk:
     pass
 ```
 
@@ -101,7 +101,7 @@ async with OHFPSDK(config_path="config.json") as sdk:
 The SDK automatically discovers all available methods from the existing CQRS handlers:
 
 ```python
-async with OHFPSDK(provider="mock") as sdk:
+async with ORBSDK(provider="mock") as sdk:
     # List all available methods
     methods = sdk.list_available_methods()
     print(f"Available methods: {methods}")
@@ -124,7 +124,7 @@ async with OHFPSDK(provider="mock") as sdk:
 ### Template Management
 
 ```python
-async with OHFPSDK(provider="aws") as sdk:
+async with ORBSDK(provider="aws") as sdk:
     # List all templates
     templates = await sdk.list_templates()
 
@@ -160,7 +160,7 @@ async with OHFPSDK(provider="aws") as sdk:
 ### Machine Provisioning
 
 ```python
-async with OHFPSDK(provider="aws") as sdk:
+async with ORBSDK(provider="aws") as sdk:
     # Create machine request
     request = await sdk.create_request(
         template_id="basic-template",
@@ -186,7 +186,7 @@ async with OHFPSDK(provider="aws") as sdk:
 ### Request Management
 
 ```python
-async with OHFPSDK(provider="aws") as sdk:
+async with ORBSDK(provider="aws") as sdk:
     # List requests
     requests = await sdk.list_requests(status="pending")
 
@@ -200,7 +200,7 @@ async with OHFPSDK(provider="aws") as sdk:
 ### Provider Operations
 
 ```python
-async with OHFPSDK(provider="aws") as sdk:
+async with ORBSDK(provider="aws") as sdk:
     # Check provider health
     health = await sdk.get_provider_health()
 
@@ -217,7 +217,7 @@ async with OHFPSDK(provider="aws") as sdk:
 ### System Operations
 
 ```python
-async with OHFPSDK(provider="aws") as sdk:
+async with ORBSDK(provider="aws") as sdk:
     # Get system status
     status = await sdk.get_system_status()
 
@@ -231,10 +231,10 @@ async with OHFPSDK(provider="aws") as sdk:
 ## Error Handling
 
 ```python
-from ohfpsdk import OHFPSDK, SDKError, ConfigurationError, ProviderError
+from orbsdk import ORBSDK, SDKError, ConfigurationError, ProviderError
 
 try:
-    async with OHFPSDK(provider="aws") as sdk:
+    async with ORBSDK(provider="aws") as sdk:
         templates = await sdk.list_templates()
 except ConfigurationError as e:
     print(f"Configuration error: {e}")
@@ -259,7 +259,7 @@ except SDKError as e:
 ### Custom Middleware
 
 ```python
-from ohfpsdk import OHFPSDK, SDKMiddleware
+from orbsdk import ORBSDK, SDKMiddleware
 
 class LoggingMiddleware(SDKMiddleware):
     async def process(self, method_name, args, kwargs, next_handler):
@@ -268,7 +268,7 @@ class LoggingMiddleware(SDKMiddleware):
         print(f"{method_name} returned: {result}")
         return result
 
-async with OHFPSDK(provider="aws") as sdk:
+async with ORBSDK(provider="aws") as sdk:
     sdk.add_middleware(LoggingMiddleware())
     templates = await sdk.list_templates()
 ```
@@ -276,7 +276,7 @@ async with OHFPSDK(provider="aws") as sdk:
 ### Batch Operations
 
 ```python
-async with OHFPSDK(provider="aws") as sdk:
+async with ORBSDK(provider="aws") as sdk:
     # Create multiple machines in different regions
     results = await sdk.batch([
         sdk.create_request("template-us-east", 2),
@@ -291,7 +291,7 @@ async with OHFPSDK(provider="aws") as sdk:
 ### Custom Serialization
 
 ```python
-async with OHFPSDK(provider="aws") as sdk:
+async with ORBSDK(provider="aws") as sdk:
     # Get raw response data
     raw_data = await sdk.list_templates(raw_response=True)
 

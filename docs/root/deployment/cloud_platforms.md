@@ -12,20 +12,20 @@ The Open Host Factory Plugin supports deployment on major cloud platforms with c
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ohfp-api
+  name: orb-api
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: ohfp-api
+      app: orb-api
   template:
     metadata:
       labels:
-        app: ohfp-api
+        app: orb-api
     spec:
       containers:
-      - name: ohfp-api
-        image: your-registry.com/ohfp-api:1.0.0
+      - name: orb-api
+        image: your-registry.com/orb-api:1.0.0
         ports:
         - containerPort: 8000
         env:
@@ -48,17 +48,17 @@ spec:
 
 ```json
 {
-  "family": "ohfp-api",
+  "family": "orb-api",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "512",
   "memory": "1024",
   "executionRoleArn": "arn:aws:iam::account:role/ecsTaskExecutionRole",
-  "taskRoleArn": "arn:aws:iam::account:role/ohfp-task-role",
+  "taskRoleArn": "arn:aws:iam::account:role/orb-task-role",
   "containerDefinitions": [
     {
-      "name": "ohfp-api",
-      "image": "your-registry.com/ohfp-api:latest",
+      "name": "orb-api",
+      "image": "your-registry.com/orb-api:latest",
       "portMappings": [
         {
           "containerPort": 8000,
@@ -74,7 +74,7 @@ spec:
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/ohfp-api",
+          "awslogs-group": "/ecs/orb-api",
           "awslogs-region": "us-east-1",
           "awslogs-stream-prefix": "ecs"
         }
@@ -88,8 +88,8 @@ spec:
 
 ```bash
 # Deploy to Cloud Run
-gcloud run deploy ohfp-api \
-  --image gcr.io/your-project/ohfp-api:latest \
+gcloud run deploy orb-api \
+  --image gcr.io/your-project/orb-api:latest \
   --platform managed \
   --region us-central1 \
   --set-env-vars HF_SERVER_ENABLED=true,HF_AUTH_ENABLED=true \
@@ -102,8 +102,8 @@ gcloud run deploy ohfp-api \
 # Deploy to Azure Container Instances
 az container create \
   --resource-group myResourceGroup \
-  --name ohfp-api \
-  --image your-registry.com/ohfp-api:latest \
+  --name orb-api \
+  --image your-registry.com/orb-api:latest \
   --ports 8000 \
   --environment-variables HF_SERVER_ENABLED=true HF_AUTH_ENABLED=true
 ```

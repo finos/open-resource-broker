@@ -49,13 +49,13 @@ class SDKConfig:
         Uses the same environment variable patterns as the existing system.
         """
         return cls(
-            provider=os.getenv("OHFP_PROVIDER", "aws"),
-            region=os.getenv("OHFP_REGION"),
-            profile=os.getenv("OHFP_PROFILE"),
-            timeout=int(os.getenv("OHFP_TIMEOUT", "300")),
-            retry_attempts=int(os.getenv("OHFP_RETRY_ATTEMPTS", "3")),
-            log_level=os.getenv("OHFP_LOG_LEVEL", "INFO"),
-            config_path=os.getenv("OHFP_CONFIG_PATH"),
+            provider=os.getenv("ORB_PROVIDER", "aws"),
+            region=os.getenv("ORB_REGION"),
+            profile=os.getenv("ORB_PROFILE"),
+            timeout=int(os.getenv("ORB_TIMEOUT", "300")),
+            retry_attempts=int(os.getenv("ORB_RETRY_ATTEMPTS", "3")),
+            log_level=os.getenv("ORB_LOG_LEVEL", "INFO"),
+            config_path=os.getenv("ORB_CONFIG_PATH"),
         )
 
     @classmethod

@@ -407,13 +407,13 @@ Use the built-in validation tool to check your configuration:
 
 ```bash
 # Validate current configuration
-ohfp config validate --native-spec
+orb config validate --native-spec
 
 # Validate specific configuration file
-ohfp config validate --file config.json --native-spec
+orb config validate --file config.json --native-spec
 
 # Test template rendering with current config
-ohfp templates validate --native-spec-test
+orb templates validate --native-spec-test
 ```
 
 ### Common Configuration Issues
@@ -577,8 +577,8 @@ export NATIVE_SPEC_ENABLED=false
 
 ```bash
 # Test configuration without applying
-ohfp config test --native-spec
+orb config test --native-spec
 
 # Validate specific template with new config
-ohfp templates render --template-id test-template --dry-run
+orb templates render --template-id test-template --dry-run
 ```

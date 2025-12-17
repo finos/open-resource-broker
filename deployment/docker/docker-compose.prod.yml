@@ -5,9 +5,9 @@ version: '3.8'
 
 services:
   # Production REST API service
-  ohfp-api:
-    image: ohfp-api:${VERSION:-latest}
-    container_name: ohfp-api-prod
+  orb-api:
+    image: orb-api:${VERSION:-latest}
+    container_name: orb-api-prod
     restart: always
 
     # Environment variables for production
@@ -53,9 +53,9 @@ services:
       # Configuration (read-only)
       - ./config/production.json:/app/config/docker.json:ro
       # Data persistence
-      - ohfp-prod-data:/app/data
+      - orb-prod-data:/app/data
       # Logs
-      - ohfp-prod-logs:/app/logs
+      - orb-prod-logs:/app/logs
 
     # Health check
     healthcheck:
@@ -97,12 +97,12 @@ services:
 
     # Network
     networks:
-      - ohfp-prod-network
+      - orb-prod-network
 
   # Production Nginx reverse proxy
   nginx:
     image: nginx:alpine
-    container_name: ohfp-nginx-prod
+    container_name: orb-nginx-prod
     restart: always
     ports:
       - "80:80"
@@ -110,11 +110,11 @@ services:
     volumes:
       - ./docker/nginx-prod.conf:/etc/nginx/nginx.conf:ro
       - ./docker/ssl:/etc/nginx/ssl:ro
-      - ohfp-prod-logs:/var/log/nginx
+      - orb-prod-logs:/var/log/nginx
     depends_on:
-      - ohfp-api
+      - orb-api
     networks:
-      - ohfp-prod-network
+      - orb-prod-network
 
     # Security options
     security_opt:
@@ -137,13 +137,13 @@ services:
   # Production monitoring (optional)
   prometheus:
     image: prom/prometheus:latest
-    container_name: ohfp-prometheus
+    container_name: orb-prometheus
     restart: always
     ports:
       - "9090:9090"
     volumes:
       - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ohfp-prometheus-data:/prometheus
+      - orb-prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -152,43 +152,43 @@ services:
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
     networks:
-      - ohfp-prod-network
+      - orb-prod-network
     profiles:
       - monitoring
 
   # Production log aggregation (optional)
   fluentd:
     image: fluent/fluentd:v1.16-debian-1
-    container_name: ohfp-fluentd
+    container_name: orb-fluentd
     restart: always
     volumes:
       - ./docker/fluentd.conf:/fluentd/etc/fluent.conf:ro
-      - ohfp-prod-logs:/var/log/ohfp:ro
+      - orb-prod-logs:/var/log/orb:ro
     networks:
-      - ohfp-prod-network
+      - orb-prod-network
     profiles:
       - logging
 
 # Production volumes
 volumes:
-  ohfp-prod-data:
+  orb-prod-data:
     driver: local
     driver_opts:
       type: none
       o: bind
       device: ${DATA_PATH:-./data}
-  ohfp-prod-logs:
+  orb-prod-logs:
     driver: local
     driver_opts:
       type: none
       o: bind
       device: ${LOGS_PATH:-./logs}
-  ohfp-prometheus-data:
+  orb-prometheus-data:
     driver: local
 
 # Production network
 networks:
-  ohfp-prod-network:
+  orb-prod-network:
     driver: bridge
     ipam:
       config:

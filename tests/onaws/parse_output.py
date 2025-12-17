@@ -1,5 +1,5 @@
 """
-Output parsing utility for OHFP test results.
+Output parsing utility for ORB test results.
 
 This module provides functions to parse and display JSON output from
 Host Factory Plugin operations in a readable format.

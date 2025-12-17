@@ -87,8 +87,8 @@ The `ProviderCapabilityService` validates template requirements against provider
 #### Capability Validation
 ```python
 def validate_template_requirements(
-    template: Template, 
-    provider_instance: str, 
+    template: Template,
+    provider_instance: str,
     level: ValidationLevel
 ) -> ValidationResult:
     # Validate API support
@@ -328,26 +328,26 @@ POST /api/v1/requests
 #### Provider Management
 ```bash
 # List available providers
-ohfp providers list
+orb providers list
 
 # Show provider capabilities
-ohfp providers show aws-us-east-1
+orb providers show aws-us-east-1
 
 # Validate provider configuration
-ohfp providers validate
+orb providers validate
 ```
 
 #### Template Operations
 ```bash
 # List templates by provider
-ohfp templates list --provider-type aws
-ohfp templates list --provider-name aws-us-east-1
+orb templates list --provider-type aws
+orb templates list --provider-name aws-us-east-1
 
 # Show template source information
-ohfp templates show web-server --source-info
+orb templates show web-server --source-info
 
 # Validate template against provider
-ohfp templates validate web-server --provider aws-us-east-1
+orb templates validate web-server --provider aws-us-east-1
 ```
 
 ## Error Handling and Validation
@@ -426,10 +426,10 @@ ohfp templates validate web-server --provider aws-us-east-1
 ### Template Migration
 ```bash
 # Migrate existing templates to provider-specific files
-ohfp templates migrate --from templates.json --to-provider aws-us-east-1
+orb templates migrate --from templates.json --to-provider aws-us-east-1
 
 # Validate migrated templates
-ohfp templates validate --all --provider aws-us-east-1
+orb templates validate --all --provider aws-us-east-1
 ```
 
 ## Best Practices

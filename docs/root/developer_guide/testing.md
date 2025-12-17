@@ -144,8 +144,8 @@ def test_dockerfile_structure(self, dockerfile_path):
     assert "FROM python:3.11-slim as production" in content
 
     # Check for security best practices
-    assert "RUN groupadd -r ohfp && useradd -r -g ohfp" in content
-    assert "USER ohfp" in content
+    assert "RUN groupadd -r orb && useradd -r -g orb" in content
+    assert "USER orb" in content
 ```
 
 ### Container Integration Testing
@@ -175,8 +175,8 @@ def test_docker_compose_dev_service_configuration(self, project_root):
     with open(project_root / "docker-compose.yml") as f:
         compose_config = yaml.safe_load(f)
 
-    assert "ohfp-api" in compose_config["services"]
-    assert "build" in compose_config["services"]["ohfp-api"]
+    assert "orb-api" in compose_config["services"]
+    assert "build" in compose_config["services"]["orb-api"]
 ```
 
 ## Test Utilities

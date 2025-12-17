@@ -30,7 +30,7 @@ vim .env
 docker-compose up -d
 
 # View logs
-docker-compose logs -f ohfp-api
+docker-compose logs -f orb-api
 
 # Access API documentation
 open http://localhost:8000/docs
@@ -129,7 +129,7 @@ Configuration files are loaded in the following order (highest precedence first)
 
 ```bash
 # Build development image
-docker build -t ohfp-api:dev .
+docker build -t orb-api:dev .
 
 # Build production image with build script
 ./docker/build.sh --version 1.0.0
@@ -143,55 +143,55 @@ docker build -t ohfp-api:dev .
 ```bash
 # Run development container
 docker run -d \
-  --name ohfp-api \
+  --name orb-api \
   -p 8000:8000 \
   -e HF_SERVER_ENABLED=true \
   -e HF_AUTH_ENABLED=false \
   -v $(pwd)/config:/app/config:ro \
   -v $(pwd)/data:/app/data \
-  ohfp-api:latest
+  orb-api:latest
 
 # Run with authentication
 docker run -d \
-  --name ohfp-api-auth \
+  --name orb-api-auth \
   -p 8000:8000 \
   -e HF_SERVER_ENABLED=true \
   -e HF_AUTH_ENABLED=true \
   -e HF_AUTH_STRATEGY=bearer_token \
   -e HF_AUTH_BEARER_SECRET_KEY=your-secret-key \
-  ohfp-api:latest
+  orb-api:latest
 
 # Run with AWS credentials
 docker run -d \
-  --name ohfp-api-aws \
+  --name orb-api-aws \
   -p 8000:8000 \
   -e HF_SERVER_ENABLED=true \
   -e AWS_ACCESS_KEY_ID=your-key \
   -e AWS_SECRET_ACCESS_KEY=your-secret \
   -e HF_PROVIDER_AWS_REGION=us-east-1 \
-  ohfp-api:latest
+  orb-api:latest
 ```
 
 ### Container Management
 
 ```bash
 # View logs
-docker logs -f ohfp-api
+docker logs -f orb-api
 
 # Execute commands in container
-docker exec -it ohfp-api bash
+docker exec -it orb-api bash
 
 # Run CLI commands
-docker exec ohfp-api python src/run.py templates list
+docker exec orb-api python src/run.py templates list
 
 # Health check
-docker exec ohfp-api curl -f http://localhost:8000/health
+docker exec orb-api curl -f http://localhost:8000/health
 
 # Stop container
-docker stop ohfp-api
+docker stop orb-api
 
 # Remove container
-docker rm ohfp-api
+docker rm orb-api
 ```
 
 ## Docker Compose
@@ -203,13 +203,13 @@ docker rm ohfp-api
 docker-compose up -d
 
 # Start specific services
-docker-compose up -d ohfp-api
+docker-compose up -d orb-api
 
 # View logs
 docker-compose logs -f
 
 # Scale services
-docker-compose up -d --scale ohfp-api=3
+docker-compose up -d --scale orb-api=3
 
 # Stop services
 docker-compose down
@@ -226,20 +226,20 @@ docker-compose -f docker-compose.prod.yml up -d
 
 # Update production deployment
 docker-compose -f docker-compose.prod.yml pull
-docker-compose -f docker-compose.prod.yml up -d --no-deps ohfp-api
+docker-compose -f docker-compose.prod.yml up -d --no-deps orb-api
 
 # View production logs
 docker-compose -f docker-compose.prod.yml logs -f
 
 # Production health check
-docker-compose -f docker-compose.prod.yml exec ohfp-api curl -f http://localhost:8000/health
+docker-compose -f docker-compose.prod.yml exec orb-api curl -f http://localhost:8000/health
 ```
 
 ## Security
 
 ### Container Security
 
-- **Non-root user**: Container runs as `ohfp` user (UID/GID 1000)
+- **Non-root user**: Container runs as `orb` user (UID/GID 1000)
 - **Read-only filesystem**: Production containers use read-only root filesystem
 - **No new privileges**: Security option prevents privilege escalation
 - **Minimal attack surface**: Multi-stage build with minimal runtime dependencies
@@ -249,34 +249,34 @@ docker-compose -f docker-compose.prod.yml exec ohfp-api curl -f http://localhost
 
 ```bash
 # Create custom network
-docker network create --driver bridge ohfp-network
+docker network create --driver bridge orb-network
 
 # Run with custom network
 docker run -d \
-  --name ohfp-api \
-  --network ohfp-network \
+  --name orb-api \
+  --network orb-network \
   -p 8000:8000 \
-  ohfp-api:latest
+  orb-api:latest
 ```
 
 ### Secrets Management
 
 ```bash
 # Use Docker secrets (Docker Swarm)
-echo "your-secret-key" | docker secret create ohfp-jwt-secret -
+echo "your-secret-key" | docker secret create orb-jwt-secret -
 
 # Use environment file
 docker run -d \
-  --name ohfp-api \
+  --name orb-api \
   --env-file .env.production \
-  ohfp-api:latest
+  orb-api:latest
 
 # Use external secrets management
 docker run -d \
-  --name ohfp-api \
+  --name orb-api \
   -e HF_AUTH_BEARER_SECRET_KEY_FILE=/run/secrets/jwt-secret \
   -v /path/to/secrets:/run/secrets:ro \
-  ohfp-api:latest
+  orb-api:latest
 ```
 
 ## Monitoring
@@ -285,7 +285,7 @@ docker run -d \
 
 ```bash
 # Container health check
-docker inspect --format='{{.State.Health.Status}}' ohfp-api
+docker inspect --format='{{.State.Health.Status}}' orb-api
 
 # Manual health check
 curl -f http://localhost:8000/health
@@ -298,29 +298,29 @@ curl -f -H "Authorization: Bearer your-token" http://localhost:8000/health
 
 ```bash
 # View container logs
-docker logs ohfp-api
+docker logs orb-api
 
 # Follow logs
-docker logs -f ohfp-api
+docker logs -f orb-api
 
 # View logs with timestamps
-docker logs -t ohfp-api
+docker logs -t orb-api
 
 # View last N lines
-docker logs --tail 100 ohfp-api
+docker logs --tail 100 orb-api
 ```
 
 ### Metrics
 
 ```bash
 # Container resource usage
-docker stats ohfp-api
+docker stats orb-api
 
 # Container processes
-docker exec ohfp-api ps aux
+docker exec orb-api ps aux
 
 # Container filesystem usage
-docker exec ohfp-api df -h
+docker exec orb-api df -h
 ```
 
 ## Troubleshooting
@@ -330,19 +330,19 @@ docker exec ohfp-api df -h
 #### Container Won't Start
 ```bash
 # Check container logs
-docker logs ohfp-api
+docker logs orb-api
 
 # Check container configuration
-docker inspect ohfp-api
+docker inspect orb-api
 
 # Run container interactively
-docker run -it --rm ohfp-api:latest bash
+docker run -it --rm orb-api:latest bash
 ```
 
 #### Authentication Issues
 ```bash
 # Check authentication configuration
-docker exec ohfp-api python -c "
+docker exec orb-api python -c "
 from src.config.manager import ConfigurationManager
 config = ConfigurationManager()
 print(config.get_typed(ServerConfig).auth.enabled)
@@ -355,13 +355,13 @@ curl -v http://localhost:8000/info
 #### AWS Connectivity Issues
 ```bash
 # Check AWS credentials
-docker exec ohfp-api aws sts get-caller-identity
+docker exec orb-api aws sts get-caller-identity
 
 # Check AWS region
-docker exec ohfp-api env | grep AWS
+docker exec orb-api env | grep AWS
 
 # Test AWS connectivity
-docker exec ohfp-api python -c "
+docker exec orb-api python -c "
 import boto3
 ec2 = boto3.client('ec2')
 print(ec2.describe_regions())
@@ -371,16 +371,16 @@ print(ec2.describe_regions())
 #### Performance Issues
 ```bash
 # Check resource usage
-docker stats ohfp-api
+docker stats orb-api
 
 # Check container limits
-docker inspect ohfp-api | grep -A 10 Resources
+docker inspect orb-api | grep -A 10 Resources
 
 # Increase worker processes
 docker run -d \
-  --name ohfp-api \
+  --name orb-api \
   -e HF_SERVER_WORKERS=4 \
-  ohfp-api:latest
+  orb-api:latest
 ```
 
 ### Debug Mode
@@ -388,17 +388,17 @@ docker run -d \
 ```bash
 # Run in debug mode
 docker run -d \
-  --name ohfp-api-debug \
+  --name orb-api-debug \
   -p 8000:8000 \
   -e HF_DEBUG=true \
   -e HF_LOGGING_LEVEL=DEBUG \
-  ohfp-api:latest
+  orb-api:latest
 
 # Interactive debugging
 docker run -it --rm \
   -p 8000:8000 \
   -e HF_DEBUG=true \
-  ohfp-api:latest bash
+  orb-api:latest bash
 ```
 
 ## Best Practices
@@ -430,8 +430,8 @@ docker run -it --rm \
 
 # Security scanning
 docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-  aquasec/trivy image ohfp-api:latest
+  aquasec/trivy image orb-api:latest
 
 # Push to registry
-docker push ${CI_REGISTRY}/ohfp-api:${CI_COMMIT_TAG}
+docker push ${CI_REGISTRY}/orb-api:${CI_COMMIT_TAG}
 ```

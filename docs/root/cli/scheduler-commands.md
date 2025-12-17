@@ -9,21 +9,21 @@ The scheduler management commands allow you to list, configure, and validate sch
 List all available scheduler strategies:
 
 ```bash
-ohfp scheduler list
+orb scheduler list
 ```
 
 List with detailed information:
 
 ```bash
-ohfp scheduler list --long
+orb scheduler list --long
 ```
 
 Output formats:
 
 ```bash
-ohfp scheduler list --format table
-ohfp scheduler list --format yaml
-ohfp scheduler list --format json
+orb scheduler list --format table
+orb scheduler list --format yaml
+orb scheduler list --format json
 ```
 
 ### Show Scheduler Configuration
@@ -31,14 +31,14 @@ ohfp scheduler list --format json
 Show current scheduler configuration:
 
 ```bash
-ohfp scheduler show
+orb scheduler show
 ```
 
 Show specific scheduler configuration:
 
 ```bash
-ohfp scheduler show --scheduler default
-ohfp scheduler show --scheduler hostfactory
+orb scheduler show --scheduler default
+orb scheduler show --scheduler hostfactory
 ```
 
 ### Validate Scheduler Configuration
@@ -46,13 +46,13 @@ ohfp scheduler show --scheduler hostfactory
 Validate current scheduler configuration:
 
 ```bash
-ohfp scheduler validate
+orb scheduler validate
 ```
 
 Validate specific scheduler:
 
 ```bash
-ohfp scheduler validate --scheduler default
+orb scheduler validate --scheduler default
 ```
 
 ## Global Scheduler Override
@@ -61,13 +61,13 @@ You can override the scheduler strategy for any command using the global `--sche
 
 ```bash
 # Use default scheduler for templates command
-ohfp --scheduler default templates list
+orb --scheduler default templates list
 
 # Use hostfactory scheduler for requests
-ohfp --scheduler hostfactory requests create --template-id test --count 5
+orb --scheduler hostfactory requests create --template-id test --count 5
 
 # Override scheduler for machine operations
-ohfp --scheduler hf machines list
+orb --scheduler hf machines list
 ```
 
 ### Supported Schedulers
@@ -82,7 +82,7 @@ ohfp --scheduler hf machines list
 
 ```bash
 # List available schedulers
-$ ohfp scheduler list
+$ orb scheduler list
 {
   "strategies": [
     {
@@ -91,7 +91,7 @@ $ ohfp scheduler list
       "registered": true
     },
     {
-      "name": "hostfactory", 
+      "name": "hostfactory",
       "active": true,
       "registered": true
     },
@@ -106,7 +106,7 @@ $ ohfp scheduler list
 }
 
 # Show current configuration
-$ ohfp scheduler show
+$ orb scheduler show
 {
   "scheduler_name": "hostfactory",
   "configuration": {
@@ -119,7 +119,7 @@ $ ohfp scheduler show
 }
 
 # Validate configuration
-$ ohfp scheduler validate
+$ orb scheduler validate
 {
   "is_valid": true,
   "validation_errors": [],
@@ -131,7 +131,7 @@ $ ohfp scheduler validate
 
 ```bash
 # List with detailed information
-$ ohfp scheduler list --long
+$ orb scheduler list --long
 {
   "strategies": [
     {
@@ -158,11 +158,11 @@ $ ohfp scheduler list --long
 
 ```bash
 # Compare template output with different schedulers
-$ ohfp --scheduler default templates list --format table
-$ ohfp --scheduler hostfactory templates list --format table
+$ orb --scheduler default templates list --format table
+$ orb --scheduler hostfactory templates list --format table
 
 # Use specific scheduler for machine requests
-$ ohfp --scheduler default requests create --template-id aws-ec2-basic --count 3
+$ orb --scheduler default requests create --template-id aws-ec2-basic --count 3
 ```
 
 ## Error Handling
@@ -172,7 +172,7 @@ The scheduler commands provide detailed error messages for common issues:
 ### Invalid Scheduler
 
 ```bash
-$ ohfp scheduler validate --scheduler unknown
+$ orb scheduler validate --scheduler unknown
 {
   "is_valid": false,
   "validation_errors": [
@@ -185,7 +185,7 @@ $ ohfp scheduler validate --scheduler unknown
 ### Configuration Issues
 
 ```bash
-$ ohfp scheduler validate
+$ orb scheduler validate
 {
   "is_valid": false,
   "validation_errors": [

@@ -33,12 +33,12 @@ log_debug() {
 # Print startup banner
 print_banner() {
     cat << 'EOF'
-  ___                   _   _           _     _____          _                   
- / _ \ _ __   ___ _ __  | | | | ___  ___| |_  |  ___|_ _  ___| |_ ___  _ __ _   _ 
+  ___                   _   _           _     _____          _
+ / _ \ _ __   ___ _ __  | | | | ___  ___| |_  |  ___|_ _  ___| |_ ___  _ __ _   _
 | | | | '_ \ / _ \ '_ \ | |_| |/ _ \/ __| __| | |_ / _` |/ __| __/ _ \| '__| | | |
 | |_| | |_) |  __/ | | |  _  | (_) \__ \ |_  |  _| (_| | (__| || (_) | |  | |_| |
  \___/| .__/ \___|_| |_|_| |_|\___/|___/\__| |_|  \__,_|\___|\__\___/|_|   \__, |
-      |_|                                                                  |___/ 
+      |_|                                                                  |___/
                             Plugin REST API
 EOF
     echo ""
@@ -84,7 +84,7 @@ setup_configuration() {
 
     # Configuration file precedence:
     # 1. /app/config/docker.json (if exists)
-    # 2. /app/config/production.json (if exists)  
+    # 2. /app/config/production.json (if exists)
     # 3. /app/config/default_config.json (fallback)
     # 4. Environment variables (highest precedence)
 
@@ -127,7 +127,7 @@ setup_aws_credentials() {
         # Check for AWS credentials
         if [[ -n "${AWS_ACCESS_KEY_ID}" ]] && [[ -n "${AWS_SECRET_ACCESS_KEY}" ]]; then
             log_info "Using AWS credentials from environment variables"
-        elif [[ -f "/root/.aws/credentials" ]] || [[ -f "/home/ohfp/.aws/credentials" ]]; then
+        elif [[ -f "/root/.aws/credentials" ]] || [[ -f "/home/orb/.aws/credentials" ]]; then
             log_info "Using AWS credentials from credentials file"
         elif [[ -n "${AWS_ROLE_ARN}" ]]; then
             log_info "Using AWS IAM role: ${AWS_ROLE_ARN}"
@@ -201,10 +201,10 @@ start_application() {
         cmd_args+=("--server-log-level" "${HF_SERVER_LOG_LEVEL}")
     fi
 
-    log_info "Executing: ohfp ${cmd_args[*]}"
+    log_info "Executing: orb ${cmd_args[*]}"
 
     # Execute the application
-    exec ohfp "${cmd_args[@]}"
+    exec orb "${cmd_args[@]}"
 }
 
 # Handle different commands
@@ -221,7 +221,7 @@ handle_command() {
             # Run CLI commands
             shift
             log_info "Running CLI command: $*"
-            exec ohfp "$@"
+            exec orb "$@"
             ;;
         "bash"|"sh")
             # Start interactive shell
@@ -243,7 +243,7 @@ handle_command() {
         *)
             # Unknown command - pass through to application
             log_info "Passing command to application: $*"
-            exec ohfp "$@"
+            exec orb "$@"
             ;;
     esac
 }

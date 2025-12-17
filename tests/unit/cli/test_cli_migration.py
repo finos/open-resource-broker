@@ -56,12 +56,12 @@ class TestCLIMigration:
         bash_completion = generate_bash_completion()
         assert isinstance(bash_completion, str)
         assert "#!/bin/bash" in bash_completion
-        assert "_ohfp_completion" in bash_completion
+        assert "_orb_completion" in bash_completion
 
         zsh_completion = generate_zsh_completion()
         assert isinstance(zsh_completion, str)
-        assert "#compdef ohfp" in zsh_completion
-        assert "_ohfp" in zsh_completion
+        assert "#compdef orb" in zsh_completion
+        assert "_orb" in zsh_completion
 
     def test_output_formatting(self):
         """Test that output formatting works correctly."""

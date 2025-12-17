@@ -58,13 +58,13 @@ class TestSDKConfig:
     def test_from_env_with_values(self):
         """Test creating configuration from environment with values."""
         env_vars = {
-            "OHFP_PROVIDER": "mock",
-            "OHFP_REGION": "us-east-1",
-            "OHFP_PROFILE": "test",
-            "OHFP_TIMEOUT": "600",
-            "OHFP_RETRY_ATTEMPTS": "5",
-            "OHFP_LOG_LEVEL": "DEBUG",
-            "OHFP_CONFIG_PATH": "/path/to/config",
+            "ORB_PROVIDER": "mock",
+            "ORB_REGION": "us-east-1",
+            "ORB_PROFILE": "test",
+            "ORB_TIMEOUT": "600",
+            "ORB_RETRY_ATTEMPTS": "5",
+            "ORB_LOG_LEVEL": "DEBUG",
+            "ORB_CONFIG_PATH": "/path/to/config",
         }
 
         with patch.dict(os.environ, env_vars, clear=True):

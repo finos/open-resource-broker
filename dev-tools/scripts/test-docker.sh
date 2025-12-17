@@ -32,8 +32,8 @@ log_debug() {
 
 # Configuration
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TEST_IMAGE_NAME="ohfp-api:docker-test"
-CONTAINER_NAME="ohfp-docker-test"
+TEST_IMAGE_NAME="orb-api:docker-test"
+CONTAINER_NAME="orb-docker-test"
 TEST_PORT="8004"
 
 # Cleanup function
@@ -264,17 +264,17 @@ test_security_features() {
     local user_check
     user_check=$(docker run --rm "${TEST_IMAGE_NAME}" bash -c "whoami")
 
-    if [[ "${user_check}" != "ohfp" ]]; then
-        log_error "Container not running as ohfp user (running as: ${user_check})"
+    if [[ "${user_check}" != "orb" ]]; then
+        log_error "Container not running as orb user (running as: ${user_check})"
         return 1
     fi
 
     # Test file permissions
     local perm_check
-    perm_check=$(docker run --rm "${TEST_IMAGE_NAME}" bash -c "ls -la /app/ | grep -E '^d.*ohfp.*ohfp'")
+    perm_check=$(docker run --rm "${TEST_IMAGE_NAME}" bash -c "ls -la /app/ | grep -E '^d.*orb.*orb'")
 
     if [[ -z "${perm_check}" ]]; then
-        log_error "App directory not owned by ohfp user"
+        log_error "App directory not owned by orb user"
         return 1
     fi
 
@@ -323,7 +323,7 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  --debug         Enable debug output"
             echo "  --port PORT     Use specific port for testing (default: 8004)"
-            echo "  --image NAME    Use specific image name (default: ohfp-api:docker-test)"
+            echo "  --image NAME    Use specific image name (default: orb-api:docker-test)"
             echo "  --help          Show this help message"
             exit 0
             ;;

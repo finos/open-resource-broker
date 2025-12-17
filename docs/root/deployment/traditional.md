@@ -13,8 +13,8 @@ Deploy the Open Host Factory Plugin directly on servers using traditional instal
 python3 --version
 
 # Virtual environment
-python3 -m venv ohfp-env
-source ohfp-env/bin/activate
+python3 -m venv orb-env
+source orb-env/bin/activate
 ```
 
 ### Installation
@@ -33,18 +33,18 @@ pip install -e .
 
 ```bash
 # Create configuration directory
-sudo mkdir -p /etc/ohfp
-sudo cp config/production.json /etc/ohfp/config.json
+sudo mkdir -p /etc/orb
+sudo cp config/production.json /etc/orb/config.json
 
 # Edit configuration
-sudo vim /etc/ohfp/config.json
+sudo vim /etc/orb/config.json
 ```
 
 ## Systemd Service
 
 ### Service File
 
-Create `/etc/systemd/system/ohfp-api.service`:
+Create `/etc/systemd/system/orb-api.service`:
 
 ```ini
 [Unit]
@@ -53,13 +53,13 @@ After=network.target
 
 [Service]
 Type=simple
-User=ohfp
-Group=ohfp
-WorkingDirectory=/opt/ohfp
+User=orb
+Group=orb
+WorkingDirectory=/opt/orb
 Environment=HF_SERVER_ENABLED=true
 Environment=HF_AUTH_ENABLED=true
-Environment=HF_CONFIG_FILE=/etc/ohfp/config.json
-ExecStart=/opt/ohfp/venv/bin/python -m src.run system serve
+Environment=HF_CONFIG_FILE=/etc/orb/config.json
+ExecStart=/opt/orb/venv/bin/python -m src.run system serve
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -73,14 +73,14 @@ WantedBy=multi-user.target
 
 ```bash
 # Enable and start service
-sudo systemctl enable ohfp-api
-sudo systemctl start ohfp-api
+sudo systemctl enable orb-api
+sudo systemctl start orb-api
 
 # Check status
-sudo systemctl status ohfp-api
+sudo systemctl status orb-api
 
 # View logs
-sudo journalctl -u ohfp-api -f
+sudo journalctl -u orb-api -f
 ```
 
 ## Nginx Reverse Proxy

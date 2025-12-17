@@ -2,7 +2,7 @@ name: Publish to PyPI
 
 # SECURITY NOTE: This workflow uses PyPI Trusted Publishing (OIDC)
 # No API tokens required - authentication is handled automatically via GitHub's OIDC token
-# 
+#
 # Prerequisites:
 # 1. Configure trusted publisher on PyPI: https://pypi.org/manage/account/publishing/
 # 2. Configure trusted publisher on TestPyPI: https://test.pypi.org/manage/account/publishing/
@@ -46,7 +46,7 @@ jobs:
     name: Build and Publish Package
     runs-on: ubuntu-latest
     needs: [get-config]
-    environment: 
+    environment:
       name: ${{ needs.get-config.outputs.is-release == 'true' && 'pypi' || github.event.inputs.environment || 'testpypi' }}
       url: ${{ needs.get-config.outputs.is-release == 'true' && 'https://pypi.org/p/open-hostfactory-plugin' || 'https://test.pypi.org/p/open-hostfactory-plugin' }}
     permissions:
@@ -119,7 +119,7 @@ jobs:
           echo ""
           echo "**Version:** $VERSION"
           echo "**Commands:**"
-          echo "- \`ohfp --help\`"
+          echo "- \`orb --help\`"
           echo "- \`open-hostfactory-plugin --help\`"
         } >> "$GITHUB_STEP_SUMMARY"
 

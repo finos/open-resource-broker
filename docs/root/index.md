@@ -51,7 +51,7 @@ open http://localhost:8000/docs
 pip install open-hostfactory-plugin
 
 # Verify installation
-ohfp --help
+orb --help
 ```
 
 ## Features
@@ -68,7 +68,7 @@ ohfp --help
 The plugin follows Domain-Driven Design (DDD) principles with a clean architecture approach:
 
 - **Domain Layer**: Pure business logic and entities
-- **Application Layer**: Use cases and application services  
+- **Application Layer**: Use cases and application services
 - **Infrastructure Layer**: Technical implementations
 - **API Layer**: REST API endpoints and CLI interface
 

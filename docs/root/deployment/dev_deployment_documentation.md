@@ -1,6 +1,6 @@
-# OHFP Provider Deployment Documentation
+# ORB Provider Deployment Documentation
 
-This document describes how to configure the Open Host Factory Plugin (OHFP) as a provider in IBM Spectrum Symphony Host Factory.
+This document describes how to configure the Open Host Factory Plugin (ORB) as a provider in IBM Spectrum Symphony Host Factory.
 
 ## Installation of the Open Host Factory Plugin
 
@@ -18,9 +18,9 @@ cd /opt/ibm/spectrumcomputing/hostfactory/1.2/providerplugins
 
 2. **Clone the repository:**
 ```bash
-mkdir -p ohfp
-git clone https://github.com/awslabs/open-hostfactory-plugin.git ./ohfp
-cd ohfp
+mkdir -p orb
+git clone https://github.com/awslabs/open-hostfactory-plugin.git ./orb
+cd orb
 ```
 
 3. **Set up Python virtual environment:**
@@ -46,8 +46,8 @@ pip install -e ".[dev]"
 
 5. **Verify installation:**
 ```bash
-ohfp --version
-ohfp --help
+orb --version
+orb --help
 ```
 
 
@@ -55,9 +55,9 @@ ohfp --help
 
 
 
-## Configuration of OHFP
+## Configuration of ORB
 
-There are 2 ways to configure OHFP:
+There are 2 ways to configure ORB:
 
 1. **Define a new provider altogether** (this document)
 2. **Define a new plugin for the existing provider**
@@ -70,15 +70,15 @@ There are 2 ways to configure OHFP:
 Navigate to the providers folder and create a folder for the new provider.
 ```bash
 cd /opt/ibm/spectrumcomputing/hostfactory/conf/providers
-mkdir aws_ohfp_provider
+mkdir aws_orb_provider
 ```
 
 Note: Due to current configuration, actual config files need to be placed into work directory instead of plugin config dir.
 
-Copy these 3 configuration files from the OHFP repository:
+Copy these 3 configuration files from the ORB repository:
 
 - `default_config.json`
-  - Base configuration containing defaults for OHFP. Does not need to be changed
+  - Base configuration containing defaults for ORB. Does not need to be changed
 
 
 - `config.json`
@@ -89,9 +89,9 @@ Copy these 3 configuration files from the OHFP repository:
 
 **Base Configuration:**
 ```bash
-cp /opt/ibm/spectrumcomputing/hostfactory/1.2/providerplugins/ohfp/config/default_config.json opt/ibm/spectrumcomputing/hostfactory/work/config/
-cp /opt/ibm/spectrumcomputing/hostfactory/1.2/providerplugins/ohfp/config/config.json opt/ibm/spectrumcomputing/hostfactory/work/config/
-cp /opt/ibm/spectrumcomputing/hostfactory/1.2/providerplugins/ohfp/config/awsprov_templates.json opt/ibm/spectrumcomputing/hostfactory/work/config/
+cp /opt/ibm/spectrumcomputing/hostfactory/1.2/providerplugins/orb/config/default_config.json opt/ibm/spectrumcomputing/hostfactory/work/config/
+cp /opt/ibm/spectrumcomputing/hostfactory/1.2/providerplugins/orb/config/config.json opt/ibm/spectrumcomputing/hostfactory/work/config/
+cp /opt/ibm/spectrumcomputing/hostfactory/1.2/providerplugins/orb/config/awsprov_templates.json opt/ibm/spectrumcomputing/hostfactory/work/config/
 ```
 
 
@@ -105,11 +105,11 @@ vi /opt/ibm/spectrumcomputing/hostfactory/conf/providers/hostProviders.json
 Add the new provider configuration:
 ```json
 {
-    "name": "aws_ohfp_provider",
+    "name": "aws_orb_provider",
     "enabled": 1,
-    "plugin": "ohfp",
-    "confPath": "${HF_CONFDIR}/providers/aws_ohfp_provider/",
-    "workPath": "${HF_WORKDIR}/providers/aws_ohfp_provider/",
+    "plugin": "orb",
+    "confPath": "${HF_CONFDIR}/providers/aws_orb_provider/",
+    "workPath": "${HF_WORKDIR}/providers/aws_orb_provider/",
     "logPath": "${HF_LOGDIR}/"
 }
 ```
@@ -122,12 +122,12 @@ Edit the provider plugins configuration:
 vi /opt/ibm/spectrumcomputing/hostfactory/conf/providerplugins/hostProviderPlugins.json
 ```
 
-Add the OHFP plugin configuration and disable other plugins:
+Add the ORB plugin configuration and disable other plugins:
 ```json
 {
-    "name": "ohfp",
+    "name": "orb",
     "enabled": 1,
-    "scriptPath": "${HF_TOP}/${HF_VERSION}/providerplugins/ohfp/scripts/"
+    "scriptPath": "${HF_TOP}/${HF_VERSION}/providerplugins/orb/scripts/"
 }
 ```
 
@@ -150,13 +150,13 @@ Update the requestor configuration:
             "confPath": "${HF_CONFDIR}/requestors/symAinst/",
             "workPath": "${HF_WORKDIR}/requestors/symAinst/",
             "logPath": "${HF_LOGDIR}/",
-            "providers": ["aws_ohfp_provider"],
+            "providers": ["aws_orb_provider"],
             "requestMode": "POLL"
         },
         {
             "name": "admin",
             "enabled": 1,
-            "providers": ["aws_ohfp_provider"],
+            "providers": ["aws_orb_provider"],
             "requestMode": "REST_MANUAL"
         }
     ]
@@ -166,7 +166,7 @@ Update the requestor configuration:
 ## Set Environment Variables in invoke_provider.sh
 
 ```
-/opt/ibm/spectrumcomputing/hostfactory/1.2/providerplugins/ohfp/scripts/invoke_provider.sh
+/opt/ibm/spectrumcomputing/hostfactory/1.2/providerplugins/orb/scripts/invoke_provider.sh
 export USE_LOCAL_DEV="true"         # Set true for this type of deployment
 export LOG_CONSOLE_ENABLED=false    # STDOUT will interfere with HF expected output.
 export LOG_SCRIPTS="true"           # For debug purposes log raw IO between HF and the plugin
@@ -179,13 +179,13 @@ export LOG_LEVEL=DEBUG              # Enable for plugin logging
 After configuration, your directory structure should look like:
 
 
-hostfactory/work/providers/aws_ohfp_provider/dataopt/ibm/spectrumcomputing/hostfactory/work/providers/aws_ohfp_provider/data/
+hostfactory/work/providers/aws_orb_provider/dataopt/ibm/spectrumcomputing/hostfactory/work/providers/aws_orb_provider/data/
 ```
 hostfactory
 ├── conf/
 │   ├── providers/
 │   │   ├── awsinst/                    # Original AWS provider (disabled)
-│   │   ├── aws_ohfp_provider/          # New OHFP provider
+│   │   ├── aws_orb_provider/          # New ORB provider
 │   │   │   ├── <...>                   # Currently no config files here!
 │   │   └── hostProviders.json          # Provider registry (update)
 │   ├── providerplugins/
@@ -195,9 +195,9 @@ hostfactory
 ├── work/
 │   └── config/                         # config.json, default-config.json, awsprov_templates.json
 │   └── logs/
-│       └── app.log                     # OHFP Plugin Logs
+│       └── app.log                     # ORB Plugin Logs
 │   └── providers/
-│       └── aws_ohfp_provider/
+│       └── aws_orb_provider/
 │           └── data/
 ├               ├──request_database.json. # Request/machine data
 ├── log/
@@ -206,9 +206,9 @@ hostfactory
 │   └── symAinst.log                    # Requestors logs
 └── 1.2/
     └── providerplugins/
-        └── ohfp/
+        └── orb/
             ├── .venv/
-            ├── src/                    # OHFP source code
+            ├── src/                    # ORB source code
             └── scripts/                # Provider scripts
                 ├── getAvailableTemplates.sh
                 ├── requestMachines.sh
@@ -224,8 +224,8 @@ hostfactory
 
 Check these log files for troubleshooting:
 - **Host Factory logs:** `/opt/ibm/spectrumcomputing/hostfactory/log/hostfactory.log`
-- **OHFP application logs:** `/opt/ibm/spectrumcomputing/hostfactory/log/app.log`
-- **Provider work directory:** `/opt/ibm/spectrumcomputing/hostfactory/work/providers/aws_ohfp_provider/`
+- **ORB application logs:** `/opt/ibm/spectrumcomputing/hostfactory/log/app.log`
+- **Provider work directory:** `/opt/ibm/spectrumcomputing/hostfactory/work/providers/aws_orb_provider/`
 
 ## Execution
 
@@ -245,7 +245,7 @@ rm /opt/ibm/spectrumcomputing/hostfactory/log/* -f
 rm /opt/ibm/spectrumcomputing/hostfactory/work/logs/app.log -f
 rm /opt/ibm/spectrumcomputing/hostfactory/work/requestors/symAinst/* -f
 rm /opt/ibm/spectrumcomputing/hostfactory/db/hf.db -f
-rm /opt/ibm/spectrumcomputing/hostfactory/1.2/providerplugins/ohfp/awscpinst/data/*.json -f
+rm /opt/ibm/spectrumcomputing/hostfactory/1.2/providerplugins/orb/awscpinst/data/*.json -f
 ```
 
 Note: symAinst-requestor.log is visible only if plugin successfully started and returned list of available templates.

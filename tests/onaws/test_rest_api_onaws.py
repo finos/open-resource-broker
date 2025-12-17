@@ -107,8 +107,8 @@ class RequestTimeoutError(TimeoutError):
         self.status_response = status_response
 
 
-class OhfpServerManager:
-    """Manage OHFP server lifecycle for testing."""
+class ORBServerManager:
+    """Manage ORB server lifecycle for testing."""
 
     def __init__(
         self,
@@ -124,9 +124,9 @@ class OhfpServerManager:
         self._log_file_handle = None
 
     def start(self, timeout: int | None = None):
-        """Start OHFP server: ohfp system serve --host 0.0.0.0 --port 8000"""
-        cmd = ["ohfp", "system", "serve", "--host", self.host, "--port", str(self.port)]
-        log.info(f"Starting OHFP server: {' '.join(cmd)}")
+        """Start ORB server: orb system serve --host 0.0.0.0 --port 8000"""
+        cmd = ["orb", "system", "serve", "--host", self.host, "--port", str(self.port)]
+        log.info(f"Starting ORB server: {' '.join(cmd)}")
 
         stdout_target = subprocess.PIPE
         stderr_target = subprocess.PIPE
@@ -157,7 +157,7 @@ class OhfpServerManager:
                     timeout=scenarios_rest_api.REST_API_SERVER["start_probe_timeout"],
                 )
                 if response.status_code == 200:
-                    log.info(f"OHFP server started successfully on {self.base_url}")
+                    log.info(f"ORB server started successfully on {self.base_url}")
                     return
             except requests.exceptions.RequestException:
                 time.sleep(scenarios_rest_api.REST_API_SERVER["start_probe_interval"])
@@ -167,25 +167,25 @@ class OhfpServerManager:
             stdout, stderr = self.process.communicate(
                 timeout=scenarios_rest_api.REST_API_SERVER["start_capture_timeout"]
             )
-            error_msg = f"OHFP server failed to start within {timeout}s. stderr: {stderr}"
+            error_msg = f"ORB server failed to start within {timeout}s. stderr: {stderr}"
         except subprocess.TimeoutExpired:
-            error_msg = f"OHFP server failed to start within {timeout}s (process still running)"
+            error_msg = f"ORB server failed to start within {timeout}s (process still running)"
 
         raise RuntimeError(error_msg)
 
     def stop(self):
-        """Terminate OHFP server process."""
+        """Terminate ORB server process."""
         if self.process:
-            log.info("Stopping OHFP server")
+            log.info("Stopping ORB server")
             self.process.terminate()
             try:
                 self.process.wait(timeout=scenarios_rest_api.REST_API_SERVER["stop_wait_timeout"])
-                log.info("OHFP server stopped gracefully")
+                log.info("ORB server stopped gracefully")
             except subprocess.TimeoutExpired:
-                log.warning("OHFP server did not stop gracefully, killing process")
+                log.warning("ORB server did not stop gracefully, killing process")
                 self.process.kill()
                 self.process.wait(timeout=scenarios_rest_api.REST_API_SERVER["stop_kill_timeout"])
-                log.info("OHFP server killed")
+                log.info("ORB server killed")
             finally:
                 if self._log_file_handle:
                     try:
@@ -344,13 +344,13 @@ def setup_rest_api_environment(request):
 
 
 @pytest.fixture
-def ohfp_server(setup_rest_api_environment):
-    """Start OHFP server after env/templates exist, stop after each test."""
+def orb_server(setup_rest_api_environment):
+    """Start ORB server after env/templates exist, stop after each test."""
     log_dir = os.environ.get("HF_PROVIDER_LOGDIR", "./logs")
     os.makedirs(log_dir, exist_ok=True)
     server_log_path = os.path.join(log_dir, "server.log")
 
-    server = OhfpServerManager(log_path=server_log_path)
+    server = ORBServerManager(log_path=server_log_path)
     server.start(timeout=REST_TIMEOUTS["server_start"])
 
     yield server
@@ -359,10 +359,10 @@ def ohfp_server(setup_rest_api_environment):
 
 
 @pytest.fixture
-def rest_api_client(ohfp_server):
-    """Create REST API client connected to running OHFP server."""
+def rest_api_client(orb_server):
+    """Create REST API client connected to running ORB server."""
     return RestApiClient(
-        base_url=ohfp_server.base_url,
+        base_url=orb_server.base_url,
         api_prefix="/api/v1",
         timeout=REST_TIMEOUTS["rest_api_timeout"],
         retry_attempts=REST_TIMEOUTS["rest_api_retry_attempts"],
@@ -864,7 +864,7 @@ def _wait_for_request_completion_rest(
             )
 
         summary_payload = {"status": status_response.get("status"), "requests": summaries}
-        log.debug("OHFP Request status summary: %s", json.dumps(summary_payload, indent=2))
+        log.debug("ORB Request status summary: %s", json.dumps(summary_payload, indent=2))
         _log_aws_capacity_progress(requests_list, expected_capacity, provider_api)
 
         # Only consider the inner request statuses, not the top-level status
@@ -1068,7 +1068,7 @@ def test_00_rest_api_server_health(setup_rest_api_environment):
     os.makedirs(log_dir, exist_ok=True)
     server_log_path = os.path.join(log_dir, "server.log")
 
-    server = OhfpServerManager(log_path=server_log_path)
+    server = ORBServerManager(log_path=server_log_path)
     server.start(timeout=REST_TIMEOUTS["server_start"])
 
     try:

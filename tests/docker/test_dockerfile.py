@@ -84,7 +84,7 @@ class TestDockerfile:
                     "docker",
                     "build",
                     "-t",
-                    "ohfp-api:test-build",
+                    "orb-api:test-build",
                     "--build-arg",
                     "BUILD_DATE=2025-01-07T00:00:00Z",
                     "--build-arg",
@@ -103,7 +103,7 @@ class TestDockerfile:
                 pytest.skip("Docker daemon not running")
 
             assert result.returncode == 0, f"Docker build failed: {result.stderr}"
-            assert "Successfully tagged ohfp-api:test-build" in result.stdout or result.stderr
+            assert "Successfully tagged orb-api:test-build" in result.stdout or result.stderr
 
         except subprocess.TimeoutExpired:
             pytest.fail("Docker build timed out after 5 minutes")
@@ -120,7 +120,7 @@ class TestDockerfile:
                     "docker",
                     "build",
                     "-t",
-                    "ohfp-api:test-startup",
+                    "orb-api:test-startup",
                     "--quiet",
                     str(project_root),
                 ],
@@ -130,7 +130,7 @@ class TestDockerfile:
 
             # Test version command
             result = subprocess.run(
-                ["docker", "run", "--rm", "ohfp-api:test-startup", "version"],
+                ["docker", "run", "--rm", "orb-api:test-startup", "version"],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -158,7 +158,7 @@ class TestDockerfile:
                     "docker",
                     "build",
                     "-t",
-                    "ohfp-api:test-health",
+                    "orb-api:test-health",
                     "--quiet",
                     str(project_root),
                 ],
@@ -173,14 +173,14 @@ class TestDockerfile:
                     "run",
                     "-d",
                     "--name",
-                    "ohfp-health-test",
+                    "orb-health-test",
                     "-p",
                     "8002:8000",
                     "-e",
                     "HF_SERVER_ENABLED=true",
                     "-e",
                     "HF_AUTH_ENABLED=false",
-                    "ohfp-api:test-health",
+                    "orb-api:test-health",
                     "serve",
                 ],
                 check=False,
@@ -291,13 +291,13 @@ class TestDockerfile:
             dev_compose = yaml.safe_load(f)
 
         assert "services" in dev_compose, "Should have services section"
-        assert "ohfp-api" in dev_compose["services"], "Should have ohfp-api service"
+        assert "orb-api" in dev_compose["services"], "Should have orb-api service"
 
-        ohfp_service = dev_compose["services"]["ohfp-api"]
-        assert "build" in ohfp_service, "Should have build configuration"
-        assert "ports" in ohfp_service, "Should expose ports"
-        assert "environment" in ohfp_service, "Should have environment variables"
-        assert "volumes" in ohfp_service, "Should have volume mounts"
+        orb_service = dev_compose["services"]["orb-api"]
+        assert "build" in orb_service, "Should have build configuration"
+        assert "ports" in orb_service, "Should expose ports"
+        assert "environment" in orb_service, "Should have environment variables"
+        assert "volumes" in orb_service, "Should have volume mounts"
 
         # Test production compose file
         prod_compose_path = project_root / "deployment" / "docker" / "docker-compose.prod.yml"
@@ -305,9 +305,9 @@ class TestDockerfile:
             prod_compose = yaml.safe_load(f)
 
         assert "services" in prod_compose, "Should have services section"
-        assert "ohfp-api" in prod_compose["services"], "Should have ohfp-api service"
+        assert "orb-api" in prod_compose["services"], "Should have orb-api service"
 
-        prod_service = prod_compose["services"]["ohfp-api"]
+        prod_service = prod_compose["services"]["orb-api"]
         assert "image" in prod_service, "Production should use pre-built image"
         assert "restart" in prod_service, "Should have restart policy"
 

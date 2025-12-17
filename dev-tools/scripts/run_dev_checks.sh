@@ -14,21 +14,21 @@ make generate_pyproject
 
 # Build dev tools container
 echo "Building dev tools container..."
-docker build -t ohfp-dev-tools -f dev-tools/docker/Dockerfile.dev-tools .
+docker build -t orb-dev-tools -f dev-tools/docker/Dockerfile.dev-tools .
 
 # Run checks using our existing pre-commit Python script in container
 case "${1:-all}" in
     all)
         echo "Running all pre-commit checks in container..."
-        docker run --rm -v "$PWD:/app" ohfp-dev-tools ./dev-tools/scripts/pre_commit_check.py
+        docker run --rm -v "$PWD:/app" orb-dev-tools ./dev-tools/scripts/pre_commit_check.py
         ;;
     required)
         echo "Running required pre-commit checks in container..."
-        docker run --rm -v "$PWD:/app" ohfp-dev-tools ./dev-tools/scripts/pre_commit_check.py --required-only
+        docker run --rm -v "$PWD:/app" orb-dev-tools ./dev-tools/scripts/pre_commit_check.py --required-only
         ;;
     format)
         echo "Running format in container..."
-        docker run --rm -v "$PWD:/app" ohfp-dev-tools make format
+        docker run --rm -v "$PWD:/app" orb-dev-tools make format
         ;;
     help|*)
         echo "Usage: $0 [all|required|format]"
