@@ -243,11 +243,35 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         else:
             raise ValueError(f"Unsupported HostFactory operation: {operation}")
 
-    def format_request_response(self, request_data: dict[str, Any]) -> dict[str, Any]:
+    def format_request_response(self, request_data: Any) -> dict[str, Any]:
         """Format request creation response to HostFactory format."""
+        # Allow both dicts and Pydantic-style objects
+        if hasattr(request_data, "model_dump"):
+            request_dict = request_data.model_dump()
+        elif hasattr(request_data, "to_dict"):
+            request_dict = request_data.to_dict()
+        elif isinstance(request_data, dict):
+            request_dict = request_data
+        else:
+            # Fallback: try to coerce to dict
+            try:
+                request_dict = dict(request_data)
+            except Exception:
+                request_dict = {}
+
+        if "requests" in request_dict:
+            return {
+                "requests": request_dict.get("requests", []),
+                "status": request_dict.get("status", "complete"),
+                "message": request_dict.get("message", "Status retrieved successfully"),
+            }
+
+        # Prefer snake_case in API responses
+        request_id = request_dict.get("request_id", request_dict.get("requestId"))
         return {
-            "requestId": request_data.get("request_id", request_data.get("requestId")),
-            "message": request_data.get("message", "Request VM success from AWS."),
+            # HostFactory schema expects camelCase requestId
+            "requestId": request_id,
+            "message": request_dict.get("message", "Request VM success from AWS."),
         }
 
     def convert_domain_to_hostfactory_output(

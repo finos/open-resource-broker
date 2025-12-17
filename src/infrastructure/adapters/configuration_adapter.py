@@ -119,6 +119,48 @@ class ConfigurationAdapter(ConfigurationPort):
                 "default_instance_type": "t2.micro",
             }
 
+    def get_metrics_config(self) -> dict[str, Any]:
+        """Get metrics configuration."""
+
+        # Defaults with nested aws_metrics
+        defaults: dict[str, Any] = {
+            "metrics_enabled": False,
+            "metrics_dir": "./metrics",
+            "metrics_interval": 60,
+            "trace_enabled": False,
+            "trace_buffer_size": 1000,
+            "trace_file_max_size_mb": 10,
+            "aws_metrics": {
+                "aws_metrics_enabled": False,
+                "sample_rate": 1.0,
+                "monitored_services": [],
+                "monitored_operations": [],
+                "track_payload_sizes": False,
+            },
+        }
+
+        try:
+            # Get metrics section from raw config
+            raw = self._config_manager._ensure_raw_config()  # type: ignore[attr-defined]
+            metrics_config = raw.get("metrics", {}) if isinstance(raw, dict) else {}
+
+            result: dict[str, Any] = defaults.copy()
+            result["aws_metrics"] = defaults["aws_metrics"].copy()
+
+            if isinstance(metrics_config, dict):
+                result.update(
+                    {k: metrics_config.get(k, v) for k, v in defaults.items() if k != "aws_metrics"}
+                )
+                if "aws_metrics" in metrics_config and isinstance(
+                    metrics_config["aws_metrics"], dict
+                ):
+                    result["aws_metrics"].update(metrics_config["aws_metrics"])
+
+            return result
+        except Exception:
+            # Fallback configuration
+            return defaults
+
     def get_storage_config(self) -> dict[str, Any]:
         """Get storage configuration."""
         try:

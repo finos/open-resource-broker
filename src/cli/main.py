@@ -590,6 +590,7 @@ async def execute_command(args, app) -> dict[str, Any]:
             handle_provider_metrics,
             handle_reload_provider_config,
             handle_select_provider_strategy,
+            handle_system_metrics,
             handle_validate_provider_config,
         )
         from interface.template_command_handlers import (
@@ -643,6 +644,7 @@ async def execute_command(args, app) -> dict[str, Any]:
             ("scheduler", "validate"): handle_validate_scheduler_config,
             # System commands
             ("system", "serve"): handle_serve_api,
+            ("system", "metrics"): handle_system_metrics,
             # Configuration commands
             ("config", "show"): handle_provider_config,
             ("config", "validate"): handle_validate_provider_config,

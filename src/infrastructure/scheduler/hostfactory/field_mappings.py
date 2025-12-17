@@ -18,6 +18,7 @@ class HostFactoryFieldMappings:
             "fleetType": "fleet_type",
             # Network configuration
             "subnetId": "subnet_ids",  # Will be converted to list
+            "subnetIds": "subnet_ids",  # Preserve full list when provided
             "securityGroupIds": "security_group_ids",
             # Instance configuration
             "vmType": "instance_type",

@@ -207,6 +207,7 @@ class GetProviderCapabilitiesHandler(
             raise
 
 
+@query_handler(GetProviderMetricsQuery)
 class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, dict[str, Any]]):
     """Handler for retrieving provider metrics."""
 

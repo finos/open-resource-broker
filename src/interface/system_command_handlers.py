@@ -5,6 +5,7 @@ from typing import Any
 from infrastructure.di.buses import QueryBus
 from infrastructure.di.container import get_container
 from infrastructure.error.decorators import handle_interface_exceptions
+from monitoring.metrics import MetricsCollector
 
 
 @handle_interface_exceptions(context="provider_health", interface_type="cli")
@@ -149,3 +150,25 @@ async def handle_provider_metrics(args) -> dict[str, Any]:
     metrics = await query_bus.execute(query)
 
     return {"metrics": metrics, "message": "Provider metrics retrieved successfully"}
+
+
+@handle_interface_exceptions(context="system_metrics", interface_type="cli")
+async def handle_system_metrics(args) -> dict[str, Any]:
+    """Handle get system metrics operations."""
+    container = get_container()
+    try:
+        metrics = container.get_optional(MetricsCollector)
+    except Exception:
+        metrics = None
+
+    if not metrics:
+        return {"metrics": {}, "message": "MetricsCollector not available"}
+
+    try:
+        return {
+            "metrics": metrics.get_metrics(),
+            "message": "System metrics retrieved successfully",
+        }
+    except Exception as e:
+        # Gracefully handle any issues retrieving metrics
+        return {"metrics": {}, "error": str(e), "message": "Failed to retrieve system metrics"}

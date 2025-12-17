@@ -16,8 +16,14 @@ from monitoring.metrics import MetricsCollector
 def register_core_services(container: DIContainer) -> None:
     """Register core application services."""
 
-    # Register metrics collector
-    container.register_singleton(MetricsCollector)
+    # Register metrics collector with configuration from ConfigurationPort
+    def create_metrics_collector(c):
+        config_port = c.get(ConfigurationPort)
+        metrics_config = config_port.get_metrics_config()
+        return MetricsCollector(metrics_config)
+
+    # Register as singleton so the same collector instance is shared
+    container.register_singleton(MetricsCollector, create_metrics_collector)
 
     # Register template format converter
 
@@ -62,9 +68,7 @@ def register_core_services(container: DIContainer) -> None:
 
 def _create_scheduler_strategy(container: DIContainer) -> SchedulerPort:
     """Create scheduler strategy using factory."""
-    from infrastructure.factories.scheduler_strategy_factory import (
-        SchedulerStrategyFactory,
-    )
+    from infrastructure.factories.scheduler_strategy_factory import SchedulerStrategyFactory
 
     factory = container.get(SchedulerStrategyFactory)
     config = container.get(ConfigurationPort)

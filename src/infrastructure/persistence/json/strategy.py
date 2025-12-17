@@ -13,6 +13,7 @@ from infrastructure.persistence.components import (
     MemoryTransactionManager,
 )
 from infrastructure.persistence.exceptions import PersistenceError
+from infrastructure.persistence.metrics_decorators import instrument_storage
 
 
 class JSONStorageStrategy(BaseStorageStrategy):
@@ -24,7 +25,11 @@ class JSONStorageStrategy(BaseStorageStrategy):
     """
 
     def __init__(
-        self, file_path: str, create_dirs: bool = True, entity_type: str = "entities"
+        self,
+        file_path: str,
+        create_dirs: bool = True,
+        entity_type: str = "entities",
+        metrics: Optional[object] = None,
     ) -> None:
         """
         Initialize JSON storage strategy with components.
@@ -33,11 +38,13 @@ class JSONStorageStrategy(BaseStorageStrategy):
             file_path: Path to JSON file
             create_dirs: Whether to create parent directories
             entity_type: Type of entities being stored (for logging)
+            metrics: Optional metrics collector for instrumentation
         """
         super().__init__()
 
         self.entity_type = entity_type
         self.logger = get_logger(__name__)
+        self.metrics = metrics
 
         # Initialize components
         self.file_manager = FileManager(file_path, create_dirs)
@@ -51,6 +58,7 @@ class JSONStorageStrategy(BaseStorageStrategy):
 
         self.logger.debug("Initialized JSON storage strategy for %s at %s", entity_type, file_path)
 
+    @instrument_storage(lambda self: self.metrics, "save")
     def save(self, entity_id: str, data: dict[str, Any]) -> None:
         """
         Save entity data to JSON file.
@@ -79,6 +87,7 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 self.logger.error("Failed to save %s entity %s: %s", self.entity_type, entity_id, e)
                 raise PersistenceError(f"Failed to save entity {entity_id}: {e}")
 
+    @instrument_storage(lambda self: self.metrics, "find_by_id")
     def find_by_id(self, entity_id: str) -> Optional[dict[str, Any]]:
         """
         Find entity by ID.
@@ -105,6 +114,7 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 self.logger.error("Failed to find %s entity %s: %s", self.entity_type, entity_id, e)
                 raise PersistenceError(f"Failed to find entity {entity_id}: {e}")
 
+    @instrument_storage(lambda self: self.metrics, "find_all")
     def find_all(self) -> dict[str, dict[str, Any]]:
         """
         Find all entities.
@@ -122,6 +132,7 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 self.logger.error("Failed to load all %s entities: %s", self.entity_type, e)
                 raise PersistenceError(f"Failed to load all entities: {e}")
 
+    @instrument_storage(lambda self: self.metrics, "delete")
     def delete(self, entity_id: str) -> None:
         """
         Delete entity by ID.
@@ -158,6 +169,7 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 )
                 raise PersistenceError(f"Failed to delete entity {entity_id}: {e}")
 
+    @instrument_storage(lambda self: self.metrics, "exists")
     def exists(self, entity_id: str) -> bool:
         """
         Check if entity exists.
@@ -184,6 +196,7 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 )
                 return False
 
+    @instrument_storage(lambda self: self.metrics, "find_by_criteria")
     def find_by_criteria(self, criteria: dict[str, Any]) -> list[dict[str, Any]]:
         """
         Find entities matching criteria.
@@ -214,6 +227,7 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 self.logger.error("Failed to search %s entities: %s", self.entity_type, e)
                 raise PersistenceError(f"Failed to search entities: {e}")
 
+    @instrument_storage(lambda self: self.metrics, "save_batch")
     def save_batch(self, entities: dict[str, dict[str, Any]]) -> None:
         """
         Save multiple entities in batch.
@@ -234,6 +248,7 @@ class JSONStorageStrategy(BaseStorageStrategy):
                 self.logger.error("Failed to save batch of %s entities: %s", self.entity_type, e)
                 raise PersistenceError(f"Failed to save batch: {e}")
 
+    @instrument_storage(lambda self: self.metrics, "delete_batch")
     def delete_batch(self, entity_ids: list[str]) -> None:
         """
         Delete multiple entities in batch.
@@ -277,6 +292,7 @@ class JSONStorageStrategy(BaseStorageStrategy):
         self._cache_valid = False
         self.logger.debug("Cleaned up JSON storage strategy for %s", self.entity_type)
 
+    @instrument_storage(lambda self: self.metrics, "count")
     def count(self) -> int:
         """
         Count total number of entities.

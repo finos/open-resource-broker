@@ -25,6 +25,7 @@ class TemplateJSONStorageStrategy(JSONStorageStrategy):
         file_path: str,
         legacy_file_path: Optional[str] = None,
         create_dirs: bool = True,
+        metrics: Optional[object] = None,
     ) -> None:
         """
         Initialize with both main and legacy file paths.
@@ -33,8 +34,9 @@ class TemplateJSONStorageStrategy(JSONStorageStrategy):
             file_path: Path to the main templates.json file
             legacy_file_path: Optional path to the legacy templates file
             create_dirs: Whether to create directories
+            metrics: Optional metrics collector for instrumentation
         """
-        super().__init__(file_path, create_dirs)
+        super().__init__(file_path, create_dirs, metrics=metrics)
         self.legacy_file_path = legacy_file_path
         self.logger = get_logger(__name__)
 
@@ -157,6 +159,18 @@ class TemplateJSONRepository(StrategyBasedRepository, TemplateRepository):
         templates_file_path = app_config.templates_file_path
         legacy_templates_file_path = getattr(app_config, "legacy_templates_file_path", None)
 
+        # Try to inject metrics collector from DI container
+        metrics = None
+        try:
+            from infrastructure.di.container import get_container
+            from monitoring.metrics import MetricsCollector
+
+            container = get_container()
+            metrics = container.get_optional(MetricsCollector)
+        except Exception:
+            # If metrics collector not available, proceed without instrumentation
+            pass
+
         # Choose strategy based on configuration
         if use_provider_strategy:
             strategy = ProviderTemplateStrategy(
@@ -170,6 +184,7 @@ class TemplateJSONRepository(StrategyBasedRepository, TemplateRepository):
                 file_path=templates_file_path,
                 legacy_file_path=legacy_templates_file_path,
                 create_dirs=True,
+                metrics=metrics,
             )
             self.logger.info("Using legacy template loading strategy")
 

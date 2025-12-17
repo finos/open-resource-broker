@@ -203,6 +203,7 @@ class TemplateProcessor:
         base_template: str = None,
         awsprov_base_template: str = None,
         overrides: dict = None,
+        metrics_config: dict | None = None,
     ) -> None:
         """Generate populated templates for a specific test.
 
@@ -218,9 +219,18 @@ class TemplateProcessor:
         # Create test directory
         test_dir = self.run_templates_dir / test_name
         test_dir.mkdir(parents=True, exist_ok=True)
+        metrics_dir = None
+        if metrics_config:
+            metrics_dir = test_dir / "metrics"
+            metrics_dir.mkdir(parents=True, exist_ok=True)
 
         # Load configuration
         config = self.load_config_source()
+        if metrics_config and metrics_dir:
+            metrics_config = metrics_config.copy()
+            if not metrics_config.get("metrics_dir"):
+                metrics_config["metrics_dir"] = str(metrics_dir)
+            config["metrics_dir"] = metrics_config["metrics_dir"]
 
         # Apply overrides if provided
         if overrides:
@@ -261,6 +271,11 @@ class TemplateProcessor:
                         config["percentOnDemand"] = 0
                     else:
                         config["percentOnDemand"] = 100
+            # Normalize allocation strategy keys between camel/snake for both schedulers
+            if "allocationStrategy" in overrides:
+                config["allocation_strategy"] = overrides["allocationStrategy"]
+            if "allocation_strategy" in overrides:
+                config["allocationStrategy"] = overrides["allocation_strategy"]
 
         # Set scheduler type in config for template replacement (after overrides)
         config["scheduler"] = scheduler_type
@@ -298,6 +313,14 @@ class TemplateProcessor:
                 # Replace placeholders
                 populated_template = self.replace_placeholders(base_template_data, config)
 
+                # Inject metrics configuration into config.json when provided
+                if (
+                    base_name == "config"
+                    and isinstance(populated_template, dict)
+                    and metrics_config
+                ):
+                    populated_template["metrics"] = metrics_config
+
                 # Apply explicit overrides for fields not covered by placeholders
                 if overrides and isinstance(populated_template, dict):
                     templates_list = populated_template.get("templates", [])
@@ -330,6 +353,9 @@ class TemplateProcessor:
                             "abis_instance_requirements",
                             "instance_types",
                             "instanceTypes",
+                            "allocationStrategy",
+                            "allocation_strategy",
+                            "allocationStrategyOnDemand",
                         ]:
                             if key in overrides:
                                 tmpl[key] = overrides[key]

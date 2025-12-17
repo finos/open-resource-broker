@@ -14,6 +14,7 @@ from domain.request.value_objects import RequestStatus
 class CreateRequestCommand(BaseCommand):
     """Command to create a new request."""
 
+    request_id: Optional[str] = None
     template_id: str
     requested_count: int
     timeout: Optional[int] = 3600

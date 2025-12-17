@@ -3,8 +3,9 @@
 import json
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -77,17 +78,24 @@ class MetricsCollector:
         self.config = config
         self.metrics: dict[str, Metric] = {}
         self.timers: dict[str, list[float]] = {}
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()  # Same thread can re-aquire the lock
 
         # Create metrics directory
-        self.metrics_dir = Path(config.get("METRICS_DIR", "./metrics"))
+        self.metrics_dir = Path(config.get("metrics_dir", "./metrics"))
         self.metrics_dir.mkdir(parents=True, exist_ok=True)
+
+        # Initialize tracing buffer
+        self.trace_enabled = bool(config.get("trace_enabled", False))
+        self.trace_file_max_size_mb = int(config.get("trace_file_max_size_mb", 10))
+        self._trace_buffer = (
+            deque(maxlen=int(config.get("trace_buffer_size", 1000))) if self.trace_enabled else None
+        )
 
         # Initialize default metrics
         self._initialize_metrics()
 
         # Start background metrics writer if enabled
-        if config.get("METRICS_ENABLED", True):
+        if config.get("metrics_enabled", False):
             self._start_metrics_writer()
 
     def _initialize_metrics(self) -> None:
@@ -156,6 +164,16 @@ class MetricsCollector:
             avg_time = sum(self.timers[name]) / len(self.timers[name])
             self.set_gauge(f"{name}_seconds", avg_time)
 
+            # Add trace entry if tracing is enabled
+            if self.trace_enabled and self._trace_buffer is not None:
+                self._trace_buffer.append(
+                    {
+                        "name": name,
+                        "duration": duration,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    }
+                )
+
     def record_success(
         self,
         operation: str,
@@ -197,6 +215,36 @@ class MetricsCollector:
         with self._lock:
             return {name: metric.to_dict() for name, metric in self.metrics.items()}
 
+    def get_traces(self) -> list[dict]:
+        """Return a snapshot of current traces."""
+        with self._lock:
+            return list(self._trace_buffer) if self._trace_buffer is not None else []
+
+    def flush_traces(self) -> None:
+        """Append traces to a single file and clear buffer."""
+        if not self._trace_buffer:
+            return
+
+        # Copy traces under lock, write outside lock to avoid blocking
+        with self._lock:
+            traces_to_write = list(self._trace_buffer)
+            self._trace_buffer.clear()
+
+        # Write without holding lock
+        try:
+            # Always append to a single trace file
+            trace_file = self.metrics_dir / "traces.jsonl"
+
+            with trace_file.open("a") as f:
+                for trace in traces_to_write:
+                    f.write(json.dumps(trace) + "\n")
+
+            logger.debug("Flushed %d traces to %s", len(traces_to_write), trace_file)
+
+        except Exception as e:
+            logger.error("Failed to flush traces: %s", e)
+            # Don't re-raise - tracing failures shouldn't crash the application
+
     def _start_metrics_writer(self) -> None:
         """Start background metrics writer thread."""
 
@@ -204,22 +252,8 @@ class MetricsCollector:
             """Write metrics to file periodically in background thread."""
             while True:
                 try:
-                    metrics = self.get_metrics()
-
-                    # Write to JSON file
-                    metrics_file = self.metrics_dir / "metrics.json"
-                    with metrics_file.open("w") as f:
-                        json.dump(metrics, f, indent=2)
-
-                    # Write to Prometheus format
-                    prom_file = self.metrics_dir / "metrics.prom"
-                    with prom_file.open("w") as f:
-                        for name, metric in metrics.items():
-                            labels = ",".join(f'{k}="{v}"' for k, v in metric["labels"].items())
-                            f.write(f"{name}{{{labels}}} {metric['value']}\n")
-
-                    time.sleep(self.config.get("METRICS_INTERVAL", 60))
-
+                    self._write_metrics_snapshot()
+                    time.sleep(self.config.get("metrics_interval", 10))
                 except Exception as e:
                     logger.error("Error writing metrics: %s", e)
                     time.sleep(5)  # Shorter sleep on error
@@ -227,10 +261,46 @@ class MetricsCollector:
         thread = threading.Thread(target=write_metrics, daemon=True)
         thread.start()
 
+    def _write_metrics_snapshot(self) -> None:
+        """Write the current metrics snapshot to disk."""
+        metrics = self.get_metrics()
+
+        # Write to JSON file
+        metrics_file = self.metrics_dir / "metrics.json"
+        with metrics_file.open("w") as f:
+            json.dump(metrics, f, indent=2)
+
+        # Write to Prometheus format
+        prom_file = self.metrics_dir / "metrics.prom"
+        with prom_file.open("w") as f:
+            for name, metric in metrics.items():
+                labels = ",".join(f'{k}="{v}"' for k, v in metric["labels"].items())
+                f.write(f"{name}{{{labels}}} {metric['value']}\n")
+
+        # Flush traces if tracing is enabled
+        if self.trace_enabled and self._trace_buffer:
+            self.flush_traces()
+
+    def flush(self) -> None:
+        """Flush metrics to disk immediately."""
+        try:
+            self._write_metrics_snapshot()
+        except Exception as e:
+            logger.error("Error flushing metrics: %s", e)
+
+    def __del__(self) -> None:
+        """Best-effort flush on collector destruction."""
+        try:
+            self.flush()
+        except Exception:
+            # Avoid raising during interpreter shutdown
+            pass
+
     def check_thresholds(self) -> list[dict[str, Any]]:
         """Check metrics against configured thresholds."""
         alerts = []
-        thresholds = self.config.get("ALERT_THRESHOLDS", {})
+        # TODO: unimplemented.
+        thresholds = self.config.get("alert_thresholds", {})
 
         with self._lock:
             for name, threshold in thresholds.items():

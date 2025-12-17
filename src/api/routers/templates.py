@@ -1,16 +1,13 @@
 """Template management API routes."""
 
+from datetime import datetime
 from typing import Any, Optional
 
 from fastapi import APIRouter, Body, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from application.dto.queries import (
-    GetTemplateQuery,
-    ListTemplatesQuery,
-    ValidateTemplateQuery,
-)
+from application.dto.queries import GetTemplateQuery, ListTemplatesQuery, ValidateTemplateQuery
 from application.template.commands import (
     CreateTemplateCommand,
     DeleteTemplateCommand,
@@ -27,6 +24,26 @@ PROVIDER_API_QUERY = Query(None, description="Filter by provider API")
 FORCE_REFRESH_QUERY = Query(False, description="Force refresh from files")
 INCLUDE_CONFIG_QUERY = Query(False, description="Include full configuration")
 TEMPLATE_DATA_BODY = Body(...)
+
+
+def _serialize_datetime_fields(data: Any) -> Any:
+    """
+    Recursively convert datetime objects to ISO format strings for JSON serialization.
+
+    Args:
+        data: Data structure that may contain datetime objects
+
+    Returns:
+        Data structure with datetime objects converted to strings
+    """
+    if isinstance(data, datetime):
+        return data.isoformat()
+    elif isinstance(data, dict):
+        return {key: _serialize_datetime_fields(value) for key, value in data.items()}
+    elif isinstance(data, list):
+        return [_serialize_datetime_fields(item) for item in data]
+    else:
+        return data
 
 
 class TemplateCreateRequest(BaseModel):
@@ -86,15 +103,24 @@ async def list_templates(
 
         templates = await query_bus.execute(query)
 
+        # Convert templates to JSON-serializable format
+        serializable_templates = []
+        for template in templates:
+            if hasattr(template, "model_dump"):
+                template_dict = template.model_dump()
+            else:
+                template_dict = template
+
+            # Convert datetime objects to ISO format strings
+            template_dict = _serialize_datetime_fields(template_dict)
+            serializable_templates.append(template_dict)
+
         return JSONResponse(
             status_code=200,
             content={
-                "templates": [
-                    (template.model_dump() if hasattr(template, "model_dump") else template)
-                    for template in templates
-                ],
+                "templates": serializable_templates,
                 "total_count": len(templates),
-                "timestamp": None,  # Could add timestamp from query result if needed
+                "timestamp": datetime.now().isoformat(),
             },
         )
 
@@ -128,13 +154,20 @@ async def get_template(
         template = await query_bus.execute(query)
 
         if template:
+            # Convert template to JSON-serializable format
+            if hasattr(template, "model_dump"):
+                template_dict = template.model_dump()
+            else:
+                template_dict = template
+
+            # Convert datetime objects to ISO format strings
+            template_dict = _serialize_datetime_fields(template_dict)
+
             return JSONResponse(
                 status_code=200,
                 content={
-                    "template": (
-                        template.model_dump() if hasattr(template, "model_dump") else template
-                    ),
-                    "timestamp": None,
+                    "template": template_dict,
+                    "timestamp": datetime.now().isoformat(),
                 },
             )
         else:
@@ -191,7 +224,7 @@ async def create_template(template_data: TemplateCreateRequest) -> JSONResponse:
             content={
                 "message": f"Template {template_dict['template_id']} created successfully",
                 "template_id": template_dict["template_id"],
-                "timestamp": None,
+                "timestamp": datetime.now().isoformat(),
             },
         )
 
@@ -245,7 +278,7 @@ async def update_template(template_id: str, template_data: TemplateUpdateRequest
             content={
                 "message": f"Template {template_id} updated successfully",
                 "template_id": template_id,
-                "timestamp": None,
+                "timestamp": datetime.now().isoformat(),
             },
         )
 
@@ -285,7 +318,7 @@ async def delete_template(template_id: str) -> JSONResponse:
             content={
                 "message": f"Template {template_id} deleted successfully",
                 "template_id": template_id,
-                "timestamp": None,
+                "timestamp": datetime.now().isoformat(),
             },
         )
 
@@ -334,7 +367,7 @@ async def validate_template(
                 "validation_warnings": (
                     validation_result.warnings if hasattr(validation_result, "warnings") else []
                 ),
-                "timestamp": None,
+                "timestamp": datetime.now().isoformat(),
             },
         )
 
@@ -370,7 +403,7 @@ async def refresh_templates() -> JSONResponse:
                 "message": f"Templates refreshed successfully. Found {template_count} templates.",
                 "template_count": template_count,
                 "cache_stats": {"refreshed": True},
-                "timestamp": None,
+                "timestamp": datetime.now().isoformat(),
             },
         )
 

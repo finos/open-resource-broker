@@ -9,11 +9,13 @@ from botocore.exceptions import ClientError
 
 from domain.base.dependency_injection import injectable
 from domain.base.ports import ConfigurationPort, LoggingPort
+from monitoring.metrics import MetricsCollector
 from providers.aws.exceptions.aws_exceptions import (
     AuthorizationError,
     AWSConfigurationError,
     NetworkError,
 )
+from providers.aws.infrastructure.instrumentation.botocore_metrics import BotocoreMetricsHandler
 
 if TYPE_CHECKING:
     pass
@@ -26,13 +28,19 @@ T = TypeVar("T")
 class AWSClient:
     """Wrapper for AWS service clients with additional functionality."""
 
-    def __init__(self, config: ConfigurationPort, logger: LoggingPort) -> None:
+    def __init__(
+        self,
+        config: ConfigurationPort,
+        logger: LoggingPort,
+        metrics: Optional[MetricsCollector] = None,
+    ) -> None:
         """
-        Initialize AWS client wrapper.
+        Initialize AWS client wrapper with optional metrics collection.
 
         Args:
             config: Configuration port for accessing configuration
             logger: Logger for logging messages
+            metrics: Optional metrics collector for AWS API instrumentation
         """
         self.config: dict[str, Any] = {}
         self._config_manager = config
@@ -87,13 +95,28 @@ class AWSClient:
             self._account_id = None
             self._credentials_validated = False
 
+            # Initialize metrics handler if metrics collector is available and AWS metrics are enabled
+            self._metrics_handler: Optional[BotocoreMetricsHandler] = None
+            if metrics and self._should_enable_aws_metrics():
+                aws_metrics_cfg = (
+                    metrics.config.get("aws_metrics", {}) if hasattr(metrics, "config") else {}
+                )
+                self._metrics_handler = BotocoreMetricsHandler(metrics, logger, aws_metrics_cfg)
+                self._metrics_handler.register_events(self.session)
+                logger.info("AWS API metrics collection enabled")
+            else:
+                logger.debug(
+                    "AWS API metrics collection disabled - no MetricsCollector provided or AWS_METRICS_ENABLED=false"
+                )
+
             # Single comprehensive INFO log with all important details
             self._logger.info(
-                "AWS client initialized with region: %s, profile: %s, ",
+                "AWS client initialized with region: %s, profile: %s, retries: %d, timeouts: connect=%ds, read=%ds",
                 self.region_name,
-                self.profile_name
-                + f"retries: {self.boto_config.retries['max_attempts']}, "
-                + f"timeouts: connect={self.boto_config.connect_timeout}s, read={self.boto_config.read_timeout}s",
+                self.profile_name or "default",
+                self.config.get("AWS_MAX_RETRIES", 3),
+                self.config.get("AWS_CONNECT_TIMEOUT", 5),
+                self.config.get("AWS_READ_TIMEOUT", 10),
             )
 
         except ClientError as e:
@@ -142,9 +165,7 @@ class AWSClient:
         """
         try:
             # Use provider selection service from DI container
-            from application.services.provider_selection_service import (
-                ProviderSelectionService,
-            )
+            from application.services.provider_selection_service import ProviderSelectionService
             from infrastructure.di.container import get_container
 
             container = get_container()
@@ -205,9 +226,6 @@ class AWSClient:
 
         except Exception as e:
             self._logger.debug("Could not get profile via provider selection: %s", str(e))
-            import traceback
-
-            self._logger.debug("Traceback: %s", traceback.format_exc())
 
         # Fallback: try legacy AWSProviderConfig approach
         try:
@@ -324,3 +342,28 @@ class AWSClient:
             self._logger.debug("Initializing ELBv2 client on first use")
             self._elbv2_client = self.session.client("elbv2", config=self.boto_config)
         return self._elbv2_client
+
+    def _should_enable_aws_metrics(self) -> bool:
+        """Check if AWS metrics should be enabled based on configuration."""
+        try:
+            # Get metrics configuration from ConfigurationPort
+            metrics_config = self._config_manager.get_metrics_config()
+            aws_cfg = (
+                metrics_config.get("aws_metrics", {}) if isinstance(metrics_config, dict) else {}
+            )
+            aws_metrics_enabled = aws_cfg.get(
+                "aws_metrics_enabled", metrics_config.get("aws_metrics_enabled", True)
+            )
+            self._logger.debug("aws_metrics_enabled flag value: %s", aws_metrics_enabled)
+            return aws_metrics_enabled
+        except Exception as e:
+            self._logger.debug("Could not check aws_metrics_enabled flag: %s", e)
+            return True  # Default to enabled
+
+    def get_metrics_stats(self) -> dict:
+        """Get metrics collection statistics."""
+        if self._metrics_handler:
+            stats = self._metrics_handler.get_stats()
+            stats["metrics_enabled"] = True
+            return stats
+        return {"metrics_enabled": False}

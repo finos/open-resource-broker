@@ -1014,7 +1014,11 @@ def _verify_all_resources_cleaned(
     instances_cleaned = True
     for instance_id in machine_ids:
         state_info = get_instance_state(instance_id)
-        if state_info["exists"] and state_info["state"] not in ["terminated", "shutting-down"]:
+        if not state_info["exists"]:
+            # Instance not found, so it's cleaned up.
+            continue
+
+        if state_info["state"] not in ["terminated", "shutting-down"]:
             log.error("Instance %s still exists in state: %s", instance_id, state_info["state"])
             instances_cleaned = False
 

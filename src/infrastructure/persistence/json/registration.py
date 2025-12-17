@@ -14,13 +14,13 @@ from infrastructure.registry.storage_registry import get_storage_registry
 
 def create_json_strategy(config: Any) -> Any:
     """
-    Create JSON storage strategy from configuration.
+    Create JSON storage strategy from configuration with metrics injection.
 
     Args:
         config: Configuration object containing JSON storage settings
 
     Returns:
-        JSONStorageStrategy instance
+        JSONStorageStrategy instance with optional metrics collector
     """
     from infrastructure.persistence.json.strategy import JSONStorageStrategy
 
@@ -40,7 +40,21 @@ def create_json_strategy(config: Any) -> Any:
         # Use configured file path or fallback to default
         file_path = getattr(config, "file_path", "data/request_database.json")
 
-    return JSONStorageStrategy(file_path=file_path, create_dirs=True, entity_type="generic")
+    # Try to inject metrics collector from DI container
+    metrics = None
+    try:
+        from infrastructure.di.container import get_container
+        from monitoring.metrics import MetricsCollector
+
+        container = get_container()
+        metrics = container.get_optional(MetricsCollector)
+    except Exception:
+        # If metrics collector not available, proceed without instrumentation
+        pass
+
+    return JSONStorageStrategy(
+        file_path=file_path, create_dirs=True, entity_type="generic", metrics=metrics
+    )
 
 
 def create_json_config(data: dict[str, Any]) -> Any:

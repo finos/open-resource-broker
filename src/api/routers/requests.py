@@ -2,7 +2,8 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 from api.dependencies import get_request_status_handler, get_return_requests_handler
@@ -23,18 +24,29 @@ LIMIT_QUERY = Query(None, description="Limit number of results")
     description="Get status of a specific request",
 )
 @handle_rest_exceptions(endpoint="/api/v1/requests/{request_id}/status", method="GET")
-async def get_request_status(request_id: str, handler=REQUEST_STATUS_HANDLER) -> JSONResponse:
+async def get_request_status(
+    request_id: str,
+    request: Request,
+    long: bool = Query(True, description="Include detailed info and refresh provider state"),
+    handler=REQUEST_STATUS_HANDLER,
+) -> JSONResponse:
     """
     Get the status of a specific request.
 
     - **request_id**: Request identifier
+    - **long**: Include detailed information about the request
     """
-    result = await handler.handle(
-        request_id=request_id,
-        context={"endpoint": f"/requests/{request_id}/status", "method": "GET"},
-    )
+    api_request = {
+        "input_data": {"requests": [{"requestId": request_id}]},
+        "all_flag": False,
+        "long": long,
+        "client_ip": request.client.host if request.client else None,
+        "user_agent": request.headers.get("user-agent"),
+    }
 
-    return JSONResponse(content=result)
+    result = await handler.handle(api_request)
+
+    return JSONResponse(content=jsonable_encoder(result))
 
 
 @router.get("/", summary="List Requests", description="List requests with optional filtering")
@@ -50,11 +62,14 @@ async def list_requests(
     - **status**: Filter by request status (pending, running, complete, failed)
     - **limit**: Limit number of results
     """
-    result = await handler.handle(
-        status=status, limit=limit, context={"endpoint": "/requests", "method": "GET"}
-    )
+    api_request = {
+        "input_data": {},
+        "status": status,
+        "limit": limit,
+    }
+    result = await handler.handle(api_request)
 
-    return JSONResponse(content=result)
+    return JSONResponse(content=jsonable_encoder(result))
 
 
 @router.get(
@@ -69,9 +84,13 @@ async def get_request_details(request_id: str, handler=REQUEST_STATUS_HANDLER) -
 
     - **request_id**: Request identifier
     """
-    result = await handler.handle(
-        request_id=request_id,
-        context={"endpoint": f"/requests/{request_id}", "method": "GET"},
-    )
+    api_request = {
+        # RequestStatusModel expects a list under "requests" with requestId keys
+        "input_data": {"requests": [{"requestId": request_id}]},
+        "all_flag": False,
+        "long": True,
+        "context": {"endpoint": f"/requests/{request_id}", "method": "GET"},
+    }
+    result = await handler.handle(api_request)
 
-    return JSONResponse(content=result)
+    return JSONResponse(content=jsonable_encoder(result))

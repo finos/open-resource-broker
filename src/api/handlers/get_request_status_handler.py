@@ -6,12 +6,13 @@ from typing import TYPE_CHECKING, Any, Optional
 from api.models import RequestStatusModel
 from api.validation import RequestValidator, ValidationException
 from application.base.infrastructure_handlers import BaseAPIHandler, RequestContext
+from application.dto.queries import GetRequestQuery, GetRequestStatusQuery, ListActiveRequestsQuery
 from application.request.dto import RequestStatusResponse
-from application.request.queries import GetActiveRequestsQuery, GetRequestStatusQuery
 from domain.base.dependency_injection import injectable
 from domain.base.ports import ErrorHandlingPort, LoggingPort
 from domain.base.ports.scheduler_port import SchedulerPort
 from domain.request.exceptions import RequestNotFoundError
+from infrastructure.di.buses import CommandBus, QueryBus
 from infrastructure.error.decorators import handle_interface_exceptions
 from monitoring.metrics import MetricsCollector
 
@@ -22,8 +23,8 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
 
     def __init__(
         self,
-        query_bus: "QueryBus",
-        command_bus: "CommandBus",
+        query_bus: QueryBus,
+        command_bus: CommandBus,
         scheduler_strategy: SchedulerPort,
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
@@ -115,7 +116,7 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
         try:
             if all_flag:
                 # Get all active requests using CQRS query
-                query = GetActiveRequestsQuery(limit=100)
+                query = ListActiveRequestsQuery()
                 requests = await self._query_bus.execute(query)
 
                 # Create response DTO
@@ -143,6 +144,13 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
 
                 # Process each request ID
                 for request_id in request_ids:
+                    # Validate that request_id has proper prefix (req-/ret-)
+                    if not str(request_id).startswith(("req-", "ret-")):
+                        raise ValueError(
+                            f"Invalid request ID format: '{request_id}'. "
+                            "Request IDs must start with 'req-' or 'ret-' prefix."
+                        )
+
                     try:
                         request_data = await self._get_request_with_retry(request_id, long)
 
@@ -167,11 +175,7 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
                                 },
                             )
 
-                        requests.append(
-                            request_data.to_dict()
-                            if hasattr(request_data, "to_dict")
-                            else {"requestId": request_id, "status": request_data}
-                        )
+                        requests.append(self._normalize_request_payload(request_data, request_id))
                     except Exception as e:
                         if self.logger:
                             self.logger.error(
@@ -242,14 +246,64 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
             response.metadata["processed_at"] = time.time()
             response.metadata["processing_duration"] = time.time() - context.start_time
 
-        # Apply scheduler strategy for format conversion if needed
-        if self._scheduler_strategy and hasattr(
-            self._scheduler_strategy, "format_request_response"
-        ):
-            formatted_response = await self._scheduler_strategy.format_request_response(response)
-            return formatted_response
+            # Apply scheduler strategy for format conversion if needed
+            if self._scheduler_strategy and hasattr(
+                self._scheduler_strategy, "format_request_response"
+            ):
+                # Convert Pydantic DTO to dict before formatting
+                response_payload = (
+                    response.model_dump()
+                    if hasattr(response, "model_dump")
+                    else response.to_dict()
+                    if hasattr(response, "to_dict")
+                    else response
+                )
+            formatter = self._scheduler_strategy.format_request_response
+            if callable(formatter):
+                if hasattr(formatter, "__call__") and getattr(formatter, "__name__", ""):
+                    # If formatter is async, await; otherwise call directly
+                    try:
+                        import inspect
+
+                        if inspect.iscoroutinefunction(formatter):
+                            formatted_response = await formatter(response_payload)
+                        else:
+                            formatted_response = formatter(response_payload)
+                    except TypeError:
+                        # Fallback: attempt synchronous call
+                        formatted_response = formatter(response_payload)
+                else:
+                    formatted_response = formatter(response_payload)
+                return formatted_response
 
         return response
+
+    def _normalize_request_payload(self, request_data: Any, request_id: str) -> dict[str, Any]:
+        """
+        Normalize request payload for API response and fix return request type.
+
+        Args:
+            request_data: Request DTO/object or raw status
+            request_id: ID used for the lookup
+
+        Returns:
+            Dictionary suitable for API response
+        """
+        if hasattr(request_data, "to_dict"):
+            payload = request_data.to_dict()
+        elif hasattr(request_data, "model_dump"):
+            payload = request_data.model_dump()
+        elif isinstance(request_data, dict):
+            payload = request_data
+        else:
+            payload = {"requestId": request_id, "status": request_data}
+
+        # Ensure request_type matches ID prefix for return requests
+        if str(request_id).startswith("ret-"):
+            payload["request_type"] = "return"
+            payload["requestType"] = "return"
+
+        return payload
 
     async def _get_request_with_retry(self, request_id: str, long: bool) -> Any:
         """
@@ -269,13 +323,13 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
         for attempt in range(self._max_retries):
             try:
                 if long:
-                    # Get full request details with machines using CQRS query
-                    query = GetRequestStatusQuery(request_id=request_id, include_machines=True)
-                    return await self._query_bus.execute(query)
+                    # Get full request details (including machines) via request query
+                    query = GetRequestQuery(request_id=request_id, long=long)
                 else:
-                    # Get basic request status using CQRS query
-                    query = GetRequestStatusQuery(request_id=request_id, include_machines=False)
-                    return await self._query_bus.execute(query)
+                    # Get basic request status via lightweight status query
+                    query = GetRequestStatusQuery(request_id=request_id)
+
+                return await self._query_bus.execute(query)
             except RequestNotFoundError:
                 # Don't retry if request not found
                 raise

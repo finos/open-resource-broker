@@ -1,7 +1,7 @@
 """API handler for returning machines."""
 
 import time
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, Optional
 
 from application.base.infrastructure_handlers import BaseAPIHandler, RequestContext
 from application.dto.commands import CreateReturnRequestCommand
@@ -12,6 +12,7 @@ from application.dto.responses import (
 from domain.base.dependency_injection import injectable
 from domain.base.ports import ErrorHandlingPort, LoggingPort
 from domain.base.ports.scheduler_port import SchedulerPort
+from infrastructure.di.buses import CommandBus, QueryBus
 
 # Exception handling infrastructure
 from infrastructure.error.decorators import handle_interface_exceptions
@@ -26,8 +27,8 @@ class RequestReturnMachinesRESTHandler(
 
     def __init__(
         self,
-        query_bus: "QueryBus",
-        command_bus: "CommandBus",
+        query_bus: QueryBus,
+        command_bus: CommandBus,
         scheduler_strategy: SchedulerPort,
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
@@ -293,7 +294,3 @@ class RequestReturnMachinesRESTHandler(
             machine_ids.append(machine_id)
 
         return machine_ids
-
-
-if TYPE_CHECKING:
-    from infrastructure.di.buses import CommandBus, QueryBus

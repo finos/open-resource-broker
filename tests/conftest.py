@@ -493,7 +493,8 @@ def generate_instance_id() -> str:
 
 
 def generate_request_id() -> str:
-    """Generate a unique request ID."""
+    """Generate a unique request ID for testing (defaults to ACQUIRE type)."""
+    # For tests, default to ACQUIRE type unless specified otherwise
     return f"req-{uuid.uuid4().hex[:8]}"
 
 

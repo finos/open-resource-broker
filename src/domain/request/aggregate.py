@@ -6,11 +6,7 @@ from typing import Any, Optional
 from pydantic import ConfigDict, Field
 
 from domain.base.entity import AggregateRoot
-from domain.base.events import (
-    RequestCompletedEvent,
-    RequestCreatedEvent,
-    RequestStatusChangedEvent,
-)
+from domain.base.events import RequestCompletedEvent, RequestCreatedEvent, RequestStatusChangedEvent
 from domain.base.value_objects import InstanceId
 from domain.request.request_types import RequestStatus
 from domain.request.value_objects import RequestId, RequestType
@@ -315,6 +311,7 @@ class Request(AggregateRoot):
         provider_type: str,  # Provider type must be explicitly specified
         provider_instance: Optional[str] = None,  # Specific provider instance
         metadata: Optional[dict[str, Any]] = None,
+        request_id: Optional[str] = None,  # Allow external ID to be provided
     ) -> "Request":
         """
         Create a new request with domain event generation.
@@ -326,16 +323,32 @@ class Request(AggregateRoot):
             provider_type: Cloud provider type
             provider_instance: Specific provider instance name (optional)
             metadata: Optional metadata
+            request_id: Optional external request ID (if not provided, will be generated)
 
         Returns:
             New Request instance with creation event
         """
-        # Generate appropriate RequestId using the value object's generate method
-        request_id = RequestId.generate(request_type)
+        # Use provided request_id or generate one if not provided
+        if request_id:
+            # If request_id doesn't have prefix, add it based on request_type
+            if not request_id.startswith(("req-", "ret-")):
+                prefix = "req-" if request_type == RequestType.ACQUIRE else "ret-"
+                request_id_obj = RequestId(value=f"{prefix}{request_id}")
+            else:
+                # Validate that existing prefix matches request_type
+                expected_prefix = "req-" if request_type == RequestType.ACQUIRE else "ret-"
+                if not request_id.startswith(expected_prefix):
+                    raise ValueError(
+                        f"Request ID prefix mismatch: ID '{request_id}' has wrong prefix for "
+                        f"request_type '{request_type.value}'. Expected prefix: '{expected_prefix}'"
+                    )
+                request_id_obj = RequestId(value=request_id)
+        else:
+            request_id_obj = RequestId.generate(request_type)
 
         # Create request
         request = cls(
-            request_id=request_id,
+            request_id=request_id_obj,
             request_type=request_type,
             template_id=template_id,
             requested_count=machine_count,
@@ -351,10 +364,10 @@ class Request(AggregateRoot):
         # Add domain event
         creation_event = RequestCreatedEvent(
             # DomainEvent required fields
-            aggregate_id=str(request_id.value),  # Use .value for string representation
+            aggregate_id=str(request_id_obj.value),  # Use .value for string representation
             aggregate_type="Request",
             # RequestEvent required fields
-            request_id=str(request_id.value),  # Use .value for string representation
+            request_id=str(request_id_obj.value),  # Use .value for string representation
             request_type=request_type.value,
             # RequestCreatedEvent specific fields
             template_id=template_id,

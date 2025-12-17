@@ -1,21 +1,18 @@
 """API handler for requesting machines."""
 
 import time
-import uuid
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 from api.models import RequestMachinesModel
-from api.validation import RequestValidator, ValidationException
+from api.validation import ValidationException
 from application.base.infrastructure_handlers import BaseAPIHandler
 from application.dto.commands import CreateRequestCommand
 from application.request.dto import RequestMachinesResponse
 from domain.base.dependency_injection import injectable
 from domain.base.ports import ErrorHandlingPort, LoggingPort
+from infrastructure.di.buses import CommandBus, QueryBus
 from infrastructure.error.decorators import handle_interface_exceptions
 from monitoring.metrics import MetricsCollector
-
-if TYPE_CHECKING:
-    from infrastructure.di.buses import CommandBus, QueryBus
 
 
 @injectable
@@ -24,8 +21,8 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
 
     def __init__(
         self,
-        query_bus: "QueryBus",
-        command_bus: "CommandBus",
+        query_bus: QueryBus,
+        command_bus: CommandBus,
         logger: Optional[LoggingPort] = None,
         error_handler: Optional[ErrorHandlingPort] = None,
         metrics: Optional[MetricsCollector] = None,
@@ -43,8 +40,7 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
         super().__init__(logger, error_handler)
         self._query_bus = query_bus
         self._command_bus = command_bus
-        self._metrics = metrics
-        self._validator = RequestValidator()
+        self._metrics_collector = metrics
 
     async def validate_api_request(self, request: RequestMachinesModel, context) -> None:
         """
@@ -55,15 +51,12 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
             context: Request context
         """
         try:
-            # Validate using the request validator
-            self._validator.validate_request_machines(request)
-
-            # Additional validation
+            # Basic validation for required fields
             if not request.template_id:
                 raise ValidationException("template_id is required")
 
-            if not request.max_number or request.max_number <= 0:
-                raise ValidationException("max_number must be greater than 0")
+            if not request.machine_count or request.machine_count <= 0:
+                raise ValidationException("machine_count must be greater than 0")
 
         except ValidationException as e:
             if self.logger:
@@ -74,7 +67,7 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
                 )
             raise
 
-    @handle_interface_exceptions
+    @handle_interface_exceptions(context="request_machines", interface_type="api")
     async def execute_api_request(
         self, request: RequestMachinesModel, context
     ) -> RequestMachinesResponse:
@@ -92,34 +85,33 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
             self.logger.info(
                 "Processing request machines - Template: %s, Count: %s - Correlation ID: %s",
                 request.template_id,
-                request.max_number,
+                request.machine_count,
                 context.correlation_id,
             )
 
         try:
-            # Generate request ID
-            request_id = str(uuid.uuid4())
+            # Generate prefixed request ID using centralized utility
+            from api.utils.request_id_generator import generate_request_id
+            from domain.request.value_objects import RequestType
+
+            # This is a machine request, so it's always ACQUIRE type
+            request_id = generate_request_id(RequestType.ACQUIRE)
 
             # Create CQRS command
             command = CreateRequestCommand(
                 request_id=request_id,
                 template_id=request.template_id,
-                max_number=request.max_number,
-                priority=getattr(request, "priority", "normal"),
+                requested_count=request.machine_count,
                 metadata=getattr(request, "metadata", {}),
             )
 
             # Execute command through CQRS command bus
-            await self._command_bus.execute(command)
+            result_request_id = await self._command_bus.execute(command)
 
             # Create response
             response = RequestMachinesResponse(
-                request_id=request_id,
-                template_id=request.template_id,
-                requested_count=request.max_number,
-                status="submitted",
-                correlation_id=context.correlation_id,
-                submitted_at=time.time(),
+                request_id=result_request_id,
+                metadata={"correlation_id": context.correlation_id, "submitted_at": time.time()},
             )
 
             if self.logger:
@@ -130,8 +122,10 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
                 )
 
             # Record metrics if available
-            if self._metrics:
-                self._metrics.record_api_success("request_machines", request.max_number)
+            if self._metrics_collector:
+                self._metrics_collector.record_api_success(
+                    "request_machines", request.machine_count
+                )
 
             return response
 
@@ -144,8 +138,8 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
                 )
 
             # Record metrics if available
-            if self._metrics:
-                self._metrics.record_api_failure("request_machines", str(e))
+            if self._metrics_collector:
+                self._metrics_collector.record_api_failure("request_machines", str(e))
 
             raise
 
@@ -162,8 +156,5 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
         Returns:
             Post-processed response
         """
-        # Add processing metadata
-        response.processed_at = context.start_time
-        response.processing_duration = time.time() - context.start_time
-
+        # Response DTOs are frozen; return as-is or build a copy with additional metadata if needed.
         return response

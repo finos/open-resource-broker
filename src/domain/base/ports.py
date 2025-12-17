@@ -18,6 +18,10 @@ class ConfigurationPort(Protocol):
         """Get provider-specific configuration."""
         ...
 
+    def get_metrics_config(self) -> dict[str, Any]:
+        """Get metrics configuration."""
+        ...
+
 
 class LoggingPort(Protocol):
     """Port for logging from domain layer."""

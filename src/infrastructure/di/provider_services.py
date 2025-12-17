@@ -1,11 +1,14 @@
 """Provider service registrations for dependency injection."""
 
+from typing import Optional
+
 from application.services.provider_capability_service import ProviderCapabilityService
 from application.services.provider_selection_service import ProviderSelectionService
 from domain.base.ports import ConfigurationPort, LoggingPort
 from infrastructure.di.container import DIContainer
 from infrastructure.factories.provider_strategy_factory import ProviderStrategyFactory
 from infrastructure.logging.logger import get_logger
+from monitoring.metrics import MetricsCollector
 from providers.base.strategy import ProviderContext
 
 
@@ -316,29 +319,55 @@ def create_configured_provider_context(container: DIContainer) -> ProviderContex
     """Create provider context using configuration-driven factory with lazy loading support."""
     try:
         logger = container.get(LoggingPort)
+        metrics = (
+            container.get_optional(MetricsCollector) if hasattr(container, "get_optional") else None
+        )
         config_manager = container.get(ConfigurationPort)
 
         # Check if lazy loading is enabled
-        if container.is_lazy_loading_enabled():
-            return _create_lazy_provider_context(container, logger, config_manager)
+        if hasattr(container, "is_lazy_loading_enabled") and container.is_lazy_loading_enabled():
+            return _create_lazy_provider_context(container, logger, config_manager, metrics)
         else:
-            return _create_eager_provider_context(container, logger, config_manager)
+            return _create_eager_provider_context(container, logger, config_manager, metrics)
 
     except Exception as e:
-        logger = container.get(LoggingPort)
-        logger.error("Failed to create configured provider context, using fallback: %s", e)
+        # Try to get logger safely for error reporting
+        try:
+            logger = container.get(LoggingPort)
+            logger.error("Failed to create configured provider context, using fallback: %s", e)
+        except Exception:
+            # If we can't get logger, just create fallback without logging
+            pass
+
         # Create minimal provider context as fallback
-        return ProviderContext(logger)
+        try:
+            logger = container.get(LoggingPort)
+            metrics = (
+                container.get_optional(MetricsCollector)
+                if hasattr(container, "get_optional")
+                else None
+            )
+        except Exception:
+            # If we can't get dependencies, create a basic context
+            from infrastructure.logging.logger import get_logger
+
+            logger = get_logger(__name__)
+            metrics = None
+
+        return ProviderContext(logger, metrics=metrics)
 
 
 def _create_lazy_provider_context(
-    container: DIContainer, logger: LoggingPort, config_manager: ConfigurationPort
+    container: DIContainer,
+    logger: LoggingPort,
+    config_manager: ConfigurationPort,
+    metrics: Optional[MetricsCollector],
 ) -> ProviderContext:
     """Create provider context with immediate provider registration (lazy loading fixed)."""
     logger.info("Creating provider context with lazy loading enabled")
 
     # Create provider context
-    provider_context = ProviderContext(logger)
+    provider_context = ProviderContext(logger, metrics=metrics)
 
     try:
         # IMMEDIATE LOADING instead of broken lazy loading
@@ -377,7 +406,10 @@ def _create_lazy_provider_context(
 
 
 def _create_eager_provider_context(
-    container: DIContainer, logger: LoggingPort, config_manager: ConfigurationPort
+    container: DIContainer,
+    logger: LoggingPort,
+    config_manager: ConfigurationPort,
+    metrics: Optional[MetricsCollector],
 ) -> ProviderContext:
     """Create provider context with immediate provider registration (fallback mode)."""
     logger.info("Creating provider context with eager loading (fallback mode)")
@@ -392,14 +424,14 @@ def _create_eager_provider_context(
             # Use configuration-driven approach
             from providers.base.strategy import create_provider_context
 
-            return create_provider_context(logger=logger)
+            return create_provider_context(logger=logger, metrics=metrics)
     except (AttributeError, Exception) as e:
         logger.warning("Failed to create provider context: %s", e)
 
     # Fallback to basic provider context
     from providers.base.strategy import create_provider_context
 
-    return create_provider_context(logger)
+    return create_provider_context(logger, metrics=metrics)
 
 
 def _register_provider_to_context(
@@ -435,6 +467,10 @@ def _register_aws_provider_to_context(
     try:
         # Create AWS provider configuration for this instance
         from providers.aws.configuration.config import AWSProviderConfig
+        from providers.aws.infrastructure.adapters.aws_provisioning_adapter import (
+            AWSProvisioningAdapter,
+        )
+        from providers.aws.infrastructure.aws_client import AWSClient
         from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
         aws_config = AWSProviderConfig(
@@ -442,24 +478,14 @@ def _register_aws_provider_to_context(
             profile=provider_instance.config.get("profile", "default"),
         )
 
-        # Create AWS provider strategy with correct parameters
-        aws_provisioning_port = None
-        try:
-            from providers.aws.infrastructure.adapters.aws_provisioning_adapter import (
-                AWSProvisioningAdapter,
-            )
-
-            aws_provisioning_port = container.get(AWSProvisioningAdapter)
-        except Exception as exc:  # nosec B110 - diagnostic logging only
-            logger.debug(
-                "AWS provisioning adapter unavailable during provider registration: %s",
-                exc,
-            )
-
+        # Create AWS provider strategy WITHOUT AWSProvisioningAdapter initially
+        # AWSProvisioningAdapter will be injected later when available
         aws_strategy = AWSProviderStrategy(
             config=aws_config,
             logger=logger,
-            aws_provisioning_port=aws_provisioning_port,
+            aws_provisioning_port=None,  # Lazily resolved via resolver below
+            aws_client_resolver=lambda: container.get(AWSClient),
+            aws_provisioning_port_resolver=lambda: container.get(AWSProvisioningAdapter),
         )
 
         # Register strategy with provider context
@@ -470,9 +496,7 @@ def _register_aws_provider_to_context(
 
     except Exception as e:
         logger.error(
-            "Failed to register AWS provider '%s' to context: %s",
-            provider_instance.name,
-            str(e),
+            "Failed to register AWS provider '%s' to context: %s", provider_instance.name, str(e)
         )
         return False
 
@@ -514,9 +538,7 @@ def _register_aws_services(container: DIContainer) -> None:
             raise
 
         try:
-            from providers.aws.infrastructure.aws_handler_factory import (
-                AWSHandlerFactory,
-            )
+            from providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
         except Exception as e:
             logger.debug("Failed to import AWSHandlerFactory: %s", e)
             raise
@@ -528,25 +550,19 @@ def _register_aws_services(container: DIContainer) -> None:
             raise
 
         try:
-            from providers.aws.infrastructure.handlers.spot_fleet_handler import (
-                SpotFleetHandler,
-            )
+            from providers.aws.infrastructure.handlers.spot_fleet_handler import SpotFleetHandler
         except Exception as e:
             logger.debug("Failed to import SpotFleetHandler: %s", e)
             raise
 
         try:
-            from providers.aws.infrastructure.adapters.template_adapter import (
-                AWSTemplateAdapter,
-            )
+            from providers.aws.infrastructure.adapters.template_adapter import AWSTemplateAdapter
         except Exception as e:
             logger.debug("Failed to import AWSTemplateAdapter: %s", e)
             raise
 
         try:
-            from providers.aws.infrastructure.adapters.machine_adapter import (
-                AWSMachineAdapter,
-            )
+            from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
         except Exception as e:
             logger.debug("Failed to import AWSMachineAdapter: %s", e)
             raise
@@ -560,9 +576,7 @@ def _register_aws_services(container: DIContainer) -> None:
             raise
 
         try:
-            from providers.aws.infrastructure.adapters.request_adapter import (
-                AWSRequestAdapter,
-            )
+            from providers.aws.infrastructure.adapters.request_adapter import AWSRequestAdapter
         except Exception as e:
             logger.debug("Failed to import AWSRequestAdapter: %s", e)
             raise
@@ -594,9 +608,7 @@ def _register_aws_services(container: DIContainer) -> None:
             raise
 
         try:
-            from providers.aws.managers.aws_resource_manager import (
-                AWSResourceManagerImpl,
-            )
+            from providers.aws.managers.aws_resource_manager import AWSResourceManagerImpl
         except Exception as e:
             logger.debug("Failed to import AWSResourceManagerImpl: %s", e)
             raise
@@ -605,9 +617,7 @@ def _register_aws_services(container: DIContainer) -> None:
             from infrastructure.adapters.ports.cloud_resource_manager_port import (
                 CloudResourceManagerPort,
             )
-            from infrastructure.adapters.ports.request_adapter_port import (
-                RequestAdapterPort,
-            )
+            from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
             from infrastructure.adapters.ports.resource_provisioning_port import (
                 ResourceProvisioningPort,
             )
@@ -661,33 +671,39 @@ def _register_aws_services(container: DIContainer) -> None:
 
 
 def _create_aws_client(container: DIContainer):
-    """Create AWS client from the currently selected provider."""
-    logger = container.get(LoggingPort)
+    """Create AWS client without circular dependency."""
+    try:
+        logger = container.get(LoggingPort)
+    except Exception:
+        # Fallback to basic logger if DI resolution fails
+        from infrastructure.logging.logger import get_logger
+
+        logger = get_logger(__name__)
 
     try:
-        # Get the provider context to find the currently selected provider
-        provider_context = container.get(ProviderContext)
+        config = container.get(ConfigurationPort)
+    except Exception:
+        # Fallback to basic config if DI resolution fails
+        from unittest.mock import Mock
 
-        # Get the current strategy
-        current_strategy_type = provider_context.current_strategy_type
-        if current_strategy_type and current_strategy_type in provider_context._strategies:
-            current_strategy = provider_context._strategies[current_strategy_type]
+        config = Mock()
+        config.get.return_value = {}
 
-            # If it's an AWS strategy, get its AWS client
-            if hasattr(current_strategy, "aws_client") and current_strategy.aws_client:
-                logger.debug(
-                    "Using AWS client from selected provider strategy: %s",
-                    current_strategy_type,
+    # Get metrics collector safely (avoid recursion); warn if unavailable
+    metrics = (
+        container.get_optional(MetricsCollector) if hasattr(container, "get_optional") else None
+    )
+    if metrics is None:
+        try:
+            metrics = container.get(MetricsCollector)
+        except Exception as e:
+            if hasattr(logger, "warning"):
+                logger.warning(
+                    "MetricsCollector not available; AWS API metrics will be disabled: %s", e
                 )
-                return current_strategy.aws_client
+            metrics = None
 
-        logger.debug("No selected AWS provider strategy found, creating fallback AWS client")
-
-    except Exception as e:
-        logger.debug("Could not get AWS client from provider context: %s", e)
-
-    # Fallback: create AWS client with generic configuration
-    config = container.get(ConfigurationPort)
+    # Create fresh AWSClient - don't try to get from ProviderContext
     from providers.aws.infrastructure.aws_client import AWSClient
 
-    return AWSClient(config=config, logger=logger)
+    return AWSClient(config=config, logger=logger, metrics=metrics)

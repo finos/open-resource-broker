@@ -141,17 +141,18 @@ __all__: list[str] = [
 
 
 # Convenience functions
-def create_provider_context(logger=None) -> ProviderContext:
+def create_provider_context(logger=None, metrics=None) -> ProviderContext:
     """
     Create a new provider context with default configuration.
 
     Args:
         logger: Optional logger instance
+        metrics: Optional shared MetricsCollector instance
 
     Returns:
         Configured ProviderContext instance
     """
-    context = ProviderContext(logger=logger)
+    context = ProviderContext(logger=logger, metrics=metrics)
 
     # Load strategies from the provider registry
     try:

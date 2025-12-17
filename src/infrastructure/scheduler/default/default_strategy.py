@@ -178,6 +178,15 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
 
     def format_request_response(self, request_data: dict[str, Any]) -> dict[str, Any]:
         """Format request creation response to native domain format."""
+        # If this is a status/detail response, pass through the requests list and status
+        if "requests" in request_data:
+            return {
+                "requests": request_data.get("requests", []),
+                "status": request_data.get("status", "complete"),
+                "message": request_data.get("message", "Status retrieved successfully"),
+                "errors": request_data.get("errors"),
+            }
+
         return {
             "request_id": request_data.get("request_id", request_data.get("requestId")),
             "message": request_data.get("message", "Request submitted successfully"),

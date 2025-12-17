@@ -197,7 +197,9 @@ class FleetGroupingMixin:
         - "non_group": instance is not part of managed group
         - "unknown": need AWS lookup
         """
-        if resource_id and desired_capacity > 0:
+        # If we have a resource_id (fleet/ASG), treat as grouped even if desired_capacity
+        # isn't populated; missing desired_capacity should not force non-group handling.
+        if resource_id:
             return "group", resource_id
         if resource_id is None or desired_capacity == 0:
             return "non_group", None

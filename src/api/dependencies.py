@@ -61,64 +61,45 @@ def get_server_config() -> ServerConfig:
 def get_template_handler():
     """Get template API handler from DI container."""
 
-    def _get_handler():
-        container = get_di_container()
-        from api.handlers.get_available_templates_handler import (
-            GetAvailableTemplatesRESTHandler,
-        )
+    container = get_di_container()
+    from api.handlers.get_available_templates_handler import (
+        GetAvailableTemplatesRESTHandler,
+    )
 
-        return container.get(GetAvailableTemplatesRESTHandler)
-
-    return _get_handler
+    return container.get(GetAvailableTemplatesRESTHandler)
 
 
 def get_request_machines_handler():
     """Get request machines API handler from DI container."""
 
-    def _get_handler():
-        container = get_di_container()
-        from api.handlers.request_machines_handler import RequestMachinesRESTHandler
+    container = get_di_container()
+    from api.handlers.request_machines_handler import RequestMachinesRESTHandler
 
-        return container.get(RequestMachinesRESTHandler)
-
-    return _get_handler
+    return container.get(RequestMachinesRESTHandler)
 
 
 def get_request_status_handler():
     """Get request status API handler from DI container."""
 
-    def _get_handler():
-        container = get_di_container()
-        from api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
+    container = get_di_container()
+    from api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
 
-        return container.get(GetRequestStatusRESTHandler)
-
-    return _get_handler
+    return container.get(GetRequestStatusRESTHandler)
 
 
 def get_return_requests_handler():
     """Get return requests API handler from DI container."""
 
-    def _get_handler():
-        container = get_di_container()
-        from api.handlers.get_return_requests_handler import (
-            GetReturnRequestsRESTHandler,
-        )
+    container = get_di_container()
+    from api.handlers.get_return_requests_handler import GetReturnRequestsRESTHandler
 
-        return container.get(GetReturnRequestsRESTHandler)
-
-    return _get_handler
+    return container.get(GetReturnRequestsRESTHandler)
 
 
 def get_return_machines_handler():
     """Get return machines API handler from DI container."""
 
-    def _get_handler():
-        container = get_di_container()
-        from api.handlers.request_return_machines_handler import (
-            RequestReturnMachinesRESTHandler,
-        )
+    container = get_di_container()
+    from api.handlers.request_return_machines_handler import RequestReturnMachinesRESTHandler
 
-        return container.get(RequestReturnMachinesRESTHandler)
-
-    return _get_handler
+    return container.get(RequestReturnMachinesRESTHandler)

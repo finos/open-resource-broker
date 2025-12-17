@@ -11,10 +11,7 @@ from typing import Any, Optional
 from domain.base.ports import LoggingPort
 from domain.template.template_aggregate import Template
 from infrastructure.registry.provider_registry import ProviderRegistry
-from providers.base.strategy.provider_strategy import (
-    ProviderCapabilities,
-    ProviderOperationType,
-)
+from providers.base.strategy.provider_strategy import ProviderCapabilities, ProviderOperationType
 
 
 @dataclass
@@ -190,25 +187,25 @@ class ProviderCapabilityService:
                             "supported_fleet_types": ["instant", "request", "maintain"],
                             "supports_spot": True,
                             "supports_on_demand": True,
-                            "max_instances": 1000,
+                            "max_instances": 10000,
                         },
                         "SpotFleet": {
                             "supported_fleet_types": ["request", "maintain"],
                             "supports_spot": True,
                             "supports_on_demand": True,
-                            "max_instances": 1000,
+                            "max_instances": 10000,
                         },
                         "RunInstances": {
                             "supported_fleet_types": [],
                             "supports_spot": False,
                             "supports_on_demand": True,
-                            "max_instances": 100,
+                            "max_instances": 10000,
                         },
                         "ASG": {
                             "supported_fleet_types": [],
                             "supports_spot": True,
                             "supports_on_demand": True,
-                            "max_instances": 1000,
+                            "max_instances": 10000,
                         },
                     },
                     "spot_instances": True,

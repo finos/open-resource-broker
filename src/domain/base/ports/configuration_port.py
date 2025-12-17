@@ -42,3 +42,7 @@ class ConfigurationPort(ABC):
     @abstractmethod
     def get_native_spec_config(self) -> dict[str, Any]:
         """Get native spec configuration."""
+
+    @abstractmethod
+    def get_metrics_config(self) -> dict[str, Any]:
+        """Get metrics configuration."""

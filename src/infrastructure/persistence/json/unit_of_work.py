@@ -55,24 +55,41 @@ class JSONUnitOfWork(BaseUnitOfWork):
             data_path.mkdir(parents=True, exist_ok=True)
             self.logger.info("Created data directory: %s", data_dir)
 
+        # Try to inject metrics collector from DI container
+        metrics = None
+        try:
+            from infrastructure.di.container import get_container
+            from monitoring.metrics import MetricsCollector
+
+            container = get_container()
+            metrics = container.get_optional(MetricsCollector)
+        except Exception:
+            # If metrics collector not available, proceed without instrumentation
+            pass
+
         # Create storage strategies for each repository
         machine_strategy = JSONStorageStrategy(
             file_path=os.path.join(data_dir, machine_file),
             create_dirs=create_dirs,
             entity_type="machines",
+            metrics=metrics,
         )
 
         request_strategy = JSONStorageStrategy(
             file_path=os.path.join(data_dir, request_file),
             create_dirs=create_dirs,
             entity_type="requests",
+            metrics=metrics,
         )
 
         template_path = (
             template_file if os.path.isabs(template_file) else os.path.join(data_dir, template_file)
         )
         template_strategy = JSONStorageStrategy(
-            file_path=template_path, create_dirs=create_dirs, entity_type="templates"
+            file_path=template_path,
+            create_dirs=create_dirs,
+            entity_type="templates",
+            metrics=metrics,
         )
 
         # Create repositories using simplified implementations
