@@ -271,6 +271,11 @@ class TemplateProcessor:
                         config["percentOnDemand"] = 0
                     else:
                         config["percentOnDemand"] = 100
+            # Normalize allocation strategy keys between camel/snake for both schedulers
+            if "allocationStrategy" in overrides:
+                config["allocation_strategy"] = overrides["allocationStrategy"]
+            if "allocation_strategy" in overrides:
+                config["allocationStrategy"] = overrides["allocation_strategy"]
 
         # Set scheduler type in config for template replacement (after overrides)
         config["scheduler"] = scheduler_type
@@ -348,6 +353,9 @@ class TemplateProcessor:
                             "abis_instance_requirements",
                             "instance_types",
                             "instanceTypes",
+                            "allocationStrategy",
+                            "allocation_strategy",
+                            "allocationStrategyOnDemand",
                         ]:
                             if key in overrides:
                                 tmpl[key] = overrides[key]

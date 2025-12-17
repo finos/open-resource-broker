@@ -3,10 +3,12 @@
 import json
 import logging
 import os
+import re
 import subprocess
 import time
 from collections import Counter, namedtuple
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import List, Optional
 
 import boto3
@@ -22,18 +24,12 @@ from tests.onaws.template_processor import TemplateProcessor
 try:
     from tests.onaws.test_onaws import (
         MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC,
-        _check_all_ec2_hosts_are_being_terminated,
-        _cleanup_asg_resources,
-        _get_capacity,
-        _get_resource_id_from_instance,
-        _verify_all_resources_cleaned,
-        _wait_for_capacity_change,
-        _wait_for_fleet_stable,
-        get_instance_state,
-        validate_all_instances_price_type,
-        validate_random_instance_attributes,
-        verify_abis_enabled_for_instance,
-    )
+        _check_all_ec2_hosts_are_being_terminated, _cleanup_asg_resources,
+        _get_capacity, _get_resource_id_from_instance,
+        _verify_all_resources_cleaned, _wait_for_capacity_change,
+        _wait_for_fleet_stable, get_instance_state,
+        validate_all_instances_price_type, validate_random_instance_attributes,
+        verify_abis_enabled_for_instance)
 except Exception as exc:  # pragma: no cover - defensive guard for env/creds issues
     import pytest
 
@@ -96,6 +92,14 @@ REST_API_SERVER_CFG = scenarios_rest_api.REST_API_SERVER
 MAX_CONCURRENCY = int(os.environ.get("REST_API_MAX_CONCURRENCY", 2))
 LAUNCH_DELAY = float(os.environ.get("REST_API_LAUNCH_DELAY_SEC", 3.0))
 WorkerResult = namedtuple("WorkerResult", "scenario status error traceback")
+
+
+class RequestTimeoutError(TimeoutError):
+    """Timeout with captured status payload for post-processing."""
+
+    def __init__(self, message: str, status_response: dict | None = None):
+        super().__init__(message)
+        self.status_response = status_response
 
 
 class OhfpServerManager:
@@ -275,12 +279,24 @@ class RestApiClient:
 def setup_rest_api_environment(request):
     """Generate templates and set env vars before starting the server."""
     processor = TemplateProcessor()
-    test_name = request.node.name
+    raw_test_name = request.node.name
+
+    # Preserve scenario id from the last [...] block in the raw name
+    scenario_name = None
+    if "[" in raw_test_name and "]" in raw_test_name:
+        scenario_name = raw_test_name.rsplit("[", 1)[1].split("]", 1)[0]
+
+    # Insert timestamp block before the scenario block for unique run directories
+    timestamp = datetime.now().strftime("%m.%d.%H.%M")
+    if "[" in raw_test_name:
+        base, rest = raw_test_name.split("[", 1)
+        test_name = f"{base}[{timestamp}][{rest}"
+    else:
+        test_name = f"{raw_test_name}[{timestamp}]"
 
     # Extract scenario from test parameters
-    scenario_name = None
-    if "[" in test_name and "]" in test_name:
-        scenario_name = test_name.split("[")[1].split("]")[0]
+    # (using the original name so the scenario id isn't replaced by timestamp)
+    # scenario_name already determined above
 
     # Get test case configuration
     test_case = scenarios_rest_api.get_test_case_by_name(scenario_name) if scenario_name else {}
@@ -677,25 +693,14 @@ def log_resource_history(resource_id: str, provider_api: str) -> None:
         # Log the collected history
         if history_records:
 
-            def _format_table(headers: tuple[str, ...], rows: list[tuple]) -> str:
-                widths = [len(h) for h in headers]
-                for row in rows:
-                    for idx, val in enumerate(row):
-                        widths[idx] = max(widths[idx], len(str(val)))
-
-                border = "+-" + "-+-".join("-" * w for w in widths) + "-+"
-
-                def fmt(row_vals):
-                    return (
-                        "| "
-                        + " | ".join(f"{v!s:<{widths[i]}}" for i, v in enumerate(row_vals))
-                        + " |"
-                    )
-
-                lines = [border, fmt(headers), border]
-                lines.extend(fmt(r) for r in rows)
-                lines.append(border)
-                return "\n".join(lines)
+            def _format_list(lines: list[str]) -> str:
+                """Render lines with top/bottom borders."""
+                if not lines:
+                    return ""
+                width = max(len(line) for line in lines)
+                border = "=" * (width + 4)
+                body = "\n".join(f"| {line.ljust(width)} |" for line in lines)
+                return f"{border}\n{body}\n{border}"
 
             sections: list[str] = []
 
@@ -721,36 +726,31 @@ def log_resource_history(resource_id: str, provider_api: str) -> None:
                     else:
                         other_events.append(record)
 
-                merged_rows = []
+                merged_lines = []
                 if fleet_request_change_count > 0:
-                    merged_rows.append(
-                        ("Merged Events", f"{fleet_request_change_count} x fleetRequestChange")
+                    merged_lines.append(
+                        f"Merged Events: {fleet_request_change_count} x fleetRequestChange"
                     )
 
                 if launch_events_count > 0:
-                    merged_rows.append(
-                        (
-                            "Merged Events",
-                            f"{launch_events_count} x 'Successful - Launching a new EC2 instance'",
-                        )
+                    merged_lines.append(
+                        f"Merged Events: {launch_events_count} x 'Successful - Launching a new EC2 instance'"
                     )
 
-                if merged_rows:
-                    sections.append(_format_table(("field", "value"), merged_rows))
+                if merged_lines:
+                    sections.append(_format_list(merged_lines))
 
-                detail_rows = []
+                detail_lines = []
                 for i, record in enumerate(other_events):
                     timestamp = record.get("Timestamp", "N/A")
                     event_type = record.get("EventType", "N/A")
                     event_info = record.get("EventInformation", {})
-                    detail_rows.append(
-                        (i + 1, timestamp, event_type, json.dumps(event_info, default=str))
+                    detail_lines.append(
+                        f"{i + 1}) {timestamp} | {event_type} | {json.dumps(event_info, default=str)}"
                     )
 
-                if detail_rows:
-                    sections.append(
-                        _format_table(("idx", "timestamp", "event_type", "details"), detail_rows)
-                    )
+                if detail_lines:
+                    sections.append(_format_list(detail_lines))
 
             elif provider_api == "ASG":
                 # Count and merge "Launching a new EC2 instance" activities for ASG
@@ -765,36 +765,28 @@ def log_resource_history(resource_id: str, provider_api: str) -> None:
                     else:
                         other_activities.append(record)
 
-                merged_rows = []
+                merged_lines = []
                 if launch_activities_count > 0:
-                    merged_rows.append(
-                        (
-                            "Merged Activities",
-                            f"{launch_activities_count} x 'Launching a new EC2 instance'",
-                        )
+                    merged_lines.append(
+                        f"Merged Activities: {launch_activities_count} x 'Launching a new EC2 instance'"
                     )
 
-                if merged_rows:
-                    sections.append(_format_table(("field", "value"), merged_rows))
+                if merged_lines:
+                    sections.append(_format_list(merged_lines))
 
-                detail_rows = []
+                detail_lines = []
 
                 for i, record in enumerate(other_activities):
                     start_time_str = record.get("StartTime", "N/A")
                     activity_id = record.get("ActivityId", "N/A")
                     description = record.get("Description", "N/A")
                     status_code = record.get("StatusCode", "N/A")
-                    detail_rows.append(
-                        (i + 1, start_time_str, activity_id, status_code, description)
+                    detail_lines.append(
+                        f"{i + 1}) start_time={start_time_str} | activity_id={activity_id} | status={status_code} | description={description}"
                     )
 
-                if detail_rows:
-                    sections.append(
-                        _format_table(
-                            ("idx", "start_time", "activity_id", "status", "description"),
-                            detail_rows,
-                        )
-                    )
+                if detail_lines:
+                    sections.append(_format_list(detail_lines))
 
             if sections:
                 log.info("\n%s", "\n\n".join(sections))
@@ -835,10 +827,12 @@ def _wait_for_request_completion_rest(
     """Poll request status via REST API until complete."""
     start_time = time.time()
     poll_interval = REST_TIMEOUTS["request_status_poll_interval"]
-    timeout = timeout or REST_TIMEOUTS["request_status_timeout"]
+    timeout = timeout or REST_TIMEOUTS["request_fulfillment_timeout"]
+    last_status: dict | None = None
 
     while True:
         status_response = client.get_request_status(request_id, long=True)
+        last_status = status_response
         requests_list = status_response.get("requests", [])
         request_statuses = [r.get("status") for r in requests_list if isinstance(r, dict)]
         terminal = {"complete", "partial", "failed", "cancelled", "timeout"}
@@ -873,8 +867,12 @@ def _wait_for_request_completion_rest(
             log.info("Request %s completed (inner statuses=%s)", request_id, request_statuses)
             return status_response
 
+        log.debug(f"Time left: {timeout - (time.time() - start_time)}")
         if time.time() - start_time > timeout:
-            raise TimeoutError(f"Request {request_id} did not complete within {timeout}s")
+            raise RequestTimeoutError(
+                f"Request {request_id} did not complete within {timeout}s",
+                status_response=last_status,
+            )
 
         time.sleep(poll_interval)
 
@@ -882,12 +880,11 @@ def _wait_for_request_completion_rest(
 def _wait_for_return_completion_rest(
     client: RestApiClient,
     return_request_id: str,
-    timeout: int | None = None,
+    timeout: int,
 ) -> dict:
     """Poll return request status via REST API until complete."""
     start_time = time.time()
     poll_interval = REST_TIMEOUTS["return_status_poll_interval"]
-    timeout = timeout or REST_TIMEOUTS["return_status_timeout"]
 
     while True:
         try:
@@ -906,284 +903,6 @@ def _wait_for_return_completion_rest(
             return {}
 
         time.sleep(poll_interval)
-
-
-def run_rest_api_control_loop(rest_api_client: RestApiClient, test_case: dict) -> None:
-    """
-    Core REST API control loop reused by single-threaded and concurrent tests.
-    """
-    log.info("=" * 80)
-    log.info(f"Starting REST API test: {test_case['test_name']}")
-    log.info("=" * 80)
-
-    machine_ids = []
-    resource_id = None
-    provider_api = None
-    template_json = None
-
-    try:
-        # Step 1: Request Capacity
-        log.info("=== STEP 1: Request Capacity ===")
-
-        # 1.1: Get available templates via REST API
-        log.info("1.1: Retrieving available templates via REST API")
-        templates_response = rest_api_client.get_templates()
-        log.debug(f"Templates response: {json.dumps(templates_response, indent=2)}")
-
-        # 1.2: Find target template
-        log.info("1.2: Finding target template")
-        template_id = test_case.get("template_id") or test_case["test_name"]
-        template_json = next(
-            (
-                template
-                for template in templates_response["templates"]
-                if template.get("template_id") == template_id
-            ),
-            None,
-        )
-
-        if template_json is None:
-            log.warning(f"Template {template_id} not found, using first available template")
-            template_json = templates_response["templates"][0]
-
-        log.info(f"Using template: {template_json.get('template_id')}")
-        provider_api = (
-            template_json.get("provider_api")
-            or test_case.get("overrides", {}).get("providerApi")
-            or "EC2Fleet"
-        )
-        log.info(f"Provider API for request: {provider_api}")
-
-        # 1.3: Request machines via REST API
-        log.info(f"1.3: Requesting {test_case['capacity_to_request']} machines")
-        request_response = rest_api_client.request_machines(
-            template_id=template_json["template_id"],
-            machine_count=test_case["capacity_to_request"],
-        )
-        log.debug(f"Request response: {json.dumps(request_response, indent=2)}")
-
-        # 1.4: Validate request response
-        log.info("1.4: Validating request response")
-        request_id = request_response.get("request_id")
-        if not request_id:
-            pytest.fail(f"Request ID missing in response: {request_response}")
-
-        log.info(f"Request ID: {request_id}")
-
-        # Step 2: Wait for Fulfillment
-        log.info("=== STEP 2: Wait for Fulfillment ===")
-
-        log.info(
-            "2.1: Polling request status (timeout: %ss)",
-            MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC,
-        )
-        status_response = _wait_for_request_completion_rest(
-            rest_api_client,
-            request_id,
-            timeout=MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC,
-            expected_capacity=test_case["capacity_to_request"],
-            provider_api=provider_api,
-        )
-
-        log.info("2.2: Validating status response")
-        _check_request_machines_response_status(status_response)
-
-        log.info("2.3: Verifying instances on AWS")
-        _check_all_ec2_hosts_are_being_provisioned(status_response)
-
-        log.info("2.4: Validating instance attributes")
-        attribute_validation_passed = validate_random_instance_attributes(
-            status_response, template_json
-        )
-        if not attribute_validation_passed:
-            pytest.fail(
-                "Instance attribute validation failed - EC2 instance attributes do not match template"
-            )
-        log.info("Instance attribute validation PASSED")
-
-        expected_price_type = test_case.get("overrides", {}).get("priceType")
-        if expected_price_type:
-            log.info("2.5: Validating price type for all instances")
-            if provider_api == "RunInstances" and expected_price_type == "spot":
-                log.warning(
-                    f"Skipping price type validation for {provider_api} with spot instances"
-                )
-            else:
-                price_type_validation_passed = validate_all_instances_price_type(
-                    status_response, test_case
-                )
-                if not price_type_validation_passed:
-                    pytest.fail(
-                        "Price type validation failed - instances do not match expected price type"
-                    )
-                log.info("Price type validation PASSED")
-
-        abis_requested = test_case.get("overrides", {}).get("abisInstanceRequirements")
-        if abis_requested:
-            log.info("2.6: Verifying ABIS configuration")
-            first_machine = status_response["requests"][0]["machines"][0]
-            instance_id = first_machine.get("machine_id")
-            verify_abis_enabled_for_instance(instance_id)
-            log.info("ABIS verification PASSED")
-
-        # Extract machine IDs and provider info for cleanup
-        log.info("3.1: Extracting instance IDs")
-        machine_ids = [
-            machine["machine_id"] for machine in status_response["requests"][0]["machines"]
-        ]
-        log.info(f"Machine IDs to return: {machine_ids}")
-
-        if machine_ids:
-            resource_id = _get_resource_id_from_instance(machine_ids[0], provider_api)
-            log.info(f"Resource ID extracted: {resource_id}")
-
-        # 3.1a: Retrieve resource history (controlled by global CAPTURE_RESOURCE_HISTORY flag)
-        log.info(f"CAPTURE_RESOURCE_HISTORY flag: {scenarios_rest_api.CAPTURE_RESOURCE_HISTORY}")
-        log.info(f"Provider API: {provider_api}")
-        log.info(f"Resource ID: {resource_id}")
-
-        if scenarios_rest_api.CAPTURE_RESOURCE_HISTORY:
-            log.info("3.1a: Capturing resource history before termination")
-            if resource_id and provider_api != "RunInstances":
-                log.info(
-                    f"Calling _capture_resource_history for {provider_api} resource {resource_id}"
-                )
-                _capture_resource_history(resource_id, provider_api, test_case["test_name"])
-            else:
-                if not resource_id:
-                    log.warning("Skipping history capture: resource_id is None")
-                if provider_api == "RunInstances":
-                    log.info("Skipping history capture: RunInstances has no backing resource")
-        else:
-            log.info("Skipping history capture: CAPTURE_RESOURCE_HISTORY is False")
-
-    finally:
-        # Step 3: Delete Capacity (ALWAYS EXECUTED)
-        if machine_ids:
-            log.info("=== STEP 3: Delete Capacity (Cleanup) ===")
-
-            try:
-                log.info("3.2: Requesting return via REST API")
-                return_response = rest_api_client.return_machines(machine_ids)
-                log.debug(f"Return response: {json.dumps(return_response, indent=2)}")
-
-                return_request_id = return_response.get("request_id")
-                if not return_request_id:
-                    log.warning(f"Return request ID missing in response: {return_response}")
-                else:
-                    log.info(f"Return request ID: {return_request_id}")
-
-                log.info("3.3: Waiting for return completion")
-                if return_request_id:
-                    _wait_for_return_completion_rest(
-                        rest_api_client,
-                        return_request_id,
-                        timeout=REST_TIMEOUTS["return_status_timeout"],
-                    )
-            except Exception as exc:
-                log.error(f"Error during return request: {exc}")
-
-            try:
-                log.info("3.4: Verifying termination on AWS")
-                graceful_start = time.time()
-                graceful_completed = False
-                graceful_timeout = REST_TIMEOUTS["graceful_termination_timeout"]
-                termination_poll = REST_TIMEOUTS["termination_poll_interval"]
-                while time.time() - graceful_start < graceful_timeout:
-                    if _check_all_ec2_hosts_are_being_terminated(machine_ids):
-                        log.info("Graceful termination completed successfully")
-                        graceful_completed = True
-                        break
-                    time.sleep(termination_poll)
-
-                if not graceful_completed:
-                    log.warning("Graceful termination timed out or incomplete")
-
-                    if provider_api and ("ASG" in provider_api or "asg" in provider_api.lower()):
-                        log.info("3.5: Performing comprehensive ASG cleanup")
-                        _cleanup_asg_resources(machine_ids, provider_api)
-                    else:
-                        log.info("3.5: Continuing to wait for standard termination")
-                        cleanup_start = time.time()
-                        cleanup_timeout = REST_TIMEOUTS["cleanup_wait_timeout"]
-                        while time.time() - cleanup_start < cleanup_timeout:
-                            if _check_all_ec2_hosts_are_being_terminated(machine_ids):
-                                log.info("All instances terminated successfully")
-                                break
-                            time.sleep(termination_poll)
-                        else:
-                            log.warning("Some instances may not have terminated within timeout")
-            except Exception as exc:
-                log.error(f"Error during instance termination: {exc}")
-
-            try:
-                log.info("3.6: Terminating backing resource")
-                if resource_id and provider_api != "RunInstances":
-                    _terminate_backing_resource(resource_id, provider_api)
-            except Exception as exc:
-                log.error(f"Error terminating backing resource: {exc}")
-
-            try:
-                log.info("3.7: Verifying complete resource cleanup")
-                cleanup_verified = _verify_all_resources_cleaned(
-                    machine_ids,
-                    resource_id,
-                    provider_api,
-                )
-
-                if not cleanup_verified:
-                    log.error("⚠️  Cleanup verification failed - some resources may still exist")
-
-                    # Capture current capacity if we still have a backing resource
-                    if resource_id and provider_api and provider_api != "RunInstances":
-                        try:
-                            remaining_capacity = _get_capacity(provider_api, resource_id)
-                            log.error(
-                                "Remaining capacity on %s %s: %s",
-                                provider_api,
-                                resource_id,
-                                remaining_capacity,
-                            )
-                        except Exception as cap_exc:
-                            log.warning(
-                                "Unable to fetch remaining capacity for %s %s: %s",
-                                provider_api,
-                                resource_id,
-                                cap_exc,
-                            )
-
-                    # Force termination of backing resource as a last resort
-                    if resource_id and provider_api and provider_api != "RunInstances":
-                        try:
-                            log.info(
-                                "3.7.1: Forcing termination of backing resource %s (%s)",
-                                resource_id,
-                                provider_api,
-                            )
-                            _terminate_backing_resource(resource_id, provider_api)
-                        except Exception as exc:
-                            log.error("Forced termination of backing resource failed: %s", exc)
-
-                    # Force terminate any remaining instances directly
-                    try:
-                        log.info("3.7.2: Forcing direct termination of instances %s", machine_ids)
-                        ec2_client.terminate_instances(InstanceIds=machine_ids)
-                    except Exception as exc:
-                        log.error("Direct instance termination failed: %s", exc)
-
-                    # Re-verify after forced cleanup
-                    if not _verify_all_resources_cleaned(machine_ids, resource_id, provider_api):
-                        pytest.fail(
-                            "Cleanup verification failed - resources remain after forced cleanup"
-                        )
-                else:
-                    log.info("✅ All resources successfully cleaned up")
-            except Exception as exc:
-                log.error(f"Error during cleanup verification: {exc}")
-
-    log.info("=" * 80)
-    log.info(f"REST API test completed: {test_case['test_name']}")
-    log.info("=" * 80)
 
 
 @pytest.mark.aws
@@ -1250,7 +969,7 @@ def test_rest_api_partial_return_reduces_capacity(
     status_response = _wait_for_request_completion_rest(
         rest_api_client,
         request_id,
-        timeout=REST_TIMEOUTS["request_status_timeout"],
+        timeout=REST_TIMEOUTS["request_fulfillment_timeout"],
         expected_capacity=test_case["capacity_to_request"],
         provider_api=provider_api,
     )
@@ -1304,7 +1023,7 @@ def test_rest_api_partial_return_reduces_capacity(
         state_info = get_instance_state(first_instance)
         if not state_info["exists"] or state_info["state"] in ["terminated", "shutting-down"]:
             break
-        if time.time() - terminate_start > MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC:
+        if time.time() - terminate_start > REST_TIMEOUTS["request_fulfillment_timeout"]:
             pytest.fail(f"Instance {first_instance} failed to terminate in time")
         time.sleep(REST_TIMEOUTS["termination_poll_interval"])
 
@@ -1392,11 +1111,55 @@ def _check_request_machines_response_status(status_response):
         assert machine["status"] in ["running", "pending"]
 
 
+def _describe_instances_bulk(instance_ids: list[str], chunk_size: int = 100) -> dict[str, dict]:
+    """
+    Fetch instance states in batches to minimize AWS API calls.
+
+    Returns a mapping of instance_id -> {"exists": bool, "state": str | None}.
+    """
+    states: dict[str, dict] = {}
+    if not instance_ids:
+        return states
+
+    for start in range(0, len(instance_ids), chunk_size):
+        chunk = instance_ids[start : start + chunk_size]
+        try:
+            resp = ec2_client.describe_instances(InstanceIds=chunk)
+        except ClientError as exc:  # pragma: no cover - defensive
+            log.warning("describe_instances failed for chunk %s: %s", chunk, exc)
+            continue
+
+        found_ids: set[str] = set()
+        for reservation in resp.get("Reservations", []):
+            for inst in reservation.get("Instances", []):
+                iid = inst.get("InstanceId")
+                if not iid:
+                    continue
+                found_ids.add(iid)
+                state_name = (
+                    inst.get("State", {}).get("Name")
+                    if isinstance(inst.get("State"), dict)
+                    else inst.get("State")
+                )
+                states[iid] = {"exists": True, "state": state_name}
+
+        # Any IDs in the chunk not returned are marked as missing
+        for iid in chunk:
+            if iid not in found_ids and iid not in states:
+                states[iid] = {"exists": False, "state": None}
+
+    return states
+
+
 def _check_all_ec2_hosts_are_being_provisioned(status_response):
     """Verify all EC2 instances are being provisioned."""
-    for machine in status_response["requests"][0]["machines"]:
+    machines = status_response["requests"][0]["machines"]
+    instance_ids = [m.get("machine_id") for m in machines]
+    states = _describe_instances_bulk(instance_ids)
+
+    for machine in machines:
         ec2_instance_id = machine.get("machine_id")
-        res = get_instance_state(ec2_instance_id)
+        res = states.get(ec2_instance_id, {"exists": False, "state": None})
 
         assert res["exists"] is True
         # EC2 host may still be initializing
@@ -1427,66 +1190,359 @@ def _capture_resource_history(resource_id: str, provider_api: str, test_name: st
     log.info(f"History file path: {history_file}")
 
     try:
-        history_data = {"resource_id": resource_id, "provider_api": provider_api, "history": None}
-
-        # Use a conservative lookback to satisfy AWS StartTime requirements
-        # AWS APIs expect datetime objects, not ISO strings for StartTime parameter
-        start_time = (datetime.now(timezone.utc) - timedelta(hours=1)).replace(microsecond=0)
-        log.info(f"History lookup start_time (UTC): {start_time.isoformat()}")
-
-        if provider_api == "EC2Fleet":
-            log.info(f"Calling describe_fleet_history for {resource_id}")
-            history_records: list[dict] = []
-            next_token: str | None = None
-            while True:
-                params = {
-                    "FleetId": resource_id,
-                    "StartTime": start_time,
-                    "MaxResults": 1000,
-                }
-                if next_token:
-                    params["NextToken"] = next_token
-
-                response = ec2_client.describe_fleet_history(**params)
-                history_records.extend(response.get("HistoryRecords", []))
-                next_token = response.get("NextToken")
-                if not next_token:
-                    break
-
-            history_data["history"] = history_records
-            log.info(f"Captured {len(history_data['history'])} EC2Fleet history records")
-
-        elif provider_api == "SpotFleet":
-            log.info(f"Calling describe_spot_fleet_request_history for {resource_id}")
-            history_records: list[dict] = []
-            next_token: str | None = None
-            while True:
-                params = {
-                    "SpotFleetRequestId": resource_id,
-                    "StartTime": start_time,
-                }
-                if next_token:
-                    params["NextToken"] = next_token
-
-                response = ec2_client.describe_spot_fleet_request_history(**params)
-                history_records.extend(response.get("HistoryRecords", []))
-                next_token = response.get("NextToken")
-                if not next_token:
-                    break
-
-            history_data["history"] = history_records
-            log.info(f"Captured {len(history_data['history'])} SpotFleet history records")
-
-        elif provider_api == "ASG":
-            log.info(f"Calling describe_scaling_activities for {resource_id}")
-            response = asg_client.describe_scaling_activities(
-                AutoScalingGroupName=resource_id, MaxRecords=100
+        # Load instance IDs from request database (if available) for completeness check
+        def _load_db_instance_ids() -> set[str]:
+            ids: set[str] = set()
+            workdir = os.environ.get("HF_PROVIDER_WORKDIR") or os.environ.get(
+                "DEFAULT_PROVIDER_WORKDIR"
             )
-            history_data["history"] = response.get("Activities", [])
-            log.info(f"Captured {len(history_data['history'])} ASG scaling activities")
-        else:
+            if not workdir:
+                return ids
+            db_path = Path(workdir) / "data" / "request_database.json"
+            if not db_path.exists():
+                return ids
+            try:
+                db_data = json.load(open(db_path))
+                machines = db_data.get("machines") or {}
+                ids.update(machines.keys())
+            except Exception as exc:  # pragma: no cover - defensive
+                log.warning(
+                    "Could not load request_database.json for history completeness: %s", exc
+                )
+            return ids
+
+        def _extract_instance_ids(history_records: list[dict]) -> set[str]:
+            """Grab instance ids from history payload via regex to work across providers."""
+            ids: set[str] = set()
+            pattern = re.compile(r"i-[0-9a-f]{17}")
+            for rec in history_records or []:
+                matches = pattern.findall(json.dumps(rec, default=str))
+                ids.update(matches)
+            return ids
+
+        def _fetch_history() -> list[dict]:
+            start_time = (datetime.now(timezone.utc) - timedelta(hours=1)).replace(microsecond=0)
+            if provider_api == "EC2Fleet":
+                log.info(f"Calling describe_fleets to determine fleet type for {resource_id}")
+                fleet_desc = None
+                try:
+                    fleet_resp = ec2_client.describe_fleets(FleetIds=[resource_id])
+                    fleet_desc = (fleet_resp.get("Fleets") or [None])[0]
+                except ClientError as exc:
+                    log.warning("describe_fleets failed for %s: %s", resource_id, exc)
+
+                def _build_event_description(instance: dict) -> str:
+                    payload = {
+                        "instanceType": instance.get("InstanceType"),
+                        "image": instance.get("ImageId"),
+                        "productDescription": instance.get("InstanceLifecycle") or "on-demand",
+                        "availabilityZone": (instance.get("Placement") or {}).get(
+                            "AvailabilityZone"
+                        ),
+                    }
+                    try:
+                        return json.dumps(payload)
+                    except Exception:
+                        return str(payload)
+
+                def _collect_instant_history(fleet_info: dict | None) -> list[dict]:
+                    """Build history for instant fleets by walking instances."""
+
+                    def _collect_fleet_instance_ids() -> list[str]:
+                        ids: list[str] = []
+                        # Prefer IDs from fleet description if present
+                        for inst_entry in (fleet_info or {}).get("Instances") or []:
+                            iid = inst_entry.get("InstanceIds") or []
+                            if isinstance(iid, list):
+                                ids.extend([x for x in iid if x])
+                        # Fallback to request DB if fleet description lacks instances
+                        if not ids and target_ids:
+                            ids.extend(sorted(target_ids))
+                        # As a last resort, ask AWS directly
+                        if not ids:
+                            try:
+                                inst_resp = ec2_client.describe_fleet_instances(FleetId=resource_id)
+                                for entry in inst_resp.get("ActiveInstances", []) or []:
+                                    iid = entry.get("InstanceId")
+                                    if iid:
+                                        ids.append(iid)
+                            except ClientError as exc:
+                                log.warning(
+                                    "describe_fleet_instances failed for %s: %s", resource_id, exc
+                                )
+                        return sorted(set(ids))
+
+                    instance_ids = _collect_fleet_instance_ids()
+                    events: list[dict] = []
+
+                    created_at = (fleet_info or {}).get("CreateTime") or datetime.now(timezone.utc)
+                    if created_at and created_at.tzinfo is None:
+                        created_at = created_at.replace(tzinfo=timezone.utc)
+                    events.append(
+                        {
+                            "EventInformation": {"EventSubType": "submitted"},
+                            "EventType": "fleetRequestChange",
+                            "Timestamp": created_at,
+                        }
+                    )
+
+                    # Batch describe instances to get launch timestamps
+                    for start_idx in range(0, len(instance_ids), 100):
+                        chunk = instance_ids[start_idx : start_idx + 100]
+                        try:
+                            resp = ec2_client.describe_instances(InstanceIds=chunk)
+                        except ClientError as exc:
+                            log.warning("describe_instances failed for chunk %s: %s", chunk, exc)
+                            continue
+
+                        for reservation in resp.get("Reservations", []):
+                            for inst in reservation.get("Instances", []):
+                                iid = inst.get("InstanceId")
+                                if not iid:
+                                    continue
+                                launch_time = inst.get("LaunchTime") or datetime.now(timezone.utc)
+                                if launch_time.tzinfo is None:
+                                    launch_time = launch_time.replace(tzinfo=timezone.utc)
+                                events.append(
+                                    {
+                                        "EventInformation": {
+                                            "EventDescription": _build_event_description(inst),
+                                            "EventSubType": "launched",
+                                            "InstanceId": iid,
+                                        },
+                                        "EventType": "instanceChange",
+                                        "Timestamp": launch_time,
+                                    }
+                                )
+
+                    return events
+
+                fleet_type = (
+                    (fleet_desc or {}).get("FleetType") or (fleet_desc or {}).get("Type") or ""
+                ).lower()
+                if fleet_type == "instant":
+                    log.info(
+                        "Fleet %s is instant; building history from instance launches", resource_id
+                    )
+                    return _collect_instant_history(fleet_desc)
+
+                log.info(f"Calling describe_fleet_history for {resource_id}")
+                history_records: list[dict] = []
+                next_token: str | None = None
+                while True:
+                    params = {
+                        "FleetId": resource_id,
+                        "StartTime": start_time,
+                        "MaxResults": 1000,
+                    }
+                    if next_token:
+                        params["NextToken"] = next_token
+
+                    try:
+                        response = ec2_client.describe_fleet_history(**params)
+                    except ClientError as exc:
+                        message = str(exc).lower()
+                        if (
+                            exc.response["Error"]["Code"] == "InvalidParameter"
+                            and "instant fleet" in message
+                        ):
+                            log.info(
+                                "describe_fleet_history not supported for instant fleet %s; synthesizing events",
+                                resource_id,
+                            )
+                            return _collect_instant_history(fleet_desc)
+                        raise
+
+                    history_records.extend(response.get("HistoryRecords", []))
+                    next_token = response.get("NextToken")
+                    if not next_token:
+                        break
+                return history_records
+            if provider_api == "SpotFleet":
+                log.info(f"Calling describe_spot_fleet_request_history for {resource_id}")
+                history_records: list[dict] = []
+                next_token: str | None = None
+                while True:
+                    params = {
+                        "SpotFleetRequestId": resource_id,
+                        "StartTime": start_time,
+                        "MaxResults": 1000,
+                    }
+                    if next_token:
+                        params["NextToken"] = next_token
+
+                    response = ec2_client.describe_spot_fleet_request_history(**params)
+                    history_records.extend(response.get("HistoryRecords", []))
+                    next_token = response.get("NextToken")
+                    if not next_token:
+                        break
+                return history_records
+            if provider_api == "ASG":
+                log.info(f"Calling describe_scaling_activities for {resource_id}")
+                history_records: list[dict] = []
+                next_token: str | None = None
+                while True:
+                    params = {
+                        "AutoScalingGroupName": resource_id,
+                        "MaxRecords": 100,
+                    }
+                    if next_token:
+                        params["NextToken"] = next_token
+
+                    response = asg_client.describe_scaling_activities(**params)
+                    history_records.extend(response.get("Activities", []))
+                    next_token = response.get("NextToken")
+                    if not next_token:
+                        break
+                return history_records
             log.warning(f"Unknown provider API: {provider_api}, skipping history capture")
-            return
+            return []
+
+        target_ids = _load_db_instance_ids()
+
+        attempts = 0
+        max_attempts = 2
+        history_records: list[dict] = []
+
+        while attempts < max_attempts:
+            attempts += 1
+            history_records = _fetch_history()
+            history_ids = _extract_instance_ids(history_records)
+
+            log.info(
+                "History capture attempt %s/%s: %s records, %s instance ids (db has %s)",
+                attempts,
+                max_attempts,
+                len(history_records),
+                len(history_ids),
+                len(target_ids),
+            )
+
+            # If we have all DB instances or DB is empty, stop retrying
+            if not target_ids or len(history_ids) >= len(target_ids):
+                break
+
+            if attempts < max_attempts:
+                log.warning(
+                    "History missing %s instances (expected %s, got %s); sleeping 30s before retry",
+                    len(target_ids) - len(history_ids),
+                    len(target_ids),
+                    len(history_ids),
+                )
+                time.sleep(30)
+
+        # If history still misses some instances, synthesize records from live EC2 data
+        missing_ids = sorted(target_ids - history_ids) if target_ids else []
+        if missing_ids:
+            log.warning(
+                "History still missing %s instances after retries; synthesizing records",
+                len(missing_ids),
+            )
+            synthetic_records: list[dict] = []
+
+            # Describe instances in batches to get launch time and type
+            for start in range(0, len(missing_ids), 100):
+                chunk = missing_ids[start : start + 100]
+                try:
+                    resp = ec2_client.describe_instances(InstanceIds=chunk)
+                except ClientError as exc:
+                    log.warning("describe_instances failed for chunk %s: %s", chunk, exc)
+                    continue
+
+                for reservation in resp.get("Reservations", []):
+                    for inst in reservation.get("Instances", []):
+                        iid = inst.get("InstanceId")
+                        if not iid:
+                            continue
+                        launch_time = inst.get("LaunchTime")
+                        instance_type = inst.get("InstanceType")
+                        # Normalize launch_time to datetime with tzinfo for formatting
+                        ts = launch_time
+                        if ts and ts.tzinfo is None:
+                            ts = ts.replace(tzinfo=timezone.utc)
+                        if not ts:
+                            ts = datetime.now(timezone.utc)
+                        cause_ts = ts.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+                        if provider_api == "ASG":
+                            synthetic_records.append(
+                                {
+                                    "ActivityId": f"synthetic-{iid}",
+                                    "Description": f"Launching a new EC2 instance: {iid}",
+                                    "Cause": f"At {cause_ts} a user request created an AutoScalingGroup named {resource_id} using LaunchConfiguration.",
+                                    "StartTime": ts,
+                                    "EndTime": ts,
+                                    "StatusCode": "Successful",
+                                    "Details": {
+                                        "InstanceId": iid,
+                                        "InstanceType": instance_type,
+                                        "AutoScalingGroupName": resource_id,
+                                    },
+                                }
+                            )
+                        elif provider_api in ["EC2Fleet", "SpotFleet"]:
+                            synthetic_records.append(
+                                {
+                                    "EventType": "instanceChange",
+                                    "EventInformation": {
+                                        "EventSubType": "launched",
+                                        "InstanceId": iid,
+                                        "InstanceType": instance_type,
+                                    },
+                                    "Timestamp": launch_time,
+                                }
+                            )
+                        else:
+                            # Generic fallback
+                            synthetic_records.append(
+                                {
+                                    "InstanceId": iid,
+                                    "InstanceType": instance_type,
+                                    "Timestamp": launch_time,
+                                    "EventType": "launched",
+                                }
+                            )
+
+            if synthetic_records:
+                history_records.extend(synthetic_records)
+                log.info(
+                    "Added %s synthetic history records for missing instances",
+                    len(synthetic_records),
+                )
+
+        # For ASG, append an explicit "submitted" record using the ASG creation time so downstream
+        # tooling can compute request_time similarly to fleet history.
+        if provider_api == "ASG":
+            try:
+                response = asg_client.describe_auto_scaling_groups(
+                    AutoScalingGroupNames=[resource_id]
+                )
+                groups = response.get("AutoScalingGroups", [])
+                created_at: datetime | None = groups[0].get("CreatedTime") if groups else None
+                if created_at:
+                    submission_event = {
+                        "EventInformation": {"EventSubType": "submitted"},
+                        "EventType": "fleetRequestChange",
+                        "Timestamp": created_at,
+                    }
+                    history_records.insert(0, submission_event)
+                    log.info(
+                        "Inserted ASG creation event with timestamp %s for resource %s",
+                        created_at,
+                        resource_id,
+                    )
+                else:
+                    log.warning(
+                        "ASG creation time not found for %s; skipping submitted marker", resource_id
+                    )
+            except Exception as exc:  # pragma: no cover - defensive
+                log.warning("Unable to fetch ASG creation time for %s: %s", resource_id, exc)
+
+        history_data = {
+            "resource_id": resource_id,
+            "provider_api": provider_api,
+            "history": history_records,
+        }
 
         log.info(f"Writing history to file: {history_file}")
         with open(history_file, "w") as f:
@@ -1629,6 +1685,22 @@ def _wait_for_asg_deletion(asg_name: str, timeout: int = 300) -> None:
     log.warning(f"ASG {asg_name} deletion timeout")
 
 
+def _capture_history_if_enabled(resource_id: str | None, provider_api: str | None, test_case: dict):
+    """Common history capture helper used in timeout/finally blocks."""
+    if scenarios_rest_api.CAPTURE_RESOURCE_HISTORY:
+        log.info("3.1a: Capturing resource history before termination")
+        if resource_id and provider_api != "RunInstances":
+            log.info(f"Calling _capture_resource_history for {provider_api} resource {resource_id}")
+            _capture_resource_history(resource_id, provider_api, test_case["test_name"])
+        else:
+            if not resource_id:
+                log.warning("Skipping history capture: resource_id is None")
+            if provider_api == "RunInstances":
+                log.info("Skipping history capture: RunInstances has no backing resource")
+    else:
+        log.info("Skipping history capture: CAPTURE_RESOURCE_HISTORY is False")
+
+
 @pytest.mark.aws
 @pytest.mark.slow
 @pytest.mark.rest_api
@@ -1703,15 +1775,49 @@ def test_rest_api_control_loop(rest_api_client, setup_rest_api_environment, test
 
     # 2.1: Poll request status via REST API
     log.info(
-        f"2.1: Polling request status (timeout: {MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC}s)"
+        f"2.1: Polling request status (timeout: {REST_TIMEOUTS['request_fulfillment_timeout']}s)"
     )
-    status_response = _wait_for_request_completion_rest(
-        rest_api_client,
-        request_id,
-        timeout=MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC,
-        expected_capacity=test_case["capacity_to_request"],
-        provider_api=provider_api,
-    )
+    status_response = None
+    try:
+        status_response = _wait_for_request_completion_rest(
+            rest_api_client,
+            request_id,
+            timeout=REST_TIMEOUTS["request_fulfillment_timeout"],
+            expected_capacity=test_case["capacity_to_request"],
+            provider_api=provider_api,
+        )
+    except RequestTimeoutError as exc:
+        log.error(
+            "Request %s timed out after %ss",
+            request_id,
+            REST_TIMEOUTS["request_fulfillment_timeout"],
+        )
+        status_response = getattr(exc, "status_response", None)
+        if status_response:
+            log.info("Using last polled status from timeout for history capture")
+        else:
+            try:
+                status_response = rest_api_client.get_request_status(request_id, long=True)
+                log.info("Retrieved latest status after timeout for history capture")
+            except Exception as fetch_exc:
+                log.warning("Could not fetch status after timeout: %s", fetch_exc)
+                status_response = None
+    finally:
+        history_resource_id = None
+        if status_response:
+            requests_list = status_response.get("requests") or []
+            first_request = requests_list[0] if requests_list else {}
+            machines = first_request.get("machines") or []
+            machine_ids_tmp = [m.get("machine_id") for m in machines if m.get("machine_id")]
+            if machine_ids_tmp:
+                history_resource_id = _get_resource_id_from_instance(
+                    machine_ids_tmp[0], provider_api
+                )
+            elif isinstance(first_request, dict):
+                history_resource_id = first_request.get("resource_id") or first_request.get(
+                    "provider_resource_id"
+                )
+        _capture_history_if_enabled(history_resource_id, provider_api, test_case)
 
     # 2.2: Validate status response
     log.info("2.2: Validating status response")
@@ -1776,19 +1882,9 @@ def test_rest_api_control_loop(rest_api_client, setup_rest_api_environment, test
     log.info(f"Provider API: {provider_api}")
     log.info(f"Resource ID: {resource_id}")
 
-    if scenarios_rest_api.CAPTURE_RESOURCE_HISTORY:
-        log.info("3.1a: Capturing resource history before termination")
-        if resource_id and provider_api != "RunInstances":
-            log.info(f"Calling _capture_resource_history for {provider_api} resource {resource_id}")
-            _capture_resource_history(resource_id, provider_api, test_case["test_name"])
-        else:
-            if not resource_id:
-                log.warning("Skipping history capture: resource_id is None")
-            if provider_api == "RunInstances":
-                log.info("Skipping history capture: RunInstances has no backing resource")
-    else:
-        log.info("Skipping history capture: CAPTURE_RESOURCE_HISTORY is False")
+    _capture_history_if_enabled(resource_id, provider_api, test_case)
 
+    # time.sleep(1000000)
     # 3.2: Request return via REST API
     log.info("3.2: Requesting return via REST API")
     return_response = rest_api_client.return_machines(machine_ids)

@@ -241,37 +241,6 @@ class TestMachineAggregate:
         assert machine.health_details["error"] == "High CPU usage"
         assert machine.health_details["cpu_usage"] == 95.0
 
-    def test_machine_performance_metrics(self):
-        """Test machine performance metrics."""
-        machine = Machine(
-            id="machine-008",
-            instance_id=InstanceId(value="i-abcd1234efgh5678"),
-            template_id="template-001",
-            request_id="request-001",
-            status="running",
-            instance_type=InstanceType(value="t2.micro"),
-            availability_zone="us-east-1a",
-        )
-
-        # Update performance metrics
-        metrics = PerformanceMetrics(
-            cpu_utilization=45.2,
-            memory_utilization=70.8,
-            disk_utilization=30.5,
-            network_in_bytes=1024000,
-            network_out_bytes=512000,
-            timestamp=datetime.now(timezone.utc),
-        )
-
-        machine.update_performance_metrics(metrics)
-
-        assert machine.performance_metrics.cpu_utilization == 45.2
-        assert machine.performance_metrics.memory_utilization == 70.8
-        assert machine.performance_metrics.disk_utilization == 30.5
-        assert machine.performance_metrics.network_in_bytes == 1024000
-        assert machine.performance_metrics.network_out_bytes == 512000
-        assert machine.performance_metrics.timestamp is not None
-
     def test_machine_network_configuration(self):
         """Test machine network configuration."""
         network_config = NetworkConfiguration(

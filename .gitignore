@@ -237,5 +237,9 @@ metrics/
 metrics.json
 metrics.prom
 
+# Visualise directories
+visualise/test/
+visualise/res/
+
 # Generated files - always regenerated from templates
 # pyproject.toml is now tracked - selective templating only

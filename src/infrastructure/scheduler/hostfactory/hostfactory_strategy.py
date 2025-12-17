@@ -267,8 +267,10 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             }
 
         # Prefer snake_case in API responses
+        request_id = request_dict.get("request_id", request_dict.get("requestId"))
         return {
-            "request_id": request_dict.get("request_id", request_dict.get("requestId")),
+            # HostFactory schema expects camelCase requestId
+            "requestId": request_id,
             "message": request_dict.get("message", "Request VM success from AWS."),
         }
 

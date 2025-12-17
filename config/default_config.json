@@ -45,7 +45,8 @@
           "ASG": {
             "handler_class": "ASGHandler",
             "supports_spot": true,
-            "supports_ondemand": true
+            "supports_ondemand": true,
+            "max_instances": 10000
           },
           "RunInstances": {
             "handler_class": "RunInstancesHandler",
@@ -243,7 +244,7 @@
     },
     "enable_parallel": true,
     "max_workers": 10,
-    "enable_caching": true,
+    "enable_caching": false,
     "cache_ttl": 300,
     "enable_adaptive_batch_sizing": true,
     "adaptive_batch_sizing": {
@@ -258,19 +259,34 @@
     },
     "caching": {
       "ami_resolution": {
-        "enabled": true,
+        "enabled": false,
         "ttl_seconds": 3600,
         "file": "ami_cache.json"
       },
       "handler_discovery": {
-        "enabled": true,
+        "enabled": false,
         "file": "handler_discovery.json"
       },
       "request_status": {
-        "enabled": true,
+        "enabled": false,
         "ttl_seconds": 300
       }
     }
+  },
+  "metrics": {
+    "metrics_enabled": true,
+    "aws_metrics": {
+      "aws_metrics_enabled": true,
+      "sample_rate": 1.0,
+      "monitored_services": [],
+      "monitored_operations": [],
+      "track_payload_sizes": true
+    },
+    "metrics_dir": "./metrics",
+    "metrics_interval": 20,
+    "trace_enabled": true,
+    "trace_buffer_size": 1000,
+    "trace_file_max_size_mb": 10
   },
   "retry": {
     "max_attempts": 3,
@@ -336,7 +352,7 @@
         "profile": null,
         "required_actions": [
           "ec2:DescribeInstances",
-          "ec2:RunInstances", 
+          "ec2:RunInstances",
           "ec2:TerminateInstances"
         ]
       },

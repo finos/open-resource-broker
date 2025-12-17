@@ -82,36 +82,18 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             self.logger.debug(f"Machines associated with this request in DB: {machine_obj_from_db}")
 
             # Update machine status if needed
-            machine_objects_from_provider = []
-            provider_metadata = {}
-            if not machine_obj_from_db and request.resource_ids:
-                self.logger.info(
-                    "DEBUG: No machines in storage but have resource IDs %s, checking provider",
-                    request.resource_ids,
-                )
-                # No machines in storage but we have resource IDs - check provider and
-                # create machines
-                (
-                    machine_objects_from_provider,
-                    provider_metadata,
-                ) = await self._check_provider_and_create_machines(request)
-                self.logger.info(
-                    "DEBUG: Provider check returned %s machines", len(machine_obj_from_db)
-                )
-            elif machine_obj_from_db:
-                self.logger.info(
-                    "DEBUG: Have %s machines, updating status from AWS", len(machine_obj_from_db)
-                )
-                # We have machines - update their status from AWS
-                (
-                    machine_objects_from_provider,
-                    provider_metadata,
-                ) = await self._update_machine_status_from_aws(machine_obj_from_db, request)
-            else:
-                self.logger.info(
-                    "DEBUG: No machines and no resource IDs for request %s",
-                    query.request_id,
-                )
+            # Always fetch provider view first
+            machine_objects_from_provider, provider_metadata = await self._fetch_provider_machines(
+                request, machine_obj_from_db
+            )
+
+            # Merge/refresh machines using provider view (creates missing ones)
+            (
+                machine_objects_from_provider,
+                provider_metadata,
+            ) = await self._update_machine_status_from_aws(
+                machine_obj_from_db, request, machine_objects_from_provider, provider_metadata
+            )
             self.logger.debug(f"Machines from DB:  {machine_obj_from_db}")
             self.logger.debug(f"Machines from cloud provider:  {machine_objects_from_provider}")
 
@@ -283,14 +265,113 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             )
             return [], {}
 
+    async def _fetch_provider_machines(self, request, existing_machines) -> tuple[list, dict]:
+        """
+        Fetch the latest machine list from the provider.
+
+        Prefers resource-based discovery (DESCRIBE_RESOURCE_INSTANCES) to capture the
+        full membership of the resource (ASG/Fleet). Falls back to GET_INSTANCE_STATUS
+        when only instance IDs are known.
+        """
+        provider_context = self._get_provider_context()
+        if not provider_context:
+            self.logger.warning("Provider context not available; cannot refresh from provider")
+            return [], {}
+
+        from providers.base.strategy import ProviderOperation, ProviderOperationType
+
+        # Prefer resource-level discovery so we don't miss new instances
+        if request.resource_ids:
+            operation_type = ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES
+            parameters = {
+                "resource_ids": request.resource_ids,
+                "provider_api": request.metadata.get("provider_api"),
+                "template_id": request.template_id,
+            }
+        else:
+            instance_ids = [
+                str(m.instance_id.value)
+                for m in (existing_machines or [])
+                if hasattr(m, "instance_id")
+            ]
+            if not instance_ids:
+                self.logger.info(
+                    "No resource_ids or instance_ids available to query provider for request %s",
+                    request.request_id,
+                )
+                return [], {}
+            operation_type = ProviderOperationType.GET_INSTANCE_STATUS
+            parameters = {
+                "instance_ids": instance_ids,
+                "template_id": request.template_id,
+            }
+
+        operation = ProviderOperation(
+            operation_type=operation_type,
+            parameters=parameters,
+            context={
+                "correlation_id": str(request.request_id),
+                "request_id": str(request.request_id),
+            },
+        )
+
+        strategy_identifier = f"{request.provider_type}-{request.provider_type}-{request.provider_instance or 'default'}"
+
+        try:
+            result = await provider_context.execute_with_strategy(strategy_identifier, operation)
+        except Exception as exc:
+            self.logger.warning("Provider query failed for request %s: %s", request.request_id, exc)
+            return [], {}
+
+        if not result.success:
+            self.logger.warning(
+                "Provider query unsuccessful for request %s: %s",
+                request.request_id,
+                result.error_message,
+            )
+            return [], result.metadata or {}
+
+        data = result.data or {}
+        raw_instances = []
+        if isinstance(data, dict):
+            raw_instances = data.get("instances") or data.get("machines") or []
+        else:
+            raw_instances = data
+
+        provider_machines = []
+        for inst in raw_instances or []:
+            # If provider already returned domain machine objects, keep them
+            if hasattr(inst, "instance_id"):
+                provider_machines.append(inst)
+                continue
+            try:
+                provider_machines.append(self._create_machine_from_aws_data(inst, request))
+            except Exception as exc:
+                self.logger.warning(
+                    "Failed to normalize provider instance for request %s: %s",
+                    request.request_id,
+                    exc,
+                )
+
+        return provider_machines, (result.metadata or {})
+
     async def _update_machine_status_from_aws(
-        self, machines: list, request=None
+        self,
+        machines: list,
+        request=None,
+        provider_machine_entities: list | None = None,
+        provider_metadata: dict | None = None,
     ) -> tuple[list, dict]:
-        """Update machine status from AWS using existing handler methods."""
+        """Merge provider machine view into storage.
+
+        If the provider reports instances we don't have locally, create them so the
+        status decision logic can see the full picture. Provider calls should be made
+        by the caller; this function only merges/updates/persists.
+        """
         try:
             # Group machines by request to use existing check_hosts_status methods
             if not machines:
-                return [], {}
+                machines = []
 
             # Get the request for the first machine (all should be same request)
             if not request:
@@ -302,115 +383,165 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     if not request:
                         return machines, {}
 
-            # Get provider context and check AWS status
-            provider_context = self._get_provider_context()
+            # provider_machine_entities now contains the authoritative provider view
+            domain_machines = provider_machine_entities or []
+            provider_metadata = provider_metadata or {}
 
-            # Create operation to check instance status using instance IDs
-            from providers.base.strategy import ProviderOperation, ProviderOperationType
-
-            # Extract instance IDs from machines
-            instance_ids = [str(machine.instance_id.value) for machine in machines]
-
-            operation = ProviderOperation(
-                operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
-                parameters={
-                    "instance_ids": instance_ids,
-                    "template_id": request.template_id,
-                },
-                context={"correlation_id": str(request.request_id)},
-            )
-
-            # Execute operation using provider context
-            # Use the correct strategy identifier format:
-            # provider_type-provider_type-instance
-            strategy_identifier = f"{request.provider_type}-{request.provider_type}-{request.provider_instance or 'default'}"
-
-            result = await provider_context.execute_with_strategy(strategy_identifier, operation)
-            if not result.success:
-                self.logger.warning("Failed to check resource status: %s", result.error_message)
-                return machines, {}
-
-            # Extract domain machine entities from result (provider strategy already
-            # converted AWS data)
-            domain_machines = result.data.get("machines", [])
-
-            # Update machine status if changed
+            # Ensure we have a map of existing machines for quick lookup
+            existing_by_id = {str(m.instance_id.value): m for m in machines}
             updated_machines = []
-            for machine in machines:
-                domain_machine = next(
-                    (
-                        dm
-                        for dm in domain_machines
-                        if dm["instance_id"] == str(machine.instance_id.value)
-                    ),
-                    None,
-                )
+            new_machines = []
 
-                if domain_machine:
-                    # Provider strategy already converted AWS data to domain format
-                    from domain.machine.machine_status import MachineStatus
+            from domain.machine.aggregate import Machine as DomainMachine
+            from domain.machine.machine_status import MachineStatus
 
-                    new_status = MachineStatus(domain_machine["status"])
+            def _normalize_provider_entry(entry: Any) -> dict[str, Any]:
+                """Normalize provider entry (dict or DomainMachine) to a common shape."""
+                if isinstance(entry, DomainMachine):
+                    status_val = entry.status
+                    try:
+                        status_obj = (
+                            status_val
+                            if isinstance(status_val, MachineStatus)
+                            else MachineStatus.from_str(str(status_val))
+                        )
+                    except Exception:
+                        status_obj = MachineStatus.UNKNOWN
+                    return {
+                        "instance_id": str(entry.instance_id.value),
+                        "status": status_obj,
+                        "private_ip": entry.private_ip,
+                        "public_ip": entry.public_ip,
+                        "launch_time": entry.launch_time,
+                        "instance_type": getattr(entry.instance_type, "value", entry.instance_type),
+                        "image_id": entry.image_id,
+                        "subnet_id": entry.subnet_id,
+                        "metadata": entry.metadata or {},
+                        "raw": entry,
+                    }
+                if isinstance(entry, dict):
+                    status_val = entry.get("status") or entry.get("State") or entry.get("state")
+                    try:
+                        status_obj = (
+                            status_val
+                            if isinstance(status_val, MachineStatus)
+                            else MachineStatus.from_str(str(status_val))
+                            if status_val
+                            else MachineStatus.UNKNOWN
+                        )
+                    except Exception:
+                        status_obj = MachineStatus.UNKNOWN
+                    return {
+                        "instance_id": entry.get("instance_id") or entry.get("InstanceId"),
+                        "status": status_obj,
+                        "private_ip": entry.get("private_ip") or entry.get("PrivateIpAddress"),
+                        "public_ip": entry.get("public_ip") or entry.get("PublicIpAddress"),
+                        "launch_time": entry.get("launch_time") or entry.get("LaunchTime"),
+                        "instance_type": entry.get("instance_type") or entry.get("InstanceType"),
+                        "image_id": entry.get("image_id") or entry.get("ImageId"),
+                        "subnet_id": entry.get("subnet_id") or entry.get("SubnetId"),
+                        "metadata": entry.get("metadata") or entry,
+                        "raw": entry,
+                    }
+                return {}
 
-                    # Check if we need to update the machine (status or network info
-                    # changed)
+            # Update existing machines and add new ones discovered from provider
+            for dm in domain_machines:
+                normalized = _normalize_provider_entry(dm)
+                dm_id = normalized.get("instance_id")
+                if not dm_id:
+                    continue
+
+                existing = existing_by_id.get(dm_id)
+
+                if existing:
+                    new_status = normalized.get("status") or MachineStatus.UNKNOWN
                     needs_update = (
-                        machine.status != new_status
-                        or machine.private_ip != domain_machine.get("private_ip")
-                        or machine.public_ip != domain_machine.get("public_ip")
+                        existing.status != new_status
+                        or existing.private_ip != normalized.get("private_ip")
+                        or existing.public_ip != normalized.get("public_ip")
                     )
 
                     if needs_update:
-                        # Create updated machine data using domain entity format
-                        machine_data = machine.model_dump()
+                        machine_data = existing.model_dump()
                         machine_data["status"] = new_status
-                        machine_data["private_ip"] = domain_machine.get("private_ip")
-                        machine_data["public_ip"] = domain_machine.get("public_ip")
-                        machine_data["launch_time"] = domain_machine.get(
-                            "launch_time", machine.launch_time
+                        machine_data["private_ip"] = normalized.get("private_ip")
+                        machine_data["public_ip"] = normalized.get("public_ip")
+                        machine_data["launch_time"] = normalized.get(
+                            "launch_time", existing.launch_time
                         )
-                        machine_data["version"] = machine.version + 1
+                        machine_data["version"] = existing.version + 1
 
-                        # Create new machine instance with updated data
-                        from domain.machine.aggregate import Machine
-
-                        updated_machine = Machine.model_validate(machine_data)
-
-                        # Save updated machine
+                        updated_machine = DomainMachine.model_validate(machine_data)
                         with self.uow_factory.create_unit_of_work() as uow:
                             uow.machines.save(updated_machine)
-
                         updated_machines.append(updated_machine)
                     else:
-                        updated_machines.append(machine)
+                        updated_machines.append(existing)
                 else:
-                    # Domain machine not found - machine might be terminated
-                    updated_machines.append(machine)
+                    # New machine discovered from provider
+                    try:
+                        # If the provider already returned a domain machine, reuse it
+                        if isinstance(dm, DomainMachine):
+                            created_machine = dm
+                        else:
+                            if self._container:
+                                from infrastructure.di.container import get_container
+
+                                container = get_container()
+                                machine_adapter = container.get_optional(
+                                    "providers.aws.infrastructure.adapters.machine_adapter.AWSMachineAdapter"
+                                )
+                            else:
+                                machine_adapter = None
+
+                            if machine_adapter:
+                                created_machine = machine_adapter.create_machine_from_aws_instance(
+                                    normalized.get("raw"),
+                                    request_id=str(request.request_id),
+                                    provider_api=request.metadata.get("provider_api", "ASG"),
+                                    resource_id=request.resource_ids[0]
+                                    if request.resource_ids
+                                    else None,
+                                )
+                            else:
+                                # Fallback to building minimal Machine
+                                created_machine = DomainMachine(
+                                    instance_id=dm_id,
+                                    template_id=request.template_id,
+                                    request_id=str(request.request_id),
+                                    provider_type=request.provider_type,
+                                    status=normalized.get("status", MachineStatus.PENDING),
+                                    instance_type=normalized.get("instance_type"),
+                                    image_id=normalized.get("image_id"),
+                                    private_ip=normalized.get("private_ip"),
+                                    public_ip=normalized.get("public_ip"),
+                                    subnet_id=normalized.get("subnet_id"),
+                                    metadata=normalized.get("metadata", {}),
+                                )
+
+                        with self.uow_factory.create_unit_of_work() as uow:
+                            uow.machines.save(created_machine)
+
+                        new_machines.append(created_machine)
+                    except Exception as exc:
+                        self.logger.warning(
+                            "Failed to create machine %s from provider data: %s", dm_id, exc
+                        )
+
+            # Merge existing updates and newly discovered machines
+            if new_machines:
+                updated_machines.extend(new_machines)
+
+            # Ensure any original machines not updated are retained
+            seen_ids = {str(m.instance_id.value) for m in updated_machines}
+            for m in machines:
+                if str(m.instance_id.value) not in seen_ids:
+                    updated_machines.append(m)
 
             # Update ASG metadata if this is an ASG request
             if request.metadata.get("provider_api") == "ASG":
                 await self._update_asg_metadata_if_needed(request, updated_machines)
-
-            # Fetch capacity metadata (fleet/ASG) via describe operation when resource_ids exist
-            provider_metadata: dict = {}
-            if request.resource_ids:
-                try:
-                    describe_op = ProviderOperation(
-                        operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
-                        parameters={
-                            "resource_ids": request.resource_ids,
-                            "provider_api": request.metadata.get("provider_api"),
-                            "template_id": request.template_id,
-                        },
-                        context={"correlation_id": str(request.request_id)},
-                    )
-                    describe_result = await provider_context.execute_with_strategy(
-                        strategy_identifier, describe_op
-                    )
-                    if describe_result.success and describe_result.metadata:
-                        provider_metadata = describe_result.metadata
-                except Exception as e:
-                    self.logger.warning("Failed to fetch capacity metadata: %s", e)
 
             return updated_machines, provider_metadata
 

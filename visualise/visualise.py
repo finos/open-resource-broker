@@ -17,7 +17,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+import boto3
 import pandas as pd
+from botocore.exceptions import ClientError
 from dateutil import parser as date_parser
 from PIL import Image, ImageDraw, ImageFont
 
@@ -107,8 +109,8 @@ class ASGHistoryParser:
     def __init__(self, logger: logging.Logger):
         self.logger = logger
 
-    def parse_activities(self, history_data: list) -> list:
-        """Extract instance creation activities from ASG history"""
+    def parse_activities(self, history_data: list, request_time: Optional[datetime] = None) -> list:
+        """Extract instance creation activities from ASG history."""
         activities = []
 
         for activity in history_data:
@@ -120,15 +122,19 @@ class ASGHistoryParser:
                     "Description", ""
                 ):
                     instance_id = self.extract_instance_id(activity["Description"])
-                    request_time = self.extract_request_time(activity["Cause"])
-                    creation_time = self.normalize_timestamp(activity["EndTime"])
+                    request_time_local = request_time or self.extract_request_time(
+                        activity.get("Cause", "")
+                    )
+                    creation_time = self.normalize_timestamp(
+                        activity["StartTime"]
+                    )  # TODO: Should we use StartTime or EndTime
 
-                    if instance_id and request_time and creation_time:
+                    if instance_id and request_time_local and creation_time:
                         activities.append(
                             {
                                 "instance_id": instance_id,
                                 "creation_time": creation_time,
-                                "request_time": request_time,
+                                "request_time": request_time_local,
                                 "activity_id": activity.get("ActivityId"),
                                 "status": activity.get("StatusCode"),
                                 "capacity": 1,  # Default capacity for ASG instances
@@ -150,6 +156,7 @@ class ASGHistoryParser:
     def extract_request_time(self, cause_text: str) -> Optional[datetime]:
         """Parse initial request timestamp from cause description"""
         # Pattern: "At 2025-12-04T16:02:25Z a user request created..."
+        self.logger.warning(f"Extracting request time from cause: {cause_text}")
         pattern = r"At (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)"
         match = re.search(pattern, cause_text)
 
@@ -359,6 +366,64 @@ class DataProcessor:
         self.asg_parser = ASGHistoryParser(logger)
         self.ec2_parser = EC2FleetHistoryParser(logger)
         self.spot_parser = SpotFleetHistoryParser(logger)
+        self._vcpu_cache_path = Path(__file__).with_name("instance_vcpu_mapping.json")
+        self._vcpu_cache = self._load_vcpu_cache()
+        self._ec2_client = None
+
+    def _load_vcpu_cache(self) -> dict[str, int]:
+        """Load instance->vCPU mapping from JSON file, falling back to empty dict."""
+        try:
+            if self._vcpu_cache_path.exists():
+                with open(self._vcpu_cache_path, encoding="utf-8") as fh:
+                    data = json.load(fh)
+                    if isinstance(data, dict):
+                        # Coerce values to int where possible
+                        return {k: int(v) for k, v in data.items() if isinstance(v, (int, float))}
+            else:
+                self.logger.info(
+                    "vCPU cache file not found at %s; will create on first lookup",
+                    self._vcpu_cache_path,
+                )
+        except Exception as exc:
+            self.logger.warning("Failed to load vCPU cache from %s: %s", self._vcpu_cache_path, exc)
+        return {}
+
+    def _save_vcpu_cache(self) -> None:
+        """Persist the vCPU cache to disk."""
+        try:
+            with open(self._vcpu_cache_path, "w", encoding="utf-8") as fh:
+                json.dump(self._vcpu_cache, fh, indent=2, sort_keys=True)
+        except Exception as exc:
+            self.logger.warning("Failed to write vCPU cache to %s: %s", self._vcpu_cache_path, exc)
+
+    def _ensure_ec2_client(self):
+        """Lazily create a boto3 EC2 client for DescribeInstanceTypes calls."""
+        if self._ec2_client is None:
+            try:
+                self._ec2_client = boto3.client("ec2")
+            except Exception as exc:  # pragma: no cover - environment-specific
+                self.logger.warning("Failed to create EC2 client: %s", exc)
+                self._ec2_client = None
+        return self._ec2_client
+
+    def _fetch_vcpu_from_aws(self, instance_type: str) -> Optional[int]:
+        """Query AWS for the vCPU count of the given instance type."""
+        client = self._ensure_ec2_client()
+        if not client:
+            return None
+        try:
+            resp = client.describe_instance_types(InstanceTypes=[instance_type])
+            types = resp.get("InstanceTypes") or []
+            if not types:
+                return None
+            vcpu_info = types[0].get("VCpuInfo") or {}
+            vcpus = vcpu_info.get("DefaultVCpus")
+            return int(vcpus) if vcpus is not None else None
+        except ClientError as exc:
+            self.logger.warning("describe_instance_types failed for %s: %s", instance_type, exc)
+        except Exception as exc:  # pragma: no cover - defensive
+            self.logger.warning("Unexpected error fetching vCPU for %s: %s", instance_type, exc)
+        return None
 
     def process_history_file(
         self,
@@ -407,28 +472,18 @@ class DataProcessor:
         processed_data = []
         special_events: list[dict] = []
 
+        # Normalize events/history list once for all provider types
+        events = data.get("events") or data.get("history") or data.get("HistoryRecords") or []
+        request_time = self._resolve_request_time(events, data.get("request_time"))
+        if request_time is None:
+            raise ValueError("request_time missing and could not infer from history")
+
         if detected_type == "ASG":
-            processed_data = self.asg_parser.parse_activities(data["history"])
+            processed_data = self.asg_parser.parse_activities(events, request_time)
         elif detected_type == "EC2FLEET":
-            events = data.get("events") or data.get("history") or data.get("HistoryRecords") or []
-            request_time_str = data.get("request_time")
-            if not request_time_str:
-                request_time = self._infer_request_time(events)
-            else:
-                request_time = self.normalize_timestamps(request_time_str)
-            if request_time is None:
-                raise ValueError("EC2Fleet request_time missing and could not infer from history")
             processed_data, special = self.ec2_parser.parse_events(events, request_time)
             special_events.extend(special)
         elif detected_type == "SPOTFLEET":
-            events = data.get("events") or data.get("history") or data.get("HistoryRecords") or []
-            request_time_str = data.get("request_time")
-            if not request_time_str:
-                request_time = self._infer_request_time(events)
-            else:
-                request_time = self.normalize_timestamps(request_time_str)
-            if request_time is None:
-                raise ValueError("SpotFleet request_time missing and could not infer from history")
             processed_data, special = self.spot_parser.parse_events(events, request_time)
             special_events.extend(special)
         else:
@@ -442,11 +497,54 @@ class DataProcessor:
         self.logger.info(f"Successfully processed {len(df)} instances from {file_path}")
         return df, special_events
 
+    def _resolve_request_time(
+        self, events: list, request_time_str: Optional[str]
+    ) -> Optional[datetime]:
+        """
+        Determine request_time for fleet/spot based on history content:
+        1) Prefer the 'submitted' fleetRequestChange event timestamp
+        2) Fall back to explicit request_time in the file
+        3) Finally fall back to earliest event timestamp
+        """
+        submission_time = self._find_submission_time(events)
+        if submission_time:
+            return submission_time
+
+        if request_time_str:
+            try:
+                return self.normalize_timestamps(request_time_str)
+            except Exception as exc:
+                self.logger.warning("Failed to parse request_time '%s': %s", request_time_str, exc)
+
+        return self._infer_request_time(events)
+
+    def _find_submission_time(self, events: list) -> Optional[datetime]:
+        """Locate the fleet submission event and return its timestamp."""
+        candidates: list[datetime] = []
+        for ev in events:
+            info = ev.get("EventInformation") or {}
+            if not isinstance(info, dict):
+                info = {}
+            subtype = info.get("EventSubType") or ev.get("EventSubType") or ev.get("Status")
+            if isinstance(subtype, str) and subtype.lower() == "submitted":
+                ts = ev.get("Timestamp")
+                if ts:
+                    try:
+                        candidates.append(self.normalize_timestamps(ts))
+                    except Exception as exc:
+                        self.logger.debug(
+                            "Skipping submitted event with invalid timestamp: %s", exc
+                        )
+        if candidates:
+            return min(candidates)
+        return None
+
     def _infer_request_time(self, events: list) -> Optional[datetime]:
-        """Infer request_time from earliest event timestamp."""
+        """Infer request_time from earliest event timestamp when no submitted event is found."""
+        self.logger.warning("Request time missing; inferring from earliest event")
         timestamps = []
         for ev in events:
-            ts = ev.get("Timestamp")
+            ts = ev.get("Timestamp") or ev.get("StartTime") or ev.get("EndTime")
             if ts:
                 try:
                     timestamps.append(self.normalize_timestamps(ts))
@@ -510,9 +608,25 @@ class DataProcessor:
             instance_id = item["instance_id"]
 
             # Extract instance type from parsed data or request DB and get vCPU count
-            instance_type = (
-                item.get("instance_type") or machine_lookup.get(instance_id) or "unknown"
-            )
+            parsed_instance_type = item.get("instance_type")
+            lookup_instance_type = machine_lookup.get(instance_id)
+            instance_type = parsed_instance_type or lookup_instance_type or "unknown"
+
+            # Log detailed debugging information when we encounter unknown instance types
+            if instance_type == "unknown":
+                self.logger.warning(f"Instance {instance_id} has unknown instance type:")
+                self.logger.warning(f"  - From parsed data: {parsed_instance_type}")
+                self.logger.warning(f"  - From request DB: {lookup_instance_type}")
+                self.logger.warning("  - Using default: 1 vCPU")
+            elif parsed_instance_type and not lookup_instance_type:
+                self.logger.debug(
+                    f"Instance {instance_id} type '{instance_type}' from parsed data (not in request DB)"
+                )
+            elif lookup_instance_type and not parsed_instance_type:
+                self.logger.debug(
+                    f"Instance {instance_id} type '{instance_type}' from request DB (not in parsed data)"
+                )
+
             vcpu_count = self.get_vcpu_count(instance_type)
 
             row = {
@@ -541,11 +655,17 @@ class DataProcessor:
         df["creation_time_utc_seconds"] = df["creation_time_utc_seconds"].astype(float)
         df["vcpu_count"] = df["vcpu_count"].astype(int)
 
-        # Sort by time_from_request to ensure monotonic cumulative line
-        df = df.sort_values("time_from_request").reset_index(drop=True)
-
-        # Add cumulative vCPU count column (non-decreasing)
+        # Sort primarily by time_from_request, then by cumulative CPU for identical timestamps
+        df = df.sort_values("time_from_request", kind="stable").reset_index(drop=True)
         df["cumulative_vcpus"] = df["vcpu_count"].cumsum()
+        df = df.sort_values(["time_from_request", "cumulative_vcpus"], kind="stable").reset_index(
+            drop=True
+        )
+        # Recompute cumulative after final ordering to align with plotted order
+        df["cumulative_vcpus"] = df["vcpu_count"].cumsum()
+        pd.set_option("display.max_rows", None)
+        pd.set_option("display.max_columns", None)  # optional
+        print(df["time_from_request"], df["cumulative_vcpus"])
 
         return df
 
@@ -554,138 +674,32 @@ class DataProcessor:
         return item.get("instance_type") or "unknown"
 
     def get_vcpu_count(self, instance_type: str) -> int:
-        """Get vCPU count for given instance type"""
-        # AWS EC2 instance type to vCPU mapping
-        vcpu_mapping = {
-            # T3 instances
-            "t3.nano": 2,
-            "t3.micro": 2,
-            "t3.small": 2,
-            "t3.medium": 2,
-            "t3.large": 2,
-            "t3.xlarge": 4,
-            "t3.2xlarge": 8,
-            # M5 instances
-            "m5.large": 2,
-            "m5.xlarge": 4,
-            "m5.2xlarge": 8,
-            "m5.4xlarge": 16,
-            "m5.8xlarge": 32,
-            "m5.12xlarge": 48,
-            "m5.16xlarge": 64,
-            "m5.24xlarge": 96,
-            # C5 instances
-            "c5.large": 2,
-            "c5.xlarge": 4,
-            "c5.2xlarge": 8,
-            "c5.4xlarge": 16,
-            "c5.9xlarge": 36,
-            "c5.12xlarge": 48,
-            "c5.18xlarge": 72,
-            "c5.24xlarge": 96,
-            # R5 instances
-            "r5.large": 2,
-            "r5.xlarge": 4,
-            "r5.2xlarge": 8,
-            "r5.4xlarge": 16,
-            "r5.8xlarge": 32,
-            "r5.12xlarge": 48,
-            "r5.16xlarge": 64,
-            "r5.24xlarge": 96,
-            # R5a instances
-            "r5a.large": 2,
-            "r5a.xlarge": 4,
-            "r5a.2xlarge": 8,
-            "r5a.4xlarge": 16,
-            "r5a.8xlarge": 32,
-            "r5a.12xlarge": 48,
-            "r5a.16xlarge": 64,
-            "r5a.24xlarge": 96,
-            # R5ad instances
-            "r5ad.large": 2,
-            "r5ad.xlarge": 4,
-            "r5ad.2xlarge": 8,
-            "r5ad.4xlarge": 16,
-            "r5ad.8xlarge": 32,
-            "r5ad.12xlarge": 48,
-            "r5ad.16xlarge": 64,
-            "r5ad.24xlarge": 96,
-            # R5b instances
-            "r5b.large": 2,
-            "r5b.xlarge": 4,
-            "r5b.2xlarge": 8,
-            "r5b.4xlarge": 16,
-            "r5b.8xlarge": 32,
-            "r5b.12xlarge": 48,
-            "r5b.16xlarge": 64,
-            "r5b.24xlarge": 96,
-            # R5d instances
-            "r5d.large": 2,
-            "r5d.xlarge": 4,
-            "r5d.2xlarge": 8,
-            "r5d.4xlarge": 16,
-            "r5d.8xlarge": 32,
-            "r5d.12xlarge": 48,
-            "r5d.16xlarge": 64,
-            "r5d.24xlarge": 96,
-            # R5n instances
-            "r5n.large": 2,
-            "r5n.xlarge": 4,
-            "r5n.2xlarge": 8,
-            "r5n.4xlarge": 16,
-            "r5n.8xlarge": 32,
-            "r5n.12xlarge": 48,
-            "r5n.16xlarge": 64,
-            "r5n.24xlarge": 96,
-            # R6a instances
-            "r6a.large": 2,
-            "r6a.xlarge": 4,
-            "r6a.2xlarge": 8,
-            "r6a.4xlarge": 16,
-            "r6a.8xlarge": 32,
-            "r6a.12xlarge": 48,
-            "r6a.16xlarge": 64,
-            "r6a.24xlarge": 96,
-            # R6i instances
-            "r6i.large": 2,
-            "r6i.xlarge": 4,
-            "r6i.2xlarge": 8,
-            "r6i.4xlarge": 16,
-            "r6i.8xlarge": 32,
-            "r6i.12xlarge": 48,
-            "r6i.16xlarge": 64,
-            "r6i.24xlarge": 96,
-            # R7a instances
-            "r7a.medium": 1,
-            "r7a.large": 2,
-            "r7a.xlarge": 4,
-            "r7a.2xlarge": 8,
-            "r7a.4xlarge": 16,
-            "r7a.8xlarge": 32,
-            "r7a.12xlarge": 48,
-            "r7a.16xlarge": 64,
-            "r7a.24xlarge": 96,
-            "r7a.48xlarge": 192,
-            # R7i instances
-            "r7i.large": 2,
-            "r7i.xlarge": 4,
-            "r7i.2xlarge": 8,
-            "r7i.4xlarge": 16,
-            "r7i.8xlarge": 32,
-            "r7i.12xlarge": 48,
-            "r7i.16xlarge": 64,
-            "r7i.24xlarge": 96,
-            "r7i.48xlarge": 192,
-            # Legacy/other types seen in histories
-            "m1.small": 1,
-            "m1.medium": 1,
-            "c7a.medium": 1,
-        }
+        """Get vCPU count for given instance type with on-disk cache and AWS lookup."""
+        if not instance_type:
+            return 1
 
-        if instance_type not in vcpu_mapping:
-            raise ValueError(f"Instance type {instance_type} missing from vCPU mapping")
+        cached = self._vcpu_cache.get(instance_type)
+        if cached is not None:
+            return int(cached)
 
-        return vcpu_mapping[instance_type]
+        if instance_type == "unknown":
+            return 1
+
+        # Fallback to AWS DescribeInstanceTypes
+        vcpus = self._fetch_vcpu_from_aws(instance_type)
+        if vcpus is not None:
+            self._vcpu_cache[instance_type] = vcpus
+            self._save_vcpu_cache()
+            return vcpus
+
+        # Default when lookup fails
+        self.logger.warning(
+            "Could not determine vCPU count for instance type '%s'; defaulting to 1",
+            instance_type,
+        )
+        self._vcpu_cache[instance_type] = 1
+        self._save_vcpu_cache()
+        return 1
 
 
 class OutputManager:
@@ -1392,7 +1406,8 @@ def render_cumulative_plot(
             continue
         color = palette_colors[idx % len(palette_colors)]
         pts = []
-        for _, row in df.sort_values("time_from_request").iterrows():
+        # for _, row in df.sort_values("time_from_request").iterrows():
+        for _, row in df.iterrows():
             sx = y_axis_x + int((row["time_from_request"] / x_max) * plot_w)
             sy = x_axis_y - int((row["cumulative_vcpus"] / y_max) * plot_h)
             pts.append((sx, sy))

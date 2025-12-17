@@ -66,9 +66,9 @@ REST_API_TIMEOUTS = {
     "health_check": 5,  # Health endpoint timeout
     "templates": 60,  # Timeout for fetching templates
     "request_status_poll_interval": 5,  # Poll interval for request status
-    "request_status_timeout": 600,  # Max wait for request fulfillment
+    "request_fulfillment_timeout": 600,  # Max wait for request fulfillment
     "return_status_poll_interval": 5,  # Poll interval for return status
-    "return_status_timeout": 300,  # Max wait for return completion
+    "return_status_timeout": 100,  # Max wait for return completion
     "server_shutdown_check_interval": 2,  # Interval between shutdown health probes
     "server_shutdown_attempts": 5,  # How many shutdown probes to attempt
     "graceful_termination_timeout": 180,  # Max time to wait for graceful termination
@@ -130,108 +130,80 @@ LARGE_SCALE_VM_TYPES_1 = {
     "r7i.8xlarge": 2,
 }
 
-LARGE_SCALE_TESTS = [
-    # SpotFleet with ABIS
-    # {
-    #     "test_name": "hostfactory.SpotFleet.ABIS.SIZE.1000",
-    #     "template_id": "SpotFleetRequest",
-    #     "capacity_to_request": 100,
-    #     "awsprov_base_template": "awsprov_templates.base.json",
-    #     "overrides": {
-    #         "providerApi": "SpotFleet",
-    #         "fleetType": "request",
-    #         "scheduler": "hostfactory",
-    #         "abisInstanceRequirements": {
-    #             "VCpuCount": {"Min": 1, "Max": 128},
-    #             "MemoryMiB": {"Min": 1024, "Max": 257000},
-    #         },
-    #     },
-    # },
-    # {
-    #     "test_name": "hostfactory.EC2Fleet.ABIS.SIZE.1000",
-    #     "template_id": "EC2FleetRequest",
-    #     "capacity_to_request": 100,
-    #     "awsprov_base_template": "awsprov_templates.base.json",
-    #     "overrides": {
-    #         "providerApi": "EC2Fleet",
-    #         "scheduler": "hostfactory",
-    #         "fleetType": "request",
-    #         "abisInstanceRequirements": {
-    #             "VCpuCount": {"Min": 1, "Max": 128},
-    #             "MemoryMiB": {"Min": 1024, "Max": 257000},
-    #         },
-    #     },
-    # },
-    # {
-    #     "test_name": "hostfactory.ASG.ABIS.SIZE.1000",
-    #     "template_id": "ASG",
-    #     "capacity_to_request": 100,
-    #     "awsprov_base_template": "awsprov_templates.base.json",
-    #     "overrides": {
-    #         "providerApi": "ASG",
-    #         "scheduler": "hostfactory",
-    #         "abisInstanceRequirements": {
-    #             "VCpuCount": {"Min": 1, "Max": 128},
-    #             "MemoryMiB": {"Min": 1024, "Max": 257000},
-    #         },
-    #     },
-    # },
-    {
-        "test_name": "hostfactory.SpoEC2FleettFleet.ABIS.SIZE.1000",
-        "template_id": "EC2FleetInstant",
-        "capacity_to_request": 100,
-        "awsprov_base_template": "awsprov_templates.base.json",
-        "overrides": {
-            "providerApi": "Ec2Fleet",
-            "fleetType": "instant",
-            "scheduler": "hostfactory",
-            "abisInstanceRequirements": {
-                "VCpuCount": {"Min": 1, "Max": 128},
-                "MemoryMiB": {"Min": 1024, "Max": 257000},
+
+LARGE_SCALE_CAPACITIES = [100]
+
+
+def _make_large_scale_tests() -> List[Dict[str, Any]]:
+    """Parameterize large-scale scenarios across multiple capacities."""
+    abis_requirements = {
+        "VCpuCount": {"Min": 1, "Max": 128},
+        "MemoryMiB": {"Min": 1024, "Max": 257000},
+    }
+
+    def spot(cap: int) -> Dict[str, Any]:
+        return {
+            "test_name": f"hostfactory.SpotFleet.request.ABIS.SIZE.{cap}",
+            "template_id": "SpotFleetRequest",
+            "capacity_to_request": cap,
+            "awsprov_base_template": "awsprov_templates.base.json",
+            "overrides": {
+                "providerApi": "SpotFleet",
+                "fleetType": "request",
+                "scheduler": "hostfactory",
+                "abisInstanceRequirements": abis_requirements,
+                "allocationStrategy": "price-capacity-optimized",
             },
-        },
-    },
-    # ############################################################
-    # ############################################################
-    # # SpotFleet with multiTypes
-    # {
-    #     "test_name": "hostfactory.SpotFleetRequest.MultiTypes",
-    #     "template_id": "SpotFleetRequest",
-    #     "capacity_to_request": 4,
-    #     "awsprov_base_template": "awsprov_templates.base.json",
-    #     "overrides": {
-    #         "providerApi": "SpotFleet",
-    #         "fleetType": "request",
-    #         "scheduler": "hostfactory",
-    #         "vmTypes": LARGE_SCALE_VM_TYPES_1
-    #     },
-    # },
-    # # EC2Fleet with multiTypes
-    #     {
-    #         "test_name": "hostfactory.EC2FleetRequest.MultiTypes",
-    #         "template_id": "EC2FleetRequest",
-    #         "capacity_to_request": 4,
-    #         "awsprov_base_template": "awsprov_templates.base.json",
-    #         "overrides": {
-    #             "providerApi": "EC2Fleet",
-    #             "fleetType": "request",
-    #             "scheduler": "hostfactory",
-    #             "vmTypes": LARGE_SCALE_VM_TYPES_1
-    #         },
-    #     },
-    #     # ASG with multiTypes
-    #     {
-    #         "test_name": "hostfactory.ASG.MultiTypes",
-    #         "template_id": "ASG",
-    #         "capacity_to_request": 4,
-    #         "awsprov_base_template": "awsprov_templates.base.json",
-    #         "overrides": {
-    #             "providerApi": "ASG",
-    #             "scheduler": "hostfactory",
-    #             "vmTypes": LARGE_SCALE_VM_TYPES_1
-    #         },
-    #     },
-]
+        }
+
+    def ec2_request(cap: int) -> Dict[str, Any]:
+        return {
+            "test_name": f"hostfactory.EC2Fleet.request.ABIS.SIZE.{cap}",
+            "template_id": "EC2FleetRequest",
+            "capacity_to_request": cap,
+            "awsprov_base_template": "awsprov_templates.base.json",
+            "overrides": {
+                "providerApi": "EC2Fleet",
+                "scheduler": "hostfactory",
+                "fleetType": "request",
+                "abisInstanceRequirements": abis_requirements,
+                "allocationStrategy": "priceCapacityOptimized",
+            },
+        }
+
+    def ec2_instant(cap: int) -> Dict[str, Any]:
+        return {
+            "test_name": f"hostfactory.EC2Fleet.intant.ABIS.SIZE.{cap}",
+            "template_id": "EC2FleetRequest",
+            "capacity_to_request": cap,
+            "awsprov_base_template": "awsprov_templates.base.json",
+            "overrides": {
+                "providerApi": "EC2Fleet",
+                "scheduler": "hostfactory",
+                "fleetType": "instant",
+                "abisInstanceRequirements": abis_requirements,
+                "allocationStrategy": "priceCapacityOptimized",
+            },
+        }
+
+    def asg(cap: int) -> Dict[str, Any]:
+        return {
+            "test_name": f"hostfactory.ASG.ABIS.SIZE.{cap}",
+            "template_id": "ASG",
+            "capacity_to_request": cap,
+            "awsprov_base_template": "awsprov_templates.base.json",
+            "overrides": {
+                "providerApi": "ASG",
+                "scheduler": "hostfactory",
+                "abisInstanceRequirements": abis_requirements,
+                "allocationStrategy": "price-capacity-optimized",
+            },
+        }
+
+    scenarios: List[Dict[str, Any]] = []
+    for cap in LARGE_SCALE_CAPACITIES:
+        scenarios.extend([spot(cap), ec2_request(cap), ec2_instant(cap), asg(cap)])
+    return scenarios
 
 
 def generate_scenarios_from_attributes(
@@ -330,7 +302,7 @@ def get_rest_api_test_cases() -> List[Dict[str, Any]]:
     # Add custom scenarios from shared onaws definitions
     scenarios.extend(CUSTOM_TEST_CASES)
 
-    scenarios.extend(LARGE_SCALE_TESTS)
+    scenarios.extend(_make_large_scale_tests())
 
     # Add REST API specific metadata to all scenarios
     for scenario in scenarios:
