@@ -1,6 +1,6 @@
 # Machine Discovery Flow Architecture
 
-This document describes the complete end-to-end flow for machine discovery and status checking in the HostFactory plugin.
+This document describes the complete end-to-end flow for machine discovery and status checking in the Open Resource Broker.
 
 ## Overview
 

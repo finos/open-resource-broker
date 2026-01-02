@@ -8,7 +8,7 @@
 
 ## Overview
 
-This guide provides practical information for developers working with the Open HostFactory Plugin's performance-optimized lazy loading architecture. It covers development practices, debugging techniques, and optimization strategies.
+This guide provides practical information for developers working with the Open Resource Broker's performance-optimized lazy loading architecture. It covers development practices, debugging techniques, and optimization strategies.
 
 ## Quick Start
 

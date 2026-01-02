@@ -52,7 +52,9 @@ docker-compose up -d
 curl http://localhost:8000/health
 ```
 
-### Package Installation
+## Installation
+
+### Package Installation (Recommended)
 
 ```bash
 # Install from PyPI
@@ -63,7 +65,43 @@ orb --version
 orb --help
 ```
 
-### Fast Development Setup with UV (Recommended)
+### System-Wide Installation (Production)
+
+```bash
+# Auto-detects best location (no sudo needed if not available)
+make install-system
+
+# Or install to custom directory (requires sudo if needed)
+ORB_INSTALL_DIR=/opt/orb make install-system
+
+# Installation will output the actual location and next steps
+# Add to PATH as instructed by the installer
+orb --version
+```
+
+### Local Development Installation
+
+```bash
+# Clone repository
+git clone https://github.com/awslabs/open-resource-broker.git
+cd open-resource-broker
+
+# Install local development environment
+make dev-install
+
+# Or full development workflow (recommended)
+make dev
+```
+
+### Installation Comparison
+
+| Method | Location | Use Case | Command |
+|--------|----------|----------|---------|
+| **PyPI** | System Python | End users | `pip install open-resource-broker` |
+| **System** | `/usr/local/orb/` or `~/.local/orb/` | Production deployment | `make install-system` |
+| **Local** | `./.venv/` | Development | `make dev-install` |
+
+### Fast Development Setup with UV (Advanced)
 
 For faster dependency resolution and installation, use [uv](https://github.com/astral-sh/uv):
 
@@ -76,10 +114,7 @@ git clone https://github.com/awslabs/open-resource-broker.git
 cd open-resource-broker
 
 # Fast development setup with uv
-make dev-install-uv
-
-# Or manually with uv
-uv pip install -e ".[dev]"
+make dev-install
 
 # Generate lock files for reproducible builds
 make uv-lock
@@ -87,16 +122,6 @@ make uv-lock
 # Sync with lock files (fastest)
 make uv-sync-dev
 ```
-
-### Traditional Development Setup
-
-```bash
-# Clone repository
-git clone https://github.com/awslabs/open-resource-broker.git
-cd open-resource-broker
-
-# Traditional setup with pip
-make dev-install-pip
 
 # Or manually
 pip install -e ".[dev]"
@@ -150,7 +175,7 @@ Pre-built prompts for common infrastructure tasks:
 ```json
 {
   "mcpServers": {
-    "open-hostfactory": {
+    "open-resource-broker": {
       "command": "orb",
       "args": ["mcp", "serve", "--stdio"]
     }

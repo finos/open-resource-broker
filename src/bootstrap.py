@@ -123,7 +123,7 @@ class Application:
 
             self._initialized = True
             self.logger.info(
-                "Open HostFactory Plugin initialized successfully with %s provider",
+                "Open Resource Broker initialized successfully with %s provider",
                 self.provider_type,
             )
             return True

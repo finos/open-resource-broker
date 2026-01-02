@@ -52,12 +52,12 @@ sudo su - hostfactory
 ```bash
 # Clone to production location
 cd /opt
-sudo git clone <repository-url> hostfactory-plugin
-sudo chown -R hostfactory:hostfactory hostfactory-plugin
+sudo git clone <repository-url> orb
+sudo chown -R hostfactory:hostfactory orb
 
 # Switch to application user
 sudo su - hostfactory
-cd /opt/hostfactory-plugin
+cd /opt/orb
 
 # Create virtual environment
 python3 -m venv .venv
@@ -169,13 +169,13 @@ Edit Symphony's `hostfactory.xml`:
 <HostFactory>
   <Providers>
     <Provider name="aws-production">
-      <Command>/opt/hostfactory-plugin/.venv/bin/python</Command>
-      <Arguments>/opt/hostfactory-plugin/run.py</Arguments>
-      <WorkingDirectory>/opt/hostfactory-plugin</WorkingDirectory>
+      <Command>/opt/orb/.venv/bin/python</Command>
+      <Arguments>/opt/orb/run.py</Arguments>
+      <WorkingDirectory>/opt/orb</WorkingDirectory>
       <Environment>
         <Variable name="HOSTFACTORY_CONFIG" value="/etc/hostfactory/config.json"/>
         <Variable name="AWS_PROFILE" value="production"/>
-        <Variable name="PYTHONPATH" value="/opt/hostfactory-plugin"/>
+        <Variable name="PYTHONPATH" value="/opt/orb"/>
       </Environment>
       <Timeout>600</Timeout>
       <MaxConcurrentRequests>10</MaxConcurrentRequests>
@@ -198,9 +198,9 @@ sym hostfactory -provider aws-production -cmd requestMachines -data '{"template_
 ### File Permissions
 ```bash
 # Set secure permissions
-sudo chmod 750 /opt/hostfactory-plugin
+sudo chmod 750 /opt/orb
 sudo chmod 640 /etc/hostfactory/config.json
-sudo chmod 755 /opt/hostfactory-plugin/run.py
+sudo chmod 755 /opt/orb/run.py
 
 # Ensure logs are readable by Symphony
 sudo chmod 644 /var/log/hostfactory/app.log
@@ -303,8 +303,8 @@ ls -la /opt/hostfactory-plugin/run.py
 ls -la /etc/hostfactory/config.json
 
 # Fix permissions if needed
-sudo chown hostfactory:hostfactory /opt/hostfactory-plugin/run.py
-sudo chmod 755 /opt/hostfactory-plugin/run.py
+sudo chown hostfactory:hostfactory /opt/orb/run.py
+sudo chmod 755 /opt/orb/run.py
 ```
 
 #### AWS Credential Issues

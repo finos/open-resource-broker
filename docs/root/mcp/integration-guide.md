@@ -173,7 +173,7 @@ Access cloud providers.
 ```json
 {
   "mcpServers": {
-    "open-hostfactory": {
+    "open-resource-broker": {
       "command": "orb",
       "args": ["mcp", "serve", "--stdio"]
     }

@@ -50,7 +50,7 @@ The plugin can be deployed in multiple configurations depending on your infrastr
     "strategy": "json",
     "json_strategy": {
       "storage_type": "single_file",
-      "base_path": "/opt/hostfactory-plugin/data"
+      "base_path": "/opt/orb/data"
     }
   }
 }
@@ -136,7 +136,7 @@ The plugin can be deployed in multiple configurations depending on your infrastr
   },
   "logging": {
     "level": "INFO",
-    "file_path": "/var/log/hostfactory-plugin/app.log",
+    "file_path": "/var/log/orb/app.log",
     "max_size": 100,
     "backup_count": 10
   }
@@ -297,21 +297,21 @@ The plugin can be deployed in multiple configurations depending on your infrastr
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: hostfactory-plugin
+  name: open-resource-broker
   namespace: symphony
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: hostfactory-plugin
+      app: open-resource-broker
   template:
     metadata:
       labels:
-        app: hostfactory-plugin
+        app: open-resource-broker
     spec:
       containers:
       - name: plugin
-        image: hostfactory-plugin:latest
+        image: open-resource-broker:latest
         ports:
         - containerPort: 8000
         env:
@@ -335,10 +335,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: hostfactory-plugin-service
+  name: open-resource-broker-service
 spec:
   selector:
-    app: hostfactory-plugin
+    app: open-resource-broker
   ports:
   - port: 8000
     targetPort: 8000

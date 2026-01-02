@@ -19,7 +19,7 @@
         "config": {
           "region": "us-east-1",
           "profile": "production",
-          "role_arn": "arn:aws:iam::123456789012:role/OpenHostFactoryRole",
+          "role_arn": "arn:aws:iam::123456789012:role/OpenResourceBrokerRole",
           "max_retries": 5,
           "timeout": 60
         }
@@ -34,7 +34,7 @@
         "config": {
           "region": "us-west-2",
           "profile": "production",
-          "role_arn": "arn:aws:iam::123456789012:role/OpenHostFactoryRole",
+          "role_arn": "arn:aws:iam::123456789012:role/OpenResourceBrokerRole",
           "max_retries": 5,
           "timeout": 60
         }
@@ -83,7 +83,7 @@
       "subnet-prod-west-2b"
     ],
     "security_group_ids": [
-      "sg-prod-open-hostfactory",
+      "sg-prod-open-resource-broker",
       "sg-prod-monitoring"
     ],
     "ami_resolution": {

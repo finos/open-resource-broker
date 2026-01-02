@@ -32,7 +32,7 @@ def parse_args() -> tuple[argparse.Namespace, dict]:
     # Main parser with global options
     parser = argparse.ArgumentParser(
         prog=os.path.basename(sys.argv[0]),
-        description="Open HostFactory Plugin - Cloud resource management for IBM Spectrum Symphony",
+        description="Open Resource Broker - Cloud resource management for IBM Spectrum Symphony",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=f"""
 Examples:

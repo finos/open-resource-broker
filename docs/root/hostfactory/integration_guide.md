@@ -44,13 +44,13 @@ Add the plugin to your HostFactory configuration file:
 ```xml
 <HostProvider name="aws-cloud-provider">
   <Script>
-    <GetAvailableTemplates>/opt/hostfactory-plugin/scripts/getAvailableTemplates.sh</GetAvailableTemplates>
-    <RequestMachines>/opt/hostfactory-plugin/scripts/requestMachines.sh</RequestMachines>
-    <RequestReturnMachines>/opt/hostfactory-plugin/scripts/requestReturnMachines.sh</RequestReturnMachines>
-    <GetRequestStatus>/opt/hostfactory-plugin/scripts/getRequestStatus.sh</GetRequestStatus>
+    <GetAvailableTemplates>/opt/orb/scripts/getAvailableTemplates.sh</GetAvailableTemplates>
+    <RequestMachines>/opt/orb/scripts/requestMachines.sh</RequestMachines>
+    <RequestReturnMachines>/opt/orb/scripts/requestReturnMachines.sh</RequestReturnMachines>
+    <GetRequestStatus>/opt/orb/scripts/getRequestStatus.sh</GetRequestStatus>
   </Script>
   <Parameters>
-    <Parameter name="CONFIG_PATH">/opt/hostfactory-plugin/config/config.json</Parameter>
+    <Parameter name="CONFIG_PATH">/opt/orb/config/config.json</Parameter>
     <Parameter name="LOG_LEVEL">INFO</Parameter>
   </Parameters>
 </HostProvider>
@@ -64,13 +64,13 @@ For production environments with multiple providers:
 <HostProviders>
   <HostProvider name="aws-us-east-1">
     <Script>
-      <GetAvailableTemplates>/opt/hostfactory-plugin/scripts/getAvailableTemplates.sh</GetAvailableTemplates>
-      <RequestMachines>/opt/hostfactory-plugin/scripts/requestMachines.sh</RequestMachines>
-      <RequestReturnMachines>/opt/hostfactory-plugin/scripts/requestReturnMachines.sh</RequestReturnMachines>
-      <GetRequestStatus>/opt/hostfactory-plugin/scripts/getRequestStatus.sh</GetRequestStatus>
+      <GetAvailableTemplates>/opt/orb/scripts/getAvailableTemplates.sh</GetAvailableTemplates>
+      <RequestMachines>/opt/orb/scripts/requestMachines.sh</RequestMachines>
+      <RequestReturnMachines>/opt/orb/scripts/requestReturnMachines.sh</RequestReturnMachines>
+      <GetRequestStatus>/opt/orb/scripts/getRequestStatus.sh</GetRequestStatus>
     </Script>
     <Parameters>
-      <Parameter name="CONFIG_PATH">/opt/hostfactory-plugin/config/aws-us-east-1.yml</Parameter>
+      <Parameter name="CONFIG_PATH">/opt/orb/config/aws-us-east-1.yml</Parameter>
       <Parameter name="AWS_REGION">us-east-1</Parameter>
       <Parameter name="PROVIDER_NAME">aws-us-east-1</Parameter>
     </Parameters>
@@ -78,10 +78,10 @@ For production environments with multiple providers:
 
   <HostProvider name="aws-us-west-2">
     <Script>
-      <GetAvailableTemplates>/opt/hostfactory-plugin/scripts/getAvailableTemplates.sh</GetAvailableTemplates>
-      <RequestMachines>/opt/hostfactory-plugin/scripts/requestMachines.sh</RequestMachines>
-      <RequestReturnMachines>/opt/hostfactory-plugin/scripts/requestReturnMachines.sh</RequestReturnMachines>
-      <GetRequestStatus>/opt/hostfactory-plugin/scripts/getRequestStatus.sh</GetRequestStatus>
+      <GetAvailableTemplates>/opt/orb/scripts/getAvailableTemplates.sh</GetAvailableTemplates>
+      <RequestMachines>/opt/orb/scripts/requestMachines.sh</RequestMachines>
+      <RequestReturnMachines>/opt/orb/scripts/requestReturnMachines.sh</RequestReturnMachines>
+      <GetRequestStatus>/opt/orb/scripts/getRequestStatus.sh</GetRequestStatus>
     </Script>
     <Parameters>
       <Parameter name="CONFIG_PATH">/opt/hostfactory-plugin/config/aws-us-west-2.yml</Parameter>

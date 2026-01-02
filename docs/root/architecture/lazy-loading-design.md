@@ -8,7 +8,7 @@
 
 ## Overview
 
-The Open HostFactory Plugin implements a comprehensive lazy loading architecture to optimize startup performance and resource utilization. This document describes the design principles, implementation patterns, and performance characteristics of the lazy loading system.
+The Open Resource Broker implements a comprehensive lazy loading architecture to optimize startup performance and resource utilization. This document describes the design principles, implementation patterns, and performance characteristics of the lazy loading system.
 
 ## Performance Achievements
 
