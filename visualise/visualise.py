@@ -13,6 +13,7 @@ import logging
 import re
 import sys
 import tempfile
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -21,6 +22,7 @@ import boto3
 import pandas as pd
 from botocore.exceptions import ClientError
 from dateutil import parser as date_parser
+from openpyxl.drawing.image import Image as XLImage
 from PIL import Image, ImageDraw, ImageFont
 
 
@@ -227,7 +229,7 @@ class ASGHistoryParser:
                 dt = dt.replace(tzinfo=datetime.now().astimezone().tzinfo)
             return dt.astimezone(datetime.now().astimezone().tzinfo).replace(tzinfo=None)
         except Exception as e:
-            raise ValueError(f"Unable to parse timestamp '{timestamp_str}': {e}")
+            raise ValueError(f"Unable to parse timestamp '{timestamp_str}': {e}") from e
 
 
 class EC2FleetHistoryParser:
@@ -323,7 +325,7 @@ class EC2FleetHistoryParser:
                 dt = dt.replace(tzinfo=datetime.now().astimezone().tzinfo)
             return dt.astimezone(datetime.now().astimezone().tzinfo).replace(tzinfo=None)
         except Exception as e:
-            raise ValueError(f"Unable to parse timestamp '{timestamp_str}': {e}")
+            raise ValueError(f"Unable to parse timestamp '{timestamp_str}': {e}") from e
 
 
 class SpotFleetHistoryParser:
@@ -419,7 +421,7 @@ class SpotFleetHistoryParser:
                 dt = dt.replace(tzinfo=datetime.now().astimezone().tzinfo)
             return dt.astimezone(datetime.now().astimezone().tzinfo).replace(tzinfo=None)
         except Exception as e:
-            raise ValueError(f"Unable to parse timestamp '{timestamp_str}': {e}")
+            raise ValueError(f"Unable to parse timestamp '{timestamp_str}': {e}") from e
 
 
 class DataProcessor:
@@ -656,7 +658,7 @@ class DataProcessor:
                 dt = dt.replace(tzinfo=datetime.now().astimezone().tzinfo)
             return dt.astimezone(datetime.now().astimezone().tzinfo).replace(tzinfo=None)
         except Exception as e:
-            raise ValueError(f"Unable to parse timestamp '{timestamp_str}': {e}")
+            raise ValueError(f"Unable to parse timestamp '{timestamp_str}': {e}") from e
 
     def generate_dataframe(
         self, processed_data: list, resource_id: str, provider_api: str, machine_lookup: dict
@@ -962,8 +964,6 @@ class OutputManager:
         self, worksheet, dataframe: pd.DataFrame, special_events: list[dict]
     ) -> None:
         """Add PNG chart to worksheet"""
-        from openpyxl.drawing.image import Image as XLImage
-
         plot_path = self._render_plot_to_png(dataframe, special_events)
         if plot_path:
             img = XLImage(plot_path)
@@ -997,7 +997,7 @@ class OutputManager:
                 if ts and base_time:
                     event_offsets.append((ts - base_time).total_seconds())
             if event_offsets:
-                x_max = max(x_max, max(event_offsets))
+                x_max = max(x_max, *event_offsets)
 
         y_max = float(df["cumulative_vcpus"].max() or 1.0)
         if x_max <= 0:
@@ -1023,7 +1023,6 @@ class OutputManager:
 
         img = Image.new("RGB", (dimensions["width"], dimensions["height"]), "white")
         draw = ImageDraw.Draw(img)
-        font = ImageFont.load_default()
 
         # Draw axes and labels
         x_axis_y = dimensions["height"] - dimensions["margin_bottom"]
@@ -1316,8 +1315,6 @@ def main():
     except Exception as e:
         logger.error(f"Processing failed: {e}")
         if args.verbose:
-            import traceback
-
             traceback.print_exc()
         return 1
 
@@ -1397,14 +1394,11 @@ def _build_target_paths(args) -> list:
 def _process_all_paths(args, logger, processor, output_manager, target_paths) -> list:
     """Process all target paths and return processed datasets."""
     processed_datasets = []
-    overall_status = 0
 
     for input_path in target_paths:
         result = _process_single_path(args, logger, processor, output_manager, input_path)
         if result:
             processed_datasets.append(result)
-        else:
-            overall_status = 1
 
     return processed_datasets
 
@@ -1673,7 +1667,8 @@ def _draw_cumulative_dataset_lines(
             )
             pts.append((sx, sy))
 
-        if len(pts) >= 2:
+        min_points_for_line = 2
+        if len(pts) >= min_points_for_line:
             draw.line(pts, fill=color, width=3)
         elif len(pts) == 1:
             draw.ellipse(
