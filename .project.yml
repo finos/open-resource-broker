@@ -11,7 +11,7 @@ project:
   email: "aws-proserve@amazon.com"
   license: "Apache-2.0"
 python:
-  versions: [3.9, 3.10, 3.11, 3.12, 3.13] # Supported Python versions
+  versions: ["3.9", "3.10", "3.11", "3.12", "3.13"] # Supported Python versions
   default_version: 3.13
 repository:
   org: awslabs

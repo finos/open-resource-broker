@@ -30,7 +30,7 @@ runs:
       shell: bash
       run: |
         DEFAULT_PYTHON_VERSION=$(yq '.python.default_version' .project.yml)
-        PYTHON_VERSIONS=$(yq -o json '.python.versions' .project.yml | tr -d '\n' | tr -d ' ')
+        PYTHON_VERSIONS=$(yq -o json '.python.versions' .project.yml | tr -d '\n')
         CONTAINER_REGISTRY=$(yq '.repository.registry // "ghcr.io"' .project.yml)
         REPO_ORG=$(yq '.repository.org' .project.yml)
         REPO_NAME=$(yq '.repository.name' .project.yml)
