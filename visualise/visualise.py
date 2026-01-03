@@ -50,33 +50,57 @@ class HistoryFileProcessor:
     def extract_provider_type(self, data: dict) -> str:
         """Determine AWS service type from file content"""
         provider_api = data.get("provider_api", "").upper()
+        
+        # Check explicit provider API first
+        explicit_type = self._get_explicit_provider_type(provider_api)
+        if explicit_type:
+            return explicit_type
+        
+        # Check for SpotFleet identifier
+        if data.get("SpotFleetRequestId"):
+            return "SpotFleet"
+        
+        # Infer from data structure
+        inferred_type = self._infer_provider_from_structure(data)
+        if inferred_type:
+            return inferred_type
+        
+        raise ValueError(f"Unable to determine provider type from data. Found provider_api: {provider_api}")
 
-        if provider_api in ["ASG", "AUTOSCALING"]:
-            return "ASG"
-        elif provider_api in ["EC2FLEET", "EC2_FLEET"]:
+    def _get_explicit_provider_type(self, provider_api: str) -> Optional[str]:
+        """Get provider type from explicit API name."""
+        provider_mapping = {
+            "ASG": "ASG",
+            "AUTOSCALING": "ASG",
+            "EC2FLEET": "EC2Fleet",
+            "EC2_FLEET": "EC2Fleet",
+            "SPOTFLEET": "SpotFleet",
+            "SPOT_FLEET": "SpotFleet"
+        }
+        return provider_mapping.get(provider_api)
+
+    def _infer_provider_from_structure(self, data: dict) -> Optional[str]:
+        """Infer provider type from data structure."""
+        if "history" in data and isinstance(data["history"], list):
+            return self._check_history_structure(data["history"])
+        elif "events" in data and isinstance(data["events"], list):
             return "EC2Fleet"
-        elif provider_api in ["SPOTFLEET", "SPOT_FLEET"]:
-            return "SpotFleet"
-        elif data.get("SpotFleetRequestId"):
-            return "SpotFleet"
-        else:
-            # Try to infer from structure
-            if "history" in data and isinstance(data["history"], list):
-                if data["history"] and "ActivityId" in data["history"][0]:
-                    return "ASG"
-            elif "events" in data and isinstance(data["events"], list):
-                return "EC2Fleet"  # Default for events structure
-            elif "HistoryRecords" in data and isinstance(data["HistoryRecords"], list):
-                # Spot/EC2 fleet describe history style
-                # Check for SpotFleetRequestId inside
-                for rec in data["HistoryRecords"]:
-                    if rec.get("SpotFleetRequestId"):
-                        return "SpotFleet"
-                return "EC2Fleet"
+        elif "HistoryRecords" in data and isinstance(data["HistoryRecords"], list):
+            return self._check_history_records(data["HistoryRecords"])
+        return None
 
-            raise ValueError(
-                f"Unable to determine provider type from data. Found provider_api: {provider_api}"
-            )
+    def _check_history_structure(self, history: list) -> Optional[str]:
+        """Check history structure for ASG indicators."""
+        if history and "ActivityId" in history[0]:
+            return "ASG"
+        return None
+
+    def _check_history_records(self, records: list) -> str:
+        """Check HistoryRecords for SpotFleet indicators."""
+        for rec in records:
+            if rec.get("SpotFleetRequestId"):
+                return "SpotFleet"
+        return "EC2Fleet"
 
     def validate_schema(self, data: dict) -> bool:
         """Validate input file structure"""
@@ -1129,18 +1153,23 @@ def _handle_cumulative_plot(args, logger, processed_datasets):
 
 
 def render_cumulative_plot(
-    datasets: list[tuple[str, pd.DataFrame]] = None, output_path: Path = None
+    datasets: Optional[list[tuple[str, pd.DataFrame]]] = None, output_path: Optional[Path] = None
 ) -> None:
     """Render cumulative vCPU lines for multiple datasets."""
     datasets = datasets or []
     if not datasets:
         return
 
+    dimensions = _calculate_cumulative_plot_dimensions(datasets)
+    img = _create_cumulative_plot_canvas(dimensions)
+    _draw_cumulative_dataset_lines(img, datasets, dimensions)
+    _save_cumulative_plot(img, output_path)
+
+def _calculate_cumulative_plot_dimensions(datasets: list[tuple[str, pd.DataFrame]]) -> dict:
+    """Calculate plot dimensions and data ranges."""
     width, height = 2600, 1560
     margin_left, margin_right, margin_top, margin_bottom = 110, 200, 70, 120
-    plot_w = width - margin_left - margin_right
-    plot_h = height - margin_top - margin_bottom
-
+    
     x_max = 0.0
     y_max = 0.0
     for _, df in datasets:
@@ -1148,92 +1177,123 @@ def render_cumulative_plot(
             continue
         x_max = max(x_max, float(df["time_from_request"].max() or 0))
         y_max = max(y_max, float(df["cumulative_vcpus"].max() or 0))
+    
     if x_max <= 0:
         x_max = 1.0
     if y_max <= 0:
         y_max = 1.0
+    
+    return {
+        'width': width, 'height': height,
+        'margin_left': margin_left, 'margin_right': margin_right,
+        'margin_top': margin_top, 'margin_bottom': margin_bottom,
+        'plot_w': width - margin_left - margin_right,
+        'plot_h': height - margin_top - margin_bottom,
+        'x_max': x_max, 'y_max': y_max
+    }
 
-    img = Image.new("RGB", (width, height), "white")
+def _create_cumulative_plot_canvas(dimensions: dict):
+    """Create plot canvas with axes and labels."""
+    from PIL import Image, ImageDraw, ImageFont
+    
+    img = Image.new("RGB", (dimensions['width'], dimensions['height']), "white")
     draw = ImageDraw.Draw(img)
     font = ImageFont.load_default()
+    
+    # Draw axes
+    x_axis_y = dimensions['height'] - dimensions['margin_bottom']
+    y_axis_x = dimensions['margin_left']
+    draw.line((y_axis_x, dimensions['margin_top'], y_axis_x, x_axis_y), fill="black", width=2)
+    draw.line((y_axis_x, x_axis_y, dimensions['width'] - dimensions['margin_right'], x_axis_y), fill="black", width=2)
+    
+    # Draw labels and ticks
+    _draw_cumulative_plot_labels_and_ticks(draw, font, dimensions)
+    
+    return img
 
-    # Axes
-    x_axis_y = height - margin_bottom
-    y_axis_x = margin_left
-    draw.line((y_axis_x, margin_top, y_axis_x, x_axis_y), fill="black", width=2)
-    draw.line((y_axis_x, x_axis_y, width - margin_right, x_axis_y), fill="black", width=2)
+def _draw_cumulative_plot_labels_and_ticks(draw, font, dimensions: dict) -> None:
+    """Draw axis labels and tick marks."""
+    x_axis_y = dimensions['height'] - dimensions['margin_bottom']
+    y_axis_x = dimensions['margin_left']
+    
+    # Axis titles
     draw.text(
-        (y_axis_x + plot_w / 2 - 140, height - margin_bottom + 50),
-        "Time from Request (seconds)",
-        fill="black",
-        font=font,
+        (y_axis_x + dimensions['plot_w'] / 2 - 140, dimensions['height'] - dimensions['margin_bottom'] + 50),
+        "Time from Request (seconds)", fill="black", font=font
     )
-    draw.text((20, margin_top + plot_h / 2 - 20), "Cumulative vCPUs", fill="black", font=font)
-
+    draw.text((20, dimensions['margin_top'] + dimensions['plot_h'] / 2 - 20), "Cumulative vCPUs", fill="black", font=font)
+    
     # Ticks
     ticks = 5
     for i in range(ticks + 1):
-        tx = y_axis_x + int(plot_w * i / ticks)
-        val = x_max * i / ticks
+        # X ticks
+        tx = y_axis_x + int(dimensions['plot_w'] * i / ticks)
+        val = dimensions['x_max'] * i / ticks
         draw.line((tx, x_axis_y, tx, x_axis_y + 6), fill="black")
         label = f"{val:.1f}"
         draw.text((tx - len(label) * 3, x_axis_y + 10), label, fill="black", font=font)
-
-        ty = x_axis_y - int(plot_h * i / ticks)
-        y_val = y_max * i / ticks
+        
+        # Y ticks
+        ty = x_axis_y - int(dimensions['plot_h'] * i / ticks)
+        y_val = dimensions['y_max'] * i / ticks
         draw.line((y_axis_x - 6, ty, y_axis_x, ty), fill="black")
         label_y = f"{y_val:.0f}"
         draw.text((y_axis_x - (len(label_y) * 6 + 12), ty - 4), label_y, fill="black", font=font)
 
-    palette_colors = [
-        "#2f7d32",
-        "#1f4e79",
-        "#7f6000",
-        "#9c27b0",
-        "#ff6f00",
-        "#00838f",
-        "#795548",
-        "#c62828",
-    ]
-
+def _draw_cumulative_dataset_lines(img, datasets: list[tuple[str, pd.DataFrame]], dimensions: dict) -> None:
+    """Draw lines for each dataset and create legend."""
+    from PIL import ImageDraw, ImageFont
+    
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.load_default()
+    
+    palette_colors = ["#2f7d32", "#1f4e79", "#7f6000", "#9c27b0", "#ff6f00", "#00838f", "#795548", "#c62828"]
     legend_entries = []
+    
+    y_axis_x = dimensions['margin_left']
+    x_axis_y = dimensions['height'] - dimensions['margin_bottom']
+    
     for idx, (name, df) in enumerate(datasets):
         if df.empty:
             continue
         color = palette_colors[idx % len(palette_colors)]
         pts = []
-        # for _, row in df.sort_values("time_from_request").iterrows():
         for _, row in df.iterrows():
-            sx = y_axis_x + int((row["time_from_request"] / x_max) * plot_w)
-            sy = x_axis_y - int((row["cumulative_vcpus"] / y_max) * plot_h)
+            sx = y_axis_x + int((row["time_from_request"] / dimensions['x_max']) * dimensions['plot_w'])
+            sy = x_axis_y - int((row["cumulative_vcpus"] / dimensions['y_max']) * dimensions['plot_h'])
             pts.append((sx, sy))
+        
         if len(pts) >= 2:
             draw.line(pts, fill=color, width=3)
         elif len(pts) == 1:
-            draw.ellipse(
-                (pts[0][0] - 3, pts[0][1] - 3, pts[0][0] + 3, pts[0][1] + 3),
-                fill=color,
-                outline="black",
-            )
+            draw.ellipse((pts[0][0] - 3, pts[0][1] - 3, pts[0][0] + 3, pts[0][1] + 3), fill=color, outline="black")
         legend_entries.append((name, color))
+    
+    _draw_cumulative_plot_legend(draw, font, legend_entries, dimensions)
 
-    # Legend
-    legend_x = width - margin_right + 20
-    legend_y = margin_top + 20
+def _draw_cumulative_plot_legend(draw, font, legend_entries: list, dimensions: dict) -> None:
+    """Draw the plot legend."""
+    legend_x = dimensions['width'] - dimensions['margin_right'] + 20
+    legend_y = dimensions['margin_top'] + 20
     draw.text((legend_x, legend_y - 20), "Tests", fill="black", font=font)
+    
     for idx, (label, color) in enumerate(legend_entries):
         ly = legend_y + idx * 20
         draw.line((legend_x + 5, ly + 5, legend_x + 25, ly + 5), fill=color, width=3)
         draw.text((legend_x + 30, ly - 2), label, fill="black", font=font)
+    
     if legend_entries:
         border_padding = 8
         legend_height = (len(legend_entries) + 1) * 20
         draw.rectangle(
             (legend_x - border_padding, legend_y - 30, legend_x + 200, legend_y + legend_height),
-            outline="black",
-            width=1,
+            outline="black", width=1
         )
 
+def _save_cumulative_plot(img, output_path: Optional[Path]) -> None:
+    """Save the cumulative plot to file."""
+    import tempfile
+    
     if output_path is None:
         output_path = Path("cumulative_report.png")
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
