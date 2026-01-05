@@ -18,23 +18,9 @@ on:
         default: '3.13'
 
 jobs:
-  get-config:
-    name: Get Configuration
-    runs-on: ubuntu-latest
-    outputs:
-      default-python-version: ${{ steps.config.outputs.default-python-version }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6.0.1
-
-      - name: Get project configuration
-        id: config
-        uses: ./.github/actions/get-config
-
   security-scan:
     name: ${{ inputs.scan-type }} Security Scan
     runs-on: ubuntu-latest
-    needs: get-config
     permissions:
       security-events: write
       actions: read
