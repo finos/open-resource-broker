@@ -188,7 +188,7 @@ jobs:
   container-manifest:
     name: Create Multi-Architecture Manifests
     runs-on: ubuntu-latest
-    needs: [config, container-build]
+    needs: [config, calculate-tags, container-build]
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'release')
 
     permissions:
@@ -209,8 +209,8 @@ jobs:
         IMAGE: ${{ needs.config.outputs.container-image }}
         VERSION: ${{ needs.config.outputs.package-version }}
         DEFAULT_PYTHON: ${{ needs.config.outputs.default-python-version }}
-        PRIMARY_TAGS: ${{ needs.config.outputs.primary-tags }}
-        PYTHON_TAGS: ${{ needs.config.outputs.python-tags }}
+        PRIMARY_TAGS: ${{ needs.calculate-tags.outputs.primary-tags }}
+        PYTHON_TAGS: ${{ needs.calculate-tags.outputs.python-tags }}
       run: |
         # Create primary tags (latest, X.Y.Z) -> point to default Python
         if [[ -n "$PRIMARY_TAGS" ]]; then
@@ -238,7 +238,7 @@ jobs:
   container-validation:
     name: Validate Container Tags
     runs-on: ubuntu-latest
-    needs: [config, container-manifest]
+    needs: [config, calculate-tags, container-manifest]
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.event_name == 'release')
 
     permissions:
@@ -256,8 +256,8 @@ jobs:
       env:
         REGISTRY: ${{ needs.config.outputs.container-registry }}
         IMAGE: ${{ needs.config.outputs.container-image }}
-        PRIMARY_TAGS: ${{ needs.config.outputs.primary-tags }}
-        PYTHON_TAGS: ${{ needs.config.outputs.python-tags }}
+        PRIMARY_TAGS: ${{ needs.calculate-tags.outputs.primary-tags }}
+        PYTHON_TAGS: ${{ needs.calculate-tags.outputs.python-tags }}
       run: |
         # Test primary tags can be pulled and work
         if [[ -n "$PRIMARY_TAGS" ]]; then
