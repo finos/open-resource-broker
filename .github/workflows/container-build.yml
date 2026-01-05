@@ -13,6 +13,8 @@ on:
       - 'deployment/docker/**'
       - 'dev-tools/scripts/container_build.sh'
       - '.github/workflows/container-build.yml'
+  release:
+    types: [published]
   pull_request:
     branches: [ main, develop ]
     paths:
@@ -22,10 +24,6 @@ on:
       - 'deployment/docker/**'
       - 'dev-tools/scripts/container_build.sh'
       - '.github/workflows/container-build.yml'
-  issue_comment:
-    types: [created]
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       push_images:

@@ -28,7 +28,6 @@ permissions:
   pull-requests: read
   id-token: write
   packages: write
-  actions: write
 
 jobs:
   release:
@@ -48,10 +47,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Get project configuration
-        id: config
-        uses: ./.github/actions/get-config
-
       - name: Install semantic-release
         run: |
           source .venv/bin/activate
@@ -60,8 +55,6 @@ jobs:
       - name: Run semantic release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REGISTRY: ${{ steps.config.outputs.container-registry }}
-          IMAGE_NAME: ${{ steps.config.outputs.container-image }}
           RELEASE_MODE: ${{ inputs.mode || 'forward' }}
           RELEASE_COMMIT: ${{ inputs.commit }}
           RELEASE_VERSION: ${{ inputs.version }}
@@ -77,7 +70,7 @@ jobs:
             RELEASE_MODE=historical RELEASE_COMMIT=${{ inputs.commit }} RELEASE_VERSION=${{ inputs.version }} semantic-release version
           elif [ "${{ inputs.mode }}" = "analysis" ]; then
             echo "Running release analysis"
-            RELEASE_MODE=analysis ./dev-tools/release/orchestrator.sh
+            RELEASE_MODE=analysis ./dev-tools/release/analyze_rc_readiness.sh
           else
             echo "Running forward release with semantic-release"
             semantic-release version
