@@ -48,6 +48,7 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     "dynaconf>=3.2.0",
     "structlog>=23.1.0",
+    "urllib3>=2.6.3",  # Security: Fix CVE vulnerabilities
     "opentelemetry-api>=1.20.0",
     "opentelemetry-sdk>=1.20.0",
     "psutil>=5.9.0",
