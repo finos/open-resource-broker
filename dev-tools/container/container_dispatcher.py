@@ -59,8 +59,10 @@ def handle_version():
 
 def handle_run():
     """Handle run command."""
+    # Static script path - no user input validation needed
+    script_path = "./dev-tools/scripts/container_build.sh"
     try:
-        subprocess.run(["./dev-tools/scripts/container_build.sh"], check=True)
+        subprocess.run([script_path], check=True)
         return 0
     except subprocess.CalledProcessError as e:
         return e.returncode
@@ -99,7 +101,13 @@ def handle_single():
 
 def handle_multi(push):
     """Handle multi-platform build."""
-    cmd = ["./dev-tools/scripts/container_build.sh"]
+    # Validate push parameter
+    if not isinstance(push, bool):
+        raise ValueError(f"Invalid push parameter: {push}")
+    
+    script_path = "./dev-tools/scripts/container_build.sh"
+    cmd = [script_path]
+    
     if push:
         os.environ["PUSH"] = "true"
 
