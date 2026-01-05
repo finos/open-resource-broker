@@ -6,7 +6,7 @@ Get up and running with the Open Resource Broker in minutes. This guide covers t
 
 Before starting, ensure you have:
 
-- Python 3.8 or higher installed
+- Python 3.10 or higher installed
 - AWS CLI configured or IAM role with appropriate permissions
 - Basic familiarity with command-line tools
 

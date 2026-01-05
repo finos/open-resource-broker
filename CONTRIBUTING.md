@@ -6,7 +6,7 @@ Thank you for your interest in contributing to the Open Resource Broker! This gu
 
 ### Prerequisites
 
-- Python 3.9+ (tested on 3.9, 3.10, 3.11, 3.12, 3.13)
+- Python 3.10+ (tested on 3.10, 3.11, 3.12, 3.13, 3.14)
 - Docker and Docker Compose
 - AWS CLI (for AWS provider testing)
 

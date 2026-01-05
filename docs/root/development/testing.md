@@ -355,7 +355,7 @@ def test_instance_type_validation(self, instance_type: str):
 
 2. **Test Matrix** (`.github/workflows/test-matrix.yml`):
    - Multi-OS testing (Ubuntu, Windows, macOS)
-   - Multi-Python version testing (3.9-3.12)
+   - Multi-Python version testing (3.10-3.14)
    - Comprehensive test coverage
 
 3. **Security Scan** (`.github/workflows/security.yml`):

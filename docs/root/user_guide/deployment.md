@@ -31,7 +31,7 @@ The plugin operates as:
 
 #### Server Requirements
 - **OS**: Linux (RHEL/CentOS 7+, Ubuntu 18.04+)
-- **Python**: 3.8 or higher
+- **Python**: 3.10 or higher
 - **Memory**: 2GB RAM minimum, 4GB recommended
 - **Storage**: 10GB available space
 - **Network**: Outbound HTTPS access to AWS APIs

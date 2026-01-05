@@ -5,7 +5,7 @@ This document describes how to configure the Open Resource Broker (ORB) as a pro
 ## Installation of the Open Resource Broker
 
 ### Prerequisites
-- Python 3.9+
+- Python 3.10+
 - Git
 - Virtual environment support
 

@@ -10,7 +10,7 @@ The Open Resource Broker is a command-line tool that integrates with IBM Spectru
 
 ### System Requirements
 
-- **Python**: 3.8 or higher
+- **Python**: 3.10 or higher
 - **Operating System**: Linux, macOS, or Windows
 - **Memory**: Minimum 512MB RAM
 - **Disk Space**: 100MB for application and dependencies
@@ -295,7 +295,7 @@ python --version
 python3 --version
 
 # Use specific Python version if needed
-python3.8 -m venv .venv
+python3.10 -m venv .venv
 ```
 
 #### Permission Issues

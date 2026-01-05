@@ -117,7 +117,7 @@ class CIChecker:
 
                         if version_tuple < (3, 9):
                             self.log(
-                                f"FAIL: Python version {python_version} is too old (need 3.9+)"
+                                f"FAIL: Python version {python_version} is too old (need 3.10+)"
                             )
                             self.failed_checks.append(f"Python version {python_version} too old")
                             return False

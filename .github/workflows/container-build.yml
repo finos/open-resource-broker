@@ -76,9 +76,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - python-version: "3.9"
-            scan-level: basic
-            push-to-registry: true
           - python-version: "3.10"
             scan-level: basic
             push-to-registry: true
@@ -90,6 +87,9 @@ jobs:
             push-to-registry: true
           - python-version: "3.13"
             scan-level: full
+            push-to-registry: true
+          - python-version: "3.14"
+            scan-level: basic
             push-to-registry: true
 
     permissions:

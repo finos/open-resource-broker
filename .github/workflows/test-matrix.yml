@@ -45,8 +45,8 @@ jobs:
       matrix:
         os: [ubuntu-latest]  # Disabled windows-latest, macos-latest for now
         # Dynamic matrix from config with static fallback for act/dry-run
-        # Update static list when adding new Python versions (currently 3.9-3.13)
-        python-version: ${{ fromJSON(needs.get-config.outputs.python-versions || '["3.9", "3.10", "3.11", "3.12", "3.13"]') }}
+        # Update static list when adding new Python versions (currently 3.10-3.14)
+        python-version: ${{ fromJSON(needs.get-config.outputs.python-versions || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
     uses: ./.github/workflows/reusable-test.yml
     with:
       test-type: unit
@@ -65,8 +65,8 @@ jobs:
       matrix:
         os: [ubuntu-latest]  # Disabled windows-latest, macos-latest for now
         # Dynamic matrix from config with static fallback for act/dry-run
-        # Update static list when adding new Python versions (currently 3.9-3.13)
-        python-version: ${{ fromJSON(needs.get-config.outputs.python-versions || '["3.9", "3.10", "3.11", "3.12", "3.13"]') }}
+        # Update static list when adding new Python versions (currently 3.10-3.14)
+        python-version: ${{ fromJSON(needs.get-config.outputs.python-versions || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
     uses: ./.github/workflows/reusable-test.yml
     with:
       test-type: integration
@@ -85,8 +85,8 @@ jobs:
       matrix:
         os: [ubuntu-latest]  # Disabled windows-latest, macos-latest for now
         # Dynamic matrix from config with static fallback for act/dry-run
-        # Update static list when adding new Python versions (currently 3.9-3.13)
-        python-version: ${{ fromJSON(needs.get-config.outputs.python-versions || '["3.9", "3.10", "3.11", "3.12", "3.13"]') }}
+        # Update static list when adding new Python versions (currently 3.10-3.14)
+        python-version: ${{ fromJSON(needs.get-config.outputs.python-versions || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
     uses: ./.github/workflows/reusable-test.yml
     with:
       test-type: e2e

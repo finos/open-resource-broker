@@ -6,7 +6,7 @@ This guide covers setting up a development environment, understanding the codeba
 
 ### Prerequisites
 
-- **Python 3.8+**: Required for the application
+- **Python 3.10+**: Required for the application
 - **Git**: For version control
 - **AWS CLI**: For AWS provider functionality (optional)
 - **Docker**: For containerized development (optional)
