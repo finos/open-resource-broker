@@ -104,25 +104,45 @@ jobs:
     - name: Build package wheel
       run: make build
 
-    - name: Build container image
+    - name: Build and scan container image
       env:
         REGISTRY: ${{ needs.config.outputs.container-registry }}
         IMAGE_NAME: ${{ needs.config.outputs.container-image }}
         VERSION: ${{ needs.config.outputs.package-version }}
         PYTHON_VERSION: ${{ matrix.python-version }}
       run: |
-        docker buildx build \
-          --platform linux/amd64 \
-          --build-arg "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
-          --build-arg "VERSION=$VERSION" \
-          --build-arg "VCS_REF=$(git rev-parse --short HEAD)" \
-          --build-arg "PYTHON_VERSION=$PYTHON_VERSION" \
-          --build-arg PACKAGE_NAME_SHORT=orb \
-          --cache-from type=gha \
-          --cache-to type=gha,mode=max \
-          --load \
-          -t "$REGISTRY/$IMAGE_NAME:$VERSION-python$PYTHON_VERSION" \
-          .
+        if [[ "${{ matrix.push-to-registry }}" == "true" && "${{ github.event_name }}" != "pull_request" ]]; then
+          # Build multi-platform image and push to registry
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --build-arg "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            --build-arg "VERSION=$VERSION" \
+            --build-arg "VCS_REF=$(git rev-parse --short HEAD)" \
+            --build-arg "PYTHON_VERSION=$PYTHON_VERSION" \
+            --build-arg PACKAGE_NAME_SHORT=orb \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            --push \
+            -t "$REGISTRY/$IMAGE_NAME:$VERSION-python$PYTHON_VERSION" \
+            .
+          
+          # Pull back amd64 version for local scanning
+          docker pull --platform linux/amd64 "$REGISTRY/$IMAGE_NAME:$VERSION-python$PYTHON_VERSION"
+        else
+          # Build single platform for scanning only (PR/test builds)
+          docker buildx build \
+            --platform linux/amd64 \
+            --build-arg "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            --build-arg "VERSION=$VERSION" \
+            --build-arg "VCS_REF=$(git rev-parse --short HEAD)" \
+            --build-arg "PYTHON_VERSION=$PYTHON_VERSION" \
+            --build-arg PACKAGE_NAME_SHORT=orb \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            --load \
+            -t "$REGISTRY/$IMAGE_NAME:$VERSION-python$PYTHON_VERSION" \
+            .
+        fi
 
     - name: Run Trivy security scan
       uses: aquasecurity/trivy-action@0.33.1
@@ -154,26 +174,7 @@ jobs:
       with:
         sarif_file: hadolint-dockerfile.sarif
 
-    - name: Push to registry
-      if: matrix.push-to-registry && github.event_name != 'pull_request'
-      env:
-        REGISTRY: ${{ needs.config.outputs.container-registry }}
-        IMAGE_NAME: ${{ needs.config.outputs.container-image }}
-        VERSION: ${{ needs.config.outputs.package-version }}
-        PYTHON_VERSION: ${{ matrix.python-version }}
-      run: |
-        docker buildx build \
-          --platform linux/amd64,linux/arm64 \
-          --build-arg "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
-          --build-arg "VERSION=$VERSION" \
-          --build-arg "VCS_REF=$(git rev-parse --short HEAD)" \
-          --build-arg "PYTHON_VERSION=$PYTHON_VERSION" \
-          --build-arg PACKAGE_NAME_SHORT=orb \
-          --cache-from type=gha \
-          --cache-to type=gha,mode=max \
-          --push \
-          -t "$REGISTRY/$IMAGE_NAME:$VERSION-python$PYTHON_VERSION" \
-          .
+
 
   container-manifest:
     name: Create Multi-Architecture Manifests
