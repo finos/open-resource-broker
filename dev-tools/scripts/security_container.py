@@ -4,10 +4,31 @@
 import logging
 import subprocess
 import sys
+from pathlib import Path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
+
+# Get project root
+project_root = Path(__file__).parent.parent.parent
+
+
+def _get_config_value(key: str) -> str:
+    """Get value from .project.yml using yq."""
+    try:
+        result = subprocess.run(
+            ["yq", key, ".project.yml"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        logger.error(f"Error reading config key '{key}': {e}")
+        logger.error("Make sure yq is installed and .project.yml exists")
+        sys.exit(1)
 
 
 def run_command(cmd: list[str]) -> int:
@@ -44,7 +65,7 @@ def main() -> int:
 
     # Build Docker image for security scan
     logger.info("Building Docker image for security scan...")
-    project_name = "open-resource-broker"  # Could be made configurable
+    project_name = _get_config_value(".project.name")
     if run_command(["docker", "build", "-t", f"{project_name}:security-scan", "."]) != 0:
         return 1
 

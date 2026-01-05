@@ -11,7 +11,7 @@ if [ "${PUBLISH_CONTAINERS:-true}" = "true" ]; then
     echo "=== PUBLISHING CONTAINERS ==="
     echo "Building and pushing containers..."
     make container-build
-    make container-push
+    make container-push-multi
     echo "Container publishing complete"
 else
     echo "Skipping container publishing (PUBLISH_CONTAINERS not set to true)"
