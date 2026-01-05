@@ -17,7 +17,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     # Security: Upgrade setuptools to latest version
-    pip install --no-cache-dir --upgrade pip==25.2 setuptools==80.9.0
+    pip install --no-cache-dir --upgrade pip==25.3 setuptools==80.9.0
 ARG BUILD_DATE
 ARG VERSION=dev
 ARG VCS_REF
@@ -53,7 +53,7 @@ WORKDIR /app
 RUN mkdir -p /app/logs /app/data /app/tmp
 
 # Install UV and create virtual environment in single layer
-RUN pip install --no-cache-dir uv==0.8.11 \
+RUN pip install --no-cache-dir uv==0.8.12 \
     && uv venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
