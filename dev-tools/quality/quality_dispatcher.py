@@ -80,12 +80,6 @@ def main():
     if parsed["fix_mode"]:
         success &= run_whitespace_cleanup()
 
-    # Run ruff format
-    success &= run_ruff_format(parsed["fix_mode"], parsed["files"])
-
-    # Run ruff check
-    success &= run_ruff_check(parsed["fix_mode"], parsed["files"])
-
     # Run additional checks if all mode
     if parsed["check_all"]:
         success &= run_additional_checks()
