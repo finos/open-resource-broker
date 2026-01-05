@@ -11,9 +11,9 @@ try:
         CreateMachineRequestHandler as CreateRequestHandler,
     )
     from application.dto.commands import (
+        BaseCommand,
         CreateRequestCommand,
         UpdateRequestStatusCommand,
-        BaseCommand,
     )
     from application.dto.queries import GetRequestStatusQuery
     from infrastructure.di.buses import CommandBus, QueryBus
