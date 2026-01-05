@@ -44,24 +44,24 @@ def detect_secrets(source_dir: str = "src") -> bool:
                 content = f.read()
 
             for line_num, line in enumerate(content.split("\n"), 1):
-                matches = secret_pattern.findall(line)
-                for _match in matches:
+                # Check if line contains potential secrets without storing the match content
+                if secret_pattern.search(line):
                     # Check if this is an exception
                     if not any(exc in line for exc in exceptions):
-                        found_secrets.append(f"{py_file}:{line_num}: {line.strip()}")
+                        # Store only file path and line number to avoid retaining secret content
+                        found_secrets.append((str(py_file), line_num))
 
         except Exception as e:
             logger.warning(f"Could not read {py_file}: {e}")
 
     if found_secrets:
-        logger.error("Potential hardcoded secrets found:")
-        for secret in found_secrets:
-            # Security: Don't log the actual secret content, only the location
-            location = secret.split(':')[0] if ':' in secret else 'unknown location'
-            logger.error(f"  Secret detected at: {location}")
+        logger.error("Potential hardcoded credentials found:")
+        for file_path, line_number in found_secrets:
+            # Security: Log only file and line number, never the actual credential content
+            logger.error(f"  Issue detected at: {file_path}:{line_number}")
         return False
     else:
-        logger.info("No hardcoded secrets detected")
+        logger.info("No hardcoded credentials detected")
         return True
 
 
