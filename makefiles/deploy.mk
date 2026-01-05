@@ -119,6 +119,9 @@ get-version:  ## Generate unified version (works for PyPI, Docker, Git)
 		echo "$(VERSION).dev$${dev_int}"; \
 	fi
 
+get-container-tags:  ## Calculate container tags for current context
+	@./dev-tools/container/calculate_tags.sh
+
 version-bump:  ## Show version bump help
 	@echo "Version Management Commands:"
 	@echo "  make version-show         - Show current version"

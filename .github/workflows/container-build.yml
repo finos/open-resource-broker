@@ -48,32 +48,16 @@ jobs:
     outputs:
       primary-tags: ${{ steps.tags.outputs.primary-tags }}
       python-tags: ${{ steps.tags.outputs.python-tags }}
-      precision-tags: ${{ steps.tags.outputs.precision-tags }}
     steps:
-    - name: Calculate all container tags
+    - name: Checkout code
+      uses: actions/checkout@v6.0.1
+
+    - name: Calculate container tags
       id: tags
+      env:
+        IS_RELEASE: ${{ needs.config.outputs.is-release }}
       run: |
-        VERSION="${{ needs.config.outputs.package-version }}"
-        
-        if [[ "${{ github.event_name }}" == "release" ]]; then
-          PRIMARY_TAGS="latest,$VERSION"
-          PYTHON_TAGS="python3.9,python3.10,python3.11,python3.12,python3.13"
-          PRECISION_TAGS="$VERSION-python3.9,$VERSION-python3.10,$VERSION-python3.11,$VERSION-python3.12,$VERSION-python3.13"
-        elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-          PRIMARY_TAGS="main,dev"
-          PYTHON_TAGS="python3.9,python3.10,python3.11,python3.12,python3.13"
-          PRECISION_TAGS=""
-        else
-          PRIMARY_TAGS=""
-          PYTHON_TAGS=""
-          PRECISION_TAGS=""
-        fi
-        
-        {
-          echo "primary-tags=$PRIMARY_TAGS"
-          echo "python-tags=$PYTHON_TAGS"
-          echo "precision-tags=$PRECISION_TAGS"
-        } >> "$GITHUB_OUTPUT"
+        make get-container-tags >> "$GITHUB_OUTPUT"
 
   container-build:
     name: Build Container Images
