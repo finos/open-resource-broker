@@ -10,7 +10,11 @@ try:
     from application.commands.request_handlers import (
         CreateMachineRequestHandler as CreateRequestHandler,
     )
-    from application.dto.commands import CreateRequestCommand, UpdateRequestStatusCommand, BaseCommand
+    from application.dto.commands import (
+        CreateRequestCommand,
+        UpdateRequestStatusCommand,
+        BaseCommand,
+    )
     from application.dto.queries import GetRequestStatusQuery
     from infrastructure.di.buses import CommandBus, QueryBus
 
@@ -501,6 +505,7 @@ class TestCommandHandlerImplementation:
 
         # Should raise exception for invalid command
         from domain.base.exceptions import EntityNotFoundError
+
         with pytest.raises(EntityNotFoundError):
             await handler.handle(invalid_command)
 

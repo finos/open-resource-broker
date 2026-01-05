@@ -89,10 +89,10 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
 
             template_query = GetTemplateQuery(template_id=command.template_id)
             template = await self._query_bus.execute(template_query)
-            
+
             if not template:
                 raise EntityNotFoundError("Template", command.template_id)
-                
+
             self.logger.debug("Template found: %s %s", type(template), template.to_dict())
 
             # Select provider based on template requirements
