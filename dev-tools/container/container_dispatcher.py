@@ -9,28 +9,28 @@ import sys
 
 def validate_python_version(version):
     """Validate Python version format (e.g., 3.10, 3.11, 3.12, 3.13, 3.14)."""
-    if not re.match(r'^3\.(1[0-4]|[0-9])$', version):
+    if not re.match(r"^3\.(1[0-4]|[0-9])$", version):
         raise ValueError(f"Invalid Python version: {version}")
     return version
 
 
 def validate_registry(registry):
     """Validate container registry format."""
-    if not re.match(r'^[a-zA-Z0-9.-]+(?:\:[0-9]+)?$', registry):
+    if not re.match(r"^[a-zA-Z0-9.-]+(?:\:[0-9]+)?$", registry):
         raise ValueError(f"Invalid registry: {registry}")
     return registry
 
 
 def validate_image_name(name):
     """Validate container image name."""
-    if not re.match(r'^[a-z0-9-]+$', name):
+    if not re.match(r"^[a-z0-9-]+$", name):
         raise ValueError(f"Invalid image name: {name}")
     return name
 
 
 def validate_version(version):
     """Validate semantic version format."""
-    if not re.match(r'^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9-]+)?$', version):
+    if not re.match(r"^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9-]+)?$", version):
         raise ValueError(f"Invalid version: {version}")
     return version
 
