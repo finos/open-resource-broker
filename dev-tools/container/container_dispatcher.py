@@ -104,10 +104,10 @@ def handle_multi(push):
     # Validate push parameter
     if not isinstance(push, bool):
         raise ValueError(f"Invalid push parameter: {push}")
-    
+
     script_path = "./dev-tools/scripts/container_build.sh"
     cmd = [script_path]
-    
+
     if push:
         os.environ["PUSH"] = "true"
 
