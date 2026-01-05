@@ -48,9 +48,10 @@ def create_json_strategy(config: Any) -> Any:
 
         container = get_container()
         metrics = container.get_optional(MetricsCollector)
-    except Exception:
-        # If metrics collector not available, proceed without instrumentation
-        pass
+    except (AttributeError, ImportError):
+        # Metrics collector not available, proceed without instrumentation
+        # This is expected when metrics are disabled or during testing
+        metrics = None
 
     return JSONStorageStrategy(
         file_path=file_path, create_dirs=True, entity_type="generic", metrics=metrics

@@ -292,8 +292,9 @@ class MetricsCollector:
         """Best-effort flush on collector destruction."""
         try:
             self.flush()
-        except Exception:
+        except (OSError, ValueError, RuntimeError):
             # Avoid raising during interpreter shutdown
+            # Common exceptions during cleanup: file I/O errors, invalid state
             pass
 
     def check_thresholds(self) -> list[dict[str, Any]]:

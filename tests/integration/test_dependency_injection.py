@@ -64,14 +64,14 @@ def test_dependency_injection_updates():
             assert True
         else:
             print("WARN:  Some dependency injection tests failed")
-            assert False, f"Only {passed}/{total} tests passed"
+            raise AssertionError(f"Only {passed}/{total} tests passed")
 
     except Exception as e:
         print(f"FAIL: Test execution failed: {e!s}")
         import traceback
 
         traceback.print_exc()
-        assert False, f"Test execution failed: {e!s}"
+        raise AssertionError(f"Test execution failed: {e!s}")
 
 
 def test_aws_launch_template_manager_registration():

@@ -244,7 +244,7 @@ class TestCommandBusImplementation:
         unregistered_command = CreateRequestCommand(template_id="test-template", requested_count=2)
 
         # Should raise appropriate exception for unregistered command
-        with pytest.raises(Exception):  # Specific exception type depends on implementation
+        with pytest.raises(KeyError):
             await command_bus.execute(unregistered_command)
 
     def test_command_bus_supports_middleware(self):
@@ -496,7 +496,7 @@ class TestCommandHandlerImplementation:
         mock_query_bus.execute.return_value = None
 
         # Should raise exception for invalid command
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             await handler.handle(invalid_command)
 
     @pytest.mark.asyncio

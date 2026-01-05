@@ -27,7 +27,9 @@ Note:
 """
 
 from typing import Any, Optional
+import logging
 
+from botocore.exceptions import ClientError
 from domain.base.dependency_injection import injectable
 from domain.base.ports import LoggingPort
 from domain.request.aggregate import Request
@@ -560,8 +562,9 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                                 asg_mapping[asg_name] = []
                             asg_mapping[asg_name].append(instance_id)
 
-                except Exception:
-                    # Skip failed chunks
+                except (ClientError, KeyError, ValueError) as e:
+                    # Skip failed chunks and log the issue for debugging
+                    logging.warning("Failed to process instance chunk: %s", e)
                     continue
 
             return asg_mapping

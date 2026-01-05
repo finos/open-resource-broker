@@ -29,7 +29,7 @@ def _strategy_with_clients(ec2_client, autoscaling_client):
 def test_augment_capacity_metadata_ec2_fleet_mixed_weights():
     """EC2 Fleet uses fulfilled capacity from API (already weight-adjusted)."""
     ec2_client = types.SimpleNamespace(
-        describe_fleets=lambda FleetIds: {
+        describe_fleets=lambda fleet_ids: {
             "Fleets": [
                 {
                     "TargetCapacitySpecification": {"TotalTargetCapacity": 10},
@@ -57,7 +57,7 @@ def test_augment_capacity_metadata_ec2_fleet_mixed_weights():
 def test_augment_capacity_metadata_spot_fleet_mixed_weights():
     """Spot Fleet fulfilled capacity comes from API (sum of weighted overrides)."""
     ec2_client = types.SimpleNamespace(
-        describe_spot_fleet_requests=lambda SpotFleetRequestIds: {
+        describe_spot_fleet_requests=lambda spot_fleet_request_ids: {
             "SpotFleetRequestConfigs": [
                 {
                     "SpotFleetRequestConfig": {
@@ -87,7 +87,7 @@ def test_augment_capacity_metadata_spot_fleet_mixed_weights():
 def test_augment_capacity_metadata_asg_mixed_weights():
     """ASG fulfilled capacity sums weighted instances; count reflects InService instances."""
     autoscaling_client = types.SimpleNamespace(
-        describe_auto_scaling_groups=lambda AutoScalingGroupNames: {
+        describe_auto_scaling_groups=lambda auto_scaling_group_names: {
             "AutoScalingGroups": [
                 {
                     "DesiredCapacity": 10,

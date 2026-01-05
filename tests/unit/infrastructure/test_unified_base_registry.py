@@ -7,6 +7,7 @@ import pytest
 from infrastructure.registry.base_registry import RegistryMode
 from infrastructure.registry.provider_registry import (
     ProviderRegistry,
+    UnsupportedProviderError,
     get_provider_registry,
 )
 from infrastructure.registry.scheduler_registry import (
@@ -15,6 +16,7 @@ from infrastructure.registry.scheduler_registry import (
 )
 from infrastructure.registry.storage_registry import (
     StorageRegistry,
+    UnsupportedStorageError,
     get_storage_registry,
 )
 
@@ -179,14 +181,14 @@ class TestIntegratedBaseRegistry:
         provider_registry = get_provider_registry()
 
         # Test storage registry errors
-        with pytest.raises(Exception):  # UnsupportedStorageError
+        with pytest.raises(UnsupportedStorageError):
             storage_registry.create_strategy("unknown", {})
 
         # Test provider registry errors
-        with pytest.raises(Exception):  # UnsupportedProviderError
+        with pytest.raises(UnsupportedProviderError):
             provider_registry.create_strategy("unknown", {})
 
-        with pytest.raises(Exception):  # UnsupportedProviderError
+        with pytest.raises(UnsupportedProviderError):
             provider_registry.create_strategy_from_instance("unknown-instance", {})
 
     def test_singleton_behavior(self):

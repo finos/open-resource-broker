@@ -140,9 +140,9 @@ class HostFactoryMock:
         """
         self.scheduler = scheduler
         # TARGET="IBM_SYMPHONY"
-        TARGET = "AWS_PLUGIN"
+        target = "AWS_PLUGIN"
 
-        if TARGET == "IBM_SYMPHONY":
+        if target == "IBM_SYMPHONY":
             os.environ["HF_PROVIDER_CONFDIR"] = (
                 "/opt/ibm/spectrumcomputing/hostfactory/conf/providers/awsinst"
             )
@@ -155,7 +155,7 @@ class HostFactoryMock:
             hf_scripts_location = Path(
                 "/opt/ibm/spectrumcomputing/hostfactory/1.2/providerplugins/aws/scripts/"
             )
-        elif TARGET == "AWS_PLUGIN":
+        elif target == "AWS_PLUGIN":
             # os.environ["AWS_PROVIDER_LOG_DIR"] = "./logs"
             os.environ["LOG_DESTINATION"] = "file"
 

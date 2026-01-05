@@ -289,8 +289,9 @@ class ConfigurationManager:
                 scheduler_path = os.path.join(scheduler_dir, filename)
                 if os.path.exists(scheduler_path):
                     return scheduler_path
-        except Exception:
-            pass
+        except (OSError, ValueError) as e:
+            # Log path resolution failure but continue with fallback
+            logger.debug("Failed to resolve scheduler path from %s: %s", scheduler_dir, e)
 
         # 3. Fall back to default directory + filename
         if default_dir is None:

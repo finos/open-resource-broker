@@ -319,12 +319,12 @@ class TestSQLRepositoryImplementation:
     def test_sql_repository_handles_connection_failures(self):
         """Test that SQL repository handles connection failures."""
         mock_sql_storage = Mock()
-        mock_sql_storage.get_connection.side_effect = Exception("Connection failed")
+        mock_sql_storage.get_connection.side_effect = ConnectionError("Connection failed")
 
         request_repo = RequestRepository(storage_port=mock_sql_storage)
 
         # Should handle connection failure gracefully
-        with pytest.raises(Exception):
+        with pytest.raises(ConnectionError):
             request = Request.create_new_request(
                 template_id="test-template", machine_count=2, requester_id="test-user"
             )

@@ -10,6 +10,7 @@ from domain.base.ports.spec_rendering_port import SpecRenderingPort
 from domain.request.aggregate import Request
 from domain.request.request_identifiers import RequestId
 from domain.request.request_types import RequestType
+from domain.template.exceptions import InvalidTemplateConfigurationError
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.domain.template.value_objects import ProviderApi
 from providers.aws.infrastructure.services.aws_native_spec_service import (
@@ -524,7 +525,7 @@ class TestNativeSpecAllProviders:
         )
 
         # Should handle template syntax errors gracefully
-        with pytest.raises(Exception):  # Specific exception type depends on implementation
+        with pytest.raises(InvalidTemplateConfigurationError):
             self.aws_native_spec_service.process_provider_api_spec(template_invalid, request)
 
     def test_context_variable_availability(self):

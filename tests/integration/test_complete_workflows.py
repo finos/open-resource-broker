@@ -182,13 +182,15 @@ class TestCompleteWorkflowIntegration:
         mock_template_service.get_template_by_id.return_value = mock_template
 
         # Mock command bus to simulate failure then success
+        from domain.request.exceptions import RequestProcessingError
+
         mock_command_bus.dispatch.side_effect = [
-            Exception("Temporary failure"),  # First call fails
+            RequestProcessingError("Temporary failure"),  # First call fails
             "req-12345678-1234-1234-1234-123456789012",  # Second call succeeds
         ]
 
         # First request fails
-        with pytest.raises(Exception):
+        with pytest.raises(RequestProcessingError):
             app_service.request_machines(template_id="test-template", machine_count=2)
 
         # Retry succeeds

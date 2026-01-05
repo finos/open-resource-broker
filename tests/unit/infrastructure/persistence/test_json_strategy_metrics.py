@@ -28,8 +28,8 @@ def test_save_with_metrics_error(tmp_path):
 
     strategy = JSONStorageStrategy(file_path=str(test_file), metrics=metrics)
 
-    with patch.object(strategy, "_save_data", side_effect=Exception("Test error")):
-        with pytest.raises(Exception):
+    with patch.object(strategy, "_save_data", side_effect=IOError("Test error")):
+        with pytest.raises(IOError):
             strategy.save("test-id", {"key": "value"})
 
     metrics.increment_counter.assert_called_with("storage.json.save_errors_total")
@@ -86,8 +86,8 @@ def test_find_by_id_with_metrics_error(tmp_path):
 
     strategy = JSONStorageStrategy(file_path=str(test_file), metrics=metrics)
 
-    with patch.object(strategy, "_load_data", side_effect=Exception("Test error")):
-        with pytest.raises(Exception):
+    with patch.object(strategy, "_load_data", side_effect=IOError("Test error")):
+        with pytest.raises(IOError):
             strategy.find_by_id("test-id")
 
     metrics.increment_counter.assert_called_with("storage.json.find_by_id_errors_total")
@@ -135,8 +135,8 @@ def test_delete_with_metrics_error(tmp_path):
 
     strategy = JSONStorageStrategy(file_path=str(test_file), metrics=metrics)
 
-    with patch.object(strategy, "_load_data", side_effect=Exception("Test error")):
-        with pytest.raises(Exception):
+    with patch.object(strategy, "_load_data", side_effect=IOError("Test error")):
+        with pytest.raises(IOError):
             strategy.delete("test-id")
 
     metrics.increment_counter.assert_called_with("storage.json.delete_errors_total")

@@ -323,7 +323,7 @@ class TestAdditionalEndToEnd:
         self.mock_aws_client.ec2_client.create_launch_template.side_effect = error
 
         # Execute and verify error handling
-        with pytest.raises(Exception):
+        with pytest.raises(ClientError):
             self.spot_fleet_handler.acquire_hosts(self.request, self.aws_template)
 
         # Verify error was logged

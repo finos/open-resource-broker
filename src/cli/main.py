@@ -604,7 +604,7 @@ async def execute_command(args, app) -> dict[str, Any]:
         )
 
         # Command handler mapping - all handlers are now async functions
-        COMMAND_HANDLERS = {
+        command_handlers = {
             # Templates - Complete CRUD operations
             ("templates", "list"): handle_list_templates,
             ("templates", "show"): handle_get_template,
@@ -658,10 +658,10 @@ async def execute_command(args, app) -> dict[str, Any]:
         }
 
         # All handlers are now async functions - no special handling needed
-        if handler_key not in COMMAND_HANDLERS:
+        if handler_key not in command_handlers:
             raise ValueError(f"Unknown command: {args.resource} {args.action}")
 
-        handler_func = COMMAND_HANDLERS[handler_key]
+        handler_func = command_handlers[handler_key]
 
         if handler_func is None:
             raise NotImplementedError(f"Command not yet implemented: {args.resource} {args.action}")

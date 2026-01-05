@@ -355,7 +355,7 @@ class JSONStorageStrategy(BaseStorageStrategy):
                     full_data = self.serializer.deserialize(content)
                 else:
                     full_data = {}
-            except:
+            except Exception:
                 full_data = {}
 
             # Ensure full_data is a dictionary

@@ -63,9 +63,10 @@ class JSONUnitOfWork(BaseUnitOfWork):
 
             container = get_container()
             metrics = container.get_optional(MetricsCollector)
-        except Exception:
-            # If metrics collector not available, proceed without instrumentation
-            pass
+        except (AttributeError, ImportError):
+            # Metrics collector not available, proceed without instrumentation
+            # This is expected when metrics are disabled or during testing
+            metrics = None
 
         # Create storage strategies for each repository
         machine_strategy = JSONStorageStrategy(

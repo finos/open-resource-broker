@@ -395,7 +395,7 @@ class BotocoreMetricsHandler:
             import json
 
             return len(json.dumps(params, default=str))
-        except:
+        except Exception:
             return 0
 
     def _estimate_response_size(self, response: dict) -> int:
@@ -406,7 +406,7 @@ class BotocoreMetricsHandler:
             import json
 
             return len(json.dumps(response, default=str))
-        except:
+        except Exception:
             return 0
 
     def _should_sample(self) -> bool:

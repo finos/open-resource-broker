@@ -335,8 +335,9 @@ def create_configured_provider_context(container: DIContainer) -> ProviderContex
         try:
             logger = container.get(LoggingPort)
             logger.error("Failed to create configured provider context, using fallback: %s", e)
-        except Exception:
-            # If we can't get logger, just create fallback without logging
+        except (AttributeError, KeyError):
+            # Logger not available in container, proceed with fallback silently
+            # This is expected during early initialization or testing
             pass
 
         # Create minimal provider context as fallback

@@ -344,7 +344,7 @@ class TestAWSLaunchTemplateManager:
         self.mock_aws_client.ec2_client.create_launch_template.side_effect = error
 
         # Execute and verify exception is raised
-        with pytest.raises(Exception):
+        with pytest.raises(ClientError):
             self.manager.create_or_update_launch_template(self.aws_template, self.request)
 
         # Verify error was logged

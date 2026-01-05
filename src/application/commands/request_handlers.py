@@ -533,11 +533,11 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                 )
                 self.logger.info(f"Provisioning results: {provisioning_result}")
 
-            except:
+            except Exception as e:
                 # Handle provisioning errors
                 # Log the error and raise a custom exception
                 self.logger.error("Provisioning failed for return request: %s", request.request_id)
-                raise ValueError("Provisioning failed for return request")
+                raise ValueError("Provisioning failed for return request") from e
 
             return str(request.request_id)
 

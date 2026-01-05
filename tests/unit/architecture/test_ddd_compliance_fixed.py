@@ -65,19 +65,19 @@ class TestDDDComplianceFixed:
         instance_id = InstanceId(value="i-1234567890abcdef0")
 
         # Should not be able to modify value objects
-        with pytest.raises(Exception):  # Pydantic ValidationError for frozen instances
+        with pytest.raises(AttributeError):  # Pydantic ValidationError for frozen instances
             instance_id.value = "i-new-value"
 
         # Test ResourceId immutability
         resource_id = ResourceId(value="r-1234567890abcdef0")
 
-        with pytest.raises(Exception):
+        with pytest.raises(AttributeError):
             resource_id.value = "r-new-value"
 
         # Test ResourceQuota immutability
         quota = ResourceQuota(resource_type="instances", limit=10, used=5, available=5)
 
-        with pytest.raises(Exception):
+        with pytest.raises(AttributeError):
             quota.limit = 20
 
     def test_entity_identity_rules(self):

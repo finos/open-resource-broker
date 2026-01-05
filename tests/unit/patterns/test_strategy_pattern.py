@@ -99,11 +99,11 @@ class TestStrategyPattern:
         # Test composite strategy behavior
         with patch(
             "src.providers.base.strategy.composite_strategy.CompositeProviderStrategy"
-        ) as MockComposite:
+        ) as mock_composite:
             mock_instance = Mock()
-            MockComposite.return_value = mock_instance
+            mock_composite.return_value = mock_instance
 
-            composite = MockComposite()
+            composite = mock_composite()
 
             # Mock child strategies
             mock_strategy1 = Mock(spec=ProviderStrategy)
@@ -171,11 +171,11 @@ class TestStrategyPattern:
         # Test fallback strategy behavior
         with patch(
             "src.providers.base.strategy.fallback_strategy.FallbackProviderStrategy"
-        ) as MockFallback:
+        ) as mock_fallback:
             mock_instance = Mock()
-            MockFallback.return_value = mock_instance
+            mock_fallback.return_value = mock_instance
 
-            fallback = MockFallback()
+            fallback = mock_fallback()
 
             # Mock primary and fallback strategies
             primary_strategy = Mock(spec=ProviderStrategy)
@@ -215,11 +215,11 @@ class TestStrategyPattern:
         # Test load balancing across multiple providers
         with patch(
             "src.providers.base.strategy.load_balancing_strategy.LoadBalancingProviderStrategy"
-        ) as MockLoadBalancer:
+        ) as mock_load_balancer:
             mock_instance = Mock()
-            MockLoadBalancer.return_value = mock_instance
+            mock_load_balancer.return_value = mock_instance
 
-            load_balancer = MockLoadBalancer()
+            load_balancer = mock_load_balancer()
 
             # Mock multiple provider strategies
             strategies = []
@@ -281,11 +281,11 @@ class TestStrategyPattern:
         # Test that strategies handle errors gracefully
         with patch(
             "src.providers.base.strategy.composite_strategy.CompositeProviderStrategy"
-        ) as MockComposite:
+        ) as mock_composite:
             mock_instance = Mock()
-            MockComposite.return_value = mock_instance
+            mock_composite.return_value = mock_instance
 
-            MockComposite()
+            mock_composite()
 
             # Mock a failing operation
             operation = ProviderOperation(operation_type="invalid_operation", parameters={})
@@ -314,11 +314,11 @@ class TestStrategyPattern:
         # Test that strategies can be monitored
         with patch(
             "src.providers.base.strategy.load_balancing_strategy.LoadBalancingProviderStrategy"
-        ) as MockLoadBalancer:
+        ) as mock_load_balancer:
             mock_instance = Mock()
-            MockLoadBalancer.return_value = mock_instance
+            mock_load_balancer.return_value = mock_instance
 
-            strategy = MockLoadBalancer()
+            strategy = mock_load_balancer()
 
             # Strategies should support metrics collection
             if hasattr(mock_instance, "get_metrics"):
@@ -339,11 +339,11 @@ class TestStrategyPattern:
         # Test that strategies manage state correctly
         with patch(
             "src.providers.base.strategy.load_balancing_strategy.LoadBalancingProviderStrategy"
-        ) as MockLoadBalancer:
+        ) as mock_load_balancer:
             mock_instance = Mock()
-            MockLoadBalancer.return_value = mock_instance
+            mock_load_balancer.return_value = mock_instance
 
-            strategy = MockLoadBalancer()
+            strategy = mock_load_balancer()
 
         # Strategies should be stateless or thread-safe
         operation = ProviderOperation(operation_type="create_instances", parameters={"count": 1})
@@ -426,11 +426,11 @@ class TestStrategyPattern:
         # Test chaining strategies
         with patch(
             "src.providers.base.strategy.composite_strategy.CompositeProviderStrategy"
-        ) as MockComposite:
+        ) as mock_composite:
             mock_instance = Mock()
-            MockComposite.return_value = mock_instance
+            mock_composite.return_value = mock_instance
 
-            composite = MockComposite()
+            composite = mock_composite()
 
             if hasattr(mock_instance, "chain_strategies"):
                 mock_instance.chain_strategies(strategies)

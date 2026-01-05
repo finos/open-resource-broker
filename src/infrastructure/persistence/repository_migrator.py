@@ -203,8 +203,8 @@ class RepositoryMigrator:
 
                 # Create engine and session
                 engine = create_engine(connection_string)
-                Session = sessionmaker(bind=engine)
-                session = Session()
+                session_factory = sessionmaker(bind=engine)
+                session = session_factory()
 
                 # Import domain entities
                 from domain.machine.aggregate import Machine

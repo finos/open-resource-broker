@@ -208,12 +208,12 @@ class TestCleanArchitecture:
         # Mock the ProviderCapabilityService since it requires many dependencies
         with patch(
             "application.services.provider_capability_service.ProviderCapabilityService"
-        ) as MockAppService:
+        ) as mock_app_service:
             mock_instance = Mock()
-            MockAppService.return_value = mock_instance
+            mock_app_service.return_value = mock_instance
 
             # Application service should depend on abstractions, not concretions
-            app_service = MockAppService()
+            app_service = mock_app_service()
             assert app_service is not None
 
         # Test DI container properly inverts dependencies
@@ -277,12 +277,12 @@ class TestCleanArchitecture:
         # Mock the ProviderCapabilityService since it requires many dependencies
         with patch(
             "application.services.provider_capability_service.ProviderCapabilityService"
-        ) as MockAppService:
+        ) as mock_app_service:
             mock_instance = Mock()
-            MockAppService.return_value = mock_instance
+            mock_app_service.return_value = mock_instance
 
             # Application service should orchestrate domain operations
-            MockAppService()
+            mock_app_service()
 
             # Mock expected methods for coordinating use cases
             mock_instance.validate_template_requirements = Mock(return_value=Mock(is_valid=True))
