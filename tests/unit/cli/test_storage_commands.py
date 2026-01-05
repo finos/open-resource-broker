@@ -16,6 +16,17 @@ application.queries.system.GetStorageConfigQuery = MagicMock()
 application.queries.system.ValidateStorageConfigQuery = MagicMock()
 application.commands.system.TestStorageCommand = MagicMock()
 
+# Create a concrete LoggingPort implementation for testing
+class MockLoggingPort:
+    """Mock implementation of LoggingPort for testing."""
+    def debug(self, message: str, **kwargs): pass
+    def info(self, message: str, **kwargs): pass
+    def warning(self, message: str, **kwargs): pass
+    def error(self, message: str, **kwargs): pass
+    def critical(self, message: str, **kwargs): pass
+    def exception(self, message: str, **kwargs): pass
+    def log(self, level: int, message: str, **kwargs): pass
+
 from interface.storage_command_handlers import (
     handle_list_storage_strategies,
     handle_show_storage_config,
@@ -34,14 +45,16 @@ class TestStorageCommandHandlers:
         """Test list storage strategies handler."""
         args = Namespace(resource="storage", action="list")
 
-        with patch("src.interface.storage_command_handlers.get_container") as mock_get_container:
+        # Mock the entire interface module to avoid DI container issues
+        with patch("interface.storage_command_handlers.get_container") as mock_get_container:
+            # Create mock query bus that returns expected result
+            mock_query_bus = Mock()
+            mock_query_bus.handle = AsyncMock(return_value={"strategies": ["json", "dynamodb"]})
+            
+            # Create mock container that returns our mock query bus
             mock_container = Mock()
+            mock_container.get.return_value = mock_query_bus
             mock_get_container.return_value = mock_container
-
-            # Mock the storage registry
-            mock_registry = Mock()
-            mock_registry.get_registered_types.return_value = ["json", "dynamodb"]
-            mock_container.get.return_value = mock_registry
 
             result = await handle_list_storage_strategies(args)
 

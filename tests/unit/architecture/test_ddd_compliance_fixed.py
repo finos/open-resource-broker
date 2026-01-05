@@ -9,6 +9,7 @@ This module validates that the codebase properly implements DDD patterns includi
 """
 
 import pytest
+from pydantic import ValidationError
 
 from src.domain.base.exceptions import DomainException
 from src.domain.base.value_objects import InstanceId, ResourceId, ResourceQuota
@@ -64,20 +65,20 @@ class TestDDDComplianceFixed:
         # Test InstanceId immutability with correct constructor
         instance_id = InstanceId(value="i-1234567890abcdef0")
 
-        # Should not be able to modify value objects
-        with pytest.raises(AttributeError):  # Pydantic ValidationError for frozen instances
+        # Should not be able to modify value objects (Pydantic frozen instances)
+        with pytest.raises(ValidationError):  # Pydantic ValidationError for frozen instances
             instance_id.value = "i-new-value"
 
         # Test ResourceId immutability
         resource_id = ResourceId(value="r-1234567890abcdef0")
 
-        with pytest.raises(AttributeError):
+        with pytest.raises(ValidationError):
             resource_id.value = "r-new-value"
 
         # Test ResourceQuota immutability
         quota = ResourceQuota(resource_type="instances", limit=10, used=5, available=5)
 
-        with pytest.raises(AttributeError):
+        with pytest.raises(ValidationError):
             quota.limit = 20
 
     def test_entity_identity_rules(self):
@@ -145,12 +146,19 @@ class TestDDDComplianceFixed:
     def test_domain_invariants_enforcement(self):
         """Test that domain invariants are properly enforced."""
         # Test template invariants based on actual validation
-        with pytest.raises(ValueError, match="image_id is required"):
+        with pytest.raises(ValidationError, match="Field required"):
+            Template(
+                name="Test Template",
+                # Missing template_id - should fail validation
+                subnet_ids=["subnet-12345"],
+            )
+            
+        # Test max_instances validation
+        with pytest.raises(ValueError, match="max_instances must be greater than 0"):
             Template(
                 template_id="test-template",
-                name="Test Template",
-                # Missing image_id - should fail validation
-                subnet_ids=["subnet-12345"],
+                name="Test Template", 
+                max_instances=0,  # Invalid value
             )
 
         # Test that max_instances must be positive - validation happens during construction

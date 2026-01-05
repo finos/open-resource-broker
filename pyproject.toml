@@ -286,9 +286,10 @@ namespace_packages = true
 [tool.semantic_release]
 version_variables = [".project.yml:project.version"]
 build_command = "./dev-tools/release/orchestrator.sh"
-major_on_zero = false
+major_on_zero = true
 allow_zero_version = true
 tag_format = "v{version}"
+commit_parser = "conventional"
 
 [tool.semantic_release.branches.main]
 match = "(main|master)"
@@ -306,6 +307,7 @@ changelog_file = "CHANGELOG.md"
 [tool.semantic_release.commit_parser_options]
 minor_tags = ["feat"]
 patch_tags = ["fix", "perf"]
+major_tags = ["release"]
 default_bump_level = 0
 
 [tool.semantic_release.remote]
