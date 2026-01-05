@@ -28,6 +28,8 @@ jobs:
   generate-cache-key:
     name: Generate Cache Key
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       cache-key: ${{ steps.cache-key.outputs.key }}
       cache-hit: ${{ steps.cache.outputs.cache-hit }}
