@@ -876,8 +876,9 @@ class TestCQRSIntegration:
     def test_cqrs_supports_saga_patterns(self):
         """Test that CQRS supports saga/process manager patterns."""
         from unittest.mock import Mock
-        from infrastructure.di.container import DIContainer
+
         from domain.base.ports import LoggingPort
+        from infrastructure.di.container import DIContainer
 
         # Create mocks for required dependencies
         mock_container = Mock(spec=DIContainer)
