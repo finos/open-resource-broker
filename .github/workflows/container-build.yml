@@ -66,12 +66,9 @@ jobs:
 
     strategy:
       matrix:
+        python-version: ${{ fromJSON(needs.config.outputs.python-versions || '["3.9", "3.10", "3.11", "3.12", "3.13"]') }}
         include:
-          - python-version: "3.9"
-            scan-level: basic
-            push-to-registry: true
-          - python-version: "3.13"
-            scan-level: full
+          - scan-level: full
             push-to-registry: true
 
     permissions:
