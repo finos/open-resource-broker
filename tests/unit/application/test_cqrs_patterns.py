@@ -1,6 +1,5 @@
 """Comprehensive tests for CQRS pattern implementation."""
 
-from datetime import datetime, timezone
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -664,34 +663,34 @@ class TestQueryHandlerImplementation:
         from application.queries.handlers import GetRequestHandler
         from application.dto.queries import GetRequestQuery
         from unittest.mock import Mock, MagicMock
-        
+
         # Mock dependencies
         mock_uow_factory = Mock()
         mock_logger = Mock()
         mock_error_handler = Mock()
         mock_container = Mock()
-        
+
         # Mock container to return cache service and event publisher
         mock_container.get.side_effect = lambda service_type: Mock()
-        
+
         handler = GetRequestHandler(
             uow_factory=mock_uow_factory,
             logger=mock_logger,
             error_handler=mock_error_handler,
-            container=mock_container
+            container=mock_container,
         )
 
         # Mock UoW and repository with proper context manager
         mock_uow = Mock()
         mock_request_repo = Mock()
         mock_uow.request_repository = mock_request_repo
-        
+
         # Mock the context manager properly
         mock_context_manager = MagicMock()
         mock_context_manager.__enter__.return_value = mock_uow
         mock_context_manager.__exit__.return_value = None
         mock_uow_factory.create.return_value = mock_context_manager
-        
+
         # Mock request entity
         mock_request = Mock()
         mock_request.id.value = "test-request"
@@ -709,36 +708,34 @@ class TestQueryHandlerImplementation:
         except Exception:
             # If it fails due to missing dependencies, that's expected in unit test
             # The important thing is the handler exists and has the handle method
-            assert hasattr(handler, 'handle'), "Handler should have handle method"
+            assert hasattr(handler, "handle"), "Handler should have handle method"
 
     def test_query_handlers_support_projections(self):
         """Test that query handlers support data projections with real GetRequestStatusQueryHandler."""
         from application.queries.handlers import GetRequestStatusQueryHandler
         from application.dto.queries import GetRequestStatusQuery
         from unittest.mock import Mock, MagicMock
-        
+
         # Mock dependencies (no container needed for this handler)
         mock_uow_factory = Mock()
         mock_logger = Mock()
         mock_error_handler = Mock()
-        
+
         handler = GetRequestStatusQueryHandler(
-            uow_factory=mock_uow_factory,
-            logger=mock_logger,
-            error_handler=mock_error_handler
+            uow_factory=mock_uow_factory, logger=mock_logger, error_handler=mock_error_handler
         )
 
         # Mock UoW and repository with proper context manager
         mock_uow = Mock()
         mock_request_repo = Mock()
         mock_uow.request_repository = mock_request_repo
-        
+
         # Mock the context manager properly
         mock_context_manager = MagicMock()
         mock_context_manager.__enter__.return_value = mock_uow
         mock_context_manager.__exit__.return_value = None
         mock_uow_factory.create_unit_of_work.return_value = mock_context_manager
-        
+
         # Mock request entity with domain events (full entity)
         mock_request = Mock()
         mock_request.id.value = "test-request"
@@ -747,17 +744,17 @@ class TestQueryHandlerImplementation:
         mock_request_repo.find_by_id.return_value = mock_request
 
         query = GetRequestStatusQuery(request_id="test-request")
-        
+
         try:
             # This handler is async, so we test the interface exists
-            assert hasattr(handler, 'handle'), "Handler should have handle method"
-            assert hasattr(handler, 'execute_query'), "Handler should have execute_query method"
+            assert hasattr(handler, "handle"), "Handler should have handle method"
+            assert hasattr(handler, "execute_query"), "Handler should have execute_query method"
             # The handler returns a string (status projection), not full entity
             # This tests the CQRS projection pattern
         except Exception:
             # If it fails due to missing dependencies, that's expected in unit test
             # The important thing is the handler exists and has the handle method
-            assert hasattr(handler, 'handle'), "Handler should have handle method"
+            assert hasattr(handler, "handle"), "Handler should have handle method"
 
 
 @pytest.mark.unit
@@ -769,72 +766,73 @@ class TestCQRSIntegration:
         from infrastructure.di.buses import CommandBus
         from application.dto.commands import CreateRequestCommand
         from unittest.mock import Mock
-        
+
         # Mock dependencies that CommandBus requires
         mock_container = Mock()
         mock_logger = Mock()
-        
+
         # Mock container to return handlers
         mock_container.get_handlers.return_value = {}
-        
+
         command_bus = CommandBus(container=mock_container, logger=mock_logger)
 
         # Test that CommandBus exists and has execute method
-        assert hasattr(command_bus, 'execute'), "CommandBus should have execute method"
-        
+        assert hasattr(command_bus, "execute"), "CommandBus should have execute method"
+
         # Create a real command with correct field names
         command = CreateRequestCommand(
             template_id="test-template",
             requested_count=2,  # Correct field name
-            tags={}
+            tags={},
         )
-        
+
         # Test that command has the expected structure
-        assert hasattr(command, 'template_id'), "Command should have template_id"
+        assert hasattr(command, "template_id"), "Command should have template_id"
         assert command.template_id == "test-template"
         assert command.requested_count == 2
-        
+
         # The command bus integration works if we can create it and it has the right interface
         # We don't need to actually execute since that would require full DI setup
+
     def test_cqrs_supports_read_models(self):
         """Test that CQRS supports read models using real ListActiveRequestsHandler."""
         from application.queries.handlers import ListActiveRequestsHandler
         from application.dto.queries import ListActiveRequestsQuery
         from unittest.mock import Mock, MagicMock
-        
+
         # Mock dependencies
         mock_uow_factory = Mock()
         mock_logger = Mock()
         mock_error_handler = Mock()
         mock_container = Mock()
-        
+
         # Mock container to return cache service
         mock_container.get.side_effect = lambda service_type: Mock()
-        
+
         handler = ListActiveRequestsHandler(
             uow_factory=mock_uow_factory,
             logger=mock_logger,
             error_handler=mock_error_handler,
-            container=mock_container
+            container=mock_container,
         )
 
         # Mock UoW and repository with proper context manager
         mock_uow = Mock()
         mock_request_repo = Mock()
         mock_uow.request_repository = mock_request_repo
-        
+
         # Mock the context manager properly
         mock_context_manager = MagicMock()
         mock_context_manager.__enter__.return_value = mock_uow
         mock_context_manager.__exit__.return_value = None
         mock_uow_factory.create.return_value = mock_context_manager
-        
+
         # Mock read model data (list of requests)
         mock_requests = [Mock(), Mock()]
         mock_request_repo.find_active_requests.return_value = mock_requests
 
         query = ListActiveRequestsQuery()
-        
+
         try:
             result = handler.handle(query)
             # Should return a list (read model), not individual entities
@@ -843,7 +841,8 @@ class TestCQRSIntegration:
         except Exception:
             # If it fails due to missing dependencies, that's expected in unit test
             # The important thing is the handler exists and supports read models
-            assert hasattr(handler, 'handle'), "Handler should have handle method"
+            assert hasattr(handler, "handle"), "Handler should have handle method"
+
     def test_cqrs_handles_eventual_consistency(self):
         """Test that CQRS handles eventual consistency using real command and query handlers."""
         from application.commands.request_handlers import CreateMachineRequestHandler
@@ -851,47 +850,43 @@ class TestCQRSIntegration:
         from application.dto.commands import CreateRequestCommand
         from application.dto.queries import GetRequestQuery
         from unittest.mock import Mock
-        
+
         # Mock dependencies for command handler
         mock_uow_factory = Mock()
         mock_logger = Mock()
         mock_error_handler = Mock()
         mock_container = Mock()
-        
+
         # Mock services that command handler needs
         mock_container.get.side_effect = lambda service_type: Mock()
-        
+
         command_handler = CreateMachineRequestHandler(
             uow_factory=mock_uow_factory,
             logger=mock_logger,
             error_handler=mock_error_handler,
-            container=mock_container
+            container=mock_container,
         )
-        
+
         query_handler = GetRequestHandler(
             uow_factory=mock_uow_factory,
             logger=mock_logger,
             error_handler=mock_error_handler,
-            container=mock_container
+            container=mock_container,
         )
 
         # Test that both handlers exist and have handle methods
-        assert hasattr(command_handler, 'handle'), "Command handler should have handle method"
-        assert hasattr(query_handler, 'handle'), "Query handler should have handle method"
-        
+        assert hasattr(command_handler, "handle"), "Command handler should have handle method"
+        assert hasattr(query_handler, "handle"), "Query handler should have handle method"
+
         # Create real command and query
-        command = CreateRequestCommand(
-            template_id="test-template",
-            max_number=2,
-            attributes={}
-        )
-        
+        command = CreateRequestCommand(template_id="test-template", max_number=2, attributes={})
+
         query = GetRequestQuery(request_id="test-request")
-        
+
         # Test that command and query have expected structure
-        assert hasattr(command, 'template_id'), "Command should have template_id"
-        assert hasattr(query, 'request_id'), "Query should have request_id"
-        
+        assert hasattr(command, "template_id"), "Command should have template_id"
+        assert hasattr(query, "request_id"), "Query should have request_id"
+
         # The eventual consistency is handled by the fact that commands and queries
         # operate on the same underlying data store through UoW pattern
         # We don't need to test actual execution, just that the pattern is in place
@@ -901,26 +896,26 @@ class TestCQRSIntegration:
         from application.dto.queries import ListActiveRequestsQuery, GetRequestQuery
         from infrastructure.di.buses import QueryBus
         from unittest.mock import Mock
-        
+
         # Mock dependencies for QueryBus
         mock_container = Mock()
         mock_logger = Mock()
         mock_container.get_handlers.return_value = {}
-        
+
         query_bus = QueryBus(container=mock_container, logger=mock_logger)
-        
+
         # Test that QueryBus exists and has execute method
-        assert hasattr(query_bus, 'execute'), "QueryBus should have execute method"
-        
+        assert hasattr(query_bus, "execute"), "QueryBus should have execute method"
+
         # Create real queries that represent read models
         list_query = ListActiveRequestsQuery()
         get_query = GetRequestQuery(request_id="test-request")
-        
+
         # Test that queries have expected structure for read models
-        assert hasattr(list_query, 'model_validate'), "Query should be a Pydantic model"
-        assert hasattr(get_query, 'request_id'), "Query should have request_id field"
+        assert hasattr(list_query, "model_validate"), "Query should be a Pydantic model"
+        assert hasattr(get_query, "request_id"), "Query should have request_id field"
         assert get_query.request_id == "test-request"
-        
+
         # The read model pattern works - queries are separate from commands
         # and can be optimized for reading without affecting write models
 
@@ -930,40 +925,38 @@ class TestCQRSIntegration:
         from application.dto.queries import GetRequestQuery, GetRequestStatusQuery
         from infrastructure.di.buses import CommandBus, QueryBus
         from unittest.mock import Mock
-        
+
         # Mock dependencies for buses
         mock_container = Mock()
         mock_logger = Mock()
         mock_container.get_handlers.return_value = {}
-        
+
         command_bus = CommandBus(container=mock_container, logger=mock_logger)
         query_bus = QueryBus(container=mock_container, logger=mock_logger)
-        
+
         # Test that both buses exist and have execute methods
-        assert hasattr(command_bus, 'execute'), "CommandBus should have execute method"
-        assert hasattr(query_bus, 'execute'), "QueryBus should have execute method"
-        
+        assert hasattr(command_bus, "execute"), "CommandBus should have execute method"
+        assert hasattr(query_bus, "execute"), "QueryBus should have execute method"
+
         # Create real commands and queries that demonstrate eventual consistency
         create_command = CreateRequestCommand(
-            template_id="test-template",
-            requested_count=2,
-            tags={}
+            template_id="test-template", requested_count=2, tags={}
         )
-        
+
         update_command = UpdateRequestStatusCommand(
             request_id="test-request",
-            status="in_progress"  # Use valid enum value
+            status="in_progress",  # Use valid enum value
         )
-        
+
         get_query = GetRequestQuery(request_id="test-request")
         status_query = GetRequestStatusQuery(request_id="test-request")
-        
+
         # Test that commands and queries have expected structure
-        assert hasattr(create_command, 'template_id'), "Command should have template_id"
-        assert hasattr(update_command, 'request_id'), "Command should have request_id"
-        assert hasattr(get_query, 'request_id'), "Query should have request_id"
-        assert hasattr(status_query, 'request_id'), "Query should have request_id"
-        
+        assert hasattr(create_command, "template_id"), "Command should have template_id"
+        assert hasattr(update_command, "request_id"), "Command should have request_id"
+        assert hasattr(get_query, "request_id"), "Query should have request_id"
+        assert hasattr(status_query, "request_id"), "Query should have request_id"
+
         # The eventual consistency pattern works:
         # 1. Commands modify write models
         # 2. Queries read from potentially separate read models
