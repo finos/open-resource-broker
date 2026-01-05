@@ -30,20 +30,20 @@ classifiers = [
     "Natural Language :: English",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
+
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: System :: Clustering",
     "Topic :: System :: Distributed Computing",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 
 dependencies = [
-    "boto3>=1.26.0",
-    "botocore>=1.29.0",
+    "boto3>=1.42.21",
+    "botocore>=1.42.21",
     "pydantic>=2.0.0",
     "sqlalchemy>=2.0.0",
     "dynaconf>=3.2.0",
@@ -88,9 +88,12 @@ ci = [
     "coverage>=7.3.2,<8.0.0",
 
     # AWS Testing
-    "moto[all]>=4.2.7,<6.0.0",
+    "moto[all]>=5.1.19,<6.0.0",
     "responses>=0.24.0,<1.0.0",
     "requests-mock>=1.11.0,<2.0.0",
+    # Security overrides for vulnerable dependencies
+    "joserfc>=1.6.1",
+    "werkzeug>=3.1.4",
 
     # Essential Type Stubs
     "types-PyYAML>=6.0.12.12,<7.0.0",
@@ -100,10 +103,12 @@ ci = [
     "tomli>=2.0.0,<3.0.0",  # For pyproject.toml parsing in dev scripts (Python < 3.11)
 
     # Security Scanning
-    "safety>=3.0.1,<4.0.0",
+    "safety>=3.7.0,<4.0.0",
     "pip-audit>=2.6.1,<3.0.0",
     "semgrep>=1.45.0,<2.0.0",
     "cyclonedx-bom>=4.0.0,<8.0.0",
+    # Security override for safety's vulnerable peewee dependency
+    "peewee>=3.18.3",
 
     # Documentation
     "mkdocs>=1.5.0,<2.0.0",
