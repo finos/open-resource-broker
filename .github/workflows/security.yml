@@ -36,7 +36,7 @@ jobs:
       default-python-version: ${{ steps.config.outputs.default-python-version }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v6.0.1
 
     - name: Get project configuration
       id: config
@@ -113,7 +113,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v6.0.1
 
       with:
         fetch-depth: 0
@@ -133,7 +133,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v6.0.1
 
 
     - name: Dependency Review
@@ -171,7 +171,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v6.0.1
 
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
@@ -186,7 +186,7 @@ jobs:
       run: make build
 
     - name: Build Docker image
-      uses: docker/build-push-action@v6
+      uses: docker/build-push-action@v6.18.0
       with:
         context: .
         file: ./Dockerfile
@@ -247,7 +247,7 @@ jobs:
         sarif_file: hadolint-dev-tools.sarif
 
     - name: Upload container security reports
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v6.0.0
       if: always()
       with:
         name: container-security-reports-py${{ matrix.python-version }}

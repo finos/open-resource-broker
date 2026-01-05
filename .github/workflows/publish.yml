@@ -36,7 +36,7 @@ jobs:
       is-release: ${{ steps.config.outputs.is-release }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v6.0.1
 
     - name: Get project configuration
       id: config
@@ -55,7 +55,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v6.0.1
       with:
         ref: ${{ github.sha }}
 
@@ -136,7 +136,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6
+      uses: actions/checkout@v6.0.1
 
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
@@ -149,7 +149,7 @@ jobs:
         make ci-build-sbom
 
     - name: Upload SBOM artifacts
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v6.0.0
       with:
         name: sbom-reports
         path: |
