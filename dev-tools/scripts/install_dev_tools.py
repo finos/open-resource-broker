@@ -354,7 +354,7 @@ class DevToolsInstaller:
         """Install syft using their install script."""
         return self._run_command(
             "curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin",
-            shell=True
+            shell=True,
         )
 
     def _install_uv_generic(self):

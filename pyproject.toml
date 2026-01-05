@@ -286,7 +286,7 @@ namespace_packages = true
 
 [tool.semantic_release]
 version_variables = [".project.yml:project.version"]
-build_command = "./dev-tools/release/orchestrator.sh"
+build_command = "make build"
 major_on_zero = true
 allow_zero_version = true
 tag_format = "v{version}"
