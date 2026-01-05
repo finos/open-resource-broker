@@ -375,6 +375,10 @@ class ProviderSelectionService:
         if api in effective_handlers:
             return True
 
+        # Check if the API is in provider capabilities
+        if provider.capabilities and api in provider.capabilities:
+            return True
+
         # For AWS providers, check against known APIs
         if provider.type == "aws":
             aws_apis = ["EC2Fleet", "SpotFleet", "RunInstances", "ASG"]

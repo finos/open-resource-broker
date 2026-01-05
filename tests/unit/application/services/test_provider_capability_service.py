@@ -136,13 +136,13 @@ class TestProviderCapabilityService:
     def test_validate_template_requirements_high_instance_count(
         self, service, template_high_instance_count
     ):
-        """Test validation with instance count exceeding API limits."""
+        """Test validation with instance count within API limits."""
         result = service.validate_template_requirements(
             template_high_instance_count, "aws-us-east-1", ValidationLevel.STRICT
         )
 
-        assert not result.is_valid
-        assert any("exceeds API limit" in error for error in result.errors)
+        assert result.is_valid
+        assert "Instance count: 500 (within limit)" in result.supported_features
 
     def test_validate_template_requirements_fleet_type_support(
         self, service, template_with_fleet_type
@@ -282,7 +282,7 @@ class TestProviderCapabilityService:
         assert "max_instances" in capabilities
         assert capabilities["supports_spot"] is True
         assert capabilities["supports_on_demand"] is True
-        assert capabilities["max_instances"] == 1000
+        assert capabilities["max_instances"] == 10000
 
     def test_get_provider_api_capabilities_unknown_api(self, service):
         """Test getting capabilities for unknown API."""

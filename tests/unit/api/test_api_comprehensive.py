@@ -208,7 +208,7 @@ class TestRequestStatusHandlerBehaviour:
         # Scheduler strategy formats the response dict
         scheduler = Mock()
         scheduler.format_request_response = AsyncMock(
-            return_value={"requests": [{"requestId": "req-1", "status": "complete"}]}
+            return_value={"requests": [{"requestId": "req-12345678-1234-1234-1234-123456789012", "status": "complete"}]}
         )
 
         handler = GetRequestStatusRESTHandler(
@@ -221,7 +221,7 @@ class TestRequestStatusHandlerBehaviour:
         )
 
         api_request = {
-            "input_data": {"requests": [{"requestId": "req-1"}]},
+            "input_data": {"requests": [{"requestId": "req-12345678-1234-1234-1234-123456789012"}]},
             "all_flag": False,
             "long": False,
         }
@@ -229,7 +229,7 @@ class TestRequestStatusHandlerBehaviour:
         result = await handler.handle(api_request)
 
         scheduler.format_request_response.assert_awaited_once()
-        assert result["requests"][0]["requestId"] == "req-1"
+        assert result["requests"][0]["requestId"] == "req-12345678-1234-1234-1234-123456789012"
         assert result["requests"][0]["status"] == "complete"
 
         # Ensure the correct query type was used
@@ -272,7 +272,7 @@ class TestRequestStatusHandlerBehaviour:
         command_bus = Mock()
         scheduler = Mock()
         scheduler.format_request_response = AsyncMock(
-            return_value={"requests": [{"requestId": "req-3", "status": "complete"}]}
+            return_value={"requests": [{"requestId": "req-87654321-4321-4321-4321-210987654321", "status": "complete"}]}
         )
 
         query_bus.execute = AsyncMock(return_value=RequestStatusResponse(requests=[]))
@@ -287,7 +287,7 @@ class TestRequestStatusHandlerBehaviour:
         )
 
         api_request = {
-            "input_data": {"requests": [{"requestId": "req-3"}]},
+            "input_data": {"requests": [{"requestId": "req-87654321-4321-4321-4321-210987654321"}]},
             "all_flag": False,
             "long": True,
         }

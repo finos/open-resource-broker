@@ -60,7 +60,7 @@ class TestAPIHandlerInitialization:
         assert handler._command_bus == self.command_bus
         assert handler.logger == self.logger
         assert handler.error_handler == self.error_handler
-        assert handler._metrics == self.metrics
+        assert handler._metrics_collector == self.metrics
 
     def test_get_request_status_handler_initialization(self):
         """Test that GetRequestStatusRESTHandler can be initialized with all dependencies."""

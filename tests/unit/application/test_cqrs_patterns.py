@@ -10,7 +10,7 @@ try:
     from application.commands.request_handlers import (
         CreateMachineRequestHandler as CreateRequestHandler,
     )
-    from application.dto.commands import CreateRequestCommand, UpdateRequestStatusCommand
+    from application.dto.commands import CreateRequestCommand, UpdateRequestStatusCommand, BaseCommand
     from application.dto.queries import GetRequestStatusQuery
     from infrastructure.di.buses import CommandBus, QueryBus
 
@@ -241,7 +241,11 @@ class TestCommandBusImplementation:
         mock_logger = Mock()
         command_bus = CommandBus(container=mock_container, logger=mock_logger)
 
-        unregistered_command = CreateRequestCommand(template_id="test-template", requested_count=2)
+        # Create a command class that doesn't have a registered handler
+        class UnregisteredCommand(BaseCommand):
+            test_field: str = "test"
+
+        unregistered_command = UnregisteredCommand()
 
         # Should raise appropriate exception for unregistered command
         with pytest.raises(KeyError):
@@ -496,7 +500,8 @@ class TestCommandHandlerImplementation:
         mock_query_bus.execute.return_value = None
 
         # Should raise exception for invalid command
-        with pytest.raises(ValueError):
+        from domain.base.exceptions import EntityNotFoundError
+        with pytest.raises(EntityNotFoundError):
             await handler.handle(invalid_command)
 
     @pytest.mark.asyncio
@@ -598,8 +603,8 @@ class TestCommandHandlerImplementation:
         )
 
         # Should have event publisher
-        assert hasattr(handler, "_event_publisher")
-        assert handler._event_publisher == mock_event_publisher
+        assert hasattr(handler, "event_publisher")
+        assert handler.event_publisher is mock_event_publisher
 
 
 @pytest.mark.unit

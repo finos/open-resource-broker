@@ -117,6 +117,11 @@ class ProviderInstanceConfig(BaseModel):
         None, description="Instance-specific extension overrides"
     )
 
+    # Provider capabilities
+    capabilities: Optional[list[str]] = Field(
+        None, description="List of APIs/capabilities this provider supports"
+    )
+
     health_check: HealthCheckConfig = Field(
         default_factory=HealthCheckConfig, description="Health check configuration"
     )
