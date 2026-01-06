@@ -13,13 +13,23 @@ on:
       - 'CHANGELOG.md'
   workflow_dispatch:
 
-env:
-  PYTHON_VERSION: '3.11'
-
 jobs:
+  get-config:
+    name: Get Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      default-python-version: ${{ steps.config.outputs.default-python-version }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6.0.1
+    - name: Get project configuration
+      id: config
+      uses: ./.github/actions/get-config
+
   validate-changelog:
     name: Validate Changelog
     runs-on: ubuntu-latest
+    needs: get-config
     permissions:
       contents: read
     
@@ -32,7 +42,7 @@ jobs:
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
       with:
-        cache-key: changelog-${{ env.PYTHON_VERSION }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+        cache-key: changelog-${{ needs.get-config.outputs.default-python-version }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
         fail-on-cache-miss: false
     
     - name: Install changelog dependencies

@@ -8,8 +8,7 @@ on:
     # Allow manual triggering
   push:
     branches: [main]
-    tags: ['v*']
-    # Only run on main branch and releases for comprehensive testing
+    # Only run on main branch for comprehensive testing
 
 env:
   AWS_DEFAULT_REGION: us-east-1
