@@ -164,7 +164,6 @@ jobs:
 
     - name: Run mypy type check
       run: make ci-quality-mypy
-      continue-on-error: true
 
   arch-validation:
     name: Architecture Validation
@@ -187,4 +186,3 @@ jobs:
 
     - name: Run architecture validation
       run: make ci-arch-${{ matrix.check }}
-      continue-on-error: true
