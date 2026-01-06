@@ -8,6 +8,14 @@ on:
     # Allow manual triggering
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'uv.lock'
+      - 'Makefile'
+      - 'makefiles/**'
     # Only run on main branch for comprehensive testing
 
 env:

@@ -15,6 +15,12 @@ env:
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'uv.lock'
+      - 'README.md'
   workflow_run:
     workflows: ["CI Quality", "CI Tests"]
     types: [completed]
