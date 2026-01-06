@@ -29,11 +29,11 @@ permissions:
   pull-requests: read
 
 env:
-  AWS_DEFAULT_REGION: us-east-1
-  AWS_ACCESS_KEY_ID: testing
-  AWS_SECRET_ACCESS_KEY: testing
-  ENVIRONMENT: testing
-  TESTING: true
+  AWS_DEFAULT_REGION: ${{ needs.config.outputs.aws-region }}
+  AWS_ACCESS_KEY_ID: ${{ needs.config.outputs.aws-access-key }}
+  AWS_SECRET_ACCESS_KEY: ${{ needs.config.outputs.aws-secret-key }}
+  ENVIRONMENT: ${{ needs.config.outputs.environment }}
+  TESTING: ${{ needs.config.outputs.testing-flag }}
 
 jobs:
   config:
