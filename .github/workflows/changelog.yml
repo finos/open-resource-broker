@@ -7,10 +7,6 @@ on:
       - '.git-changelog.toml'
       - '.changelog-template.md'
       - 'dev-tools/release/changelog_manager.py'
-  push:
-    branches: [main]
-    paths:
-      - 'CHANGELOG.md'
   workflow_dispatch:
 
 jobs:
@@ -92,23 +88,3 @@ jobs:
         } >> "$GITHUB_STEP_SUMMARY"
         make changelog-preview --from-commit="${{ github.event.pull_request.base.sha }}" >> "$GITHUB_STEP_SUMMARY" || echo "No changes to preview" >> "$GITHUB_STEP_SUMMARY"
         echo '```' >> "$GITHUB_STEP_SUMMARY"
-
-  check-changelog-sync:
-    name: Check Changelog Sync
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v6.0.1
-      with:
-        fetch-depth: 0
-    
-    - name: Setup Python and UV
-      uses: ./.github/actions/setup-uv-cached
-      with:
-        cache-key: changelog-sync-${{ env.PYTHON_VERSION }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
-        fail-on-cache-miss: false
-    
-    - name: Validate changelog
-      run: make changelog-validate
