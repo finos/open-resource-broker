@@ -51,52 +51,45 @@ make test-unit
 make test-integration
 ```
 
-### PR Comment Commands
+### CI/CD Pipeline
 
-You can trigger CI/CD actions by commenting on pull requests:
+The project uses a multi-stage CI/CD pipeline:
 
-**Security Note**: Comment triggers are restricted to repository members, owners, and collaborators.
+```
+Push → Quality Gates → Development Artifacts → Release Decision → Production Artifacts
+```
 
-#### Trigger Word Configuration
+**Development Workflow:**
+1. Push to main → Quality gates run (tests, linting, security)
+2. If quality passes → Development artifacts build (TestPyPI, dev containers)
+3. Commit with "release:" prefix → Semantic-release creates GitHub release
+4. Release event → Production artifacts build (PyPI, production containers)
 
-The trigger words are configurable via environment variables in each workflow:
+**To create a release:**
+```bash
+# Make changes with conventional commits
+git commit -m "feat: add new feature"
+git commit -m "fix: resolve bug"
 
-- **CI Pipeline**: `CI_TRIGGERS="/test,/build,/ci"`
-- **Publishing**: `PUBLISH_TRIGGERS="/package"`
-- **Security Scans**: `SECURITY_TRIGGERS="/security"`
-- **Container Builds**: `CONTAINER_TRIGGERS="/container"`
+# When ready to release
+git commit -m "release: version with new features and fixes"
+git push origin main
+```
 
-To modify trigger words, update the `env` section in the respective workflow files.
+**Version calculation:**
+- `fix:` → patch version (1.0.1)
+- `feat:` → minor version (1.1.0)  
+- `BREAKING CHANGE:` → major version (2.0.0)
 
-#### Testing Commands (Members, Owners, Collaborators)
-- **`/test`** - Run full CI pipeline (tests, linting, type checking)
-- **`/build`** - Run CI pipeline including package build verification
-- **`/ci`** - Same as `/test` - run complete CI pipeline
-- **`/security`** - Run security scans
-- **`/container`** - Build container images (no registry push for security)
+### Artifact Locations
 
-#### Publishing Commands (Members, Owners only)
-- **`/package`** - Build and publish to TestPyPI only (never production PyPI)
-  - Creates a dev version: `0.1.0.dev20250818125457+abc1234`
-  - Publishes to https://test.pypi.org for installation testing
-  - Use: `pip install --index-url https://test.pypi.org/simple/ open-resource-broker`
+**Development Artifacts:**
+- TestPyPI: `test.pypi.org/project/open-resource-broker`
+- Containers: `ghcr.io/awslabs/open-resource-broker:main`
 
-**Security Note**: Comment triggers can never publish to production PyPI. Only GitHub releases publish to PyPI.
-
-Commands must be exact matches (e.g., `/test` not `/test please`).
-
-### Version Alignment
-
-Package and container versions are aligned:
-
-- **Development**: `0.1.0.dev20250818125457+abc1234` (both PyPI package and container)
-- **Release**: `0.1.0` (both PyPI package and container)
-
-### Container Security
-
-- **Comment triggers** (`/container`) - Build only, no registry push
-- **Branch pushes** - Build and push with dev tags
-- **Releases** - Build and push with release tags (`latest`, `v0.1.0`)
+**Production Artifacts:**
+- PyPI: `pypi.org/project/open-resource-broker`
+- Containers: `ghcr.io/awslabs/open-resource-broker:latest`
 
 ### Automated Publishing
 

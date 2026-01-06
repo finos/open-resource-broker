@@ -406,28 +406,20 @@ make test-performance
 The project uses semantic-release for automated version management:
 
 ```bash
-# Create a new release (automatic version calculation)
-make release
-
-# Test release process (dry run)
-make release-dry-run
-
-# Create historical release
-make release-historical COMMIT=abc123 VERSION=0.0.5
-
-# Analyze RC readiness
-make release-analysis
+# Create a new release
+git commit -m "release: add new features and bug fixes"
+git push origin main
 ```
 
 **Release Process:**
 - Uses conventional commits for version calculation
 - `feat:` → minor version bump
-- `fix:` → patch version bump
+- `fix:` → patch version bump  
 - `BREAKING CHANGE:` → major version bump
+- Commit with "release:" prefix triggers semantic-release
+- Automatically publishes to PyPI, builds containers, and deploys documentation
 
-Releases automatically trigger PyPI publishing, container builds, and documentation deployment.
-
-See [Release Management Guide](docs/docs/developer_guide/releases.md) for complete documentation.
+See [Release Management Guide](docs/root/developer_guide/releases.md) for complete documentation.
 
 ## Documentation
 

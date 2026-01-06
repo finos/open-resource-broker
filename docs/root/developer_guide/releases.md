@@ -1,52 +1,111 @@
 # Release Management Guide
 
-This guide covers the complete release management system for the Open Resource Broker.
+This guide covers the release management system for the Open Resource Broker.
 
 ## Release Process Overview
 
-### Automated Release Flow
+The project uses semantic-release for automated version management with a quality-gated CI/CD pipeline.
 
-The system creates releases automatically based on a scheduled progression:
+### CI/CD Pipeline Flow
 
 ```
-Developer workflow → Scheduled releases → Manual stable release
+Push to main → Quality Gates → Development Artifacts → Release Decision → Production Artifacts
+     ↓              ↓                    ↓                    ↓                ↓
+  CI Quality    Dev Containers      Semantic Release    Prod Containers    GitHub Release
+  CI Tests      Dev PyPI Publish    (if "release:")     Prod PyPI Publish  Release Assets
+  Security      Dev Docs Deploy                         Prod Docs Deploy   SBOM Upload
 ```
 
-### What Happens During Development
+## Development Workflow
 
-**Pull Request Creation**:
-- Automated tests execute
-- No releases are created
+### Daily Development
+Every push to `main` triggers:
+1. **Quality Gates** - Tests, linting, security scans must pass
+2. **Development Artifacts** - If quality passes:
+   - TestPyPI publishing (versions like `0.2.3.devXXXXX`)
+   - Development containers (`main`, `dev` tags)
+   - Development documentation deployment
 
-**Merge to Main Branch**:
-- Code is integrated
-- No immediate release occurs
-- Changes await scheduled release cycles
+### Creating a Release
 
-### Scheduled Release Automation
+When ready to release:
 
-**Daily Alpha Releases (5 AM UTC)**:
-- System checks for commits since last alpha release
-- If changes exist: creates alpha version (e.g., `1.0.1-alpha.1`)
-- Publishes to TestPyPI for testing
-- If no changes: no action taken
+```bash
+# Make changes with conventional commits
+git commit -m "feat: add new feature"
+git commit -m "fix: resolve critical bug"
 
-**Weekly Beta Releases (Monday 6 AM UTC)**:
-- System checks for alpha releases to promote
-- If new alphas exist: creates beta version (e.g., `1.0.1-beta.1`)
-- Publishes to TestPyPI for broader testing
-- If no new alphas: no action taken
+# Create release commit (triggers semantic-release)
+git commit -m "release: version 1.2.0 with new features and bug fixes"
+git push origin main
+```
 
-**Bi-weekly RC Releases (Wednesday 11 AM UTC)**:
-- System checks for beta releases to promote
-- If new betas exist: creates release candidate (e.g., `1.0.1-rc.1`)
-- Publishes to TestPyPI for final testing
-- If no new betas: no action taken
+**What happens:**
+1. Quality gates run first
+2. Development artifacts build
+3. Semantic-release calculates version based on commits:
+   - `fix:` → patch version (1.0.1)
+   - `feat:` → minor version (1.1.0)
+   - `BREAKING CHANGE:` → major version (2.0.0)
+4. GitHub release is created
+5. Production pipeline builds all production artifacts
 
-**Manual Stable Releases**:
-- Developer executes: `make release`
-- Creates stable version (e.g., `1.0.1`)
-- Publishes to production PyPI
+## Artifact Locations
+
+### Development Artifacts (Every Push)
+- **PyPI**: `test.pypi.org/project/open-resource-broker`
+- **Containers**: `ghcr.io/awslabs/open-resource-broker:main`
+- **Documentation**: GitHub Pages (development)
+
+### Production Artifacts (On Release)
+- **PyPI**: `pypi.org/project/open-resource-broker`
+- **Containers**: `ghcr.io/awslabs/open-resource-broker:latest`
+- **Documentation**: GitHub Pages (production)
+- **Assets**: GitHub Releases (wheel, source, SBOM)
+
+## Container Tags
+
+### Development Tags
+- `main` - Latest main branch build
+- `dev` - Alias for main
+- `0.2.3.devXXXXX-python3.12` - Specific dev version
+
+### Production Tags  
+- `latest` - Latest production release
+- `1.0.0` - Specific version
+- `python3.12` - Latest release with specific Python version
+
+## Manual Release (Emergency)
+
+For emergency releases or specific versions:
+
+```bash
+# Trigger production pipeline directly
+gh workflow run prod-release.yml -f version=1.0.1
+```
+
+## Troubleshooting
+
+### Release Not Created
+Ensure commit message contains "release:" prefix:
+```bash
+# ✅ Correct
+git commit -m "release: add new feature"
+
+# ❌ Incorrect  
+git commit -m "feat: add new feature"
+```
+
+### Quality Gates Failing
+Development and production artifacts only build after quality gates pass. Check:
+- Test failures in CI Tests workflow
+- Linting errors in CI Quality workflow  
+- Security issues in Security Code Scanning workflow
+
+### Production Pipeline Not Triggered
+1. Verify semantic-release created a GitHub release
+2. Check the release is published (not draft)
+3. Monitor Production Release Pipeline workflow
 
 ## Manual Release Commands
 
