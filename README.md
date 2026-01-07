@@ -1,5 +1,12 @@
 # Open Resource Broker
 
+[![Test Matrix](https://github.com/awslabs/open-resource-broker/workflows/Test%20Matrix/badge.svg)](https://github.com/awslabs/open-resource-broker/actions/workflows/test-matrix.yml)
+[![Quality Checks](https://github.com/awslabs/open-resource-broker/workflows/Quality%20Checks/badge.svg)](https://github.com/awslabs/open-resource-broker/actions/workflows/ci-quality.yml)
+[![Security Scanning](https://github.com/awslabs/open-resource-broker/workflows/Security%20Scanning/badge.svg)](https://github.com/awslabs/open-resource-broker/actions/workflows/security-code.yml)
+[![Latest Release](https://img.shields.io/github/v/release/awslabs/open-resource-broker)](https://github.com/awslabs/open-resource-broker/releases)
+[![PyPI Version](https://img.shields.io/pypi/v/open-resource-broker)](https://pypi.org/project/open-resource-broker/)
+[![License](https://img.shields.io/github/license/awslabs/open-resource-broker)](LICENSE)
+
 A cloud provider integration plugin for IBM Spectrum Symphony Host Factory, enabling dynamic provisioning of compute resources with a REST API interface and structured architecture implementation.
 
 ## Overview
@@ -401,33 +408,37 @@ make test-integration
 make test-performance
 ```
 
+### Project Health & Metrics
+
+[![Python Versions](https://img.shields.io/pypi/pyversions/open-resource-broker)](https://pypi.org/project/open-resource-broker/)
+[![Success Rate](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/ec3393a523fa3a6b6ff89a0636de3085/raw/success-rate.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/health-monitoring.yml)
+[![Avg Duration](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/ec3393a523fa3a6b6ff89a0636de3085/raw/avg-duration.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/health-monitoring.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/50bc37df3c178a0846dbd3682a71d50a/raw/coverage.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/advanced-metrics.yml)
+[![Lines of Code](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/50bc37df3c178a0846dbd3682a71d50a/raw/lines-of-code.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/advanced-metrics.yml)
+[![Comments](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/50bc37df3c178a0846dbd3682a71d50a/raw/comments.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/advanced-metrics.yml)
+[![Test Duration](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/50bc37df3c178a0846dbd3682a71d50a/raw/test-duration.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/advanced-metrics.yml)
+
+These badges show real-time project health metrics including workflow success rates, test coverage, code quality indicators, and performance metrics. Dynamic badges are populated by automated workflows and may show "resource not found" until the first workflow runs complete.
+
 ### Release Workflow
 
 The project uses semantic-release for automated version management:
 
 ```bash
-# Create a new release (automatic version calculation)
-make release
-
-# Test release process (dry run)
-make release-dry-run
-
-# Create historical release
-make release-historical COMMIT=abc123 VERSION=0.0.5
-
-# Analyze RC readiness
-make release-analysis
+# Create a new release
+git commit -m "release: add new features and bug fixes"
+git push origin main
 ```
 
 **Release Process:**
 - Uses conventional commits for version calculation
 - `feat:` → minor version bump
-- `fix:` → patch version bump
+- `fix:` → patch version bump  
 - `BREAKING CHANGE:` → major version bump
+- Commit with "release:" prefix triggers semantic-release
+- Automatically publishes to PyPI, builds containers, and deploys documentation
 
-Releases automatically trigger PyPI publishing, container builds, and documentation deployment.
-
-See [Release Management Guide](docs/docs/developer_guide/releases.md) for complete documentation.
+See [Release Management Guide](docs/root/developer_guide/releases.md) for complete documentation.
 
 ## Documentation
 

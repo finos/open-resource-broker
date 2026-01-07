@@ -1,0 +1,162 @@
+name: Advanced Metrics Badges
+
+permissions:
+  contents: read
+  actions: read
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+  workflow_dispatch:
+
+jobs:
+  config:
+    name: Configuration
+    uses: ./.github/workflows/shared-config.yml
+
+  metrics:
+    name: Generate Advanced Metrics
+    needs: config
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6.0.1
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ needs.config.outputs.default-python-version }}
+
+    - name: Cache management
+      uses: ./.github/workflows/cache-management.yml
+      with:
+        python-version: ${{ needs.config.outputs.default-python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install coverage pytest cloc
+
+    - name: Run tests with coverage
+      run: |
+        coverage run -m pytest tests/ --tb=short
+        coverage report --format=total > coverage.txt
+        coverage xml
+
+    - name: Calculate lines of code
+      run: |
+        # Install cloc if not available
+        sudo apt-get update && sudo apt-get install -y cloc
+        
+        # Count lines of code (excluding tests, docs, config)
+        cloc src/ --json --out=cloc.json
+        
+        # Extract metrics
+        total_lines=$(jq -r '.SUM.code // 0' cloc.json)
+        comment_lines=$(jq -r '.SUM.comment // 0' cloc.json)
+        
+        # Calculate comment percentage
+        if [ "$total_lines" -gt 0 ]; then
+          comment_percent=$(echo "scale=1; $comment_lines * 100 / $total_lines" | bc)
+        else
+          comment_percent="0"
+        fi
+        
+        # Format for badges
+        if [ "$total_lines" -ge 1000 ]; then
+          loc_display=$(echo "scale=1; $total_lines / 1000" | bc)k
+        else
+          loc_display="$total_lines"
+        fi
+        
+        echo "TOTAL_LOC=$loc_display" >> "$GITHUB_ENV"
+        echo "COMMENT_PERCENT=$comment_percent" >> "$GITHUB_ENV"
+
+    - name: Run performance test
+      run: |
+        start_time=$(date +%s.%N)
+        python -m pytest tests/ -x --tb=no -q
+        end_time=$(date +%s.%N)
+        
+        # Calculate duration in seconds
+        duration=$(echo "$end_time - $start_time" | bc)
+        duration_formatted=$(printf "%.1fs" "$duration")
+        
+        echo "TEST_DURATION=$duration_formatted" >> "$GITHUB_ENV"
+
+    - name: Extract coverage percentage
+      run: |
+        coverage_percent=$(cat coverage.txt)
+        echo "COVERAGE_PERCENT=$coverage_percent" >> "$GITHUB_ENV"
+        
+        # Set coverage color
+        if [ "$coverage_percent" -ge 90 ]; then
+          coverage_color="brightgreen"
+        elif [ "$coverage_percent" -ge 75 ]; then
+          coverage_color="yellow"
+        elif [ "$coverage_percent" -ge 60 ]; then
+          coverage_color="orange"
+        else
+          coverage_color="red"
+        fi
+        
+        echo "COVERAGE_COLOR=$coverage_color" >> "$GITHUB_ENV"
+
+    - name: Create coverage badge
+      uses: schneegans/dynamic-badges-action@v1.7.0
+      with:
+        auth: ${{ secrets.GITHUB_TOKEN }}
+        gistID: ${{ secrets.METRICS_GIST_ID }}
+        filename: coverage.json
+        label: Coverage
+        message: ${{ env.COVERAGE_PERCENT }}%
+        color: ${{ env.COVERAGE_COLOR }}
+
+    - name: Create lines of code badge
+      uses: schneegans/dynamic-badges-action@v1.7.0
+      with:
+        auth: ${{ secrets.GITHUB_TOKEN }}
+        gistID: ${{ secrets.METRICS_GIST_ID }}
+        filename: lines-of-code.json
+        label: Lines of Code
+        message: ${{ env.TOTAL_LOC }}
+        color: lightgrey
+
+    - name: Create comment percentage badge
+      uses: schneegans/dynamic-badges-action@v1.7.0
+      with:
+        auth: ${{ secrets.GITHUB_TOKEN }}
+        gistID: ${{ secrets.METRICS_GIST_ID }}
+        filename: comments.json
+        label: Comments
+        message: ${{ env.COMMENT_PERCENT }}%
+        valColorRange: ${{ env.COMMENT_PERCENT }}
+        maxColorRange: 30
+        minColorRange: 0
+
+    - name: Create test duration badge
+      uses: schneegans/dynamic-badges-action@v1.7.0
+      with:
+        auth: ${{ secrets.GITHUB_TOKEN }}
+        gistID: ${{ secrets.METRICS_GIST_ID }}
+        filename: test-duration.json
+        label: Test Duration
+        message: ${{ env.TEST_DURATION }}
+        color: blue
+
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v4.4.3
+      with:
+        name: coverage-report
+        retention-days: 30
+        path: |
+          coverage.xml
+          cloc.json

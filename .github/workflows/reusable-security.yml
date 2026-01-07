@@ -13,9 +13,8 @@ on:
         type: string
       default-python-version:
         description: 'Default Python version (fallback)'
-        required: false
+        required: true
         type: string
-        default: '3.13'
 
 jobs:
   security-scan:

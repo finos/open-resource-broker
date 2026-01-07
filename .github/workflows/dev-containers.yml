@@ -1,4 +1,4 @@
-name: Container Build and Publish
+name: Container Build
 
 env:
   CONTAINER_TRIGGERS: "/container"
@@ -12,9 +12,11 @@ on:
       - 'pyproject.toml'
       - 'deployment/docker/**'
       - 'dev-tools/scripts/container_build.sh'
-      - '.github/workflows/container-build.yml'
-  release:
-    types: [published]
+      - '.github/workflows/dev-containers.yml'
+  workflow_run:
+    workflows: ["Quality Checks", "Unit Tests"]
+    types: [completed]
+    branches: [main]
   pull_request:
     branches: [ main, develop ]
     paths:
@@ -23,7 +25,7 @@ on:
       - 'pyproject.toml'
       - 'deployment/docker/**'
       - 'dev-tools/scripts/container_build.sh'
-      - '.github/workflows/container-build.yml'
+      - '.github/workflows/dev-containers.yml'
   workflow_dispatch:
     inputs:
       push_images:
@@ -34,13 +36,16 @@ on:
 
 permissions:
   contents: read
-  packages: write
-  pull-requests: read
+
+concurrency:
+  group: "container-registry"
+  cancel-in-progress: true
 
 jobs:
   config:
     name: Configuration
     uses: ./.github/workflows/shared-config.yml
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
 
   calculate-tags:
     name: Calculate Container Tags

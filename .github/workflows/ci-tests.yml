@@ -1,4 +1,4 @@
-name: CI Tests
+name: Unit Tests
 
 on:
   push:
@@ -8,6 +8,7 @@ on:
       - 'tests/**'
       - 'pyproject.toml'
       - 'requirements*.txt'
+      - 'uv.lock'
       - 'pytest.ini'
       - '.github/workflows/ci-tests.yml'
   pull_request:
@@ -17,6 +18,7 @@ on:
       - 'tests/**'
       - 'pyproject.toml'
       - 'requirements*.txt'
+      - 'uv.lock'
       - 'pytest.ini'
       - '.github/workflows/ci-tests.yml'
   schedule:
@@ -24,14 +26,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
-
-env:
-  AWS_DEFAULT_REGION: us-east-1
-  AWS_ACCESS_KEY_ID: testing
-  AWS_SECRET_ACCESS_KEY: testing
-  ENVIRONMENT: testing
-  TESTING: true
 
 jobs:
   config:
@@ -48,7 +42,7 @@ jobs:
       python-version: ${{ needs.config.outputs.default-python-version }}
 
   tests:
-    name: Quick Tests (Default Python)
+    name: Unit Tests (Default Python)
     needs: [config, setup-cache]
     uses: ./.github/workflows/reusable-test.yml
     with:
@@ -56,6 +50,11 @@ jobs:
       python-version: ${{ needs.config.outputs.default-python-version }}
       default-python-version: ${{ needs.config.outputs.default-python-version }}
       continue-on-error: true  # TODO: Remove once tests are stable
+      aws-region: ${{ needs.config.outputs.aws-region }}
+      aws-access-key: ${{ needs.config.outputs.aws-access-key }}
+      aws-secret-key: ${{ needs.config.outputs.aws-secret-key }}
+      environment: ${{ needs.config.outputs.environment }}
+      testing-flag: ${{ needs.config.outputs.testing-flag }}
 
   build-and-package:
     name: Build & Package
@@ -78,9 +77,10 @@ jobs:
       run: make build
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v6.0.0
+      uses: actions/upload-artifact@v4
       with:
-        name: build-artifacts
+        name: build-artifacts-${{ needs.config.outputs.package-version }}
+        retention-days: 60
         path: |
           dist/
           build/
@@ -92,6 +92,9 @@ jobs:
     if: always()
     permissions:
       contents: read
+      issues: read
+      checks: write
+      pull-requests: write
 
     steps:
     - name: Checkout code
@@ -104,28 +107,26 @@ jobs:
         fail-on-cache-miss: false
 
     - name: Download test results
-      uses: actions/download-artifact@v7.0.0
+      uses: actions/download-artifact@v4
       with:
         path: test-results/
 
-    - name: Generate test report
-      run: make test-report
-      continue-on-error: true
-
-    - name: Upload test report
-      uses: actions/upload-artifact@v6.0.0
+    - name: Publish Test Results
+      uses: EnricoMi/publish-unit-test-result-action@v2
       if: always()
+      continue-on-error: true
       with:
-        name: test-report
-        path: |
-          test-results-combined.xml
-          coverage-combined.xml
-          htmlcov/
+        files: "test-results/**/*.xml"
+        check_name: "Test Results Summary"
+        comment_mode: "always"
+        job_summary: true
+        action_fail: false
+        fail_on: "nothing"
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
       if: always()
       with:
-        files: coverage-combined.xml
+        files: test-results/**/*coverage*.xml
         flags: unit
         name: unit-tests

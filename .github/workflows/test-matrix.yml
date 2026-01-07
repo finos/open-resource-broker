@@ -8,32 +8,21 @@ on:
     # Allow manual triggering
   push:
     branches: [main]
-    tags: ['v*']
-    # Only run on main branch and releases for comprehensive testing
-
-env:
-  AWS_DEFAULT_REGION: us-east-1
-  AWS_ACCESS_KEY_ID: testing
-  AWS_SECRET_ACCESS_KEY: testing
-  ENVIRONMENT: testing
-  TESTING: true
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'uv.lock'
+      - 'Makefile'
+      - 'makefiles/**'
+      - '.github/workflows/test-matrix.yml'
+    # Only run on main branch for comprehensive testing
 
 jobs:
   get-config:
     name: Get Configuration
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
-      python-versions: ${{ steps.config.outputs.python-versions }}
-      default-python-version: ${{ steps.config.outputs.default-python-version }}
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v6.0.1
-
-    - name: Get project configuration
-      id: config
-      uses: ./.github/actions/get-config
+    uses: ./.github/workflows/shared-config.yml
 
   unit-tests:
     name: Unit Tests
@@ -54,6 +43,11 @@ jobs:
       os: ${{ matrix.os }}
       default-python-version: ${{ needs.get-config.outputs.default-python-version }}
       continue-on-error: true  # TODO: Remove once tests are stable
+      aws-region: ${{ needs.get-config.outputs.aws-region }}
+      aws-access-key: ${{ needs.get-config.outputs.aws-access-key }}
+      aws-secret-key: ${{ needs.get-config.outputs.aws-secret-key }}
+      environment: ${{ needs.get-config.outputs.environment }}
+      testing-flag: ${{ needs.get-config.outputs.testing-flag }}
 
   integration-tests:
     name: Integration Tests
@@ -74,6 +68,11 @@ jobs:
       os: ${{ matrix.os }}
       default-python-version: ${{ needs.get-config.outputs.default-python-version }}
       continue-on-error: true  # TODO: Remove once tests are stable
+      aws-region: ${{ needs.get-config.outputs.aws-region }}
+      aws-access-key: ${{ needs.get-config.outputs.aws-access-key }}
+      aws-secret-key: ${{ needs.get-config.outputs.aws-secret-key }}
+      environment: ${{ needs.get-config.outputs.environment }}
+      testing-flag: ${{ needs.get-config.outputs.testing-flag }}
 
   e2e-tests:
     name: End-to-End Tests
@@ -94,6 +93,11 @@ jobs:
       os: ${{ matrix.os }}
       default-python-version: ${{ needs.get-config.outputs.default-python-version }}
       continue-on-error: true  # TODO: Remove once tests are stable
+      aws-region: ${{ needs.get-config.outputs.aws-region }}
+      aws-access-key: ${{ needs.get-config.outputs.aws-access-key }}
+      aws-secret-key: ${{ needs.get-config.outputs.aws-secret-key }}
+      environment: ${{ needs.get-config.outputs.environment }}
+      testing-flag: ${{ needs.get-config.outputs.testing-flag }}
 
   test-summary:
     name: Test Summary
@@ -105,7 +109,7 @@ jobs:
 
     steps:
     - name: Download all test results
-      uses: actions/download-artifact@v7.0.0
+      uses: actions/download-artifact@v4
       with:
         path: test-results/
 

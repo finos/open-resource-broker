@@ -21,6 +21,21 @@ on:
       is-release:
         description: 'Whether this is a release build'
         value: ${{ jobs.get-config.outputs.is-release }}
+      aws-region:
+        description: 'AWS region for testing'
+        value: ${{ jobs.get-config.outputs.aws-region }}
+      aws-access-key:
+        description: 'AWS access key for testing'
+        value: ${{ jobs.get-config.outputs.aws-access-key }}
+      aws-secret-key:
+        description: 'AWS secret key for testing'
+        value: ${{ jobs.get-config.outputs.aws-secret-key }}
+      environment:
+        description: 'Environment name'
+        value: ${{ jobs.get-config.outputs.environment }}
+      testing-flag:
+        description: 'Testing flag'
+        value: ${{ jobs.get-config.outputs.testing-flag }}
 
 jobs:
   get-config:
@@ -35,12 +50,17 @@ jobs:
       container-image: ${{ steps.config.outputs.container-image }}
       package-version: ${{ steps.config.outputs.package-version }}
       is-release: ${{ steps.config.outputs.is-release }}
+      aws-region: us-east-1
+      aws-access-key: testing
+      aws-secret-key: testing
+      environment: testing
+      testing-flag: "true"
     steps:
     - name: Checkout code
       uses: actions/checkout@v6.0.1
 
     - name: Setup cache
-      uses: actions/cache@v5.0.0
+      uses: actions/cache@v5
       with:
         path: |
           ~/.cache/uv

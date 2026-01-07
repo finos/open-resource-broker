@@ -3,6 +3,10 @@ name: Semantic Release
 on:
   push:
     branches: [main]
+  workflow_run:
+    workflows: ["Quality Checks", "Unit Tests", "Security Scanning", "Workflow Validation", "Changelog Validation", "Container Build", "PyPI Publishing", "Documentation"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       mode:
@@ -25,9 +29,12 @@ on:
 
 permissions:
   contents: write
-  pull-requests: read
   id-token: write
   packages: write
+
+concurrency:
+  group: "semantic-release"
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -35,20 +42,28 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       (github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, 'release:')) ||
-      github.event_name == 'workflow_dispatch'
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && contains(github.event.workflow_run.head_commit.message, 'release:'))
     
     steps:
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
       - name: Checkout code
         uses: actions/checkout@v6.0.1
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Python Semantic Release
         id: release
         uses: python-semantic-release/python-semantic-release@v10.5.3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ steps.app-token.outputs.token }}
           git_committer_name: "github-actions[bot]"
           git_committer_email: "github-actions[bot]@users.noreply.github.com"
           
@@ -56,5 +71,5 @@ jobs:
         uses: python-semantic-release/publish-action@v10.5.3
         if: steps.release.outputs.released == 'true'
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ steps.app-token.outputs.token }}
           tag: ${{ steps.release.outputs.tag }}

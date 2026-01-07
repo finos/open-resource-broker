@@ -1,12 +1,16 @@
-name: Validate Workflows
+name: Workflow Validation
 
 on:
   push:
     paths:
       - '.github/workflows/**'
+      - 'Makefile'
+      - 'makefiles/**'
   pull_request:
     paths:
       - '.github/workflows/**'
+      - 'Makefile'
+      - 'makefiles/**'
 
 jobs:
   get-config:
@@ -25,10 +29,19 @@ jobs:
       id: config
       uses: ./.github/actions/get-config
 
+  setup-cache:
+    name: Setup Cache
+    needs: get-config
+    uses: ./.github/workflows/cache-management.yml
+    with:
+      cache-type: dependencies
+      cache-key-base: workflow-validation
+      python-version: ${{ needs.get-config.outputs.default-python-version }}
+
   validate-workflows:
     name: Validate Workflow Files
     runs-on: ubuntu-latest
-    needs: get-config
+    needs: [get-config, setup-cache]
     permissions:
       contents: read
 
@@ -39,7 +52,7 @@ jobs:
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
       with:
-        cache-key: deps-${{ needs.get-config.outputs.default-python-version }}-${{ hashFiles('.project.yml', 'pyproject.toml', 'requirements*.txt') }}
+        cache-key: ${{ needs.setup-cache.outputs.cache-key }}
         fail-on-cache-miss: false
 
     - name: Validate workflow syntax and logic

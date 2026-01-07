@@ -1,4 +1,4 @@
-name: Security Code Scanning
+name: Security Scanning
 
 on:
   push:
@@ -7,12 +7,16 @@ on:
       - 'src/**'
       - 'requirements*.txt'
       - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/security-code.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'src/**'
       - 'requirements*.txt'
       - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/security-code.yml'
   schedule:
     - cron: '0 3 * * 0'
 

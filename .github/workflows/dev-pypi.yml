@@ -1,4 +1,4 @@
-name: Publish to PyPI
+name: PyPI Publishing
 
 # SECURITY NOTE: This workflow uses PyPI Trusted Publishing (OIDC)
 # No API tokens required - authentication is handled automatically via GitHub's OIDC token
@@ -15,8 +15,15 @@ env:
 on:
   push:
     branches: [main]
-  release:
-    types: [published]
+    paths:
+      - 'src/**'
+      - 'pyproject.toml'
+      - 'requirements*.txt'
+      - 'uv.lock'
+  workflow_run:
+    workflows: ["Quality Checks", "Unit Tests"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
@@ -28,10 +35,15 @@ on:
         - testpypi
         - pypi
 
+concurrency:
+  group: "pypi-publishing"
+  cancel-in-progress: false
+
 jobs:
   get-config:
     name: Get Configuration
     runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     outputs:
       default-python-version: ${{ steps.config.outputs.default-python-version }}
       package-version: ${{ steps.config.outputs.package-version }}
@@ -150,13 +162,13 @@ jobs:
         make ci-build-sbom
 
     - name: Upload SBOM artifacts
-      uses: actions/upload-artifact@v6.0.0
+      uses: actions/upload-artifact@v4
       with:
-        name: sbom-reports
+        name: reports-sbom-${{ needs.get-config.outputs.package-version }}
         path: |
           python-sbom-cyclonedx.json
           python-sbom-spdx.json
-        retention-days: 90
+        retention-days: 180
 
     - name: Upload SBOM to GitHub Security tab
       uses: github/codeql-action/upload-sarif@v4

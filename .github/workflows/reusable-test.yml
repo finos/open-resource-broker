@@ -13,9 +13,8 @@ on:
         type: string
       default-python-version:
         description: 'Default Python version (fallback)'
-        required: false
+        required: true
         type: string
-        default: '3.13'
       os:
         description: 'Operating system to run on'
         required: false
@@ -31,13 +30,38 @@ on:
         required: false
         type: boolean
         default: true
+      aws-region:
+        description: 'AWS region for testing'
+        required: false
+        type: string
+        default: 'us-east-1'
+      aws-access-key:
+        description: 'AWS access key for testing'
+        required: false
+        type: string
+        default: 'testing'
+      aws-secret-key:
+        description: 'AWS secret key for testing'
+        required: false
+        type: string
+        default: 'testing'
+      environment:
+        description: 'Environment name'
+        required: false
+        type: string
+        default: 'testing'
+      testing-flag:
+        description: 'Testing flag'
+        required: false
+        type: string
+        default: 'true'
 
 env:
-  AWS_DEFAULT_REGION: us-east-1
-  AWS_ACCESS_KEY_ID: testing
-  AWS_SECRET_ACCESS_KEY: testing
-  ENVIRONMENT: testing
-  TESTING: true
+  AWS_DEFAULT_REGION: ${{ inputs.aws-region }}
+  AWS_ACCESS_KEY_ID: ${{ inputs.aws-access-key }}
+  AWS_SECRET_ACCESS_KEY: ${{ inputs.aws-secret-key }}
+  ENVIRONMENT: ${{ inputs.environment }}
+  TESTING: ${{ inputs.testing-flag }}
 
 jobs:
   test:
@@ -61,10 +85,11 @@ jobs:
         continue-on-error: ${{ inputs.continue-on-error }}
 
       - name: Upload test results
-        uses: actions/upload-artifact@v6.0.0
+        uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ${{ inputs.test-type }}-test-results-${{ inputs.os }}-${{ inputs.python-version || inputs.default-python-version }}
+          name: test-results-${{ inputs.test-type }}-${{ inputs.os }}-py${{ inputs.python-version || inputs.default-python-version }}
+          retention-days: 30
           path: |
             junit-*.xml
             coverage-*.xml

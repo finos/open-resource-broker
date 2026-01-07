@@ -1,0 +1,161 @@
+name: Workflow Health Monitoring
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Weekly on Monday at 9 AM UTC
+  workflow_dispatch:     # Manual trigger for testing
+
+jobs:
+  config:
+    name: Configuration
+    permissions:
+      contents: read
+    uses: ./.github/workflows/shared-config.yml
+
+  health-check:
+    name: Weekly Health Report
+    needs: config
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6.0.1
+
+    - name: Set date range
+      run: |
+        echo "START_DATE=$(date -d '-7 days' +%Y-%m-%d)" >> "$GITHUB_ENV"
+        echo "END_DATE=$(date +%Y-%m-%d)" >> "$GITHUB_ENV"
+
+    - name: Collect workflow metrics
+      uses: kittychiu/workflow-metrics@v0.4.7
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        OWNER_NAME: ${{ github.repository_owner }}
+        REPO_NAME: ${{ github.event.repository.name }}
+        START_DATE: ${{ env.START_DATE }}
+        END_DATE: ${{ env.END_DATE }}
+
+    - name: Generate health report
+      run: |
+        {
+          echo "# Weekly Workflow Health Report"
+          echo ""
+          echo "**Period:** ${{ env.START_DATE }} to ${{ env.END_DATE }}"
+          echo "**Repository:** ${{ github.repository }}"
+          echo ""
+          echo "## Workflow Statistics"
+          echo ""
+        } > health-report.md
+        if [ -f workflow-stats.csv ]; then
+          header=$(head -n 1 workflow-stats.csv | sed 's/,/|/g' | sed 's/_/ /g')
+          echo "|${header}|" >> health-report.md
+          metadata=$(head -n 1 workflow-stats.csv | sed 's/,/|/g' | sed 's/[^|]/-/g')
+          echo "|${metadata}|" >> health-report.md
+          tail -n +2 workflow-stats.csv | sed 's/,/|/g; s/^/|/; s/$/|/' >> health-report.md
+        else
+          echo "No workflow data available for this period." >> health-report.md
+        fi
+        
+        {
+          echo ""
+          echo "## Health Alerts"
+          echo ""
+        } >> health-report.md
+        
+        # Check for workflows with low success rates
+        if [ -f workflow-stats.csv ]; then
+          low_success=$(tail -n +2 workflow-stats.csv | awk -F',' '$4 < 80 {print "- **" $1 "**: " $4 "% success rate (WARNING)"}')
+          if [ -n "$low_success" ]; then
+            echo "$low_success" >> health-report.md
+          else
+            echo "All workflows have healthy success rates (≥80%)" >> health-report.md
+          fi
+        fi
+        
+        {
+          echo ""
+          echo "---"
+          echo "*Generated automatically by [Workflow Health Monitoring](.github/workflows/health-monitoring.yml)*"
+        } >> health-report.md
+
+    - name: Calculate badge metrics
+      run: |
+        if [ -f workflow-stats.csv ]; then
+          # Calculate overall success rate
+          overall_success=$(tail -n +2 workflow-stats.csv | awk -F',' '
+            BEGIN { total_runs=0; weighted_success=0 }
+            { total_runs += $5; weighted_success += ($4 * $5) }
+            END { if(total_runs > 0) print int(weighted_success/total_runs); else print 0 }
+          ')
+          
+          # Calculate average duration
+          avg_duration=$(tail -n +2 workflow-stats.csv | awk -F',' '
+            BEGIN { total=0; count=0 }
+            { total += $2; count++ }
+            END { if(count > 0) printf "%.1f", total/count; else print "0" }
+          ')
+          
+          # Set badge colors based on success rate
+          if [ "$overall_success" -ge 95 ]; then
+            success_color="brightgreen"
+          elif [ "$overall_success" -ge 80 ]; then
+            success_color="yellow"
+          else
+            success_color="red"
+          fi
+          
+          {
+            echo "SUCCESS_RATE=$overall_success"
+            echo "AVG_DURATION=${avg_duration}min"
+            echo "SUCCESS_COLOR=$success_color"
+          } >> "$GITHUB_ENV"
+        else
+          {
+            echo "SUCCESS_RATE=0"
+            echo "AVG_DURATION=0min"
+            echo "SUCCESS_COLOR=lightgrey"
+          } >> "$GITHUB_ENV"
+        fi
+
+    - name: Create success rate badge
+      uses: schneegans/dynamic-badges-action@v1.7.0
+      with:
+        auth: ${{ secrets.GITHUB_TOKEN }}
+        gistID: ${{ secrets.HEALTH_GIST_ID }}
+        filename: success-rate.json
+        label: Success Rate
+        message: ${{ env.SUCCESS_RATE }}%
+        color: ${{ env.SUCCESS_COLOR }}
+
+    - name: Create performance badge
+      uses: schneegans/dynamic-badges-action@v1.7.0
+      with:
+        auth: ${{ secrets.GITHUB_TOKEN }}
+        gistID: ${{ secrets.HEALTH_GIST_ID }}
+        filename: avg-duration.json
+        label: Avg Duration
+        message: ${{ env.AVG_DURATION }}
+        color: blue
+
+    - name: Create health report issue
+      uses: peter-evans/create-issue-from-file@v5
+      with:
+        title: "Weekly Health Report (${{ env.START_DATE }} to ${{ env.END_DATE }})"
+        content-filepath: health-report.md
+        labels: |
+          health-monitoring
+          automated-report
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4.4.3
+      with:
+        name: health-report-${{ env.END_DATE }}
+        retention-days: 30
+        path: |
+          health-report.md
+          workflow-stats.csv
+          runs.json
