@@ -8,6 +8,8 @@ on:
 jobs:
   config:
     name: Configuration
+    permissions:
+      contents: read
     uses: ./.github/workflows/shared-config.yml
 
   health-check:

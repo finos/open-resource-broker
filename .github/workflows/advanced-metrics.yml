@@ -1,5 +1,9 @@
 name: Advanced Metrics Badges
 
+permissions:
+  contents: read
+  actions: read
+
 on:
   push:
     branches: [ main ]

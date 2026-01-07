@@ -90,9 +90,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: [config, setup-cache, tests]
     if: always()
-    continue-on-error: true  # TODO: Remove once test report generation is stable
     permissions:
       contents: read
+      issues: read
+      checks: write
+      pull-requests: write
 
     steps:
     - name: Checkout code
@@ -109,24 +111,22 @@ jobs:
       with:
         path: test-results/
 
-    - name: Generate test report
-      run: make test-report
-
-    - name: Upload test report
-      uses: actions/upload-artifact@v4
+    - name: Publish Test Results
+      uses: EnricoMi/publish-unit-test-result-action@v2
       if: always()
+      continue-on-error: true
       with:
-        name: reports-test-${{ github.run_number }}
-        retention-days: 30
-        path: |
-          test-results-combined.xml
-          coverage-combined.xml
-          htmlcov/
+        files: "test-results/**/*.xml"
+        check_name: "Test Results Summary"
+        comment_mode: "always"
+        job_summary: true
+        action_fail: false
+        fail_on: "nothing"
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
       if: always()
       with:
-        files: coverage-combined.xml
+        files: test-results/**/*coverage*.xml
         flags: unit
         name: unit-tests
