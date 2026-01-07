@@ -88,7 +88,8 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ${{ inputs.test-type }}-test-results-${{ inputs.os }}-${{ inputs.python-version || inputs.default-python-version }}
+          name: test-results-${{ inputs.test-type }}-${{ inputs.os }}-py${{ inputs.python-version || inputs.default-python-version }}
+          retention-days: 30
           path: |
             junit-*.xml
             coverage-*.xml

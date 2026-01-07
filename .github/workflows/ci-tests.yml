@@ -86,7 +86,8 @@ jobs:
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: build-artifacts
+        name: build-artifacts-${{ needs.config.outputs.package-version }}
+        retention-days: 60
         path: |
           dist/
           build/
@@ -121,7 +122,8 @@ jobs:
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: test-report
+        name: reports-test-${{ github.run_number }}
+        retention-days: 30
         path: |
           test-results-combined.xml
           coverage-combined.xml

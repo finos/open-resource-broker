@@ -164,11 +164,11 @@ jobs:
     - name: Upload SBOM artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: sbom-reports
+        name: reports-sbom-${{ needs.get-config.outputs.package-version }}
         path: |
           python-sbom-cyclonedx.json
           python-sbom-spdx.json
-        retention-days: 90
+        retention-days: 180
 
     - name: Upload SBOM to GitHub Security tab
       uses: github/codeql-action/upload-sarif@v4
