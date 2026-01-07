@@ -39,14 +39,14 @@ jobs:
 
     - name: Generate health report
       run: |
-        echo "# 🏥 Weekly Workflow Health Report" > health-report.md
+        echo "# Weekly Workflow Health Report" > health-report.md
         echo "" >> health-report.md
         echo "**Period:** ${{ env.START_DATE }} to ${{ env.END_DATE }}" >> health-report.md
         echo "**Repository:** ${{ github.repository }}" >> health-report.md
         echo "" >> health-report.md
         
         # Convert CSV to markdown table
-        echo "## 📊 Workflow Statistics" >> health-report.md
+        echo "## Workflow Statistics" >> health-report.md
         echo "" >> health-report.md
         if [ -f workflow-stats.csv ]; then
           header=$(head -n 1 workflow-stats.csv | sed 's/,/|/g' | sed 's/_/ /g')
@@ -59,16 +59,16 @@ jobs:
         fi
         
         echo "" >> health-report.md
-        echo "## 🚨 Health Alerts" >> health-report.md
+        echo "## Health Alerts" >> health-report.md
         echo "" >> health-report.md
         
         # Check for workflows with low success rates
         if [ -f workflow-stats.csv ]; then
-          low_success=$(tail -n +2 workflow-stats.csv | awk -F',' '$4 < 80 {print "- ⚠️ **" $1 "**: " $4 "% success rate"}')
+          low_success=$(tail -n +2 workflow-stats.csv | awk -F',' '$4 < 80 {print "- **" $1 "**: " $4 "% success rate (WARNING)"}')
           if [ -n "$low_success" ]; then
             echo "$low_success" >> health-report.md
           else
-            echo "✅ All workflows have healthy success rates (≥80%)" >> health-report.md
+            echo "All workflows have healthy success rates (≥80%)" >> health-report.md
           fi
         fi
         
@@ -79,7 +79,7 @@ jobs:
     - name: Create health report issue
       uses: peter-evans/create-issue-from-file@v5
       with:
-        title: "🏥 Weekly Health Report (${{ env.START_DATE }} to ${{ env.END_DATE }})"
+        title: "Weekly Health Report (${{ env.START_DATE }} to ${{ env.END_DATE }})"
         content-filepath: health-report.md
         labels: |
           health-monitoring
