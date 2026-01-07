@@ -1,4 +1,4 @@
-name: Development Container Build
+name: Container Build
 
 env:
   CONTAINER_TRIGGERS: "/container"
@@ -36,6 +36,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: "container-registry"
+  cancel-in-progress: true
 
 jobs:
   config:

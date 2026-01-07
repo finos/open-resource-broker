@@ -49,7 +49,7 @@ jobs:
       python-version: ${{ needs.config.outputs.default-python-version }}
 
   tests:
-    name: Quick Tests (Default Python)
+    name: Unit Tests (Default Python)
     needs: [config, setup-cache]
     uses: ./.github/workflows/reusable-test.yml
     with:

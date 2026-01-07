@@ -8,6 +8,10 @@ on:
     - cron: '0 6 1 * 1'
   workflow_dispatch:
 
+concurrency:
+  group: "dependency-updates-${{ github.ref }}"
+  cancel-in-progress: true
+
 jobs:
   get-config:
     name: Get Configuration

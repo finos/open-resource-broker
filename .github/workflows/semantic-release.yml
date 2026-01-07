@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   workflow_run:
-    workflows: ["Quality Checks", "Unit Tests", "Security Scanning", "Workflow Validation", "Changelog Format Validation", "Development Container Build", "Development PyPI Publishing", "Deploy Documentation"]
+    workflows: ["Quality Checks", "Unit Tests", "Security Scanning", "Workflow Validation", "Changelog Validation", "Container Build", "PyPI Publishing", "Documentation"]
     types: [completed]
     branches: [main]
   workflow_dispatch:
@@ -31,6 +31,10 @@ permissions:
   contents: write
   id-token: write
   packages: write
+
+concurrency:
+  group: "semantic-release"
+  cancel-in-progress: false
 
 jobs:
   release:

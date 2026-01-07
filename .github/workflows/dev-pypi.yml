@@ -1,4 +1,4 @@
-name: Development PyPI Publishing
+name: PyPI Publishing
 
 # SECURITY NOTE: This workflow uses PyPI Trusted Publishing (OIDC)
 # No API tokens required - authentication is handled automatically via GitHub's OIDC token
@@ -34,6 +34,10 @@ on:
         options:
         - testpypi
         - pypi
+
+concurrency:
+  group: "pypi-publishing"
+  cancel-in-progress: false
 
 jobs:
   get-config:

@@ -1,4 +1,4 @@
-name: Production Release Pipeline
+name: Release Pipeline
 
 on:
   release:
