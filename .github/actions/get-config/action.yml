@@ -19,6 +19,9 @@ outputs:
   is-release:
     description: 'Whether this is a release build'
     value: ${{ steps.config.outputs.is-release }}
+  pypi-name:
+    description: 'PyPI package name'
+    value: ${{ steps.config.outputs.pypi-name }}
 runs:
   using: 'composite'
   steps:
@@ -35,6 +38,7 @@ runs:
         REPO_ORG=$(yq '.repository.org' .project.yml)
         REPO_NAME=$(yq '.repository.name' .project.yml)
         CONTAINER_IMAGE="$REPO_ORG/$REPO_NAME"
+        PYPI_NAME=$(yq '.project.pypi_name' .project.yml)
         
         # Centralized version generation using Makefile infrastructure
         if [[ "${{ github.event_name }}" == "release" ]]; then
@@ -54,6 +58,7 @@ runs:
           echo "container-image=$CONTAINER_IMAGE"
           echo "package-version=$PACKAGE_VERSION"
           echo "is-release=$IS_RELEASE"
+          echo "pypi-name=$PYPI_NAME"
         } >> "$GITHUB_OUTPUT"
         
         echo "Default Python version: $DEFAULT_PYTHON_VERSION"
@@ -62,3 +67,4 @@ runs:
         echo "Container image: $CONTAINER_IMAGE"
         echo "Package version: $PACKAGE_VERSION"
         echo "Is release: $IS_RELEASE"
+        echo "PyPI name: $PYPI_NAME"

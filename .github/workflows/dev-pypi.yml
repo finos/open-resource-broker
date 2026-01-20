@@ -46,7 +46,7 @@ jobs:
     outputs:
       default-python-version: ${{ steps.config.outputs.default-python-version }}
       package-version: ${{ steps.config.outputs.package-version }}
-      is-release: ${{ steps.config.outputs.is-release }}
+      pypi-name: ${{ steps.config.outputs.pypi-name }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v6.0.1
@@ -61,7 +61,7 @@ jobs:
     needs: [get-config]
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/orb-py
+      url: https://test.pypi.org/p/${{ needs.get-config.outputs.pypi-name }}
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
       contents: read   # needed to checkout code
@@ -106,7 +106,7 @@ jobs:
           echo "## Package Published Successfully"
           echo ""
           echo "**Environment:** Test PyPI"
-          echo "**Installation:** \`pip install --index-url https://test.pypi.org/simple/ orb-py\`"
+          echo "**Installation:** \`pip install --index-url https://test.pypi.org/simple/ ${{ needs.get-config.outputs.pypi-name }}\`"
           echo ""
           echo "**Version:** $VERSION"
           echo "**Commands:**"
