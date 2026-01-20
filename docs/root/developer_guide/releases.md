@@ -141,7 +141,7 @@ make release-major              # 1.0.0 → 2.0.0
 
 ### PyPI (Production Environment)
 - Stable releases: `1.0.1`
-- Installation: `pip install open-resource-broker`
+- Installation: `pip install orb-py`
 
 ## Release Schedule
 

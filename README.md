@@ -65,7 +65,7 @@ curl http://localhost:8000/health
 
 ```bash
 # Install from PyPI
-pip install open-resource-broker
+pip install orb-py
 
 # Verify installation
 orb --version
@@ -104,7 +104,7 @@ make dev
 
 | Method | Location | Use Case | Command |
 |--------|----------|----------|---------|
-| **PyPI** | System Python | End users | `pip install open-resource-broker` |
+| **PyPI** | System Python | End users | `pip install orb-py` |
 | **System** | `/usr/local/orb/` or `~/.local/orb/` | Production deployment | `make install-system` |
 | **Local** | `./.venv/` | Development | `make dev-install` |
 

@@ -8,7 +8,7 @@ with appropriate JSON schemas for AI assistant integration.
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from sdk.client import OpenHFPluginSDK
+from sdk.client import OpenResourceBroker
 from sdk.discovery import MethodInfo
 
 
@@ -35,7 +35,7 @@ class MCPToolDiscovery:
         """Initialize the instance."""
         self._tool_definitions: dict[str, MCPToolDefinition] = {}
 
-    def discover_mcp_tools(self, sdk: OpenHFPluginSDK) -> dict[str, MCPToolDefinition]:
+    def discover_mcp_tools(self, sdk: OpenResourceBroker) -> dict[str, MCPToolDefinition]:
         """
         Auto-discover MCP tools from SDK methods.
 

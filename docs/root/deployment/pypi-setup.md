@@ -122,7 +122,7 @@ To verify trusted publishing is working:
    pip install --index-url https://test.pypi.org/simple/ open-resource-broker
 
    # Test installation from Production PyPI
-   pip install open-resource-broker
+   pip install orb-py
    ```
 
 ## Security Best Practices

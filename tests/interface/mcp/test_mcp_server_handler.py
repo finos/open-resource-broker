@@ -63,10 +63,10 @@ class TestMCPServerHandler:
     @pytest.mark.asyncio
     async def test_stdio_server_message_handling(self, mock_app):
         """Test stdio server message handling."""
-        from interface.mcp.server.core import OpenHFPluginMCPServer
+        from interface.mcp.server.core import OpenResourceBrokerMCPServer
         from interface.mcp.server.handler import _run_stdio_server
 
-        mcp_server = OpenHFPluginMCPServer(app=mock_app)
+        mcp_server = OpenResourceBrokerMCPServer(app=mock_app)
 
         # Mock stdin/stdout
         with (
@@ -107,9 +107,9 @@ class TestMCPServerHandler:
             mock_start_server.return_value = mock_server
 
             # Run TCP server (should exit on KeyboardInterrupt)
-            from interface.mcp.server.core import OpenHFPluginMCPServer
+            from interface.mcp.server.core import OpenResourceBrokerMCPServer
 
-            mcp_server = OpenHFPluginMCPServer(app=mock_app)
+            mcp_server = OpenResourceBrokerMCPServer(app=mock_app)
 
             await _run_tcp_server(mcp_server, "localhost", 3000)
 

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from interface.mcp.server.core import OpenHFPluginMCPServer
+from interface.mcp.server.core import OpenResourceBrokerMCPServer
 
 
 class TestMCPProtocolCompliance:
@@ -32,7 +32,7 @@ class TestMCPProtocolCompliance:
     @pytest.fixture
     def mcp_server(self, mock_app):
         """Create MCP server instance."""
-        return OpenHFPluginMCPServer(app=mock_app)
+        return OpenResourceBrokerMCPServer(app=mock_app)
 
     @pytest.mark.asyncio
     async def test_full_mcp_session_workflow(self, mcp_server):

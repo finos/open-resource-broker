@@ -27,12 +27,12 @@ def _get_from_package_metadata() -> Optional[dict]:
     try:
         from importlib.metadata import metadata, version
 
-        meta = metadata("open-resource-broker")
+        meta = metadata("orb-py")
         return {
             "project": {
                 "name": meta["Name"],
                 "short_name": "orb",  # Not in package metadata, hardcode this one
-                "version": version("open-resource-broker"),
+                "version": version("orb-py"),
                 "description": meta["Summary"],
                 "author": meta["Author"],
                 "email": meta["Author-email"],
@@ -58,7 +58,7 @@ if not config:
     # missing dependencies (PyYAML), or constrained deployment environments
     config = {
         "project": {
-            "name": "open-resource-broker",
+            "name": "orb-py",
             "short_name": "orb",
             # PEP 440 compliant development version - prevents PyPI normalization from "0.1.0-dev" to "0.1.0.dev0"
             # CI builds will override this with dynamic versions like "0.1.0.dev20250822145030+abc1234"

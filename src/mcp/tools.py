@@ -7,12 +7,12 @@ without requiring a separate server process.
 
 from typing import Any, Optional
 
-from sdk.client import OpenHFPluginSDK
+from sdk.client import OpenResourceBroker
 
 from .discovery import MCPToolDefinition, MCPToolDiscovery
 
 
-class OpenHFPluginMCPTools:
+class OpenResourceBrokerMCPTools:
     """
     MCP tools for direct AI assistant integration.
 
@@ -20,7 +20,7 @@ class OpenHFPluginMCPTools:
     and structured error handling for AI assistant consumption.
     """
 
-    def __init__(self, sdk: Optional[OpenHFPluginSDK] = None, **sdk_kwargs) -> None:
+    def __init__(self, sdk: Optional[OpenResourceBroker] = None, **sdk_kwargs) -> None:
         """
         Initialize MCP tools.
 
@@ -28,7 +28,7 @@ class OpenHFPluginMCPTools:
             sdk: Optional SDK instance (will create if not provided)
             **sdk_kwargs: Arguments for SDK initialization if sdk not provided
         """
-        self.sdk = sdk or OpenHFPluginSDK(**sdk_kwargs)
+        self.sdk = sdk or OpenResourceBroker(**sdk_kwargs)
         self.discovery = MCPToolDiscovery()
         self.tools: dict[str, MCPToolDefinition] = {}
         self._initialized = False
@@ -61,7 +61,7 @@ class OpenHFPluginMCPTools:
         self.tools.clear()
 
     # Context manager support
-    async def __aenter__(self) -> "OpenHFPluginMCPTools":
+    async def __aenter__(self) -> "OpenResourceBrokerMCPTools":
         """Async context manager entry."""
         await self.initialize()
         return self
@@ -246,4 +246,4 @@ class OpenHFPluginMCPTools:
         """Return string representation of MCP tools instance."""
         status = "initialized" if self._initialized else "not initialized"
         tool_count = len(self.tools) if self._initialized else 0
-        return f"OpenHFPluginMCPTools(status='{status}', tools={tool_count})"
+        return f"OpenResourceBrokerMCPTools(status='{status}', tools={tool_count})"

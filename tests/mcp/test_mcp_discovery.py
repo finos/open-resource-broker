@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import pytest
 
 from mcp.discovery import MCPToolDefinition, MCPToolDiscovery
-from sdk.client import OpenHFPluginSDK
+from sdk.client import OpenResourceBroker
 from sdk.discovery import MethodInfo
 
 
@@ -21,7 +21,7 @@ class TestMCPToolDiscovery:
 
     def test_discover_mcp_tools_sdk_not_initialized(self):
         """Test discovery fails when SDK not initialized."""
-        mock_sdk = Mock(spec=OpenHFPluginSDK)
+        mock_sdk = Mock(spec=OpenResourceBroker)
         mock_sdk.initialized = False
 
         discovery = MCPToolDiscovery()
@@ -31,7 +31,7 @@ class TestMCPToolDiscovery:
 
     def test_discover_mcp_tools_success(self):
         """Test successful MCP tool discovery."""
-        mock_sdk = Mock(spec=OpenHFPluginSDK)
+        mock_sdk = Mock(spec=OpenResourceBroker)
         mock_sdk.initialized = True
         mock_sdk.list_available_methods = Mock(return_value=["test_method", "another_method"])
 

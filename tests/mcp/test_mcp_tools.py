@@ -5,34 +5,34 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from mcp.discovery import MCPToolDiscovery
-from mcp.tools import OpenHFPluginMCPTools
-from sdk.client import OpenHFPluginSDK
+from mcp.tools import OpenResourceBrokerMCPTools
+from sdk.client import OpenResourceBroker
 
 
-class TestOpenHFPluginMCPTools:
-    """Test cases for OpenHFPluginMCPTools following existing test patterns."""
+class TestOpenResourceBrokerMCPTools:
+    """Test cases for OpenResourceBrokerMCPTools following existing test patterns."""
 
     def test_initialization_with_default_sdk(self):
         """Test MCP tools initialization with default SDK."""
-        tools = OpenHFPluginMCPTools()
+        tools = OpenResourceBrokerMCPTools()
 
         assert tools.sdk is not None
-        assert isinstance(tools.sdk, OpenHFPluginSDK)
+        assert isinstance(tools.sdk, OpenResourceBroker)
         assert isinstance(tools.discovery, MCPToolDiscovery)
         assert not tools.initialized
         assert tools.tools == {}
 
     def test_initialization_with_custom_sdk(self):
         """Test MCP tools initialization with custom SDK."""
-        mock_sdk = Mock(spec=OpenHFPluginSDK)
-        tools = OpenHFPluginMCPTools(sdk=mock_sdk)
+        mock_sdk = Mock(spec=OpenResourceBroker)
+        tools = OpenResourceBrokerMCPTools(sdk=mock_sdk)
 
         assert tools.sdk is mock_sdk
         assert not tools.initialized
 
     def test_initialization_with_sdk_kwargs(self):
         """Test MCP tools initialization with SDK kwargs."""
-        tools = OpenHFPluginMCPTools(provider="mock", timeout=600)
+        tools = OpenResourceBrokerMCPTools(provider="mock", timeout=600)
 
         assert tools.sdk.provider == "mock"
         # The timeout goes into custom_config, not the main config field
@@ -41,13 +41,13 @@ class TestOpenHFPluginMCPTools:
     @pytest.mark.asyncio
     async def test_initialize_success(self):
         """Test successful MCP tools initialization."""
-        mock_sdk = Mock(spec=OpenHFPluginSDK)
+        mock_sdk = Mock(spec=OpenResourceBroker)
         mock_sdk.initialized = False
         mock_sdk.initialize = AsyncMock(return_value=True)
         mock_sdk.list_available_methods = Mock(return_value=["test_method"])
         mock_sdk.get_method_info = Mock(return_value=Mock())
 
-        tools = OpenHFPluginMCPTools(sdk=mock_sdk)
+        tools = OpenResourceBrokerMCPTools(sdk=mock_sdk)
 
         with patch.object(tools.discovery, "discover_mcp_tools") as mock_discover:
             mock_discover.return_value = {"test_method": Mock()}
@@ -61,8 +61,8 @@ class TestOpenHFPluginMCPTools:
     @pytest.mark.asyncio
     async def test_initialize_already_initialized(self):
         """Test initialization when already initialized."""
-        mock_sdk = Mock(spec=OpenHFPluginSDK)
-        tools = OpenHFPluginMCPTools(sdk=mock_sdk)
+        mock_sdk = Mock(spec=OpenResourceBroker)
+        tools = OpenResourceBrokerMCPTools(sdk=mock_sdk)
         tools._initialized = True
 
         await tools.initialize()
@@ -73,10 +73,10 @@ class TestOpenHFPluginMCPTools:
     @pytest.mark.asyncio
     async def test_initialize_with_initialized_sdk(self):
         """Test initialization with already initialized SDK."""
-        mock_sdk = Mock(spec=OpenHFPluginSDK)
+        mock_sdk = Mock(spec=OpenResourceBroker)
         mock_sdk.initialized = True
 
-        tools = OpenHFPluginMCPTools(sdk=mock_sdk)
+        tools = OpenResourceBrokerMCPTools(sdk=mock_sdk)
 
         with patch.object(tools.discovery, "discover_mcp_tools") as mock_discover:
             mock_discover.return_value = {}
@@ -90,10 +90,10 @@ class TestOpenHFPluginMCPTools:
     @pytest.mark.asyncio
     async def test_cleanup(self):
         """Test MCP tools cleanup."""
-        mock_sdk = Mock(spec=OpenHFPluginSDK)
+        mock_sdk = Mock(spec=OpenResourceBroker)
         mock_sdk.cleanup = AsyncMock()
 
-        tools = OpenHFPluginMCPTools(sdk=mock_sdk)
+        tools = OpenResourceBrokerMCPTools(sdk=mock_sdk)
         tools._initialized = True
         tools.tools = {"test": Mock()}
 
@@ -106,12 +106,12 @@ class TestOpenHFPluginMCPTools:
     @pytest.mark.asyncio
     async def test_context_manager(self):
         """Test MCP tools as async context manager."""
-        mock_sdk = Mock(spec=OpenHFPluginSDK)
+        mock_sdk = Mock(spec=OpenResourceBroker)
         mock_sdk.initialized = False
         mock_sdk.initialize = AsyncMock(return_value=True)
         mock_sdk.cleanup = AsyncMock()
 
-        tools = OpenHFPluginMCPTools(sdk=mock_sdk)
+        tools = OpenResourceBrokerMCPTools(sdk=mock_sdk)
 
         with patch.object(tools, "initialize", new_callable=AsyncMock) as mock_init:
             with patch.object(tools, "cleanup", new_callable=AsyncMock) as mock_cleanup:
@@ -123,14 +123,14 @@ class TestOpenHFPluginMCPTools:
 
     def test_list_tools_not_initialized(self):
         """Test list_tools raises error when not initialized."""
-        tools = OpenHFPluginMCPTools()
+        tools = OpenResourceBrokerMCPTools()
 
         with pytest.raises(ValueError, match="MCP tools not initialized"):
             tools.list_tools()
 
     def test_list_tools_success(self):
         """Test successful tools listing."""
-        tools = OpenHFPluginMCPTools()
+        tools = OpenResourceBrokerMCPTools()
         tools._initialized = True
 
         mock_tools_list = [{"name": "test_tool", "description": "Test tool", "inputSchema": {}}]
@@ -143,7 +143,7 @@ class TestOpenHFPluginMCPTools:
     @pytest.mark.asyncio
     async def test_call_tool_not_initialized(self):
         """Test call_tool raises error when not initialized."""
-        tools = OpenHFPluginMCPTools()
+        tools = OpenResourceBrokerMCPTools()
 
         with pytest.raises(ValueError, match="MCP tools not initialized"):
             await tools.call_tool("test_tool", {})
@@ -151,7 +151,7 @@ class TestOpenHFPluginMCPTools:
     @pytest.mark.asyncio
     async def test_call_tool_unknown_tool(self):
         """Test call_tool raises error for unknown tool."""
-        tools = OpenHFPluginMCPTools()
+        tools = OpenResourceBrokerMCPTools()
         tools._initialized = True
         tools.tools = {"known_tool": Mock()}
 
@@ -161,14 +161,14 @@ class TestOpenHFPluginMCPTools:
     @pytest.mark.asyncio
     async def test_call_tool_success(self):
         """Test successful tool call."""
-        mock_sdk = Mock(spec=OpenHFPluginSDK)
+        mock_sdk = Mock(spec=OpenResourceBroker)
         mock_method = AsyncMock(return_value={"result": "success"})
         mock_sdk.test_method = mock_method
 
         mock_tool_def = Mock()
         mock_tool_def.method_name = "test_method"
 
-        tools = OpenHFPluginMCPTools(sdk=mock_sdk)
+        tools = OpenResourceBrokerMCPTools(sdk=mock_sdk)
         tools._initialized = True
         tools.tools = {"test_tool": mock_tool_def}
 
@@ -181,12 +181,12 @@ class TestOpenHFPluginMCPTools:
     @pytest.mark.asyncio
     async def test_call_tool_method_not_found(self):
         """Test call_tool when SDK method not found."""
-        mock_sdk = Mock(spec=OpenHFPluginSDK)
+        mock_sdk = Mock(spec=OpenResourceBroker)
 
         mock_tool_def = Mock()
         mock_tool_def.method_name = "nonexistent_method"
 
-        tools = OpenHFPluginMCPTools(sdk=mock_sdk)
+        tools = OpenResourceBrokerMCPTools(sdk=mock_sdk)
         tools._initialized = True
         tools.tools = {"test_tool": mock_tool_def}
 
@@ -198,14 +198,14 @@ class TestOpenHFPluginMCPTools:
     @pytest.mark.asyncio
     async def test_call_tool_execution_error(self):
         """Test call_tool when method execution fails."""
-        mock_sdk = Mock(spec=OpenHFPluginSDK)
+        mock_sdk = Mock(spec=OpenResourceBroker)
         mock_method = AsyncMock(side_effect=Exception("Execution failed"))
         mock_sdk.test_method = mock_method
 
         mock_tool_def = Mock()
         mock_tool_def.method_name = "test_method"
 
-        tools = OpenHFPluginMCPTools(sdk=mock_sdk)
+        tools = OpenResourceBrokerMCPTools(sdk=mock_sdk)
         tools._initialized = True
         tools.tools = {"test_tool": mock_tool_def}
 
@@ -217,7 +217,7 @@ class TestOpenHFPluginMCPTools:
 
     def test_get_tool_info_not_initialized(self):
         """Test get_tool_info when not initialized."""
-        tools = OpenHFPluginMCPTools()
+        tools = OpenResourceBrokerMCPTools()
 
         result = tools.get_tool_info("test_tool")
 
@@ -227,7 +227,7 @@ class TestOpenHFPluginMCPTools:
         """Test successful get_tool_info."""
         mock_tool_def = Mock()
 
-        tools = OpenHFPluginMCPTools()
+        tools = OpenResourceBrokerMCPTools()
         tools._initialized = True
         tools.tools = {"test_tool": mock_tool_def}
 
@@ -237,7 +237,7 @@ class TestOpenHFPluginMCPTools:
 
     def test_get_tools_by_type_not_initialized(self):
         """Test get_tools_by_type when not initialized."""
-        tools = OpenHFPluginMCPTools()
+        tools = OpenResourceBrokerMCPTools()
 
         result = tools.get_tools_by_type("query")
 
@@ -257,7 +257,7 @@ class TestOpenHFPluginMCPTools:
         mock_tool_def_command = Mock()
         mock_tool_def_command.method_info = mock_method_info_command
 
-        tools = OpenHFPluginMCPTools()
+        tools = OpenResourceBrokerMCPTools()
         tools._initialized = True
         tools.tools = {
             "query_tool": mock_tool_def_query,
@@ -272,10 +272,10 @@ class TestOpenHFPluginMCPTools:
 
     def test_get_stats_not_initialized(self):
         """Test get_stats when not initialized."""
-        mock_sdk = Mock(spec=OpenHFPluginSDK)
+        mock_sdk = Mock(spec=OpenResourceBroker)
         mock_sdk.initialized = False
 
-        tools = OpenHFPluginMCPTools(sdk=mock_sdk)
+        tools = OpenResourceBrokerMCPTools(sdk=mock_sdk)
 
         stats = tools.get_stats()
 
@@ -285,10 +285,10 @@ class TestOpenHFPluginMCPTools:
 
     def test_get_stats_initialized(self):
         """Test get_stats when initialized."""
-        mock_sdk = Mock(spec=OpenHFPluginSDK)
+        mock_sdk = Mock(spec=OpenResourceBroker)
         mock_sdk.get_stats = Mock(return_value={"sdk_stat": "value"})
 
-        tools = OpenHFPluginMCPTools(sdk=mock_sdk)
+        tools = OpenResourceBrokerMCPTools(sdk=mock_sdk)
         tools._initialized = True
         tools.tools = {"tool1": Mock(), "tool2": Mock()}
 
@@ -306,11 +306,11 @@ class TestOpenHFPluginMCPTools:
 
     def test_repr(self):
         """Test string representation."""
-        tools = OpenHFPluginMCPTools()
+        tools = OpenResourceBrokerMCPTools()
 
         repr_str = repr(tools)
 
-        assert "OpenHFPluginMCPTools" in repr_str
+        assert "OpenResourceBrokerMCPTools" in repr_str
         assert "not initialized" in repr_str
         assert "tools=0" in repr_str
 

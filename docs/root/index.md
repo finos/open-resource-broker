@@ -48,7 +48,7 @@ open http://localhost:8000/docs
 
 ```bash
 # Install from PyPI
-pip install open-resource-broker
+pip install orb-py
 
 # Verify installation
 orb --help

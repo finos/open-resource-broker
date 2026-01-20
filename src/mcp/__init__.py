@@ -1,5 +1,5 @@
 """
-OpenHFPlugin MCP (Model Context Protocol) Integration.
+Open Resource Broker MCP (Model Context Protocol) Integration.
 
 This package provides MCP integration for AI assistants and agents,
 supporting both direct tool integration and standalone server modes.
@@ -13,20 +13,20 @@ Key Features:
 
 Usage:
     # Direct tool integration
-    from orbsdk.mcp import OpenHFPluginMCPTools
+    from orb_py.mcp import OpenResourceBrokerMCPTools
 
-    tools = OpenHFPluginMCPTools()
+    tools = OpenResourceBrokerMCPTools()
     await tools.initialize()
     result = await tools.call_tool("list_templates", {"active_only": True})
 
     # Standalone server mode
-    from orbsdk.mcp import OpenHFPluginMCPServer
+    from orb_py.mcp import OpenResourceBrokerMCPServer
 
-    server = OpenHFPluginMCPServer()
+    server = OpenResourceBrokerMCPServer()
     await server.start_stdio()
 """
 
 from .discovery import MCPToolDiscovery
-from .tools import OpenHFPluginMCPTools
+from .tools import OpenResourceBrokerMCPTools
 
-__all__: list[str] = ["MCPToolDiscovery", "OpenHFPluginMCPTools"]
+__all__: list[str] = ["MCPToolDiscovery", "OpenResourceBrokerMCPTools"]

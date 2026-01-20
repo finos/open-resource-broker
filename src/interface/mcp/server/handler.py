@@ -8,7 +8,7 @@ from infrastructure.di.container import get_container
 from infrastructure.error.decorators import handle_interface_exceptions
 from infrastructure.logging.logger import get_logger
 
-from .core import OpenHFPluginMCPServer
+from .core import OpenResourceBrokerMCPServer
 
 
 @handle_interface_exceptions(context="mcp_server", interface_type="cli")
@@ -33,7 +33,7 @@ async def handle_mcp_serve(args) -> dict[str, Any]:
     container = get_container()
 
     # Create MCP server instance
-    mcp_server = OpenHFPluginMCPServer(app=container)
+    mcp_server = OpenResourceBrokerMCPServer(app=container)
 
     if stdio_mode:
         # Run in stdio mode for direct MCP client communication
@@ -47,7 +47,7 @@ async def handle_mcp_serve(args) -> dict[str, Any]:
         return {"message": f"MCP server started on {host}:{port}"}
 
 
-async def _run_stdio_server(mcp_server: OpenHFPluginMCPServer):
+async def _run_stdio_server(mcp_server: OpenResourceBrokerMCPServer):
     """Run MCP server in stdio mode."""
     logger = get_logger(__name__)
 
@@ -88,7 +88,7 @@ async def _run_stdio_server(mcp_server: OpenHFPluginMCPServer):
         raise
 
 
-async def _run_tcp_server(mcp_server: OpenHFPluginMCPServer, host: str, port: int):
+async def _run_tcp_server(mcp_server: OpenResourceBrokerMCPServer, host: str, port: int):
     """Run MCP server as TCP server."""
     logger = get_logger(__name__)
 

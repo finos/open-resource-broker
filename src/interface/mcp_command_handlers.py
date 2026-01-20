@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from infrastructure.error.decorators import handle_interface_exceptions
-from mcp.tools import OpenHFPluginMCPTools
+from mcp.tools import OpenResourceBrokerMCPTools
 
 
 @handle_interface_exceptions(context="mcp_tools_list", interface_type="cli")
@@ -24,7 +24,7 @@ async def handle_mcp_tools_list(args) -> dict[str, Any]:
     Returns:
         Formatted tool list response
     """
-    async with OpenHFPluginMCPTools() as tools:
+    async with OpenResourceBrokerMCPTools() as tools:
         tool_list = tools.list_tools()
 
         # Filter by type if specified
@@ -82,7 +82,7 @@ async def handle_mcp_tools_call(args) -> dict[str, Any]:
             return {"error": f"Invalid JSON in arguments: {e!s}"}
 
     # Execute tool
-    async with OpenHFPluginMCPTools() as tools:
+    async with OpenResourceBrokerMCPTools() as tools:
         result = await tools.call_tool(args.tool_name, tool_args)
 
         if args.format == "table" and "data" in result:
@@ -102,7 +102,7 @@ async def handle_mcp_tools_info(args) -> dict[str, Any]:
     Returns:
         Tool information
     """
-    async with OpenHFPluginMCPTools() as tools:
+    async with OpenResourceBrokerMCPTools() as tools:
         tool_def = tools.get_tool_info(args.tool_name)
 
         if not tool_def:
@@ -145,7 +145,7 @@ async def handle_mcp_validate(args) -> dict[str, Any]:
 
     # Test MCP tools initialization
     try:
-        async with OpenHFPluginMCPTools() as tools:
+        async with OpenResourceBrokerMCPTools() as tools:
             stats = tools.get_stats()
             validation_result["checks"].append(
                 {

@@ -1,6 +1,6 @@
-# OpenHFPlugin SDK Quickstart
+# Open Resource Broker SDK Quickstart
 
-The OpenHFPlugin SDK (orbsdk) provides a clean, async-first programmatic interface for cloud resource provisioning operations.
+The Open Resource Broker SDK (orb_py) provides a clean, async-first programmatic interface for cloud resource provisioning operations.
 
 ## Key Features
 
@@ -14,10 +14,10 @@ The OpenHFPlugin SDK (orbsdk) provides a clean, async-first programmatic interfa
 
 ```bash
 # Install the base package
-pip install open-resource-broker
+pip install orb-py
 
 # Or install with SDK support
-pip install open-resource-broker[sdk]
+pip install orb-py[sdk]
 ```
 
 ## Basic Usage
@@ -25,9 +25,9 @@ pip install open-resource-broker[sdk]
 ### Context Manager (Recommended)
 
 ```python
-from orbsdk import ORBSDK
+from orb_py import orb
 
-async with ORBSDK(provider="aws") as sdk:
+async with orb(provider="aws") as sdk:
     # List available templates
     templates = await sdk.list_templates(active_only=True)
     print(f"Found {len(templates)} templates")
@@ -48,9 +48,9 @@ async with ORBSDK(provider="aws") as sdk:
 ### Manual Initialization
 
 ```python
-from orbsdk import ORBSDK
+from orb_py import orb
 
-sdk = ORBSDK(provider="aws")
+sdk = orb(provider="aws")
 await sdk.initialize()
 
 try:
@@ -83,7 +83,7 @@ config = {
     "log_level": "DEBUG"
 }
 
-async with ORBSDK(config=config) as sdk:
+async with orb(config=config) as sdk:
     # Use SDK with custom configuration
     pass
 ```
@@ -92,7 +92,7 @@ async with ORBSDK(config=config) as sdk:
 
 ```python
 # Load from JSON file
-async with ORBSDK(config_path="config.json") as sdk:
+async with orb(config_path="config.json") as sdk:
     pass
 ```
 
@@ -101,7 +101,7 @@ async with ORBSDK(config_path="config.json") as sdk:
 The SDK automatically discovers all available methods from the existing CQRS handlers:
 
 ```python
-async with ORBSDK(provider="mock") as sdk:
+async with orb(provider="mock") as sdk:
     # List all available methods
     methods = sdk.list_available_methods()
     print(f"Available methods: {methods}")
@@ -124,7 +124,7 @@ async with ORBSDK(provider="mock") as sdk:
 ### Template Management
 
 ```python
-async with ORBSDK(provider="aws") as sdk:
+async with orb(provider="aws") as sdk:
     # List all templates
     templates = await sdk.list_templates()
 
@@ -160,7 +160,7 @@ async with ORBSDK(provider="aws") as sdk:
 ### Machine Provisioning
 
 ```python
-async with ORBSDK(provider="aws") as sdk:
+async with orb(provider="aws") as sdk:
     # Create machine request
     request = await sdk.create_request(
         template_id="basic-template",
@@ -186,7 +186,7 @@ async with ORBSDK(provider="aws") as sdk:
 ### Request Management
 
 ```python
-async with ORBSDK(provider="aws") as sdk:
+async with orb(provider="aws") as sdk:
     # List requests
     requests = await sdk.list_requests(status="pending")
 
@@ -200,7 +200,7 @@ async with ORBSDK(provider="aws") as sdk:
 ### Provider Operations
 
 ```python
-async with ORBSDK(provider="aws") as sdk:
+async with orb(provider="aws") as sdk:
     # Check provider health
     health = await sdk.get_provider_health()
 
@@ -217,7 +217,7 @@ async with ORBSDK(provider="aws") as sdk:
 ### System Operations
 
 ```python
-async with ORBSDK(provider="aws") as sdk:
+async with orb(provider="aws") as sdk:
     # Get system status
     status = await sdk.get_system_status()
 
@@ -231,10 +231,10 @@ async with ORBSDK(provider="aws") as sdk:
 ## Error Handling
 
 ```python
-from orbsdk import ORBSDK, SDKError, ConfigurationError, ProviderError
+from orb_py import orb, SDKError, ConfigurationError, ProviderError
 
 try:
-    async with ORBSDK(provider="aws") as sdk:
+    async with orb(provider="aws") as sdk:
         templates = await sdk.list_templates()
 except ConfigurationError as e:
     print(f"Configuration error: {e}")
@@ -259,7 +259,7 @@ except SDKError as e:
 ### Custom Middleware
 
 ```python
-from orbsdk import ORBSDK, SDKMiddleware
+from orb_py import orb, SDKMiddleware
 
 class LoggingMiddleware(SDKMiddleware):
     async def process(self, method_name, args, kwargs, next_handler):
@@ -268,7 +268,7 @@ class LoggingMiddleware(SDKMiddleware):
         print(f"{method_name} returned: {result}")
         return result
 
-async with ORBSDK(provider="aws") as sdk:
+async with orb(provider="aws") as sdk:
     sdk.add_middleware(LoggingMiddleware())
     templates = await sdk.list_templates()
 ```
@@ -276,7 +276,7 @@ async with ORBSDK(provider="aws") as sdk:
 ### Batch Operations
 
 ```python
-async with ORBSDK(provider="aws") as sdk:
+async with orb(provider="aws") as sdk:
     # Create multiple machines in different regions
     results = await sdk.batch([
         sdk.create_request("template-us-east", 2),
@@ -291,7 +291,7 @@ async with ORBSDK(provider="aws") as sdk:
 ### Custom Serialization
 
 ```python
-async with ORBSDK(provider="aws") as sdk:
+async with orb(provider="aws") as sdk:
     # Get raw response data
     raw_data = await sdk.list_templates(raw_response=True)
 

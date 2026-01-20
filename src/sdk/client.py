@@ -1,5 +1,5 @@
 """
-OpenHFPlugin SDK main client implementation.
+Open Resource Broker SDK main client implementation.
 
 Provides a clean, async-first API that leverages the existing
 application service and CQRS infrastructure with automatic
@@ -16,16 +16,16 @@ from .discovery import MethodInfo, SDKMethodDiscovery
 from .exceptions import ConfigurationError, ProviderError, SDKError
 
 
-class OpenHFPluginSDK:
+class OpenResourceBroker:
     """
-    Main SDK interface for Host Factory operations.
+    Main SDK interface for Open Resource Broker operations.
 
     Provides automatic method discovery from existing CQRS handlers,
     ensuring zero code duplication while maintaining clean architecture
     principles and full integration with the existing system.
 
     Usage:
-        async with OpenHFPluginSDK(provider="aws") as sdk:
+        async with OpenResourceBroker(provider="aws") as sdk:
             templates = await sdk.list_templates(active_only=True)
             request = await sdk.create_request(template_id="basic", machine_count=5)
             status = await sdk.get_request_status(request_id=request.id)
@@ -39,7 +39,7 @@ class OpenHFPluginSDK:
         **kwargs,
     ) -> None:
         """
-        Initialize the Host Factory SDK.
+        Initialize the Open Resource Broker SDK.
 
         Args:
             provider: Cloud provider type (aws, mock, etc.)
@@ -146,7 +146,7 @@ class OpenHFPluginSDK:
                     delattr(self, method_name)
 
     # Context manager support
-    async def __aenter__(self) -> "OpenHFPluginSDK":
+    async def __aenter__(self) -> "OpenResourceBroker":
         """Async context manager entry."""
         await self.initialize()
         return self
@@ -262,4 +262,4 @@ class OpenHFPluginSDK:
         """Return string representation of SDK instance."""
         status = "initialized" if self._initialized else "not initialized"
         method_count = len(self._methods) if self._initialized else 0
-        return f"OpenHFPluginSDK(provider='{self._config.provider}', status='{status}', methods={method_count})"
+        return f"OpenResourceBroker(provider='{self._config.provider}', status='{status}', methods={method_count})"

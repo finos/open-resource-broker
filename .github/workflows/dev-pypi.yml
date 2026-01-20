@@ -62,7 +62,7 @@ jobs:
     needs: [get-config]
     environment:
       name: ${{ needs.get-config.outputs.is-release == 'true' && 'pypi' || github.event.inputs.environment || 'testpypi' }}
-      url: ${{ needs.get-config.outputs.is-release == 'true' && 'https://pypi.org/p/open-resource-broker' || 'https://test.pypi.org/p/open-resource-broker' }}
+      url: ${{ needs.get-config.outputs.is-release == 'true' && 'https://pypi.org/p/orb-py' || 'https://test.pypi.org/p/orb-py' }}
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
       contents: read   # needed to checkout code
@@ -124,16 +124,15 @@ jobs:
           echo ""
           if [ "$TARGET" = "pypi" ]; then
             echo "**Environment:** Production PyPI"
-            echo "**Installation:** \`pip install open-resource-broker\`"
+            echo "**Installation:** \`pip install orb-py\`"
           else
             echo "**Environment:** Test PyPI"
-            echo "**Installation:** \`pip install --index-url https://test.pypi.org/simple/ open-resource-broker\`"
+            echo "**Installation:** \`pip install --index-url https://test.pypi.org/simple/ orb-py\`"
           fi
           echo ""
           echo "**Version:** $VERSION"
           echo "**Commands:**"
           echo "- \`orb --help\`"
-          echo "- \`open-resource-broker --help\`"
         } >> "$GITHUB_STEP_SUMMARY"
 
   generate-sbom:

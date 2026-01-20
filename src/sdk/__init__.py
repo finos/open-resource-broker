@@ -1,5 +1,5 @@
 """
-OpenHFPlugin SDK - Programmatic interface for Host Factory operations.
+Open Resource Broker SDK - Programmatic interface for cloud resource operations.
 
 This SDK provides a clean, async-first API for cloud resource provisioning
 while maintaining full compatibility with the existing CQRS architecture.
@@ -12,25 +12,27 @@ Key Features:
 - Async/await support throughout
 
 Usage:
-    from orbsdk import ORBSDK
+    from orb_py import orb
 
-    async with ORBSDK(provider="aws") as sdk:
-        templates = await sdk.list_templates(active_only=True)
-        request = await sdk.create_request(template_id="basic", machine_count=5)
-        status = await sdk.get_request_status(request_id=request.id)
+    async with orb(provider="aws") as client:
+        templates = await client.list_templates(active_only=True)
+        request = await client.create_request(template_id="basic", machine_count=5)
+        status = await client.get_request_status(request_id=request.id)
 """
 
-from .client import OpenHFPluginSDK
+from .client import OpenResourceBroker
 from .config import SDKConfig
 from .exceptions import ConfigurationError, ProviderError, SDKError
 
-# Convenient alias
-ORBSDK = OpenHFPluginSDK
+# Convenient aliases
+ORB = OpenResourceBroker
+orb = OpenResourceBroker
 
 __all__: list[str] = [
-    "ORBSDK",
+    "OpenResourceBroker",
+    "ORB",
+    "orb",
     "ConfigurationError",
-    "OpenHFPluginSDK",
     "ProviderError",
     "SDKConfig",
     "SDKError",

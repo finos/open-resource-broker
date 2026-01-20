@@ -19,10 +19,10 @@ MCP Tools Mode automatically discovers all SDK methods and exposes them as MCP t
 ### Direct Integration in AI Assistants
 
 ```python
-from orbsdk.mcp import OpenHFPluginMCPTools
+from orb_py.mcp import OpenResourceBrokerMCPTools
 
 # Initialize MCP tools
-async with OpenHFPluginMCPTools(provider="aws") as tools:
+async with OpenResourceBrokerMCPTools(provider="aws") as tools:
     # List all available tools
     available_tools = tools.list_tools()
     print(f"Available tools: {len(available_tools)}")
@@ -82,7 +82,7 @@ orb mcp validate
 MCP tools are automatically discovered from SDK methods:
 
 ```python
-async with OpenHFPluginMCPTools() as tools:
+async with OpenResourceBrokerMCPTools() as tools:
     # Get tools by type
     query_tools = tools.get_tools_by_type("query")
     command_tools = tools.get_tools_by_type("command")
@@ -190,7 +190,7 @@ export ORB_PROFILE=default
 ### Configuration File
 ```python
 # Load MCP tools with custom configuration
-tools = OpenHFPluginMCPTools(
+tools = OpenResourceBrokerMCPTools(
     provider="aws",
     config={
         "region": "us-west-2",
@@ -204,7 +204,7 @@ tools = OpenHFPluginMCPTools(
 MCP tools provide comprehensive error handling:
 
 ```python
-async with OpenHFPluginMCPTools() as tools:
+async with OpenResourceBrokerMCPTools() as tools:
     try:
         result = await tools.call_tool("create_request", {
             "template_id": "invalid-template",
@@ -240,12 +240,12 @@ async with OpenHFPluginMCPTools() as tools:
     "hostfactory": {
       "command": "python",
       "args": ["-c", "
-        from orbsdk.mcp import OpenHFPluginMCPTools
+        from orb_py.mcp import OpenResourceBrokerMCPTools
         import asyncio
         import json
 
         async def main():
-            async with OpenHFPluginMCPTools() as tools:
+            async with OpenResourceBrokerMCPTools() as tools:
                 # Your integration logic here
                 pass
 
@@ -263,7 +263,7 @@ class HostFactoryAssistant:
         self.mcp_tools = None
 
     async def initialize(self):
-        self.mcp_tools = OpenHFPluginMCPTools()
+        self.mcp_tools = OpenResourceBrokerMCPTools()
         await self.mcp_tools.initialize()
 
     async def handle_request(self, tool_name: str, args: dict):
@@ -292,7 +292,7 @@ class HostFactoryAssistant:
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
-async with OpenHFPluginMCPTools() as tools:
+async with OpenResourceBrokerMCPTools() as tools:
     # Debug information
     stats = tools.get_stats()
     print(f"Debug stats: {stats}")

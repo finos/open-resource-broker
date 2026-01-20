@@ -116,7 +116,7 @@ gcloud run deploy orb-api \
 #### Direct Installation
 ```bash
 # Install from PyPI
-pip install open-resource-broker
+pip install orb-py
 
 # Or install from source
 git clone <repository-url>

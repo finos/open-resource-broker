@@ -4,17 +4,17 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from sdk.client import OpenHFPluginSDK
+from sdk.client import OpenResourceBroker
 from sdk.config import SDKConfig
 from sdk.exceptions import ConfigurationError, ProviderError, SDKError
 
 
-class TestOpenHFPluginSDK:
-    """Test cases for OpenHFPluginSDK following existing test patterns."""
+class TestOpenResourceBroker:
+    """Test cases for OpenResourceBroker following existing test patterns."""
 
     def test_sdk_initialization_with_defaults(self):
         """Test SDK initialization with default configuration."""
-        sdk = OpenHFPluginSDK()
+        sdk = OpenResourceBroker()
 
         assert sdk.provider == "aws"
         assert not sdk.initialized
@@ -22,7 +22,7 @@ class TestOpenHFPluginSDK:
 
     def test_sdk_initialization_with_custom_provider(self):
         """Test SDK initialization with custom provider."""
-        sdk = OpenHFPluginSDK(provider="mock")
+        sdk = OpenResourceBroker(provider="mock")
 
         assert sdk.provider == "mock"
         assert not sdk.initialized
@@ -31,7 +31,7 @@ class TestOpenHFPluginSDK:
         """Test SDK initialization with configuration dictionary."""
         config = {"provider": "mock", "timeout": 600, "log_level": "DEBUG"}
 
-        sdk = OpenHFPluginSDK(config=config)
+        sdk = OpenResourceBroker(config=config)
 
         assert sdk.provider == "mock"
         assert sdk.config.timeout == 600
@@ -39,7 +39,7 @@ class TestOpenHFPluginSDK:
 
     def test_sdk_initialization_with_kwargs(self):
         """Test SDK initialization with additional kwargs."""
-        sdk = OpenHFPluginSDK(provider="mock", custom_option="test_value")
+        sdk = OpenResourceBroker(provider="mock", custom_option="test_value")
 
         assert sdk.provider == "mock"
         assert sdk.config.custom_config["custom_option"] == "test_value"
@@ -47,11 +47,11 @@ class TestOpenHFPluginSDK:
     @pytest.mark.asyncio
     async def test_sdk_context_manager_success(self):
         """Test SDK as async context manager with successful initialization."""
-        with patch.object(OpenHFPluginSDK, "initialize", new_callable=AsyncMock) as mock_init:
-            with patch.object(OpenHFPluginSDK, "cleanup", new_callable=AsyncMock) as mock_cleanup:
+        with patch.object(OpenResourceBroker, "initialize", new_callable=AsyncMock) as mock_init:
+            with patch.object(OpenResourceBroker, "cleanup", new_callable=AsyncMock) as mock_cleanup:
                 mock_init.return_value = True
 
-                async with OpenHFPluginSDK(provider="mock") as sdk:
+                async with OpenResourceBroker(provider="mock") as sdk:
                     assert sdk is not None
 
                 mock_init.assert_called_once()
@@ -60,12 +60,12 @@ class TestOpenHFPluginSDK:
     @pytest.mark.asyncio
     async def test_sdk_context_manager_with_exception(self):
         """Test SDK context manager cleanup on exception."""
-        with patch.object(OpenHFPluginSDK, "initialize", new_callable=AsyncMock) as mock_init:
-            with patch.object(OpenHFPluginSDK, "cleanup", new_callable=AsyncMock) as mock_cleanup:
+        with patch.object(OpenResourceBroker, "initialize", new_callable=AsyncMock) as mock_init:
+            with patch.object(OpenResourceBroker, "cleanup", new_callable=AsyncMock) as mock_cleanup:
                 mock_init.return_value = True
 
                 with pytest.raises(ValueError):
-                    async with OpenHFPluginSDK(provider="mock"):
+                    async with OpenResourceBroker(provider="mock"):
                         raise ValueError("Test exception")
 
                 mock_init.assert_called_once()
@@ -73,28 +73,28 @@ class TestOpenHFPluginSDK:
 
     def test_list_available_methods_not_initialized(self):
         """Test list_available_methods raises error when not initialized."""
-        sdk = OpenHFPluginSDK(provider="mock")
+        sdk = OpenResourceBroker(provider="mock")
 
         with pytest.raises(SDKError, match="SDK not initialized"):
             sdk.list_available_methods()
 
     def test_get_method_info_not_initialized(self):
         """Test get_method_info raises error when not initialized."""
-        sdk = OpenHFPluginSDK(provider="mock")
+        sdk = OpenResourceBroker(provider="mock")
 
         with pytest.raises(SDKError, match="SDK not initialized"):
             sdk.get_method_info("test_method")
 
     def test_get_methods_by_type_not_initialized(self):
         """Test get_methods_by_type raises error when not initialized."""
-        sdk = OpenHFPluginSDK(provider="mock")
+        sdk = OpenResourceBroker(provider="mock")
 
         with pytest.raises(SDKError, match="SDK not initialized"):
             sdk.get_methods_by_type("query")
 
     def test_sdk_stats_not_initialized(self):
         """Test get_stats returns appropriate info when not initialized."""
-        sdk = OpenHFPluginSDK(provider="mock")
+        sdk = OpenResourceBroker(provider="mock")
 
         stats = sdk.get_stats()
 
@@ -104,11 +104,11 @@ class TestOpenHFPluginSDK:
 
     def test_sdk_repr(self):
         """Test SDK string representation."""
-        sdk = OpenHFPluginSDK(provider="mock")
+        sdk = OpenResourceBroker(provider="mock")
 
         repr_str = repr(sdk)
 
-        assert "OpenHFPluginSDK" in repr_str
+        assert "OpenResourceBroker" in repr_str
         assert "provider='mock'" in repr_str
         assert "not initialized" in repr_str
         assert "methods=0" in repr_str
@@ -121,7 +121,7 @@ class TestOpenHFPluginSDK:
             mock_app.initialize = AsyncMock(return_value=False)
             mock_app_class.return_value = mock_app
 
-            sdk = OpenHFPluginSDK(provider="mock")
+            sdk = OpenResourceBroker(provider="mock")
 
             with pytest.raises(ProviderError, match="Failed to initialize mock provider"):
                 await sdk.initialize()
@@ -136,7 +136,7 @@ class TestOpenHFPluginSDK:
             mock_app.get_command_bus = Mock(return_value=None)
             mock_app_class.return_value = mock_app
 
-            sdk = OpenHFPluginSDK(provider="mock")
+            sdk = OpenResourceBroker(provider="mock")
 
             with pytest.raises(ConfigurationError, match="CQRS buses not available"):
                 await sdk.initialize()
@@ -144,7 +144,7 @@ class TestOpenHFPluginSDK:
     @pytest.mark.asyncio
     async def test_cleanup_with_exception(self):
         """Test cleanup handles exceptions gracefully."""
-        sdk = OpenHFPluginSDK(provider="mock")
+        sdk = OpenResourceBroker(provider="mock")
         sdk._initialized = True
 
         # Mock app with cleanup that raises exception

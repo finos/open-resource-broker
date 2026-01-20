@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from interface.mcp.server.core import MCPMessage, OpenHFPluginMCPServer
+from interface.mcp.server.core import MCPMessage, OpenResourceBrokerMCPServer
 
 
 class TestMCPMessage:
@@ -30,7 +30,7 @@ class TestMCPMessage:
         assert msg.params == {"key": "value"}
 
 
-class TestOpenHFPluginMCPServer:
+class TestOpenResourceBrokerMCPServer:
     """Test MCP server implementation."""
 
     @pytest.fixture
@@ -44,7 +44,7 @@ class TestOpenHFPluginMCPServer:
     @pytest.fixture
     def mcp_server(self, mock_app):
         """Create MCP server instance."""
-        return OpenHFPluginMCPServer(app=mock_app)
+        return OpenResourceBrokerMCPServer(app=mock_app)
 
     def test_server_initialization(self, mcp_server):
         """Test server initializes with correct tools and resources."""

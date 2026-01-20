@@ -79,6 +79,12 @@ def update_pyproject_selective(pyproject_path: Path) -> None:
     # Get metadata updates
     package_name = _get_config_value(".project.name")
     package_name_short = _get_config_value(".project.short_name")
+    
+    # Get PyPI-specific name, fallback to package_name if not set
+    pypi_name = _get_config_value(".project.pypi_name")
+    if not pypi_name or pypi_name == "null":
+        pypi_name = package_name
+    
     version = _get_config_value(".project.version")
     description = _get_config_value(".project.description")
     author = _get_config_value(".project.author")
@@ -114,7 +120,7 @@ def update_pyproject_selective(pyproject_path: Path) -> None:
             new_lines.extend(
                 [
                     "[project]",
-                    f'name = "{package_name}"',
+                    f'name = "{pypi_name}"',
                     f'version = "{version}"',
                     f'description = "{description}"',
                     'readme = "README.md"',

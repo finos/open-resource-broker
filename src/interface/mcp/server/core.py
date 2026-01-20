@@ -29,7 +29,7 @@ class MCPMessage:
     error: Optional[dict[str, Any]] = None
 
 
-class OpenHFPluginMCPServer:
+class OpenResourceBrokerMCPServer:
     """
     Full MCP Server implementation for Open Resource Broker.
 
