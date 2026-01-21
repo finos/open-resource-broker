@@ -85,7 +85,7 @@ jobs:
         continue-on-error: ${{ inputs.continue-on-error }}
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: always()
         with:
           name: test-results-${{ inputs.test-type }}-${{ inputs.os }}-py${{ inputs.python-version || inputs.default-python-version }}

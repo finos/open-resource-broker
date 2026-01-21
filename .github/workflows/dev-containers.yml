@@ -176,7 +176,7 @@ jobs:
 
     - name: Run Hadolint Dockerfile scan
       if: matrix.python-version == needs.config.outputs.default-python-version
-      uses: hadolint/hadolint-action@v3.1.0
+      uses: hadolint/hadolint-action@v3.3.0
       with:
         dockerfile: Dockerfile
         format: sarif

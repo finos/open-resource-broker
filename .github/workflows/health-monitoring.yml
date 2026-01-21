@@ -142,7 +142,7 @@ jobs:
         color: blue
 
     - name: Create health report issue
-      uses: peter-evans/create-issue-from-file@v5
+      uses: peter-evans/create-issue-from-file@v6
       with:
         title: "Weekly Health Report (${{ env.START_DATE }} to ${{ env.END_DATE }})"
         content-filepath: health-report.md
@@ -151,7 +151,7 @@ jobs:
           automated-report
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4.4.3
+      uses: actions/upload-artifact@v6
       with:
         name: health-report-${{ env.END_DATE }}
         retention-days: 30

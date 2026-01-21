@@ -139,7 +139,7 @@ jobs:
         make ci-build-sbom
 
     - name: Upload SBOM artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: reports-sbom-${{ needs.config.outputs.package-version }}
         path: |
