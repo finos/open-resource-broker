@@ -65,6 +65,15 @@ build: clean dev-install  ## Build package
 	VERSION=$${VERSION:-$$(make -s get-version)} $(MAKE) generate-pyproject && \
 	VERSION=$${VERSION:-$$(make -s get-version)} BUILD_ARGS="$(BUILD_ARGS)" ./dev-tools/package/build.sh
 
+build-with-version: clean dev-install  ## Build package with explicit version (skips generate-pyproject)
+	@if [ -z "$$VERSION" ]; then \
+		echo "ERROR: VERSION environment variable must be set"; \
+		exit 1; \
+	fi
+	@echo "Updating pyproject.toml version to: $$VERSION"
+	@sed -i.bak "s/^version = .*/version = \"$$VERSION\"/" pyproject.toml && rm -f pyproject.toml.bak
+	@BUILD_ARGS="$(BUILD_ARGS)" ./dev-tools/package/build.sh
+
 semantic-release-build:  ## Build package for semantic-release (minimal dependencies)
 	./dev-tools/package/build.sh
 
@@ -75,6 +84,17 @@ build-test: build  ## Build and test package installation
 test-install: build  ## Test package installation in clean environment
 	@echo "Testing package installation in clean environment..."
 	# Create temporary virtual environment and test installation
+	python -m venv /tmp/test-install-env
+	/tmp/test-install-env/bin/pip install dist/*.whl
+	/tmp/test-install-env/bin/python -c "import $(PYTHON_MODULE); print('Package installed successfully')"
+	rm -rf /tmp/test-install-env
+
+test-install-only:  ## Test package installation without rebuilding
+	@echo "Testing package installation in clean environment..."
+	@if [ ! -f dist/*.whl ]; then \
+		echo "ERROR: No wheel file found in dist/. Run 'make build' first."; \
+		exit 1; \
+	fi
 	python -m venv /tmp/test-install-env
 	/tmp/test-install-env/bin/pip install dist/*.whl
 	/tmp/test-install-env/bin/python -c "import $(PYTHON_MODULE); print('Package installed successfully')"
