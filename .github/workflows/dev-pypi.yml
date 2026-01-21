@@ -85,13 +85,14 @@ jobs:
       with:
         cache-key: deps-${{ needs.get-config.outputs.default-python-version }}-${{ hashFiles('.project.yml', 'pyproject.toml', 'requirements*.txt') }}
         fail-on-cache-miss: false
+
     - name: Build package
       run: |
-        make build
+        make build-with-version
 
     - name: Check package
       run: |
-        make test-install
+        make test-install-only
 
     - name: Publish to Test PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
