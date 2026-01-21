@@ -77,7 +77,7 @@ test-install: build  ## Test package installation in clean environment
 	# Create temporary virtual environment and test installation
 	python -m venv /tmp/test-install-env
 	/tmp/test-install-env/bin/pip install dist/*.whl
-	/tmp/test-install-env/bin/python -c "import $(PACKAGE_NAME_SHORT); print('Package installed successfully')"
+	/tmp/test-install-env/bin/python -c "import $(PYTHON_MODULE); print('Package installed successfully')"
 	rm -rf /tmp/test-install-env
 
 # @SECTION Release Management
