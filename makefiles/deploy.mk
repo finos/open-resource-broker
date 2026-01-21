@@ -145,6 +145,9 @@ get-version:  ## Generate unified version (works for PyPI, Docker, Git)
 get-container-tags:  ## Calculate container tags for current context
 	@./dev-tools/container/calculate_tags.sh
 
+get-container-tags-env:  ## Export container tags as environment variables
+	@./dev-tools/container/calculate_tags.sh | sed 's/^/export /'
+
 version-bump:  ## Show version bump help
 	@echo "Version Management Commands:"
 	@echo "  make version-show         - Show current version"

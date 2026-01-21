@@ -1,5 +1,5 @@
-name: 'Setup Python and UV'
-description: 'Setup Python, UV, generate pyproject.toml, and install dependencies'
+name: 'Setup UV Fresh'
+description: 'Setup Python, UV, generate pyproject.toml, and install dependencies from scratch'
 inputs:
   python-version:
     description: 'Python version to setup'

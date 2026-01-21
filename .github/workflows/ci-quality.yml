@@ -52,7 +52,7 @@ jobs:
         fetch-depth: 0
     
     - name: Setup Python and UV
-      uses: ./.github/actions/setup-python-uv
+      uses: ./.github/actions/setup-uv-fresh
       with:
         python-version: ${{ needs.config.outputs.default-python-version }}
         cache-key-suffix: quality

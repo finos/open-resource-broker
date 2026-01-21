@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  get-config:
+  config:
     name: Get Configuration
     runs-on: ubuntu-latest
     outputs:
@@ -42,14 +42,14 @@ jobs:
 
   prod-containers:
     name: Build Production Containers
-    needs: get-config
+    needs: config
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ${{ fromJSON(needs.get-config.outputs.python-versions) }}
+        python-version: ${{ fromJSON(needs.config.outputs.python-versions) }}
     
     env:
-      SCAN_LEVEL: ${{ matrix.python-version == needs.get-config.outputs.default-python-version && 'full' || 'basic' }}
+      SCAN_LEVEL: ${{ matrix.python-version == needs.config.outputs.default-python-version && 'full' || 'basic' }}
       PUSH_TO_REGISTRY: true
 
     permissions:
@@ -69,14 +69,14 @@ jobs:
     - name: Log in to Container Registry
       uses: docker/login-action@v3
       with:
-        registry: ${{ needs.get-config.outputs.container-registry }}
+        registry: ${{ needs.config.outputs.container-registry }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
       with:
-        cache-key: prod-${{ needs.get-config.outputs.package-version }}-py${{ matrix.python-version }}
+        cache-key: prod-${{ needs.config.outputs.package-version }}-py${{ matrix.python-version }}
         fail-on-cache-miss: false
 
     - name: Build package wheel
@@ -84,11 +84,11 @@ jobs:
 
     - name: Build and scan container image
       env:
-        REGISTRY: ${{ needs.get-config.outputs.container-registry }}
-        IMAGE_NAME: ${{ needs.get-config.outputs.container-image }}
-        VERSION: ${{ needs.get-config.outputs.package-version }}
+        REGISTRY: ${{ needs.config.outputs.container-registry }}
+        IMAGE_NAME: ${{ needs.config.outputs.container-image }}
+        VERSION: ${{ needs.config.outputs.package-version }}
         PYTHON_VERSION: ${{ matrix.python-version }}
-        DEFAULT_PYTHON: ${{ needs.get-config.outputs.default-python-version }}
+        DEFAULT_PYTHON: ${{ needs.config.outputs.default-python-version }}
       run: |
         make container single push \
           REGISTRY="$REGISTRY" \
@@ -98,7 +98,7 @@ jobs:
 
   prod-manifests:
     name: Create Production Manifests
-    needs: [get-config, prod-containers]
+    needs: [config, prod-containers]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -111,20 +111,20 @@ jobs:
     - name: Log in to Container Registry
       uses: docker/login-action@v3
       with:
-        registry: ${{ needs.get-config.outputs.container-registry }}
+        registry: ${{ needs.config.outputs.container-registry }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Create production tag manifests
       env:
-        REGISTRY: ${{ needs.get-config.outputs.container-registry }}
-        IMAGE: ${{ needs.get-config.outputs.container-image }}
-        VERSION: ${{ needs.get-config.outputs.package-version }}
-        DEFAULT_PYTHON: ${{ needs.get-config.outputs.default-python-version }}
+        REGISTRY: ${{ needs.config.outputs.container-registry }}
+        IMAGE: ${{ needs.config.outputs.container-image }}
+        VERSION: ${{ needs.config.outputs.package-version }}
+        DEFAULT_PYTHON: ${{ needs.config.outputs.default-python-version }}
         IS_RELEASE: "true"
       run: |
-        # Get tags from calculation script
-        eval "$(make get-container-tags)"
+        # Get tags from Makefile target
+        eval "$(make get-container-tags-env)"
         
         # Create primary tags (latest, version)
         if [[ -n "$primary_tags" ]]; then
@@ -151,7 +151,7 @@ jobs:
 
   prod-pypi:
     name: Publish to PyPI
-    needs: get-config
+    needs: config
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -165,7 +165,7 @@ jobs:
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
       with:
-        cache-key: prod-pypi-${{ needs.get-config.outputs.package-version }}
+        cache-key: prod-pypi-${{ needs.config.outputs.package-version }}
         fail-on-cache-miss: false
 
     - name: Build package
@@ -179,8 +179,11 @@ jobs:
 
   prod-docs:
     name: Deploy Production Documentation
-    needs: get-config
+    needs: config
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     permissions:
       contents: read
       pages: write
@@ -193,7 +196,7 @@ jobs:
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
       with:
-        cache-key: prod-docs-${{ needs.get-config.outputs.package-version }}
+        cache-key: prod-docs-${{ needs.config.outputs.package-version }}
         fail-on-cache-miss: false
 
     - name: Build documentation
@@ -211,7 +214,7 @@ jobs:
 
   github-assets:
     name: Upload GitHub Release Assets
-    needs: [get-config, prod-containers, prod-pypi]
+    needs: [config, prod-containers, prod-pypi]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -223,7 +226,7 @@ jobs:
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
       with:
-        cache-key: prod-assets-${{ needs.get-config.outputs.package-version }}
+        cache-key: prod-assets-${{ needs.config.outputs.package-version }}
         fail-on-cache-miss: false
 
     - name: Build package
@@ -236,7 +239,7 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        VERSION="${{ needs.get-config.outputs.package-version }}"
+        VERSION="${{ needs.config.outputs.package-version }}"
         RELEASE_TAG="v$VERSION"
         
         # Upload wheel and source distribution

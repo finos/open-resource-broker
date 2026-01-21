@@ -20,13 +20,13 @@ on:
     # Only run on main branch for comprehensive testing
 
 jobs:
-  get-config:
+  config:
     name: Get Configuration
     uses: ./.github/workflows/shared-config.yml
 
   unit-tests:
     name: Unit Tests
-    needs: get-config
+    needs: config
     permissions:
       contents: read
     strategy:
@@ -35,23 +35,23 @@ jobs:
         os: [ubuntu-latest]  # Disabled windows-latest, macos-latest for now
         # Dynamic matrix from config with static fallback for act/dry-run
         # Update static list when adding new Python versions (currently 3.10-3.14)
-        python-version: ${{ fromJSON(needs.get-config.outputs.python-versions || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
+        python-version: ${{ fromJSON(needs.config.outputs.python-versions || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
     uses: ./.github/workflows/reusable-test.yml
     with:
       test-type: unit
       python-version: ${{ matrix.python-version }}
       os: ${{ matrix.os }}
-      default-python-version: ${{ needs.get-config.outputs.default-python-version }}
+      default-python-version: ${{ needs.config.outputs.default-python-version }}
       continue-on-error: true  # TODO: Remove once tests are stable
-      aws-region: ${{ needs.get-config.outputs.aws-region }}
-      aws-access-key: ${{ needs.get-config.outputs.aws-access-key }}
-      aws-secret-key: ${{ needs.get-config.outputs.aws-secret-key }}
-      environment: ${{ needs.get-config.outputs.environment }}
-      testing-flag: ${{ needs.get-config.outputs.testing-flag }}
+      aws-region: ${{ needs.config.outputs.aws-region }}
+      aws-access-key: ${{ needs.config.outputs.aws-access-key }}
+      aws-secret-key: ${{ needs.config.outputs.aws-secret-key }}
+      environment: ${{ needs.config.outputs.environment }}
+      testing-flag: ${{ needs.config.outputs.testing-flag }}
 
   integration-tests:
     name: Integration Tests
-    needs: [get-config, unit-tests]
+    needs: [config, unit-tests]
     permissions:
       contents: read
     strategy:
@@ -60,23 +60,23 @@ jobs:
         os: [ubuntu-latest]  # Disabled windows-latest, macos-latest for now
         # Dynamic matrix from config with static fallback for act/dry-run
         # Update static list when adding new Python versions (currently 3.10-3.14)
-        python-version: ${{ fromJSON(needs.get-config.outputs.python-versions || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
+        python-version: ${{ fromJSON(needs.config.outputs.python-versions || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
     uses: ./.github/workflows/reusable-test.yml
     with:
       test-type: integration
       python-version: ${{ matrix.python-version }}
       os: ${{ matrix.os }}
-      default-python-version: ${{ needs.get-config.outputs.default-python-version }}
+      default-python-version: ${{ needs.config.outputs.default-python-version }}
       continue-on-error: true  # TODO: Remove once tests are stable
-      aws-region: ${{ needs.get-config.outputs.aws-region }}
-      aws-access-key: ${{ needs.get-config.outputs.aws-access-key }}
-      aws-secret-key: ${{ needs.get-config.outputs.aws-secret-key }}
-      environment: ${{ needs.get-config.outputs.environment }}
-      testing-flag: ${{ needs.get-config.outputs.testing-flag }}
+      aws-region: ${{ needs.config.outputs.aws-region }}
+      aws-access-key: ${{ needs.config.outputs.aws-access-key }}
+      aws-secret-key: ${{ needs.config.outputs.aws-secret-key }}
+      environment: ${{ needs.config.outputs.environment }}
+      testing-flag: ${{ needs.config.outputs.testing-flag }}
 
   e2e-tests:
     name: End-to-End Tests
-    needs: [get-config, unit-tests, integration-tests]
+    needs: [config, unit-tests, integration-tests]
     permissions:
       contents: read
     strategy:
@@ -85,19 +85,19 @@ jobs:
         os: [ubuntu-latest]  # Disabled windows-latest, macos-latest for now
         # Dynamic matrix from config with static fallback for act/dry-run
         # Update static list when adding new Python versions (currently 3.10-3.14)
-        python-version: ${{ fromJSON(needs.get-config.outputs.python-versions || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
+        python-version: ${{ fromJSON(needs.config.outputs.python-versions || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
     uses: ./.github/workflows/reusable-test.yml
     with:
       test-type: e2e
       python-version: ${{ matrix.python-version }}
       os: ${{ matrix.os }}
-      default-python-version: ${{ needs.get-config.outputs.default-python-version }}
+      default-python-version: ${{ needs.config.outputs.default-python-version }}
       continue-on-error: true  # TODO: Remove once tests are stable
-      aws-region: ${{ needs.get-config.outputs.aws-region }}
-      aws-access-key: ${{ needs.get-config.outputs.aws-access-key }}
-      aws-secret-key: ${{ needs.get-config.outputs.aws-secret-key }}
-      environment: ${{ needs.get-config.outputs.environment }}
-      testing-flag: ${{ needs.get-config.outputs.testing-flag }}
+      aws-region: ${{ needs.config.outputs.aws-region }}
+      aws-access-key: ${{ needs.config.outputs.aws-access-key }}
+      aws-secret-key: ${{ needs.config.outputs.aws-secret-key }}
+      environment: ${{ needs.config.outputs.environment }}
+      testing-flag: ${{ needs.config.outputs.testing-flag }}
 
   test-summary:
     name: Test Summary

@@ -18,9 +18,18 @@ jobs:
     name: Configuration
     uses: ./.github/workflows/shared-config.yml
 
+  setup-cache:
+    name: Setup Cache
+    needs: config
+    uses: ./.github/workflows/cache-management.yml
+    with:
+      cache-type: dependencies
+      cache-key-base: metrics-deps
+      python-version: ${{ needs.config.outputs.default-python-version }}
+
   metrics:
     name: Generate Advanced Metrics
-    needs: config
+    needs: [config, setup-cache]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -30,15 +39,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v6.0.1
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
+    - name: Setup Python and UV
+      uses: ./.github/actions/setup-uv-cached
       with:
-        python-version: ${{ needs.config.outputs.default-python-version }}
-
-    - name: Cache management
-      uses: ./.github/workflows/cache-management.yml
-      with:
-        python-version: ${{ needs.config.outputs.default-python-version }}
+        cache-key: ${{ needs.setup-cache.outputs.cache-key }}
+        fail-on-cache-miss: false
 
     - name: Install dependencies
       run: |

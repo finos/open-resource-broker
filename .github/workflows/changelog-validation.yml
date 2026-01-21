@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  get-config:
+  config:
     name: Get Configuration
     runs-on: ubuntu-latest
     permissions:
@@ -27,17 +27,17 @@ jobs:
 
   setup-cache:
     name: Setup Cache
-    needs: get-config
+    needs: config
     uses: ./.github/workflows/cache-management.yml
     with:
       cache-type: dependencies
       cache-key-base: changelog-validation
-      python-version: ${{ needs.get-config.outputs.default-python-version }}
+      python-version: ${{ needs.config.outputs.default-python-version }}
 
   validate-changelog:
     name: Validate Changelog Format
     runs-on: ubuntu-latest
-    needs: [get-config, setup-cache]
+    needs: [config, setup-cache]
     permissions:
       contents: read
     

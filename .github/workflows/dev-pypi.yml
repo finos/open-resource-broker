@@ -39,7 +39,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  get-config:
+  config:
     name: Get Configuration
     runs-on: ubuntu-latest
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
@@ -58,10 +58,10 @@ jobs:
   publish:
     name: Build and Publish Package
     runs-on: ubuntu-latest
-    needs: [get-config]
+    needs: [config]
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/${{ needs.get-config.outputs.pypi-name }}
+      url: https://test.pypi.org/p/${{ needs.config.outputs.pypi-name }}
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
       contents: read   # needed to checkout code
@@ -75,7 +75,7 @@ jobs:
     - name: Determine version and target
       run: |
         {
-          echo "VERSION=${{ needs.get-config.outputs.package-version }}"
+          echo "VERSION=${{ needs.config.outputs.package-version }}"
           echo "TARGET=testpypi"
         } >> "$GITHUB_ENV"
         echo "Publishing to: TestPyPI with version: $VERSION"
@@ -83,7 +83,7 @@ jobs:
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
       with:
-        cache-key: deps-${{ needs.get-config.outputs.default-python-version }}-${{ hashFiles('.project.yml', 'pyproject.toml', 'requirements*.txt') }}
+        cache-key: deps-${{ needs.config.outputs.default-python-version }}-${{ hashFiles('.project.yml', 'pyproject.toml', 'requirements*.txt') }}
         fail-on-cache-miss: false
 
     - name: Build package
@@ -107,7 +107,7 @@ jobs:
           echo "## Package Published Successfully"
           echo ""
           echo "**Environment:** Test PyPI"
-          echo "**Installation:** \`pip install --index-url https://test.pypi.org/simple/ ${{ needs.get-config.outputs.pypi-name }}\`"
+          echo "**Installation:** \`pip install --index-url https://test.pypi.org/simple/ ${{ needs.config.outputs.pypi-name }}\`"
           echo ""
           echo "**Version:** $VERSION"
           echo "**Commands:**"
@@ -117,7 +117,7 @@ jobs:
   generate-sbom:
     name: Generate SBOM
     runs-on: ubuntu-latest
-    needs: [get-config, publish]
+    needs: [config, publish]
 
     permissions:
       contents: read
@@ -131,7 +131,7 @@ jobs:
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached
       with:
-        cache-key: deps-${{ needs.get-config.outputs.default-python-version }}-${{ hashFiles('.project.yml', 'pyproject.toml', 'requirements*.txt') }}
+        cache-key: deps-${{ needs.config.outputs.default-python-version }}-${{ hashFiles('.project.yml', 'pyproject.toml', 'requirements*.txt') }}
         fail-on-cache-miss: false
 
     - name: Generate SBOM files
@@ -141,7 +141,7 @@ jobs:
     - name: Upload SBOM artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: reports-sbom-${{ needs.get-config.outputs.package-version }}
+        name: reports-sbom-${{ needs.config.outputs.package-version }}
         path: |
           python-sbom-cyclonedx.json
           python-sbom-spdx.json

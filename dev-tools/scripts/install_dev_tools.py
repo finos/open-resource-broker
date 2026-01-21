@@ -433,7 +433,7 @@ class DevToolsInstaller:
     def _install_pip_audit_python(self):
         """Install pip-audit using Python package manager."""
         # Try uv first, fall back to pip
-        if self._run_command(["uv", "--version"], capture_output=True):
+        if self._run_command(["uv", "--version"]):
             return self._run_command(["uv", "tool", "install", "pip-audit"])
         else:
             return self._run_command(["pip", "install", "--user", "pip-audit"])

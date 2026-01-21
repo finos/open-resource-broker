@@ -34,7 +34,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  get-config:
+  config:
     name: Get Configuration
     runs-on: ubuntu-latest
     outputs:
@@ -48,15 +48,15 @@ jobs:
 
   setup-cache:
     name: Setup Cache
-    needs: get-config
+    needs: config
     uses: ./.github/workflows/cache-management.yml
     with:
       cache-type: dependencies
       cache-key-base: docs-deps
-      python-version: ${{ needs.get-config.outputs.default-python-version }}
+      python-version: ${{ needs.config.outputs.default-python-version }}
 
   build:
-    needs: [get-config, setup-cache]
+    needs: [config, setup-cache]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
