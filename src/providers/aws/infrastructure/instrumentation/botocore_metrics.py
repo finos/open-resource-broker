@@ -196,11 +196,11 @@ class BotocoreMetricsHandler:
             )
 
             # Record response size metrics
-            self.metrics.record_gauge(
+            self.metrics.set_gauge(
                 f"aws.{context.service}.{context.operation}.response_size",
                 response_size,
             )
-            self.metrics.record_gauge("aws_api_response_size", response_size)
+            self.metrics.set_gauge("aws_api_response_size", response_size)
 
             if status_code and status_code >= 400:
                 self.metrics.increment_counter(
