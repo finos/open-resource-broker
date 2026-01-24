@@ -45,6 +45,10 @@ class AWSClient:
         self.config: dict[str, Any] = {}
         self._config_manager = config
         self._logger = logger
+        self._aws_config: Optional["AWSProviderConfig"] = None
+        # Tracks whether we've attempted provider selection; we cache failures too.
+        # This avoids repeated DI lookups and log spam when selection is unavailable.
+        self._aws_config_loaded = False
 
         # Get region from configuration
         self.region_name = self._get_region_from_config_manager() or "eu-west-1"
@@ -137,16 +141,10 @@ class AWSClient:
         Returns:
             AWS region or None if not found
         """
-        try:
-            # Try to get AWS config from ConfigurationManager
-            from providers.aws.configuration.config import AWSProviderConfig
-
-            aws_config = self._config_manager.get_typed(AWSProviderConfig)
-            if aws_config and aws_config.region:
-                self._logger.debug("Using region from ConfigurationManager: %s", aws_config.region)
-                return aws_config.region
-        except Exception as e:
-            self._logger.debug("Could not get region from ConfigurationManager: %s", str(e))
+        aws_config = self._get_selected_aws_provider_config()
+        if aws_config and aws_config.region:
+            self._logger.debug("Using region from selected AWS config: %s", aws_config.region)
+            return aws_config.region
 
         return None
 
@@ -157,6 +155,37 @@ class AWSClient:
         Returns:
             AWS profile or None if not found
         """
+        aws_config = self._get_selected_aws_provider_config()
+        if aws_config and aws_config.profile:
+            self._logger.debug(
+                "Using profile from selected AWS config: %s",
+                aws_config.profile,
+            )
+            return aws_config.profile
+
+        return None
+
+    def _get_selected_aws_provider_config(self) -> Optional["AWSProviderConfig"]:
+        """Get selected AWS provider configuration.
+
+        Primary path: use ProviderSelectionService to pick the active instance and
+        build AWSProviderConfig from its config payload.
+        Fallback path: use the legacy ConfigurationManager.get_typed(AWSProviderConfig) resolution.
+
+        This function attempts to get config only once and stores _aws_config_loaded=True
+        even if retrieval failed.
+        """
+        if self._aws_config_loaded:
+            return self._aws_config
+
+        self._aws_config_loaded = True
+
+        try:
+            from providers.aws.configuration.config import AWSProviderConfig
+        except Exception as e:
+            self._logger.debug("Could not import AWSProviderConfig: %s", str(e))
+            return None
+
         try:
             # Use provider selection service from DI container
             from application.services.provider_selection_service import ProviderSelectionService
@@ -174,66 +203,67 @@ class AWSClient:
 
             # Ensure we have an AWS provider
             if selection_result.provider_type != "aws":
-                self._logger.debug(
-                    "Selected provider is not AWS: %s", selection_result.provider_type
+                raise AWSConfigurationError(
+                    "Selected provider is not AWS: %s" % selection_result.provider_type
                 )
-                return None
 
             # Get the provider instance configuration
             provider_config = self._config_manager.get_provider_config()
             if not provider_config:
                 self._logger.debug("No provider config found")
-                return None
+            else:
+                # Find the selected provider instance
+                for provider in provider_config.providers:
+                    if provider.name == selection_result.provider_instance:
+                        self._logger.debug(
+                            "Found provider %s, building AWSProviderConfig", provider.name
+                        )
+                        if not hasattr(provider, "config") or not provider.config:
+                            self._logger.debug("Provider has no config attribute")
+                            break
 
-            # Find the selected provider instance
-            for provider in provider_config.providers:
-                if provider.name == selection_result.provider_instance:
-                    self._logger.debug("Found provider %s, checking config...", provider.name)
-                    # Access profile from provider config dict
-                    if hasattr(provider, "config") and provider.config:
-                        self._logger.debug("Provider has config: %s", type(provider.config))
+                        if isinstance(provider.config, AWSProviderConfig):
+                            self._aws_config = provider.config
+                            return self._aws_config
 
-                        # Handle both dict and object config
                         if isinstance(provider.config, dict):
                             self._logger.debug("Config dict contents: %s", provider.config)
-                            profile = provider.config.get("profile")
-                        else:
-                            profile = getattr(provider.config, "profile", None)
+                            self._aws_config = AWSProviderConfig(**provider.config)
+                            return self._aws_config
 
-                        if profile:
-                            self._logger.debug(
-                                "Using profile from selected provider %s: %s",
-                                provider.name,
-                                profile,
-                            )
-                            return profile
-                        else:
-                            self._logger.debug("No profile found in provider config")
-                    else:
-                        self._logger.debug("Provider has no config attribute")
-                    break
-            else:
-                self._logger.debug(
-                    "Provider %s not found in config",
-                    selection_result.provider_instance,
-                )
+                        config_data = None
+                        if hasattr(provider.config, "model_dump"):
+                            config_data = provider.config.model_dump()
+                        elif hasattr(provider.config, "dict"):
+                            config_data = provider.config.dict()
+                        elif hasattr(provider.config, "__dict__"):
+                            config_data = provider.config.__dict__
 
+                        if isinstance(config_data, dict):
+                            self._aws_config = AWSProviderConfig(**config_data)
+                            return self._aws_config
+
+                        self._logger.debug(
+                            "Unsupported provider config type: %s", type(provider.config)
+                        )
+                        break
+                else:
+                    self._logger.debug(
+                        "Provider %s not found in config",
+                        selection_result.provider_instance,
+                    )
+        except AWSConfigurationError:
+            raise
         except Exception as e:
-            self._logger.debug("Could not get profile via provider selection: %s", str(e))
+            self._logger.debug("Could not get AWS config via provider selection: %s", str(e))
 
         # Fallback: try legacy AWSProviderConfig approach
         try:
-            from providers.aws.configuration.config import AWSProviderConfig
-
             aws_config = self._config_manager.get_typed(AWSProviderConfig)
-            if aws_config and aws_config.profile:
-                self._logger.debug(
-                    "Using profile from legacy AWSProviderConfig: %s",
-                    aws_config.profile,
-                )
-                return aws_config.profile
+            self._aws_config = aws_config
+            return aws_config
         except Exception as e:
-            self._logger.debug("Could not get profile from legacy config: %s", str(e))
+            self._logger.debug("Could not get AWS config from legacy config: %s", str(e))
 
         return None
 
