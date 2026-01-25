@@ -34,7 +34,7 @@ jobs:
       cache-hit: ${{ steps.cache.outputs.cache-hit }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6.0.1
+      uses: actions/checkout@v6.0.2
 
     - name: Generate cache key
       id: cache-key

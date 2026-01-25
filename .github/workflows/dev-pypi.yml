@@ -49,7 +49,7 @@ jobs:
       pypi-name: ${{ steps.config.outputs.pypi-name }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6.0.1
+      uses: actions/checkout@v6.0.2
 
     - name: Get project configuration
       id: config
@@ -68,7 +68,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6.0.1
+      uses: actions/checkout@v6.0.2
       with:
         ref: ${{ github.sha }}
 
@@ -126,7 +126,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6.0.1
+      uses: actions/checkout@v6.0.2
 
     - name: Setup Python and UV
       uses: ./.github/actions/setup-uv-cached

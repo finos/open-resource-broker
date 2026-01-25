@@ -20,7 +20,7 @@ jobs:
       default-python-version: ${{ steps.config.outputs.default-python-version }}
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6.0.1
+      uses: actions/checkout@v6.0.2
     - name: Get project configuration
       id: config
       uses: ./.github/actions/get-config
@@ -43,7 +43,7 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v6.0.1
+      uses: actions/checkout@v6.0.2
       with:
         fetch-depth: 0  # Need full history for changelog generation
     
