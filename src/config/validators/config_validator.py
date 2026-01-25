@@ -71,10 +71,7 @@ class ConfigValidator:
                     aws_config = provider.config
 
                     # Validate AWS-specific business rules
-                    if (
-                        hasattr(aws_config, "aws_max_retries")
-                        and aws_config.aws_max_retries > 10
-                    ):
+                    if hasattr(aws_config, "aws_max_retries") and aws_config.aws_max_retries > 10:
                         result.add_warning(
                             f"AWS provider '{provider.name}' aws_max_retries is very high, consider reducing for better performance"
                         )

@@ -56,9 +56,7 @@ class AWSClient:
 
         aws_provider_config = self._get_selected_aws_provider_config()
         max_attempts = int(aws_provider_config.aws_max_retries) if aws_provider_config else 3
-        connect_timeout = (
-            int(aws_provider_config.aws_connect_timeout) if aws_provider_config else 5
-        )
+        connect_timeout = int(aws_provider_config.aws_connect_timeout) if aws_provider_config else 5
         read_timeout = int(aws_provider_config.aws_read_timeout) if aws_provider_config else 10
 
         # Configure retry settings
