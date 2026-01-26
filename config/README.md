@@ -14,15 +14,17 @@ This section configures AWS SDK behavior:
 "aws": {
   "region": "us-east-1",
   "profile": "default",
-  "max_retries": 3,
-  "timeout": 30
+  "aws_max_retries": 3,
+  "aws_connect_timeout": 10,
+  "aws_read_timeout": 30
 }
 ```
 
 - `region`: AWS region to use for API calls
 - `profile`: AWS profile to use for credentials
-- `max_retries`: Number of retries for AWS API calls
-- `timeout`: Timeout in seconds for AWS API calls
+- `aws_max_retries`: Number of retries for AWS API calls
+- `aws_connect_timeout`: Connection timeout in seconds for AWS API calls
+- `aws_read_timeout`: Timeout in seconds for AWS API calls
 
 ### Logging Configuration (`logging`)
 

@@ -141,9 +141,9 @@ This API uses URL path versioning (e.g., `/api/v1/`). Breaking changes will resu
 def _get_security_scheme_name(strategy: str) -> str:
     """Get security scheme name for the given auth strategy."""
     scheme_mapping = {
-        "bearer_token": "BearerAuth",
-        "iam": "AWSAuth",
-        "cognito": "CognitoAuth",
+        "bearer_token": "BearerAuth",  # nosec B105
+        "iam": "AWSAuth",  # nosec B105
+        "cognito": "CognitoAuth",  # nosec B105
     }
     return scheme_mapping.get(strategy)
 

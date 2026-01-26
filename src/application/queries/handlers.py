@@ -931,6 +931,31 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             request_type = request.request_type
             provider_metadata = provider_metadata or {}
 
+            # If provisioning already recorded a failure, keep the request terminal.
+            metadata = getattr(request, "metadata", {}) or {}
+            error_details = getattr(request, "error_details", {}) or {}
+
+            provisioning_error_type = metadata.get("error_type")
+            provisioning_error_message = metadata.get("error_message")
+            fleet_errors = metadata.get("fleet_errors")
+            ec2_fleet_errors = (error_details.get("ec2_fleet") or {}).get("errors")
+
+            if provisioning_error_type or fleet_errors or ec2_fleet_errors:
+                status_message = provisioning_error_message or "Provisioning failed"
+                if not status_message.lower().startswith("provisioning failed"):
+                    status_message = f"Provisioning failed: {status_message}"
+                if current_status != RequestStatus.FAILED:
+                    return (RequestStatus.FAILED.value, status_message)
+                return (None, None)
+
+            if current_status in [
+                RequestStatus.COMPLETED,
+                RequestStatus.FAILED,
+                RequestStatus.CANCELLED,
+                RequestStatus.TIMEOUT,
+            ]:
+                return (None, None)
+
             # Count machines by status from provider data (most up-to-date)
             provider_machine_count = len(machine_objects_from_provider)
             database_machine_count = len(machine_objects_from_database)

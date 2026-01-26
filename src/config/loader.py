@@ -67,6 +67,7 @@ class ConfigurationLoader:
         "AWS_KEY_FILE": ("aws", "key_file"),
         "AWS_PROXY_HOST": ("aws", "proxy_host"),
         "AWS_PROXY_PORT": ("aws", "proxy_port"),
+        "AWS_CONNECT_TIMEOUT": ("aws", "aws_connect_timeout"),
         "AWS_CONNECTION_TIMEOUT_MS": ("aws", "connection_timeout_ms"),
         "AWS_REQUEST_RETRY_ATTEMPTS": ("aws", "request_retry_attempts"),
         "AWS_INSTANCE_PENDING_TIMEOUT_SEC": ("aws", "instance_pending_timeout_sec"),

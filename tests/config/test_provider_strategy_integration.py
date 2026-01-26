@@ -59,7 +59,7 @@ class TestProviderStrategyIntegration:
                         "config": {
                             "region": "us-east-1",
                             "profile": "resilient-profile",
-                            "max_retries": 5,
+                            "aws_max_retries": 5,
                         },
                     }
                 ],
@@ -71,7 +71,7 @@ class TestProviderStrategyIntegration:
 
         assert aws_config.region == "us-east-1"
         assert aws_config.profile == "resilient-profile"
-        assert aws_config.max_retries == 5
+        assert aws_config.aws_max_retries == 5
 
     def test_provider_strategy_health_check_configuration(self):
         """Test provider strategy with health check configuration."""

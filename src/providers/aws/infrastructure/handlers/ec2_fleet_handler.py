@@ -249,30 +249,121 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         fleet_id = response["FleetId"]
         self._logger.info("Successfully created EC2 Fleet: %s", fleet_id)
 
+        instance_ids = self._extract_instant_instance_ids(response)
+
+        # Check for errors in response (especially for instant fleets)
+        errors = self._extract_fleet_errors(response)
+        if errors:
+            error_summary = "; ".join(
+                f"{error.get('error_code', 'Unknown')}: {error.get('error_message', 'No message')}"
+                for error in errors
+            )
+            self._record_fleet_error_details(
+                request=request,
+                fleet_id=fleet_id,
+                errors=errors,
+                response=response,
+                instance_ids=instance_ids,
+            )
+            self._logger.error(
+                "EC2 Fleet %s returned %d error(s) during creation: %s",
+                fleet_id,
+                len(errors),
+                error_summary,
+            )
+            raise AWSInfrastructureError(
+                f"Fleet {fleet_id} creation failed with {len(errors)} error(s): {error_summary}"
+            )
+
         # Apply post-creation tagging for fleet instances
         # EC2Fleet maintain/request types can't tag instances at creation - need post-creation
         if aws_template.fleet_type in ["maintain", "request"]:
             self._tag_fleet_instances_if_needed(fleet_id, request, aws_template)
 
-        # For instant fleets, store instance IDs in request metadata
+        # For instant fleets, store instance IDs or warn if nothing was returned
         if fleet_type == AWSFleetType.INSTANT:
-            instance_ids = []
-            # For instant fleets, AWS returns 'Instances' -> [{ 'InstanceIds': ['i-...', 'i-...'], ... }]
-            for inst_block in response.get("Instances", []):
-                for instance_id in inst_block.get("InstanceIds", []):
-                    instance_ids.append(instance_id)
-
-            # Log the response structure at debug level if no instances were found
-            if not instance_ids:
-                self._logger.debug(
-                    "No instance IDs found in response. Response structure: %s",
+            if instance_ids:
+                request.metadata["instance_ids"] = instance_ids
+                self._logger.debug("Stored instance IDs in request metadata: %s", instance_ids)
+            else:
+                self._logger.warning(
+                    "No instance IDs found in instant fleet response (no errors reported). Response: %s",
                     response,
                 )
 
-            request.metadata["instance_ids"] = instance_ids
-            self._logger.debug("Stored instance IDs in request metadata: %s", instance_ids)
-
         return fleet_id
+
+    def _extract_instant_instance_ids(self, response: dict[str, Any]) -> list[str]:
+        """Extract instance IDs from an instant fleet response."""
+        instance_ids: list[str] = []
+        for inst_block in response.get("Instances", []):
+            for instance_id in inst_block.get("InstanceIds", []):
+                instance_ids.append(instance_id)
+        return instance_ids
+
+    def _extract_fleet_errors(self, response: dict[str, Any]) -> list[dict[str, Any]]:
+        """Normalize EC2 Fleet error payloads for logging and persistence."""
+        errors = response.get("Errors") or []
+        if isinstance(errors, dict):
+            errors = [errors]
+        if not isinstance(errors, list):
+            return [{"error_code": "Unknown", "error_message": str(errors)}]
+
+        normalized: list[dict[str, Any]] = []
+        for error in errors:
+            if not isinstance(error, dict):
+                normalized.append(
+                    {"error_code": "Unknown", "error_message": str(error), "lifecycle": None}
+                )
+                continue
+
+            lt_overrides = error.get("LaunchTemplateAndOverrides", {}) or {}
+            lt_spec = lt_overrides.get("LaunchTemplateSpecification", {}) or {}
+            overrides = lt_overrides.get("Overrides", {}) or {}
+
+            normalized.append(
+                {
+                    "error_code": error.get("ErrorCode", "Unknown"),
+                    "error_message": error.get("ErrorMessage", "No message"),
+                    "lifecycle": error.get("Lifecycle"),
+                    "launch_template_id": lt_spec.get("LaunchTemplateId"),
+                    "launch_template_version": lt_spec.get("Version"),
+                    "subnet_id": overrides.get("SubnetId"),
+                    "instance_type": overrides.get("InstanceType"),
+                    "instance_requirements": overrides.get("InstanceRequirements"),
+                }
+            )
+
+        return normalized
+
+    def _record_fleet_error_details(
+        self,
+        request: Request,
+        fleet_id: str,
+        errors: list[dict[str, Any]],
+        response: dict[str, Any],
+        instance_ids: list[str],
+    ) -> None:
+        """Persist fleet error context in the request for downstream status handling."""
+        if not hasattr(request, "metadata") or request.metadata is None:
+            request.metadata = {}
+
+        response_metadata = response.get("ResponseMetadata")
+        request.metadata["fleet_id"] = fleet_id
+        request.metadata["fleet_errors"] = errors
+        if response_metadata:
+            request.metadata["fleet_response_metadata"] = response_metadata
+        if instance_ids:
+            request.metadata["instance_ids"] = instance_ids
+
+        error_details = dict(getattr(request, "error_details", {}) or {})
+        error_details["ec2_fleet"] = {
+            "fleet_id": fleet_id,
+            "errors": errors,
+            "response_metadata": response_metadata or {},
+            "instance_ids": instance_ids,
+        }
+        request.error_details = error_details
 
     def _format_instance_data(
         self,

@@ -1,8 +1,8 @@
 """AWS provider configuration - single source of truth."""
 
-from typing import Optional
+from typing import Any, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from infrastructure.interfaces.provider import BaseProviderConfig
 
@@ -72,6 +72,8 @@ class AWSProviderConfig(BaseProviderConfig):
     - Authentication, service settings, and legacy Symphony compatibility
     """
 
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
     # Provider identification (from BaseProviderConfig)
     provider_type: str = "aws"
 
@@ -85,8 +87,16 @@ class AWSProviderConfig(BaseProviderConfig):
     # AWS Settings
     region: str = Field("us-east-1", description="AWS region")
     endpoint_url: Optional[str] = Field(None, description="AWS endpoint URL")
-    max_retries: int = Field(3, description="Maximum number of retries for AWS API calls")
-    timeout: int = Field(30, description="Timeout for AWS API calls in seconds")
+    aws_max_retries: int = Field(
+        3,
+        description="Maximum number of retries for AWS API calls",
+        alias="max_retries",
+    )
+    aws_read_timeout: int = Field(
+        30,
+        description="Read timeout for AWS API calls in seconds",
+        alias="timeout",
+    )
 
     # AWS Services
     service_role_spot_fleet: str = Field(
@@ -109,7 +119,10 @@ class AWSProviderConfig(BaseProviderConfig):
     key_file: Optional[str] = Field(None, description="Path to directory containing key pair files")
     proxy_host: Optional[str] = Field(None, description="Proxy server hostname")
     proxy_port: Optional[int] = Field(None, description="Proxy server port")
-    connection_timeout_ms: int = Field(10000, description="Connection timeout in milliseconds")
+    aws_connect_timeout: int = Field(
+        10,
+        description="Connection timeout in seconds",
+    )
     request_retry_attempts: int = Field(0, description="Number of retry attempts for AWS requests")
     instance_pending_timeout_sec: int = Field(
         180, description="Timeout for pending instances in seconds"
@@ -118,6 +131,33 @@ class AWSProviderConfig(BaseProviderConfig):
         0, description="Number of retries for status requests"
     )
     describe_request_interval: int = Field(0, description="Delay between retries in milliseconds")
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_connect_timeout(cls, data: Any) -> Any:
+        """Normalize legacy connection timeout fields to seconds."""
+        if not isinstance(data, dict):
+            return data
+
+        if "aws_connect_timeout" in data:
+            return data
+
+        raw_timeout = None
+        if "aws_connection_timeout" in data:
+            raw_timeout = data.get("aws_connection_timeout")
+        elif "connection_timeout_ms" in data:
+            raw_timeout = data.get("connection_timeout_ms")
+
+        if raw_timeout is None:
+            return data
+
+        updated = dict(data)
+        try:
+            updated["aws_connect_timeout"] = int(float(raw_timeout) / 1000)
+        except Exception:
+            updated["aws_connect_timeout"] = raw_timeout
+
+        return updated
 
     @model_validator(mode="after")
     def check_auth_method(self) -> "AWSProviderConfig":

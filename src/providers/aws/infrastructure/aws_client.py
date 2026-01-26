@@ -18,7 +18,7 @@ from providers.aws.exceptions.aws_exceptions import (
 from providers.aws.infrastructure.instrumentation.botocore_metrics import BotocoreMetricsHandler
 
 if TYPE_CHECKING:
-    pass
+    from providers.aws.configuration.config import AWSProviderConfig
 
 # Type variable for generic function return type
 T = TypeVar("T")
@@ -42,28 +42,36 @@ class AWSClient:
             logger: Logger for logging messages
             metrics: Optional metrics collector for AWS API instrumentation
         """
-        self.config: dict[str, Any] = {}
         self._config_manager = config
         self._logger = logger
+        self._aws_config: Optional[AWSProviderConfig] = None
+        # Tracks whether we've attempted provider selection; we cache failures too.
+        # This avoids repeated DI lookups and log spam when selection is unavailable.
+        self._aws_config_loaded = False
 
         # Get region from configuration
-        self.region_name = self._get_region_from_config_manager(self._config_manager) or "eu-west-1"
+        self.region_name = self._get_region_from_config_manager() or "eu-west-1"
 
         self._logger.debug("AWS client region determined: %s", self.region_name)
+
+        aws_provider_config = self._get_selected_aws_provider_config()
+        max_attempts = int(aws_provider_config.aws_max_retries) if aws_provider_config else 3
+        connect_timeout = int(aws_provider_config.aws_connect_timeout) if aws_provider_config else 5
+        read_timeout = int(aws_provider_config.aws_read_timeout) if aws_provider_config else 10
 
         # Configure retry settings
         self.boto_config = Config(
             region_name=self.region_name,
             retries={
-                "max_attempts": self.config.get("AWS_MAX_RETRIES", 3),
+                "max_attempts": max_attempts,
                 "mode": "adaptive",
             },
-            connect_timeout=self.config.get("AWS_CONNECT_TIMEOUT", 5),
-            read_timeout=self.config.get("AWS_READ_TIMEOUT", 10),
+            connect_timeout=connect_timeout,
+            read_timeout=read_timeout,
         )
 
         # Load performance configuration
-        self.perf_config = self._load_performance_config(self._config_manager)
+        self.perf_config = self._load_performance_config()
 
         # Initialize resource cache
         self._resource_cache: dict[str, Any] = {}
@@ -75,7 +83,7 @@ class AWSClient:
         self._batch_lock = threading.RLock()
 
         # Get profile from config manager
-        self.profile_name = self._get_profile_from_config_manager(self._config_manager)
+        self.profile_name = self._get_profile_from_config_manager()
 
         self._logger.debug("AWS client profile determined: %s", self.profile_name)
 
@@ -114,9 +122,9 @@ class AWSClient:
                 "AWS client initialized with region: %s, profile: %s, retries: %d, timeouts: connect=%ds, read=%ds",
                 self.region_name,
                 self.profile_name or "default",
-                self.config.get("AWS_MAX_RETRIES", 3),
-                self.config.get("AWS_CONNECT_TIMEOUT", 5),
-                self.config.get("AWS_READ_TIMEOUT", 10),
+                max_attempts,
+                connect_timeout,
+                read_timeout,
             )
 
         except ClientError as e:
@@ -130,39 +138,60 @@ class AWSClient:
             else:
                 raise AWSConfigurationError(f"AWS client initialization failed: {error_message}")
 
-    def _get_region_from_config_manager(self, config_manager) -> Optional[str]:
+    def _get_region_from_config_manager(self) -> Optional[str]:
         """
         Get AWS region from ConfigurationManager.
-
-        Args:
-            config_manager: ConfigurationManager instance
 
         Returns:
             AWS region or None if not found
         """
-        try:
-            # Try to get AWS config from ConfigurationManager
-            from providers.aws.configuration.config import AWSProviderConfig
-
-            aws_config = config_manager.get_typed(AWSProviderConfig)
-            if aws_config and aws_config.region:
-                self._logger.debug("Using region from ConfigurationManager: %s", aws_config.region)
-                return aws_config.region
-        except Exception as e:
-            self._logger.debug("Could not get region from ConfigurationManager: %s", str(e))
+        aws_provider_config = self._get_selected_aws_provider_config()
+        if aws_provider_config and aws_provider_config.region:
+            self._logger.debug(
+                "Using region from selected AWS config: %s", aws_provider_config.region
+            )
+            return aws_provider_config.region
 
         return None
 
-    def _get_profile_from_config_manager(self, config_manager) -> Optional[str]:
+    def _get_profile_from_config_manager(self) -> Optional[str]:
         """
         Get AWS profile from ConfigurationManager using provider selection.
-
-        Args:
-            config_manager: ConfigurationManager instance
 
         Returns:
             AWS profile or None if not found
         """
+        aws_provider_config = self._get_selected_aws_provider_config()
+        if aws_provider_config and aws_provider_config.profile:
+            self._logger.debug(
+                "Using profile from selected AWS config: %s",
+                aws_provider_config.profile,
+            )
+            return aws_provider_config.profile
+
+        return None
+
+    def _get_selected_aws_provider_config(self) -> Optional["AWSProviderConfig"]:
+        """Get selected AWS provider configuration.
+
+        Primary path: use ProviderSelectionService to pick the active instance and
+        build AWSProviderConfig from its config payload.
+        Fallback path: use the legacy ConfigurationManager.get_typed(AWSProviderConfig) resolution.
+
+        This function attempts to get config only once and stores _aws_config_loaded=True
+        even if retrieval failed.
+        """
+        if self._aws_config_loaded:
+            return self._aws_config
+
+        self._aws_config_loaded = True
+
+        try:
+            from providers.aws.configuration.config import AWSProviderConfig
+        except Exception as e:
+            self._logger.debug("Could not import AWSProviderConfig: %s", str(e))
+            return None
+
         try:
             # Use provider selection service from DI container
             from application.services.provider_selection_service import ProviderSelectionService
@@ -180,75 +209,73 @@ class AWSClient:
 
             # Ensure we have an AWS provider
             if selection_result.provider_type != "aws":
-                self._logger.debug(
-                    "Selected provider is not AWS: %s", selection_result.provider_type
+                raise AWSConfigurationError(
+                    "Selected provider is not AWS: %s" % selection_result.provider_type
                 )
-                return None
 
             # Get the provider instance configuration
-            provider_config = config_manager.get_provider_config()
+            provider_config = self._config_manager.get_provider_config()
             if not provider_config:
                 self._logger.debug("No provider config found")
-                return None
+            else:
+                # Find the selected provider instance
+                for provider in provider_config.providers:
+                    if provider.name == selection_result.provider_instance:
+                        self._logger.debug(
+                            "Found provider %s, building AWSProviderConfig", provider.name
+                        )
+                        if not hasattr(provider, "config") or not provider.config:
+                            self._logger.debug("Provider has no config attribute")
+                            break
 
-            # Find the selected provider instance
-            for provider in provider_config.providers:
-                if provider.name == selection_result.provider_instance:
-                    self._logger.debug("Found provider %s, checking config...", provider.name)
-                    # Access profile from provider config dict
-                    if hasattr(provider, "config") and provider.config:
-                        self._logger.debug("Provider has config: %s", type(provider.config))
+                        if isinstance(provider.config, AWSProviderConfig):
+                            self._aws_config = provider.config
+                            return self._aws_config
 
-                        # Handle both dict and object config
                         if isinstance(provider.config, dict):
                             self._logger.debug("Config dict contents: %s", provider.config)
-                            profile = provider.config.get("profile")
-                        else:
-                            profile = getattr(provider.config, "profile", None)
+                            self._aws_config = AWSProviderConfig(**provider.config)
+                            return self._aws_config
 
-                        if profile:
-                            self._logger.debug(
-                                "Using profile from selected provider %s: %s",
-                                provider.name,
-                                profile,
-                            )
-                            return profile
-                        else:
-                            self._logger.debug("No profile found in provider config")
-                    else:
-                        self._logger.debug("Provider has no config attribute")
-                    break
-            else:
-                self._logger.debug(
-                    "Provider %s not found in config",
-                    selection_result.provider_instance,
-                )
+                        config_data = None
+                        if hasattr(provider.config, "model_dump"):
+                            config_data = provider.config.model_dump()
+                        elif hasattr(provider.config, "dict"):
+                            config_data = provider.config.dict()
+                        elif hasattr(provider.config, "__dict__"):
+                            config_data = provider.config.__dict__
 
+                        if isinstance(config_data, dict):
+                            self._aws_config = AWSProviderConfig(**config_data)
+                            return self._aws_config
+
+                        self._logger.debug(
+                            "Unsupported provider config type: %s", type(provider.config)
+                        )
+                        break
+                else:
+                    self._logger.debug(
+                        "Provider %s not found in config",
+                        selection_result.provider_instance,
+                    )
+        except AWSConfigurationError:
+            raise
         except Exception as e:
-            self._logger.debug("Could not get profile via provider selection: %s", str(e))
+            self._logger.debug("Could not get AWS config via provider selection: %s", str(e))
 
         # Fallback: try legacy AWSProviderConfig approach
         try:
-            from providers.aws.configuration.config import AWSProviderConfig
-
-            aws_config = config_manager.get_typed(AWSProviderConfig)
-            if aws_config and aws_config.profile:
-                self._logger.debug(
-                    "Using profile from legacy AWSProviderConfig: %s",
-                    aws_config.profile,
-                )
-                return aws_config.profile
+            aws_provider_config = self._config_manager.get_typed(AWSProviderConfig)
+            self._aws_config = aws_provider_config
+            return aws_provider_config
         except Exception as e:
-            self._logger.debug("Could not get profile from legacy config: %s", str(e))
+            self._logger.debug("Could not get AWS config from legacy config: %s", str(e))
 
         return None
 
-    def _load_performance_config(self, config_manager) -> dict[str, Any]:
+    def _load_performance_config(self) -> dict[str, Any]:
         """
         Load performance configuration from ConfigurationManager.
-
-        Args:
-            config_manager: ConfigurationManager instance
 
         Returns:
             Performance configuration dictionary
@@ -257,7 +284,7 @@ class AWSClient:
             # Try to get performance config from ConfigurationManager
             from config import PerformanceConfig
 
-            perf_config = config_manager.get_typed(PerformanceConfig)
+            perf_config = self._config_manager.get_typed(PerformanceConfig)
             if perf_config:
                 self._logger.debug("Loaded performance configuration from ConfigurationManager")
                 return {

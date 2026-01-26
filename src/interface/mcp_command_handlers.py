@@ -323,7 +323,7 @@ def _format_validation_table(result: dict[str, Any]) -> dict[str, Any]:
     rows = []
 
     for check in result["checks"]:
-        status_symbol = {"PASS": "PASS", "WARNING": "WARN", "FAIL": "FAIL"}.get(
+        status_symbol = {"PASS": "PASS", "WARNING": "WARN", "FAIL": "FAIL"}.get(  # nosec B105
             check["status"], "UNKNOWN"
         )
 

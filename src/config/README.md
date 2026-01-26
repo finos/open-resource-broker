@@ -53,8 +53,9 @@ Comprehensive validation system for all configuration sections.
   "aws": {
     "region": "us-east-1",
     "profile": "default",
-    "max_retries": 3,
-    "timeout": 30,
+    "aws_max_retries": 3,
+    "aws_connect_timeout": 10,
+    "aws_read_timeout": 30,
     "access_key_id": null,
     "secret_access_key": null,
     "session_token": null
@@ -65,8 +66,9 @@ Comprehensive validation system for all configuration sections.
 **Fields:**
 - `region`: Cloud region for API calls
 - `profile`: Credential profile to use
-- `max_retries`: Number of API call retries
-- `timeout`: API call timeout in seconds
+- `aws_max_retries`: Number of API call retries
+- `aws_connect_timeout`: Connection timeout in seconds
+- `aws_read_timeout`: API call timeout in seconds
 - `access_key_id`: Direct access key (optional)
 - `secret_access_key`: Direct secret key (optional)
 - `session_token`: Session token for temporary credentials (optional)
@@ -236,8 +238,9 @@ log_level = config.get_logging_config().level
 # Configuration is type-safe with dataclasses
 aws_config = config.get_aws_config()
 assert isinstance(aws_config.region, str)
-assert isinstance(aws_config.max_retries, int)
-assert isinstance(aws_config.timeout, int)
+assert isinstance(aws_config.aws_max_retries, int)
+assert isinstance(aws_config.aws_connect_timeout, int)
+assert isinstance(aws_config.aws_read_timeout, int)
 
 # Optional fields are properly typed
 if aws_config.access_key_id is not None:
@@ -323,11 +326,15 @@ def validate_aws_config(aws_config: AWSConfig) -> None:
         raise ValueError("AWS region is required")
 
     # Retry validation
-    if aws_config.max_retries < 0:
+    if aws_config.aws_max_retries < 0:
         raise ValueError("Max retries cannot be negative")
 
+    # Connection timeout validation
+    if aws_config.aws_connect_timeout <= 0:
+        raise ValueError("Connect timeout must be positive")
+
     # Timeout validation
-    if aws_config.timeout <= 0:
+    if aws_config.aws_read_timeout <= 0:
         raise ValueError("Timeout must be positive")
 
     # Credential validation
@@ -392,8 +399,9 @@ def validate_repository_config(repo_config: RepositoryConfig) -> None:
 {
   "aws": {
     "region": "us-east-1",
-    "max_retries": 5,
-    "timeout": 60
+    "aws_max_retries": 5,
+    "aws_connect_timeout": 10,
+    "aws_read_timeout": 60
   },
   "logging": {
     "level": "INFO",

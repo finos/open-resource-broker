@@ -10,13 +10,17 @@ from domain.machine.machine_status import MachineStatus
 from domain.request.request_types import RequestStatus, RequestType
 
 
-def _request(request_type, status, requested_count, created_at=None):
+def _request(
+    request_type, status, requested_count, created_at=None, metadata=None, error_details=None
+):
     return SimpleNamespace(
         request_id="req-1",
         request_type=request_type,
         status=status,
         requested_count=requested_count,
         created_at=created_at or datetime.now(UTC),
+        metadata=metadata or {},
+        error_details=error_details or {},
     )
 
 
@@ -218,3 +222,21 @@ def test_return_request_in_progress_when_shutting_down():
     new_status, msg = handler._determine_request_status_from_machines([], machines, request, {})
     assert new_status == RequestStatus.IN_PROGRESS.value
     assert "in progress" in msg.lower()
+
+
+@pytest.mark.unit
+def test_provisioning_failure_metadata_forces_failed():
+    handler = DummyHandler()
+    request = _request(
+        RequestType.ACQUIRE,
+        RequestStatus.IN_PROGRESS,
+        requested_count=3,
+        metadata={
+            "error_type": "ProvisioningFailure",
+            "error_message": "Failed to create EC2 fleet",
+        },
+    )
+
+    new_status, msg = handler._determine_request_status_from_machines([], [], request, {})
+    assert new_status == RequestStatus.FAILED.value
+    assert "Provisioning failed" in msg

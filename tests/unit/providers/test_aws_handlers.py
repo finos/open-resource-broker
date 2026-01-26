@@ -1,7 +1,7 @@
 """Tests for AWS handler implementations."""
 
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import boto3
 import pytest
@@ -10,6 +10,7 @@ from moto import mock_aws
 # Import AWS components
 try:
     from providers.aws.domain.template.value_objects import AWSFleetType
+    from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
     from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
     from providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHandler
     from providers.aws.infrastructure.handlers.run_instances_handler import (
@@ -367,6 +368,111 @@ class TestEC2FleetHandler:
         result = handler.acquire_hosts(request, template)
         assert not result["success"]
         assert "error_message" in result
+
+    def test_ec2_fleet_instant_errors_without_instances_records_failure_details(self):
+        """Instant fleet errors without instances should be captured and fail the request."""
+        logger = Mock()
+        aws_client = Mock()
+        aws_client.ec2_client.create_fleet = Mock()
+        handler = EC2FleetHandler(
+            aws_client=aws_client,
+            logger=logger,
+            aws_ops=Mock(),
+            launch_template_manager=Mock(),
+        )
+        handler._validate_prerequisites = Mock()
+        handler._create_fleet_config = Mock(return_value={})
+
+        response = {
+            "FleetId": "fleet-123",
+            "Errors": [
+                {
+                    "LaunchTemplateAndOverrides": {
+                        "LaunchTemplateSpecification": {
+                            "LaunchTemplateId": "lt-123",
+                            "Version": "1",
+                        },
+                        "Overrides": {"SubnetId": "subnet-123"},
+                    },
+                    "Lifecycle": "on-demand",
+                    "ErrorCode": "RequestLimitExceeded",
+                    "ErrorMessage": "Request limit exceeded.",
+                }
+            ],
+            "Instances": [],
+        }
+        handler._retry_with_backoff = Mock(return_value=response)
+        handler.launch_template_manager.create_or_update_launch_template.return_value = (
+            SimpleNamespace(template_id="lt-123", version="1")
+        )
+
+        request = SimpleNamespace(
+            request_id="req-123",
+            requested_count=1,
+            metadata={},
+            error_details={},
+        )
+        template = SimpleNamespace(template_id="tmpl-123", fleet_type="instant")
+
+        with patch(
+            "providers.aws.infrastructure.adapters.aws_validation_adapter.create_aws_validation_adapter"
+        ) as mock_validation:
+            mock_validation.return_value.get_valid_fleet_types_for_api.return_value = [
+                "instant",
+                "request",
+                "maintain",
+            ]
+            with pytest.raises(AWSInfrastructureError):
+                handler._create_fleet_internal(request, template)
+
+        assert request.metadata["fleet_id"] == "fleet-123"
+        assert request.metadata["fleet_errors"][0]["error_code"] == "RequestLimitExceeded"
+        assert "instance_ids" not in request.metadata
+        assert request.error_details["ec2_fleet"]["errors"][0]["launch_template_id"] == "lt-123"
+
+    def test_ec2_fleet_instant_no_errors_no_instances_warns(self):
+        """Instant fleet without instances and errors should warn and return fleet id."""
+        logger = Mock()
+        aws_client = Mock()
+        aws_client.ec2_client.create_fleet = Mock()
+        handler = EC2FleetHandler(
+            aws_client=aws_client,
+            logger=logger,
+            aws_ops=Mock(),
+            launch_template_manager=Mock(),
+        )
+        handler._validate_prerequisites = Mock()
+        handler._create_fleet_config = Mock(return_value={})
+
+        response = {"FleetId": "fleet-456", "Instances": [], "Errors": []}
+        handler._retry_with_backoff = Mock(return_value=response)
+        handler.launch_template_manager.create_or_update_launch_template.return_value = (
+            SimpleNamespace(template_id="lt-456", version="1")
+        )
+
+        request = SimpleNamespace(
+            request_id="req-456",
+            requested_count=1,
+            metadata={},
+            error_details={},
+        )
+        template = SimpleNamespace(template_id="tmpl-456", fleet_type="instant")
+
+        with patch(
+            "providers.aws.infrastructure.adapters.aws_validation_adapter.create_aws_validation_adapter"
+        ) as mock_validation:
+            mock_validation.return_value.get_valid_fleet_types_for_api.return_value = [
+                "instant",
+                "request",
+                "maintain",
+            ]
+            fleet_id = handler._create_fleet_internal(request, template)
+
+        assert fleet_id == "fleet-456"
+        assert request.metadata == {}
+        assert request.error_details == {}
+        assert logger.warning.called
+        assert "No instance IDs found in instant fleet response" in logger.warning.call_args[0][0]
 
     @mock_aws
     def test_ec2_fleet_handler_terminates_instances(self):

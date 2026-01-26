@@ -57,7 +57,7 @@ class NoAuthStrategy(AuthPort):
             user_id="anonymous",
             user_roles=["anonymous"],
             permissions=["*"],
-            metadata={"strategy": "no_auth", "token_validation": "skipped"},
+            metadata={"strategy": "no_auth", "token_validation": "skipped"},  # nosec B105
         )
 
     async def refresh_token(self, refresh_token: str) -> AuthResult:
@@ -73,7 +73,7 @@ class NoAuthStrategy(AuthPort):
         return AuthResult(
             status=AuthStatus.SUCCESS,
             user_id="anonymous",
-            metadata={"strategy": "no_auth", "token_refresh": "not_applicable"},
+            metadata={"strategy": "no_auth", "token_refresh": "not_applicable"},  # nosec B105
         )
 
     async def revoke_token(self, token: str) -> bool:
