@@ -96,6 +96,55 @@ def get_instance_state(instance_id):
             raise
 
 
+def get_instances_states(instance_ids, client=None):
+    """
+    Check EC2 instances and return their states in the same order as input.
+
+    Returns:
+        list: State name for each instance id, or None if not found
+
+    Example:
+        input: ["i-111", "i-222", "i-333"]
+        output: ["running", None, "stopped"]
+    """
+    if not instance_ids:
+        return []
+
+    if client is None:
+        client = ec2_client
+
+    states_by_id = {instance_id: None for instance_id in instance_ids}
+    chunk_size = 1000  # as per AWS documentation
+
+    for start in range(0, len(instance_ids), chunk_size):
+        chunk = instance_ids[start : start + chunk_size]
+        try:
+            response = client.describe_instances(InstanceIds=chunk)
+            for reservation in response.get("Reservations", []):
+                for instance in reservation.get("Instances", []):
+                    instance_id = instance.get("InstanceId")
+                    if instance_id in states_by_id:
+                        states_by_id[instance_id] = instance["State"]["Name"]
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
+                for instance_id in chunk:
+                    try:
+                        response = client.describe_instances(InstanceIds=[instance_id])
+                        instance_state = response["Reservations"][0]["Instances"][0]["State"]["Name"]
+                        states_by_id[instance_id] = instance_state
+                    except ClientError as inner:
+                        if inner.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
+                            states_by_id[instance_id] = None
+                        else:
+                            print(f"Error checking instance: {inner}")
+                            raise
+            else:
+                print(f"Error checking instances: {e}")
+                raise
+
+    return [states_by_id[instance_id] for instance_id in instance_ids]
+
+
 def get_instance_details(instance_id):
     """
     Get detailed information about an EC2 instance.
@@ -1012,14 +1061,14 @@ def _verify_all_resources_cleaned(
 
     # Check instances
     instances_cleaned = True
-    for instance_id in machine_ids:
-        state_info = get_instance_state(instance_id)
-        if not state_info["exists"]:
+    instance_states = get_instances_states(machine_ids)
+    for instance_id, state in zip(machine_ids, instance_states):
+        if state is None:
             # Instance not found, so it's cleaned up.
             continue
 
-        if state_info["state"] not in ["terminated", "shutting-down"]:
-            log.error("Instance %s still exists in state: %s", instance_id, state_info["state"])
+        if state not in ["terminated", "shutting-down"]:
+            log.error("Instance %s still exists in state: %s", instance_id, state)
             instances_cleaned = False
 
     if instances_cleaned:

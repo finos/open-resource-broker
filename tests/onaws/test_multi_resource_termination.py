@@ -12,6 +12,7 @@ from jsonschema import ValidationError, validate as validate_json_schema
 from hfmock import HostFactoryMock
 from tests.onaws import plugin_io_schemas
 from tests.onaws.parse_output import parse_and_print_output
+from tests.onaws.test_onaws import get_instances_states
 from tests.onaws.template_processor import TemplateProcessor
 
 pytestmark = [  # Apply default markers to every test in this module
@@ -53,33 +54,18 @@ log.addHandler(file_handler)
 MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC = 180
 
 
-def get_instance_state(instance_id):
-    """Check if an EC2 instance exists and return its state."""
-    try:
-        response = ec2_client.describe_instances(InstanceIds=[instance_id])
-        instance_state = response["Reservations"][0]["Instances"][0]["State"]["Name"]
-        return {"exists": True, "state": instance_state}
-    except ClientError as e:
-        if e.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
-            return {"exists": False, "state": None}
-        else:
-            log.error(f"Error checking instance: {e}")
-            raise
-
-
 def check_all_instances_terminating_or_terminated(instance_ids: List[str]) -> bool:
     """Check if all instances are in terminating or terminated state."""
     all_terminating = True
+    instance_states = get_instances_states(instance_ids, ec2_client)
 
-    for instance_id in instance_ids:
-        res = get_instance_state(instance_id)
-
-        if res["exists"]:
-            if res["state"] not in ["shutting-down", "terminated"]:
-                log.debug(f"Instance {instance_id} state: {res['state']} (not terminating yet)")
+    for instance_id, state in zip(instance_ids, instance_states):
+        if state is not None:
+            if state not in ["shutting-down", "terminated"]:
+                log.debug(f"Instance {instance_id} state: {state} (not terminating yet)")
                 all_terminating = False
             else:
-                log.debug(f"Instance {instance_id} state: {res['state']} (terminating)")
+                log.debug(f"Instance {instance_id} state: {state} (terminating)")
         else:
             log.debug(f"Instance {instance_id} no longer exists (terminated)")
 
@@ -334,13 +320,15 @@ def provision_resource_capacity(
     assert status_response["requests"][0]["status"] == "complete"
     machines = status_response["requests"][0]["machines"]
 
-    for machine in machines:
+    instance_ids = [machine["machineId"] for machine in machines]
+    instance_states = get_instances_states(instance_ids, ec2_client)
+
+    for machine, state in zip(machines, instance_states):
         assert machine["status"] in ["running", "pending"]
         instance_id = machine["machineId"]
-        res = get_instance_state(instance_id)
-        assert res["exists"] == True
-        assert res["state"] in ["running", "pending"]
-        log.debug(f"EC2 {instance_id} state: {res['state']}")
+        assert state is not None
+        assert state in ["running", "pending"]
+        log.debug(f"EC2 {instance_id} state: {state}")
 
     log.info(
         f"Successfully provisioned {len(machines)} instances for template {template_json['templateId']}"
@@ -524,15 +512,16 @@ def test_multi_resource_termination(setup_multi_resource_templates):
         assert status_response["requests"][0]["status"] == "complete"
         machines = status_response["requests"][0]["machines"]
 
-        for machine in machines:
+        instance_ids = [machine["machineId"] for machine in machines]
+        instance_states = get_instances_states(instance_ids, ec2_client)
+
+        for machine, state in zip(machines, instance_states):
             assert machine["status"] in ["running", "pending"]
             instance_id = machine["machineId"]
-            res = get_instance_state(instance_id)
-            assert res["exists"] == True
-            assert res["state"] in ["running", "pending"]
-            log.debug(f"EC2 {instance_id} state: {res['state']}")
+            assert state is not None
+            assert state in ["running", "pending"]
+            log.debug(f"EC2 {instance_id} state: {state}")
 
-        instance_ids = [machine["machineId"] for machine in machines]
         all_instance_ids.extend(instance_ids)
         all_status_responses.append(status_response)
         resource_instance_mapping[resource_type] = instance_ids
@@ -601,11 +590,12 @@ def test_multi_resource_termination(setup_multi_resource_templates):
         current_categorization = categorize_instances_by_resource_type(all_instance_ids)
         for resource_type, instances in current_categorization.items():
             if instances:
-                terminating_count = 0
-                for instance_id in instances:
-                    state = get_instance_state(instance_id)
-                    if state["exists"] and state["state"] in ["shutting-down", "terminated"]:
-                        terminating_count += 1
+                instance_states = get_instances_states(instances, ec2_client)
+                terminating_count = sum(
+                    1
+                    for state in instance_states
+                    if state in ["shutting-down", "terminated"]
+                )
                 log.info(
                     f"  {resource_type}: {terminating_count}/{len(instances)} instances terminating/terminated"
                 )
@@ -658,11 +648,9 @@ def test_multi_resource_termination(setup_multi_resource_templates):
     for resource_type, instances in final_categorization.items():
         if instances:
             log.info(f"  {resource_type}: {len(instances)} instances")
-            for instance_id in instances:
-                state = get_instance_state(instance_id)
-                log.info(
-                    f"    {instance_id}: {state['state'] if state['exists'] else 'terminated'}"
-                )
+            instance_states = get_instances_states(instances, ec2_client)
+            for instance_id, state in zip(instances, instance_states):
+                log.info(f"    {instance_id}: {state if state is not None else 'terminated'}")
 
     log.info("=== Multi-Resource Termination Test Completed Successfully ===")
     log.info(

@@ -12,6 +12,7 @@ from jsonschema import ValidationError, validate as validate_json_schema
 from hfmock import HostFactoryMock
 from tests.onaws import plugin_io_schemas
 from tests.onaws.parse_output import parse_and_print_output
+from tests.onaws.test_onaws import get_instances_states
 from tests.onaws.template_processor import TemplateProcessor
 
 pytestmark = [  # Apply default markers to every test in this module
@@ -50,20 +51,6 @@ log.addHandler(console_handler)
 log.addHandler(file_handler)
 
 MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC = 300
-
-
-def get_instance_state(instance_id):
-    """Check if an EC2 instance exists and return its state."""
-    try:
-        response = ec2_client.describe_instances(InstanceIds=[instance_id])
-        instance_state = response["Reservations"][0]["Instances"][0]["State"]["Name"]
-        return {"exists": True, "state": instance_state}
-    except ClientError as e:
-        if e.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
-            return {"exists": False, "state": None}
-        else:
-            log.error(f"Error checking instance: {e}")
-            raise
 
 
 def get_spot_fleet_instances(fleet_id: str) -> List[str]:
@@ -129,16 +116,15 @@ def verify_spot_fleet_instances_detached(instance_ids: List[str]) -> bool:
 def check_all_instances_terminating_or_terminated(instance_ids: List[str]) -> bool:
     """Check if all instances are in terminating or terminated state."""
     all_terminating = True
+    instance_states = get_instances_states(instance_ids, ec2_client)
 
-    for instance_id in instance_ids:
-        res = get_instance_state(instance_id)
-
-        if res["exists"]:
-            if res["state"] not in ["shutting-down", "terminated"]:
-                log.debug(f"Instance {instance_id} state: {res['state']} (not terminating yet)")
+    for instance_id, state in zip(instance_ids, instance_states):
+        if state is not None:
+            if state not in ["shutting-down", "terminated"]:
+                log.debug(f"Instance {instance_id} state: {state} (not terminating yet)")
                 all_terminating = False
             else:
-                log.debug(f"Instance {instance_id} state: {res['state']} (terminating)")
+                log.debug(f"Instance {instance_id} state: {state} (terminating)")
         else:
             log.debug(f"Instance {instance_id} no longer exists (terminated)")
 
@@ -315,13 +301,15 @@ def provision_spot_fleet_capacity(
     assert status_response["requests"][0]["status"] == "complete"
     machines = status_response["requests"][0]["machines"]
 
-    for machine in machines:
+    instance_ids = [machine["machineId"] for machine in machines]
+    instance_states = get_instances_states(instance_ids, ec2_client)
+
+    for machine, state in zip(machines, instance_states):
         assert machine["status"] in ["running", "pending"]
         instance_id = machine["machineId"]
-        res = get_instance_state(instance_id)
-        assert res["exists"] == True
-        assert res["state"] in ["running", "pending"]
-        log.debug(f"EC2 {instance_id} state: {res['state']}")
+        assert state is not None
+        assert state in ["running", "pending"]
+        log.debug(f"EC2 {instance_id} state: {state}")
 
     log.info(
         f"Successfully provisioned {len(machines)} instances for template {template_json['templateId']}"
@@ -487,15 +475,16 @@ def test_multi_spot_fleet_termination(setup_multi_spot_fleet_templates):
         assert status_response["requests"][0]["status"] == "complete"
         machines = status_response["requests"][0]["machines"]
 
-        for machine in machines:
+        instance_ids = [machine["machineId"] for machine in machines]
+        instance_states = get_instances_states(instance_ids, ec2_client)
+
+        for machine, state in zip(machines, instance_states):
             assert machine["status"] in ["running", "pending"]
             instance_id = machine["machineId"]
-            res = get_instance_state(instance_id)
-            assert res["exists"] == True
-            assert res["state"] in ["running", "pending"]
-            log.debug(f"EC2 {instance_id} state: {res['state']}")
+            assert state is not None
+            assert state in ["running", "pending"]
+            log.debug(f"EC2 {instance_id} state: {state}")
 
-        instance_ids = [machine["machineId"] for machine in machines]
         all_instance_ids.extend(instance_ids)
         all_status_responses.append(status_response)
 

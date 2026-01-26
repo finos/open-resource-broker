@@ -284,6 +284,7 @@ class TemplateProcessor:
         # Generate each required file
         # Note: awsprov_templates.json is only for hostfactory scheduler
         template_files = [
+            ("default_config", "default_config.json"),
             ("config", "config.json"),
         ]
 

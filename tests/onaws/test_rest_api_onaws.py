@@ -1175,7 +1175,28 @@ def _check_all_ec2_hosts_are_being_provisioned(status_response):
 
 
 def _capture_resource_history(resource_id: str, provider_api: str, test_name: str) -> None:
-    """Capture full resource history before termination."""
+    """
+    Capture AWS-side history for a backing resource and write it to METRICS_DIR.
+
+    This function:
+    - Requires METRICS_DIR to be set; otherwise it logs a warning and returns.
+    - Fetches provider-specific history (EC2Fleet, SpotFleet, ASG) with pagination.
+
+    -> EC2Fleet: uses describe_fleets to detect fleet type. If the fleet is instant,
+    it synthesizes a history by collecting instance IDs (from fleet info, the request DB,
+    or describe_fleet_instances) and then calling describe_instances in batches of 100 to
+    build instanceChange events plus a synthetic “submitted” event at CreateTime. If not instant,
+    it calls describe_fleet_history with StartTime = now - 1h, paginating by NextToken;
+    if AWS rejects it as an instant fleet, it falls back to the synthetic path.
+
+    -> SpotFleet: calls describe_spot_fleet_request_history with StartTime = now - 1h, paginating by NextToken.
+
+    -> For ASG, inserts a synthetic "submitted" event at creation time so downstream
+      tooling can compute request_time consistently with fleet history.
+
+    - Writes a JSON payload (resource_id, provider_api, history) to
+      {METRICS_DIR}/{test_name}_history.json.
+    """
     log.info("=== Starting resource history capture ===")
     log.info(f"Resource ID: {resource_id}")
     log.info(f"Provider API: {provider_api}")
