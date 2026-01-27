@@ -18,19 +18,27 @@ async def handle_templates_generate(args) -> Dict[str, Any]:
         provider_api = getattr(args, 'provider_api', None)
         examples = _generate_examples(provider_type, provider_api)
         
-        # Get scheduler strategy to determine filename
+        # Get scheduler strategy class to determine filename (no if/else!)
         from config.platform_dirs import get_config_location
-        from infrastructure.di.container import get_container
-        from domain.base.ports.scheduler_port import SchedulerPort
+        from infrastructure.registry.scheduler_registry import get_scheduler_registry
         
         config_dir = get_config_location()
+        config_file = config_dir / "config.json"
         
-        # Get scheduler strategy from DI container
-        container = get_container()
-        scheduler_strategy = container.get(SchedulerPort)
+        # Load config to get scheduler type and pass to strategy
+        scheduler_type = "default"
+        config_dict = None
+        if config_file.exists():
+            with open(config_file) as f:
+                config_dict = json.load(f)
+                scheduler_type = config_dict.get("scheduler", {}).get("type", "default")
         
-        # Use strategy method (no if/else!)
-        filename = scheduler_strategy.get_templates_filename(provider_name, provider_type)
+        # Get strategy class from registry (auto-discovers, no manual mapping)
+        registry = get_scheduler_registry()
+        strategy_class = registry.get_strategy_class(scheduler_type)
+        
+        # Call classmethod on strategy (polymorphism, no if/else)
+        filename = strategy_class.get_templates_filename(provider_name, provider_type, config_dict)
         
         # Get config directory
         config_dir.mkdir(parents=True, exist_ok=True)

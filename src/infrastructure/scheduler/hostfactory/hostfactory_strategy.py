@@ -692,20 +692,21 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         workdir = self.get_working_directory()
         return os.path.join(workdir, "data")
 
-    def get_templates_filename(self, provider_name: str, provider_type: str) -> str:
-        """Get templates filename with config override support."""
+    @classmethod
+    def get_templates_filename(cls, provider_name: str, provider_type: str, config: dict = None) -> str:
+        """Get templates filename with config override support.
+        
+        Can be called as classmethod (before app init) or instance method.
+        """
         # Check config override first
-        try:
-            config = self.config_manager.get_app_config()
+        if config:
             scheduler_config = config.get("scheduler", {})
             config_filename = scheduler_config.get("templates_filename")
             if config_filename:
                 return config_filename
-        except Exception:
-            pass  # Fall back to default
         
-        # Use HostFactory default: provider_type + '_templates.json'
-        return f"{provider_type}_templates.json"
+        # Use HostFactory default: provider_name + '_templates.json'
+        return f"{provider_name}_templates.json"
 
     def should_log_to_console(self) -> bool:
         """Check if logs should be written to console for HostFactory.
