@@ -148,7 +148,7 @@ def _create_directories(config_dir: Path, work_dir: Path, logs_dir: Path):
     dirs = [
         config_dir,
         work_dir,
-        work_dir / "cache",
+        work_dir / ".cache",
         logs_dir,
     ]
 

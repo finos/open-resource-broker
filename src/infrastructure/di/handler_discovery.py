@@ -73,7 +73,7 @@ class HandlerDiscoveryService:
         """Resolve cache file path using configuration system."""
         try:
             work_dir = config_manager.get_work_dir()
-            cache_dir = os.path.join(work_dir, "cache")
+            cache_dir = os.path.join(work_dir, ".cache")
             os.makedirs(cache_dir, exist_ok=True)
             return os.path.join(cache_dir, "handler_discovery.json")
         except Exception:
@@ -89,7 +89,7 @@ class HandlerDiscoveryService:
             workdir = scheduler.get_working_directory()
         except Exception:
             workdir = os.getcwd()
-        cache_dir = os.path.join(workdir, "cache")
+        cache_dir = os.path.join(workdir, ".cache")
         os.makedirs(cache_dir, exist_ok=True)
         return os.path.join(cache_dir, "handler_discovery.json")
 
