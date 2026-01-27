@@ -153,8 +153,8 @@ def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
     try:
         # Load default config template
         try:
-            import config.templates
-            template_path = Path(config.templates.__file__).parent / "default_config.json"
+            import config
+            template_path = Path(config.__file__).parent / "default_config.json"
             with open(template_path) as f:
                 full_config = json.load(f)
         except (ImportError, FileNotFoundError):
