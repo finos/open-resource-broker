@@ -16,10 +16,16 @@ from infrastructure.logging.logger import get_logger, setup_logging
 class Application:
     """DI-based application context manager with registration pattern."""
 
-    def __init__(self, config_path: Optional[str] = None) -> None:
+    def __init__(self, config_path: Optional[str] = None, skip_validation: bool = False) -> None:
         """Initialize the instance."""
         self.config_path = config_path
         self._initialized = False
+
+        # Skip validation for commands that don't need it (templates, init, help)
+        if not skip_validation:
+            from infrastructure.validation.startup_validator import StartupValidator
+            validator = StartupValidator(config_path)
+            validator.validate_startup()
 
         # Defer heavy initialization until first use
         self._container = None
