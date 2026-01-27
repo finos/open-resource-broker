@@ -173,42 +173,36 @@ def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
     except Exception as e:
         raise FileNotFoundError(f"Could not find default_config.json template: {e}")
 
-    # Update with user values
-    full_config["scheduler"]["type"] = user_config["scheduler_type"]
-    full_config["provider"]["providers"][0]["config"]["region"] = user_config["region"]
-    full_config["provider"]["providers"][0]["config"]["profile"] = user_config["profile"]
-
-    with open(config_file, 'w') as f:
+    # Copy default_config.json to runtime config directory
+    default_config_file = config_file.parent / "default_config.json"
+    with open(default_config_file, 'w') as f:
         json.dump(full_config, f, indent=2)
 
-    logger.info("Created configuration file: %s", config_file)
-
-
-
-    
-    # Set config_root based on scheduler type
-    if user_config["scheduler_type"] == "hostfactory":
-        full_config["scheduler"]["config_root"] = "$ORB_CONFIG_DIR"
-    else:
-        full_config["scheduler"]["config_root"] = "."
-    
-    full_config["provider"]["default_provider_type"] = user_config["provider_type"]
-    full_config["provider"]["providers"] = [
-        {
-            "name": f"{user_config['provider_type']}-default",
-            "type": user_config["provider_type"],
-            "enabled": True,
-            "config": {
-                "region": user_config["region"],
-                "profile": user_config["profile"]
-            }
+    # Create config.json with user overrides only
+    config = {
+        "scheduler": {
+            "type": user_config["scheduler_type"]
+        },
+        "provider": {
+            "providers": [
+                {
+                    "name": f"{user_config['provider_type']}-{user_config['profile']}",
+                    "type": user_config["provider_type"],
+                    "enabled": True,
+                    "config": {
+                        "region": user_config["region"],
+                        "profile": user_config["profile"]
+                    }
+                }
+            ]
         }
-    ]
+    }
+
+    if user_config["scheduler_type"] == "hostfactory":
+        config["scheduler"]["config_root"] = "$ORB_CONFIG_DIR"
 
     with open(config_file, 'w') as f:
-        json.dump(full_config, f, indent=2)
-
-    logger.info("Created configuration file: %s", config_file)
+        json.dump(config, f, indent=2)
 
 
 def _copy_scripts(scripts_dir: Path):
