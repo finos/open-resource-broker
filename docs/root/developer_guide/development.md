@@ -15,7 +15,7 @@ This guide covers setting up a development environment, understanding the codeba
 
 1. **Clone the Repository**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/awslabs/open-resource-broker.git
    cd open-resource-broker
    ```
 
@@ -27,32 +27,27 @@ This guide covers setting up a development environment, understanding the codeba
 
 3. **Install Dependencies**
    ```bash
-   # Install runtime dependencies
-   pip install -r requirements.txt
-
-   # Install development dependencies
-   pip install -r requirements-dev.txt
+   # Install with all development dependencies
+   pip install -e ".[dev]"
+   
+   # Or use make target
+   make dev-install
+   
+   # Or install specific feature groups
+   pip install -e ".[cli,api,monitoring,dev]"
    ```
 
 4. **Configure Environment**
    ```bash
-   # Copy example configuration
+   # Initialize configuration
+   orb init
+   
+   # Or copy example configuration
    cp config/config.example.json config/config.json
-
-   # Edit configuration for your environment
    vim config/config.json
    ```
 
-5. **Initialize Database**
-   ```bash
-   # Create data directory
-   mkdir -p data
-
-   # Initialize database (if using SQLite)
-   python -m src.infrastructure.persistence.database.init_db
-   ```
-
-6. **Run Tests**
+5. **Run Tests**
    ```bash
    # Run all tests
    make test
@@ -61,11 +56,64 @@ This guide covers setting up a development environment, understanding the codeba
    make test-cov
    ```
 
-7. **Start Development Server**
+6. **Start Development Server**
    ```bash
-   # Run in development mode
+   # CLI mode
+   orb templates list
+   
+   # API mode (requires [api] extras)
    python -m src.bootstrap --config config/config.json --log-level DEBUG
    ```
+
+### Installing from Local Wheel (Testing)
+
+When testing local changes before publishing:
+
+```bash
+# Build wheel
+python -m build --wheel
+
+# Install minimal (base only)
+pip install dist/orb_py-*.whl
+
+# Install with CLI colors
+pip install "dist/orb_py-*.whl[cli]"
+
+# Install with API server
+pip install "dist/orb_py-*.whl[api]"
+
+# Install with monitoring
+pip install "dist/orb_py-*.whl[monitoring]"
+
+# Install everything
+pip install "dist/orb_py-*.whl[all]"
+```
+
+**Note:** Quotes are required when using brackets in bash!
+
+### Optional Dependencies
+
+The package supports several optional feature groups:
+
+- **`[cli]`**: Rich console output with colors
+  - Adds: `rich`, `rich-argparse`
+  - Use when: You want colored CLI output
+  
+- **`[api]`**: REST API server mode
+  - Adds: `fastapi`, `uvicorn`, `jinja2`
+  - Use when: Running as API server
+  
+- **`[monitoring]`**: Observability features
+  - Adds: `opentelemetry-*`, `prometheus-client`, `psutil`
+  - Use when: Need distributed tracing and metrics
+  
+- **`[dev]`**: Development tools
+  - Adds: `pytest`, `ruff`, `mypy`, etc.
+  - Use when: Contributing to the project
+  
+- **`[all]`**: All optional features
+  - Installs: `[cli,api,monitoring]`
+  - Use when: You want all features
 
 ### Development Configuration
 

@@ -31,9 +31,43 @@ uv pip install -e ".[dev]"
 python -m venv .venv
 source .venv/bin/activate
 
-# Install development dependencies
+# Install with all development dependencies
 make dev-install-pip
+
+# Or manually
+pip install -e ".[dev]"
 ```
+
+### Optional Dependencies
+
+The package supports several optional feature groups:
+
+```bash
+# Minimal install (CLI only, 10 dependencies)
+pip install -e .
+
+# With CLI colors
+pip install -e ".[cli]"
+
+# With API server
+pip install -e ".[api]"
+
+# With monitoring
+pip install -e ".[monitoring]"
+
+# All features
+pip install -e ".[all]"
+
+# Development (includes all features + dev tools)
+pip install -e ".[dev]"
+```
+
+**Feature Groups:**
+- `[cli]`: Rich console output (rich, rich-argparse)
+- `[api]`: REST API server (fastapi, uvicorn, jinja2)
+- `[monitoring]`: Observability (opentelemetry, prometheus, psutil)
+- `[dev]`: Development tools (pytest, ruff, mypy, etc.)
+- `[all]`: All optional features (cli + api + monitoring)
 
 ## Testing
 

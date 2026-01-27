@@ -25,43 +25,83 @@ The Open Resource Broker is a command-line tool that integrates with IBM Spectru
 
 ## Installation Methods
 
-### Method 1: Git Clone (Recommended)
+### Method 1: PyPI Installation (Recommended)
+
+The package is available on PyPI with optional feature groups:
+
+```bash
+# Minimal install (CLI only, 10 dependencies)
+pip install orb-py
+
+# With colored CLI output
+pip install orb-py[cli]
+
+# With API server (for REST API mode)
+pip install orb-py[api]
+
+# With monitoring (OpenTelemetry, Prometheus)
+pip install orb-py[monitoring]
+
+# Everything (all features)
+pip install orb-py[all]
+
+# Initialize configuration
+orb init
+
+# Verify installation
+orb --version
+```
+
+**Optional Dependencies:**
+- `[cli]`: Rich console output with colors (adds rich, rich-argparse)
+- `[api]`: REST API server mode (adds fastapi, uvicorn, jinja2)
+- `[monitoring]`: Observability features (adds opentelemetry, prometheus, psutil)
+- `[all]`: All optional features
+
+### Method 2: Git Clone (Development)
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/open-resource-broker.git
+git clone https://github.com/awslabs/open-resource-broker.git
 cd open-resource-broker
 
 # Create virtual environment
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install with development dependencies
+pip install -e ".[dev]"
 
-# Verify critical dependencies are installed
-python -c "import pydantic, boto3; print('Core dependencies installed successfully')"
-
-# For development (optional)
-pip install -r requirements-dev.txt
+# Or use make targets
+make dev-install
 
 # Verify installation
-python run.py getAvailableTemplates --help
+orb --version
 ```
 
-### Method 2: Direct Download
+### Method 3: Install from Wheel (Local Testing)
 
 ```bash
-# Download and extract
-wget https://github.com/your-org/open-resource-broker/archive/main.zip
-unzip main.zip
-cd open-resource-broker-main
+# Build wheel
+python -m build --wheel
 
-# Follow same steps as Method 1
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+# Install minimal (base only)
+pip install dist/orb_py-1.1.1-py3-none-any.whl
+
+# Install with CLI colors
+pip install "dist/orb_py-1.1.1-py3-none-any.whl[cli]"
+
+# Install with API server
+pip install "dist/orb_py-1.1.1-py3-none-any.whl[api]"
+
+# Install with monitoring
+pip install "dist/orb_py-1.1.1-py3-none-any.whl[monitoring]"
+
+# Install everything
+pip install "dist/orb_py-1.1.1-py3-none-any.whl[all]"
 ```
+
+**Note:** Quotes are required when using brackets in bash!
 
 ## Symphony Integration Setup
 
