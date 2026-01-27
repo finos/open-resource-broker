@@ -1,504 +1,212 @@
-# Troubleshooting
+# Troubleshooting Guide
 
-This guide helps you diagnose and resolve common issues with the Open Resource Broker.
+This guide covers common issues and their solutions when using ORB.
 
-## Common Issues
+## Configuration Issues
 
-### Installation Issues
+### 1. Configuration Not Found
 
-#### Python Version Compatibility
-```bash
-# Check Python version
-python --version
+**Error Message:**
+```
+ERROR: Configuration file not found
+  No configuration found in:
+    - /current/dir/config/config.json
+    - ~/.config/orb/config.json
+    - ~/.local/orb/config/config.json
 
-# Should be 3.8 or higher
-# If not, install a compatible version
+Run 'orb init' to create configuration
 ```
 
-#### Dependency Installation Failures
+**Solution:**
 ```bash
-# Clear pip cache
-pip cache purge
-
-# Upgrade pip
-pip install --upgrade pip
-
-# Install with verbose output
-pip install -r requirements.txt -v
+orb init
 ```
 
-#### Permission Errors
-```bash
-# Use virtual environment (recommended)
-python -m venv .venv
-source .venv/bin/activate
+This creates the configuration directory and files needed for ORB to work.
 
-# Or install with user flag
-pip install --user -r requirements.txt
+### 2. Templates Not Found
+
+**Error Message:**
+```
+ERROR: Templates file not found
+
+Searched for:
+  - awsprov_templates.json
+  - templates.json
+
+In directories:
+  - ~/.config/orb/templates/
+  - ~/.config/orb/
+
+Run 'orb templates generate' to create example templates
 ```
 
-### Configuration Issues
-
-#### Configuration File Not Found
+**Solution:**
 ```bash
-# Check file exists
-ls -la config/config.json
-
-# Create from example
-cp config/config.example.json config/config.json
-
-# Verify configuration format
-python -m json.tool config/config.json
+orb templates generate
 ```
 
-#### Invalid Configuration Format
-```bash
-# Validate JSON syntax
-python -c "import json; json.load(open('config/config.json'))"
+This creates example templates you can customize for your environment.
 
-# Check configuration schema
-python -m src.infrastructure.config.validate_config config/config.json
+### 3. AWS Credentials Missing
+
+**Error Message:**
+```
+ERROR: AWS credentials not found
+
+Profile: default
+Region: us-east-1
+
+Configure AWS credentials:
+  aws configure --profile default
+
+Or set environment variables:
+  export AWS_ACCESS_KEY_ID=...
+  export AWS_SECRET_ACCESS_KEY=...
 ```
 
-#### Environment Variable Issues
+**Solution:**
 ```bash
-# Check environment variables
-env | grep HF_
-
-# Set required variables
-export HF_PROVIDER_CONFDIR=/path/to/config
-export HF_PROVIDER_LOGDIR=/path/to/logs
-```
-
-### AWS Provider Issues
-
-#### AWS Credentials Not Found
-```bash
-# Check AWS credentials
-aws sts get-caller-identity
-
-# Configure AWS credentials
+# Option 1: Use AWS CLI
 aws configure
 
-# Or set environment variables
+# Option 2: Use specific profile
+aws configure --profile myprofile
+
+# Option 3: Environment variables
 export AWS_ACCESS_KEY_ID=your-access-key
 export AWS_SECRET_ACCESS_KEY=your-secret-key
 export AWS_DEFAULT_REGION=us-east-1
 ```
 
-#### AWS Permission Errors
-```bash
-# Check IAM permissions
-aws iam get-user
+## Configuration Locations
 
-# Test EC2 permissions
-aws ec2 describe-instances --max-items 1
+ORB looks for configuration in different locations depending on how it was installed:
 
-# Required permissions:
-# - ec2:DescribeInstances
-# - ec2:RunInstances
-# - ec2:TerminateInstances
-# - ec2:DescribeImages
-# - ec2:DescribeSubnets
-# - ec2:DescribeSecurityGroups
+### Development Mode
+```
+/path/to/project/
+├── config/
+│   ├── config.json
+│   └── templates/
+└── work/
 ```
 
-#### AWS Region Issues
-```bash
-# Check current region
-aws configure get region
-
-# Set region
-aws configure set region us-east-1
-
-# Or in configuration file
-{
-  "aws": {
-    "region": "us-east-1"
-  }
-}
+### Virtual Environment Install
+```
+/path/to/project/
+├── .venv/
+├── config/              # Next to .venv
+│   ├── config.json
+│   └── templates/
+└── work/
 ```
 
-### Database Issues
-
-#### Database Connection Errors
-```bash
-# Check database file permissions
-ls -la data/database.db
-
-# Create data directory
-mkdir -p data
-
-# Initialize database
-python -m src.infrastructure.persistence.database.init_db
+### User Install (pip install --user)
+```
+~/.local/orb/
+├── config/
+│   ├── config.json
+│   └── templates/
+└── work/
 ```
 
-#### Database Corruption
-```bash
-# Backup existing database
-cp data/database.db data/database.db.backup
-
-# Recreate database
-rm data/database.db
-python -m src.infrastructure.persistence.database.init_db
-
-# Restore from backup if needed
-cp data/database.db.backup data/database.db
+### System Install
+```
+/usr/local/orb/          # or /opt/orb/
+├── config/
+│   ├── config.json
+│   └── templates/
+└── work/
 ```
 
-#### JSON Storage Issues
+### Platform-Specific Locations
+
+**Linux/Unix:**
+- Config: `~/.config/orb/`
+- Data: `~/.local/share/orb/`
+- Cache: `~/.cache/orb/`
+
+**macOS:**
+- Config: `~/Library/Application Support/orb/config/`
+- Data: `~/Library/Application Support/orb/work/`
+- Cache: `~/Library/Caches/orb/`
+
+**Windows:**
+- Config: `%APPDATA%\orb\`
+- Data: `%LOCALAPPDATA%\orb\`
+
+## Environment Variables
+
+You can override default locations with environment variables:
+
 ```bash
-# Check JSON file format
-python -m json.tool data/database.json
+# Override config directory
+export ORB_CONFIG_DIR=/custom/path/config
 
-# Fix JSON syntax errors
-# Remove trailing commas, fix quotes, etc.
+# Override config file directly
+export ORB_CONFIG_FILE=/custom/path/config.json
 
-# Reset JSON storage
-rm data/database.json
-echo '{}' > data/database.json
+# Legacy HostFactory variables
+export HF_PROVIDER_CONFDIR=/path/to/hostfactory/conf
+export HF_PROVIDER_WORKDIR=/path/to/hostfactory/work
 ```
 
-### Runtime Issues
+## Validation Commands
 
-#### Application Won't Start
+### Check Configuration
 ```bash
-# Check for import errors
-python -c "import src.bootstrap"
-
-# Run with debug logging
-python -m src.bootstrap --log-level DEBUG
-
-# Check for port conflicts
-netstat -an | grep :8080
+orb config show
 ```
 
-#### Memory Issues
+### Validate Setup
 ```bash
-# Check memory usage
-ps aux | grep python
-
-# Monitor memory during execution
-top -p $(pgrep -f "python.*bootstrap")
-
-# Reduce memory usage by adjusting configuration
-{
-  "database": {
-    "connection_pool_size": 5
-  }
-}
+orb validate
 ```
 
-#### Performance Issues
+### List Templates
 ```bash
-# Profile application
-python -m cProfile -o profile.stats -m src.bootstrap
-
-# Check slow queries
-tail -f logs/app.log | grep "slow query"
-
-# Monitor system resources
-htop
+orb templates list
 ```
 
-### Template Issues
-
-#### Template Not Found
+### Test AWS Connection
 ```bash
-# List available templates
-python -m src.api.handlers.template --list
-
-# Check template configuration
-cat config/templates.json
-
-# Validate template format
-python -m src.domain.template.validate_template template-id
+orb providers test aws
 ```
 
-#### Template Validation Errors
-```bash
-# Check template fields
-python -c "
-from src.infrastructure.config import get_config
-config = get_config()
-print(config.templates)
-"
+## Common Solutions
 
-# Common required fields:
-# - template_id
-# - name
-# - instance_type
-# - image_id
-# - provider_api
+### Reset Configuration
+```bash
+# Remove existing config
+rm -rf ~/.config/orb/
+
+# Reinitialize
+orb init
 ```
 
-### Request Issues
-
-#### Request Creation Failures
+### Force Reinitialize
 ```bash
-# Check request parameters
-python -m src.api.handlers.request --validate-request request.json
-
-# Common validation errors:
-# - Invalid template_id
-# - machine_count <= 0
-# - Missing required fields
+orb init --force
 ```
 
-#### Request Status Not Updating
+### Use Custom Config Location
 ```bash
-# Check event processing
-tail -f logs/app.log | grep "event"
-
-# Verify event handlers are registered
-python -m src.infrastructure.events.debug --list-handlers
-
-# Check provider connectivity
-python -m src.providers.aws.test_connection
-```
-
-#### Machine Provisioning Failures
-```bash
-# Check AWS CloudTrail logs
-aws logs describe-log-groups
-
-# Check provider-specific errors
-tail -f logs/app.log | grep "provider"
-
-# Test provider operations manually
-python -m src.providers.aws.test_operations
-```
-
-## Diagnostic Commands
-
-### System Information
-```bash
-# Check system information
-python -m src.infrastructure.diagnostics.system_info
-
-# Check dependencies
-pip list
-
-# Check configuration
-python -m src.infrastructure.diagnostics.config_info
-```
-
-### Health Checks
-```bash
-# Run all health checks
-python -m src.infrastructure.diagnostics.health_check
-
-# Check specific components
-python -m src.infrastructure.diagnostics.health_check --component database
-python -m src.infrastructure.diagnostics.health_check --component aws
-python -m src.infrastructure.diagnostics.health_check --component events
+orb --config /path/to/config.json templates list
 ```
 
 ### Debug Mode
 ```bash
-# Enable debug mode
-export HF_DEBUG=true
-
-# Run with debug output
-python -m src.bootstrap --debug
-
-# Enable SQL query logging
-export HF_SQL_DEBUG=true
-```
-
-## Log Analysis
-
-### Log Locations
-```bash
-# Default log location
-tail -f logs/app.log
-
-# Check log configuration
-grep -A 10 "logging" config/config.json
-
-# Rotate logs if too large
-logrotate -f config/logrotate.conf
-```
-
-### Common Log Patterns
-
-#### Successful Operations
-```
-INFO - Request req-123 created successfully
-INFO - Machine machine-456 provisioned successfully
-INFO - Request req-123 completed with 3 machines
-```
-
-#### Error Patterns
-```
-ERROR - Failed to create request: Template template-1 not found
-ERROR - AWS API error: InvalidParameterValue
-ERROR - Database connection failed: timeout
-```
-
-#### Warning Patterns
-```
-WARN - Request req-123 taking longer than expected
-WARN - AWS rate limit approaching
-WARN - Database connection pool exhausted
-```
-
-### Log Analysis Commands
-```bash
-# Count error types
-grep "ERROR" logs/app.log | cut -d':' -f3 | sort | uniq -c
-
-# Find slow operations
-grep "slow" logs/app.log | tail -20
-
-# Monitor real-time errors
-tail -f logs/app.log | grep "ERROR"
-
-# Check request patterns
-grep "Request.*created" logs/app.log | wc -l
-```
-
-## Performance Troubleshooting
-
-### Database Performance
-```bash
-# Check database size
-du -sh data/database.db
-
-# Analyze slow queries
-grep "slow query" logs/app.log
-
-# Optimize database
-python -m src.infrastructure.persistence.database.optimize
-```
-
-### Memory Usage
-```bash
-# Monitor memory usage
-python -m src.infrastructure.diagnostics.memory_monitor
-
-# Check for memory leaks
-python -m memory_profiler src/bootstrap.py
-
-# Reduce memory usage
-# - Decrease connection pool size
-# - Enable garbage collection
-# - Use streaming for large datasets
-```
-
-### Network Issues
-```bash
-# Test AWS connectivity
-curl -I https://ec2.amazonaws.com
-
-# Check DNS resolution
-nslookup ec2.amazonaws.com
-
-# Test network latency
-ping ec2.amazonaws.com
-```
-
-## Recovery Procedures
-
-### Database Recovery
-```bash
-# Backup current state
-cp -r data/ data_backup_$(date +%Y%m%d_%H%M%S)/
-
-# Restore from backup
-cp -r data_backup_20250630_100000/ data/
-
-# Rebuild from events (if using event sourcing)
-python -m src.infrastructure.events.rebuild_from_events
-```
-
-### Configuration Recovery
-```bash
-# Reset to default configuration
-cp config/config.example.json config/config.json
-
-# Restore from backup
-cp config/config.json.backup config/config.json
-
-# Validate restored configuration
-python -m src.infrastructure.config.validate_config
-```
-
-### Provider Recovery
-```bash
-# Reset provider state
-python -m src.providers.aws.reset_state
-
-# Cleanup orphaned resources
-python -m src.providers.aws.cleanup_orphaned_resources
-
-# Re-register provider
-python -m src.providers.aws.register
+export ORB_LOG_LEVEL=DEBUG
+orb templates list
 ```
 
 ## Getting Help
 
-### Documentation
-- Check the [User Guide](../user_guide/) for usage instructions
-- Review the [Developer Guide](../developer_guide/) for technical details
-- Consult the [API Reference](api/) for API documentation
+If you're still having issues:
 
-### Support Channels
-1. **GitHub Issues**: Report bugs and request features
-2. **Documentation**: Search the documentation for solutions
-3. **Logs**: Check application logs for detailed error information
-4. **Community**: Join discussions and ask questions
-
-### Reporting Issues
-
-When reporting issues, include:
-
-1. **Environment Information**
-   ```bash
-   python --version
-   pip list
-   uname -a
-   ```
-
-2. **Configuration** (sanitized)
-   ```bash
-   # Remove sensitive information
-   cat config/config.json | jq 'del(.aws.access_key, .aws.secret_key)'
-   ```
-
-3. **Error Logs**
-   ```bash
-   # Last 50 lines of logs
-   tail -50 logs/app.log
-   ```
-
-4. **Steps to Reproduce**
-   - Exact commands run
-   - Expected behavior
-   - Actual behavior
-
-5. **System Information**
-   ```bash
-   python -m src.infrastructure.diagnostics.system_info
-   ```
-
-## Prevention
-
-### Best Practices
-- Regular backups of configuration and data
-- Monitor system resources and logs
-- Keep dependencies updated
-- Use version control for configuration
-- Test changes in development environment first
-
-### Monitoring Setup
-- Set up log rotation to prevent disk space issues
-- Monitor application metrics and alerts
-- Regular health checks of all components
-- Automated backup procedures
-
-### Maintenance
-- Regular cleanup of old logs and data
-- Update dependencies and security patches
-- Review and optimize configuration periodically
-- Test disaster recovery procedures
+1. Check the logs in your work directory
+2. Run with debug logging: `ORB_LOG_LEVEL=DEBUG orb <command>`
+3. Validate your setup: `orb validate`
+4. Check the documentation: https://awslabs.github.io/open-resource-broker/
+5. File an issue: https://github.com/awslabs/open-resource-broker/issues

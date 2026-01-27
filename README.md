@@ -41,7 +41,26 @@ The Open Resource Broker provides integration between IBM Spectrum Symphony Host
 
 ## Quick Start
 
-### Docker Deployment (Recommended)
+### PyPI Installation (Recommended)
+
+```bash
+# Install from PyPI
+pip install orb-py
+
+# Initialize configuration
+orb init
+
+# Generate example templates
+orb templates generate
+
+# List available templates
+orb templates list
+
+# Request machines
+orb requests create --template-id EC2FleetInstant --count 3
+```
+
+### Docker Deployment
 
 ```bash
 # Clone repository
@@ -66,6 +85,9 @@ curl http://localhost:8000/health
 ```bash
 # Install from PyPI
 pip install orb-py
+
+# Initialize configuration (required after installation)
+orb init
 
 # Verify installation
 orb --version
@@ -214,9 +236,34 @@ async def use_hostfactory():
 
 ### Command Line Interface
 
+#### Initial Setup
+
+```bash
+# Initialize ORB configuration (required after pip install)
+orb init
+
+# Interactive setup with prompts
+orb init --interactive
+
+# Non-interactive with defaults
+orb init --non-interactive --scheduler default --provider aws --region us-east-1
+
+# Custom configuration location
+orb init --config-dir /path/to/config
+```
+
 #### Template Management (Full CRUD Operations)
 
 ```bash
+# Generate example templates (after orb init)
+orb templates generate
+
+# Generate for specific provider
+orb templates generate --provider aws-prod
+
+# Generate for specific handler
+orb templates generate --provider-api EC2Fleet
+
 # List available templates
 orb templates list
 orb templates list --long                    # Detailed information

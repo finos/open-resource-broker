@@ -18,6 +18,10 @@ class ConfigurationAdapter(ConfigurationPort):
         """Get structured application configuration."""
         return self._config_manager.get_app_config()
 
+    def find_templates_file(self, provider_type: str) -> str:
+        """Find templates file for given provider type."""
+        return self._config_manager.find_templates_file(provider_type)
+
     def get_naming_config(self) -> dict[str, Any]:
         """Get naming configuration for domain layer."""
         try:
