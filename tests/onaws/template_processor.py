@@ -97,8 +97,12 @@ class TemplateProcessor:
             if "providers" in config_data["provider"]:
                 provider = config_data["provider"]["providers"][0]
                 if "config" in provider:
-                    extracted_config["region"] = provider["config"].get("region", "us-east-1")
-                    extracted_config["profile"] = provider["config"].get("profile", "default")
+                    provider_config = provider["config"]
+                    extracted_config["region"] = provider_config.get("region", "us-east-1")
+                    extracted_config["profile"] = provider_config.get("profile", "default")
+                    extracted_config["aws_read_timeout"] = provider_config.get(
+                        "aws_read_timeout", provider_config.get("timeout", 30)
+                    )
 
             # Extract template defaults if available
             if "provider_defaults" in config_data["provider"]:
@@ -146,6 +150,7 @@ class TemplateProcessor:
         extracted_config.setdefault("priceType", "ondemand")  # Default price type
         # Default to 100% on-demand to avoid unintentionally requesting spot capacity
         extracted_config.setdefault("percentOnDemand", 100)
+        extracted_config.setdefault("aws_read_timeout", 30)
 
         return extracted_config
 
@@ -235,6 +240,11 @@ class TemplateProcessor:
         # Apply overrides if provided
         if overrides:
             config.update(overrides)
+            # Normalize legacy timeout override to aws_read_timeout for template placeholders
+            if "timeout" in overrides and "aws_read_timeout" not in overrides:
+                config["aws_read_timeout"] = overrides["timeout"]
+            if "aws_read_timeout" in overrides and "timeout" not in overrides:
+                config["timeout"] = overrides["aws_read_timeout"]
             # Handle legacy field mappings for overrides
             if "imageId" in overrides:
                 config["image_id"] = overrides["imageId"]

@@ -430,6 +430,69 @@ class TestEC2FleetHandler:
         assert "instance_ids" not in request.metadata
         assert request.error_details["ec2_fleet"]["errors"][0]["launch_template_id"] == "lt-123"
 
+    def test_ec2_fleet_instant_errors_with_instances_marks_partial_success(self):
+        """Instant fleet errors with instances should preserve errors and instance IDs without raising."""
+        logger = Mock()
+        aws_client = Mock()
+        aws_client.ec2_client.create_fleet = Mock()
+        handler = EC2FleetHandler(
+            aws_client=aws_client,
+            logger=logger,
+            aws_ops=Mock(),
+            launch_template_manager=Mock(),
+        )
+        handler._validate_prerequisites = Mock()
+        handler._create_fleet_config = Mock(return_value={})
+
+        response = {
+            "FleetId": "fleet-789",
+            "Errors": [
+                {
+                    "LaunchTemplateAndOverrides": {
+                        "LaunchTemplateSpecification": {
+                            "LaunchTemplateId": "lt-789",
+                            "Version": "2",
+                        },
+                        "Overrides": {"SubnetId": "subnet-789"},
+                    },
+                    "Lifecycle": "spot",
+                    "ErrorCode": "InsufficientInstanceCapacity",
+                    "ErrorMessage": "Insufficient capacity.",
+                }
+            ],
+            "Instances": [{"InstanceIds": ["i-123", "i-456"]}],
+        }
+        handler._retry_with_backoff = Mock(return_value=response)
+        handler.launch_template_manager.create_or_update_launch_template.return_value = (
+            SimpleNamespace(template_id="lt-789", version="2")
+        )
+
+        request = SimpleNamespace(
+            request_id="req-789",
+            requested_count=2,
+            metadata={},
+            error_details={},
+        )
+        template = SimpleNamespace(template_id="tmpl-789", fleet_type="instant")
+
+        with patch(
+            "providers.aws.infrastructure.adapters.aws_validation_adapter.create_aws_validation_adapter"
+        ) as mock_validation:
+            mock_validation.return_value.get_valid_fleet_types_for_api.return_value = [
+                "instant",
+                "request",
+                "maintain",
+            ]
+            fleet_id = handler._create_fleet_internal(request, template)
+
+        assert fleet_id == "fleet-789"
+        assert request.metadata["fleet_id"] == "fleet-789"
+        assert request.metadata["fleet_errors"][0]["error_code"] == "InsufficientInstanceCapacity"
+        assert request.metadata["instance_ids"] == ["i-123", "i-456"]
+        assert request.error_details["ec2_fleet"]["instance_ids"] == ["i-123", "i-456"]
+        assert logger.error.called
+        assert logger.warning.called
+
     def test_ec2_fleet_instant_no_errors_no_instances_warns(self):
         """Instant fleet without instances and errors should warn and return fleet id."""
         logger = Mock()

@@ -406,6 +406,9 @@ class AWSProviderStrategy(ProviderStrategy):
 
             # Use the domain aggregate's factory method - it handles RequestId generation
             request_metadata = dict(operation.parameters.get("request_metadata", {}) or {})
+            request_id = operation.parameters.get("request_id") or (
+                operation.context.get("request_id") if operation.context else None
+            )
 
             request = Request.create_new_request(
                 request_type=RequestType.ACQUIRE,
@@ -414,6 +417,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 provider_type="aws",
                 provider_instance="aws-default",
                 metadata=request_metadata,
+                request_id=request_id,
             )
             request.provider_api = provider_api
 
@@ -440,12 +444,14 @@ class AWSProviderStrategy(ProviderStrategy):
                     adapter_success = True
                     resource_ids: list[str] = []
                     instances: list[dict[str, Any]] = []
+                    provider_data: dict[str, Any] = {}
 
                     if isinstance(adapter_result, dict):
                         resource_ids = adapter_result.get("resource_ids") or []
                         if not resource_ids and adapter_result.get("resource_id"):
                             resource_ids = [adapter_result["resource_id"]]
                         instances = adapter_result.get("instances") or []
+                        provider_data = adapter_result.get("provider_data") or {}
                         adapter_success = adapter_result.get("success", True)
 
                         if not adapter_success:
@@ -471,6 +477,10 @@ class AWSProviderStrategy(ProviderStrategy):
                             "template_config": template_config,
                             "handler_used": provider_api,
                             "method": "provisioning_port",
+                            "provider_data": provider_data,
+                            "fleet_errors": provider_data.get("fleet_errors")
+                            if isinstance(provider_data, dict)
+                            else None,
                         },
                     )
                 except Exception as e:
@@ -490,6 +500,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 instances = handler_result.get("instances", [])
                 success = handler_result.get("success", True)
                 error_message = handler_result.get("error_message")
+                provider_data = handler_result.get("provider_data") or {}
 
                 if not success:
                     return ProviderResult.error_result(
@@ -499,6 +510,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 # Handler returned single resource ID (legacy format)
                 resource_ids = [handler_result] if handler_result else []
                 instances = []
+                provider_data = {}
 
             self._logger.info(
                 "Handler returned resource_ids: %s, instances: %s",
@@ -519,6 +531,10 @@ class AWSProviderStrategy(ProviderStrategy):
                     "template_config": template_config,
                     "handler_used": provider_api,
                     "method": "handler",
+                    "provider_data": provider_data,
+                    "fleet_errors": provider_data.get("fleet_errors")
+                    if isinstance(provider_data, dict)
+                    else None,
                 },
             )
 
@@ -738,6 +754,10 @@ class AWSProviderStrategy(ProviderStrategy):
             from domain.request.aggregate import Request
             from domain.request.value_objects import RequestType
 
+            request_id = operation.parameters.get("request_id") or (
+                operation.context.get("request_id") if operation.context else None
+            )
+
             # Create request with the resource IDs
             request = Request.create_new_request(
                 request_type=RequestType.ACQUIRE,
@@ -745,6 +765,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 machine_count=1,
                 provider_type="aws",
                 provider_instance="aws-default",
+                request_id=request_id,
             )
 
             # Set the resource IDs in the request

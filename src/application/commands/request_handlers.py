@@ -204,6 +204,24 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
 
                         # Create machine aggregates for each instance
                         instance_data_list = provisioning_result.get("instances", [])
+                        provider_data = provisioning_result.get("provider_data", {})
+
+                        # Preserve provider errors (if any) for partial success handling
+                        if isinstance(provider_data, dict):
+                            provider_errors = provider_data.get("fleet_errors") or []
+                            if provider_errors and not request.metadata.get("fleet_errors"):
+                                request.metadata["fleet_errors"] = provider_errors
+
+                        has_api_errors = bool(request.metadata.get("fleet_errors"))
+                        error_summary = None
+                        if has_api_errors:
+                            error_summary = "; ".join(
+                                f"{err.get('error_code', 'Unknown')}: {err.get('error_message', 'No message')}"
+                                for err in request.metadata.get("fleet_errors", [])
+                            ) or "Unknown API errors"
+                            if error_summary and "error_message" not in request.metadata:
+                                request.metadata["error_message"] = error_summary
+                                request.metadata["error_type"] = "ProvisioningPartialFailure"
 
                         # Store ASG-specific metadata for capacity tracking (after instance_data_list is defined)
                         if template.provider_api == "ASG":
@@ -231,21 +249,33 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                             with self.uow_factory.create_unit_of_work() as uow:
                                 uow.machines.save(machine)
 
-                        # Update request status based on fulfillment
+                        # Update request status based on fulfillment and API errors
                         if len(instance_data_list) == command.requested_count:
                             from domain.request.value_objects import RequestStatus
 
-                            request = request.update_status(
-                                RequestStatus.COMPLETED,
-                                "All instances provisioned successfully",
-                            )
+                            if has_api_errors:
+                                request = request.update_status(
+                                    RequestStatus.PARTIAL,
+                                    f"Partial success: {len(instance_data_list)}/{command.requested_count} instances created with API errors: {error_summary}",
+                                )
+                            else:
+                                request = request.update_status(
+                                    RequestStatus.COMPLETED,
+                                    "All instances provisioned successfully",
+                                )
                         elif len(instance_data_list) > 0:
                             from domain.request.value_objects import RequestStatus
 
-                            request = request.update_status(
-                                RequestStatus.PARTIAL,
-                                f"Partially fulfilled: {len(instance_data_list)}/{command.requested_count} instances",
-                            )
+                            if has_api_errors:
+                                request = request.update_status(
+                                    RequestStatus.PARTIAL,
+                                    f"Partial success: {len(instance_data_list)}/{command.requested_count} instances created with API errors: {error_summary}",
+                                )
+                            else:
+                                request = request.update_status(
+                                    RequestStatus.PARTIAL,
+                                    f"Partially fulfilled: {len(instance_data_list)}/{command.requested_count} instances",
+                                )
                         else:
                             from domain.request.value_objects import RequestStatus
 
@@ -374,9 +404,11 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                 parameters={
                     "template_config": template.to_dict(),
                     "count": request.requested_count,
+                    "request_id": str(request.request_id),
                 },
                 context={
                     "correlation_id": str(request.request_id),
+                    "request_id": str(request.request_id),
                     "dry_run": request.metadata.get("dry_run", False),
                 },
             )

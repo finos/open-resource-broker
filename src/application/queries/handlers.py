@@ -30,6 +30,63 @@ from domain.template.template_aggregate import Template
 T = TypeVar("T")
 
 
+def _normalize_provider_entry(entry: Any) -> dict[str, Any]:
+    """Normalize provider entry (dict or DomainMachine) to a common shape.
+
+    Uses local imports to avoid import-time circular dependencies.
+    """
+    from domain.machine.aggregate import Machine as DomainMachine
+    from domain.machine.machine_status import MachineStatus
+
+    if isinstance(entry, DomainMachine):
+        status_val = entry.status
+        try:
+            status_obj = (
+                status_val
+                if isinstance(status_val, MachineStatus)
+                else MachineStatus.from_str(str(status_val))
+            )
+        except Exception:
+            status_obj = MachineStatus.UNKNOWN
+        return {
+            "instance_id": str(entry.instance_id.value),
+            "status": status_obj,
+            "private_ip": entry.private_ip,
+            "public_ip": entry.public_ip,
+            "launch_time": entry.launch_time,
+            "instance_type": getattr(entry.instance_type, "value", entry.instance_type),
+            "image_id": entry.image_id,
+            "subnet_id": entry.subnet_id,
+            "metadata": entry.metadata or {},
+            "raw": entry,
+        }
+    if isinstance(entry, dict):
+        status_val = entry.get("status") or entry.get("State") or entry.get("state")
+        try:
+            status_obj = (
+                status_val
+                if isinstance(status_val, MachineStatus)
+                else MachineStatus.from_str(str(status_val))
+                if status_val
+                else MachineStatus.UNKNOWN
+            )
+        except Exception:
+            status_obj = MachineStatus.UNKNOWN
+        return {
+            "instance_id": entry.get("instance_id") or entry.get("InstanceId"),
+            "status": status_obj,
+            "private_ip": entry.get("private_ip") or entry.get("PrivateIpAddress"),
+            "public_ip": entry.get("public_ip") or entry.get("PublicIpAddress"),
+            "launch_time": entry.get("launch_time") or entry.get("LaunchTime"),
+            "instance_type": entry.get("instance_type") or entry.get("InstanceType"),
+            "image_id": entry.get("image_id") or entry.get("ImageId"),
+            "subnet_id": entry.get("subnet_id") or entry.get("SubnetId"),
+            "metadata": entry.get("metadata") or entry,
+            "raw": entry,
+        }
+    return {}
+
+
 # Query handlers
 @query_handler(GetRequestQuery)
 class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
@@ -190,6 +247,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     "resource_ids": request.resource_ids,
                     "provider_api": request.metadata.get("provider_api", "RunInstances"),
                     "template_id": request.template_id,
+                    "request_id": str(request.request_id),
                 },
                 context={
                     "correlation_id": str(request.request_id),
@@ -394,56 +452,6 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
             from domain.machine.aggregate import Machine as DomainMachine
             from domain.machine.machine_status import MachineStatus
-
-            def _normalize_provider_entry(entry: Any) -> dict[str, Any]:
-                """Normalize provider entry (dict or DomainMachine) to a common shape."""
-                if isinstance(entry, DomainMachine):
-                    status_val = entry.status
-                    try:
-                        status_obj = (
-                            status_val
-                            if isinstance(status_val, MachineStatus)
-                            else MachineStatus.from_str(str(status_val))
-                        )
-                    except Exception:
-                        status_obj = MachineStatus.UNKNOWN
-                    return {
-                        "instance_id": str(entry.instance_id.value),
-                        "status": status_obj,
-                        "private_ip": entry.private_ip,
-                        "public_ip": entry.public_ip,
-                        "launch_time": entry.launch_time,
-                        "instance_type": getattr(entry.instance_type, "value", entry.instance_type),
-                        "image_id": entry.image_id,
-                        "subnet_id": entry.subnet_id,
-                        "metadata": entry.metadata or {},
-                        "raw": entry,
-                    }
-                if isinstance(entry, dict):
-                    status_val = entry.get("status") or entry.get("State") or entry.get("state")
-                    try:
-                        status_obj = (
-                            status_val
-                            if isinstance(status_val, MachineStatus)
-                            else MachineStatus.from_str(str(status_val))
-                            if status_val
-                            else MachineStatus.UNKNOWN
-                        )
-                    except Exception:
-                        status_obj = MachineStatus.UNKNOWN
-                    return {
-                        "instance_id": entry.get("instance_id") or entry.get("InstanceId"),
-                        "status": status_obj,
-                        "private_ip": entry.get("private_ip") or entry.get("PrivateIpAddress"),
-                        "public_ip": entry.get("public_ip") or entry.get("PublicIpAddress"),
-                        "launch_time": entry.get("launch_time") or entry.get("LaunchTime"),
-                        "instance_type": entry.get("instance_type") or entry.get("InstanceType"),
-                        "image_id": entry.get("image_id") or entry.get("ImageId"),
-                        "subnet_id": entry.get("subnet_id") or entry.get("SubnetId"),
-                        "metadata": entry.get("metadata") or entry,
-                        "raw": entry,
-                    }
-                return {}
 
             # Update existing machines and add new ones discovered from provider
             for dm in domain_machines:
@@ -931,6 +939,10 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             request_type = request.request_type
             provider_metadata = provider_metadata or {}
 
+            # Count machines early so error handling can consider partial success.
+            provider_machine_count = len(machine_objects_from_provider)
+            database_machine_count = len(machine_objects_from_database)
+
             # If provisioning already recorded a failure, keep the request terminal.
             metadata = getattr(request, "metadata", {}) or {}
             error_details = getattr(request, "error_details", {}) or {}
@@ -940,7 +952,24 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             fleet_errors = metadata.get("fleet_errors")
             ec2_fleet_errors = (error_details.get("ec2_fleet") or {}).get("errors")
 
-            if provisioning_error_type or fleet_errors or ec2_fleet_errors:
+            has_provisioning_errors = bool(provisioning_error_type or fleet_errors or ec2_fleet_errors)
+            has_any_instances = provider_machine_count > 0 or database_machine_count > 0
+
+            # If instances exist alongside errors, keep/force PARTIAL (do not flip to FAILED).
+            if (
+                request_type == RequestType.ACQUIRE
+                and has_provisioning_errors
+                and has_any_instances
+            ):
+                if current_status == RequestStatus.PARTIAL:
+                    return (None, None)
+                status_message = (
+                    request.status_message
+                    or "Partial success: instances provisioned with API errors"
+                )
+                return (RequestStatus.PARTIAL.value, status_message)
+
+            if has_provisioning_errors:
                 status_message = provisioning_error_message or "Provisioning failed"
                 if not status_message.lower().startswith("provisioning failed"):
                     status_message = f"Provisioning failed: {status_message}"
@@ -957,9 +986,6 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 return (None, None)
 
             # Count machines by status from provider data (most up-to-date)
-            provider_machine_count = len(machine_objects_from_provider)
-            database_machine_count = len(machine_objects_from_database)
-
             # Analyze provider machine statuses
             running_count = 0
             pending_count = 0

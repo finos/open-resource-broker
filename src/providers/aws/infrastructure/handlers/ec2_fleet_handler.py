@@ -178,6 +178,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 "provider_data": {
                     "resource_type": "ec2_fleet",
                     "fleet_type": aws_template.fleet_type,
+                    "fleet_errors": request.metadata.get("fleet_errors", []),
                 },
             }
         except Exception as e:
@@ -265,14 +266,23 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 response=response,
                 instance_ids=instance_ids,
             )
-            self._logger.error(
-                "EC2 Fleet %s returned %d error(s) during creation: %s",
+
+            if not instance_ids:
+                self._logger.error(
+                    "EC2 Fleet %s returned %d error(s) during creation: %s",
+                    fleet_id,
+                    len(errors),
+                    error_summary,
+                )
+                raise AWSInfrastructureError(
+                    f"Fleet {fleet_id} creation failed with {len(errors)} error(s): {error_summary}"
+                )
+            self._logger.warning(
+                "EC2 Fleet %s returned errors (%d) but also created %d instance(s); treating as partial success. Errors: %s",
                 fleet_id,
                 len(errors),
-                error_summary,
-            )
-            raise AWSInfrastructureError(
-                f"Fleet {fleet_id} creation failed with {len(errors)} error(s): {error_summary}"
+                len(instance_ids),
+                error_summary
             )
 
         # Apply post-creation tagging for fleet instances

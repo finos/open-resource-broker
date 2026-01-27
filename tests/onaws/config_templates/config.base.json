@@ -11,7 +11,7 @@
           "region": "{{region}}",
           "profile": "{{profile}}",
           "max_retries": 3,
-          "timeout": 30,
+          "aws_read_timeout": "{{aws_read_timeout}}",
           "ssm_parameter_prefix": "/hostfactory/templates/"
         }
       }

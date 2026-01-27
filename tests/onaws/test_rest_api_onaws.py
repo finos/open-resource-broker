@@ -1532,7 +1532,7 @@ def _capture_resource_history(resource_id: str, provider_api: str, test_name: st
 
             if synthetic_records:
                 history_records.extend(synthetic_records)
-                log.info(
+                log.warning(
                     "Added %s synthetic history records for missing instances",
                     len(synthetic_records),
                 )
@@ -1715,7 +1715,7 @@ def _wait_for_asg_deletion(asg_name: str, timeout: int = 300) -> None:
 def _capture_history_if_enabled(resource_id: str | None, provider_api: str | None, test_case: dict):
     """Common history capture helper used in timeout/finally blocks."""
     if scenarios_rest_api.CAPTURE_RESOURCE_HISTORY:
-        log.info("3.1a: Capturing resource history before termination")
+        log.info("[STATE: 3.1a]: Capturing resource history before termination")
         if resource_id and provider_api != "RunInstances":
             log.info(f"Calling _capture_resource_history for {provider_api} resource {resource_id}")
             _capture_resource_history(resource_id, provider_api, test_case["test_name"])
