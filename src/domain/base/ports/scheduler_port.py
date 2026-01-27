@@ -69,3 +69,24 @@ class SchedulerPort(ABC):
         Returns:
             Directory path or None if not available
         """
+
+    @abstractmethod
+    def get_templates_filename(self, provider_name: str, provider_type: str) -> str:
+        """Get templates filename for the given provider."""
+
+    @abstractmethod
+    def should_log_to_console(self) -> bool:
+        """Check if logs should be written to console for this scheduler.
+        
+        Returns:
+            True if logs should go to console (Default/interactive mode)
+            False if logs should only go to file (HostFactory script mode)
+        """
+
+    @abstractmethod
+    def format_error_response(self, error: Exception, context: dict[str, Any]) -> dict[str, Any]:
+        """Format error response for this scheduler."""
+
+    @abstractmethod
+    def format_health_response(self, checks: list[dict[str, Any]]) -> dict[str, Any]:
+        """Format health check response for this scheduler."""

@@ -12,6 +12,9 @@ class SchedulerConfig(BaseModel):
     config_root: Optional[str] = Field(
         None, description="Root path for configs (supports $ENV_VAR expansion)"
     )
+    templates_filename: Optional[str] = Field(
+        None, description="Override templates filename (null = use scheduler default)"
+    )
 
     def get_config_root(self) -> str:
         """Get config root with automatic environment variable expansion."""
