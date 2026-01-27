@@ -173,30 +173,18 @@ def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
     except Exception as e:
         raise FileNotFoundError(f"Could not find default_config.json template: {e}")
 
-
-def _get_installed_template_path():
-    """Get template path for installed package using proper scheme detection."""
-    import sysconfig
-    import sys
-    
-    # Detect if this is a user install by checking if we're using user site-packages
-    try:
-        import site
-        if hasattr(site, 'USER_SITE') and site.USER_SITE in sys.path:
-            # User install - use posix_user scheme
-            scheme = 'posix_user' if os.name == 'posix' else 'nt_user'
-            data_path = Path(sysconfig.get_path('data', scheme))
-        else:
-            # System or venv install - use default scheme
-            data_path = Path(sysconfig.get_path('data'))
-    except:
-        # Fallback to default
-        data_path = Path(sysconfig.get_path('data'))
-    
-    return data_path / "orb_config" / "default_config.json"
-
     # Update with user values
     full_config["scheduler"]["type"] = user_config["scheduler_type"]
+    full_config["provider"]["providers"][0]["config"]["region"] = user_config["region"]
+    full_config["provider"]["providers"][0]["config"]["profile"] = user_config["profile"]
+
+    with open(config_file, 'w') as f:
+        json.dump(full_config, f, indent=2)
+
+    logger.info("Created configuration file: %s", config_file)
+
+
+
     
     # Set config_root based on scheduler type
     if user_config["scheduler_type"] == "hostfactory":
