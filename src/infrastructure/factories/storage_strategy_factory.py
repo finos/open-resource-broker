@@ -55,7 +55,7 @@ class StorageStrategyFactory:
     def create_machine_storage_strategy(self, config: Optional[Any] = None) -> BaseStorageStrategy:
         """Create storage strategy for machine entities."""
         if config is None and self.config_manager:
-            config = self.config_manager.get_app_config()
+            config = self.config_manager.app_config.model_dump()
 
         storage_type = self._get_storage_type(config)
         return self.create_strategy(storage_type, config)
@@ -63,7 +63,7 @@ class StorageStrategyFactory:
     def create_request_storage_strategy(self, config: Optional[Any] = None) -> BaseStorageStrategy:
         """Create storage strategy for request entities."""
         if config is None and self.config_manager:
-            config = self.config_manager.get_app_config()
+            config = self.config_manager.app_config.model_dump()
 
         storage_type = self._get_storage_type(config)
         return self.create_strategy(storage_type, config)
@@ -71,7 +71,7 @@ class StorageStrategyFactory:
     def create_template_storage_strategy(self, config: Optional[Any] = None) -> BaseStorageStrategy:
         """Create storage strategy for template entities."""
         if config is None and self.config_manager:
-            config = self.config_manager.get_app_config()
+            config = self.config_manager.app_config.model_dump()
 
         storage_type = self._get_storage_type(config)
         return self.create_strategy(storage_type, config)

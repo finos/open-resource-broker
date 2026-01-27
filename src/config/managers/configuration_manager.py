@@ -243,14 +243,6 @@ class ConfigurationManager:
         """Get raw configuration dictionary."""
         return self._ensure_raw_config().copy()
 
-    def get_app_config(self) -> dict[str, Any]:
-        """Get structured application configuration.
-
-        Returns the raw configuration dictionary for backward compatibility.
-        This method is used by repository factories and other components.
-        """
-        return self.get_raw_config()
-
     def resolve_file(
         self,
         file_type: str,

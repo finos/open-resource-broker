@@ -16,7 +16,7 @@ class ConfigurationAdapter(ConfigurationPort):
 
     def get_app_config(self) -> dict[str, Any]:
         """Get structured application configuration."""
-        return self._config_manager.get_app_config()
+        return self._config_manager.app_config.model_dump()
 
     def find_templates_file(self, provider_type: str) -> str:
         """Find templates file for given provider type."""

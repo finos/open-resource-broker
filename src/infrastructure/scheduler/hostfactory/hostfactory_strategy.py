@@ -459,7 +459,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
     def get_config_file_path(self) -> str:
         """Get config file path using configuration."""
         # Get raw config and build path manually
-        config = self.config_manager.get_app_config()
+        config = self.config_manager.app_config.model_dump()
 
         # Get scheduler config root
         scheduler_config = config.get("scheduler", {})

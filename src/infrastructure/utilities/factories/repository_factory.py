@@ -88,12 +88,10 @@ class RepositoryFactory:
         )
 
         storage_type = self.config_manager.get_storage_strategy()
-        config = self.config_manager.get_app_config()
+        config = self.config_manager.app_config.model_dump()
+        storage_strategy = self.storage_registry.create_strategy(storage_type, config)
 
         try:
-            # Get storage strategy from registry
-            storage_strategy = self.storage_registry.create_strategy(storage_type, config)
-
             # Create repository with strategy injection
             return TemplateRepository(storage_strategy)
 

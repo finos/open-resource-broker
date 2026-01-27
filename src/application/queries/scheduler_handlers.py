@@ -140,10 +140,8 @@ class GetSchedulerConfigurationHandler(
         found = False
 
         try:
-            app_config = config_manager.get_app_config()
-            if hasattr(app_config, "scheduler"):
-                configuration = app_config.scheduler.model_dump()
-                found = True
+            configuration = config_manager.app_config.scheduler.model_dump()
+            found = True
         except Exception:
             configuration = {"error": "Failed to load scheduler configuration"}
 
@@ -206,10 +204,8 @@ class ValidateSchedulerConfigurationHandler(
 
             # Check configuration completeness
             try:
-                app_config = config_manager.get_app_config()
-                if not hasattr(app_config, "scheduler"):
-                    warnings.append("No scheduler configuration section found in config")
-                elif not app_config.scheduler.type:
+                scheduler_config = config_manager.app_config.scheduler
+                if not scheduler_config.type:
                     warnings.append("Scheduler type not specified in configuration")
             except Exception as e:
                 errors.append(f"Configuration access failed: {e!s}")

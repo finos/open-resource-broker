@@ -28,10 +28,8 @@ class RequestCacheService:
     def _is_caching_enabled(self) -> bool:
         """Check if request status caching is enabled."""
         try:
-            config = self.config_manager.get_app_config()
-            caching_config = config.get("performance", {}).get("caching", {})
-            request_caching = caching_config.get("request_status_caching", {})
-            return request_caching.get("enabled", False)
+            performance = self.config_manager.app_config.performance
+            return performance.caching.request_status_caching.enabled
         except Exception as e:
             self.logger.warning("Failed to get caching config, defaulting to disabled: %s", e)
             return False
@@ -39,10 +37,8 @@ class RequestCacheService:
     def _get_cache_ttl(self) -> int:
         """Get cache TTL in seconds."""
         try:
-            config = self.config_manager.get_app_config()
-            caching_config = config.get("performance", {}).get("caching", {})
-            request_caching = caching_config.get("request_status_caching", {})
-            return request_caching.get("ttl_seconds", 300)  # Default 5 minutes
+            performance = self.config_manager.app_config.performance
+            return performance.caching.request_status_caching.ttl_seconds
         except Exception as e:
             self.logger.warning("Failed to get cache TTL, defaulting to 300 seconds: %s", e)
             return 300

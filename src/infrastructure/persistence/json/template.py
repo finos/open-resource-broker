@@ -155,9 +155,9 @@ class TemplateJSONRepository(StrategyBasedRepository, TemplateRepository):
         self.logger = get_logger(__name__)
 
         # Get template file paths from configuration
-        app_config = config_manager.get_app_config()
-        templates_file_path = app_config.templates_file_path
-        legacy_templates_file_path = getattr(app_config, "legacy_templates_file_path", None)
+        app_config = config_manager.app_config
+        templates_file_path = app_config.get_templates_file_path()
+        legacy_templates_file_path = getattr(app_config.template, "legacy_templates_file_path", None)
 
         # Try to inject metrics collector from DI container
         metrics = None
