@@ -32,9 +32,8 @@ def handle_health_check(args) -> int:
         
         # 2. Templates file check
         try:
-            from config.managers.configuration_manager import ConfigurationManager
-            config_mgr = container.get(ConfigurationManager)
-            templates_path = config_mgr.find_templates_file("aws")
+            scheduler = container.get(SchedulerPort)
+            templates_path = scheduler.get_templates_file_path()
             checks.append({
                 "name": "templates_file",
                 "status": "pass" if Path(templates_path).exists() else "fail",

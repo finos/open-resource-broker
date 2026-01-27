@@ -41,18 +41,21 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         self._provider_selection_service = container.get(ProviderSelectionService)
 
     def get_templates_file_path(self) -> str:
-        """Get the templates file path for HostFactory."""
+        """Get the templates file path for HostFactory using strategy pattern."""
         try:
             # Use provider selection service for provider selection
             selection_result = self._provider_selection_service.select_active_provider()
+            provider_name = selection_result.name
             provider_type = selection_result.provider_type
             
-            # Use ConfigurationManager's unified template discovery
-            return self.config_manager.find_templates_file(provider_type)
+            # Use scheduler strategy for filename (consistent with generation)
+            filename = self.get_templates_filename(provider_name, provider_type)
+            
+            # Use ConfigurationManager to resolve the file path
+            return self.config_manager.resolve_file("template", filename)
             
         except Exception as e:
             self._logger.error("Failed to determine templates file path: %s", e)
-            # Re-raise with context - let caller handle the error
             raise
 
     def get_template_paths(self) -> list[str]:

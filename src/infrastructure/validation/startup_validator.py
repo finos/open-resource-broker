@@ -10,7 +10,7 @@ import boto3
 from botocore.exceptions import NoCredentialsError, ClientError
 from pydantic import ValidationError
 
-from cli.console import print_error, print_info, print_command
+from cli.console import print_error, print_info, print_command, print_warning
 from config.schemas.app_schema import AppConfig
 from _package import DOCS_URL
 

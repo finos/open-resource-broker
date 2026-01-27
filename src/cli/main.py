@@ -780,28 +780,26 @@ async def main() -> None:
 
         logger = get_logger(__name__)
 
-        # Skip application initialization for init and templates commands
+        # Skip application initialization for init and templates generate commands only
         if args.resource == "init":
             # Execute init command directly without Application
             from interface.init_command_handler import handle_init
             result = await handle_init(args)
             sys.exit(result)
         
-        if args.resource == "templates":
-            # Templates commands don't need full validation (no AWS calls for list/generate)
-            skip_validation = True
-            if args.action == "generate":
-                # Execute templates generate without full app initialization
-                from interface.templates_generate_handler import handle_templates_generate
-                result = await handle_templates_generate(args)
-                # Print result
-                if result.get("status") == "success":
-                    sys.exit(0)
-                else:
-                    print(f"Error: {result.get('message')}", file=sys.stderr)
-                    sys.exit(1)
-        else:
-            skip_validation = False
+        if args.resource == "templates" and args.action == "generate":
+            # Templates generate doesn't need existing config (creates templates)
+            from interface.templates_generate_handler import handle_templates_generate
+            result = await handle_templates_generate(args)
+            # Print result
+            if result.get("status") == "success":
+                sys.exit(0)
+            else:
+                print(f"Error: {result.get('message')}", file=sys.stderr)
+                sys.exit(1)
+
+        # All other commands need full Application initialization
+        skip_validation = False
 
         # Initialize application with dry-run mode if requested
         try:

@@ -26,9 +26,12 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
         self._logger = logger
 
     def get_templates_file_path(self) -> str:
-        """Get templates file path - using native domain format."""
-        # Use ConfigurationManager's unified template discovery with "default" as provider type
-        return self.config_manager.find_templates_file("default")
+        """Get templates file path using strategy pattern."""
+        # Use scheduler strategy for filename (consistent with generation)
+        filename = self.get_templates_filename("default", "default")
+        
+        # Use ConfigurationManager to resolve the file path
+        return self.config_manager.resolve_file("template", filename)
 
     def get_template_paths(self) -> list[str]:
         """Get template file paths."""
