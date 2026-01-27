@@ -13,6 +13,7 @@ from .common_schema import (
     ResourceConfig,
 )
 from .logging_schema import LoggingConfig
+from .metrics_schema import MetricsConfig
 from .native_spec_schema import NativeSpecConfig
 from .performance_schema import CircuitBreakerConfig, PerformanceConfig
 from .provider_strategy_schema import ProviderConfig
@@ -30,6 +31,7 @@ class AppConfig(BaseModel):
     scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)
     naming: NamingConfig = Field(default_factory=lambda: NamingConfig())
     logging: LoggingConfig = Field(default_factory=lambda: LoggingConfig())
+    metrics: MetricsConfig = Field(default_factory=lambda: MetricsConfig())
     template: Optional[TemplateConfig] = None
     events: EventsConfig = Field(default_factory=lambda: EventsConfig())
     storage: StorageConfig = Field(default_factory=lambda: StorageConfig())

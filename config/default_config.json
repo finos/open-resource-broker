@@ -30,14 +30,21 @@
         "handlers": {
           "EC2Fleet": {
             "handler_class": "EC2FleetHandler",
-            "supported_fleet_types": ["instant", "request", "maintain"],
+            "supported_fleet_types": [
+              "instant",
+              "request",
+              "maintain"
+            ],
             "default_fleet_type": "instant",
             "supports_spot": true,
             "supports_ondemand": true
           },
           "SpotFleet": {
             "handler_class": "SpotFleetHandler",
-            "supported_fleet_types": ["request", "maintain"],
+            "supported_fleet_types": [
+              "request",
+              "maintain"
+            ],
             "default_fleet_type": "request",
             "supports_spot": true,
             "supports_ondemand": false
@@ -57,8 +64,12 @@
         "template_defaults": {
           "image_id": "ami-12345678",
           "instance_type": "t2.micro",
-          "security_group_ids": ["sg-12345678"],
-          "subnet_ids": ["subnet-12345678"],
+          "security_group_ids": [
+            "sg-12345678"
+          ],
+          "subnet_ids": [
+            "subnet-12345678"
+          ],
           "key_name": "",
           "provider_api": "EC2Fleet",
           "price_type": "ondemand",
@@ -288,17 +299,6 @@
     "trace_buffer_size": 1000,
     "trace_file_max_size_mb": 10
   },
-  "retry": {
-    "max_attempts": 3,
-    "base_delay": 1.0,
-    "max_delay": 60.0,
-    "jitter": true,
-    "circuit_breaker": {
-      "failure_threshold": 5,
-      "reset_timeout": 60,
-      "half_open_timeout": 30
-    }
-  },
   "storage": {
     "strategy": "json",
     "default_storage_path": "data",
@@ -383,5 +383,17 @@
     "max_request_size": 16777216,
     "access_log": true,
     "log_level": "info"
+  },
+  "circuit_breaker": {
+    "enabled": true,
+    "failure_threshold": 5,
+    "recovery_timeout": 60,
+    "half_open_max_calls": 3
+  },
+  "request_timeout": 300,
+  "max_machines_per_request": 100,
+  "resource": {
+    "max_instances": 1000,
+    "default_timeout": 300
   }
 }
