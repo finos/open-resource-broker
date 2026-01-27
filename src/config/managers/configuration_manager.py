@@ -307,38 +307,24 @@ class ConfigurationManager:
         return fallback_path
 
     def _get_scheduler_directory(self, file_type: str) -> Optional[str]:
-        """Get directory path from scheduler strategy for the given file type.
+        """Get directory path for the given file type using platform detection.
 
-        Reads directly from environment variables to avoid circular import issues
-        during configuration bootstrap.
+        Uses platform_dirs for consistent directory resolution during bootstrap.
         """
-        import os
+        from config.platform_dirs import get_config_location, get_work_location, get_logs_location
+        
+        logger.debug("[CONFIG_MGR] Getting directory for file_type=%s", file_type)
 
-        logger.debug("[CONFIG_MGR] Getting scheduler directory for file_type=%s", file_type)
-
-        # Read directly from environment variables (HostFactory convention)
         if file_type in ["conf", "template", "legacy"]:
-            confdir = os.environ.get("HF_PROVIDER_CONFDIR")
-            workdir = os.environ.get("HF_PROVIDER_WORKDIR", os.getcwd())
-            result = confdir if confdir else os.path.join(workdir, "config")
+            result = str(get_config_location())
         elif file_type == "log":
-            logdir = os.environ.get("HF_PROVIDER_LOGDIR")
-            workdir = os.environ.get("HF_PROVIDER_WORKDIR", os.getcwd())
-            result = logdir if logdir else os.path.join(workdir, "logs")
+            result = str(get_logs_location())
         elif file_type in ["work", "data"]:
-            result = os.environ.get("HF_PROVIDER_WORKDIR", os.getcwd())
+            result = str(get_work_location())
         else:
-            result = os.environ.get("HF_PROVIDER_WORKDIR", os.getcwd())
+            result = str(get_work_location())
 
-        logger.debug(
-            "[CONFIG_MGR] Resolved directory for file_type=%s: %s (HF_PROVIDER_LOGDIR=%s, HF_PROVIDER_WORKDIR=%s, HF_PROVIDER_CONFDIR=%s)",
-            file_type,
-            result,
-            os.environ.get("HF_PROVIDER_LOGDIR", "NOT_SET"),
-            os.environ.get("HF_PROVIDER_WORKDIR", "NOT_SET"),
-            os.environ.get("HF_PROVIDER_CONFDIR", "NOT_SET"),
-        )
-
+        logger.debug("[CONFIG_MGR] Resolved directory for file_type=%s: %s", file_type, result)
         return result
 
     def find_templates_file(self, provider_type: str) -> str:

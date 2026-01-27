@@ -99,7 +99,6 @@ class StartupValidator:
         candidates = [
             os.environ.get("ORB_CONFIG_FILE"),
             os.path.join(os.environ.get("ORB_CONFIG_DIR", ""), "config.json"),
-            os.path.join(os.environ.get("HF_PROVIDER_CONFDIR", ""), "config.json"),
             "./config/config.json",
         ]
         
@@ -161,7 +160,7 @@ class StartupValidator:
         print_info("")
         print_info("Configuration not found in:")
         print_info(f"  - {Path.cwd() / 'config' / 'config.json'}")
-        if env_dir := os.environ.get("HF_PROVIDER_CONFDIR"):
+        if env_dir := os.environ.get("ORB_CONFIG_DIR"):
             print_info(f"  - {env_dir}/config.json")
         print_info("")
         print_info("To initialize:")

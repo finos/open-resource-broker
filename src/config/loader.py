@@ -523,26 +523,14 @@ class ConfigurationLoader:
         if config_manager:
             return config_manager._get_scheduler_directory(file_type)
 
-        # During bootstrap, check environment variables directly
-        import os
+        # During bootstrap, use platform_dirs for consistent directory resolution
+        from config.platform_dirs import get_config_location, get_work_location, get_logs_location
 
         if file_type in ["conf", "template", "legacy"]:
-            confdir = os.environ.get("HF_PROVIDER_CONFDIR")
-            if confdir:
-                return confdir
-            workdir = os.environ.get("HF_PROVIDER_WORKDIR")
-            if workdir:
-                return os.path.join(workdir, "config")
+            return str(get_config_location())
         elif file_type == "log":
-            logdir = os.environ.get("HF_PROVIDER_LOGDIR")
-            if logdir:
-                return logdir
-            workdir = os.environ.get("HF_PROVIDER_WORKDIR")
-            if workdir:
-                return os.path.join(workdir, "logs")
+            return str(get_logs_location())
         elif file_type in ["work", "data"]:
-            workdir = os.environ.get("HF_PROVIDER_WORKDIR")
-            if workdir:
-                return workdir
+            return str(get_work_location())
 
         return None

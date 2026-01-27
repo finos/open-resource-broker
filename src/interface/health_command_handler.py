@@ -86,18 +86,37 @@ def handle_health_check(args) -> int:
             })
         
         # 5. Work directory check
-        work_dir = os.environ.get("HF_PROVIDER_WORKDIR") or "./work"
-        checks.append({
-            "name": "work_directory",
-            "status": "pass" if Path(work_dir).exists() else "fail",
-            "details": work_dir
-        })
+        try:
+            from domain.base.ports.scheduler_port import SchedulerPort
+            scheduler = container.get(SchedulerPort)
+            work_dir = scheduler.get_working_directory()
+            checks.append({
+                "name": "work_directory",
+                "status": "pass" if Path(work_dir).exists() else "fail",
+                "details": work_dir
+            })
+        except Exception as e:
+            checks.append({
+                "name": "work_directory",
+                "status": "fail",
+                "error": str(e)
+            })
         
         # 6. Logs directory check
-        logs_dir = os.environ.get("HF_PROVIDER_LOGDIR") or "./logs"
-        checks.append({
-            "name": "logs_directory",
-            "status": "pass" if Path(logs_dir).exists() else "fail",
+        try:
+            scheduler = container.get(SchedulerPort)
+            logs_dir = scheduler.get_logs_directory()
+            checks.append({
+                "name": "logs_directory",
+                "status": "pass" if Path(logs_dir).exists() else "fail",
+                "details": logs_dir
+            })
+        except Exception as e:
+            checks.append({
+                "name": "logs_directory",
+                "status": "fail",
+                "error": str(e)
+            })
             "details": logs_dir
         })
         

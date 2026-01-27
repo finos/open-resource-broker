@@ -171,7 +171,7 @@ def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
     
     # Set config_root based on scheduler type
     if user_config["scheduler_type"] == "hostfactory":
-        full_config["scheduler"]["config_root"] = "$HF_PROVIDER_CONFDIR"
+        full_config["scheduler"]["config_root"] = "$ORB_CONFIG_DIR"
     else:
         full_config["scheduler"]["config_root"] = "."
     

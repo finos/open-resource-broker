@@ -143,7 +143,7 @@ class RepositoryMigrator:
                 # Get configuration manager
                 config_manager = get_config_manager()
 
-                # Use centralized file resolution for consistent HF_PROVIDER_CONFDIR
+                # Use centralized file resolution for consistent directory
                 # support
                 templates_path = config_manager.resolve_file("template", "templates.json")
                 legacy_templates_path = config_manager.resolve_file(
