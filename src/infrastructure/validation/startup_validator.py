@@ -110,22 +110,44 @@ class StartupValidator:
         return False
     
     def _check_templates_file(self) -> bool:
-        """Check if templates file exists."""
+        """Check if templates file exists using scheduler strategy."""
         if not self.app_config:
             return False
         
-        # Get config directory
-        config_dir = Path(self.config_path).parent if self.config_path else Path("./config")
-        
-        # Try provider-specific and generic names
-        candidates = [
-            config_dir / "awsprov_templates.json",
-            config_dir / "templates.json",
-            config_dir / "templates" / "awsprov_templates.json",
-            config_dir / "templates" / "templates.json",
-        ]
-        
-        return any(candidate.exists() for candidate in candidates)
+        try:
+            # Get the correct filename from scheduler strategy
+            from infrastructure.di.container import get_container
+            from domain.base.ports.scheduler_port import SchedulerPort
+            
+            container = get_container()
+            scheduler = container.get(SchedulerPort)
+            
+            # Get provider info for filename
+            provider_config = self.app_config.provider.providers[0] if self.app_config.provider.providers else None
+            if not provider_config:
+                return False
+                
+            provider_name = provider_config.name
+            provider_type = provider_config.type
+            
+            # Get scheduler-specific filename
+            filename = scheduler.get_templates_filename(provider_name, provider_type, self.app_config.model_dump())
+            
+            # Check if file exists in config directory
+            config_dir = Path(self.config_path).parent if self.config_path else Path("./config")
+            template_file = config_dir / filename
+            
+            return template_file.exists()
+            
+        except Exception:
+            # Fallback to hardcoded names if scheduler strategy fails
+            config_dir = Path(self.config_path).parent if self.config_path else Path("./config")
+            candidates = [
+                config_dir / "aws-default_templates.json",
+                config_dir / "awsprov_templates.json", 
+                config_dir / "templates.json"
+            ]
+            return any(candidate.exists() for candidate in candidates)
     
     def _check_aws_credentials(self) -> bool:
         """Check if AWS credentials are configured."""
