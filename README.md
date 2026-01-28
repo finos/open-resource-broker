@@ -592,10 +592,10 @@ make test-performance
 [![Python Versions](https://img.shields.io/pypi/pyversions/orb-py)](https://pypi.org/project/orb-py/)
 [![Success Rate](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/ec3393a523fa3a6b6ff89a0636de3085/raw/success-rate.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/health-monitoring.yml)
 [![Avg Duration](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/ec3393a523fa3a6b6ff89a0636de3085/raw/avg-duration.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/health-monitoring.yml)
-[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/50bc37df3c178a0846dbd3682a71d50a/raw/coverage.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/advanced-metrics.yml)
-[![Lines of Code](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/50bc37df3c178a0846dbd3682a71d50a/raw/lines-of-code.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/advanced-metrics.yml)
-[![Comments](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/50bc37df3c178a0846dbd3682a71d50a/raw/comments.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/advanced-metrics.yml)
-[![Test Duration](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/50bc37df3c178a0846dbd3682a71d50a/raw/test-duration.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/advanced-metrics.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/22c627f01aad3fc08ca69a676ebf9696/raw/coverage.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/advanced-metrics.yml)
+[![Lines of Code](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/22c627f01aad3fc08ca69a676ebf9696/raw/lines-of-code.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/advanced-metrics.yml)
+[![Comments](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/22c627f01aad3fc08ca69a676ebf9696/raw/comments.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/advanced-metrics.yml)
+[![Test Duration](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/22c627f01aad3fc08ca69a676ebf9696/raw/test-duration.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/advanced-metrics.yml)
 
 These badges show real-time project health metrics including workflow success rates, test coverage, code quality indicators, and performance metrics. Dynamic badges are populated by automated workflows and may show "resource not found" until the first workflow runs complete.
 
