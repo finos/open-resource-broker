@@ -102,7 +102,8 @@ class TestInjectableDecorator:
         """Test Optional dependencies when service not available."""
 
         class UnavailableService:
-            pass
+            def __init__(self, required_param: str):
+                self.required_param = required_param
 
         @injectable
         class ServiceWithUnavailableOptional:
@@ -115,7 +116,7 @@ class TestInjectableDecorator:
 
             # Required dependency resolved
             assert isinstance(instance.port, MockAdapter)
-            # Optional dependency falls back to None
+            # Optional dependency falls back to None when instantiation fails
             assert instance.unavailable is None
 
     def test_injectable_with_mixed_parameters(self):

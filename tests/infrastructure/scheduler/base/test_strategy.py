@@ -29,6 +29,42 @@ class ConcreteSchedulerStrategy(BaseSchedulerStrategy):
     def format_templates_response(self, templates: list[Template]) -> dict[str, Any]:
         return {"templates": []}
 
+    def format_templates_for_generation(self, templates: list[dict]) -> list[dict]:
+        return templates
+
+    def format_request_response(self, request_data: dict[str, Any]) -> dict[str, Any]:
+        return {"request": request_data}
+
+    def format_machine_status_response(self, machines: list[Machine]) -> dict[str, Any]:
+        return {"machines": []}
+
+    def get_storage_base_path(self) -> str:
+        return "/test/storage"
+
+    def format_template_for_provider(self, template: Template) -> dict[str, Any]:
+        return {"template": "provider"}
+
+    def format_request_for_display(self, request: Request) -> dict[str, Any]:
+        return {"request": "display"}
+
+    def get_exit_code_for_status(self, status: str) -> int:
+        return 0
+
+    def get_directory(self, file_type: str) -> str | None:
+        return f"/test/{file_type}dir"
+
+    def get_templates_filename(self, provider_name: str, provider_type: str) -> str:
+        return f"{provider_name}_{provider_type}_templates.json"
+
+    def should_log_to_console(self) -> bool:
+        return True
+
+    def format_error_response(self, error: Exception, context: dict[str, Any]) -> dict[str, Any]:
+        return {"error": str(error)}
+
+    def format_health_response(self, checks: list[dict[str, Any]]) -> dict[str, Any]:
+        return {"health": "ok"}
+
     def format_request_status_response(self, requests: list[Request]) -> dict[str, Any]:
         return {"requests": []}
 

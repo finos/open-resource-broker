@@ -126,9 +126,10 @@ class TestAPIHandlerInitialization:
 class TestAPIHandlerRegistration:
     """Test API handler registration in server_services.py."""
 
+    @patch("infrastructure.di.server_services._register_fastapi_services")
     @patch("infrastructure.di.server_services._register_api_handlers")
-    def test_register_server_services(self, mock_register_api_handlers):
-        """Test that register_server_services calls _register_api_handlers when server is enabled."""
+    def test_register_server_services_with_fastapi(self, mock_register_api_handlers, mock_register_fastapi):
+        """Test that register_server_services calls handlers when server is enabled and FastAPI is available."""
         # Arrange
         from config.schemas.server_schema import ServerConfig
         from infrastructure.di.server_services import register_server_services
@@ -144,7 +145,31 @@ class TestAPIHandlerRegistration:
         register_server_services(container)
 
         # Assert
+        mock_register_fastapi.assert_called_once_with(container, server_config)
         mock_register_api_handlers.assert_called_once_with(container)
+
+    def test_register_server_services_without_fastapi(self):
+        """Test that register_server_services handles missing FastAPI gracefully."""
+        # Arrange
+        from config.schemas.server_schema import ServerConfig
+        from infrastructure.di.server_services import register_server_services
+
+        container = MagicMock()
+        config_manager = MagicMock()
+        server_config = MagicMock(spec=ServerConfig)
+        server_config.enabled = True
+        config_manager.get_typed.return_value = server_config
+        container.get.return_value = config_manager
+
+        # Mock FastAPI import to fail
+        with patch("infrastructure.di.server_services._register_fastapi_services") as mock_fastapi:
+            mock_fastapi.side_effect = ImportError("No module named 'fastapi'")
+            
+            # Act - should not raise exception
+            register_server_services(container)
+            
+            # Assert - function completes without error
+            assert True
 
     @patch("infrastructure.di.server_services._register_api_handlers")
     def test_register_server_services_disabled(self, mock_register_api_handlers):

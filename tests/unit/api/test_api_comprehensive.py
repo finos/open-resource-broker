@@ -10,6 +10,13 @@ from api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
 from application.dto.queries import GetRequestQuery, GetRequestStatusQuery, ListActiveRequestsQuery
 from application.request.dto import RequestStatusResponse
 
+# Check if FastAPI is available
+try:
+    import fastapi
+    FASTAPI_AVAILABLE = True
+except ImportError:
+    FASTAPI_AVAILABLE = False
+
 
 @pytest.mark.unit
 @pytest.mark.api
@@ -29,7 +36,7 @@ class TestAPIHandlersComprehensive:
 
         for handler_file in handler_files:
             try:
-                module = importlib.import_module(f"src.api.handlers.{handler_file}")
+                module = importlib.import_module(f"api.handlers.{handler_file}")
                 handler_modules.append((handler_file, module))
             except ImportError:
                 continue
@@ -319,7 +326,7 @@ class TestAPIModelsComprehensive:
 
         for model_file in model_files:
             try:
-                module = importlib.import_module(f"src.api.models.{model_file}")
+                module = importlib.import_module(f"api.models.{model_file}")
                 model_modules.append((model_file, module))
             except ImportError:
                 continue
@@ -450,7 +457,7 @@ class TestAPIRoutersComprehensive:
 
         for router_file in router_files:
             try:
-                module = importlib.import_module(f"src.api.routers.{router_file}")
+                module = importlib.import_module(f"api.routers.{router_file}")
                 router_modules.append((router_file, module))
             except ImportError:
                 continue
@@ -481,6 +488,9 @@ class TestAPIRoutersComprehensive:
 
     def test_router_integration(self):
         """Test router FastAPI integration."""
+        if not FASTAPI_AVAILABLE:
+            pytest.skip("FastAPI not available")
+            
         modules = self.get_router_modules()
 
         for _module_name, module in modules:

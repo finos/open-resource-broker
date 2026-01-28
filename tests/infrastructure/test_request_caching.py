@@ -1,7 +1,7 @@
 """Tests for request status caching functionality."""
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
 
@@ -105,9 +105,17 @@ class TestRequestCacheService:
     def test_cache_request_when_disabled(self, mock_uow_factory, mock_logger):
         """Test that cache_request does nothing when caching is disabled."""
         config_manager = Mock(spec=ConfigurationManager)
-        config_manager.get_app_config.return_value = {
-            "performance": {"caching": {"request_status_caching": {"enabled": False}}}
-        }
+        
+        # Mock the app_config property structure
+        mock_app_config = Mock()
+        mock_performance = Mock()
+        mock_caching = Mock()
+        mock_request_caching = Mock()
+        mock_request_caching.enabled = False
+        mock_caching.request_status_caching = mock_request_caching
+        mock_performance.caching = mock_caching
+        mock_app_config.performance = mock_performance
+        config_manager.app_config = mock_app_config
 
         cache_service = RequestCacheService(
             uow_factory=mock_uow_factory,
@@ -118,11 +126,10 @@ class TestRequestCacheService:
         request_dto = RequestDTO(
             request_id="test-request-id",
             template_id="test-template",
-            machine_count=1,
-            num_requested=1,
+            requested_count=1,
             status="completed",
             created_at=datetime.now(timezone.utc),
-            machines=[],
+            machine_references=[],
             metadata={},
         )
 
@@ -156,7 +163,9 @@ class TestRequestCacheService:
     def test_config_error_handling(self, mock_uow_factory, mock_logger):
         """Test that config errors are handled gracefully."""
         config_manager = Mock(spec=ConfigurationManager)
-        config_manager.get_app_config.side_effect = Exception("Config error")
+        
+        # Make app_config property raise exception when accessed
+        type(config_manager).app_config = PropertyMock(side_effect=Exception("Config error"))
 
         cache_service = RequestCacheService(
             uow_factory=mock_uow_factory,
@@ -180,11 +189,18 @@ class TestRequestCacheIntegration:
         mock_uow_factory = Mock(spec=UnitOfWorkFactory)
         mock_logger = Mock(spec=LoggingPort)
         mock_config_manager = Mock(spec=ConfigurationManager)
-        mock_config_manager.get_app_config.return_value = {
-            "performance": {
-                "caching": {"request_status_caching": {"enabled": True, "ttl_seconds": 600}}
-            }
-        }
+        
+        # Mock the app_config property structure
+        mock_app_config = Mock()
+        mock_performance = Mock()
+        mock_caching = Mock()
+        mock_request_caching = Mock()
+        mock_request_caching.enabled = True
+        mock_request_caching.ttl_seconds = 600
+        mock_caching.request_status_caching = mock_request_caching
+        mock_performance.caching = mock_caching
+        mock_app_config.performance = mock_performance
+        mock_config_manager.app_config = mock_app_config
 
         cache_service = RequestCacheService(
             uow_factory=mock_uow_factory,

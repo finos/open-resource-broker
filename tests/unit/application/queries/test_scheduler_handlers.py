@@ -135,7 +135,7 @@ class TestGetSchedulerConfigurationHandler:
             "config_root": "config",
         }
         app_config.scheduler = scheduler_config
-        config_manager.get_app_config.return_value = app_config
+        config_manager.app_config = app_config
 
         return config_manager
 
@@ -233,7 +233,7 @@ class TestValidateSchedulerConfigurationHandler:
         scheduler_config = Mock()
         scheduler_config.type = "hostfactory"
         app_config.scheduler = scheduler_config
-        config_manager.get_app_config.return_value = app_config
+        config_manager.app_config = app_config
 
         return config_manager
 

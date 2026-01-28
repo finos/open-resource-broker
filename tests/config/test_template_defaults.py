@@ -290,9 +290,19 @@ class TestTemplateDefaultsIntegration:
 
         # Setup mock template defaults service
         mock_template_defaults_service.resolve_provider_api_default.return_value = "SpotFleet"
+        mock_template_defaults_service.resolve_template_defaults.return_value = {
+            "template_id": "test-template",
+            "max_number": 5,
+            "image_id": "ami-12345",
+            "provider_api": "SpotFleet"
+        }
 
         # Create scheduler strategy with template defaults service
-        scheduler = HostFactorySchedulerStrategy(mock_config_manager, mock_logger)
+        scheduler = HostFactorySchedulerStrategy(
+            mock_config_manager, 
+            mock_logger, 
+            template_defaults_service=mock_template_defaults_service
+        )
 
         # Test template field mapping with defaults service
         template_dict = {

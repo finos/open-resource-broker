@@ -18,7 +18,8 @@ from infrastructure.di.buses import CommandBus, QueryBus
 class TestFullWorkflow:
     """Integration tests for full application workflow."""
 
-    def test_application_initialization_and_basic_operations(
+    @pytest.mark.asyncio
+    async def test_application_initialization_and_basic_operations(
         self, test_config_file: Path, aws_mocks, mock_ec2_resources
     ):
         """Test full application initialization and basic operations."""
@@ -26,7 +27,7 @@ class TestFullWorkflow:
         app = Application(config_path=str(test_config_file))
 
         # Initialize should succeed
-        assert app.initialize() is True
+        assert await app.initialize() is True
 
         # Get CQRS buses directly
         query_bus = app.get_query_bus()
@@ -48,12 +49,13 @@ class TestFullWorkflow:
         assert isinstance(provider_info, dict)
         assert "status" in provider_info
 
-    def test_template_management_workflow(
+    @pytest.mark.asyncio
+    async def test_template_management_workflow(
         self, test_config_file: Path, aws_mocks, mock_ec2_resources
     ):
         """Test template management workflow."""
         app = Application(config_path=str(test_config_file))
-        app.initialize()
+        await app.initialize()
         service = app.get_application_service()
 
         # Test template validation
@@ -79,10 +81,11 @@ class TestFullWorkflow:
             assert template is not None
             assert isinstance(template, Template)
 
-    def test_machine_request_workflow(self, test_config_file: Path, aws_mocks, mock_ec2_resources):
+    @pytest.mark.asyncio
+    async def test_machine_request_workflow(self, test_config_file: Path, aws_mocks, mock_ec2_resources):
         """Test machine request workflow."""
         app = Application(config_path=str(test_config_file))
-        app.initialize()
+        await app.initialize()
         service = app.get_application_service()
 
         # Mock command and query buses for this test
@@ -125,10 +128,11 @@ class TestFullWorkflow:
             assert status["status"] == "processing"
             assert status["progress"] == 50.0
 
-    def test_machine_return_workflow(self, test_config_file: Path, aws_mocks, mock_ec2_resources):
+    @pytest.mark.asyncio
+    async def test_machine_return_workflow(self, test_config_file: Path, aws_mocks, mock_ec2_resources):
         """Test machine return workflow."""
         app = Application(config_path=str(test_config_file))
-        app.initialize()
+        await app.initialize()
         service = app.get_application_service()
 
         # Mock command and query buses
@@ -170,12 +174,13 @@ class TestFullWorkflow:
             assert len(return_requests) == 1
             assert return_requests[0]["request_id"] == "req-return-123"
 
-    def test_machine_status_monitoring_workflow(
+    @pytest.mark.asyncio
+    async def test_machine_status_monitoring_workflow(
         self, test_config_file: Path, aws_mocks, mock_ec2_resources
     ):
         """Test machine status monitoring workflow."""
         app = Application(config_path=str(test_config_file))
-        app.initialize()
+        await app.initialize()
         service = app.get_application_service()
 
         # Mock query bus
@@ -217,10 +222,28 @@ class TestFullWorkflow:
             assert machines[0]["machine_id"] == "machine-001"
             assert machines[1]["machine_id"] == "machine-002"
 
-    def test_configuration_management_integration(self, temp_dir: Path):
+    @pytest.mark.asyncio
+    async def test_configuration_management_integration(self, temp_dir: Path):
         """Test configuration management integration."""
         # Create test configuration
         config_data = {
+            "provider": {
+                "selection_policy": "FIRST_AVAILABLE",
+                "active_provider": "aws_default_us-west-2",
+                "providers": [
+                    {
+                        "name": "aws_default_us-west-2",
+                        "type": "aws",
+                        "enabled": True,
+                        "priority": 0,
+                        "weight": 100,
+                        "config": {
+                            "region": "us-west-2",
+                            "profile": "test-profile",
+                        },
+                    }
+                ],
+            },
             "aws": {"region": "us-west-2", "profile": "test-profile"},
             "logging": {"level": "INFO", "console_enabled": True},
             "database": {"type": "sqlite", "name": ":memory:"},
@@ -248,7 +271,8 @@ class TestFullWorkflow:
         assert config_manager.get("logging.level") == "INFO"
         assert config_manager.get("database.type") == "sqlite"
 
-    def test_error_handling_integration(self, test_config_file: Path, aws_mocks):
+    @pytest.mark.asyncio
+    async def test_error_handling_integration(self, test_config_file: Path, aws_mocks):
         """Test error handling integration."""
         app = Application(config_path=str(test_config_file))
 
@@ -257,12 +281,12 @@ class TestFullWorkflow:
             mock_container.initialize.side_effect = Exception("Initialization failed")
 
             # Should handle initialization error gracefully
-            result = app.initialize()
+            result = await app.initialize()
             assert result is False
 
         # Test with valid initialization but service errors
         app = Application(config_path=str(test_config_file))
-        app.initialize()
+        await app.initialize()
         service = app.get_application_service()
 
         # Mock service to raise errors
@@ -277,10 +301,11 @@ class TestFullWorkflow:
                     requester_id="test-user",
                 )
 
-    def test_dependency_injection_integration(self, test_config_file: Path, aws_mocks):
+    @pytest.mark.asyncio
+    async def test_dependency_injection_integration(self, test_config_file: Path, aws_mocks):
         """Test dependency injection integration."""
         app = Application(config_path=str(test_config_file))
-        app.initialize()
+        await app.initialize()
 
         # Verify DI container is properly configured
         container = app._container
@@ -299,10 +324,11 @@ class TestFullWorkflow:
         query_bus = container.get_query_bus()
         assert query_bus is not None
 
-    def test_provider_integration(self, test_config_file: Path, aws_mocks, mock_ec2_resources):
+    @pytest.mark.asyncio
+    async def test_provider_integration(self, test_config_file: Path, aws_mocks, mock_ec2_resources):
         """Test provider integration."""
         app = Application(config_path=str(test_config_file))
-        app.initialize()
+        await app.initialize()
         service = app.get_application_service()
 
         # Test provider health check
@@ -334,12 +360,13 @@ class TestFullWorkflow:
 class TestEndToEndScenarios:
     """End-to-end integration test scenarios."""
 
-    def test_complete_machine_lifecycle(
+    @pytest.mark.asyncio
+    async def test_complete_machine_lifecycle(
         self, test_config_file: Path, aws_mocks, mock_ec2_resources
     ):
         """Test complete machine lifecycle from request to termination."""
         app = Application(config_path=str(test_config_file))
-        app.initialize()
+        await app.initialize()
         service = app.get_application_service()
 
         # Mock all the buses for end-to-end flow
@@ -434,10 +461,11 @@ class TestEndToEndScenarios:
             assert len(return_requests) == 1
             assert return_requests[0]["status"] == "completed"
 
-    def test_error_recovery_scenario(self, test_config_file: Path, aws_mocks):
+    @pytest.mark.asyncio
+    async def test_error_recovery_scenario(self, test_config_file: Path, aws_mocks):
         """Test error recovery scenario."""
         app = Application(config_path=str(test_config_file))
-        app.initialize()
+        await app.initialize()
         service = app.get_application_service()
 
         with (
@@ -470,12 +498,13 @@ class TestEndToEndScenarios:
             assert result["request_id"] == "req-recovery-123"
             assert result["status"] == "pending"
 
-    def test_concurrent_operations_scenario(self, test_config_file: Path, aws_mocks):
+    @pytest.mark.asyncio
+    async def test_concurrent_operations_scenario(self, test_config_file: Path, aws_mocks):
         """Test concurrent operations scenario."""
         import threading
 
         app = Application(config_path=str(test_config_file))
-        app.initialize()
+        await app.initialize()
         service = app.get_application_service()
 
         results = []
@@ -521,30 +550,51 @@ class TestEndToEndScenarios:
 class TestConfigurationIntegration:
     """Integration tests for configuration management."""
 
-    def test_configuration_file_loading(self, temp_dir: Path):
+    @pytest.mark.asyncio
+    async def test_configuration_file_loading(self, temp_dir: Path):
         """Test loading configuration from different file formats."""
         # Test JSON configuration
-        json_config = {"aws": {"region": "us-east-1"}, "logging": {"level": "DEBUG"}}
+        json_config = {
+            "provider": {
+                "selection_policy": "FIRST_AVAILABLE",
+                "active_provider": "aws_default_us-east-1",
+                "providers": [
+                    {
+                        "name": "aws_default_us-east-1",
+                        "type": "aws",
+                        "enabled": True,
+                        "priority": 0,
+                        "weight": 100,
+                        "config": {
+                            "region": "us-east-1",
+                        },
+                    }
+                ],
+            },
+            "aws": {"region": "us-east-1"},
+            "logging": {"level": "DEBUG"},
+        }
 
         json_file = temp_dir / "config.json"
         with open(json_file, "w") as f:
             json.dump(json_config, f)
 
         app = Application(config_path=str(json_file))
-        app.initialize()
+        await app.initialize()
 
         config_manager = app._container.get_config_manager()
         assert config_manager.get("aws.region") == "us-east-1"
         assert config_manager.get("logging.level") == "DEBUG"
 
-    def test_environment_variable_override(self, test_config_file: Path):
+    @pytest.mark.asyncio
+    async def test_environment_variable_override(self, test_config_file: Path):
         """Test environment variable override of configuration."""
         import os
 
         # Set environment variables
         with patch.dict(os.environ, {"AWS_REGION": "us-west-1", "LOG_LEVEL": "ERROR"}):
             app = Application(config_path=str(test_config_file))
-            app.initialize()
+            await app.initialize()
 
             config_manager = app._container.get_config_manager()
 
@@ -552,10 +602,27 @@ class TestConfigurationIntegration:
             assert config_manager.get_env("AWS_REGION") == "us-west-1"
             assert config_manager.get_env("LOG_LEVEL") == "ERROR"
 
-    def test_configuration_validation_integration(self, temp_dir: Path):
+    @pytest.mark.asyncio
+    async def test_configuration_validation_integration(self, temp_dir: Path):
         """Test configuration validation integration."""
         # Create invalid configuration
         invalid_config = {
+            "provider": {
+                "selection_policy": "FIRST_AVAILABLE",
+                "active_provider": "aws_default_us-east-1",
+                "providers": [
+                    {
+                        "name": "aws_default_us-east-1",
+                        "type": "aws",
+                        "enabled": True,
+                        "priority": 0,
+                        "weight": 100,
+                        "config": {
+                            "region": "",  # Empty region
+                        },
+                    }
+                ],
+            },
             "aws": {"region": ""},  # Empty region
             "logging": {"level": "INVALID_LEVEL"},
         }
@@ -567,7 +634,7 @@ class TestConfigurationIntegration:
         app = Application(config_path=str(invalid_file))
 
         # Should handle invalid configuration gracefully
-        result = app.initialize()
+        result = await app.initialize()
         # Depending on implementation, might succeed with defaults or fail
         assert isinstance(result, bool)
 
@@ -577,10 +644,11 @@ class TestConfigurationIntegration:
 class TestPerformanceIntegration:
     """Performance integration tests."""
 
-    def test_large_template_list_performance(self, test_config_file: Path, aws_mocks):
+    @pytest.mark.asyncio
+    async def test_large_template_list_performance(self, test_config_file: Path, aws_mocks):
         """Test performance with large template list."""
         app = Application(config_path=str(test_config_file))
-        app.initialize()
+        await app.initialize()
         service = app.get_application_service()
 
         # Mock large template list
@@ -613,13 +681,14 @@ class TestPerformanceIntegration:
             assert execution_time < 1.0
             assert len(templates) == 1000
 
-    def test_concurrent_request_performance(self, test_config_file: Path, aws_mocks):
+    @pytest.mark.asyncio
+    async def test_concurrent_request_performance(self, test_config_file: Path, aws_mocks):
         """Test performance with concurrent requests."""
         import threading
         import time
 
         app = Application(config_path=str(test_config_file))
-        app.initialize()
+        await app.initialize()
         service = app.get_application_service()
 
         results = []

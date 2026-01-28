@@ -187,6 +187,25 @@ def temp_dir() -> Generator[Path, None, None]:
 def test_config_dict() -> dict[str, Any]:
     """Basic test configuration dictionary."""
     return {
+        "provider": {
+            "selection_policy": "FIRST_AVAILABLE",
+            "active_provider": "aws_default_us-east-1",
+            "providers": [
+                {
+                    "name": "aws_default_us-east-1",
+                    "type": "aws",
+                    "enabled": True,
+                    "priority": 0,
+                    "weight": 100,
+                    "config": {
+                        "region": "us-east-1",
+                        "profile": "default",
+                        "access_key_id": "testing",
+                        "secret_access_key": "testing",
+                    },
+                }
+            ],
+        },
         "aws": {
             "region": "us-east-1",
             "profile": "default",
