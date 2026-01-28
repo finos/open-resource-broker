@@ -18,6 +18,11 @@ class ConfigurationAdapter(ConfigurationPort):
         """Get structured application configuration."""
         return self._config_manager.app_config.model_dump()
 
+    @property
+    def app_config(self) -> "AppConfig":
+        """Get application configuration object."""
+        return self._config_manager.app_config
+
     def find_templates_file(self, provider_type: str) -> str:
         """Find templates file for given provider type."""
         return self._config_manager.find_templates_file(provider_type)
