@@ -147,7 +147,7 @@ def _make_large_scale_tests() -> List[Dict[str, Any]]:
                 "fleetType": "request",
                 "scheduler": "hostfactory",
                 "abisInstanceRequirements": abis_requirements,
-                "allocationStrategy": "price-capacity-optimized",
+                "allocationStrategy": "priceCapacityOptimized",
             },
         }
 
@@ -191,7 +191,7 @@ def _make_large_scale_tests() -> List[Dict[str, Any]]:
                 "providerApi": "ASG",
                 "scheduler": "hostfactory",
                 "abisInstanceRequirements": abis_requirements,
-                "allocationStrategy": "price-capacity-optimized",
+                "allocationStrategy": "priceCapacityOptimized",
             },
         }
 

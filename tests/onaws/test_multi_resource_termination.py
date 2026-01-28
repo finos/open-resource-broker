@@ -592,9 +592,7 @@ def test_multi_resource_termination(setup_multi_resource_templates):
             if instances:
                 instance_states = get_instances_states(instances, ec2_client)
                 terminating_count = sum(
-                    1
-                    for state in instance_states
-                    if state in ["shutting-down", "terminated"]
+                    1 for state in instance_states if state in ["shutting-down", "terminated"]
                 )
                 log.info(
                     f"  {resource_type}: {terminating_count}/{len(instances)} instances terminating/terminated"

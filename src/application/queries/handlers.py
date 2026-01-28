@@ -239,7 +239,6 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             )
             return []
 
-
     async def _fetch_provider_machines(self, request, existing_machines) -> tuple[list, dict]:
         """
         Fetch the latest machine list from the provider.
@@ -889,7 +888,9 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             fleet_errors = metadata.get("fleet_errors")
             ec2_fleet_errors = (error_details.get("ec2_fleet") or {}).get("errors")
 
-            has_provisioning_errors = bool(provisioning_error_type or fleet_errors or ec2_fleet_errors)
+            has_provisioning_errors = bool(
+                provisioning_error_type or fleet_errors or ec2_fleet_errors
+            )
             has_any_instances = provider_machine_count > 0 or database_machine_count > 0
 
             # If instances exist alongside errors, keep/force PARTIAL (do not flip to FAILED).

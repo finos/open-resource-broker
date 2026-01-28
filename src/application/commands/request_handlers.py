@@ -227,10 +227,13 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                         has_api_errors = bool(request.metadata.get("fleet_errors"))
                         error_summary = None
                         if has_api_errors:
-                            error_summary = "; ".join(
-                                f"{err.get('error_code', 'Unknown')}: {err.get('error_message', 'No message')}"
-                                for err in request.metadata.get("fleet_errors", [])
-                            ) or "Unknown API errors"
+                            error_summary = (
+                                "; ".join(
+                                    f"{err.get('error_code', 'Unknown')}: {err.get('error_message', 'No message')}"
+                                    for err in request.metadata.get("fleet_errors", [])
+                                )
+                                or "Unknown API errors"
+                            )
                             if error_summary and "error_message" not in request.metadata:
                                 request.metadata["error_message"] = error_summary
                                 request.metadata["error_type"] = "ProvisioningPartialFailure"

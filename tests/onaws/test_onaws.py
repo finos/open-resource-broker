@@ -130,7 +130,9 @@ def get_instances_states(instance_ids, client=None):
                 for instance_id in chunk:
                     try:
                         response = client.describe_instances(InstanceIds=[instance_id])
-                        instance_state = response["Reservations"][0]["Instances"][0]["State"]["Name"]
+                        instance_state = response["Reservations"][0]["Instances"][0]["State"][
+                            "Name"
+                        ]
                         states_by_id[instance_id] = instance_state
                     except ClientError as inner:
                         if inner.response["Error"]["Code"] == "InvalidInstanceID.NotFound":

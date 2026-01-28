@@ -88,9 +88,7 @@ def _print_spot_fleets(fleets: list[dict[str, Any]]) -> None:
         target = config.get("TargetCapacity", "-")
         created = _utc_iso(fleet.get("CreateTime"))
         print(
-            "  - "
-            f"{fleet_id} | state={state} activity={activity} "
-            f"target={target} created={created}"
+            f"  - {fleet_id} | state={state} activity={activity} target={target} created={created}"
         )
 
 
@@ -182,7 +180,9 @@ def main() -> int:
     if args.terminate:
         ec2_fleet_ids = [fleet.get("FleetId") for fleet in ec2_fleets if fleet.get("FleetId")]
         spot_fleet_ids = [
-            fleet.get("SpotFleetRequestId") for fleet in spot_fleets if fleet.get("SpotFleetRequestId")
+            fleet.get("SpotFleetRequestId")
+            for fleet in spot_fleets
+            if fleet.get("SpotFleetRequestId")
         ]
         try:
             _terminate_ec2_fleets(ec2_client, ec2_fleet_ids)

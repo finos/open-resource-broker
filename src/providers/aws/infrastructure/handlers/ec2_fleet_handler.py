@@ -282,7 +282,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 fleet_id,
                 len(errors),
                 len(instance_ids),
-                error_summary
+                error_summary,
             )
 
         # Apply post-creation tagging for fleet instances

@@ -33,9 +33,7 @@ class TestCreateMachineRequestHandlerPartial:
         mock_uow.machines = Mock()
         mock_uow.requests.save.return_value = []
         mock_uow.machines.save_batch.return_value = []
-        mock_uow_factory.create_unit_of_work.return_value.__enter__ = Mock(
-            return_value=mock_uow
-        )
+        mock_uow_factory.create_unit_of_work.return_value.__enter__ = Mock(return_value=mock_uow)
         mock_uow_factory.create_unit_of_work.return_value.__exit__ = Mock(return_value=None)
 
         # Mock QueryBus to return a template
@@ -59,13 +57,11 @@ class TestCreateMachineRequestHandlerPartial:
         mock_provider_selection = Mock(spec=ProviderSelectionService)
         from application.services.provider_selection_service import ProviderSelectionResult
 
-        mock_provider_selection.select_provider_for_template.return_value = (
-            ProviderSelectionResult(
-                provider_type="aws",
-                provider_instance="aws-default",
-                selection_reason="test",
-                confidence=0.9,
-            )
+        mock_provider_selection.select_provider_for_template.return_value = ProviderSelectionResult(
+            provider_type="aws",
+            provider_instance="aws-default",
+            selection_reason="test",
+            confidence=0.9,
         )
 
         mock_provider_capability = Mock(spec=ProviderCapabilityService)
@@ -123,7 +119,10 @@ class TestCreateMachineRequestHandlerPartial:
         assert isinstance(result, str)
         saved_request = mock_uow.requests.save.call_args[0][0]
         assert saved_request.status == RequestStatus.PARTIAL
-        assert saved_request.metadata["fleet_errors"][0]["error_code"] == "InsufficientInstanceCapacity"
+        assert (
+            saved_request.metadata["fleet_errors"][0]["error_code"]
+            == "InsufficientInstanceCapacity"
+        )
         mock_uow.machines.save_batch.assert_called_once()
         saved_machines = mock_uow.machines.save_batch.call_args[0][0]
         assert len(saved_machines) == 2
