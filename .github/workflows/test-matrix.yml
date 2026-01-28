@@ -86,11 +86,11 @@ jobs:
         # Dynamic matrix from config with static fallback
         python-version: ${{ fromJSON(needs.config.outputs.python-versions || '["3.10", "3.11", "3.12", "3.13", "3.14"]') }}
         package-variant: 
-          - "orb-py"
-          - "orb-py[cli]"
-          - "orb-py[api]"
-          - "orb-py[monitoring]"
-          - "orb-py[all]"
+          - "."
+          - ".[cli]"
+          - ".[api]"
+          - ".[monitoring]"
+          - ".[all]"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

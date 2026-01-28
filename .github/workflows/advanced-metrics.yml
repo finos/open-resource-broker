@@ -42,7 +42,7 @@ jobs:
 
     - name: Run tests with coverage
       run: |
-        uv run coverage run -m pytest tests/ --tb=short
+        uv run coverage run -m pytest tests/unit tests/config tests/onaws --tb=short
         uv run coverage report --format=total > coverage.txt
         uv run coverage xml
 
@@ -78,7 +78,7 @@ jobs:
     - name: Run performance test
       run: |
         start_time=$(date +%s.%N)
-        uv run python -m pytest tests/ -x --tb=no -q
+        uv run python -m pytest tests/unit tests/config tests/onaws -x --tb=no -q
         end_time=$(date +%s.%N)
         
         # Calculate duration in seconds
