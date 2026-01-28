@@ -64,7 +64,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -240,7 +240,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
@@ -298,7 +298,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
@@ -342,7 +342,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
@@ -388,7 +388,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
@@ -418,7 +418,7 @@ jobs:
           
           # Test console
           console = get_console()
-          console.print('[green]Integration test successful[/green]')
+          console.print('Integration test successful')
           print('PASS: Rich console works')
           
           print('Integration test completed successfully!')
@@ -438,22 +438,22 @@ jobs:
     steps:
       - name: Display summary
         run: |
-          echo "## Package Testing Strategy Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Test Results:" >> $GITHUB_STEP_SUMMARY
-          echo "- Package Variants: ${{ needs.package-variants.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Import Guard Validation: ${{ needs.import-guard-validation.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Dependency Isolation: ${{ needs.dependency-isolation.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Error Message Quality: ${{ needs.error-message-quality.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Integration Test: ${{ needs.integration-test.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Package Testing Strategy Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Test Results:" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Package Variants: ${{ needs.package-variants.result }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Import Guard Validation: ${{ needs.import-guard-validation.result }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Dependency Isolation: ${{ needs.dependency-isolation.result }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Error Message Quality: ${{ needs.error-message-quality.result }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Integration Test: ${{ needs.integration-test.result }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
           
           if [[ "${{ needs.package-variants.result }}" == "success" && 
                 "${{ needs.import-guard-validation.result }}" == "success" && 
                 "${{ needs.dependency-isolation.result }}" == "success" && 
                 "${{ needs.error-message-quality.result }}" == "success" && 
                 "${{ needs.integration-test.result }}" == "success" ]]; then
-            echo "PASS: All package testing strategy tests passed!" >> $GITHUB_STEP_SUMMARY
+            echo "PASS: All package testing strategy tests passed!" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "FAIL: Some package testing strategy tests failed!" >> $GITHUB_STEP_SUMMARY
+            echo "FAIL: Some package testing strategy tests failed!" >> "$GITHUB_STEP_SUMMARY"
           fi

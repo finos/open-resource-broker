@@ -122,7 +122,10 @@ def format_generic_table(items: list[dict], title: str = "Items") -> str:
 
         # Data rows
         for item in items:
-            row_values = [str(item.get(key, "N/A")).ljust(width) for key, width in zip(sorted(all_keys), col_widths)]
+            row_values = [
+                str(item.get(key, "N/A")).ljust(width)
+                for key, width in zip(sorted(all_keys), col_widths)
+            ]
             lines.append(" | ".join(row_values))
 
         return "\n".join(lines)
