@@ -240,10 +240,20 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
 
         # Prefer snake_case in API responses
         request_id = request_dict.get("request_id", request_dict.get("requestId"))
+        
+        # Check request status to provide appropriate message
+        status = request_dict.get("status", "pending")
+        if status == "failed":
+            message = "Request created but provisioning failed. Check status for details."
+        elif status in ["pending", "running", "provisioning"]:
+            message = "Request submitted for processing"
+        else:
+            message = request_dict.get("message", "Request VM success from AWS.")
+        
         return {
             # HostFactory schema expects camelCase requestId
             "requestId": request_id,
-            "message": request_dict.get("message", "Request VM success from AWS."),
+            "message": message,
         }
 
     def convert_domain_to_hostfactory_output(

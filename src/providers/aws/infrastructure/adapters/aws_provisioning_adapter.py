@@ -69,7 +69,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         """Get the AWS client instance."""
         return self._aws_client
 
-    async def provision_resources(self, request: Request, template: Template) -> str:
+    async def provision_resources(self, request: Request, template: Template) -> dict[str, Any]:
         """
         Provision AWS resources based on the request and template.
 
@@ -147,7 +147,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             self._logger.error("Provider strategy operation failed: %s", result.error_message)
             raise InfrastructureError(f"Failed to provision resources: {result.error_message}")
 
-    def _provision_via_handlers(self, request: Request, template: Template) -> str:
+    def _provision_via_handlers(self, request: Request, template: Template) -> dict[str, Any]:
         """
         Provision resources using the legacy handler approach.
 
@@ -156,16 +156,34 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             template: The template to use for provisioning
 
         Returns:
-            str: The resource ID
+            dict: The provisioning result with resource_ids list
         """
         # Get the appropriate handler for the template
         handler = self._get_handler_for_template(template)
 
         try:
             # Acquire hosts using the handler
-            resource_id = handler.acquire_hosts(request, template)
-            self._logger.info("Successfully provisioned resources with ID %s", resource_id)
-            return resource_id
+            result = handler.acquire_hosts(request, template)
+            
+            # Handle both string (legacy) and dict (new) return types
+            if isinstance(result, dict):
+                success = result.get("success", True)
+                if not success:
+                    error_msg = result.get("error_message", "Handler reported failure")
+                    raise InfrastructureError(f"Handler failed: {error_msg}")
+                
+                resource_ids = result.get("resource_ids", [])
+                self._logger.info("Successfully provisioned resources with IDs %s", resource_ids)
+                return result
+            else:
+                # Legacy string return - convert to new format
+                resource_ids = [result] if result else []
+                self._logger.info("Successfully provisioned resources with IDs %s", resource_ids)
+                return {
+                    "success": True,
+                    "resource_ids": resource_ids,
+                    "instances": []
+                }
         except AWSValidationError as e:
             self._logger.error("Validation error during resource provisioning: %s", str(e))
             raise

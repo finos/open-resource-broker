@@ -474,53 +474,20 @@ class AWSProviderStrategy(ProviderStrategy):
                         },
                     )
                 except Exception as e:
-                    self._logger.warning(
-                        "Provisioning adapter failed for provider_api=%s, falling back to handler: %s",
+                    self._logger.error(
+                        "Provisioning adapter failed for provider_api=%s: %s",
                         provider_api,
                         e,
                     )
-
-            # Use the handler to acquire hosts as a fallback path
-            handler_result = handler.acquire_hosts(request, aws_template)
-
-            # Extract resource IDs and instances from handler result
-            if isinstance(handler_result, dict):
-                # Handler returned structured result
-                resource_ids = handler_result.get("resource_ids", [])
-                instances = handler_result.get("instances", [])
-                success = handler_result.get("success", True)
-                error_message = handler_result.get("error_message")
-
-                if not success:
                     return ProviderResult.error_result(
-                        error_message or "Handler reported failure", "HANDLER_ERROR"
+                        f"Provisioning failed: {e}", "PROVISIONING_ADAPTER_ERROR"
                     )
             else:
-                # Handler returned single resource ID (legacy format)
-                resource_ids = [handler_result] if handler_result else []
-                instances = []
-
-            self._logger.info(
-                "Handler returned resource_ids: %s, instances: %s",
-                resource_ids,
-                len(instances),
-            )
-
-            return ProviderResult.success_result(
-                {
-                    "resource_ids": resource_ids,
-                    "instances": instances,
-                    "provider_api": provider_api,
-                    "count": count,
-                    "template_id": aws_template.template_id,
-                },
-                {
-                    "operation": "create_instances",
-                    "template_config": template_config,
-                    "handler_used": provider_api,
-                    "method": "handler",
-                },
-            )
+                # No provisioning adapter available - this is a configuration error
+                return ProviderResult.error_result(
+                    "AWS provisioning adapter not available - check DI configuration",
+                    "CONFIGURATION_ERROR"
+                )
 
         except Exception as e:
             return ProviderResult.error_result(
