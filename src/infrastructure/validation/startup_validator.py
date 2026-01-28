@@ -110,44 +110,34 @@ class StartupValidator:
         return False
     
     def _check_templates_file(self) -> bool:
-        """Check if templates file exists using scheduler strategy."""
+        """Check if templates file exists using scheduler-aware path resolution."""
         if not self.app_config:
             return False
         
-        try:
-            # Get the correct filename from scheduler strategy
-            from infrastructure.di.container import get_container
-            from domain.base.ports.scheduler_port import SchedulerPort
+        from config.loader import ConfigurationLoader
+        from infrastructure.di.container import get_container
+        from domain.base.ports.scheduler_port import SchedulerPort
+        
+        container = get_container()
+        scheduler = container.get(SchedulerPort)
+        
+        # Get provider info for scheduler-specific filename
+        provider_config = self.app_config.provider.providers[0] if self.app_config.provider.providers else None
+        if not provider_config:
+            return False
             
-            container = get_container()
-            scheduler = container.get(SchedulerPort)
-            
-            # Get provider info for filename
-            provider_config = self.app_config.provider.providers[0] if self.app_config.provider.providers else None
-            if not provider_config:
-                return False
-                
-            provider_name = provider_config.name
-            provider_type = provider_config.type
-            
-            # Get scheduler-specific filename
-            filename = scheduler.get_templates_filename(provider_name, provider_type, self.app_config.model_dump())
-            
-            # Check if file exists in config directory
-            config_dir = Path(self.config_path).parent if self.config_path else Path("./config")
-            template_file = config_dir / filename
-            
-            return template_file.exists()
-            
-        except Exception:
-            # Fallback to hardcoded names if scheduler strategy fails
-            config_dir = Path(self.config_path).parent if self.config_path else Path("./config")
-            candidates = [
-                config_dir / "aws-default_templates.json",
-                config_dir / "awsprov_templates.json", 
-                config_dir / "templates.json"
-            ]
-            return any(candidate.exists() for candidate in candidates)
+        provider_name = provider_config.name
+        provider_type = provider_config.type
+        
+        # Get scheduler-specific filename
+        filename = scheduler.get_templates_filename(provider_name, provider_type, self.app_config.model_dump())
+        
+        # Use config loader's path resolution for template files
+        resolved_path = ConfigurationLoader._resolve_file_path(
+            "template", filename, explicit_path=None, config_manager=None
+        )
+        
+        return resolved_path is not None and Path(resolved_path).exists()
     
     def _check_aws_credentials(self) -> bool:
         """Check if AWS credentials are configured."""
@@ -178,12 +168,19 @@ class StartupValidator:
             return True  # Don't fail on unexpected errors
     
     def _print_config_help(self) -> None:
-        """Print helpful config location information."""
+        """Print helpful config location information using same logic as config loader."""
+        from config.loader import ConfigurationLoader
+        
         print_info("")
         print_info("Configuration not found in:")
-        print_info(f"  - {Path.cwd() / 'config' / 'config.json'}")
-        if env_dir := os.environ.get("ORB_CONFIG_DIR"):
-            print_info(f"  - {env_dir}/config.json")
+        
+        # Use the exact same path resolution logic as the config loader
+        resolved_path = ConfigurationLoader._resolve_file_path(
+            "conf", "config.json", explicit_path=None, config_manager=None
+        )
+        if resolved_path:
+            print_info(f"  - {resolved_path}")
+        
         print_info("")
         print_info("To initialize:")
         print_command("  orb init")
