@@ -106,6 +106,7 @@ jobs:
         echo "COVERAGE_COLOR=$coverage_color" >> "$GITHUB_ENV"
 
     - name: Create coverage badge
+      if: ${{ secrets.METRICS_GIST_ID != '' }}
       uses: schneegans/dynamic-badges-action@v1.7.0
       with:
         auth: ${{ secrets.GITHUB_TOKEN }}
@@ -116,6 +117,7 @@ jobs:
         color: ${{ env.COVERAGE_COLOR }}
 
     - name: Create lines of code badge
+      if: ${{ secrets.METRICS_GIST_ID != '' }}
       uses: schneegans/dynamic-badges-action@v1.7.0
       with:
         auth: ${{ secrets.GITHUB_TOKEN }}
@@ -126,6 +128,7 @@ jobs:
         color: lightgrey
 
     - name: Create comment percentage badge
+      if: ${{ secrets.METRICS_GIST_ID != '' }}
       uses: schneegans/dynamic-badges-action@v1.7.0
       with:
         auth: ${{ secrets.GITHUB_TOKEN }}
@@ -138,6 +141,7 @@ jobs:
         minColorRange: 0
 
     - name: Create test duration badge
+      if: ${{ secrets.METRICS_GIST_ID != '' }}
       uses: schneegans/dynamic-badges-action@v1.7.0
       with:
         auth: ${{ secrets.GITHUB_TOKEN }}
