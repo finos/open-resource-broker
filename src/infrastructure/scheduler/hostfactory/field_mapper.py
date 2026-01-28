@@ -35,10 +35,6 @@ class HostFactoryFieldMapper(SchedulerFieldMapper):
         if "vmType" in mapped:
             mapped["attributes"] = self._create_hf_attributes(mapped["vmType"])
         
-        # Add HostFactory-specific fields
-        mapped["pgrpName"] = None
-        mapped["onDemandCapacity"] = 0
-        
         return mapped
     
     def _create_hf_attributes(self, instance_type: str) -> Dict[str, List[str]]:

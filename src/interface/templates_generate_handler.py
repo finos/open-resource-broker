@@ -100,7 +100,7 @@ def _generate_examples_from_factory(provider_type: str, provider_api: str = None
             # Filter by provider_api if specified
             if provider_api and template.provider_api != provider_api:
                 continue
-            examples.append(template.model_dump())
+            examples.append(template.model_dump(exclude_none=True))
         
         return examples
     else:
