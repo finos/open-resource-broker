@@ -523,7 +523,7 @@ class ConfigurationLoader:
             return config_manager._get_scheduler_directory(file_type)
 
         # During bootstrap, use platform_dirs for consistent directory resolution
-        from config.platform_dirs import get_config_location, get_work_location, get_logs_location
+        from config.platform_dirs import get_config_location, get_logs_location, get_work_location
 
         if file_type in ["conf", "template", "legacy"]:
             return str(get_config_location())

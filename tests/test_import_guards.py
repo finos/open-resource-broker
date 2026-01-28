@@ -7,9 +7,10 @@ This test suite validates that:
 4. Core functionality works regardless of optional dependencies
 """
 
-import sys
 import subprocess
+import sys
 from unittest.mock import patch
+
 import pytest
 
 
@@ -23,7 +24,7 @@ class TestImportGuards:
             if "cli.console" in sys.modules:
                 del sys.modules["cli.console"]
 
-            from cli.console import get_console, print_success, print_error
+            from cli.console import get_console, print_error, print_success
 
             console = get_console()
             assert console is not None
@@ -39,7 +40,7 @@ class TestImportGuards:
             if "cli.formatters" in sys.modules:
                 del sys.modules["cli.formatters"]
 
-            from cli.formatters import format_generic_table, format_generic_list
+            from cli.formatters import format_generic_list, format_generic_table
 
             test_data = [
                 {"id": "1", "name": "test1", "status": "active"},

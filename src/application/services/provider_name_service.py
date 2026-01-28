@@ -2,8 +2,9 @@
 
 from typing import Any, Dict
 
-from infrastructure.di.injectable import injectable
 from providers.registry.provider_registry import ProviderRegistry
+
+from infrastructure.di.injectable import injectable
 
 
 @injectable

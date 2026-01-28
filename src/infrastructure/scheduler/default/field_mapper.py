@@ -1,6 +1,7 @@
 """Default scheduler field mapper - no transformations needed."""
 
-from typing import Dict, Any
+from typing import Any, Dict
+
 from infrastructure.scheduler.base.field_mapper import SchedulerFieldMapper
 
 

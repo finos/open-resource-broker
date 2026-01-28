@@ -12,8 +12,8 @@ except ImportError:
     FastAPI = None  # type: ignore
 
 from _package import __version__
-from infrastructure.logging.logger import get_logger
 from infrastructure.auth.registry import get_auth_registry
+from infrastructure.logging.logger import get_logger
 
 
 def create_fastapi_app(server_config):

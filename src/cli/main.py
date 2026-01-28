@@ -644,6 +644,7 @@ async def execute_command(args, app) -> dict[str, Any]:
 
     try:
         # Import function handlers - all are now async functions with decorators
+        from interface.init_command_handler import handle_init
         from interface.mcp.server.handler import handle_mcp_serve
         from interface.mcp_command_handlers import (
             handle_mcp_tools_call,
@@ -692,7 +693,6 @@ async def execute_command(args, app) -> dict[str, Any]:
             handle_update_template,
             handle_validate_template,
         )
-        from interface.init_command_handler import handle_init
         from interface.templates_generate_handler import handle_templates_generate
 
         # Command handler mapping - all handlers are now async functions

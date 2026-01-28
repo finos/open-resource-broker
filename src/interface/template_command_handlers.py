@@ -12,8 +12,6 @@ from __future__ import annotations
 import argparse
 from typing import Any
 
-from cli.console import print_info, print_command
-
 from application.dto.queries import (
     GetTemplateQuery,
     ListTemplatesQuery,
@@ -24,6 +22,7 @@ from application.template.commands import (
     DeleteTemplateCommand,
     UpdateTemplateCommand,
 )
+from cli.console import print_command, print_info
 from domain.base.ports.scheduler_port import SchedulerPort
 from infrastructure.di.buses import CommandBus, QueryBus
 from infrastructure.di.container import get_container

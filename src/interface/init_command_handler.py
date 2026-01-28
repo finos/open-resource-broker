@@ -6,12 +6,12 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict
 
-from cli.console import print_separator, print_success, print_info, print_command, print_error
+from cli.console import print_command, print_error, print_info, print_separator, print_success
 from config.platform_dirs import (
     get_config_location,
-    get_work_location,
     get_logs_location,
     get_scripts_location,
+    get_work_location,
 )
 from infrastructure.logging.logger import get_logger
 

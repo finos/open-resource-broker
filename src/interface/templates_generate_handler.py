@@ -3,9 +3,9 @@
 import json
 from typing import Any, Dict
 
-from cli.console import print_success, print_info
-from infrastructure.di.container import get_container
+from cli.console import print_info, print_success
 from domain.base.ports.scheduler_port import SchedulerPort
+from infrastructure.di.container import get_container
 
 
 async def handle_templates_generate(args) -> Dict[str, Any]:
@@ -64,8 +64,8 @@ async def _generate_templates_for_provider(provider: dict, args) -> dict:
     examples = _generate_examples_from_factory(provider_type, provider_name, provider_api)
 
     # Get scheduler strategy for filename
-    from infrastructure.registry.scheduler_registry import get_scheduler_registry
     from config.platform_dirs import get_config_location
+    from infrastructure.registry.scheduler_registry import get_scheduler_registry
 
     config_dir = get_config_location()
     config_file = config_dir / "config.json"
@@ -172,8 +172,8 @@ def _generate_examples_from_factory(
 ) -> list[Dict[str, Any]]:
     """Generate example templates using handler factory."""
     if provider_type == "aws":
-        from providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
         from infrastructure.di.container import get_container
+        from providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
 
         container = get_container()
         factory = container.get(AWSHandlerFactory)

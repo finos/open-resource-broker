@@ -4,16 +4,17 @@ import os
 import sys
 from pathlib import Path
 from unittest.mock import patch
+
 import pytest
 
 from src.config.platform_dirs import (
-    in_virtualenv,
-    is_user_install,
-    is_system_install,
     get_config_location,
-    get_work_location,
     get_logs_location,
     get_scripts_location,
+    get_work_location,
+    in_virtualenv,
+    is_system_install,
+    is_user_install,
 )
 
 

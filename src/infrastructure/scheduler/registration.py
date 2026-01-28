@@ -27,10 +27,10 @@ def create_symphony_hostfactory_strategy(container: "DIContainer") -> "Scheduler
         SchedulerPort: Symphony HostFactory scheduler strategy instance
     """
     from domain.base.ports import LoggingPort
+    from domain.template.ports.template_defaults_port import TemplateDefaultsPort
     from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
         HostFactorySchedulerStrategy,
     )
-    from domain.template.ports.template_defaults_port import TemplateDefaultsPort
 
     config_manager = container.get(ConfigurationPort)
     logger = container.get(LoggingPort)

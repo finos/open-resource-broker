@@ -21,7 +21,7 @@ def setup_environment():
         return  # User has explicitly set ORB_* vars
 
     try:
-        from config.platform_dirs import get_config_location, get_work_location, get_logs_location
+        from config.platform_dirs import get_config_location, get_logs_location, get_work_location
 
         config_dir = str(get_config_location())
         work_dir = str(get_work_location())

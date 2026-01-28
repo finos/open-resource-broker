@@ -359,8 +359,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
         """Execute provisioning via selected provider using existing ProviderContext."""
         try:
             # Import required types
-            from providers.base.strategy import ProviderOperation, ProviderOperationType
             from domain.base.ports.scheduler_port import SchedulerPort
+            from providers.base.strategy import ProviderOperation, ProviderOperationType
 
             # Get scheduler for template formatting
             scheduler = self._container.get(SchedulerPort)

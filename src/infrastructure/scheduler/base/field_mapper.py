@@ -1,7 +1,7 @@
 """Base field mapper for scheduler-specific field mapping and transformations."""
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
 
 class SchedulerFieldMapper(ABC):

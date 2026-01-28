@@ -16,6 +16,7 @@ from botocore.exceptions import ClientError
 from domain.base.dependency_injection import injectable
 from domain.base.ports import ErrorHandlingPort, LoggingPort
 from domain.request.aggregate import Request
+from domain.template.template_aggregate import Template
 from infrastructure.resilience import retry
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.exceptions.aws_exceptions import (
@@ -29,7 +30,6 @@ from providers.aws.exceptions.aws_exceptions import (
     ResourceInUseError,
 )
 from providers.aws.infrastructure.aws_client import AWSClient
-from domain.template.template_aggregate import Template
 
 T = TypeVar("T")
 

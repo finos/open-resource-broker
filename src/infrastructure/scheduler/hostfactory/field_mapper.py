@@ -1,6 +1,7 @@
 """HostFactory-specific field mapping and transformations."""
 
-from typing import Dict, Any, List
+from typing import Any, Dict, List
+
 from infrastructure.scheduler.base.field_mapper import SchedulerFieldMapper
 from infrastructure.scheduler.hostfactory.field_mappings import HostFactoryFieldMappings
 

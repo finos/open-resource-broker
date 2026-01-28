@@ -67,6 +67,7 @@ def format_generic_table(items: list[dict], title: str = "Items") -> str:
 
     try:
         from rich.table import Table
+
         from cli.console import get_console
 
         # Get all unique keys from all items

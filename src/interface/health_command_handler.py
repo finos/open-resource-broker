@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 
-from cli.console import print_success, print_error, print_info, print_warning
+from cli.console import print_error, print_info, print_success, print_warning
 from domain.base.ports.scheduler_port import SchedulerPort
 from infrastructure.di.container import get_container
 

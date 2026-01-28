@@ -7,12 +7,12 @@ from pathlib import Path
 from typing import Optional
 
 import boto3
-from botocore.exceptions import NoCredentialsError, ClientError
+from botocore.exceptions import ClientError, NoCredentialsError
 from pydantic import ValidationError
 
-from cli.console import print_error, print_info, print_command, print_warning
-from config.schemas.app_schema import AppConfig
 from _package import DOCS_URL
+from cli.console import print_command, print_error, print_info, print_warning
+from config.schemas.app_schema import AppConfig
 
 
 class StartupValidator:
@@ -120,8 +120,8 @@ class StartupValidator:
             return False
 
         from config.loader import ConfigurationLoader
-        from infrastructure.di.container import get_container
         from domain.base.ports.scheduler_port import SchedulerPort
+        from infrastructure.di.container import get_container
 
         container = get_container()
         scheduler = container.get(SchedulerPort)

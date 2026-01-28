@@ -31,8 +31,9 @@ async def handle_serve_api(args) -> dict[str, Any]:
     try:
         # Import here to avoid circular dependencies
         try:
-            from api.server import create_fastapi_app
             import uvicorn
+
+            from api.server import create_fastapi_app
         except ImportError:
             raise ImportError("API server requires: pip install orb-py[api]") from None
 

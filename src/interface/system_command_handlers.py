@@ -12,6 +12,7 @@ from monitoring.metrics import MetricsCollector
 async def handle_system_health(args) -> dict[str, Any]:
     """Handle system health check."""
     import asyncio
+
     from interface.health_command_handler import handle_health_check
 
     # Run sync health check in executor

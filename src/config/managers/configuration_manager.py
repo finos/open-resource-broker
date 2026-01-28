@@ -320,7 +320,7 @@ class ConfigurationManager:
 
         Uses platform_dirs for consistent directory resolution during bootstrap.
         """
-        from config.platform_dirs import get_config_location, get_work_location, get_logs_location
+        from config.platform_dirs import get_config_location, get_logs_location, get_work_location
 
         logger.debug("[CONFIG_MGR] Getting directory for file_type=%s", file_type)
 

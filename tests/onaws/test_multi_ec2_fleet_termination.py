@@ -12,8 +12,8 @@ from jsonschema import ValidationError, validate as validate_json_schema
 from hfmock import HostFactoryMock
 from tests.onaws import plugin_io_schemas
 from tests.onaws.parse_output import parse_and_print_output
-from tests.onaws.test_onaws import get_instances_states
 from tests.onaws.template_processor import TemplateProcessor
+from tests.onaws.test_onaws import get_instances_states
 
 pytestmark = [  # Apply default markers to every test in this module
     pytest.mark.manual_aws,

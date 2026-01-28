@@ -2482,7 +2482,7 @@ wheels = [
 
 [[package]]
 name = "orb-py"
-version = "1.1.1"
+version = "1.1.2"
 source = { editable = "." }
 dependencies = [
     { name = "boto3" },
