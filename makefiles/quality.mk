@@ -88,7 +88,7 @@ sbom-generate: dev-install ## Generate Software Bill of Materials (SBOM)
 	./dev-tools/scripts/install_dev_tools.py --tool pip-audit
 	@echo "Generating Python dependency SBOM..."
 	$(call run-tool,pip-audit,--format=cyclonedx-json --output=python-sbom-cyclonedx.json)
-	$(call run-tool,pip-audit,--format=spdx-json --output=python-sbom-spdx.json)
+	$(call run-tool,pip-audit,--format=json --output=python-sbom.json)
 	@echo "SBOM files generated successfully"
 
 security-report: security sbom-generate  ## Generate comprehensive security report

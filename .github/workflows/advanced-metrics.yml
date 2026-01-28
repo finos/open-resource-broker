@@ -47,14 +47,16 @@ jobs:
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install coverage pytest cloc
+        # Install project with dependencies first
+        uv sync --frozen
+        # Install additional tools
+        uv pip install coverage pytest cloc
 
     - name: Run tests with coverage
       run: |
-        coverage run -m pytest tests/ --tb=short
-        coverage report --format=total > coverage.txt
-        coverage xml
+        uv run coverage run -m pytest tests/ --tb=short
+        uv run coverage report --format=total > coverage.txt
+        uv run coverage xml
 
     - name: Calculate lines of code
       run: |
@@ -88,7 +90,7 @@ jobs:
     - name: Run performance test
       run: |
         start_time=$(date +%s.%N)
-        python -m pytest tests/ -x --tb=no -q
+        uv run python -m pytest tests/ -x --tb=no -q
         end_time=$(date +%s.%N)
         
         # Calculate duration in seconds
