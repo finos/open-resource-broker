@@ -46,12 +46,10 @@ def handle_health_check(args) -> int:
 
         # 3. Templates loaded check
         try:
-            from infrastructure.persistence.repositories.template_repository import (
-                TemplateRepositoryImpl,
-            )
-
-            repo = container.get(TemplateRepositoryImpl)
-            templates = repo.find_all()
+            from domain.template.repository import TemplateRepository
+            
+            repo = container.get(TemplateRepository)
+            templates = repo.find_active_templates()  # Use interface method
             checks.append(
                 {
                     "name": "templates_loaded",

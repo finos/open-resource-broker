@@ -46,7 +46,7 @@ class TemplateRepositoryImpl(TemplateRepository):
     def find_active_templates(self) -> list[Template]:
         """Find all active templates."""
         self._logger.debug("Finding all active templates")
-        return self._template_manager.get_all_templates()
+        return self._template_manager.get_all_templates_sync()
 
     def search_templates(self, criteria: dict[str, Any]) -> list[Template]:
         """Search templates by criteria."""
