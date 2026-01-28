@@ -135,7 +135,10 @@ async def handle_request_machines(args: "argparse.Namespace") -> dict[str, Any]:
         status = request_dto.status if request_dto else "unknown"
         error_msg = None
         if request_dto and hasattr(request_dto, 'metadata'):
-            error_msg = getattr(request_dto.metadata, "error_message", None)
+            if isinstance(request_dto.metadata, dict):
+                error_msg = request_dto.metadata.get("error_message")
+            else:
+                error_msg = getattr(request_dto.metadata, "error_message", None)
         
         request_data = {
             "request_id": request_id,
