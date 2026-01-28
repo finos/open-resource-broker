@@ -94,6 +94,16 @@ class QueryBus:
             self.logger.error("Query execution failed: %s", str(e))
             raise
 
+    def execute_sync(self, query: TQuery) -> TResult:
+        """Execute query synchronously for sync contexts."""
+        import asyncio
+        try:
+            return asyncio.run(self.execute(query))
+        except RuntimeError:
+            # Event loop already running
+            loop = asyncio.get_event_loop()
+            return loop.run_until_complete(self.execute(query))
+
     def _trigger_lazy_cqrs_setup(self) -> None:
         """Trigger lazy CQRS infrastructure setup."""
         try:

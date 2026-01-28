@@ -67,7 +67,7 @@ def handle_health_check(args) -> int:
 
             query_bus = container.get(QueryBus)
             query = GetSystemStatusQuery()
-            status = query_bus.execute(query)
+            status = query_bus.execute_sync(query)
 
             checks.append(
                 {

@@ -40,7 +40,7 @@ class TestFullWorkflow:
 
             # Test template listing
             query = ListTemplatesQuery()
-            templates = query_bus.execute(query)
+            templates = query_bus.execute_sync(query)
             assert isinstance(templates, list)
 
         # Test provider health using direct provider context
