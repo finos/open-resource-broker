@@ -115,7 +115,7 @@ class StartupValidator:
         return False
     
     def _check_templates_file(self) -> bool:
-        """Check if templates file exists using scheduler-aware path resolution."""
+        """Check if templates file exists."""
         if not self.app_config:
             return False
         
@@ -126,7 +126,6 @@ class StartupValidator:
         container = get_container()
         scheduler = container.get(SchedulerPort)
         
-        # Get provider info for scheduler-specific filename
         provider_config = self.app_config.provider.providers[0] if self.app_config.provider.providers else None
         if not provider_config:
             return False
@@ -134,10 +133,8 @@ class StartupValidator:
         provider_name = provider_config.name
         provider_type = provider_config.type
         
-        # Get scheduler-specific filename
         filename = scheduler.get_templates_filename(provider_name, provider_type, self.app_config.model_dump())
         
-        # Use config loader's path resolution for template files
         resolved_path = ConfigurationLoader._resolve_file_path(
             "template", filename, explicit_path=None, config_manager=None
         )
@@ -148,7 +145,6 @@ class StartupValidator:
         """Check if default_config.json template exists."""
         from config.loader import ConfigurationLoader
         
-        # Use config loader's path resolution for default_config.json
         resolved_path = ConfigurationLoader._resolve_file_path(
             "template", "default_config.json", explicit_path=None, config_manager=None
         )
@@ -184,20 +180,18 @@ class StartupValidator:
             return True  # Don't fail on unexpected errors
     
     def _print_config_help(self) -> None:
-        """Print helpful config location information using same logic as config loader."""
+        """Print helpful config location information."""
         from config.loader import ConfigurationLoader
         
         print_info("")
         print_info("Configuration not found in:")
         
-        # Check for default_config.json template first
         default_resolved = ConfigurationLoader._resolve_file_path(
             "template", "default_config.json", explicit_path=None, config_manager=None
         )
         if default_resolved:
             print_info(f"  - {default_resolved}")
         
-        # Then check for config.json
         config_resolved = ConfigurationLoader._resolve_file_path(
             "conf", "config.json", explicit_path=None, config_manager=None
         )
