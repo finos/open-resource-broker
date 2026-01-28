@@ -52,6 +52,13 @@ class ProviderContextAdapter(ProviderPort):
             "strategies": self.available_strategies,
         }
 
+    def get_strategy(self, strategy_name: str) -> Any:
+        """Get specific provider strategy from wrapped ProviderContext."""
+        if hasattr(self.provider_context, 'check_strategy_health'):
+            # Use health check instead of getting strategy directly
+            return self.provider_context.check_strategy_health(strategy_name)
+        return None
+
     def execute_with_strategy(self, *args, **kwargs):
         """Execute with strategy using provider context."""
         if hasattr(self.provider_context, "execute_with_strategy"):

@@ -979,9 +979,11 @@ class AWSProviderStrategy(ProviderStrategy):
         start_time = time.time()
 
         try:
-            if not self._aws_client:
+            # Trigger lazy initialization of AWS client
+            aws_client = self.aws_client
+            if not aws_client:
                 return ProviderHealthStatus.unhealthy(
-                    "AWS client not initialized", {"error": "client_not_initialized"}
+                    "AWS client initialization failed", {"error": "client_initialization_failed"}
                 )
 
             # Check if we're in dry-run mode
@@ -998,6 +1000,8 @@ class AWSProviderStrategy(ProviderStrategy):
             # Perform basic AWS connectivity check
             # This is a lightweight operation to verify AWS access
             try:
+                # Use the initialized client for health check
+                aws_client.sts_client.get_caller_identity()
                 # Import dry-run context here to avoid circular imports
                 from providers.aws.infrastructure.dry_run_adapter import aws_dry_run_context
 

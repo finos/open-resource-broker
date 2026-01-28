@@ -62,20 +62,50 @@ def handle_health_check(args) -> int:
 
         # 4. Provider health check (provider-agnostic)
         try:
-            from application.queries.system import GetSystemStatusQuery
-            from infrastructure.di.buses import QueryBus
+            from domain.base.ports import ProviderPort
 
-            query_bus = container.get(QueryBus)
-            query = GetSystemStatusQuery()
-            status = query_bus.execute_sync(query)
-
-            checks.append(
-                {
+            provider_port = container.get(ProviderPort)
+            strategies = provider_port.available_strategies()
+            
+            if not strategies:
+                checks.append({
                     "name": "provider_health",
-                    "status": "pass" if status.get("healthy") else "warn",
-                    "details": status.get("message", "Provider check completed"),
-                }
-            )
+                    "status": "warn",
+                    "details": "No provider strategies configured"
+                })
+            else:
+                # Check all configured providers
+                healthy_count = 0
+                total_count = len(strategies)
+                errors = []
+                
+                for strategy_name in strategies:
+                    try:
+                        health_result = provider_port.get_strategy(strategy_name)
+                        if health_result and hasattr(health_result, 'is_healthy') and health_result.is_healthy:
+                            healthy_count += 1
+                        elif health_result and hasattr(health_result, 'status_message'):
+                            errors.append(f"{strategy_name}: {health_result.status_message}")
+                        else:
+                            errors.append(f"{strategy_name}: Unknown health status")
+                    except Exception as e:
+                        errors.append(f"{strategy_name}: {str(e)}")
+                
+                if healthy_count == total_count:
+                    status = "pass"
+                    details = f"All {total_count} provider strategies healthy"
+                elif healthy_count > 0:
+                    status = "warn" 
+                    details = f"{healthy_count}/{total_count} providers healthy"
+                else:
+                    status = "warn"
+                    details = f"No providers healthy. Errors: {'; '.join(errors)}"
+                
+                checks.append({
+                    "name": "provider_health",
+                    "status": status,
+                    "details": details
+                })
         except Exception as e:
             checks.append({"name": "provider_health", "status": "warn", "error": str(e)})
 

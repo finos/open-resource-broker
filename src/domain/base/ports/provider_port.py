@@ -34,3 +34,7 @@ class ProviderPort(ABC):
     @abstractmethod
     def get_provider_info(self) -> dict[str, Any]:
         """Get provider information."""
+
+    @abstractmethod
+    def get_strategy(self, strategy_name: str) -> Any:
+        """Get specific provider strategy."""
