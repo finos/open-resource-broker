@@ -86,8 +86,7 @@ For more information, visit: {DOCS_URL}
         help="Override scheduler strategy for this command",
     )
     parser.add_argument(
-        "--provider",
-        help="Override provider instance for this command (e.g., aws-prod, aws-dev)"
+        "--provider", help="Override provider instance for this command (e.g., aws-prod, aws-dev)"
     )
     parser.add_argument(
         "--completion", choices=["bash", "zsh"], help="Generate shell completion script"
@@ -135,9 +134,13 @@ For more information, visit: {DOCS_URL}
     )
 
     # Templates show
-    templates_show = templates_subparsers.add_parser("show", help="Show template details (supports both positional and --template-id flag)")
+    templates_show = templates_subparsers.add_parser(
+        "show", help="Show template details (supports both positional and --template-id flag)"
+    )
     templates_show.add_argument("template_id", nargs="?", help="Template ID to show")
-    templates_show.add_argument("--template-id", "-t", dest="flag_template_id", help="Template ID to show")
+    templates_show.add_argument(
+        "--template-id", "-t", dest="flag_template_id", help="Template ID to show"
+    )
     templates_show.add_argument(
         "--format", choices=["json", "yaml", "table", "list"], help="Output format"
     )
@@ -150,17 +153,25 @@ For more information, visit: {DOCS_URL}
     )
 
     # Templates update
-    templates_update = templates_subparsers.add_parser("update", help="Update existing template (supports both positional and --template-id flag)")
+    templates_update = templates_subparsers.add_parser(
+        "update", help="Update existing template (supports both positional and --template-id flag)"
+    )
     templates_update.add_argument("template_id", nargs="?", help="Template ID to update")
-    templates_update.add_argument("--template-id", "-t", dest="flag_template_id", help="Template ID to update")
+    templates_update.add_argument(
+        "--template-id", "-t", dest="flag_template_id", help="Template ID to update"
+    )
     templates_update.add_argument(
         "--file", required=True, help="Updated template configuration file"
     )
 
     # Templates delete
-    templates_delete = templates_subparsers.add_parser("delete", help="Delete template (supports both positional and --template-id flag)")
+    templates_delete = templates_subparsers.add_parser(
+        "delete", help="Delete template (supports both positional and --template-id flag)"
+    )
     templates_delete.add_argument("template_id", nargs="?", help="Template ID to delete")
-    templates_delete.add_argument("--template-id", "-t", dest="flag_template_id", help="Template ID to delete")
+    templates_delete.add_argument(
+        "--template-id", "-t", dest="flag_template_id", help="Template ID to delete"
+    )
     templates_delete.add_argument(
         "--force", action="store_true", help="Force deletion without confirmation"
     )
@@ -179,8 +190,7 @@ For more information, visit: {DOCS_URL}
     )
     templates_generate.add_argument("--provider", help="Generate for specific provider instance")
     templates_generate.add_argument(
-        "--all-providers", action="store_true", 
-        help="Explicitly generate for all active providers"
+        "--all-providers", action="store_true", help="Explicitly generate for all active providers"
     )
     templates_generate.add_argument(
         "--provider-api", help="Specific provider API (EC2Fleet, SpotFleet, ASG, RunInstances)"
@@ -202,15 +212,22 @@ For more information, visit: {DOCS_URL}
     )
 
     # Machines show
-    machines_show = machines_subparsers.add_parser("show", help="Show machine details (supports both positional and --machine-id flag)")
+    machines_show = machines_subparsers.add_parser(
+        "show", help="Show machine details (supports both positional and --machine-id flag)"
+    )
     machines_show.add_argument("machine_id", nargs="?", help="Machine ID to show")
-    machines_show.add_argument("--machine-id", "-m", dest="flag_machine_id", help="Machine ID to show")
+    machines_show.add_argument(
+        "--machine-id", "-m", dest="flag_machine_id", help="Machine ID to show"
+    )
     machines_show.add_argument(
         "--format", choices=["json", "yaml", "table", "list"], help="Output format"
     )
 
     # Machines request (create machines)
-    machines_request = machines_subparsers.add_parser("request", help="Request new machines (supports both positional args and --template-id/--count flags)")
+    machines_request = machines_subparsers.add_parser(
+        "request",
+        help="Request new machines (supports both positional args and --template-id/--count flags)",
+    )
     machines_request.add_argument(
         "template_id",
         nargs="?",
@@ -222,8 +239,12 @@ For more information, visit: {DOCS_URL}
         type=int,
         help="Number of machines to request (optional if using -f/--file or -d/--data)",
     )
-    machines_request.add_argument("--template-id", "-t", dest="flag_template_id", help="Template ID to use")
-    machines_request.add_argument("--count", "-c", type=int, dest="flag_machine_count", help="Number of machines to request")
+    machines_request.add_argument(
+        "--template-id", "-t", dest="flag_template_id", help="Template ID to use"
+    )
+    machines_request.add_argument(
+        "--count", "-c", type=int, dest="flag_machine_count", help="Number of machines to request"
+    )
     machines_request.add_argument(
         "--wait", action="store_true", help="Wait for machines to be ready"
     )
@@ -276,9 +297,17 @@ For more information, visit: {DOCS_URL}
     requests_cancel.add_argument("--force", action="store_true", help="Force cancellation")
 
     # Requests status
-    requests_status = requests_subparsers.add_parser("status", help="Check request status (supports both positional args and --request-id flags)")
+    requests_status = requests_subparsers.add_parser(
+        "status", help="Check request status (supports both positional args and --request-id flags)"
+    )
     requests_status.add_argument("request_ids", nargs="*", help="Request IDs to check")
-    requests_status.add_argument("--request-id", "-r", action="append", dest="flag_request_ids", help="Request ID to check (can be used multiple times)")
+    requests_status.add_argument(
+        "--request-id",
+        "-r",
+        action="append",
+        dest="flag_request_ids",
+        help="Request ID to check (can be used multiple times)",
+    )
 
     # System resource
     system_parser = subparsers.add_parser("system", help="System operations")
@@ -799,15 +828,15 @@ async def main() -> None:
 
             # For other errors, show the original error message and re-raise
             if error_output.strip():
-                print(error_output.strip(), file=sys.stderr)  # noqa: CLI output
+                print(error_output.strip(), file=sys.stderr)
             raise
 
         # Handle completion generation
         if args.completion:
             if args.completion == "bash":
-                print(generate_bash_completion())  # noqa: CLI output
+                print(generate_bash_completion())
             elif args.completion == "zsh":
-                print(generate_zsh_completion())  # noqa: CLI output
+                print(generate_zsh_completion())
             return
 
         # Configure logging - let the application's structured logging system handle
@@ -881,10 +910,10 @@ async def main() -> None:
                 with open(args.output, "w") as f:
                     f.write(formatted_output)
                 if not args.quiet:
-                    print(f"Output written to {args.output}")  # noqa: CLI output
+                    print(f"Output written to {args.output}")
             else:
-                print(formatted_output)  # noqa: CLI output
-            
+                print(formatted_output)
+
             # Exit with appropriate code
             if exit_code != 0:
                 sys.exit(exit_code)
@@ -892,7 +921,7 @@ async def main() -> None:
         except DomainException as e:
             logger.exception("Domain error: %s", e)
             if not args.quiet:
-                print(f"Error: {e}")  # noqa: CLI error
+                print(f"Error: {e}")
             sys.exit(1)
         except Exception as e:
             logger.exception("Unexpected error: %s", e)
@@ -901,14 +930,14 @@ async def main() -> None:
 
                 traceback.print_exc()
             if not args.quiet:
-                print(f"Unexpected error: {e}")  # noqa: CLI error
+                print(f"Unexpected error: {e}")
             sys.exit(1)
 
     except KeyboardInterrupt:
-        print("\nOperation cancelled by user.")  # noqa: CLI output
+        print("\nOperation cancelled by user.")
         sys.exit(130)
     except Exception as e:
-        print(f"Fatal error: {e}")  # noqa: CLI error
+        print(f"Fatal error: {e}")
         sys.exit(1)
 
 

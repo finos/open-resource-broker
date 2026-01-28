@@ -7,7 +7,7 @@ from typing import Any, Optional
 
 class FleetGroupingMixin:
     """Provides reusable grouping logic for Fleet/ASG handlers.
-    
+
     Groups instances by their controlling AWS resource (Fleet, ASG) using
     cached mapping data when available, falling back to AWS API calls only
     when necessary for optimal performance.

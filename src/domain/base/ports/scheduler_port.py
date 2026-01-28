@@ -72,7 +72,7 @@ class SchedulerPort(ABC):
         """Format template for CLI/API display using scheduler-specific field mapping."""
         pass
 
-    @abstractmethod  
+    @abstractmethod
     def format_template_for_provider(self, template: Template) -> dict[str, Any]:
         """Format template for provider operations using scheduler-specific field mapping."""
         pass

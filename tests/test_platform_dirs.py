@@ -3,7 +3,7 @@
 import os
 import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import pytest
 
 from src.config.platform_dirs import (
@@ -139,7 +139,7 @@ class TestGetConfigLocation:
         ):
             mock_cwd.return_value = Path("/dev/project")
             mock_exists.side_effect = lambda: True  # pyproject.toml exists
-            
+
             result = get_config_location()
             assert result == Path("/dev/project/config")
 
@@ -150,11 +150,11 @@ class TestGetConfigLocation:
             patch("pathlib.Path.cwd") as mock_cwd,
         ):
             mock_cwd.return_value = Path("/dev/project/subdir")
-            
+
             # Mock exists to return True only for parent/pyproject.toml
             def mock_exists(self):
                 return str(self).endswith("/dev/project/pyproject.toml")
-            
+
             with patch("pathlib.Path.exists", mock_exists):
                 result = get_config_location()
                 assert result == Path("/dev/project/config")
@@ -171,7 +171,7 @@ class TestGetConfigLocation:
             mock_cwd.return_value = Path("/somewhere")
             mock_exists.return_value = False
             mock_home.return_value = Path("/home/user")
-            
+
             result = get_config_location()
             assert result == Path("/home/user/.local/orb/config")
 
@@ -187,7 +187,7 @@ class TestGetConfigLocation:
             mock_cwd.return_value = Path("/somewhere")
             mock_exists.return_value = False
             mock_home.return_value = Path("/home/user")
-            
+
             result = get_config_location()
             assert result == Path("/usr/local/orb/config")
 
@@ -203,7 +203,7 @@ class TestGetConfigLocation:
             mock_cwd.return_value = Path("/somewhere")
             mock_exists.return_value = False
             mock_home.return_value = Path("/home/user")
-            
+
             result = get_config_location()
             assert result == Path("/opt/python3.11/orb/config")
 
@@ -220,7 +220,7 @@ class TestGetConfigLocation:
             mock_cwd.return_value = Path("/somewhere")
             mock_exists.return_value = False
             mock_home.return_value = Path("/home/user")
-            
+
             result = get_config_location()
             assert result == Path("/project/config")
 
@@ -237,7 +237,7 @@ class TestGetConfigLocation:
             mock_cwd.return_value = Path("/fallback/dir")
             mock_exists.return_value = False
             mock_home.return_value = Path("/home/user")
-            
+
             result = get_config_location()
             assert result == Path("/fallback/dir/config")
 
@@ -258,7 +258,7 @@ class TestGetWorkLocation:
             patch("src.config.platform_dirs.get_config_location") as mock_config,
         ):
             mock_config.return_value = Path("/base/config")
-            
+
             result = get_work_location()
             assert result == Path("/base/work")
 
@@ -269,7 +269,7 @@ class TestGetWorkLocation:
             patch("src.config.platform_dirs.get_config_location") as mock_config,
         ):
             mock_config.return_value = Path("/base/config")
-            
+
             result = get_work_location()
             assert result == Path("/base/work")
 
@@ -290,7 +290,7 @@ class TestGetLogsLocation:
             patch("src.config.platform_dirs.get_config_location") as mock_config,
         ):
             mock_config.return_value = Path("/base/config")
-            
+
             result = get_logs_location()
             assert result == Path("/base/logs")
 
@@ -301,7 +301,7 @@ class TestGetLogsLocation:
             patch("src.config.platform_dirs.get_config_location") as mock_config,
         ):
             mock_config.return_value = Path("/base/config")
-            
+
             result = get_logs_location()
             assert result == Path("/base/logs")
 
@@ -313,7 +313,7 @@ class TestGetScriptsLocation:
         """Test scripts location relative to config location."""
         with patch("src.config.platform_dirs.get_config_location") as mock_config:
             mock_config.return_value = Path("/base/config")
-            
+
             result = get_scripts_location()
             assert result == Path("/base/scripts")
 
@@ -328,7 +328,7 @@ class TestEnvironmentOverrides:
             "ORB_WORK_DIR": "/env/work",
             "ORB_LOG_DIR": "/env/logs",
         }
-        
+
         with patch.dict(os.environ, env_vars):
             assert get_config_location() == Path("/env/config")
             assert get_work_location() == Path("/env/work")
@@ -343,7 +343,7 @@ class TestEnvironmentOverrides:
         ):
             # Config uses env var
             assert get_config_location() == Path("/env/config")
-            
+
             # Others use relative to config
             mock_config.return_value = Path("/env/config")
             assert get_work_location() == Path("/env/work")
@@ -390,7 +390,7 @@ class TestEdgeCases:
             mock_cwd.return_value = Path("/deep/nested/directory")
             mock_exists.return_value = False  # No pyproject.toml anywhere
             mock_home.return_value = Path("/home/user")
-            
+
             result = get_config_location()
             assert result == Path("/deep/nested/directory/config")
 
@@ -401,7 +401,7 @@ class TestEdgeCases:
             patch("pathlib.Path.cwd") as mock_cwd,
         ):
             mock_cwd.side_effect = PermissionError("Permission denied")
-            
+
             # Should not crash, but behavior depends on implementation
             # This tests that we handle the exception gracefully
             with pytest.raises(PermissionError):
@@ -418,12 +418,12 @@ class TestIntegration:
             work_dir = get_work_location()
             logs_dir = get_logs_location()
             scripts_dir = get_scripts_location()
-            
+
             # All should be under same parent
             assert work_dir.parent == config_dir.parent
             assert logs_dir.parent == config_dir.parent
             assert scripts_dir.parent == config_dir.parent
-            
+
             # Correct subdirectories
             assert config_dir.name == "config"
             assert work_dir.name == "work"
@@ -435,7 +435,7 @@ class TestIntegration:
         # Can't be both user and system install
         if is_user_install():
             assert not is_system_install()
-        
+
         # Virtual env detection is independent
         venv_status = in_virtualenv()
         assert isinstance(venv_status, bool)

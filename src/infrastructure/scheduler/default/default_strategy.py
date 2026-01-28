@@ -42,7 +42,9 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
         """Get templates file path using strategy pattern."""
         try:
             # Use provider selection service that respects CLI override
-            selection_result = self._provider_selection_service.select_provider_for_template_loading()
+            selection_result = (
+                self._provider_selection_service.select_provider_for_template_loading()
+            )
             provider_name = selection_result.provider_instance
             provider_type = selection_result.provider_type
 
@@ -258,16 +260,22 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
         status = request_data.get("status", "pending")
         error_message = request_data.get("error_message")
         request_id = request_data.get("request_id", request_data.get("requestId"))
-        
+
         # Status-based message and response logic
         if status == "failed":
-            return {"error": f"Request failed: {error_message or 'Unknown error'}", "request_id": request_id}
+            return {
+                "error": f"Request failed: {error_message or 'Unknown error'}",
+                "request_id": request_id,
+            }
         elif status == "cancelled":
             return {"error": "Request cancelled", "request_id": request_id}
         elif status == "timeout":
             return {"error": "Request timed out", "request_id": request_id}
         elif status == "partial":
-            return {"warning": f"Request partially completed: {error_message or 'Some resources failed'}", "request_id": request_id}
+            return {
+                "warning": f"Request partially completed: {error_message or 'Some resources failed'}",
+                "request_id": request_id,
+            }
         elif status == "complete":
             return {"request_id": request_id, "message": "Request completed successfully"}
         elif status == "in_progress":
@@ -275,4 +283,7 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
         elif status == "pending":
             return {"request_id": request_id, "message": "Request submitted successfully"}
         else:
-            return {"request_id": request_id, "message": request_data.get("message", "Request status unknown")}
+            return {
+                "request_id": request_id,
+                "message": request_data.get("message", "Request status unknown"),
+            }

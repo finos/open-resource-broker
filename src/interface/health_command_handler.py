@@ -47,7 +47,7 @@ def handle_health_check(args) -> int:
         # 3. Templates loaded check
         try:
             from domain.template.repository import TemplateRepository
-            
+
             repo = container.get(TemplateRepository)
             templates = repo.find_active_templates()  # Use interface method
             checks.append(
@@ -66,46 +66,48 @@ def handle_health_check(args) -> int:
 
             provider_port = container.get(ProviderPort)
             strategies = provider_port.available_strategies()
-            
+
             if not strategies:
-                checks.append({
-                    "name": "provider_health",
-                    "status": "warn",
-                    "details": "No provider strategies configured"
-                })
+                checks.append(
+                    {
+                        "name": "provider_health",
+                        "status": "warn",
+                        "details": "No provider strategies configured",
+                    }
+                )
             else:
                 # Check all configured providers
                 healthy_count = 0
                 total_count = len(strategies)
                 errors = []
-                
+
                 for strategy_name in strategies:
                     try:
                         health_result = provider_port.get_strategy(strategy_name)
-                        if health_result and hasattr(health_result, 'is_healthy') and health_result.is_healthy:
+                        if (
+                            health_result
+                            and hasattr(health_result, "is_healthy")
+                            and health_result.is_healthy
+                        ):
                             healthy_count += 1
-                        elif health_result and hasattr(health_result, 'status_message'):
+                        elif health_result and hasattr(health_result, "status_message"):
                             errors.append(f"{strategy_name}: {health_result.status_message}")
                         else:
                             errors.append(f"{strategy_name}: Unknown health status")
                     except Exception as e:
-                        errors.append(f"{strategy_name}: {str(e)}")
-                
+                        errors.append(f"{strategy_name}: {e!s}")
+
                 if healthy_count == total_count:
                     status = "pass"
                     details = f"All {total_count} provider strategies healthy"
                 elif healthy_count > 0:
-                    status = "warn" 
+                    status = "warn"
                     details = f"{healthy_count}/{total_count} providers healthy"
                 else:
                     status = "warn"
                     details = f"No providers healthy. Errors: {'; '.join(errors)}"
-                
-                checks.append({
-                    "name": "provider_health",
-                    "status": status,
-                    "details": details
-                })
+
+                checks.append({"name": "provider_health", "status": status, "details": details})
         except Exception as e:
             checks.append({"name": "provider_health", "status": "warn", "error": str(e)})
 

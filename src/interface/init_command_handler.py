@@ -183,11 +183,8 @@ def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
         json.dump(full_config, f, indent=2)
 
     # Generate provider name using provider-aware naming convention
-    provider_config = {
-        "profile": user_config["profile"],
-        "region": user_config["region"]
-    }
-    
+    provider_config = {"profile": user_config["profile"], "region": user_config["region"]}
+
     # Use provider type from user config instead of hardcoded "aws"
     provider_type = user_config["provider_type"]
     provider_name = f"{provider_type}_{user_config['profile']}_{user_config['region']}"

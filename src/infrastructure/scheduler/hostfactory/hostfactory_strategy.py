@@ -48,7 +48,9 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         """Get the templates file path for HostFactory using strategy pattern."""
         try:
             # Use provider selection service that respects CLI override
-            selection_result = self._provider_selection_service.select_provider_for_template_loading()
+            selection_result = (
+                self._provider_selection_service.select_provider_for_template_loading()
+            )
             provider_name = selection_result.provider_instance
             provider_type = selection_result.provider_type
 
@@ -240,12 +242,12 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
 
         # Prefer snake_case in API responses
         request_id = request_dict.get("request_id", request_dict.get("requestId"))
-        
+
         # Check request status to provide appropriate message
         status = request_dict.get("status", "pending")
         error_message = request_dict.get("error_message")
         request_id = request_dict.get("request_id", request_dict.get("requestId"))
-        
+
         # Status-based message and response logic
         if status == "failed":
             return {"message": f"Request failed: {error_message or 'Unknown error'}"}
@@ -254,7 +256,9 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         elif status == "timeout":
             return {"message": "Request timed out"}
         elif status == "partial":
-            return {"message": f"Request partially completed: {error_message or 'Some resources failed'}"}
+            return {
+                "message": f"Request partially completed: {error_message or 'Some resources failed'}"
+            }
         elif status == "complete":
             return {"requestId": request_id, "message": "Request completed successfully"}
         elif status == "in_progress":
@@ -262,7 +266,10 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         elif status == "pending":
             return {"requestId": request_id, "message": "Request submitted for processing"}
         else:
-            return {"requestId": request_id, "message": request_dict.get("message", "Request status unknown")}
+            return {
+                "requestId": request_id,
+                "message": request_dict.get("message", "Request status unknown"),
+            }
 
     def convert_domain_to_hostfactory_output(
         self, operation: str, data: dict[str, Any]
@@ -375,8 +382,8 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         else:
             template_dict = template
 
-        # Already formatted by field mapper in format_template_for_display
-        return template_dict
+        # Start with the formatted template
+        hf_template = template_dict.copy()
 
         # Add optional HostFactory fields if present
         optional_fields = [

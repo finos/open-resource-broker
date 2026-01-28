@@ -128,21 +128,23 @@ class ProviderSelectionService:
         # Check for CLI override first
         if override := self._config_manager.get_active_provider_override():
             return self._select_override_provider_for_templates(override)
-        
+
         # Use normal provider selection
         return self.select_active_provider()
 
-    def _select_override_provider_for_templates(self, provider_name: str) -> ProviderSelectionResult:
+    def _select_override_provider_for_templates(
+        self, provider_name: str
+    ) -> ProviderSelectionResult:
         """Select overridden provider for template loading."""
         provider_instance = self._get_provider_instance_config(provider_name)
         if not provider_instance:
             raise ValueError(f"Provider instance '{provider_name}' not found")
-        
+
         return ProviderSelectionResult(
             provider_type=provider_instance.type,
             provider_instance=provider_name,
             selection_reason=f"CLI override for template loading (--provider {provider_name})",
-            confidence=1.0
+            confidence=1.0,
         )
 
     def select_active_provider(self) -> ProviderSelectionResult:
@@ -217,19 +219,21 @@ class ProviderSelectionService:
             confidence=1.0,
         )
 
-    def _select_override_provider(self, template: Template, provider_name: str) -> ProviderSelectionResult:
+    def _select_override_provider(
+        self, template: Template, provider_name: str
+    ) -> ProviderSelectionResult:
         """Select CLI-overridden provider with validation."""
         provider_instance = self._get_provider_instance_config(provider_name)
         if not provider_instance:
             raise ValueError(f"Provider instance '{provider_name}' not found")
         if not provider_instance.enabled:
             raise ValueError(f"Provider instance '{provider_name}' is disabled")
-        
+
         return ProviderSelectionResult(
             provider_type=provider_instance.type,
             provider_instance=provider_name,
             selection_reason=f"CLI override (--provider {provider_name})",
-            confidence=1.0
+            confidence=1.0,
         )
 
     def _select_load_balanced_provider(self, template: Template) -> ProviderSelectionResult:

@@ -164,14 +164,14 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         try:
             # Acquire hosts using the handler
             result = handler.acquire_hosts(request, template)
-            
+
             # Handle both string (legacy) and dict (new) return types
             if isinstance(result, dict):
                 success = result.get("success", True)
                 if not success:
                     error_msg = result.get("error_message", "Handler reported failure")
                     raise InfrastructureError(f"Handler failed: {error_msg}")
-                
+
                 resource_ids = result.get("resource_ids", [])
                 self._logger.info("Successfully provisioned resources with IDs %s", resource_ids)
                 return result
@@ -179,11 +179,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
                 # Legacy string return - convert to new format
                 resource_ids = [result] if result else []
                 self._logger.info("Successfully provisioned resources with IDs %s", resource_ids)
-                return {
-                    "success": True,
-                    "resource_ids": resource_ids,
-                    "instances": []
-                }
+                return {"success": True, "resource_ids": resource_ids, "instances": []}
         except AWSValidationError as e:
             self._logger.error("Validation error during resource provisioning: %s", str(e))
             raise

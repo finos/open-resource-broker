@@ -246,10 +246,10 @@ class ProviderStrategy(ABC):
     @abstractmethod
     def generate_provider_name(self, config: dict[str, Any]) -> str:
         """Generate provider name based on provider-specific components.
-        
+
         Args:
             config: Provider configuration dict
-            
+
         Returns:
             Provider name following provider-specific convention
         """
@@ -257,10 +257,10 @@ class ProviderStrategy(ABC):
     @abstractmethod
     def parse_provider_name(self, provider_name: str) -> dict[str, str]:
         """Parse provider name back to components.
-        
+
         Args:
             provider_name: Provider name to parse
-            
+
         Returns:
             Dict with provider-specific components
         """
@@ -268,7 +268,7 @@ class ProviderStrategy(ABC):
     @abstractmethod
     def get_provider_name_pattern(self) -> str:
         """Get the naming pattern for this provider type.
-        
+
         Returns:
             Pattern string (e.g., "{type}_{profile}_{region}")
         """

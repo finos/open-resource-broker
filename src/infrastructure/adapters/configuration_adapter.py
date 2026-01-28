@@ -4,6 +4,7 @@ from typing import Any, Optional
 
 from config import NamingConfig, RequestConfig, TemplateConfig
 from config.manager import ConfigurationManager
+from config.schemas.app_schema import AppConfig
 from domain.base.ports import ConfigurationPort
 
 
@@ -118,6 +119,7 @@ class ConfigurationAdapter(ConfigurationPort):
         except Exception as e:
             # Fallback to empty config if loading fails
             from infrastructure.logging.logger import get_logger
+
             get_logger(__name__).warning("Failed to get template config: %s", e)
             return {}
 

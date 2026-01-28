@@ -486,7 +486,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 # No provisioning adapter available - this is a configuration error
                 return ProviderResult.error_result(
                     "AWS provisioning adapter not available - check DI configuration",
-                    "CONFIGURATION_ERROR"
+                    "CONFIGURATION_ERROR",
                 )
 
         except Exception as e:
@@ -1154,15 +1154,15 @@ class AWSProviderStrategy(ProviderStrategy):
             parts = provider_name.split("_")
             return {
                 "type": parts[0] if len(parts) > 0 else self.provider_type,
-                "profile": parts[1] if len(parts) > 1 else "default", 
-                "region": parts[2] if len(parts) > 2 else "us-east-1"
+                "profile": parts[1] if len(parts) > 1 else "default",
+                "region": parts[2] if len(parts) > 2 else "us-east-1",
             }
         else:
             # Legacy format: aws-default
             return {
                 "type": provider_name.split("-")[0],
                 "profile": "default",
-                "region": "us-east-1"
+                "region": "us-east-1",
             }
 
     def get_provider_name_pattern(self) -> str:

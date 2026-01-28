@@ -92,9 +92,11 @@ async def handle_request_machines(args: "argparse.Namespace") -> dict[str, Any]:
     else:
         # Merge positional and flag arguments
         template_id = getattr(args, "template_id", None) or getattr(args, "flag_template_id", None)
-        machine_count = getattr(args, "machine_count", None) or getattr(args, "flag_machine_count", None)
+        machine_count = getattr(args, "machine_count", None) or getattr(
+            args, "flag_machine_count", None
+        )
         machine_id = getattr(args, "machine_id", None) or getattr(args, "flag_machine_id", None)
-        
+
         raw_request_data = {
             "template_id": template_id,
             "requested_count": machine_count,
@@ -143,12 +145,12 @@ async def handle_request_machines(args: "argparse.Namespace") -> dict[str, Any]:
         # Create response data with resource ID information
         status = request_dto.status if request_dto else "unknown"
         error_msg = None
-        if request_dto and hasattr(request_dto, 'metadata'):
+        if request_dto and hasattr(request_dto, "metadata"):
             if isinstance(request_dto.metadata, dict):
                 error_msg = request_dto.metadata.get("error_message")
             else:
                 error_msg = getattr(request_dto.metadata, "error_message", None)
-        
+
         request_data = {
             "request_id": request_id,
             "resource_ids": resource_ids,

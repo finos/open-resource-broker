@@ -10,7 +10,6 @@ from typing import Any
 from domain.base.ports.scheduler_port import SchedulerPort
 from domain.request.aggregate import Request
 from domain.template.template_aggregate import Template
-from domain.template.template_aggregate import Template
 
 
 class BaseSchedulerStrategy(SchedulerPort, ABC):

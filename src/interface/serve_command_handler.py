@@ -35,7 +35,7 @@ async def handle_serve_api(args) -> dict[str, Any]:
             import uvicorn
         except ImportError:
             raise ImportError("API server requires: pip install orb-py[api]") from None
-            
+
         from config.schemas.server_schema import ServerConfig
         from domain.base.ports.configuration_port import ConfigurationPort
         from infrastructure.di.container import get_container

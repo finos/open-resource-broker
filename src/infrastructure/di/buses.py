@@ -97,6 +97,7 @@ class QueryBus:
     def execute_sync(self, query: TQuery) -> TResult:
         """Execute query synchronously for sync contexts."""
         import asyncio
+
         try:
             return asyncio.run(self.execute(query))
         except RuntimeError:

@@ -9,7 +9,7 @@ This test suite validates that:
 
 import sys
 import subprocess
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import pytest
 
 
@@ -18,48 +18,40 @@ class TestImportGuards:
 
     def test_cli_console_without_rich(self):
         """Test CLI console works without Rich installed."""
-        with patch.dict(sys.modules, {
-            'rich': None, 
-            'rich.console': None,
-            'rich_argparse': None
-        }):
+        with patch.dict(sys.modules, {"rich": None, "rich.console": None, "rich_argparse": None}):
             # Force reimport to test fallback
-            if 'cli.console' in sys.modules:
-                del sys.modules['cli.console']
-            
+            if "cli.console" in sys.modules:
+                del sys.modules["cli.console"]
+
             from cli.console import get_console, print_success, print_error
-            
+
             console = get_console()
             assert console is not None
-            
+
             # These should not raise exceptions
             print_success("test success")
             print_error("test error")
 
     def test_cli_formatters_without_rich(self):
         """Test CLI formatters work without Rich installed."""
-        with patch.dict(sys.modules, {
-            'rich': None,
-            'rich.table': None,
-            'rich.console': None
-        }):
+        with patch.dict(sys.modules, {"rich": None, "rich.table": None, "rich.console": None}):
             # Force reimport to test fallback
-            if 'cli.formatters' in sys.modules:
-                del sys.modules['cli.formatters']
-            
+            if "cli.formatters" in sys.modules:
+                del sys.modules["cli.formatters"]
+
             from cli.formatters import format_generic_table, format_generic_list
-            
+
             test_data = [
-                {'id': '1', 'name': 'test1', 'status': 'active'},
-                {'id': '2', 'name': 'test2', 'status': 'inactive'}
+                {"id": "1", "name": "test1", "status": "active"},
+                {"id": "2", "name": "test2", "status": "inactive"},
             ]
-            
+
             # Should fall back to ASCII table
             table_result = format_generic_table(test_data, "Test Items")
             assert "Test Items:" in table_result
             assert "test1" in table_result
             assert "test2" in table_result
-            
+
             # Should work for list format too
             list_result = format_generic_list(test_data, "Test Items")
             assert "Test Items:" in list_result
@@ -67,59 +59,61 @@ class TestImportGuards:
 
     def test_cli_main_without_rich_argparse(self):
         """Test CLI main works without rich-argparse."""
-        with patch.dict(sys.modules, {'rich_argparse': None}):
+        with patch.dict(sys.modules, {"rich_argparse": None}):
             # Force reimport to test fallback
-            if 'cli.main' in sys.modules:
-                del sys.modules['cli.main']
-            
+            if "cli.main" in sys.modules:
+                del sys.modules["cli.main"]
+
             from cli.main import parse_args
-            
+
             # Should use standard argparse formatter
             # This is a basic test - full CLI testing would need more setup
             assert parse_args is not None
 
     def test_api_server_without_fastapi(self):
         """Test API server gracefully fails without FastAPI."""
-        with patch.dict(sys.modules, {
-            'fastapi': None,
-            'fastapi.middleware': None,
-            'fastapi.middleware.cors': None,
-            'fastapi.middleware.trustedhost': None,
-            'fastapi.responses': None
-        }):
+        with patch.dict(
+            sys.modules,
+            {
+                "fastapi": None,
+                "fastapi.middleware": None,
+                "fastapi.middleware.cors": None,
+                "fastapi.middleware.trustedhost": None,
+                "fastapi.responses": None,
+            },
+        ):
             # Force reimport to test guard
-            if 'api.server' in sys.modules:
-                del sys.modules['api.server']
-            
+            if "api.server" in sys.modules:
+                del sys.modules["api.server"]
+
             from api.server import create_fastapi_app
-            
+
             with pytest.raises(ImportError) as exc_info:
                 create_fastapi_app(None)
-            
+
             error_msg = str(exc_info.value)
             assert "FastAPI not installed" in error_msg
             assert "pip install orb-py[api]" in error_msg
 
     def test_monitoring_without_optional_deps(self):
         """Test monitoring works without optional dependencies."""
-        with patch.dict(sys.modules, {
-            'psutil': None,
-            'prometheus_client': None,
-            'opentelemetry': None,
-            'opentelemetry.trace': None
-        }):
+        with patch.dict(
+            sys.modules,
+            {
+                "psutil": None,
+                "prometheus_client": None,
+                "opentelemetry": None,
+                "opentelemetry.trace": None,
+            },
+        ):
             # Force reimport to test guards
-            if 'monitoring.health' in sys.modules:
-                del sys.modules['monitoring.health']
-            
-            from monitoring.health import HealthCheck, HealthStatus
-            
+            if "monitoring.health" in sys.modules:
+                del sys.modules["monitoring.health"]
+
+            from monitoring.health import HealthStatus
+
             # Should create but with limited functionality
-            health_status = HealthStatus(
-                name="test",
-                status="healthy",
-                details={"test": "value"}
-            )
+            health_status = HealthStatus(name="test", status="healthy", details={"test": "value"})
             assert health_status is not None
             assert health_status.name == "test"
 
@@ -127,21 +121,28 @@ class TestImportGuards:
         """Test core imports work regardless of optional dependencies."""
         # Mock all optional dependencies as unavailable
         optional_modules = [
-            'rich', 'rich.console', 'rich.table', 'rich_argparse',
-            'fastapi', 'fastapi.middleware', 'uvicorn',
-            'psutil', 'prometheus_client', 'opentelemetry'
+            "rich",
+            "rich.console",
+            "rich.table",
+            "rich_argparse",
+            "fastapi",
+            "fastapi.middleware",
+            "uvicorn",
+            "psutil",
+            "prometheus_client",
+            "opentelemetry",
         ]
-        
+
         with patch.dict(sys.modules, {mod: None for mod in optional_modules}):
             # These should never fail
             from bootstrap import Application
             from domain.base.exceptions import DomainException
             from infrastructure.logging.logger import get_logger
-            
+
             assert Application is not None
             assert DomainException is not None
             assert get_logger is not None
-            
+
             # Test basic instantiation
             logger = get_logger(__name__)
             assert logger is not None
@@ -154,26 +155,34 @@ class TestPackageVariants:
     def test_minimal_package_functionality(self):
         """Test minimal package provides core functionality."""
         # Test core imports work
-        result = subprocess.run([
-            sys.executable, "-c", 
-            """
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                """
 import run
 from bootstrap import Application
 from domain.base.exceptions import DomainException
 from infrastructure.logging.logger import get_logger
 print('CORE_IMPORTS_OK')
-            """
-        ], capture_output=True, text=True)
-        
+            """,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
         assert result.returncode == 0
         assert "CORE_IMPORTS_OK" in result.stdout
 
-    @pytest.mark.integration  
+    @pytest.mark.integration
     def test_cli_fallback_functionality(self):
         """Test CLI package provides fallback functionality."""
-        result = subprocess.run([
-            sys.executable, "-c",
-            """
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                """
 from cli.formatters import format_generic_table
 from cli.console import get_console
 
@@ -183,9 +192,13 @@ result = format_generic_table(test_data, 'Test Items')
 console = get_console()
 console.print('Console test')
 print('CLI_FALLBACK_OK')
-            """
-        ], capture_output=True, text=True)
-        
+            """,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
         assert result.returncode == 0
         assert "CLI_FALLBACK_OK" in result.stdout
 
@@ -195,29 +208,29 @@ class TestErrorMessages:
 
     def test_api_error_message_helpful(self):
         """Test API error message tells user how to install."""
-        with patch.dict(sys.modules, {'fastapi': None}):
-            if 'api.server' in sys.modules:
-                del sys.modules['api.server']
-            
+        with patch.dict(sys.modules, {"fastapi": None}):
+            if "api.server" in sys.modules:
+                del sys.modules["api.server"]
+
             from api.server import create_fastapi_app
-            
+
             with pytest.raises(ImportError) as exc_info:
                 create_fastapi_app(None)
-            
+
             error_msg = str(exc_info.value)
             assert "FastAPI not installed" in error_msg
             assert "pip install orb-py[api]" in error_msg
 
     def test_serve_command_error_message(self):
         """Test serve command error message is helpful."""
-        with patch.dict(sys.modules, {'fastapi': None, 'uvicorn': None}):
+        with patch.dict(sys.modules, {"fastapi": None, "uvicorn": None}):
             # This would test the serve command handler
             # Implementation depends on the actual serve command structure
             pass
 
     def test_monitoring_graceful_degradation(self):
         """Test monitoring provides helpful messages for missing features."""
-        with patch.dict(sys.modules, {'prometheus_client': None}):
+        with patch.dict(sys.modules, {"prometheus_client": None}):
             # Test that monitoring still works but indicates limited functionality
             # This would be implemented based on actual monitoring code structure
             pass
@@ -229,7 +242,7 @@ class TestImportGuardPatterns:
     def test_availability_flag_pattern(self):
         """Test the FEATURE_AVAILABLE flag pattern."""
         # Test pattern: try/except with boolean flag
-        with patch.dict(sys.modules, {'rich': None}):
+        with patch.dict(sys.modules, {"rich": None}):
             code = """
 try:
     from rich.console import Console
@@ -250,11 +263,11 @@ try:
 except ImportError as e:
     print(f"RICH_ERROR={e}")
             """
-            
-            result = subprocess.run([
-                sys.executable, "-c", code
-            ], capture_output=True, text=True)
-            
+
+            result = subprocess.run(
+                [sys.executable, "-c", code], capture_output=True, text=True, check=False
+            )
+
             assert result.returncode == 0
             assert "RICH_AVAILABLE=False" in result.stdout
             assert "RICH_ERROR=Rich not available" in result.stdout
@@ -262,7 +275,7 @@ except ImportError as e:
     def test_graceful_degradation_pattern(self):
         """Test the graceful degradation pattern."""
         # Test pattern: fallback class/function
-        with patch.dict(sys.modules, {'rich': None}):
+        with patch.dict(sys.modules, {"rich": None}):
             code = """
 try:
     from rich.console import Console
@@ -275,11 +288,11 @@ except ImportError:
 
 console.print("test message")
             """
-            
-            result = subprocess.run([
-                sys.executable, "-c", code
-            ], capture_output=True, text=True)
-            
+
+            result = subprocess.run(
+                [sys.executable, "-c", code], capture_output=True, text=True, check=False
+            )
+
             assert result.returncode == 0
             assert "PLAIN: test message" in result.stdout
 
@@ -300,12 +313,12 @@ try:
 except ImportError as e:
     print(f"LAZY_ERROR={e}")
         """
-        
-        with patch.dict(sys.modules, {'fastapi': None}):
-            result = subprocess.run([
-                sys.executable, "-c", code
-            ], capture_output=True, text=True)
-            
+
+        with patch.dict(sys.modules, {"fastapi": None}):
+            result = subprocess.run(
+                [sys.executable, "-c", code], capture_output=True, text=True, check=False
+            )
+
             assert result.returncode == 0
             assert "pip install orb-py[api]" in result.stdout
 
@@ -318,36 +331,36 @@ class TestFeatureDetection:
         code = """
 def detect_features():
     features = {}
-    
+
     try:
         import rich
         features['cli_rich'] = True
     except ImportError:
         features['cli_rich'] = False
-    
+
     try:
         import fastapi
         features['api'] = True
     except ImportError:
         features['api'] = False
-    
+
     try:
         import prometheus_client
         features['monitoring'] = True
     except ImportError:
         features['monitoring'] = False
-    
+
     return features
 
 features = detect_features()
 for feature, available in features.items():
     print(f"{feature}={available}")
         """
-        
-        result = subprocess.run([
-            sys.executable, "-c", code
-        ], capture_output=True, text=True)
-        
+
+        result = subprocess.run(
+            [sys.executable, "-c", code], capture_output=True, text=True, check=False
+        )
+
         assert result.returncode == 0
         # Should show which features are available in current environment
         assert "cli_rich=" in result.stdout

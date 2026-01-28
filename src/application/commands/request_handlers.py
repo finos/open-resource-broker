@@ -151,6 +151,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                     RequestStatus.COMPLETED, "Request created successfully (dry-run)"
                 )
             else:
+                try:
                     # Execute provisioning using selected provider
                     provisioning_result = await self._execute_provisioning(
                         template, request, selection_result
@@ -250,6 +251,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                                 RequestStatus.IN_PROGRESS,
                                 "Resources created, instances pending",
                             )
+                    else:
                         # Handle provisioning failure
                         from domain.request.value_objects import RequestStatus
 

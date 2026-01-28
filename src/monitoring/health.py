@@ -188,7 +188,9 @@ class HealthCheck:
         try:
             import psutil
         except ImportError:
-            raise ImportError("System monitoring requires: pip install orb-py[monitoring]") from None
+            raise ImportError(
+                "System monitoring requires: pip install orb-py[monitoring]"
+            ) from None
 
         try:
             cpu_percent = psutil.cpu_percent()
