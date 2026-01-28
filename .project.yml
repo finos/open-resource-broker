@@ -6,7 +6,7 @@ project:
   name: open-resource-broker
   pypi_name: orb-py # PyPI distribution name
   short_name: orb # CLI command name
-  version: 1.1.1
+  version: 1.1.2
   description: "Cloud provider integration plugin for IBM Spectrum Symphony Host Factory"
   author: "AWS Professional Services"
   email: "aws-proserve@amazon.com"
