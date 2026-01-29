@@ -165,6 +165,23 @@ async def _show_providers_help(args):
     return await _show_resource_help("providers")
 
 
+def add_infrastructure_actions(subparsers):
+    """Add infrastructure actions to a subparser."""
+    # Infrastructure discover
+    infra_discover = subparsers.add_parser("discover", help="Discover infrastructure")
+    infra_discover.add_argument("--provider", help="Specific provider to discover")
+    infra_discover.add_argument("--all-providers", action="store_true", help="Discover for all providers")
+
+    # Infrastructure show
+    infra_show = subparsers.add_parser("show", help="Show infrastructure configuration")
+    infra_show.add_argument("--provider", help="Specific provider to show")
+    infra_show.add_argument("--all-providers", action="store_true", help="Show all providers")
+
+    # Infrastructure validate
+    infra_validate = subparsers.add_parser("validate", help="Validate infrastructure")
+    infra_validate.add_argument("--provider", help="Specific provider to validate")
+
+
 def add_provider_actions(subparsers):
     """Add provider actions to a subparser."""
     # Providers list
@@ -462,22 +479,19 @@ For more information, visit: {DOCS_URL}
     infrastructure_parser = subparsers.add_parser("infrastructure", help="Infrastructure management")
     resource_parsers["infrastructure"] = infrastructure_parser
     infrastructure_subparsers = infrastructure_parser.add_subparsers(
-        dest="action", help="Infrastructure actions", required=True
+        dest="action", help="Infrastructure actions"
     )
 
-    # Infrastructure discover
-    infra_discover = infrastructure_subparsers.add_parser("discover", help="Discover infrastructure")
-    infra_discover.add_argument("--provider", help="Specific provider to discover")
-    infra_discover.add_argument("--all-providers", action="store_true", help="Discover for all providers")
+    # Infra resource (shortcut alias - hidden from main help)
+    infra_parser = subparsers.add_parser("infra")
+    resource_parsers["infra"] = infra_parser
+    infra_subparsers = infra_parser.add_subparsers(
+        dest="action", help="Infrastructure actions"
+    )
 
-    # Infrastructure show
-    infra_show = infrastructure_subparsers.add_parser("show", help="Show infrastructure configuration")
-    infra_show.add_argument("--provider", help="Specific provider to show")
-    infra_show.add_argument("--all-providers", action="store_true", help="Show all providers")
-
-    # Infrastructure validate
-    infra_validate = infrastructure_subparsers.add_parser("validate", help="Validate infrastructure")
-    infra_validate.add_argument("--provider", help="Specific provider to validate")
+    # Add actions to both full and shortcut forms
+    add_infrastructure_actions(infrastructure_subparsers)
+    add_infrastructure_actions(infra_subparsers)
 
     # Config resource
     config_parser = subparsers.add_parser("config", help="Configuration management")
@@ -878,6 +892,10 @@ async def execute_command(args, app, resource_parsers) -> dict[str, Any]:
             ("infrastructure", "discover"): handle_infrastructure_discover,
             ("infrastructure", "show"): handle_infrastructure_show,
             ("infrastructure", "validate"): handle_infrastructure_validate,
+            # Infra commands (shortcut aliases)
+            ("infra", "discover"): handle_infrastructure_discover,
+            ("infra", "show"): handle_infrastructure_show,
+            ("infra", "validate"): handle_infrastructure_validate,
             # Configuration commands
             ("config", "show"): handle_provider_config,
             ("config", "validate"): handle_validate_provider_config,
@@ -985,8 +1003,8 @@ async def main() -> None:
         logger = get_logger(__name__)
 
         # Handle help display early - no need for app initialization
-        if args.action is None and args.resource in ["templates", "template", "machines", "machine", "requests", "request", "providers", "provider"]:
-            resource_map = {"template": "templates", "machine": "machines", "request": "requests", "provider": "providers"}
+        if args.action is None and args.resource in ["templates", "template", "machines", "machine", "requests", "request", "providers", "provider", "infrastructure", "infra"]:
+            resource_map = {"template": "templates", "machine": "machines", "request": "requests", "provider": "providers", "infra": "infrastructure"}
             help_resource = resource_map.get(args.resource, args.resource)
             
             if help_resource in resource_parsers:
