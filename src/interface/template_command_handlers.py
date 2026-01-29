@@ -100,16 +100,12 @@ async def handle_list_templates(args: argparse.Namespace) -> dict[str, Any]:
 
         # Print helpful message to stderr when no templates found
         if len(templates) == 0:
+            from cli.help_utils import print_getting_started_help
+            
             print_info("")  # Empty line
             print_info("No templates found.")
             print_info("")  # Empty line
-            print_info("To get started:")
-            print_command("  orb templates generate    # Generate example templates")
-            print_command("  orb templates create      # Create custom template")
-            print_info("")  # Empty line
-            print_info("Example:")
-            print_command("  $ orb templates generate")
-            print_command("  $ orb templates list")
+            print_getting_started_help()
 
         return result
 

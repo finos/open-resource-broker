@@ -73,6 +73,7 @@ async def handle_init(args) -> int:
         print_info("Next Steps:")
         print_command("  1. Generate templates: orb templates generate")
         print_command("  2. List templates:     orb templates list")
+        print_command("  3. Show infrastructure: orb infrastructure show")
         print_command("  3. Show config:        orb config show")
 
         return 0
