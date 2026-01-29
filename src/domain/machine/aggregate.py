@@ -26,6 +26,8 @@ class Machine(AggregateRoot):
     request_id: Optional[str] = None  # Link to the request that created this machine
     provider_type: str
     provider_name: str  # Provider instance name (e.g., "aws_prod_us-west-2")
+    provider_api: Optional[str] = None  # How was this machine provisioned (EC2Fleet, SpotFleet, etc.)
+    resource_id: Optional[str] = None  # Which resource does this machine belong to (fleet-xxx, asg-xxx, etc.)
 
     # Machine configuration
     instance_type: InstanceType

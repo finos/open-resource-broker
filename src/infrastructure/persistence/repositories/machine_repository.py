@@ -29,6 +29,8 @@ class MachineSerializer:
                 "request_id": machine.request_id,
                 "provider_type": machine.provider_type,
                 "provider_name": machine.provider_name,
+                "provider_api": machine.provider_api,
+                "resource_id": machine.resource_id,
                 # Machine configuration
                 "instance_type": str(machine.instance_type.value),
                 "image_id": machine.image_id,
@@ -92,6 +94,8 @@ class MachineSerializer:
                 "request_id": data.get("request_id"),
                 "provider_type": data.get("provider_type", "aws"),
                 "provider_name": data.get("provider_name", data.get("provider_type", "aws") + "-default"),  # Migration fallback
+                "provider_api": data.get("provider_api"),
+                "resource_id": data.get("resource_id"),
                 # Machine configuration
                 "instance_type": InstanceType(value=data["instance_type"]),
                 "image_id": data["image_id"],

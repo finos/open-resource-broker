@@ -796,12 +796,12 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     return ProviderResult.error_result(str(e))
 
             async def check_resource_status(self, request) -> list[dict[str, Any]]:
-                """Use appropriate AWS handler based on resource type."""
-                aws_handler = self._get_aws_handler_for_request(request)
-                return aws_handler.check_hosts_status(request)
+                """Use appropriate handler based on provider type."""
+                handler = self._get_handler_for_request(request)
+                return handler.check_hosts_status(request)
 
-            def _get_aws_handler_for_resource_id(self, resource_id: str, request):
-                """Get appropriate AWS handler based on request metadata."""
+            def _get_handler_for_request(self, request):
+                """Get appropriate handler based on request metadata."""
                 strategy = self._get_provider_strategy(request)
                 if not strategy:
                     self.logger.warning("No strategy available for provider: %s", request.provider_name)
@@ -809,21 +809,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 
                 handler_type = request.metadata.get("provider_api") or request.provider_api
                 if not handler_type:
-                    self.logger.warning("No provider_api found in request metadata for resource: %s", resource_id)
-                    handler_type = "RunInstances"
-                
-                return strategy.get_handler(handler_type)
-
-            def _get_aws_handler_for_request(self, request):
-                """Get appropriate AWS handler based on request metadata."""
-                strategy = self._get_provider_strategy(request)
-                if not strategy:
-                    self.logger.warning("No strategy available for provider: %s", request.provider_name)
-                    return None
-                    
-                handler_type = request.metadata.get("provider_api") or request.provider_api
-                if not handler_type:
-                    handler_type = "RunInstances"
+                    handler_type = strategy.get_default_handler_type()
                 
                 return strategy.get_handler(handler_type)
                 

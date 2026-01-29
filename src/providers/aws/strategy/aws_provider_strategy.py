@@ -210,6 +210,10 @@ class AWSProviderStrategy(ProviderStrategy):
             return None
             
         return self.handler_factory.create_handler(handler_type)
+        
+    def get_default_handler_type(self) -> str:
+        """Get default handler type for this provider."""
+        return "RunInstances"
 
     @property
     def handlers(self) -> dict[str, Any]:
