@@ -32,6 +32,7 @@ class AWSClient:
         self,
         config: ConfigurationPort,
         logger: LoggingPort,
+        provider_name: Optional[str] = None,
         metrics: Optional[MetricsCollector] = None,
     ) -> None:
         """
@@ -40,10 +41,12 @@ class AWSClient:
         Args:
             config: Configuration port for accessing configuration
             logger: Logger for logging messages
+            provider_name: Specific provider instance name (for multi-provider support)
             metrics: Optional metrics collector for AWS API instrumentation
         """
         self._config_manager = config
         self._logger = logger
+        self._provider_name = provider_name
         self._aws_config: Optional[AWSProviderConfig] = None
         # Tracks whether we've attempted provider selection; we cache failures too.
         # This avoids repeated DI lookups and log spam when selection is unavailable.
@@ -193,34 +196,41 @@ class AWSClient:
             return None
 
         try:
-            # Use provider selection service from DI container
-            from application.services.provider_selection_service import ProviderSelectionService
-            from infrastructure.di.container import get_container
+            # Use specific provider name if provided, otherwise use provider selection
+            if self._provider_name:
+                provider_name = self._provider_name
+                self._logger.debug("Using specific provider: %s", provider_name)
+            else:
+                # Use provider selection service from DI container
+                from application.services.provider_selection_service import ProviderSelectionService
+                from infrastructure.di.container import get_container
 
-            container = get_container()
-            selection_service = container.get(ProviderSelectionService)
-            selection_result = selection_service.select_active_provider()
+                container = get_container()
+                selection_service = container.get(ProviderSelectionService)
+                selection_result = selection_service.select_active_provider()
 
-            self._logger.debug(
-                "Provider selection result: %s, %s",
-                selection_result.provider_type,
-                selection_result.provider_name,
-            )
-
-            # Ensure we have an AWS provider
-            if selection_result.provider_type != "aws":
-                raise AWSConfigurationError(
-                    f"Selected provider is not AWS: {selection_result.provider_type}"
+                self._logger.debug(
+                    "Provider selection result: %s, %s",
+                    selection_result.provider_type,
+                    selection_result.provider_name,
                 )
+
+                # Ensure we have an AWS provider
+                if selection_result.provider_type != "aws":
+                    raise AWSConfigurationError(
+                        f"Selected provider is not AWS: {selection_result.provider_type}"
+                    )
+                
+                provider_name = selection_result.provider_name
 
             # Get the provider instance configuration
             provider_config = self._config_manager.get_provider_config()
             if not provider_config:
                 self._logger.debug("No provider config found")
             else:
-                # Find the selected provider instance
+                # Find the specified provider instance
                 for provider in provider_config.providers:
-                    if provider.name == selection_result.provider_name:
+                    if provider.name == provider_name:
                         self._logger.debug(
                             "Found provider %s, building AWSProviderConfig", provider.name
                         )

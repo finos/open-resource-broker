@@ -119,20 +119,51 @@ class AWSProviderStrategy(ProviderStrategy):
         return "aws"
 
     @property
+    def provider_name(self) -> Optional[str]:
+        """Get the provider name for this strategy."""
+        return getattr(self, 'name', None)
+
+    @property
     def aws_client(self) -> Optional[AWSClient]:
         """Get the AWS client instance with lazy initialization."""
         if self._aws_client is None:
-            self._logger.debug("Creating AWS client on first access")
+            self._logger.debug("Creating AWS client for provider: %s", self.provider_name or 'unknown')
 
-            # Prefer resolver (from DI) so metrics and config wiring are consistent
-            if self._aws_client_resolver:
+            # Create provider-specific client if we have a provider name
+            if self.provider_name and self._aws_client_resolver:
+                try:
+                    # Use existing resolver but pass provider name to created client
+                    base_client = self._aws_client_resolver()
+                    if base_client and hasattr(base_client, '_provider_name'):
+                        # If resolver created client without provider name, create new one with provider name
+                        if not base_client._provider_name:
+                            self._aws_client = AWSClient(
+                                config=base_client._config_manager,
+                                logger=base_client._logger,
+                                provider_name=self.provider_name,
+                                metrics=getattr(base_client, '_metrics', None)
+                            )
+                            self._logger.info("Created provider-specific AWS client for: %s", self.provider_name)
+                        else:
+                            self._aws_client = base_client
+                    else:
+                        self._aws_client = base_client
+                except Exception as exc:
+                    self._logger.warning("Failed to create provider-specific client for %s: %s", self.provider_name, exc)
+                    self._aws_client = None
+            
+            # Fallback to resolver (existing behavior)
+            if self._aws_client is None and self._aws_client_resolver:
                 try:
                     self._aws_client = self._aws_client_resolver()
+                    self._logger.debug("Using fallback AWS client resolver")
                 except Exception as exc:  # nosec B110 - diagnostic only
                     self._logger.warning("Failed to resolve AWSClient lazily: %s", exc)
                     self._aws_client = None
-            else:
-                self._logger.warning("AWSClient resolver not provided; AWS metrics may be disabled")
+            
+            if self._aws_client is None:
+                self._logger.warning("No AWS client available; operations may fail")
+                
         return self._aws_client
 
     @property
