@@ -177,13 +177,28 @@ def _get_provider_config(provider_name: str) -> dict:
 def _generate_examples_from_factory(
     provider_type: str, provider_name: str, provider_api: str = None
 ) -> list[Dict[str, Any]]:
-    """Generate example templates using handler factory."""
+    """Generate example templates using strategy's handler factory."""
     if provider_type == "aws":
         from infrastructure.di.container import get_container
-        from providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
+        from application.services.provider_selection_service import ProviderSelectionService
 
         container = get_container()
-        factory = container.get(AWSHandlerFactory)
+        
+        # Get provider strategy instead of DI handler factory
+        provider_selection_service = container.get(ProviderSelectionService)
+        
+        if provider_name:
+            # Use specific provider instance
+            selection_result = provider_selection_service.select_provider_by_name(provider_name)
+        else:
+            # Use active provider
+            selection_result = provider_selection_service.select_active_provider()
+            
+        if not selection_result or not selection_result.strategy:
+            return []
+            
+        strategy = selection_result.strategy
+        factory = strategy.handler_factory
 
         # Get examples from handlers as Template domain objects
         template_objects = factory.generate_example_templates()
