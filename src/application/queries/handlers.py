@@ -886,7 +886,10 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             {
                 "request_id": str(request.request_id),
                 "template_id": request.template_id,
-                "provider_type": "aws",
+                "provider_type": request.provider_type,
+                "provider_name": request.provider_name,
+                "provider_api": request.metadata.get("provider_api") or request.provider_api,
+                "resource_id": aws_instance.get("resource_id") or (request.resource_ids[0] if request.resource_ids else None),
             }
         )
 

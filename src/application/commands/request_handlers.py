@@ -399,6 +399,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
             template_id=template_id,
             provider_type=request.provider_type,
             provider_name=request.provider_name,
+            provider_api=request.metadata.get("provider_api") or request.provider_api,
+            resource_id=instance_data.get("resource_id"),
             instance_type=InstanceType(value=instance_data.get("instance_type", "t2.micro")),
             image_id=instance_data.get("image_id", "unknown"),
             status=MachineStatus.PENDING,
