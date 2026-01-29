@@ -397,7 +397,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
             instance_id=InstanceId(value=instance_data["instance_id"]),
             request_id=str(request.request_id),
             template_id=template_id,
-            provider_type="aws",
+            provider_type=request.provider_type,
+            provider_name=request.provider_name,
             instance_type=InstanceType(value=instance_data.get("instance_type", "t2.micro")),
             image_id=instance_data.get("image_id", "unknown"),
             status=MachineStatus.PENDING,
@@ -544,64 +545,59 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         self.logger.info("Creating return request for machines: %s", command.machine_ids)
 
         try:
-            # Create return request aggregate
-            # Get provider type from configuration using injected container
             from domain.request.aggregate import Request
+            from domain.base.exceptions import EntityNotFoundError
+            from collections import defaultdict
 
-            # config_manager = self._container.get(ConfigurationPort)
-            # provider_type = config_manager.get_provider_config("provider.type", "aws")
-            # provider_config = config_manager.get_provider_config()
-            provider_type = "aws"  # KBG TODO
-            # Create return request with business logic
-            # Use first machine's template if available, otherwise use generic return
-            # template
-            # template_id = "return-machines"  # Business template for return operations
-            # if command.machine_ids:
-            #     # Try to get template from first machine
-            #     try:
-            #         with self.uow_factory.create_unit_of_work() as uow:
-            #             machine = self.machines.find_by_id(command.machine_ids[0])
-
-            #     except Exception as e:
-            #         # Fallback to generic return template
-            #         self.logger.warning(
-            #             "Failed to determine return template ID from machine: %s",
-            #             e,
-            #             extra={"machine_ids": command.machine_ids},
-            #         )
-
-            request = Request.create_return_request(
-                instance_ids=command.machine_ids,
-                provider_type=provider_type,
-                metadata=command.metadata or {},
-            )
-
-            # Add machine IDs to the request
-            # from domain.base.value_objects import InstanceId
-            # for machine_id in command.machine_ids:
-            #     request = request.add_instance_id(InstanceId(value=machine_id))
-            # KBG TODO
-
+            # Group machines by provider to handle multi-provider returns
+            provider_groups = defaultdict(list)
+            
             with self.uow_factory.create_unit_of_work() as uow:
-                events = uow.requests.save(request)
-                for event in events:
-                    self.event_publisher.publish(event)
+                for machine_id in command.machine_ids:
+                    machine = uow.machines.get_by_id(machine_id)
+                    if not machine:
+                        raise EntityNotFoundError("Machine", machine_id)
+                    
+                    provider_key = (machine.provider_type, machine.provider_name)
+                    provider_groups[provider_key].append(machine_id)
 
-            self.logger.info("Return request created: %s", request.request_id)
-
-            try:
-                provisioning_result = await self._execute_deprovisioning(
-                    command.machine_ids, request
+            # Create separate return requests for each provider
+            created_requests = []
+            for (provider_type, provider_name), machine_ids in provider_groups.items():
+                request = Request.create_return_request(
+                    instance_ids=machine_ids,
+                    provider_type=provider_type,
+                    provider_name=provider_name,
+                    metadata=command.metadata or {},
                 )
-                self.logger.info(f"Provisioning results: {provisioning_result}")
+                
+                with self.uow_factory.create_unit_of_work() as uow:
+                    events = uow.requests.save(request)
+                    for event in events:
+                        self.event_publisher.publish(event)
+                
+                created_requests.append(str(request.request_id))
+                self.logger.info(
+                    "Return request created for provider %s: %s (%d machines)",
+                    provider_name, request.request_id, len(machine_ids)
+                )
 
-            except Exception as e:
-                # Handle provisioning errors
-                # Log the error and raise a custom exception
-                self.logger.error("Provisioning failed for return request: %s", request.request_id)
-                raise ValueError("Provisioning failed for return request") from e
+                # Execute deprovisioning for this provider batch
+                try:
+                    provisioning_result = await self._execute_deprovisioning(
+                        machine_ids, request
+                    )
+                    self.logger.info(f"Deprovisioning results for {provider_name}: {provisioning_result}")
+                except Exception as e:
+                    self.logger.error("Deprovisioning failed for provider %s request %s: %s", 
+                                    provider_name, request.request_id, e)
 
-            return str(request.request_id)
+            # Return first request ID for backward compatibility
+            return created_requests[0] if created_requests else None
+
+        except Exception as e:
+            self.logger.error("Failed to create return request: %s", e)
+            raise
 
         except Exception as e:
             self.logger.error("Failed to create return request: %s", e)

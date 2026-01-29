@@ -414,8 +414,8 @@ class AWSProviderStrategy(ProviderStrategy):
                 request_type=RequestType.ACQUIRE,
                 template_id=aws_template.template_id,
                 machine_count=count,
-                provider_type="aws",
-                provider_name="aws",  # Internal AWS strategy operation
+                provider_type=self.provider_type,
+                provider_name=self.provider_name,
                 metadata=request_metadata,
                 request_id=request_id,
             )
@@ -774,8 +774,8 @@ class AWSProviderStrategy(ProviderStrategy):
                 request_type=RequestType.ACQUIRE,
                 template_id=operation.parameters.get("template_id", "unknown"),
                 machine_count=1,
-                provider_type="aws",
-                provider_name="aws",  # Internal AWS strategy operation
+                provider_type=self.provider_type,
+                provider_name=self.provider_name,
                 request_id=request_id,
             )
 

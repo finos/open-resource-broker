@@ -25,6 +25,7 @@ class Machine(AggregateRoot):
     template_id: str
     request_id: Optional[str] = None  # Link to the request that created this machine
     provider_type: str
+    provider_name: str  # Provider instance name (e.g., "aws_prod_us-west-2")
 
     # Machine configuration
     instance_type: InstanceType

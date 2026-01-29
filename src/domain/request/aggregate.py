@@ -383,6 +383,7 @@ class Request(AggregateRoot):
         cls,
         instance_ids: list[str],
         provider_type: str,
+        provider_name: str,
         metadata: Optional[dict[str, Any]] = None,
     ) -> "Request":
         """
@@ -405,6 +406,7 @@ class Request(AggregateRoot):
             requested_count=len(instance_ids),
             desired_capacity=len(instance_ids),  # Initially set to same as requested_count
             provider_type=provider_type,
+            provider_name=provider_name,
             status=RequestStatus.PENDING,
             instance_ids=[InstanceId(value=id_str) for id_str in instance_ids],
             metadata=metadata or {},
