@@ -168,17 +168,32 @@ async def _show_providers_help(args):
 def add_infrastructure_actions(subparsers):
     """Add infrastructure actions to a subparser."""
     # Infrastructure discover
-    infra_discover = subparsers.add_parser("discover", help="Discover infrastructure")
+    infra_discover = subparsers.add_parser(
+        "discover", 
+        help="Scan AWS to find available infrastructure (VPCs, subnets, security groups)",
+        description="Discover available infrastructure in your AWS account. Makes AWS API calls to find VPCs, subnets, and security groups you can use."
+    )
     infra_discover.add_argument("--provider", help="Specific provider to discover")
     infra_discover.add_argument("--all-providers", action="store_true", help="Discover for all providers")
+    infra_discover.add_argument("--show", nargs='?', const='', help="Show only specific resources: vpcs,subnets,security-groups (or sg), or 'all' for everything")
+    infra_discover.add_argument("--all", action="store_true", help="Show all resources without truncation")
+    infra_discover.add_argument("--summary", action="store_true", help="Show only summary counts, no details")
 
     # Infrastructure show
-    infra_show = subparsers.add_parser("show", help="Show infrastructure configuration")
+    infra_show = subparsers.add_parser(
+        "show", 
+        help="Show current ORB infrastructure configuration",
+        description="Display what infrastructure ORB is currently configured to use (from template_defaults in config)."
+    )
     infra_show.add_argument("--provider", help="Specific provider to show")
     infra_show.add_argument("--all-providers", action="store_true", help="Show all providers")
 
     # Infrastructure validate
-    infra_validate = subparsers.add_parser("validate", help="Validate infrastructure")
+    infra_validate = subparsers.add_parser(
+        "validate", 
+        help="Verify configured infrastructure still exists in AWS",
+        description="Check if the infrastructure configured in ORB (template_defaults) still exists in your AWS account."
+    )
     infra_validate.add_argument("--provider", help="Specific provider to validate")
 
 
@@ -1003,7 +1018,7 @@ async def main() -> None:
         logger = get_logger(__name__)
 
         # Handle help display early - no need for app initialization
-        if args.action is None and args.resource in ["templates", "template", "machines", "machine", "requests", "request", "providers", "provider", "infrastructure", "infra"]:
+        if hasattr(args, 'action') and args.action is None and args.resource in ["templates", "template", "machines", "machine", "requests", "request", "providers", "provider", "infrastructure", "infra"]:
             resource_map = {"template": "templates", "machine": "machines", "request": "requests", "provider": "providers", "infra": "infrastructure"}
             help_resource = resource_map.get(args.resource, args.resource)
             

@@ -6,7 +6,7 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict
 
-from cli.console import print_command, print_error, print_info, print_separator, print_success
+from cli.console import print_command, print_error, print_info, print_separator, print_success, print_newline
 from config.platform_dirs import (
     get_config_location,
     get_logs_location,
@@ -100,33 +100,42 @@ def _interactive_setup() -> Dict[str, Any]:
 
         # Scheduler type
         print_info("")
-        print_info("[1/3] Scheduler Type")
+        print_info("[1/4] Scheduler Type")
         print_separator(width=60, char="-", color="cyan")
-        print_info("  1. default    - Standalone usage")
-        print_info("  2. hostfactory - IBM Spectrum Symphony integration")
+        print_info("  (1) default    - Standalone usage")
+        print_info("  (2) hostfactory - IBM Spectrum Symphony integration")
         print_info("")
-        scheduler_choice = input("  Select scheduler [1]: ").strip() or "1"
+        scheduler_choice = input("  Select scheduler (1): ").strip() or "1"
         scheduler_type = "default" if scheduler_choice == "1" else "hostfactory"
 
+        print_newline()
+        print_separator(width=60, char="-", color="cyan")
+        
         # Provider type
         print_info("")
         print_info("[2/4] Cloud Provider")
         print_separator(width=60, char="-", color="cyan")
-        print_info("  1. aws - Amazon Web Services")
+        print_info("  (1) aws - Amazon Web Services")
         print_info("")
-        provider_choice = input("  Select provider [1]: ").strip() or "1"
+        provider_choice = input("  Select provider (1): ").strip() or "1"
         provider_type = "aws"  # Only AWS supported currently
+
+        print_newline()
+        print_separator(width=60, char="-", color="cyan")
 
         # Provider configuration
         print_info("")
         print_info("[3/4] Provider Configuration")
         print_separator(width=60, char="-", color="cyan")
         if provider_type == "aws":
-            region = input("  Region [us-east-1]: ").strip() or "us-east-1"
-            profile = input("  Profile [default]: ").strip() or "default"
+            region = input("  Region (us-east-1): ").strip() or "us-east-1"
+            profile = input("  Profile (default): ").strip() or "default"
         else:
             region = "us-east-1"
             profile = "default"
+        
+        print_newline()
+        print_separator(width=60, char="-", color="cyan")
         
         # Infrastructure discovery
         print_info("")
@@ -135,7 +144,7 @@ def _interactive_setup() -> Dict[str, Any]:
         print_info("  Discover AWS infrastructure for template defaults?")
         print_info("  This will help create generic templates that work across regions/accounts.")
         print_info("")
-        discover_choice = input("  Discover infrastructure? [y/N]: ").strip().lower()
+        discover_choice = input("  Discover infrastructure? (y/N): ").strip().lower()
         
         infrastructure_defaults = {}
         if discover_choice in ['y', 'yes']:

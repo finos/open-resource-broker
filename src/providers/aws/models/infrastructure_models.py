@@ -14,7 +14,8 @@ class VPCInfo:
 
     def __str__(self) -> str:
         default_marker = " (default)" if self.is_default else ""
-        return f"{self.id}{default_marker} - {self.cidr_block}"
+        name_part = f" ({self.name})" if self.name and self.name != self.id else ""
+        return f"{self.id}{name_part}{default_marker} - {self.cidr_block}"
 
 
 @dataclass
@@ -29,7 +30,8 @@ class SubnetInfo:
 
     def __str__(self) -> str:
         subnet_type = "public" if self.is_public else "private"
-        return f"{self.id} ({self.availability_zone}) - {self.cidr_block} ({subnet_type})"
+        name_part = f" ({self.name})" if self.name and self.name != self.id else ""
+        return f"{self.id}{name_part} ({self.availability_zone}) - {self.cidr_block} ({subnet_type})"
 
 
 @dataclass

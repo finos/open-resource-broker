@@ -6,6 +6,8 @@ from typing import Any, Dict
 from cli.console import print_info, print_success
 from domain.base.ports.scheduler_port import SchedulerPort
 from infrastructure.di.container import get_container
+from infrastructure.di.buses import QueryBus
+from application.dto.queries import ListTemplatesQuery
 
 
 async def handle_templates_generate(args) -> Dict[str, Any]:
@@ -61,7 +63,7 @@ async def _generate_templates_for_provider(provider: dict, args) -> dict:
     provider_api = getattr(args, "provider_api", None)
 
     # Generate examples using provider-specific logic
-    examples = _generate_examples_from_factory(provider_type, provider_name, provider_api)
+    examples = await _generate_examples_from_factory(provider_type, provider_name, provider_api)
 
     # Get scheduler strategy for filename
     from config.platform_dirs import get_config_location
@@ -174,7 +176,7 @@ def _get_provider_config(provider_name: str) -> dict:
     }
 
 
-def _generate_examples_from_factory(
+async def _generate_examples_from_factory(
     provider_type: str, provider_name: str, provider_api: str = None
 ) -> list[Dict[str, Any]]:
     """Generate example templates using strategy's handler factory."""
@@ -184,33 +186,29 @@ def _generate_examples_from_factory(
 
         container = get_container()
         
-        # Get provider strategy instead of DI handler factory
-        provider_selection_service = container.get(ProviderSelectionService)
+        # Use CQRS QueryBus to get templates (same as list command)
+        container = get_container()
+        query_bus = container.get(QueryBus)
         
-        if provider_name:
-            # Use specific provider instance
-            selection_result = provider_selection_service.select_provider_by_name(provider_name)
-        else:
-            # Use active provider
-            selection_result = provider_selection_service.select_active_provider()
-            
-        if not selection_result or not selection_result.strategy:
+        if not query_bus:
             return []
-            
-        strategy = selection_result.strategy
-        factory = strategy.handler_factory
-
-        # Get examples from handlers as Template domain objects
-        template_objects = factory.generate_example_templates()
-
-        # Convert to dict format for processing
+        
+        # Create query to get templates
+        query = ListTemplatesQuery(
+            provider_api=provider_api,
+            active_only=True,
+            include_configuration=True
+        )
+        
+        # Execute query to get templates
+        templates = await query_bus.execute(query)
+        
+        # Convert Template objects to dict format for generation
         examples = []
-        for template in template_objects:
-            # Filter by provider_api if specified
-            if provider_api and template.provider_api != provider_api:
-                continue
-            examples.append(template.model_dump(exclude_none=True))
-
+        for template in templates:
+            template_dict = template.model_dump(exclude_none=True)
+            examples.append(template_dict)
+        
         return examples
     else:
         return []

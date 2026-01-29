@@ -1333,10 +1333,41 @@ class AWSProviderStrategy(ProviderStrategy):
             from cli.console import print_info, print_separator
 
             config = provider_config.get("config", {})
+            cli_args = provider_config.get("cli_args")
+            
             discovery = AWSInfrastructureDiscoveryService(
                 region=config.get("region", "us-east-1"),
                 profile=config.get("profile", "default")
             )
+
+            # Handle summary flag
+            if cli_args and getattr(cli_args, 'summary', False):
+                return self._discover_infrastructure_summary(provider_config, discovery)
+            
+            # Handle show flag (filter resources)
+            show_filter = None
+            if cli_args and hasattr(cli_args, 'show') and cli_args.show is not None:
+                if not cli_args.show.strip():
+                    from cli.console import print_error, print_info
+                    print_error("--show flag requires resource types")
+                    print_info("Available resources: vpcs, subnets, security-groups (or sg), all")
+                    print_info("Examples:")
+                    print_info("  orb infra discover --show subnets")
+                    print_info("  orb infra discover --show sg")
+                    print_info("  orb infra discover --show all")
+                    return {"provider": provider_config.get("name", "unknown"), "error": "Invalid --show argument"}
+                
+                show_filter = [s.strip() for s in cli_args.show.split(',')]
+                # Handle aliases and special cases
+                show_filter = [f.replace('sg', 'security-groups') for f in show_filter]
+                
+                # Handle "all" as special case - same as --all flag
+                if 'all' in show_filter:
+                    show_all = True
+                    show_filter = None  # Show everything
+            
+            # Handle all flag (no truncation)
+            show_all = cli_args and getattr(cli_args, 'all', False)
 
             vpcs = discovery.discover_vpcs()
             print_info(f"\nProvider: {provider_config.get('name', 'unknown')}")
@@ -1348,36 +1379,79 @@ class AWSProviderStrategy(ProviderStrategy):
                 return {"provider": provider_config.get("name", "unknown"), "vpcs": 0}
 
             print_info(f"Found {len(vpcs)} VPCs:")
+            total_subnets = 0
+            total_sgs = 0
+
             for vpc in vpcs:
                 print_info(f"  {vpc}")
                 
-                subnets = discovery.discover_subnets(vpc.id)
-                if subnets:
-                    print_info(f"    Subnets ({len(subnets)}):")
-                    for subnet in subnets[:3]:  # Show first 3
-                        print_info(f"      {subnet}")
-                    if len(subnets) > 3:
-                        print_info(f"      ... and {len(subnets) - 3} more")
+                # Show subnets if not filtered out
+                if not show_filter or 'subnets' in show_filter:
+                    subnets = discovery.discover_subnets(vpc.id)
+                    total_subnets += len(subnets)
+                    if subnets:
+                        print_info(f"    Subnets ({len(subnets)}):")
+                        # Show all or truncate based on flags
+                        display_count = len(subnets) if show_all else min(3, len(subnets))
+                        for subnet in subnets[:display_count]:
+                            print_info(f"      {subnet}")
+                        if not show_all and len(subnets) > 3:
+                            print_info(f"      ... and {len(subnets) - 3} more")
 
-                sgs = discovery.discover_security_groups(vpc.id)
-                if sgs:
-                    print_info(f"    Security Groups ({len(sgs)}):")
-                    for sg in sgs[:2]:  # Show first 2
-                        print_info(f"      {sg}")
-                    if len(sgs) > 2:
-                        print_info(f"      ... and {len(sgs) - 2} more")
+                # Show security groups if not filtered out
+                if not show_filter or 'security-groups' in show_filter:
+                    sgs = discovery.discover_security_groups(vpc.id)
+                    total_sgs += len(sgs)
+                    if sgs:
+                        print_info(f"    Security Groups ({len(sgs)}):")
+                        # Show all or truncate based on flags
+                        display_count = len(sgs) if show_all else min(2, len(sgs))
+                        for sg in sgs[:display_count]:
+                            print_info(f"      {sg}")
+                        if not show_all and len(sgs) > 2:
+                            print_info(f"      ... and {len(sgs) - 2} more")
 
             return {
                 "provider": provider_config.get("name", "unknown"),
                 "vpcs": len(vpcs),
-                "total_subnets": sum(len(discovery.discover_subnets(vpc.id)) for vpc in vpcs),
-                "total_sgs": sum(len(discovery.discover_security_groups(vpc.id)) for vpc in vpcs),
+                "total_subnets": total_subnets,
+                "total_sgs": total_sgs,
             }
 
         except Exception as e:
             from cli.console import print_error
             print_error(f"Failed to discover infrastructure: {e}")
             return {"provider": provider_config.get("name", "unknown"), "error": str(e)}
+
+    def _discover_infrastructure_summary(self, provider_config: dict[str, Any], discovery) -> dict[str, Any]:
+        """Discover infrastructure summary (counts only)."""
+        from cli.console import print_info, print_separator
+        
+        config = provider_config.get("config", {})
+        vpcs = discovery.discover_vpcs()
+        
+        print_info(f"\nProvider: {provider_config.get('name', 'unknown')}")
+        print_info(f"Region: {config.get('region', 'us-east-1')}")
+        print_separator(width=50, char="-")
+        
+        if not vpcs:
+            print_info("No infrastructure found")
+            return {"provider": provider_config.get("name", "unknown"), "vpcs": 0}
+        
+        total_subnets = sum(len(discovery.discover_subnets(vpc.id)) for vpc in vpcs)
+        total_sgs = sum(len(discovery.discover_security_groups(vpc.id)) for vpc in vpcs)
+        
+        print_info(f"Infrastructure Summary:")
+        print_info(f"  VPCs: {len(vpcs)}")
+        print_info(f"  Subnets: {total_subnets}")
+        print_info(f"  Security Groups: {total_sgs}")
+        
+        return {
+            "provider": provider_config.get("name", "unknown"),
+            "vpcs": len(vpcs),
+            "total_subnets": total_subnets,
+            "total_sgs": total_sgs,
+        }
 
     def discover_infrastructure_interactive(self, provider_config: dict[str, Any]) -> dict[str, Any]:
         """Discover AWS infrastructure interactively."""
@@ -1403,9 +1477,9 @@ class AWSProviderStrategy(ProviderStrategy):
             print_info("")
             print_info("Found VPCs:")
             for i, vpc in enumerate(vpcs, 1):
-                print_info(f"  [{i}] {vpc}")
+                print_info(f"  ({i}) {vpc}")
             
-            vpc_choice = input(f"\nSelect VPC [1]: ").strip() or "1"
+            vpc_choice = input(f"\nSelect VPC (1): ").strip() or "1"
             try:
                 selected_vpc = vpcs[int(vpc_choice) - 1]
             except (ValueError, IndexError):
@@ -1418,10 +1492,10 @@ class AWSProviderStrategy(ProviderStrategy):
                 print_info("")
                 print_info(f"Found subnets in {selected_vpc.id}:")
                 for i, subnet in enumerate(subnets, 1):
-                    print_info(f"  [{i}] {subnet}")
-                print_info("  [s] Skip subnet selection")
+                    print_info(f"  ({i}) {subnet}")
+                print_info("  (s) Skip subnet selection")
                 
-                subnet_choice = input(f"\nSelect subnets (comma-separated) [1,2]: ").strip()
+                subnet_choice = input(f"\nSelect subnets (comma-separated) (1,2): ").strip()
                 if subnet_choice.lower() != 's':
                     if not subnet_choice:
                         subnet_choice = "1,2" if len(subnets) >= 2 else "1"
@@ -1440,10 +1514,10 @@ class AWSProviderStrategy(ProviderStrategy):
                 print_info("")
                 print_info(f"Found security groups in {selected_vpc.id}:")
                 for i, sg in enumerate(sgs, 1):
-                    print_info(f"  [{i}] {sg}")
-                print_info("  [s] Skip security group selection")
+                    print_info(f"  ({i}) {sg}")
+                print_info("  (s) Skip security group selection")
                 
-                sg_choice = input(f"\nSelect security groups [1]: ").strip() or "1"
+                sg_choice = input(f"\nSelect security groups (1): ").strip() or "1"
                 if sg_choice.lower() != 's':
                     try:
                         sg_indices = [int(x.strip()) - 1 for x in sg_choice.split(',')]

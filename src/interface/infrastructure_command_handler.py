@@ -19,7 +19,7 @@ async def handle_infrastructure_discover(args) -> Dict[str, Any]:
 
         results = []
         for provider in providers:
-            result = await _discover_provider_infrastructure(provider)
+            result = await _discover_provider_infrastructure(provider, args)
             results.append(result)
 
         return {
@@ -81,7 +81,7 @@ async def handle_infrastructure_validate(args) -> Dict[str, Any]:
         }
 
 
-async def _discover_provider_infrastructure(provider: Dict[str, Any]) -> Dict[str, Any]:
+async def _discover_provider_infrastructure(provider: Dict[str, Any], args) -> Dict[str, Any]:
     """Discover infrastructure for a provider using strategy pattern."""
     try:
         from infrastructure.di.container import get_container
@@ -90,8 +90,11 @@ async def _discover_provider_infrastructure(provider: Dict[str, Any]) -> Dict[st
         container = get_container()
         provider_strategy = container.get(ProviderPort)
         
+        # Pass CLI args to the provider strategy
+        provider_with_args = {**provider, "cli_args": args}
+        
         # Use the provider strategy to discover infrastructure
-        return provider_strategy.discover_infrastructure(provider)
+        return provider_strategy.discover_infrastructure(provider_with_args)
             
     except Exception as e:
         print_error(f"Failed to discover infrastructure for {provider['name']}: {e}")

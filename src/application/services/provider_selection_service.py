@@ -147,6 +147,10 @@ class ProviderSelectionService:
             confidence=1.0,
         )
 
+    def select_provider_by_name(self, provider_name: str) -> ProviderSelectionResult:
+        """Select provider by specific name/instance."""
+        return self._select_override_provider_for_templates(provider_name)
+
     def select_active_provider(self) -> ProviderSelectionResult:
         """
         Select active provider based on selection policy (non-template specific).
