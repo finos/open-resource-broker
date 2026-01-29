@@ -204,7 +204,7 @@ class AWSClient:
             self._logger.debug(
                 "Provider selection result: %s, %s",
                 selection_result.provider_type,
-                selection_result.provider_instance,
+                selection_result.provider_name,
             )
 
             # Ensure we have an AWS provider
@@ -220,7 +220,7 @@ class AWSClient:
             else:
                 # Find the selected provider instance
                 for provider in provider_config.providers:
-                    if provider.name == selection_result.provider_instance:
+                    if provider.name == selection_result.provider_name:
                         self._logger.debug(
                             "Found provider %s, building AWSProviderConfig", provider.name
                         )
@@ -256,7 +256,7 @@ class AWSClient:
                 else:
                     self._logger.debug(
                         "Provider %s not found in config",
-                        selection_result.provider_instance,
+                        selection_result.provider_name,
                     )
         except AWSConfigurationError:
             raise

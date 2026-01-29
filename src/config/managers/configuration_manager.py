@@ -237,6 +237,10 @@ class ConfigurationManager:
         """Get provider configuration."""
         return self._ensure_provider_manager().get_provider_config()
 
+    def get_provider_instance_config(self, provider_name: str):
+        """Get configuration for a specific provider instance."""
+        return self._ensure_provider_manager().get_provider_instance_config(provider_name)
+
     def save(self, config_path: str) -> None:
         """Save configuration to file."""
         try:

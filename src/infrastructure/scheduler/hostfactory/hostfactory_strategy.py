@@ -51,7 +51,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             selection_result = (
                 self._provider_selection_service.select_provider_for_template_loading()
             )
-            provider_name = selection_result.provider_instance
+            provider_name = selection_result.provider_name
             provider_type = selection_result.provider_type
 
             # Use scheduler strategy for filename (consistent with generation)
@@ -137,7 +137,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             )
             # Apply all template defaults using the service
             mapped = self.template_defaults_service.resolve_template_defaults(
-                mapped, self._get_provider_instance_name()
+                mapped, self._get_provider_name()
             )
         else:
             mapped["provider_api"] = template.get(
@@ -160,14 +160,14 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
 
         return mapped
 
-    def _get_provider_instance_name(self) -> str:
+    def _get_provider_name(self) -> str:
         """Get the active provider instance name."""
         try:
             selection_result = self._provider_selection_service.select_active_provider()
-            return selection_result.provider_instance
+            return selection_result.provider_name
         except Exception as e:
             self._logger.warning("Failed to get provider instance name: %s", e)
-            return "aws-default"
+            return "default"
 
     def _map_hostfactory_to_internal_field(self, hf_field: str) -> str:
         """Map HostFactory field names to internal field names."""
@@ -442,8 +442,18 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
 
         # Get provider type from active provider
         provider_config = config.get("provider", {})
-        active_provider = provider_config.get("active_provider", "aws-default")
-        provider_type = active_provider.split("-")[0]
+        active_provider = provider_config.get("active_provider")
+        if not active_provider:
+            # Get from provider selection service instead of hardcoded default
+            try:
+                from infrastructure.di.container import get_container
+                provider_selection = get_container().get("ProviderSelectionService")
+                selection_result = provider_selection.select_active_provider()
+                active_provider = selection_result.provider_name
+            except Exception:
+                active_provider = "aws_default"
+        
+        provider_type = active_provider.split("-")[0] if "-" in active_provider else active_provider.split("_")[0]
 
         # Build config file path
         config_file = f"{provider_type}prov_config.json"

@@ -8,6 +8,7 @@ from domain.base.ports import ConfigurationPort, LoggingPort
 from infrastructure.di.container import DIContainer
 from infrastructure.factories.provider_strategy_factory import ProviderStrategyFactory
 from infrastructure.logging.logger import get_logger
+from infrastructure.registry.provider_registry import ProviderRegistry
 from monitoring.metrics import MetricsCollector
 from providers.base.strategy import ProviderContext
 
@@ -39,8 +40,10 @@ def register_provider_services(container: DIContainer) -> None:
     container.register_singleton(
         ProviderCapabilityService,
         lambda c: ProviderCapabilityService(
-            logger=c.get(LoggingPort), provider_registry=None
-        ),  # Optional for now
+            logger=c.get(LoggingPort), 
+            config_manager=c.get(ConfigurationPort),
+            provider_registry=c.get(ProviderRegistry)
+        ),
     )
 
     # Register provider-specific services conditionally

@@ -111,17 +111,17 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
             )
             self.logger.info(
                 "Selected provider: %s (%s)",
-                selection_result.provider_instance,
+                selection_result.provider_name,
                 selection_result.selection_reason,
             )
 
             # Validate template compatibility with selected provider
             validation_result = self._provider_capability_service.validate_template_requirements(
-                template, selection_result.provider_instance, ValidationLevel.STRICT
+                template, selection_result.provider_name, ValidationLevel.STRICT
             )
 
             if not validation_result.is_valid:
-                error_msg = f"Template incompatible with provider {selection_result.provider_instance}: {'; '.join(validation_result.errors)}"
+                error_msg = f"Template incompatible with provider {selection_result.provider_name}: {'; '.join(validation_result.errors)}"
                 self.logger.error(error_msg)
                 raise ValueError(error_msg)
 
@@ -137,7 +137,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                 template_id=command.template_id,
                 machine_count=command.requested_count,
                 provider_type=selection_result.provider_type,
-                provider_instance=selection_result.provider_instance,
+                provider_name=selection_result.provider_name,
                 metadata={
                     **command.metadata,
                     "dry_run": getattr(command, "dry_run", False),
@@ -432,10 +432,25 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                 },
             )
 
-            # Execute operation using provider context
-            strategy_identifier = (
-                f"{selection_result.provider_type}-{selection_result.provider_instance}"
+            # Resolve strategy identifier using registry
+            from infrastructure.services.provider_strategy_resolver import ProviderStrategyResolver
+            resolver = ProviderStrategyResolver(self._provider_context)
+            strategy_identifier = resolver.resolve_strategy_identifier(
+                selection_result.provider_type,
+                selection_result.provider_name
             )
+            
+            if not strategy_identifier:
+                available = resolver.get_available_strategies()
+                error_msg = f"Provider strategy not found: {selection_result.provider_type}-{selection_result.provider_name}. Available: {available}"
+                self.logger.error(error_msg)
+                return MachineRequestResult(
+                    request_id=request_id,
+                    success=False,
+                    error_message=error_msg,
+                    instances=[],
+                    resource_ids=[],
+                )
 
             # Log available strategies for debugging
             available_strategies = self._provider_context.available_strategies

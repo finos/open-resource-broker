@@ -125,16 +125,16 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             )
 
             # Get instance details immediately
-            instance_ids = request.metadata.get("instance_ids", [])
-            instance_details = self._get_instance_details(instance_ids)
-            instances = self._format_instance_data(
-                instance_details, resource_id, request, aws_template
-            )
+            # instance_ids = request.metadata.get("instance_ids", [])
+            # instance_details = self._get_instance_details(instance_ids)
+            # instances = self._format_instance_data(
+            #     instance_details, resource_id, request, aws_template
+            # )
 
             return {
                 "success": True,
                 "resource_ids": [resource_id],
-                "instances": instances,
+                "instances": [],  # RunInstances instances come later via status queries
                 "provider_data": {"resource_type": "run_instances"},
             }
         except Exception as e:

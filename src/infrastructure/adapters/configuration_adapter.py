@@ -91,6 +91,10 @@ class ConfigurationAdapter(ConfigurationPort):
         """Get provider configuration - delegate to ConfigurationManager."""
         return self._config_manager.get_provider_config()
 
+    def get_provider_instance_config(self, provider_name: str):
+        """Get configuration for a specific provider instance."""
+        return self._config_manager.get_provider_instance_config(provider_name)
+
     def get_request_config(self) -> dict[str, Any]:
         """Get request configuration for domain layer."""
         try:

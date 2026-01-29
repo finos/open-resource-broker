@@ -227,7 +227,7 @@ class TemplateConfigurationManager:
             container = get_container()
             selection_service = container.get(ProviderSelectionService)
             selection_result = selection_service.select_active_provider()
-            return selection_result.provider_instance
+            return selection_result.provider_name
         except Exception as e:
             self.logger.debug("Could not determine provider instance via selection service: %s", e)
 

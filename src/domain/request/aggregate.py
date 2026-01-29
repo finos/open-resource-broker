@@ -25,7 +25,7 @@ class Request(AggregateRoot):
     request_id: RequestId
     request_type: RequestType
     provider_type: str
-    provider_instance: Optional[str] = None
+    provider_name: Optional[str] = None
 
     # Request configuration
     template_id: str
@@ -35,7 +35,6 @@ class Request(AggregateRoot):
     )
 
     # Provider tracking (which provider was used)
-    provider_name: Optional[str] = None  # Specific provider instance name
     provider_api: Optional[str] = None  # Provider API/service used
 
     # Resource tracking (what was created)
@@ -309,7 +308,7 @@ class Request(AggregateRoot):
         template_id: str,
         machine_count: int,
         provider_type: str,  # Provider type must be explicitly specified
-        provider_instance: Optional[str] = None,  # Specific provider instance
+        provider_name: Optional[str] = None,  # Specific provider instance
         metadata: Optional[dict[str, Any]] = None,
         request_id: Optional[str] = None,  # Allow external ID to be provided
     ) -> "Request":
@@ -354,7 +353,7 @@ class Request(AggregateRoot):
             requested_count=machine_count,
             desired_capacity=machine_count,  # Initially set to same as requested_count
             provider_type=provider_type,
-            provider_instance=provider_instance,
+            provider_name=provider_name,
             status=RequestStatus.PENDING,
             metadata=metadata or {},
             created_at=datetime.now(timezone.utc),

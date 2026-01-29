@@ -180,6 +180,122 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             )
             return []
 
+<<<<<<< HEAD
+    async def _check_provider_and_create_machines(self, request) -> tuple[list, dict]:
+        """Check provider status and create machine aggregates using provider strategy pattern."""
+        try:
+            # Get provider context from container
+            provider_context = self._get_provider_context()
+            if not provider_context:
+                self.logger.error("Provider context not available")
+                return [], {}
+
+            # Create operation for resource-to-instance discovery using stored
+            # provider API
+            from providers.base.strategy import ProviderOperation, ProviderOperationType
+
+            operation = ProviderOperation(
+                operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
+                parameters={
+                    "resource_ids": request.resource_ids,
+                    "provider_api": request.metadata.get("provider_api", "RunInstances"),
+                    "template_id": request.template_id,
+                },
+                context={
+                    "correlation_id": str(request.request_id),
+                    "request_id": str(request.request_id),
+                },
+            )
+
+            # Resolve strategy identifier using registry
+            from infrastructure.services.provider_strategy_resolver import ProviderStrategyResolver
+            resolver = ProviderStrategyResolver(provider_context)
+            strategy_identifier = resolver.resolve_strategy_identifier(
+                request.provider_type, 
+                request.provider_name
+            )
+            
+            if not strategy_identifier:
+                available = resolver.get_available_strategies()
+                self.logger.error(
+                    "Strategy not found for %s-%s. Available: %s",
+                    request.provider_type, request.provider_name, available
+                )
+                return MachineStatusQueryResult(
+                    request_id=request.request_id,
+                    status=RequestStatus.FAILED,
+                    instances=[],
+                    error_message=f"Provider strategy not found: {request.provider_type}-{request.provider_name}",
+                )
+            
+            self.logger.info(
+                "Using provider strategy: %s for request %s",
+                strategy_identifier,
+                request.request_id,
+            )
+            self.logger.info("Operation parameters: %s", operation.parameters)
+
+            result = await provider_context.execute_with_strategy(strategy_identifier, operation)
+
+            self.logger.info(
+                "Provider strategy result: success=%s, data_keys=%s",
+                result.success,
+                list(result.data.keys()) if result.data else "None",
+            )
+
+            if not result.success:
+                self.logger.warning(
+                    "Failed to discover instances from resources: %s",
+                    result.error_message,
+                )
+                return [], result.metadata or {}
+
+            # Get instance details from result
+            instance_details = result.data.get("instances", [])
+            if hasattr(instance_details, "__await__"):
+                self.logger.debug("Provider returned awaitable instances result, awaiting it")
+                instance_details = await instance_details
+            if not instance_details:
+                self.logger.info("No instances found for request %s", request.request_id)
+                return [], result.metadata or {}
+
+            # Create machine aggregates from instance details
+            machines = []
+            for instance_data in instance_details:
+                self.logger.debug("instance_data: %s", instance_data)
+                machine = self._create_machine_from_aws_data(instance_data, request)
+                machines.append(machine)
+
+            # Batch save machines for efficiency
+            if machines:
+                with self.uow_factory.create_unit_of_work() as uow:
+                    # Save each machine individually
+                    for machine in machines:
+                        uow.machines.save(machine)
+
+                    # Publish events for all machines
+                    for machine in machines:
+                        events = machine.get_domain_events()
+                        for event in events:
+                            self.event_publisher.publish(event)
+                        machine.clear_domain_events()
+
+                self.logger.info(
+                    "Created and saved %s machines for request %s",
+                    len(machines),
+                    request.request_id,
+                )
+
+            return machines, result.metadata or {}
+
+        except Exception as e:
+            self.logger.exception(
+                "Failed to check provider and create machines: %s", e, exc_info=True
+            )
+            return [], {}
+
+=======
+>>>>>>> origin/main
     async def _fetch_provider_machines(self, request, existing_machines) -> tuple[list, dict]:
         """
         Fetch the latest machine list from the provider.
@@ -230,7 +346,21 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             },
         )
 
-        strategy_identifier = f"{request.provider_type}-{request.provider_type}-{request.provider_instance or 'default'}"
+        # Resolve strategy identifier using registry
+        from infrastructure.services.provider_strategy_resolver import ProviderStrategyResolver
+        resolver = ProviderStrategyResolver(provider_context)
+        strategy_identifier = resolver.resolve_strategy_identifier(
+            request.provider_type, 
+            request.provider_name
+        )
+        
+        if not strategy_identifier:
+            available = resolver.get_available_strategies()
+            self.logger.error(
+                "Strategy not found for %s-%s. Available: %s",
+                request.provider_type, request.provider_name, available
+            )
+            return [], {}
 
         try:
             result = await provider_context.execute_with_strategy(strategy_identifier, operation)

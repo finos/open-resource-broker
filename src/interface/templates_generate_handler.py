@@ -113,8 +113,15 @@ def _get_active_providers() -> list[dict]:
     config_file = config_dir / "config.json"
 
     if not config_file.exists():
-        # Fallback to default provider
-        return [{"name": "aws-default", "type": "aws"}]
+        # Get active provider from provider selection service
+        try:
+            from infrastructure.di.container import get_container
+            provider_selection = get_container().get("ProviderSelectionService")
+            selection_result = provider_selection.select_active_provider()
+            return [{"name": selection_result.provider_name, "type": selection_result.provider_type}]
+        except Exception:
+            # Final fallback to default
+            return [{"name": "default", "type": "aws"}]
 
     with open(config_file) as f:
         config_dict = json.load(f)

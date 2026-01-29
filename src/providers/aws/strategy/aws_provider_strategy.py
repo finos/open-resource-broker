@@ -415,7 +415,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 template_id=aws_template.template_id,
                 machine_count=count,
                 provider_type="aws",
-                provider_instance="aws-default",
+                provider_name="aws",  # Internal AWS strategy operation
                 metadata=request_metadata,
                 request_id=request_id,
             )
@@ -775,7 +775,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 template_id=operation.parameters.get("template_id", "unknown"),
                 machine_count=1,
                 provider_type="aws",
-                provider_instance="aws-default",
+                provider_name="aws",  # Internal AWS strategy operation
                 request_id=request_id,
             )
 

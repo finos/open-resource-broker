@@ -45,7 +45,7 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
             selection_result = (
                 self._provider_selection_service.select_provider_for_template_loading()
             )
-            provider_name = selection_result.provider_instance
+            provider_name = selection_result.provider_name
             provider_type = selection_result.provider_type
 
             # Use scheduler strategy for filename (consistent with generation)

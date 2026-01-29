@@ -101,7 +101,7 @@ class TemplateSerializer:
             if self.defaults_service:
                 try:
                     processed_data = self.defaults_service.resolve_template_defaults(
-                        data, provider_instance_name="aws-default"
+                        data, provider_name="default"
                     )
                     self.logger.debug("Applied configuration defaults to template data")
                 except Exception as e:

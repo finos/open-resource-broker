@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Optional
 
+from domain.base.ports.configuration_port import ConfigurationPort
+
 from domain.base.ports import LoggingPort
 from domain.template.template_aggregate import Template
 from infrastructure.registry.provider_registry import ProviderRegistry
@@ -62,16 +64,18 @@ class ProviderCapabilityService:
     """
 
     def __init__(
-        self, logger: LoggingPort, provider_registry: Optional[ProviderRegistry] = None
+        self, logger: LoggingPort, config_manager: ConfigurationPort, provider_registry: Optional[ProviderRegistry] = None
     ) -> None:
         """
         Initialize provider capability service.
 
         Args:
             logger: Logger for validation results and debugging
+            config_manager: Configuration manager for provider configs
             provider_registry: Optional provider registry for capability queries
         """
         self._logger = logger
+        self._config_manager = config_manager
         self._provider_registry = provider_registry
 
     def validate_template_requirements(
@@ -113,11 +117,7 @@ class ProviderCapabilityService:
             # Get provider capabilities
             capabilities = self._get_provider_capabilities(provider_instance)
             if not capabilities:
-                result.is_valid = False
-                result.errors.append(
-                    f"Cannot retrieve capabilities for provider {provider_instance}"
-                )
-                return result
+                capabilities = self._get_config_based_capabilities(provider_instance)
 
             # Validate core requirements
             self._validate_api_support(template, capabilities, result)
@@ -154,72 +154,40 @@ class ProviderCapabilityService:
     def _get_provider_capabilities(self, provider_instance: str) -> Optional[ProviderCapabilities]:
         """Get capabilities for specified provider instance."""
         if not self._provider_registry:
-            # Fallback to hardcoded capabilities for testing
-            return self._get_default_capabilities(provider_instance)
+            return None
 
         try:
-            # Get provider strategy from registry
             strategy = self._provider_registry.create_strategy_from_instance(provider_instance, {})
             return strategy.get_capabilities()
         except Exception as e:
             self._logger.warning("Failed to get capabilities for %s: %s", provider_instance, str(e))
             return None
 
-    def _get_default_capabilities(self, provider_instance: str) -> ProviderCapabilities:
-        """Get default capabilities based on provider instance name."""
-        # Extract provider type from instance name
-        provider_type = (
-            provider_instance.split("-")[0] if "-" in provider_instance else provider_instance
+    def _get_config_based_capabilities(self, provider_instance: str) -> ProviderCapabilities:
+        """Get capabilities from merged provider configuration."""
+        provider_config = self._config_manager.get_provider_instance_config(provider_instance)
+        if not provider_config:
+            raise ValueError(f"Provider instance {provider_instance} not found in configuration")
+        
+        # Get provider defaults for merging (same pattern as ProviderSelectionService)
+        provider_config_root = self._config_manager.get_provider_config()
+        provider_defaults = provider_config_root.provider_defaults.get(provider_config.type)
+        
+        # Use the provider's own merge logic to get effective handlers
+        effective_handlers = provider_config.get_effective_handlers(provider_defaults)
+        supported_apis = list(effective_handlers.keys())
+        
+        return ProviderCapabilities(
+            provider_type=provider_config.type,
+            supported_operations=[
+                ProviderOperationType.CREATE_INSTANCES,
+                ProviderOperationType.TERMINATE_INSTANCES,
+                ProviderOperationType.GET_INSTANCE_STATUS,
+            ],
+            features={
+                "supported_apis": supported_apis,
+            },
         )
-
-        if provider_type == "aws":
-            return ProviderCapabilities(
-                provider_type="aws",
-                supported_operations=[
-                    ProviderOperationType.CREATE_INSTANCES,
-                    ProviderOperationType.TERMINATE_INSTANCES,
-                    ProviderOperationType.GET_INSTANCE_STATUS,
-                ],
-                features={
-                    "supported_apis": ["EC2Fleet", "SpotFleet", "RunInstances", "ASG"],
-                    "api_capabilities": {
-                        "EC2Fleet": {
-                            "supported_fleet_types": ["instant", "request", "maintain"],
-                            "supports_spot": True,
-                            "supports_on_demand": True,
-                            "max_instances": 10000,
-                        },
-                        "SpotFleet": {
-                            "supported_fleet_types": ["request", "maintain"],
-                            "supports_spot": True,
-                            "supports_on_demand": True,
-                            "max_instances": 10000,
-                        },
-                        "RunInstances": {
-                            "supported_fleet_types": [],
-                            "supports_spot": False,
-                            "supports_on_demand": True,
-                            "max_instances": 10000,
-                        },
-                        "ASG": {
-                            "supported_fleet_types": [],
-                            "supports_spot": True,
-                            "supports_on_demand": True,
-                            "max_instances": 10000,
-                        },
-                    },
-                    "spot_instances": True,
-                    "fleet_management": True,
-                    "auto_scaling": True,
-                },
-            )
-        else:
-            # Default capabilities for unknown providers
-            return ProviderCapabilities(
-                provider_type=provider_type,
-                supported_operations=[ProviderOperationType.CREATE_INSTANCES],
-                features={},
-            )
 
     def _validate_api_support(
         self,

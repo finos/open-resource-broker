@@ -21,7 +21,7 @@ class ProviderSelectionResult:
     """Result of provider selection process."""
 
     provider_type: str
-    provider_instance: str
+    provider_name: str
     selection_reason: str
     confidence: float = 1.0
     alternatives: list[str] = None
@@ -142,7 +142,7 @@ class ProviderSelectionService:
 
         return ProviderSelectionResult(
             provider_type=provider_instance.type,
-            provider_instance=provider_name,
+            provider_name=provider_name,
             selection_reason=f"CLI override for template loading (--provider {provider_name})",
             confidence=1.0,
         )
@@ -185,7 +185,7 @@ class ProviderSelectionService:
 
         result = ProviderSelectionResult(
             provider_type=selected.type,
-            provider_instance=selected.name,
+            provider_name=selected.name,
             selection_reason=reason,
             confidence=1.0,
             alternatives=[p.name for p in active_providers if p.name != selected.name],
@@ -214,7 +214,7 @@ class ProviderSelectionService:
 
         return ProviderSelectionResult(
             provider_type=provider_instance.type,
-            provider_instance=provider_name,
+            provider_name=provider_name,
             selection_reason="Explicitly specified in template",
             confidence=1.0,
         )
@@ -231,7 +231,7 @@ class ProviderSelectionService:
 
         return ProviderSelectionResult(
             provider_type=provider_instance.type,
-            provider_instance=provider_name,
+            provider_name=provider_name,
             selection_reason=f"CLI override (--provider {provider_name})",
             confidence=1.0,
         )
@@ -256,7 +256,7 @@ class ProviderSelectionService:
 
         return ProviderSelectionResult(
             provider_type=provider_type,
-            provider_instance=selected_instance.name,
+            provider_name=selected_instance.name,
             selection_reason=f"Load balanced across {len(instances)} {provider_type} instances",
             confidence=0.9,
             alternatives=[inst.name for inst in instances if inst.name != selected_instance.name],
@@ -282,7 +282,7 @@ class ProviderSelectionService:
 
         return ProviderSelectionResult(
             provider_type=selected_instance.type,
-            provider_instance=selected_instance.name,
+            provider_name=selected_instance.name,
             selection_reason=f"Supports required API '{provider_api}'",
             confidence=0.8,
             alternatives=[
@@ -312,7 +312,7 @@ class ProviderSelectionService:
 
         return ProviderSelectionResult(
             provider_type=default_provider_type,
-            provider_instance=default_provider_instance,
+            provider_name=default_provider_instance,
             selection_reason="Configuration default (no provider specified in template)",
             confidence=0.7,
         )

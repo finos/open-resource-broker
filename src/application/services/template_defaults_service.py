@@ -50,14 +50,14 @@ class TemplateDefaultsService(TemplateDefaultsPort):
     def resolve_template_defaults(
         self,
         template_dict: dict[str, Any],
-        provider_instance_name: Optional[str] = None,
+        provider_name: Optional[str] = None,
     ) -> dict[str, Any]:
         """
         Apply hierarchical defaults to a template dictionary.
 
         Args:
             template_dict: Raw template data from file
-            provider_instance_name: Name of provider instance for context
+            provider_name: Name of provider instance for context
 
         Returns:
             Template dictionary with defaults applied
@@ -76,8 +76,8 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         self.logger.debug("Applied %s global defaults", len(global_defaults))
 
         # 2. Apply provider type defaults
-        if provider_instance_name:
-            provider_type = self._get_provider_type(provider_instance_name)
+        if provider_name:
+            provider_type = self._get_provider_type(provider_name)
             if provider_type:
                 provider_type_defaults = self._get_provider_type_defaults(provider_type)
                 resolved_defaults.update(provider_type_defaults)
@@ -89,13 +89,13 @@ class TemplateDefaultsService(TemplateDefaultsPort):
 
                 # 3. Apply provider instance defaults
                 provider_instance_defaults = self._get_provider_instance_defaults(
-                    provider_instance_name
+                    provider_name
                 )
                 resolved_defaults.update(provider_instance_defaults)
                 self.logger.debug(
                     "Applied %s provider instance defaults for %s",
                     len(provider_instance_defaults),
-                    provider_instance_name,
+                    provider_name,
                 )
 
         # 4. Apply template values (highest priority - only for missing fields)
@@ -110,7 +110,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
     def resolve_provider_api_default(
         self,
         template_dict: dict[str, Any],
-        provider_instance_name: Optional[str] = None,
+        provider_name: Optional[str] = None,
     ) -> str:
         """
         Resolve provider_api default using hierarchical configuration.
@@ -132,15 +132,15 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             return provider_api
 
         # 2. Check provider instance defaults
-        if provider_instance_name:
-            instance_defaults = self._get_provider_instance_defaults(provider_instance_name)
+        if provider_name:
+            instance_defaults = self._get_provider_instance_defaults(provider_name)
             if instance_defaults.get("provider_api"):
                 provider_api = instance_defaults["provider_api"]
                 self.logger.debug("Using provider_api from instance defaults: %s", provider_api)
                 return provider_api
 
             # 3. Check provider type defaults
-            provider_type = self._get_provider_type(provider_instance_name)
+            provider_type = self._get_provider_type(provider_name)
             if provider_type:
                 type_defaults = self._get_provider_type_defaults(provider_type)
                 if type_defaults.get("provider_api"):
