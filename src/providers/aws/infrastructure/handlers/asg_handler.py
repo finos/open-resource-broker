@@ -114,24 +114,22 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         """
         try:
             asg_name = self.aws_ops.execute_with_standard_error_handling(
-                operation=lambda: self._create_asg_internal(request, aws_template),
+                operation=lambda: self._create_asg_with_response(request, aws_template),
                 operation_name="create Auto Scaling Group",
                 context="ASG",
             )
 
+            instances = []
+            
             return {
                 "success": True,
                 "resource_ids": [asg_name],
-                "instances": [],  # ASG instances come later
+                "instances": instances,
                 "provider_data": {"resource_type": "asg"},
             }
         except Exception as e:
-            return {
-                "success": False,
-                "resource_ids": [],
-                "instances": [],
-                "error_message": str(e),
-            }
+            self._logger.error("ASG creation failed: %s", e)
+            return {"success": False, "resource_ids": [], "instances": [], "error_message": str(e)}
 
     def _validate_asg_prerequisites(self, template: AWSTemplate) -> None:
         """Validate ASG-specific prerequisites."""
@@ -152,7 +150,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             detailed_message = f"ASG template validation failed - {'; '.join(error_details)}"
             raise AWSInfrastructureError(detailed_message, errors)
 
-    def _create_asg_internal(self, request: Request, aws_template: AWSTemplate) -> str:
+    def _create_asg_with_response(self, request: Request, aws_template: AWSTemplate) -> str:
         """Create ASG with pure business logic."""
         # Validate ASG specific prerequisites
         self._validate_asg_prerequisites(aws_template)

@@ -423,7 +423,7 @@ class TestEC2FleetHandler:
                 "maintain",
             ]
             with pytest.raises(AWSInfrastructureError):
-                handler._create_fleet_internal(request, template)
+                handler._create_fleet_with_response(request, template)
 
         assert request.metadata["fleet_id"] == "fleet-123"
         assert request.metadata["fleet_errors"][0]["error_code"] == "RequestLimitExceeded"
@@ -483,7 +483,8 @@ class TestEC2FleetHandler:
                 "request",
                 "maintain",
             ]
-            fleet_id = handler._create_fleet_internal(request, template)
+            fleet_response = handler._create_fleet_with_response(request, template)
+            fleet_id = fleet_response["FleetId"]
 
         assert fleet_id == "fleet-789"
         assert request.metadata["fleet_id"] == "fleet-789"
@@ -529,7 +530,8 @@ class TestEC2FleetHandler:
                 "request",
                 "maintain",
             ]
-            fleet_id = handler._create_fleet_internal(request, template)
+            fleet_response = handler._create_fleet_with_response(request, template)
+            fleet_id = fleet_response["FleetId"]
 
         assert fleet_id == "fleet-456"
         assert request.metadata == {}

@@ -118,16 +118,39 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
         Returns structured result with resource IDs and instance data.
         """
         try:
-            resource_id = self.aws_ops.execute_with_standard_error_handling(
-                operation=lambda: self._create_instances_internal(request, aws_template),
+            # Execute RunInstances operation (existing logic)
+            response = self.aws_ops.execute_with_standard_error_handling(
+                operation=lambda: self._create_instances_with_response(request, aws_template),
                 operation_name="run EC2 instances",
                 context="RunInstances",
             )
 
-            # Get instance details immediately
-            # instance_ids = request.metadata.get("instance_ids", [])
-            # instance_details = self._get_instance_details(instance_ids)
-            # instances = self._format_instance_data(
+            resource_id = response["ReservationId"]
+            
+            instance_ids = self._extract_instance_ids(
+                response, lambda r: [i["InstanceId"] for i in r.get("Instances", [])]
+            )
+            
+            # Create instances using existing machine adapter
+            instances = []
+            if instance_ids and self._machine_adapter:
+                for instance_id in instance_ids:
+                    instance_data = {"InstanceId": instance_id}
+                    instances.append(
+                        self._machine_adapter.create_machine_from_aws_instance(
+                            instance_data, str(request.request_id), "RunInstances", resource_id
+                        )
+                    )
+            
+            return {
+                "success": True,
+                "resource_ids": [resource_id],
+                "instances": instances,
+                "provider_data": {"resource_type": "run_instances"},
+            }
+        except Exception as e:
+            self._logger.error("RunInstances failed: %s", e)
+            return {"success": False, "resource_ids": [], "instances": [], "error_message": str(e)}
             #     instance_details, resource_id, request, aws_template
             # )
 
@@ -145,7 +168,55 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 "error_message": str(e),
             }
 
-    def _create_instances_internal(self, request: Request, aws_template: AWSTemplate) -> str:
+    def _create_instances_with_response(self, request: Request, aws_template: AWSTemplate) -> dict[str, Any]:
+        """Create RunInstances and return full AWS response."""
+        # Validate prerequisites
+        self._validate_prerequisites(aws_template)
+
+        # Create launch template using the new manager
+        launch_template_result = self.launch_template_manager.create_or_update_launch_template(
+            aws_template, request
+        )
+
+        # Store launch template info in request (if request has this method)
+        if hasattr(request, "set_launch_template_info"):
+            request.set_launch_template_info(
+                launch_template_result.template_id, launch_template_result.version
+            )
+
+        # Create RunInstances parameters
+        run_params = self._create_run_instances_params(
+            aws_template=aws_template,
+            request=request,
+            launch_template_id=launch_template_result.template_id,
+            launch_template_version=launch_template_result.version,
+        )
+
+        # Execute RunInstances API call with circuit breaker for critical operation
+        response = self._retry_with_backoff(
+            self.aws_client.ec2_client.run_instances,
+            operation_type="critical",
+            **run_params,
+        )
+
+        # Validate response
+        reservation_id = response.get("ReservationId")
+        instance_ids = [instance["InstanceId"] for instance in response.get("Instances", [])]
+
+        if not instance_ids:
+            raise AWSInfrastructureError("No instances were created by RunInstances")
+
+        if not reservation_id:
+            raise AWSInfrastructureError("No reservation ID returned by RunInstances")
+
+        self._logger.info(
+            "Successfully created %d instances via RunInstances with reservation ID %s: %s",
+            len(instance_ids),
+            reservation_id,
+            instance_ids,
+        )
+
+        return response
         """Create RunInstances with pure business logic."""
         # Validate prerequisites
         self._validate_prerequisites(aws_template)

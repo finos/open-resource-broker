@@ -120,77 +120,139 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         Returns structured result with resource IDs and instance data.
         """
         try:
-            fleet_id = self.aws_ops.execute_with_standard_error_handling(
-                operation=lambda: self._create_fleet_internal(request, aws_template),
+            response = self.aws_ops.execute_with_standard_error_handling(
+                operation=lambda: self._create_fleet_with_response(request, aws_template),
                 operation_name="create EC2 fleet",
                 context="EC2Fleet",
             )
 
-            # Get instance details based on fleet type
-            instances: list[dict[str, Any]] = []
-            instance_details: list[dict[str, Any]] = []
-            fleet_type = aws_template.fleet_type
-            if not isinstance(fleet_type, AWSFleetType):
-                try:
-                    fleet_type = AWSFleetType(str(fleet_type))
-                except Exception:
-                    fleet_type = None
-
-            if fleet_type is AWSFleetType.INSTANT:
-                # For instant fleets, instance IDs are in metadata
-                instance_ids = request.metadata.get("instance_ids", [])
-                if instance_ids:
-                    instances = self._get_instance_details(
-                        instance_ids,
-                        request_id=str(request.request_id),
-                        resource_id=fleet_id,
-                        provider_api="EC2Fleet",
+            fleet_id = response["FleetId"]
+            
+            instance_ids = self._extract_instance_ids(response, self._extract_instant_instance_ids)
+            
+            # Create instances using existing machine adapter
+            instances = []
+            if instance_ids and self._machine_adapter:
+                for instance_id in instance_ids:
+                    instance_data = {"InstanceId": instance_id}
+                    instances.append(
+                        self._machine_adapter.create_machine_from_aws_instance(
+                            instance_data, str(request.request_id), "EC2Fleet", fleet_id
+                        )
                     )
-
-                    # Collect detailed instance information for enhanced monitoring
-                    for instance in instances:
-                        instance_detail = {
-                            "instance_id": instance.get("instance_id"),
-                            "instance_type": instance.get("instance_type"),
-                            "availability_zone": instance.get("availability_zone"),
-                            "launch_time": instance.get("launch_time"),
-                            "state": instance.get("state"),
-                            "private_ip": instance.get("private_ip_address"),
-                            "public_ip": instance.get("public_ip_address"),
-                            "fleet_id": fleet_id,
-                            "fleet_type": aws_template.fleet_type,
-                        }
-                        instance_details.append(instance_detail)
-
-                    # Log detailed instance information for monitoring
-                    self._logger.info(
-                        "EC2Fleet instance details collected",
-                        extra={
-                            "fleet_id": fleet_id,
-                            "instance_count": len(instance_details),
-                            "instance_details": instance_details,
-                        },
-                    )
-
+            
             return {
                 "success": True,
                 "resource_ids": [fleet_id],
                 "instances": instances,
-                "provider_data": {
-                    "resource_type": "ec2_fleet",
-                    "fleet_type": aws_template.fleet_type,
-                    "fleet_errors": request.metadata.get("fleet_errors", []),
-                },
+                "provider_data": {"resource_type": "ec2_fleet", "fleet_type": str(aws_template.fleet_type)},
             }
         except Exception as e:
-            return {
-                "success": False,
-                "resource_ids": [],
-                "instances": [],
-                "error_message": str(e),
-            }
+            self._logger.error("EC2Fleet creation failed: %s", e)
+            return {"success": False, "resource_ids": [], "instances": [], "error_message": str(e)}
 
-    def _create_fleet_internal(self, request: Request, aws_template: AWSTemplate) -> str:
+    def _create_fleet_with_response(self, request: Request, aws_template: AWSTemplate) -> dict[str, Any]:
+        """Create EC2 Fleet and return full AWS response."""
+        # Validate prerequisites
+        self._validate_prerequisites(aws_template)
+        # Validate fleet type
+        if not aws_template.fleet_type:
+            raise AWSValidationError("Fleet type is required for EC2Fleet")
+
+        # Validate fleet type using existing validation system
+        from providers.aws.infrastructure.adapters.aws_validation_adapter import (
+            create_aws_validation_adapter,
+        )
+
+        validation_adapter = create_aws_validation_adapter(self._logger)
+        valid_types = validation_adapter.get_valid_fleet_types_for_api("EC2Fleet")
+
+        try:
+            fleet_type = AWSFleetType(aws_template.fleet_type.lower())
+            if fleet_type.value not in valid_types:
+                raise ValueError  # Will be caught by the except block below
+        except ValueError:
+            raise AWSValidationError(
+                f"Invalid EC2 fleet type: {aws_template.fleet_type}. "
+                f"Must be one of: {', '.join(valid_types)}"
+            )
+
+        # Create launch template using the new manager
+        launch_template_result = self.launch_template_manager.create_or_update_launch_template(
+            aws_template, request
+        )
+
+        # Store launch template info in request (if request has this method)
+        if hasattr(request, "set_launch_template_info"):
+            request.set_launch_template_info(
+                launch_template_result.template_id, launch_template_result.version
+            )
+
+        # Create fleet configuration
+        fleet_config = self._create_fleet_config(
+            template=aws_template,
+            request=request,
+            launch_template_id=launch_template_result.template_id,
+            launch_template_version=launch_template_result.version,
+        )
+
+        # Create the fleet with circuit breaker for critical operation
+        try:
+            response = self._retry_with_backoff(
+                self.aws_client.ec2_client.create_fleet,
+                operation_type="critical",
+                **fleet_config,
+            )
+
+        except CircuitBreakerOpenError as e:
+            self._logger.error("Circuit breaker OPEN for EC2 Fleet creation: %s", str(e))
+            # Re-raise to allow upper layers to handle graceful degradation
+            raise
+
+        fleet_id = response["FleetId"]
+        self._logger.info("Successfully created EC2 Fleet: %s", fleet_id)
+
+        # Check for errors in response (especially for instant fleets)
+        errors = self._extract_fleet_errors(response)
+        if errors:
+            error_summary = "; ".join(
+                f"{error.get('error_code', 'Unknown')}: {error.get('error_message', 'No message')}"
+                for error in errors
+            )
+            
+            instance_ids = self._extract_instant_instance_ids(response)
+            self._record_fleet_error_details(
+                request=request,
+                fleet_id=fleet_id,
+                errors=errors,
+                response=response,
+                instance_ids=instance_ids,
+            )
+
+            if not instance_ids:
+                self._logger.error(
+                    "EC2 Fleet %s returned %d error(s) during creation: %s",
+                    fleet_id,
+                    len(errors),
+                    error_summary,
+                )
+                raise AWSInfrastructureError(
+                    f"Fleet {fleet_id} creation failed with {len(errors)} error(s): {error_summary}"
+                )
+            self._logger.warning(
+                "EC2 Fleet %s returned errors (%d) but also created %d instance(s); treating as partial success. Errors: %s",
+                fleet_id,
+                len(errors),
+                len(instance_ids),
+                error_summary,
+            )
+
+        # Apply post-creation tagging for fleet instances
+        # EC2Fleet maintain/request types can't tag instances at creation - need post-creation
+        if aws_template.fleet_type in ["maintain", "request"]:
+            self._tag_fleet_instances_if_needed(fleet_id, request, aws_template)
+
+        return response
         """Create EC2 Fleet with pure business logic."""
         # Validate prerequisites
         self._validate_prerequisites(aws_template)

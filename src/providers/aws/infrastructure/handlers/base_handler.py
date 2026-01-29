@@ -148,6 +148,10 @@ class AWSHandler(ABC):
             InfrastructureError: For other AWS API errors
         """
 
+    def _extract_instance_ids(self, api_response: dict[str, Any], extractor: callable) -> list[str]:
+        """Extract instance IDs from API response if available."""
+        return extractor(api_response)
+
     @abstractmethod
     def release_hosts(self, request: Request) -> None:
         """

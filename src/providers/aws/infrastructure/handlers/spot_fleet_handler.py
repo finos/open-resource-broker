@@ -119,30 +119,68 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         Returns structured result with resource IDs and instance data.
         """
         try:
-            fleet_id = self.aws_ops.execute_with_standard_error_handling(
-                operation=lambda: self._create_spot_fleet_internal(request, aws_template),
+            response = self.aws_ops.execute_with_standard_error_handling(
+                operation=lambda: self._create_spot_fleet_with_response(request, aws_template),
                 operation_name="create Spot Fleet",
                 context="SpotFleet",
             )
 
+            fleet_id = response["SpotFleetRequestId"]
+            
+            instances = []
+            
             return {
                 "success": True,
                 "resource_ids": [fleet_id],
-                "instances": [],  # Spot Fleet instances come later
-                "provider_data": {
-                    "resource_type": "spot_fleet",
-                    "fleet_type": aws_template.fleet_type,
-                },
+                "instances": instances,
+                "provider_data": {"resource_type": "spot_fleet"},
             }
         except Exception as e:
-            return {
-                "success": False,
-                "resource_ids": [],
-                "instances": [],
-                "error_message": str(e),
-            }
+            self._logger.error("SpotFleet creation failed: %s", e)
+            return {"success": False, "resource_ids": [], "instances": [], "error_message": str(e)}
 
-    def _create_spot_fleet_internal(self, request: Request, aws_template: AWSTemplate) -> str:
+    def _create_spot_fleet_with_response(self, request: Request, aws_template: AWSTemplate) -> dict[str, Any]:
+        """Create Spot Fleet and return full AWS response."""
+        # Validate Spot Fleet specific prerequisites
+        self._validate_spot_prerequisites(aws_template)
+
+        # Validate fleet type
+        if not aws_template.fleet_type:
+            raise AWSValidationError("Fleet type is required for SpotFleet")
+
+        # Create launch template using the new manager
+        launch_template_result = self.launch_template_manager.create_or_update_launch_template(
+            aws_template, request
+        )
+
+        # Store launch template info in request (if request has this method)
+        if hasattr(request, "set_launch_template_info"):
+            request.set_launch_template_info(
+                launch_template_result.template_id, launch_template_result.version
+            )
+
+        # Create spot fleet configuration
+        fleet_config = self._create_spot_fleet_config(
+            template=aws_template,
+            request=request,
+            launch_template_id=launch_template_result.template_id,
+            launch_template_version=launch_template_result.version,
+        )
+
+        # Request spot fleet with circuit breaker for critical operation
+        response = self._retry_with_backoff(
+            self.aws_client.ec2_client.request_spot_fleet,
+            operation_type="critical",
+            SpotFleetRequestConfig=fleet_config,
+        )
+
+        fleet_id = response["SpotFleetRequestId"]
+        self._logger.info("Successfully created Spot Fleet request: %s", fleet_id)
+
+        # Apply post-creation tagging for spot fleet instances as fallback
+        self._tag_spot_fleet_instances_if_needed(fleet_id, request, aws_template)
+
+        return response
         """Create Spot Fleet with pure business logic."""
         # Validate Spot Fleet specific prerequisites
         self._validate_spot_prerequisites(aws_template)
