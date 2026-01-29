@@ -606,13 +606,13 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             raise
 
     async def _execute_deprovisioning(self, machine_ids: list[str], request) -> dict[str, Any]:
-        """Execute deprovisioning - handles instances from multiple templates in parallel."""
+        """Execute deprovisioning - groups by provider context and resource."""
 
         try:
-            # Group instances by their original template
+            # Group machines by (provider_name, provider_api, resource_id)
             from collections import defaultdict
 
-            template_groups = defaultdict(list)
+            resource_groups = defaultdict(list)
 
             for machine_id in machine_ids:
                 try:
@@ -620,38 +620,35 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                         machine = uow.machines.find_by_id(machine_id)
                         if not machine:
                             raise ValueError(f"Machine not found: {machine_id}")
-                        if not machine.template_id:
-                            raise ValueError(f"Machine {machine_id} has no template_id")
-                        template_groups[machine.template_id].append(machine_id)
+                        
+                        # Use machine's actual provider context
+                        group_key = (
+                            machine.provider_name,
+                            machine.provider_api or "RunInstances",  # Fallback for old machines
+                            machine.resource_id
+                        )
+                        resource_groups[group_key].append(machine)
+                        
                 except Exception as e:
-                    self.logger.error("Failed to get template for machine %s: %s", machine_id, e)
-                    raise ValueError(f"Cannot determine template for machine {machine_id}: {e}")
+                    self.logger.error("Failed to get machine context for %s: %s", machine_id, e)
+                    raise ValueError(f"Cannot determine context for machine {machine_id}: {e}")
 
             self.logger.info(
-                "Grouped instances by template: %s",
-                {tid: len(instances) for tid, instances in template_groups.items()},
+                "Grouped machines by resource context: %s",
+                {f"{pn}-{pa}-{rid}": len(machines) for (pn, pa, rid), machines in resource_groups.items()},
             )
-
-            # Create instance ID to resource ID mapping
-            resource_mapping = self._get_instance_ids_to_resource_id_mapping(machine_ids)
 
             # Create tasks for parallel execution
             import asyncio
 
             tasks = []
 
-            for template_id, instance_group in template_groups.items():
-                # Filter mapping for this template group
-                template_mapping = {
-                    instance_id: resource_mapping.get(instance_id, (None, 0))
-                    for instance_id in instance_group
-                }
-
+            for (provider_name, provider_api, resource_id), machines in resource_groups.items():
                 task = asyncio.create_task(
-                    self._process_template_group(
-                        template_id, instance_group, request, template_mapping
+                    self._process_resource_group(
+                        provider_name, provider_api, resource_id, machines, request
                     ),
-                    name=f"terminate-{template_id}",
+                    name=f"terminate-{provider_name}-{provider_api}-{resource_id}",
                 )
                 tasks.append(task)
 
