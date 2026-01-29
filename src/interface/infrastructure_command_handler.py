@@ -90,12 +90,8 @@ async def _discover_provider_infrastructure(provider: Dict[str, Any]) -> Dict[st
         container = get_container()
         provider_strategy = container.get(ProviderPort)
         
-        # Check if provider strategy supports infrastructure discovery
-        if hasattr(provider_strategy, 'discover_infrastructure'):
-            return provider_strategy.discover_infrastructure(provider)
-        else:
-            print_info(f"Infrastructure discovery not supported for provider: {provider['name']}")
-            return {"provider": provider["name"], "error": "Infrastructure discovery not supported"}
+        # Use the provider strategy to discover infrastructure
+        return provider_strategy.discover_infrastructure(provider)
             
     except Exception as e:
         print_error(f"Failed to discover infrastructure for {provider['name']}: {e}")

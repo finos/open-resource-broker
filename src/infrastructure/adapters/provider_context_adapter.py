@@ -59,6 +59,30 @@ class ProviderContextAdapter(ProviderPort):
             return self.provider_context.check_strategy_health(strategy_name)
         return None
 
+    def discover_infrastructure(self, provider_config: dict[str, Any]) -> dict[str, Any]:
+        """Discover infrastructure using the underlying strategy."""
+        if hasattr(self.provider_context, '_current_strategy') and self.provider_context._current_strategy:
+            current_strategy = self.provider_context._current_strategy
+            if hasattr(current_strategy, 'discover_infrastructure'):
+                return current_strategy.discover_infrastructure(provider_config)
+        return super().discover_infrastructure(provider_config)
+
+    def discover_infrastructure_interactive(self, provider_config: dict[str, Any]) -> dict[str, Any]:
+        """Discover infrastructure interactively using the underlying strategy."""
+        if hasattr(self.provider_context, '_current_strategy') and self.provider_context._current_strategy:
+            current_strategy = self.provider_context._current_strategy
+            if hasattr(current_strategy, 'discover_infrastructure_interactive'):
+                return current_strategy.discover_infrastructure_interactive(provider_config)
+        return super().discover_infrastructure_interactive(provider_config)
+
+    def validate_infrastructure(self, provider_config: dict[str, Any]) -> dict[str, Any]:
+        """Validate infrastructure using the underlying strategy."""
+        if hasattr(self.provider_context, '_current_strategy') and self.provider_context._current_strategy:
+            current_strategy = self.provider_context._current_strategy
+            if hasattr(current_strategy, 'validate_infrastructure'):
+                return current_strategy.validate_infrastructure(provider_config)
+        return super().validate_infrastructure(provider_config)
+
     def execute_with_strategy(self, *args, **kwargs):
         """Execute with strategy using provider context."""
         if hasattr(self.provider_context, "execute_with_strategy"):
