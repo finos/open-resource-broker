@@ -139,7 +139,7 @@ async def _validate_provider_infrastructure(provider: Dict[str, Any]) -> Dict[st
         
         # Check if provider strategy supports infrastructure validation
         if hasattr(provider_strategy, 'validate_infrastructure'):
-            return await provider_strategy.validate_infrastructure(provider)
+            return provider_strategy.validate_infrastructure(provider)
         else:
             print_info(f"Infrastructure validation not supported for provider: {provider['name']}")
             return {"provider": provider["name"], "error": "Infrastructure validation not supported"}
