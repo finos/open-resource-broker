@@ -125,7 +125,7 @@ The migration system uses the application's existing configuration and provides 
 ```bash
 # Create manual backup
 python -c "
-from src.infrastructure.persistence.repository_migrator import RepositoryMigrator
+from src.infrastructure.storage.repository_migrator import RepositoryMigrator
 from src.infrastructure.di.container import get_container
 
 container = get_container()
@@ -159,7 +159,7 @@ cp config/config.json "$BACKUP_DIR/config_$(date +%H%M%S).json"
 
 # Backup data
 python -c "
-from src.infrastructure.persistence.repository_migrator import RepositoryMigrator
+from src.infrastructure.storage.repository_migrator import RepositoryMigrator
 from src.infrastructure.di.container import get_container
 
 container = get_container()
@@ -179,7 +179,7 @@ find backups/ -type d -mtime +30 -exec rm -rf {} \;
 ```bash
 # Restore data from backup
 python -c "
-from src.infrastructure.persistence.repository_migrator import RepositoryMigrator
+from src.infrastructure.storage.repository_migrator import RepositoryMigrator
 from src.infrastructure.di.container import get_container
 
 container = get_container()
@@ -200,7 +200,7 @@ print(f'Restore completed: {restore_result}')
 # Restore to specific point in time
 python -c "
 from datetime import datetime
-from src.infrastructure.persistence.repository_migrator import RepositoryMigrator
+from src.infrastructure.storage.repository_migrator import RepositoryMigrator
 
 migrator = RepositoryMigrator(container)
 
@@ -589,7 +589,7 @@ for op in analysis['slowest_operations'][:5]:
 ```bash
 # Optimize database performance
 python -c "
-from src.infrastructure.persistence.maintenance import DatabaseMaintenance
+from src.infrastructure.storage.maintenance import DatabaseMaintenance
 
 maintenance = DatabaseMaintenance()
 
@@ -680,7 +680,7 @@ print('Health check passed')
 # 2. Database maintenance
 echo "Running database maintenance..."
 python -c "
-from src.infrastructure.persistence.maintenance import DatabaseMaintenance
+from src.infrastructure.storage.maintenance import DatabaseMaintenance
 maintenance = DatabaseMaintenance()
 maintenance.optimize_database()
 print('Database maintenance completed')
@@ -695,7 +695,7 @@ echo "Log cleanup completed"
 # 4. Backup creation
 echo "Creating backup..."
 python -c "
-from src.infrastructure.persistence.repository_migrator import RepositoryMigrator
+from src.infrastructure.storage.repository_migrator import RepositoryMigrator
 from src.infrastructure.di.container import get_container
 container = get_container()
 migrator = RepositoryMigrator(container)
@@ -753,7 +753,7 @@ tail -f logs/app.log | grep migration
 
 # Validate source data
 python -c "
-from src.infrastructure.persistence.repository_migrator import RepositoryMigrator
+from src.infrastructure.storage.repository_migrator import RepositoryMigrator
 migrator = RepositoryMigrator(container)
 validation_result = migrator.validate_source_data('json')
 print(f'Source validation: {validation_result}')

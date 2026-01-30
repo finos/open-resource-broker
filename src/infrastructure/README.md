@@ -7,7 +7,7 @@ The Infrastructure Layer provides concrete implementations of domain ports and h
 ```
 infrastructure/
 ├── di/                # Dependency Injection container and registrations
-├── persistence/       # Data persistence implementations
+├── storage/           # Data storage implementations
 ├── providers/         # Cloud provider integrations
 ├── scheduler/         # Job scheduling and workflow management
 ├── template/          # Template infrastructure components

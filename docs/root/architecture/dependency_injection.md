@@ -402,9 +402,9 @@ The DI container supports factory patterns for complex object creation:
 ### Provider Strategy Factory
 
 ```python
-# src/infrastructure/factories/provider_strategy_factory.py
-class ProviderStrategyFactory:
-    """Factory for creating provider strategies."""
+# src/infrastructure/storage/factory.py
+class StorageStrategyFactory:
+    """Factory for creating storage strategies."""
 
     def __init__(self,
                  config_manager: ConfigurationPort,
@@ -412,25 +412,25 @@ class ProviderStrategyFactory:
         self._config_manager = config_manager
         self._logger = logger
 
-    def create_strategy(self, provider_type: str) -> ProviderStrategy:
-        """Create provider strategy based on type."""
-        if provider_type == "aws":
-            return self._create_aws_strategy()
+    def create_strategy(self, storage_type: str) -> StorageStrategy:
+        """Create storage strategy based on type."""
+        if storage_type == "json":
+            return self._create_json_strategy()
         else:
-            raise UnsupportedProviderError(f"Provider type not supported: {provider_type}")
+            raise UnsupportedStorageError(f"Storage type not supported: {storage_type}")
 
-    def _create_aws_strategy(self) -> AWSProviderStrategy:
-        """Create AWS provider strategy."""
-        aws_config = self._config_manager.get_section("aws")
-        return AWSProviderStrategy(
-            config=AWSProviderConfig(**aws_config),
+    def _create_json_strategy(self) -> JSONStorageStrategy:
+        """Create JSON storage strategy."""
+        json_config = self._config_manager.get_section("json")
+        return JSONStorageStrategy(
+            config=JSONStorageConfig(**json_config),
             logger=self._logger
         )
 
 # Factory registration
-def create_provider_strategy_factory(container: DIContainer) -> ProviderStrategyFactory:
-    """Factory function for provider strategy factory."""
-    return ProviderStrategyFactory(
+def create_storage_strategy_factory(container: DIContainer) -> StorageStrategyFactory:
+    """Factory function for storage strategy factory."""
+    return StorageStrategyFactory(
         config_manager=container.get(ConfigurationPort),
         logger=container.get(LoggingPort)
     )
@@ -566,7 +566,7 @@ def register_port_adapters(container):
 
     # Register scheduler port adapter using registry pattern
     def create_scheduler_port(c):
-        from src.infrastructure.registry.scheduler_registry import get_scheduler_registry
+        from src.infrastructure.scheduler.registry import get_scheduler_registry
         from src.config.manager import get_config_manager
 
         config_manager = get_config_manager()

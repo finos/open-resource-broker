@@ -385,7 +385,7 @@ class AWSProviderStrategy(ProviderStrategy):
 #### DynamoDB Template Repository
 
 ```python
-# src/infrastructure/persistence/dynamodb/template_repository.py
+# src/infrastructure/storage/dynamodb/template_repository.py
 from src.domain.template.repository import TemplateRepository
 from src.domain.template.aggregate import Template
 from src.domain.base.ports import LoggingPort

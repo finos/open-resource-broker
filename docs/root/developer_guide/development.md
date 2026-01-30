@@ -227,7 +227,7 @@ Implements technical concerns and external integrations:
 infrastructure/
 +--- interfaces/             # Technical interfaces
 +--- ports/                  # External system ports
-+--- persistence/            # Data persistence
++--- storage/                # Data storage
 +--- events/                 # Event infrastructure
 +--- logging/                # Logging utilities
 +--- config/                 # Configuration management

@@ -143,7 +143,7 @@ The infrastructure layer implements external concerns and technical details.
 
 **Repository Implementations**
 ```python
-# src/infrastructure/persistence/repositories/template_repository.py
+# src/infrastructure/storage/repositories/template_repository.py
 class TemplateRepositoryImpl(TemplateRepository):
     """Template repository implementation."""
 

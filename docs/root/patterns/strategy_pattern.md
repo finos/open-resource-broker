@@ -283,7 +283,7 @@ class ProviderContext:
 The strategy factory creates appropriate strategies based on configuration:
 
 ```python
-# src/infrastructure/factories/provider_strategy_factory.py
+# src/infrastructure/storage/provider_strategy_factory.py
 from src.domain.base.ports import LoggingPort, ConfigurationPort
 from src.providers.base.strategy.provider_strategy import ProviderStrategy
 from src.providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
