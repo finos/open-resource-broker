@@ -7,24 +7,42 @@ from infrastructure.logging.logger import get_logger
 
 
 def register_storage_services(container: DIContainer) -> None:
-    """Register storage services with configuration-driven strategy loading."""
+    """Register storage services respecting lazy loading configuration."""
 
-    # Register all available storage types first
-    from infrastructure.persistence.registration import register_all_storage_types
-
-    register_all_storage_types()
-
-    # Register storage strategy factory
+    # Register storage strategy factory only
     container.register_factory(StorageStrategyFactory, create_storage_strategy_factory)
 
-    # Register only the configured storage strategy
-    _register_configured_storage_strategy(container)
+    # Respect lazy loading configuration
+    lazy_config = container.get_lazy_config()
+    
+    if lazy_config.discovery_mode == "eager":
+        # Eager mode: register configured storage immediately
+        _register_configured_storage_strategy(container)
+    elif lazy_config.preload_critical:
+        # Preload critical storage types only
+        _register_critical_storage_types(container, lazy_config.preload_critical)
+    # Lazy mode (default): register nothing - let registry handle on-demand
 
 
 def create_storage_strategy_factory(container: DIContainer) -> StorageStrategyFactory:
     """Create storage strategy factory with configuration."""
     config = container.get(ConfigurationPort)
     return StorageStrategyFactory(config_manager=config)
+
+
+def _register_critical_storage_types(container: DIContainer, critical_types: list[str]) -> None:
+    """Register critical storage types specified in preload_critical."""
+    logger = get_logger(__name__)
+    
+    from infrastructure.registry.storage_registry import get_storage_registry
+    registry = get_storage_registry()
+    
+    for storage_type in critical_types:
+        try:
+            registry.ensure_type_registered(storage_type)
+            logger.info("Preloaded critical storage type: %s", storage_type)
+        except Exception as e:
+            logger.warning("Failed to preload critical storage type %s: %s", storage_type, e)
 
 
 def _register_configured_storage_strategy(container: DIContainer) -> None:

@@ -145,6 +145,12 @@ def register_dynamodb_storage(
 
         registry = get_storage_registry()
 
+    # Check if already registered (idempotent registration)
+    if hasattr(registry, "is_registered") and registry.is_registered("dynamodb"):
+        if logger:
+            logger.debug("DynamoDB storage type already registered, skipping")
+        return
+
     try:
         registry.register_storage(
             storage_type="dynamodb",
