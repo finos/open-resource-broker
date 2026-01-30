@@ -115,35 +115,18 @@ class StartupValidator:
         return False
 
     def _check_templates_file(self) -> bool:
-        """Check if templates file exists."""
+        """Check if any template files exist in the hierarchy."""
         if not self.app_config:
             return False
 
-        from config.loader import ConfigurationLoader
         from domain.base.ports.scheduler_port import SchedulerPort
         from infrastructure.di.container import get_container
 
         container = get_container()
         scheduler = container.get(SchedulerPort)
 
-        provider_config = (
-            self.app_config.provider.providers[0] if self.app_config.provider.providers else None
-        )
-        if not provider_config:
-            return False
-
-        provider_name = provider_config.name
-        provider_type = provider_config.type
-
-        filename = scheduler.get_templates_filename(
-            provider_name, provider_type, self.app_config.model_dump()
-        )
-
-        resolved_path = ConfigurationLoader._resolve_file_path(
-            "template", filename, explicit_path=None, config_manager=None
-        )
-
-        return resolved_path is not None and Path(resolved_path).exists()
+        template_paths = scheduler.get_template_paths()
+        return any(Path(path).exists() for path in template_paths)
 
     def _check_default_config(self) -> bool:
         """Check if default_config.json template exists."""
