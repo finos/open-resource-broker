@@ -19,7 +19,7 @@ from domain.template.repository import TemplateRepository as TemplateRepositoryI
 from infrastructure.di.container import DIContainer
 from infrastructure.logging.logger import get_logger
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 
 class RepositoryMigrator:
@@ -133,34 +133,8 @@ class RepositoryMigrator:
 
         try:
             # For templates, always use template repository from DI container
+            # Get template repository from DI container
             template_repo = self.container.get(TemplateRepositoryInterface)
-
-            # If not registered, create a new JSON template repository
-            if not template_repo:
-                from config.manager import get_config_manager
-                from infrastructure.persistence.json import JSONTemplateRepository
-
-                # Get configuration manager
-                config_manager = get_config_manager()
-
-                # Use centralized file resolution for consistent directory
-                # support
-                templates_path = config_manager.resolve_file("template", "templates.json")
-                legacy_templates_path = config_manager.resolve_file(
-                    "template", "awsprov_templates.json"
-                )
-
-                get_logger().info(
-                    "Repository migrator using centralized resolution for template files:"
-                )
-                get_logger().info("  templates.json: %s", templates_path)
-                get_logger().info("  awsprov_templates.json: %s", legacy_templates_path)
-
-                # Create a new template repository
-                template_repo = JSONTemplateRepository(templates_path, legacy_templates_path)
-
-                # Register it with the container
-                self.container.register_singleton(TemplateRepositoryInterface, template_repo)
 
             # For other repositories, create based on storage type
             if storage_type == "dynamodb":

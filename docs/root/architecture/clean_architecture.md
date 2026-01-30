@@ -143,12 +143,12 @@ The infrastructure layer implements external concerns and technical details.
 
 **Repository Implementations**
 ```python
-# src/infrastructure/persistence/json/template_repository.py
-class JSONTemplateRepository(TemplateRepository):
-    """JSON implementation of template repository."""
+# src/infrastructure/persistence/repositories/template_repository.py
+class TemplateRepositoryImpl(TemplateRepository):
+    """Template repository implementation."""
 
     async def get_by_id(self, template_id: str) -> Optional[Template]:
-        # JSON-specific implementation
+        # Implementation delegates to configuration manager
 ```
 
 **External Service Adapters**
@@ -256,9 +256,9 @@ class TemplateRepository(ABC):
         pass
 
 # Infrastructure layer implements interface
-class JSONTemplateRepository(TemplateRepository):
+class TemplateRepositoryImpl(TemplateRepository):
     async def get_by_id(self, template_id: str) -> Optional[Template]:
-        # JSON implementation
+        # Implementation using configuration manager
 ```
 
 **Provider Strategy Pattern**
@@ -388,13 +388,13 @@ class TemplateRepository(ABC):
 
 **Concrete Implementation**
 ```python
-class JSONTemplateRepository(TemplateRepository):
-    def __init__(self, file_path: str, logger: LoggingPort):
-        self._file_path = file_path
+class TemplateRepositoryImpl(TemplateRepository):
+    def __init__(self, config_manager: ConfigurationManager, logger: LoggingPort):
+        self._config_manager = config_manager
         self._logger = logger
 
     async def get_all(self) -> List[Template]:
-        # JSON-specific implementation
+        # Implementation using configuration manager
 ```
 
 ## Testing Strategy

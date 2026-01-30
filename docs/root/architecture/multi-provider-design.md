@@ -138,8 +138,8 @@ class TemplateRepositoryImpl(TemplateRepository):
 3. **Clean Dependency Injection**: Uses factory pattern registration instead of decorator-based DI
 4. **Comprehensive Functionality**: Provides both required methods and convenience methods
 
-#### Provider-Specific Template Loading
-The `ProviderTemplateStrategy` implements hierarchical template loading:
+#### Template Loading Architecture
+The template system implements hierarchical template loading through the scheduler strategy:
 
 ##### File Priority Order (Highest to Lowest)
 1. Provider instance files: `{provider-instance}_templates.json`
