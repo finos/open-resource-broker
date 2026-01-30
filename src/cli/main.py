@@ -315,6 +315,12 @@ def add_template_actions(subparsers):
     templates_generate.add_argument(
         "--provider-api", help="Specific provider API (EC2Fleet, SpotFleet, ASG, RunInstances)"
     )
+    templates_generate.add_argument(
+        "--generic", action="store_true", help="Generate generic templates (shared across providers)"
+    )
+    templates_generate.add_argument(
+        "--provider-type", help="Generate templates for specific provider type (e.g., aws)"
+    )
 
 
 def parse_args() -> tuple[argparse.Namespace, dict]:

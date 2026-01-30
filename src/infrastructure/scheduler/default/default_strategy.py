@@ -61,11 +61,55 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
             return self.config_manager.resolve_file("template", filename)
 
     def get_template_paths(self) -> list[str]:
-        """Get template file paths."""
-        return [self.get_templates_file_path()]
+        """Get template file paths with fallback hierarchy."""
+        paths = []
+        
+        # 1. Provider-specific file (highest priority)
+        provider_name = self._get_provider_name()
+        provider_type = self._get_active_provider_type()
+        
+        provider_specific_filename = self.get_templates_filename(provider_name, provider_type)
+        provider_specific_path = self.config_manager.resolve_file("template", provider_specific_filename)
+        paths.append(provider_specific_path)
+        
+        # 2. Generic provider-type file (fallback)
+        generic_filename = f"{provider_type}_templates.json"
+        generic_path = self.config_manager.resolve_file("template", generic_filename)
+        
+        # Avoid duplicates
+        if generic_path != provider_specific_path:
+            paths.append(generic_path)
+        
+        return paths
 
     def load_templates_from_path(self, template_path: str) -> list[dict[str, Any]]:
-        """Load templates from path - no field mapping needed."""
+        """Load templates from multiple paths with merge logic."""
+        all_templates = {}  # template_id -> template_dict
+        
+        for path in self.get_template_paths():
+            if not os.path.exists(path):
+                self._logger.debug("Template file not found: %s", path)
+                continue
+                
+            try:
+                templates = self._load_single_file(path)
+                self._logger.debug("Loaded %d templates from %s", len(templates), path)
+                
+                for template in templates:
+                    template_id = template.get("template_id")
+                    if template_id:
+                        # First occurrence wins (provider-specific overrides generic)
+                        if template_id not in all_templates:
+                            all_templates[template_id] = template
+                            
+            except Exception as e:
+                self._logger.error("Failed to load templates from %s: %s", path, e)
+                continue
+        
+        return list(all_templates.values())
+
+    def _load_single_file(self, template_path: str) -> list[dict[str, Any]]:
+        """Load templates from a single file."""
         try:
             import json
 
@@ -81,8 +125,37 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
                 return []
 
         except Exception:
-            # Return empty list on error - let caller handle logging
             return []
+
+    def _get_provider_name(self) -> str:
+        """Get the active provider instance name."""
+        try:
+            from infrastructure.di.container import get_container
+            from application.services.provider_selection_service import ProviderSelectionService
+            
+            container = get_container()
+            provider_selection_service = container.get(ProviderSelectionService)
+            selection_result = provider_selection_service.select_active_provider()
+            return selection_result.provider_name
+        except Exception as e:
+            self._logger.warning("Failed to get provider instance name: %s", e)
+            return "default"
+
+    def _get_active_provider_type(self) -> str:
+        """Get the active provider type from configuration."""
+        try:
+            from infrastructure.di.container import get_container
+            from application.services.provider_selection_service import ProviderSelectionService
+            
+            container = get_container()
+            provider_selection_service = container.get(ProviderSelectionService)
+            selection_result = provider_selection_service.select_active_provider()
+            provider_type = selection_result.provider_type
+            self._logger.debug("Active provider type: %s", provider_type)
+            return provider_type
+        except Exception as e:
+            self._logger.warning("Failed to get active provider type, defaulting to 'aws': %s", e)
+            return "aws"
 
     def get_config_file_path(self) -> str:
         """Get config file path - using default configuration."""
@@ -175,18 +248,20 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
     def get_templates_filename(
         cls, provider_name: str, provider_type: str, config: dict = None
     ) -> str:
-        """Get templates filename with config override support.
-
-        Can be called as classmethod (before app init) or instance method.
-        """
-        # Check config override first
+        """Get templates filename with config override support."""
         if config:
-            scheduler_config = config.get("scheduler", {})
-            config_filename = scheduler_config.get("templates_filename")
-            if config_filename:
+            template_config = config.get("template", {})
+            patterns = template_config.get("filename_patterns", {})
+            
+            # Use generic pattern for default scheduler
+            if pattern := patterns.get("generic"):
+                return pattern.format(provider_name=provider_name, provider_type=provider_type)
+            
+            # Check for explicit filename override
+            if config_filename := template_config.get("templates_filename"):
                 return config_filename
 
-        # Use Default scheduler default: 'templates.json'
+        # Hardcoded fallback for backward compatibility
         return "templates.json"
 
     def should_log_to_console(self) -> bool:

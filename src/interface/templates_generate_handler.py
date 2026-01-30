@@ -84,8 +84,16 @@ async def _generate_templates_for_provider(provider: dict, args) -> dict:
     registry = get_scheduler_registry()
     strategy_class = registry.get_strategy_class(scheduler_type)
 
-    # Generate filename using provider name
-    filename = strategy_class.get_templates_filename(provider_name, provider_type, config_dict)
+    # Determine filename based on generation mode
+    if getattr(args, "generic", False):
+        # Generic mode: use provider_type pattern
+        filename = f"{provider_type}_templates.json"
+    elif getattr(args, "provider_type", None):
+        # Provider-type mode: use specified provider type
+        filename = f"{args.provider_type}_templates.json"
+    else:
+        # Provider-specific mode: use provider name pattern
+        filename = strategy_class.get_templates_filename(provider_name, provider_type, config_dict)
 
     # Write templates file
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -93,11 +101,28 @@ async def _generate_templates_for_provider(provider: dict, args) -> dict:
 
     container = get_container()
     scheduler_strategy = container.get(SchedulerPort)
-    formatted_examples = scheduler_strategy.format_templates_for_generation(examples)
+    
+    # Format templates based on generation mode
+    if getattr(args, "generic", False) or getattr(args, "provider_type", None):
+        # Generic mode: don't apply provider-specific defaults
+        formatted_examples = examples
+    else:
+        # Provider-specific mode: apply provider-specific defaults
+        formatted_examples = scheduler_strategy.format_templates_for_generation(examples)
 
     templates_data = {"templates": formatted_examples}
+    
+    # Custom JSON encoder to handle datetime objects
+    from datetime import datetime
+    
+    class DateTimeEncoder(json.JSONEncoder):
+        def default(self, obj):
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            return super().default(obj)
+    
     with open(templates_file, "w") as f:
-        json.dump(templates_data, f, indent=2)
+        json.dump(templates_data, f, indent=2, cls=DateTimeEncoder)
 
     return {
         "provider": provider_name,

@@ -65,11 +65,72 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             raise
 
     def get_template_paths(self) -> list[str]:
-        """Get template file paths."""
-        return [self.get_templates_file_path()]
+        """Get template file paths with fallback hierarchy."""
+        paths = []
+        
+        # 1. Provider-specific file (highest priority)
+        provider_name = self._get_provider_name()
+        provider_type = self._get_active_provider_type()
+        
+        provider_specific_filename = self.get_templates_filename(provider_name, provider_type)
+        provider_specific_path = self.config_manager.resolve_file("template", provider_specific_filename)
+        paths.append(provider_specific_path)
+        
+        # 2. Generic provider-type file (fallback)
+        generic_filename = f"{provider_type}_templates.json"
+        generic_path = self.config_manager.resolve_file("template", generic_filename)
+        
+        # Avoid duplicates
+        if generic_path != provider_specific_path:
+            paths.append(generic_path)
+        
+        return paths
 
     def load_templates_from_path(self, template_path: str) -> list[dict[str, Any]]:
-        """Load and process templates from a file path with field mapping."""
+        """Load templates from multiple paths with merge logic."""
+        all_templates = {}  # template_id -> template_dict
+        
+        for path in self.get_template_paths():
+            if not os.path.exists(path):
+                self._logger.debug("Template file not found: %s", path)
+                continue
+                
+            try:
+                templates = self._load_single_file(path)
+                self._logger.debug("Loaded %d templates from %s", len(templates), path)
+                
+                for template in templates:
+                    template_id = template.get("template_id")
+                    if template_id:
+                        # First occurrence wins (provider-specific overrides generic)
+                        if template_id not in all_templates:
+                            all_templates[template_id] = template
+                            
+            except Exception as e:
+                self._logger.error("Failed to load templates from %s: %s", path, e)
+                continue
+        
+        # Process each template with field mapping
+        processed_templates = []
+        for template in all_templates.values():
+            if template is None:
+                continue
+
+            try:
+                processed_template = self._map_template_fields(template)
+                processed_templates.append(processed_template)
+            except Exception as e:
+                self._logger.warning(
+                    "Skipping invalid template %s: %s",
+                    template.get("id", "unknown"),
+                    e,
+                )
+                continue
+
+        return processed_templates
+
+    def _load_single_file(self, template_path: str) -> list[dict[str, Any]]:
+        """Load templates from a single file."""
         try:
             import json
 
@@ -78,34 +139,13 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
 
             # Handle different template file formats
             if isinstance(data, dict) and "templates" in data:
-                template_data = data["templates"]
+                return data["templates"]
             elif isinstance(data, list):
-                template_data = data
+                return data
             else:
                 return []
 
-            # Process each template with field mapping
-            processed_templates = []
-            for template in template_data:
-                if template is None:
-                    continue
-
-                try:
-                    processed_template = self._map_template_fields(template)
-                    processed_templates.append(processed_template)
-                except Exception as e:
-                    # Skip invalid templates but log the issue
-                    self._logger.warning(
-                        "Skipping invalid template %s: %s",
-                        template.get("id", "unknown"),
-                        e,
-                    )
-                    continue
-
-            return processed_templates
-
         except Exception:
-            # Return empty list on error - let caller handle logging
             return []
 
     def _map_template_fields(self, template: dict[str, Any]) -> dict[str, Any]:
@@ -689,18 +729,20 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
     def get_templates_filename(
         cls, provider_name: str, provider_type: str, config: dict = None
     ) -> str:
-        """Get templates filename with config override support.
-
-        Can be called as classmethod (before app init) or instance method.
-        """
-        # Check config override first
+        """Get templates filename with config override support."""
         if config:
-            scheduler_config = config.get("scheduler", {})
-            config_filename = scheduler_config.get("templates_filename")
-            if config_filename:
+            template_config = config.get("template", {})
+            patterns = template_config.get("filename_patterns", {})
+            
+            # Use provider_specific pattern by default
+            if pattern := patterns.get("provider_specific"):
+                return pattern.format(provider_name=provider_name, provider_type=provider_type)
+            
+            # Check for explicit filename override
+            if config_filename := template_config.get("templates_filename"):
                 return config_filename
 
-        # Use HostFactory default: provider_name + '_templates.json'
+        # Hardcoded fallback for backward compatibility
         return f"{provider_name}_templates.json"
 
     def should_log_to_console(self) -> bool:

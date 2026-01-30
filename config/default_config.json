@@ -196,6 +196,11 @@
     "max_number": 10,
     "templates_file_path": "config/templates.json",
     "legacy_templates_file_path": "config/awsprov_templates.json",
+    "filename_patterns": {
+      "provider_specific": "{provider_name}_templates.json",
+      "provider_type": "{provider_type}_templates.json",
+      "generic": "templates.json"
+    },
     "default_price_type": "ondemand",
     "default_provider_api": "EC2Fleet"
   },

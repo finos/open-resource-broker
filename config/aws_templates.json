@@ -1,0 +1,538 @@
+{
+  "templates": [
+    {
+      "template_id": "EC2Fleet-Instant-OnDemand",
+      "name": "EC2 Fleet Instant On-Demand",
+      "description": "EC2 Fleet with instant fulfillment using on-demand instances",
+      "instance_type": "t3.medium",
+      "max_instances": 10,
+      "subnet_ids": [],
+      "security_group_ids": [],
+      "price_type": "ondemand",
+      "allocation_strategy": "lowest_price",
+      "instance_types": {},
+      "network_zones": [],
+      "tags": {
+        "Environment": "dev",
+        "ManagedBy": "ORB"
+      },
+      "metadata": {
+        "fleet_type": "instant"
+      },
+      "provider_type": "aws",
+      "provider_api": "EC2Fleet",
+      "created_at": "2026-01-30T11:03:13.703053",
+      "updated_at": "2026-01-30T11:03:13.703059",
+      "is_active": true,
+      "vm_types": {}
+    },
+    {
+      "template_id": "EC2Fleet-Instant-Spot",
+      "name": "EC2 Fleet Instant Spot",
+      "description": "EC2 Fleet with instant fulfillment using spot instances",
+      "instance_type": "t3.medium",
+      "max_instances": 10,
+      "subnet_ids": [],
+      "security_group_ids": [],
+      "price_type": "spot",
+      "allocation_strategy": "price_capacity_optimized",
+      "max_price": 0.05,
+      "instance_types": {},
+      "network_zones": [],
+      "tags": {
+        "Environment": "dev",
+        "ManagedBy": "ORB"
+      },
+      "metadata": {
+        "fleet_type": "instant"
+      },
+      "provider_type": "aws",
+      "provider_api": "EC2Fleet",
+      "created_at": "2026-01-30T11:03:13.703120",
+      "updated_at": "2026-01-30T11:03:13.703121",
+      "is_active": true,
+      "vm_types": {}
+    },
+    {
+      "template_id": "EC2Fleet-Instant-Mixed",
+      "name": "EC2 Fleet Instant Mixed",
+      "description": "EC2 Fleet with instant fulfillment using mixed pricing",
+      "instance_type": "t3.medium",
+      "max_instances": 10,
+      "subnet_ids": [],
+      "security_group_ids": [],
+      "price_type": "heterogeneous",
+      "allocation_strategy": "diversified",
+      "max_price": 0.05,
+      "instance_types": {},
+      "network_zones": [],
+      "tags": {
+        "Environment": "dev",
+        "ManagedBy": "ORB"
+      },
+      "metadata": {
+        "fleet_type": "instant",
+        "percent_on_demand": 30
+      },
+      "provider_type": "aws",
+      "provider_api": "EC2Fleet",
+      "created_at": "2026-01-30T11:03:13.703131",
+      "updated_at": "2026-01-30T11:03:13.703131",
+      "is_active": true,
+      "vm_types": {}
+    },
+    {
+      "template_id": "EC2Fleet-Request-OnDemand",
+      "name": "EC2 Fleet Request On-Demand",
+      "description": "EC2 Fleet with request fulfillment using on-demand instances",
+      "instance_type": "t3.medium",
+      "max_instances": 15,
+      "subnet_ids": [],
+      "security_group_ids": [],
+      "price_type": "ondemand",
+      "allocation_strategy": "lowest_price",
+      "instance_types": {},
+      "network_zones": [],
+      "tags": {
+        "Environment": "test",
+        "ManagedBy": "ORB"
+      },
+      "metadata": {
+        "fleet_type": "request"
+      },
+      "provider_type": "aws",
+      "provider_api": "EC2Fleet",
+      "created_at": "2026-01-30T11:03:13.703136",
+      "updated_at": "2026-01-30T11:03:13.703136",
+      "is_active": true,
+      "vm_types": {}
+    },
+    {
+      "template_id": "EC2Fleet-Request-Spot",
+      "name": "EC2 Fleet Request Spot",
+      "description": "EC2 Fleet with request fulfillment using spot instances",
+      "instance_type": "t3.medium",
+      "max_instances": 20,
+      "subnet_ids": [],
+      "security_group_ids": [],
+      "price_type": "spot",
+      "allocation_strategy": "capacity_optimized",
+      "max_price": 0.08,
+      "instance_types": {},
+      "network_zones": [],
+      "tags": {
+        "Environment": "test",
+        "ManagedBy": "ORB"
+      },
+      "metadata": {
+        "fleet_type": "request"
+      },
+      "provider_type": "aws",
+      "provider_api": "EC2Fleet",
+      "created_at": "2026-01-30T11:03:13.703141",
+      "updated_at": "2026-01-30T11:03:13.703142",
+      "is_active": true,
+      "vm_types": {}
+    },
+    {
+      "template_id": "EC2Fleet-Request-Mixed",
+      "name": "EC2 Fleet Request Mixed",
+      "description": "EC2 Fleet with request fulfillment using mixed pricing",
+      "max_instances": 25,
+      "subnet_ids": [],
+      "security_group_ids": [],
+      "price_type": "heterogeneous",
+      "allocation_strategy": "diversified",
+      "max_price": 0.08,
+      "instance_types": {
+        "t3.medium": 1,
+        "t3.large": 2
+      },
+      "network_zones": [],
+      "tags": {
+        "Environment": "test",
+        "ManagedBy": "ORB"
+      },
+      "metadata": {
+        "fleet_type": "request",
+        "percent_on_demand": 40
+      },
+      "provider_type": "aws",
+      "provider_api": "EC2Fleet",
+      "created_at": "2026-01-30T11:03:13.703145",
+      "updated_at": "2026-01-30T11:03:13.703146",
+      "is_active": true,
+      "vm_types": {}
+    },
+    {
+      "template_id": "EC2Fleet-Maintain-OnDemand",
+      "name": "EC2 Fleet Maintain On-Demand",
+      "description": "EC2 Fleet with maintain capacity using on-demand instances",
+      "instance_type": "t3.medium",
+      "max_instances": 12,
+      "subnet_ids": [],
+      "security_group_ids": [],
+      "price_type": "ondemand",
+      "allocation_strategy": "lowest_price",
+      "instance_types": {},
+      "network_zones": [],
+      "tags": {
+        "Environment": "prod",
+        "ManagedBy": "ORB"
+      },
+      "metadata": {
+        "fleet_type": "maintain"
+      },
+      "provider_type": "aws",
+      "provider_api": "EC2Fleet",
+      "created_at": "2026-01-30T11:03:13.703149",
+      "updated_at": "2026-01-30T11:03:13.703150",
+      "is_active": true,
+      "vm_types": {}
+    },
+    {
+      "template_id": "EC2Fleet-Maintain-Spot",
+      "name": "EC2 Fleet Maintain Spot",
+      "description": "EC2 Fleet with maintain capacity using spot instances",
+      "instance_type": "t3.medium",
+      "max_instances": 30,
+      "subnet_ids": [],
+      "security_group_ids": [],
+      "price_type": "spot",
+      "allocation_strategy": "price_capacity_optimized",
+      "max_price": 0.1,
+      "instance_types": {},
+      "network_zones": [],
+      "tags": {
+        "Environment": "prod",
+        "ManagedBy": "ORB"
+      },
+      "metadata": {
+        "fleet_type": "maintain"
+      },
+      "provider_type": "aws",
+      "provider_api": "EC2Fleet",
+      "created_at": "2026-01-30T11:03:13.703159",
+      "updated_at": "2026-01-30T11:03:13.703159",
+      "is_active": true,
+      "vm_types": {}
+    },
+    {
+      "template_id": "EC2Fleet-Maintain-Mixed",
+      "name": "EC2 Fleet Maintain Mixed",
+      "description": "EC2 Fleet with maintain capacity using mixed pricing",
+      "max_instances": 50,
+      "subnet_ids": [],
+      "security_group_ids": [],
+      "price_type": "heterogeneous",
+      "allocation_strategy": "capacity_optimized",
+      "max_price": 0.12,
+      "instance_types": {
+        "t3.medium": 1,
+        "t3.large": 2,
+        "t3.xlarge": 3
+      },
+      "network_zones": [],
+      "tags": {
+        "Environment": "prod",
+        "ManagedBy": "ORB"
+      },
+      "metadata": {
+        "fleet_type": "maintain",
+        "percent_on_demand": 50
+      },
+      "provider_type": "aws",
+      "provider_api": "EC2Fleet",
+      "created_at": "2026-01-30T11:03:13.703163",
+      "updated_at": "2026-01-30T11:03:13.703163",
+      "is_active": true,
+      "vm_types": {}
+    },
+    {
+      "template_id": "SpotFleet-Request-LowestPrice",
+      "name": "Spot Fleet Request - Lowest Price",
+      "description": "Spot Fleet request with lowest price allocation",
+      "max_instances": 20,
+      "subnet_ids": [],
+      "security_group_ids": [],
+      "price_type": "spot",
+      "allocation_strategy": "lowest_price",
+      "max_price": 0.05,
+      "instance_types": {
+        "t3.medium": 1,
+        "t3.large": 2
+      },
+      "network_zones": [],
+      "tags": {
+        "Environment": "dev",
+        "ManagedBy": "ORB"
+      },
+      "metadata": {},
+      "provider_type": "aws",
+      "provider_api": "SpotFleet",
+      "created_at": "2026-01-30T11:03:13.703169",
+      "updated_at": "2026-01-30T11:03:13.703169",
+      "is_active": true,
+      "vm_types": {}
+    },
+    {
+      "template_id": "SpotFleet-Request-Diversified",
+      "name": "Spot Fleet Request - Diversified",
+      "description": "Spot Fleet request with diversified allocation",
+      "max_instances": 25,
+      "subnet_ids": [],
+      "security_group_ids": [],
+      "price_type": "spot",
+      "allocation_strategy": "diversified",
+      "max_price": 0.06,
+      "instance_types": {
+        "t3.medium": 1,
+        "t3.large": 2
+      },
+      "network_zones": [],
+      "tags": {
+        "Environment": "dev",
+        "ManagedBy": "ORB"
+      },
+      "metadata": {},
+      "provider_type": "aws",
+      "provider_api": "SpotFleet",
+      "created_at": "2026-01-30T11:03:13.703174",
+      "updated_at": "2026-01-30T11:03:13.703175",
+      "is_active": true,
+      "vm_types": {}
+    },
+    {
+      "template_id": "SpotFleet-Request-CapacityOptimized",
+      "name": "Spot Fleet Request - Capacity Optimized",
+      "description": "Spot Fleet request with capacity optimized allocation",
+      "max_instances": 30,
+      "subnet_ids": [],
+      "security_group_ids": [],
+      "price_type": "spot",
+      "allocation_strategy": "capacity_optimized",
+      "max_price": 0.07,
+      "instance_types": {
+        "t3.medium": 1,
+        "t3.large": 2
+      },
+      "network_zones": [],
+      "tags": {
+        "Environment": "dev",
+        "ManagedBy": "ORB"
+      },
+      "metadata": {},
+      "provider_type": "aws",
+      "provider_api": "SpotFleet",
+      "created_at": "2026-01-30T11:03:13.703177",
+      "updated_at": "2026-01-30T11:03:13.703178",
+      "is_active": true,
+      "vm_types": {}
+    },
+    {
+      "template_id": "SpotFleet-Maintain-LowestPrice",
+      "name": "Spot Fleet Maintain - Lowest Price",
+      "description": "Spot Fleet maintain with lowest price allocation",
+      "max_instances": 15,
+      "subnet_ids": [],
+      "security_group_ids": [],
+      "price_type": "spot",
+      "allocation_strategy": "lowest_price",
+      "max_price": 0.04,
+      "instance_types": {
+        "t3.medium": 1,
+        "t3.large": 2
+      },
+      "network_zones": [],
+      "tags": {
+        "Environment": "prod",
+        "ManagedBy": "ORB"
+      },
+      "metadata": {},
+      "provider_type": "aws",
+      "provider_api": "SpotFleet",
+      "created_at": "2026-01-30T11:03:13.703180",
+      "updated_at": "2026-01-30T11:03:13.703181",
+      "is_active": true,
+      "vm_types": {}
+    },
+    {
+      "template_id": "SpotFleet-Maintain-Diversified",
+      "name": "Spot Fleet Maintain - Diversified",
+      "description": "Spot Fleet maintain with diversified allocation",
+      "max_instances": 20,
+      "subnet_ids": [],
+      "security_group_ids": [],
+      "price_type": "spot",
+      "allocation_strategy": "diversified",
+      "max_price": 0.05,
+      "instance_types": {
+        "t3.medium": 1,
+        "t3.large": 2
+      },
+      "network_zones": [],
+      "tags": {
+        "Environment": "prod",
+        "ManagedBy": "ORB"
+      },
+      "metadata": {},
+      "provider_type": "aws",
+      "provider_api": "SpotFleet",
+      "created_at": "2026-01-30T11:03:13.703183",
+      "updated_at": "2026-01-30T11:03:13.703183",
+      "is_active": true,
+      "vm_types": {}
+    },
+    {
+      "template_id": "SpotFleet-Maintain-CapacityOptimized",
+      "name": "Spot Fleet Maintain - Capacity Optimized",
+      "description": "Spot Fleet maintain with capacity optimized allocation",
+      "max_instances": 25,
+      "subnet_ids": [],
+      "security_group_ids": [],
+      "price_type": "spot",
+      "allocation_strategy": "capacity_optimized",
+      "max_price": 0.06,
+      "instance_types": {
+        "t3.medium": 1,
+        "t3.large": 2
+      },
+      "network_zones": [],
+      "tags": {
+        "Environment": "prod",
+        "ManagedBy": "ORB"
+      },
+      "metadata": {},
+      "provider_type": "aws",
+      "provider_api": "SpotFleet",
+      "created_at": "2026-01-30T11:03:13.703191",
+      "updated_at": "2026-01-30T11:03:13.703192",
+      "is_active": true,
+      "vm_types": {}
+    },
+    {
+      "template_id": "ASG-OnDemand",
+      "name": "Auto Scaling Group On-Demand",
+      "description": "Auto Scaling Group with on-demand instances only",
+      "instance_type": "t3.medium",
+      "max_instances": 15,
+      "subnet_ids": [],
+      "security_group_ids": [],
+      "price_type": "ondemand",
+      "allocation_strategy": "lowest_price",
+      "instance_types": {},
+      "network_zones": [],
+      "tags": {
+        "Environment": "prod",
+        "ManagedBy": "ORB"
+      },
+      "metadata": {},
+      "provider_type": "aws",
+      "provider_api": "AutoScalingGroup",
+      "created_at": "2026-01-30T11:03:13.703196",
+      "updated_at": "2026-01-30T11:03:13.703197",
+      "is_active": true,
+      "vm_types": {}
+    },
+    {
+      "template_id": "ASG-Spot",
+      "name": "Auto Scaling Group Spot",
+      "description": "Auto Scaling Group with spot instances only",
+      "instance_type": "t3.medium",
+      "max_instances": 20,
+      "subnet_ids": [],
+      "security_group_ids": [],
+      "price_type": "spot",
+      "allocation_strategy": "price_capacity_optimized",
+      "max_price": 0.05,
+      "instance_types": {},
+      "network_zones": [],
+      "tags": {
+        "Environment": "dev",
+        "ManagedBy": "ORB"
+      },
+      "metadata": {},
+      "provider_type": "aws",
+      "provider_api": "AutoScalingGroup",
+      "created_at": "2026-01-30T11:03:13.703201",
+      "updated_at": "2026-01-30T11:03:13.703201",
+      "is_active": true,
+      "vm_types": {}
+    },
+    {
+      "template_id": "ASG-Mixed",
+      "name": "Auto Scaling Group Mixed",
+      "description": "Auto Scaling Group with mixed on-demand and spot instances",
+      "max_instances": 25,
+      "subnet_ids": [],
+      "security_group_ids": [],
+      "price_type": "heterogeneous",
+      "allocation_strategy": "lowest_price",
+      "instance_types": {
+        "t3.medium": 1,
+        "t3.large": 2
+      },
+      "network_zones": [],
+      "tags": {
+        "Environment": "prod",
+        "ManagedBy": "ORB"
+      },
+      "metadata": {},
+      "provider_type": "aws",
+      "provider_api": "AutoScalingGroup",
+      "created_at": "2026-01-30T11:03:13.703206",
+      "updated_at": "2026-01-30T11:03:13.703206",
+      "is_active": true,
+      "vm_types": {}
+    },
+    {
+      "template_id": "RunInstances-OnDemand",
+      "name": "Run Instances On-Demand",
+      "description": "On-demand instances using RunInstances API",
+      "instance_type": "t3.medium",
+      "max_instances": 5,
+      "subnet_ids": [],
+      "security_group_ids": [],
+      "price_type": "ondemand",
+      "allocation_strategy": "lowest_price",
+      "instance_types": {},
+      "network_zones": [],
+      "tags": {
+        "Environment": "dev",
+        "ManagedBy": "ORB"
+      },
+      "metadata": {},
+      "provider_type": "aws",
+      "provider_api": "RunInstances",
+      "created_at": "2026-01-30T11:03:13.703210",
+      "updated_at": "2026-01-30T11:03:13.703210",
+      "is_active": true,
+      "vm_types": {}
+    },
+    {
+      "template_id": "RunInstances-Spot",
+      "name": "Run Instances Spot",
+      "description": "Spot instances using RunInstances API",
+      "instance_type": "t3.medium",
+      "max_instances": 10,
+      "subnet_ids": [],
+      "security_group_ids": [],
+      "price_type": "spot",
+      "allocation_strategy": "price_capacity_optimized",
+      "max_price": 0.05,
+      "instance_types": {},
+      "network_zones": [],
+      "tags": {
+        "Environment": "dev",
+        "ManagedBy": "ORB"
+      },
+      "metadata": {},
+      "provider_type": "aws",
+      "provider_api": "RunInstances",
+      "created_at": "2026-01-30T11:03:13.703214",
+      "updated_at": "2026-01-30T11:03:13.703214",
+      "is_active": true,
+      "vm_types": {}
+    }
+  ]
+}
