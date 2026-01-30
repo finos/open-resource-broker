@@ -91,6 +91,57 @@ async def handle_init(args) -> int:
         return 1
 
 
+def _get_available_schedulers() -> list[dict[str, str]]:
+    """Get available schedulers from registry."""
+    scheduler_types = ["default", "hostfactory"]
+    
+    schedulers = []
+    for scheduler_type in scheduler_types:
+        if scheduler_type == "default":
+            schedulers.append({
+                "type": "default",
+                "display_name": "default",
+                "description": "Standalone usage"
+            })
+        elif scheduler_type == "hostfactory":
+            schedulers.append({
+                "type": "hostfactory", 
+                "display_name": "hostfactory",
+                "description": "IBM Spectrum Symphony integration"
+            })
+    
+    return schedulers
+
+
+def _get_available_providers() -> list[dict[str, str]]:
+    """Get available providers from provider selection service."""
+    try:
+        from infrastructure.di.container import get_container
+        from application.services.provider_selection_service import ProviderSelectionService
+        
+        container = get_container()
+        provider_service = container.get(ProviderSelectionService)
+        
+        # Get unique provider types (not instances)
+        provider_types = set()
+        for provider in provider_service.get_available_providers():
+            provider_types.add(provider["type"])
+        
+        providers = []
+        for provider_type in sorted(provider_types):
+            if provider_type == "aws":
+                providers.append({
+                    "type": "aws",
+                    "display_name": "aws", 
+                    "description": "Amazon Web Services"
+                })
+        
+        return providers if providers else [{"type": "aws", "display_name": "aws", "description": "Amazon Web Services"}]
+    except Exception:
+        # Fallback to hardcoded if service unavailable
+        return [{"type": "aws", "display_name": "aws", "description": "Amazon Web Services"}]
+
+
 def _interactive_setup() -> Dict[str, Any]:
     """Interactive configuration setup."""
     try:
@@ -102,11 +153,17 @@ def _interactive_setup() -> Dict[str, Any]:
         print_info("")
         print_info("[1/4] Scheduler Type")
         print_separator(width=60, char="-", color="cyan")
-        print_info("  (1) default    - Standalone usage")
-        print_info("  (2) hostfactory - IBM Spectrum Symphony integration")
+        
+        schedulers = _get_available_schedulers()
+        for i, scheduler in enumerate(schedulers, 1):
+            print_info(f"  ({i}) {scheduler['display_name']} - {scheduler['description']}")
+        
         print_info("")
         scheduler_choice = input("  Select scheduler (1): ").strip() or "1"
-        scheduler_type = "default" if scheduler_choice == "1" else "hostfactory"
+        try:
+            scheduler_type = schedulers[int(scheduler_choice) - 1]["type"]
+        except (ValueError, IndexError):
+            scheduler_type = "default"
 
         print_newline()
         print_separator(width=60, char="-", color="cyan")
@@ -115,10 +172,17 @@ def _interactive_setup() -> Dict[str, Any]:
         print_info("")
         print_info("[2/4] Cloud Provider")
         print_separator(width=60, char="-", color="cyan")
-        print_info("  (1) aws - Amazon Web Services")
+        
+        providers = _get_available_providers()
+        for i, provider in enumerate(providers, 1):
+            print_info(f"  ({i}) {provider['display_name']} - {provider['description']}")
+        
         print_info("")
         provider_choice = input("  Select provider (1): ").strip() or "1"
-        provider_type = "aws"  # Only AWS supported currently
+        try:
+            provider_type = providers[int(provider_choice) - 1]["type"]
+        except (ValueError, IndexError):
+            provider_type = "aws"
 
         print_newline()
         print_separator(width=60, char="-", color="cyan")
