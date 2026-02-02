@@ -16,6 +16,7 @@ class HostFactoryFieldMappings:
             "imageId": "image_id",
             "keyName": "key_name",
             "fleetType": "fleet_type",
+            "providerApi": "provider_api",  # Provider API type
             # Network configuration
             "subnetId": "subnet_ids",  # Will be converted to list
             "subnetIds": "subnet_ids",  # Preserve full list when provided

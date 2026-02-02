@@ -26,23 +26,23 @@ def get_config_location() -> Path:
     if env_dir := os.environ.get("ORB_CONFIG_DIR"):
         return Path(env_dir)
 
-    # 2. Development mode
+    # 2. Virtual environment (check BEFORE user install)
+    if in_virtualenv():
+        return Path(sys.prefix).parent / "config"
+
+    # 3. Development mode
     cwd = Path.cwd()
     for parent in [cwd] + list(cwd.parents):
         if (parent / "pyproject.toml").exists():
             return parent / "config"
 
-    # 3. User installation
+    # 4. User installation
     if is_user_install():
         return Path.home() / ".local" / "orb" / "config"
 
-    # 4. System installation
+    # 5. System installation
     if is_system_install():
         return Path(sys.prefix) / "orb" / "config"
-
-    # 5. Virtual environment
-    if in_virtualenv():
-        return Path(sys.prefix).parent / "config"
 
     # 6. Fallback
     return cwd / "config"
