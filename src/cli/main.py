@@ -1053,10 +1053,7 @@ async def main() -> None:
             from interface.templates_generate_handler import handle_templates_generate
 
             try:
-                print("DEBUG: About to call handle_templates_generate", file=sys.stderr)
                 result = await handle_templates_generate(args)
-                print(f"DEBUG: Got result: {type(result)}", file=sys.stderr)
-                print(f"DEBUG: Result keys: {result.keys() if isinstance(result, dict) else 'not dict'}", file=sys.stderr)
                 
                 # Print result
                 if result.get("status") == "success":
@@ -1065,7 +1062,6 @@ async def main() -> None:
                     print(f"Error: {result.get('message')}", file=sys.stderr)
                     sys.exit(1)
             except Exception as e:
-                print(f"DEBUG: Exception in CLI: {e}", file=sys.stderr)
                 import traceback
                 traceback.print_exc()
                 sys.exit(1)
