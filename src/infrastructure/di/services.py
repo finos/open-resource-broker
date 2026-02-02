@@ -48,11 +48,20 @@ def _register_services_lazy(container: "DIContainer") -> "DIContainer":
 
     logger.info("Registering services with lazy loading enabled")
 
-    # 1. Register only essential services immediately
+    # 1. Register ConfigurationManager FIRST (port adapters depend on it)
+    from config.managers.configuration_manager import ConfigurationManager
+    
+    def create_configuration_manager(c):
+        return ConfigurationManager()  # Uses default config discovery
+    
+    container.register_singleton(ConfigurationManager, create_configuration_manager)
+
+    # 2. Register port adapters (now ConfigurationManager is available)
     from infrastructure.di.port_registrations import register_port_adapters
 
     register_port_adapters(container)
 
+    # 3. Register remaining core services
     register_core_services(container)
 
     # 2. Register configured storage strategy only
@@ -68,7 +77,11 @@ def _register_services_lazy(container: "DIContainer") -> "DIContainer":
     # 5. Register infrastructure services immediately (needed for template system)
     register_infrastructure_services(container)
 
-    # 6. Register lazy factories for non-essential services
+    # 6. Setup CQRS infrastructure immediately (handlers need to be registered before buses are used)
+    from infrastructure.di.container import _setup_cqrs_infrastructure
+    _setup_cqrs_infrastructure(container)
+
+    # 7. Register lazy factories for non-essential services
     _register_lazy_service_factories(container)
 
     logger.info("Lazy service registration complete")
@@ -124,16 +137,15 @@ def _register_lazy_service_factories(container: "DIContainer") -> None:
     logger = get_logger(__name__)
 
     # Register CQRS infrastructure as lazy - triggered by QueryBus or CommandBus access
-    def setup_cqrs_lazy(c) -> None:
-        """Setup CQRS infrastructure lazily when needed."""
-        from infrastructure.di.container import _setup_cqrs_infrastructure
+    # NOTE: CQRS is now registered immediately in lazy mode, so this is not needed
+    # def setup_cqrs_lazy(c) -> None:
+    #     """Setup CQRS infrastructure lazily when needed."""
+    #     from infrastructure.di.container import _setup_cqrs_infrastructure
+    #     _setup_cqrs_infrastructure(c)
 
-        _setup_cqrs_infrastructure(c)
-
-    from infrastructure.di.buses import CommandBus, QueryBus
-
-    container.register_on_demand(QueryBus, setup_cqrs_lazy)
-    container.register_on_demand(CommandBus, setup_cqrs_lazy)
+    # from infrastructure.di.buses import CommandBus, QueryBus
+    # container.register_on_demand(QueryBus, setup_cqrs_lazy)
+    # container.register_on_demand(CommandBus, setup_cqrs_lazy)
 
     # Provider services are now registered immediately in lazy mode
     # No need for lazy provider registration
@@ -143,9 +155,7 @@ def _register_lazy_service_factories(container: "DIContainer") -> None:
     def register_infrastructure_lazy(c) -> None:
         """Register infrastructure services lazily when first accessed."""
         register_infrastructure_services(c)
-        # Also setup CQRS if not already done (infrastructure services may need buses)
-        if not c.has(QueryBus):
-            setup_cqrs_lazy(c)
+        # CQRS is now registered immediately in lazy mode, no need to check
 
     # Register infrastructure services on-demand when needed
     # Use a placeholder type for infrastructure services
