@@ -53,45 +53,7 @@ class ConfigurationLoader:
     - Configuration validation
     """
 
-    # Environment variable mappings
-    ENV_MAPPING = {
-        "AWS_REGION": ("aws", "region"),
-        "AWS_PROFILE": ("aws", "profile"),
-        "AWS_ROLE_ARN": ("aws", "role_arn"),
-        "AWS_ACCESS_KEY_ID": ("aws", "access_key_id"),
-        "AWS_SECRET_ACCESS_KEY": ("aws", "secret_access_key"),
-        "AWS_SESSION_TOKEN": ("aws", "session_token"),
-        "AWS_ENDPOINT_URL": ("aws", "endpoint_url"),
-        # Symphony AWS configuration fields
-        "AWS_CREDENTIAL_FILE": ("aws", "credential_file"),
-        "AWS_KEY_FILE": ("aws", "key_file"),
-        "AWS_PROXY_HOST": ("aws", "proxy_host"),
-        "AWS_PROXY_PORT": ("aws", "proxy_port"),
-        "AWS_CONNECT_TIMEOUT": ("aws", "aws_connect_timeout"),
-        "AWS_CONNECTION_TIMEOUT_MS": ("aws", "connection_timeout_ms"),
-        "AWS_REQUEST_RETRY_ATTEMPTS": ("aws", "request_retry_attempts"),
-        "AWS_INSTANCE_PENDING_TIMEOUT_SEC": ("aws", "instance_pending_timeout_sec"),
-        "AWS_DESCRIBE_REQUEST_RETRY_ATTEMPTS": (
-            "aws",
-            "describe_request_retry_attempts",
-        ),
-        "AWS_DESCRIBE_REQUEST_INTERVAL": ("aws", "describe_request_interval"),
-        # Logging configuration
-        "LOG_LEVEL": ("logging", "level"),
-        "LOG_FILE": ("logging", "file_path"),
-        "LOG_CONSOLE_ENABLED": ("logging", "console_enabled"),
-        "ACCEPT_PROPAGATED_LOG_SETTING": ("logging", "accept_propagated_setting"),
-        # Events configuration
-        "EVENTS_STORE_TYPE": ("events", "store_type"),
-        "EVENTS_STORE_PATH": ("events", "store_path"),
-        "EVENTS_PUBLISHER_TYPE": ("events", "publisher_type"),
-        "EVENTS_ENABLE_LOGGING": ("events", "enable_logging"),
-        # Application configuration
-        "ENVIRONMENT": ("environment",),
-        "DEBUG": ("debug",),
-        "REQUEST_TIMEOUT": ("request_timeout",),
-        "MAX_MACHINES_PER_REQUEST": ("max_machines_per_request",),
-    }
+
 
     # Default configuration file name
     DEFAULT_CONFIG_FILENAME = "default_config.json"
@@ -379,26 +341,18 @@ class ConfigurationLoader:
         cls, config: dict[str, Any], config_manager: Optional[ConfigurationManager] = None
     ) -> None:
         """
-        Load configuration from environment variables.
+        Load configuration from environment variables using BaseSettings.
 
         Args:
             config: Configuration dictionary to update
+            config_manager: Configuration manager for scheduler directories
         """
-        # Direct environment variables
-        for env_var, config_path in cls.ENV_MAPPING.items():
-            if env_var in os.environ:
-                value = cls._convert_value(os.environ[env_var])
-                current = config
-                for i, key in enumerate(config_path):
-                    if i == len(config_path) - 1:
-                        current[key] = value
-                    else:
-                        current = current.setdefault(key, {})
+        # Configuration will be loaded via BaseSettings when AppConfig is created
+        # This provides automatic environment variable mapping with type safety
+        get_config_logger().debug("Configuration will be loaded via BaseSettings")
 
-        # Process scheduler-provided directory overrides
+        # Keep scheduler directory processing for storage and logging paths
         cls._process_scheduler_directories(config, config_manager)
-
-        get_config_logger().debug("Loaded configuration from environment variables")
 
     @classmethod
     def _process_scheduler_directories(

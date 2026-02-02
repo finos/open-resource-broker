@@ -5,6 +5,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from .app_config_settings import CoreAppSettings
+
 from .common_schema import (
     DatabaseConfig,
     EventsConfig,
@@ -46,6 +48,23 @@ class AppConfig(BaseModel):
     debug: bool = Field(False, description="Debug mode")
     request_timeout: int = Field(300, description="Request timeout in seconds")
     max_machines_per_request: int = Field(100, description="Maximum number of machines per request")
+
+    @model_validator(mode="after")
+    def merge_core_settings(self) -> "AppConfig":
+        """Merge BaseSettings values into main config."""
+        core = CoreAppSettings()
+        
+        # Override existing fields with environment variables
+        self.environment = core.environment
+        self.debug = core.debug
+        self.request_timeout = core.request_timeout
+        self.max_machines_per_request = core.max_machines_per_request
+        
+        # Override logging level if LOG_LEVEL env var is set
+        if hasattr(self, 'logging') and self.logging:
+            self.logging.level = core.log_level
+        
+        return self
 
     @model_validator(mode="after")
     def ensure_template_config(self) -> "AppConfig":

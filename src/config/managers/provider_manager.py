@@ -33,7 +33,18 @@ class ProviderConfigManager:
 
     def get_provider_type(self) -> str:
         """Get provider type from configuration."""
-        return self._get_nested_value("provider.type", "aws")
+        # Get first available provider as default
+        default_provider = "aws"  # Keep as fallback
+        try:
+            from providers.registry import get_provider_registry
+            registry = get_provider_registry()
+            registered_types = registry.get_registered_providers()
+            if registered_types:
+                default_provider = registered_types[0]
+        except Exception:
+            pass  # Use fallback
+        
+        return self._get_nested_value("provider.type", default_provider)
 
     def get_provider_config(self) -> Optional["ProviderConfig"]:
         """Get provider configuration."""
