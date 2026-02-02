@@ -1,6 +1,6 @@
 """Infrastructure service registrations for dependency injection."""
 
-from src.domain.base.ports.logging_port import LoggingPort
+from domain.base.ports.logging_port import LoggingPort
 from domain.base.ports.configuration_port import ConfigurationPort
 from domain.machine.repository import MachineRepository
 from domain.request.repository import RequestRepository

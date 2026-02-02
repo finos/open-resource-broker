@@ -2,16 +2,16 @@
 
 from typing import Optional
 
-from src.application.services.provider_capability_service import ProviderCapabilityService
-from src.application.services.provider_selection_service import ProviderSelectionService
-from src.domain.base.ports import ConfigurationPort
-from src.domain.base.ports.logging_port import LoggingPort
+from application.services.provider_capability_service import ProviderCapabilityService
+from application.services.provider_selection_service import ProviderSelectionService
+from domain.base.ports import ConfigurationPort
+from domain.base.ports.logging_port import LoggingPort
 from infrastructure.di.container import DIContainer
-from src.providers.factory import ProviderStrategyFactory
-from src.infrastructure.logging.logger import get_logger
-from src.providers.registry import ProviderRegistry
-from src.monitoring.metrics import MetricsCollector
-from src.providers.base.strategy import ProviderContext
+from providers.factory import ProviderStrategyFactory
+from infrastructure.logging.logger import get_logger
+from providers.registry import ProviderRegistry
+from monitoring.metrics import MetricsCollector
+from providers.base.strategy import ProviderContext
 
 
 def register_provider_services(container: DIContainer) -> None:

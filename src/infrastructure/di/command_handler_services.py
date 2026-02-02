@@ -13,7 +13,7 @@ from application.commands.machine_handlers import (
     UpdateMachineStatusHandler,
     ValidateProviderStateCommandHandler,
 )
-from src.domain.base.ports.logging_port import LoggingPort
+from domain.base.ports.logging_port import LoggingPort
 from infrastructure.di.buses import CommandBus
 from providers.base.strategy.provider_context import ProviderContext
 

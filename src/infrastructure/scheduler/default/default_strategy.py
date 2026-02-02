@@ -1,5 +1,6 @@
 """Default scheduler strategy using native domain fields - no conversion needed."""
 
+import os
 from typing import Any, Union
 
 from config.manager import ConfigurationManager

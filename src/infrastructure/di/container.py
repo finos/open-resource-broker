@@ -350,7 +350,7 @@ def _create_configured_container() -> DIContainer:
 def _setup_cqrs_infrastructure(container: DIContainer) -> None:
     """Set up CQRS infrastructure: handler discovery and buses."""
     try:
-        from src.domain.base.ports.logging_port import LoggingPort
+        from domain.base.ports.logging_port import LoggingPort
         from infrastructure.di.buses import BusFactory
         from infrastructure.di.handler_discovery import create_handler_discovery_service
 

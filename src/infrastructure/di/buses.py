@@ -20,7 +20,7 @@ from application.decorators import (
     get_query_handler_for_type,
 )
 from application.interfaces.command_query import Command, Query
-from src.domain.base.ports.logging_port import LoggingPort
+from domain.base.ports.logging_port import LoggingPort
 from infrastructure.di.container import DIContainer
 
 TQuery = TypeVar("TQuery", bound=Query)

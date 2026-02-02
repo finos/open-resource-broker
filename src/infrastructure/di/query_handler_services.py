@@ -4,7 +4,7 @@ All query handlers are now automatically discovered and registered via
 @query_handler decorators through the Handler Discovery System.
 """
 
-from src.domain.base.ports.logging_port import LoggingPort
+from domain.base.ports.logging_port import LoggingPort
 from infrastructure.di.buses import QueryBus
 from infrastructure.di.container import DIContainer
 

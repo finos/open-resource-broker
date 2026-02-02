@@ -1,8 +1,8 @@
 """Scheduler service registrations for dependency injection."""
 
-from src.domain.base.ports import ConfigurationPort
-from src.infrastructure.scheduler.factory import SchedulerStrategyFactory
-from src.infrastructure.logging.logger import get_logger
+from domain.base.ports import ConfigurationPort
+from infrastructure.scheduler.factory import SchedulerStrategyFactory
+from infrastructure.logging.logger import get_logger
 from infrastructure.di.container import DIContainer
 
 

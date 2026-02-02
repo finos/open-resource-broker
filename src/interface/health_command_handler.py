@@ -74,7 +74,7 @@ def handle_health_check(args) -> int:
             from domain.base.ports import ProviderPort
 
             provider_port = container.get(ProviderPort)
-            strategies = provider_port.available_strategies()
+            strategies = provider_port.available_strategies
 
             if not strategies:
                 checks.append(

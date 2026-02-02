@@ -2,8 +2,8 @@
 
 from typing import Any
 
-from src.domain.base.ports.logging_port import LoggingPort
-from src.infrastructure.logging.logger import get_logger
+from domain.base.ports.logging_port import LoggingPort
+from infrastructure.logging.logger import get_logger
 
 
 class LoggingAdapter(LoggingPort):
