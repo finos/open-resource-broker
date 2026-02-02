@@ -450,32 +450,112 @@ The plugin implements Clean Architecture principles with the following layers:
 
 ## Configuration
 
-### Environment Configuration
+### Environment Variables
+
+The Open Resource Broker supports comprehensive environment variable configuration using the `ORB_` prefix for core settings and `ORB_AWS_` prefix for AWS-specific settings.
+
+#### Core Application Settings
 
 ```bash
-# Provider configuration
-PROVIDER_TYPE=aws
-AWS_REGION=us-east-1
-AWS_PROFILE=default
+# Application behavior
+ORB_LOG_LEVEL=DEBUG                    # Logging level (DEBUG, INFO, WARNING, ERROR)
+ORB_DEBUG=true                         # Enable debug mode
+ORB_ENVIRONMENT=production             # Environment name
+ORB_REQUEST_TIMEOUT=600                # Request timeout in seconds
+ORB_MAX_MACHINES_PER_REQUEST=200       # Maximum machines per request
 
-# API configuration
-API_HOST=0.0.0.0
-API_PORT=8000
+# Directory paths (standard across all schedulers)
+ORB_CONFIG_DIR=/path/to/config         # Configuration directory
+ORB_WORK_DIR=/path/to/work             # Working directory
+ORB_LOG_DIR=/path/to/logs              # Log directory
+```
 
-# Storage configuration
-STORAGE_TYPE=dynamodb
-STORAGE_TABLE_PREFIX=hostfactory
+#### AWS Provider Settings
 
-# Scheduler directory configuration
-# HostFactory scheduler
+```bash
+# AWS authentication and region
+ORB_AWS_REGION=us-west-2               # AWS region
+ORB_AWS_PROFILE=production             # AWS credential profile
+ORB_AWS_ROLE_ARN=arn:aws:iam::123456789012:role/OrbitRole  # IAM role ARN
+ORB_AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE                 # Access key (optional)
+ORB_AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY  # Secret key (optional)
+ORB_AWS_SESSION_TOKEN=token            # Session token for temporary credentials
+ORB_AWS_ENDPOINT_URL=https://custom.endpoint.com  # Custom endpoint URL
+
+# AWS infrastructure defaults (from infrastructure discovery)
+ORB_AWS_SUBNET_IDS='["subnet-123", "subnet-456"]'           # JSON array of subnet IDs
+ORB_AWS_SECURITY_GROUP_IDS='["sg-789", "sg-012"]'           # JSON array of security group IDs
+ORB_AWS_KEY_NAME=my-key-pair           # EC2 key pair name
+
+# AWS service configuration
+ORB_AWS_MAX_RETRIES=5                  # Maximum API retry attempts
+ORB_AWS_TIMEOUT=120                    # AWS API timeout in seconds
+```
+
+#### Scheduler-Specific Variables (Legacy Support)
+
+For backward compatibility with existing HostFactory deployments:
+
+```bash
+# HostFactory scheduler (legacy)
 HF_PROVIDER_WORKDIR=/path/to/working/directory
 HF_PROVIDER_CONFDIR=/path/to/config/directory
 HF_PROVIDER_LOGDIR=/path/to/logs/directory
+HF_LOGLEVEL=DEBUG                      # HostFactory log level override
+HF_LOGGING_CONSOLE_ENABLED=false       # Disable console output for JSON-only mode
 
-# Default scheduler
+# Default scheduler (legacy)
 DEFAULT_PROVIDER_WORKDIR=/path/to/working/directory
 DEFAULT_PROVIDER_CONFDIR=/path/to/config/directory
 DEFAULT_PROVIDER_LOGDIR=/path/to/logs/directory
+```
+
+#### Nested Configuration
+
+Complex configuration objects can be set using double underscores:
+
+```bash
+# Circuit breaker configuration
+ORB_CIRCUIT_BREAKER__FAILURE_THRESHOLD=10
+ORB_CIRCUIT_BREAKER__RECOVERY_TIMEOUT=120
+ORB_CIRCUIT_BREAKER__HALF_OPEN_MAX_CALLS=3
+
+# Retry configuration
+ORB_RETRY__MAX_ATTEMPTS=5
+ORB_RETRY__BACKOFF_MULTIPLIER=2.0
+ORB_RETRY__MAX_DELAY=60
+```
+
+#### Configuration Precedence
+
+Environment variables take precedence over configuration files:
+
+1. **Environment Variables** (highest precedence)
+2. **Configuration File** (`config.json`)
+3. **Default Values** (lowest precedence)
+
+#### Example: Complete Environment Setup
+
+```bash
+# Production AWS environment
+export ORB_ENVIRONMENT=production
+export ORB_LOG_LEVEL=INFO
+export ORB_DEBUG=false
+
+# AWS configuration
+export ORB_AWS_REGION=us-east-1
+export ORB_AWS_PROFILE=production
+export ORB_AWS_SUBNET_IDS='["subnet-12345", "subnet-67890"]'
+export ORB_AWS_SECURITY_GROUP_IDS='["sg-abcdef"]'
+export ORB_AWS_KEY_NAME=prod-key-pair
+
+# Performance tuning
+export ORB_REQUEST_TIMEOUT=300
+export ORB_MAX_MACHINES_PER_REQUEST=50
+export ORB_AWS_MAX_RETRIES=3
+
+# Start the application
+orb serve --port 8000
 ```
 
 ### Provider Configuration

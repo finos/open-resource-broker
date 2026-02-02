@@ -336,14 +336,69 @@ echo '{"template_id": "test", "machine_count": 2}' | ./scripts/requestMachines.s
 ```
 
 #### Environment Variables
+
+ORB supports comprehensive environment variable configuration. See [Environment Variables Reference](../configuration/environment-variables.md) for complete details.
+
+#### Basic Configuration Override
 ```bash
-# Set Host Factory environment variables
+# Core application settings
+export ORB_ENVIRONMENT=production
+export ORB_DEBUG=false
+export ORB_LOG_LEVEL=INFO
+export ORB_REQUEST_TIMEOUT=600
+
+# AWS provider configuration
+export ORB_AWS_REGION=us-west-2
+export ORB_AWS_PROFILE=production
+export ORB_AWS_INSTANCE_TYPE=m5.large
+
+# Execute commands with overrides
+./scripts/getAvailableTemplates.sh
+```
+
+#### Multi-Environment Configuration
+```bash
+# Development environment
+export ORB_ENVIRONMENT=development
+export ORB_AWS_REGION=us-east-1
+export ORB_AWS_PROFILE=dev
+export ORB_AWS_SUBNET_IDS='["subnet-dev-1", "subnet-dev-2"]'
+
+# Production environment  
+export ORB_ENVIRONMENT=production
+export ORB_AWS_REGION=us-west-2
+export ORB_AWS_PROFILE=prod
+export ORB_AWS_ROLE_ARN=arn:aws:iam::123456789012:role/ProdOrbitRole
+export ORB_AWS_SUBNET_IDS='["subnet-prod-1", "subnet-prod-2"]'
+```
+
+#### HostFactory Integration Variables
+```bash
+# HostFactory compatibility (when using HostFactory scheduler)
 export HF_PROVIDER_CONFDIR=/etc/hostfactory
 export HF_PROVIDER_WORKDIR=/var/lib/hostfactory
 export HF_PROVIDER_LOGDIR=/var/log/hostfactory
+export HF_LOGGING_CONSOLE_ENABLED=false
 
-# Execute script
-./scripts/getAvailableTemplates.sh
+# ORB standard variables (all schedulers)
+export ORB_CONFIG_DIR=/opt/orb/config
+export ORB_WORK_DIR=/opt/orb/work
+export ORB_LOG_DIR=/opt/orb/logs
+```
+
+#### Infrastructure Override Examples
+```bash
+# Override network configuration per environment
+export ORB_AWS_SUBNET_IDS='["subnet-12345", "subnet-67890"]'
+export ORB_AWS_SECURITY_GROUP_IDS='["sg-web", "sg-app"]'
+export ORB_AWS_KEY_NAME=production-keypair
+
+# Override instance defaults
+export ORB_AWS_INSTANCE_TYPE=c5.xlarge
+export ORB_AWS_IMAGE_ID=ami-0abcdef1234567890
+
+# Execute with overrides
+python run.py requestMachines --data '{"template_id": "SymphonyOnDemand", "machine_count": 3}'
 ```
 
 ### Available Shell Scripts

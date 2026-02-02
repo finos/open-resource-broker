@@ -4,6 +4,128 @@
 
 This document describes the REST API endpoints and CLI commands for multi-provider functionality in the Open Resource Broker.
 
+## Configuration Schema
+
+### Provider Configuration with BaseSettings
+
+The Open Resource Broker uses Pydantic BaseSettings for provider configuration, enabling automatic environment variable mapping and type validation.
+
+#### Provider Configuration Structure
+
+```json
+{
+  "providers": [
+    {
+      "name": "aws-us-east-1",
+      "type": "aws",
+      "enabled": true,
+      "priority": 1,
+      "weight": 10,
+      "config": {
+        "region": "us-east-1",
+        "profile": "default",
+        "aws_max_retries": 3,
+        "aws_read_timeout": 30,
+        "handlers": {
+          "ec2_fleet": true,
+          "spot_fleet": true,
+          "auto_scaling_group": true,
+          "run_instances": true
+        },
+        "launch_template": {
+          "create_per_request": true,
+          "reuse_existing": true
+        }
+      },
+      "template_defaults": {
+        "subnet_ids": ["subnet-12345"],
+        "security_group_ids": ["sg-67890"],
+        "key_name": "my-key-pair"
+      }
+    }
+  ]
+}
+```
+
+#### Environment Variable Support
+
+All provider configuration fields support environment variable overrides:
+
+**AWS Provider Environment Variables:**
+```bash
+# Authentication
+export ORB_AWS_REGION="us-west-2"
+export ORB_AWS_PROFILE="production"
+export ORB_AWS_ROLE_ARN="arn:aws:iam::123456789012:role/OrbitRole"
+export ORB_AWS_ACCESS_KEY_ID="AKIAIOSFODNN7EXAMPLE"
+export ORB_AWS_SECRET_ACCESS_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+# Service Configuration
+export ORB_AWS_AWS_MAX_RETRIES=5
+export ORB_AWS_AWS_READ_TIMEOUT=60
+export ORB_AWS_SERVICE_ROLE_SPOT_FLEET="AWSServiceRoleForEC2SpotFleet"
+
+# Complex Objects (JSON format)
+export ORB_AWS_HANDLERS='{"ec2_fleet": true, "spot_fleet": false, "auto_scaling_group": true}'
+export ORB_AWS_LAUNCH_TEMPLATE='{"create_per_request": false, "reuse_existing": true}'
+
+# Nested Delimiter Support
+export ORB_AWS_HANDLERS__EC2_FLEET=true
+export ORB_AWS_HANDLERS__SPOT_FLEET=false
+export ORB_AWS_LAUNCH_TEMPLATE__CREATE_PER_REQUEST=false
+```
+
+#### Provider Configuration Schema
+
+##### AWS Provider Schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "provider_type": {"type": "string", "const": "aws"},
+    "region": {"type": "string", "default": "us-east-1"},
+    "profile": {"type": "string", "nullable": true},
+    "role_arn": {"type": "string", "nullable": true},
+    "access_key_id": {"type": "string", "nullable": true},
+    "secret_access_key": {"type": "string", "nullable": true},
+    "session_token": {"type": "string", "nullable": true},
+    "endpoint_url": {"type": "string", "nullable": true},
+    "aws_max_retries": {"type": "integer", "default": 3, "minimum": 0, "maximum": 10},
+    "aws_read_timeout": {"type": "integer", "default": 30, "minimum": 1, "maximum": 300},
+    "service_role_spot_fleet": {"type": "string", "default": "AWSServiceRoleForEC2SpotFleet"},
+    "ssm_parameter_prefix": {"type": "string", "default": "/hostfactory/templates/"},
+    "handlers": {
+      "type": "object",
+      "properties": {
+        "ec2_fleet": {"type": "boolean", "default": true},
+        "spot_fleet": {"type": "boolean", "default": true},
+        "auto_scaling_group": {"type": "boolean", "default": true},
+        "run_instances": {"type": "boolean", "default": true}
+      }
+    },
+    "launch_template": {
+      "type": "object",
+      "properties": {
+        "create_per_request": {"type": "boolean", "default": true},
+        "naming_strategy": {"type": "string", "default": "request_based"},
+        "version_strategy": {"type": "string", "default": "incremental"},
+        "reuse_existing": {"type": "boolean", "default": true},
+        "cleanup_old_versions": {"type": "boolean", "default": false},
+        "max_versions_per_template": {"type": "integer", "default": 10, "minimum": 1, "maximum": 100}
+      }
+    },
+    "credential_file": {"type": "string", "nullable": true},
+    "key_file": {"type": "string", "nullable": true},
+    "proxy_host": {"type": "string", "nullable": true},
+    "proxy_port": {"type": "integer", "nullable": true, "minimum": 1, "maximum": 65535},
+    "aws_connect_timeout": {"type": "integer", "default": 10, "minimum": 1, "maximum": 60}
+  },
+  "required": [],
+  "additionalProperties": true
+}
+```
+
 ## REST API Endpoints
 
 ### Provider Management
@@ -143,6 +265,52 @@ POST /api/v1/providers/validate
       "errors": [],
       "warnings": []
     }
+  ]
+}
+```
+
+#### Validate Provider Configuration with Environment Variables
+```http
+POST /api/v1/providers/validate-env
+```
+
+**Request:**
+```json
+{
+  "provider_type": "aws",
+  "environment_variables": {
+    "ORB_AWS_REGION": "us-west-2",
+    "ORB_AWS_PROFILE": "production",
+    "ORB_AWS_AWS_MAX_RETRIES": "5",
+    "ORB_AWS_HANDLERS": "{\"ec2_fleet\": true, \"spot_fleet\": false}"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "valid": true,
+  "provider_type": "aws",
+  "resolved_configuration": {
+    "region": "us-west-2",
+    "profile": "production",
+    "aws_max_retries": 5,
+    "handlers": {
+      "ec2_fleet": true,
+      "spot_fleet": false,
+      "auto_scaling_group": true,
+      "run_instances": true
+    }
+  },
+  "environment_variables": {
+    "recognized": ["ORB_AWS_REGION", "ORB_AWS_PROFILE", "ORB_AWS_AWS_MAX_RETRIES", "ORB_AWS_HANDLERS"],
+    "ignored": [],
+    "invalid": []
+  },
+  "validation_errors": [],
+  "warnings": [
+    "spot_fleet handler disabled - some templates may not be compatible"
   ]
 }
 ```
@@ -460,6 +628,85 @@ orb providers validate aws-us-east-1
 
 # Validate configuration file
 orb providers validate --config config/providers.yml
+
+# Validate with environment variables
+orb providers validate --env-vars
+
+# Test environment variable overrides
+orb providers validate --env-vars --show-resolved
+```
+
+**Environment Variable Validation Output:**
+```
+Provider Validation Results:
+
+aws-us-east-1:
+  Status: Valid
+  Configuration Source: config file + environment variables
+  
+  Environment Variables:
+    ✓ ORB_AWS_REGION=us-west-2 (overrides config: us-east-1)
+    ✓ ORB_AWS_PROFILE=production (overrides config: default)
+    ✓ ORB_AWS_AWS_MAX_RETRIES=5 (overrides config: 3)
+    ⚠ ORB_AWS_UNKNOWN_FIELD=value (ignored - not recognized)
+  
+  Resolved Configuration:
+    region: us-west-2 (from ORB_AWS_REGION)
+    profile: production (from ORB_AWS_PROFILE)
+    aws_max_retries: 5 (from ORB_AWS_AWS_MAX_RETRIES)
+    aws_read_timeout: 30 (from config file)
+  
+  Warnings:
+    - Unknown environment variable ORB_AWS_UNKNOWN_FIELD will be ignored
+```
+
+#### Show Environment Variable Support
+```bash
+# Show all supported environment variables for a provider type
+orb providers env-vars aws
+
+# Show environment variables with current values
+orb providers env-vars aws --show-values
+
+# Show environment variables in different formats
+orb providers env-vars aws --format json
+orb providers env-vars aws --format yaml
+orb providers env-vars aws --format shell
+```
+
+**Environment Variables Output:**
+```
+AWS Provider Environment Variables:
+
+Authentication:
+  ORB_AWS_REGION                    AWS region (default: us-east-1)
+  ORB_AWS_PROFILE                   AWS profile (optional)
+  ORB_AWS_ROLE_ARN                  AWS role ARN (optional)
+  ORB_AWS_ACCESS_KEY_ID             AWS access key ID (optional)
+  ORB_AWS_SECRET_ACCESS_KEY         AWS secret access key (optional)
+  ORB_AWS_SESSION_TOKEN             AWS session token (optional)
+
+Service Configuration:
+  ORB_AWS_AWS_MAX_RETRIES           Maximum retries (default: 3)
+  ORB_AWS_AWS_READ_TIMEOUT          Read timeout in seconds (default: 30)
+  ORB_AWS_AWS_CONNECT_TIMEOUT       Connect timeout in seconds (default: 10)
+  ORB_AWS_SERVICE_ROLE_SPOT_FLEET   Spot Fleet service role (default: AWSServiceRoleForEC2SpotFleet)
+
+Complex Objects (JSON format):
+  ORB_AWS_HANDLERS                  Handler configuration
+  ORB_AWS_LAUNCH_TEMPLATE           Launch template configuration
+
+Legacy/Optional:
+  ORB_AWS_CREDENTIAL_FILE           Path to credentials file (optional)
+  ORB_AWS_KEY_FILE                  Path to key files directory (optional)
+  ORB_AWS_PROXY_HOST                Proxy hostname (optional)
+  ORB_AWS_PROXY_PORT                Proxy port (optional)
+
+Current Values:
+  ORB_AWS_REGION=us-west-2 (set)
+  ORB_AWS_PROFILE=production (set)
+  ORB_AWS_AWS_MAX_RETRIES=5 (set)
+  (other variables not set)
 ```
 
 ### Template Management

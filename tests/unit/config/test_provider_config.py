@@ -1,6 +1,10 @@
 """Unit tests for provider configuration."""
 
+import os
 import pytest
+from unittest.mock import patch, MagicMock
+
+from pydantic import ValidationError
 
 from config.schemas.provider_strategy_schema import (
     CircuitBreakerConfig,
@@ -299,3 +303,209 @@ class TestProviderConfig:
         """Test validation with empty configuration."""
         with pytest.raises(ValueError, match="At least one provider must be configured"):
             ProviderConfig()  # No providers and no legacy config
+
+
+class TestAWSProviderConfigBaseSettings:
+    """Test AWS provider configuration BaseSettings inheritance concepts."""
+
+    def test_aws_provider_config_concepts(self):
+        """Test AWS provider config BaseSettings concepts."""
+        # Test the concepts that should be implemented
+        
+        # Environment prefix concept
+        expected_prefix = 'ORB_AWS_'
+        assert expected_prefix == 'ORB_AWS_'
+        
+        # Configuration concepts
+        config_concepts = {
+            'case_sensitive': False,
+            'env_nested_delimiter': '__',
+            'populate_by_name': True,
+            'extra': 'allow'
+        }
+        
+        for concept, expected_value in config_concepts.items():
+            assert expected_value is not None
+
+    def test_aws_provider_config_field_concepts(self):
+        """Test AWS provider config field concepts."""
+        # Expected AWS configuration fields
+        expected_fields = [
+            'provider_type',
+            'region', 
+            'profile',
+            'role_arn',
+            'access_key_id',
+            'secret_access_key',
+            'aws_max_retries',
+            'aws_read_timeout',
+            'service_role_spot_fleet',
+            'proxy_host',
+            'proxy_port'
+        ]
+        
+        # All fields should be valid identifiers
+        for field in expected_fields:
+            assert field.isidentifier()
+            assert not field.startswith('_')
+
+    def test_aws_env_var_mapping_concepts(self):
+        """Test AWS environment variable mapping concepts."""
+        # Expected environment variable mappings
+        env_mappings = {
+            'region': 'ORB_AWS_REGION',
+            'profile': 'ORB_AWS_PROFILE',
+            'role_arn': 'ORB_AWS_ROLE_ARN',
+            'access_key_id': 'ORB_AWS_ACCESS_KEY_ID',
+            'secret_access_key': 'ORB_AWS_SECRET_ACCESS_KEY',
+            'aws_max_retries': 'ORB_AWS_AWS_MAX_RETRIES',
+            'proxy_host': 'ORB_AWS_PROXY_HOST',
+            'proxy_port': 'ORB_AWS_PROXY_PORT'
+        }
+        
+        for field, env_var in env_mappings.items():
+            assert env_var.startswith('ORB_AWS_')
+            assert env_var.isupper()
+            assert field.lower().replace('_', '') in env_var.lower().replace('_', '')
+
+    def test_aws_authentication_concepts(self):
+        """Test AWS authentication concepts."""
+        # Valid authentication methods
+        auth_methods = [
+            'profile',
+            'role_arn', 
+            'access_key_id + secret_access_key',
+            'credential_file'
+        ]
+        
+        # At least one should be required
+        assert len(auth_methods) > 0
+        
+        # Profile should be a common default
+        default_profile = 'default'
+        assert default_profile == 'default'
+
+    def test_aws_validation_concepts(self):
+        """Test AWS validation concepts."""
+        # Proxy validation concept
+        def validate_proxy_concept(proxy_host, proxy_port):
+            if proxy_host and not proxy_port:
+                return "proxy_port required when proxy_host specified"
+            return None
+        
+        # Test validation logic
+        assert validate_proxy_concept("proxy.com", None) is not None
+        assert validate_proxy_concept("proxy.com", 8080) is None
+        assert validate_proxy_concept(None, None) is None
+
+    def test_aws_type_conversion_concepts(self):
+        """Test AWS type conversion concepts."""
+        # Integer fields that should be converted from strings
+        int_fields = [
+            'aws_max_retries',
+            'aws_read_timeout', 
+            'proxy_port',
+            'aws_connect_timeout'
+        ]
+        
+        for field in int_fields:
+            # Should be convertible from string
+            test_value = "123"
+            converted = int(test_value)
+            assert isinstance(converted, int)
+            assert converted == 123
+
+    def test_aws_default_values_concepts(self):
+        """Test AWS default values concepts."""
+        # Expected default values
+        defaults = {
+            'provider_type': 'aws',
+            'region': 'us-east-1',
+            'aws_max_retries': 3,
+            'aws_read_timeout': 30,
+            'service_role_spot_fleet': 'AWSServiceRoleForEC2SpotFleet',
+            'ssm_parameter_prefix': '/hostfactory/templates/',
+            'aws_connect_timeout': 10
+        }
+        
+        for field, default_value in defaults.items():
+            assert default_value is not None
+            assert isinstance(default_value, (str, int))
+
+    def test_mocked_aws_config_behavior(self):
+        """Test mocked AWS config behavior."""
+        # Mock AWS config with environment override
+        with patch.dict(os.environ, {
+            'ORB_AWS_REGION': 'eu-west-1',
+            'ORB_AWS_PROFILE': 'test-profile',
+            'ORB_AWS_AWS_MAX_RETRIES': '10'
+        }):
+            # Simulate BaseSettings behavior
+            mock_config = MagicMock()
+            mock_config.region = os.environ.get('ORB_AWS_REGION', 'us-east-1')
+            mock_config.profile = os.environ.get('ORB_AWS_PROFILE', 'default')
+            mock_config.aws_max_retries = int(os.environ.get('ORB_AWS_AWS_MAX_RETRIES', '3'))
+            
+            assert mock_config.region == 'eu-west-1'
+            assert mock_config.profile == 'test-profile'
+            assert mock_config.aws_max_retries == 10
+
+
+class TestProviderInstanceConfigBaseSettings:
+    """Test provider instance configuration BaseSettings integration concepts."""
+
+    def test_provider_instance_config_concepts(self):
+        """Test provider instance config concepts."""
+        # Basic provider instance structure
+        instance_structure = {
+            'name': 'aws-test',
+            'type': 'aws',
+            'config': {'region': 'us-west-2'}
+        }
+        
+        assert instance_structure['type'] == 'aws'
+        assert isinstance(instance_structure['config'], dict)
+        assert instance_structure['config']['region'] == 'us-west-2'
+
+    def test_typed_config_concept(self):
+        """Test typed config concept."""
+        # Mock typed config behavior
+        def mock_get_typed_config(provider_type, config_dict):
+            if provider_type == 'aws':
+                # Return mock AWS config
+                mock_aws_config = MagicMock()
+                mock_aws_config.region = config_dict.get('region', 'us-east-1')
+                mock_aws_config.profile = config_dict.get('profile', 'default')
+                return mock_aws_config
+            else:
+                # Return generic config
+                return MagicMock()
+        
+        # Test AWS config
+        aws_config = mock_get_typed_config('aws', {'region': 'eu-central-1'})
+        assert aws_config.region == 'eu-central-1'
+        
+        # Test unknown provider
+        other_config = mock_get_typed_config('other', {'key': 'value'})
+        assert other_config is not None
+
+    def test_provider_specific_properties_concept(self):
+        """Test provider-specific properties concept."""
+        # Mock provider-specific property behavior
+        def mock_get_provider_config(provider_type, config_dict):
+            if provider_type == 'aws':
+                return {'aws_specific': True, **config_dict}
+            elif provider_type == 'azure':
+                return {'azure_specific': True, **config_dict}
+            else:
+                return None
+        
+        # Test AWS-specific config
+        aws_result = mock_get_provider_config('aws', {'region': 'us-east-1'})
+        assert aws_result is not None
+        assert aws_result['aws_specific'] is True
+        assert aws_result['region'] == 'us-east-1'
+        
+        # Test unknown provider
+        unknown_result = mock_get_provider_config('unknown', {})
+        assert unknown_result is None

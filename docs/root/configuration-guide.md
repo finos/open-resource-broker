@@ -307,28 +307,124 @@ Automatically activated when:
 
 ### Environment Variables
 
-Override configuration values using environment variables:
+The Open Resource Broker provides comprehensive environment variable support using Pydantic BaseSettings for automatic type conversion, validation, and configuration management.
+
+#### Environment Variable Naming Convention
+
+Environment variables follow a hierarchical naming pattern:
+- **Core settings**: `ORB_<FIELD_NAME>`
+- **AWS provider**: `ORB_AWS_<FIELD_NAME>`
+- **Nested objects**: `ORB_<SECTION>__<FIELD_NAME>` (double underscore)
+
+#### Core Application Variables
 
 ```bash
-# Provider configuration
-export HF_PROVIDER_SELECTION_POLICY=ROUND_ROBIN
-export HF_PROVIDER_HEALTH_CHECK_INTERVAL=60
+# Application behavior
+ORB_LOG_LEVEL=DEBUG                    # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+ORB_DEBUG=true                         # Enable debug mode (boolean)
+ORB_ENVIRONMENT=production             # Environment identifier (string)
+ORB_REQUEST_TIMEOUT=600                # Global request timeout in seconds (integer)
+ORB_MAX_MACHINES_PER_REQUEST=200       # Maximum machines per single request (integer)
 
-# Template configuration
-export HF_TEMPLATE_AMI_RESOLUTION_ENABLED=true
-export HF_TEMPLATE_AMI_RESOLUTION_CACHE_ENABLED=true
+# Directory paths (standard across all schedulers)
+ORB_CONFIG_DIR=/opt/orb/config         # Configuration files directory
+ORB_WORK_DIR=/opt/orb/work             # Working directory for temporary files
+ORB_LOG_DIR=/opt/orb/logs              # Log files directory
+```
 
-# Logging configuration
-export HF_LOGGING_LEVEL=DEBUG
-export HF_LOGGING_CONSOLE_ENABLED=true
+#### AWS Provider Variables
 
-# Storage configuration
-export HF_STORAGE_STRATEGY=json
+```bash
+# Authentication and region
+ORB_AWS_REGION=us-west-2               # AWS region (string)
+ORB_AWS_PROFILE=production             # AWS credential profile name (string)
+ORB_AWS_ROLE_ARN=arn:aws:iam::123456789012:role/OrbitRole  # IAM role ARN (string)
+ORB_AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE                 # AWS access key ID (string)
+ORB_AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY  # AWS secret access key (string)
+ORB_AWS_SESSION_TOKEN=AQoEXAMPLEH4aoAH0gNCAPyJxz4ARKDHxyP5XpAa  # Session token (string)
+ORB_AWS_ENDPOINT_URL=https://ec2.us-west-2.amazonaws.com   # Custom endpoint URL (string)
 
-# Scheduler configuration
-export HF_SCHEDULER_STRATEGY=hostfactory
-export HF_SCHEDULER_CONFIG_ROOT=config
-export HF_SCHEDULER_TEMPLATE_PATH=awsprov_templates.json
+# Infrastructure defaults (from infrastructure discovery)
+ORB_AWS_SUBNET_IDS='["subnet-12345678", "subnet-87654321"]'           # JSON array of subnet IDs
+ORB_AWS_SECURITY_GROUP_IDS='["sg-abcdef12", "sg-34567890"]'           # JSON array of security group IDs
+ORB_AWS_KEY_NAME=my-production-key     # EC2 key pair name (string)
+ORB_AWS_IMAGE_ID=ami-0abcdef1234567890  # Default AMI ID (string)
+ORB_AWS_INSTANCE_TYPE=t3.medium        # Default instance type (string)
+
+# AWS service configuration
+ORB_AWS_MAX_RETRIES=5                  # Maximum API retry attempts (integer, 0-10)
+ORB_AWS_TIMEOUT=120                    # AWS API timeout in seconds (integer, 1-300)
+```
+
+#### Nested Configuration Variables
+
+For complex configuration objects, use double underscores (`__`) to separate levels:
+
+```bash
+# Circuit breaker configuration
+ORB_CIRCUIT_BREAKER__ENABLED=true                    # Enable circuit breaker (boolean)
+ORB_CIRCUIT_BREAKER__FAILURE_THRESHOLD=10            # Failures before opening circuit (integer)
+ORB_CIRCUIT_BREAKER__RECOVERY_TIMEOUT=120            # Recovery timeout in seconds (integer)
+ORB_CIRCUIT_BREAKER__HALF_OPEN_MAX_CALLS=3           # Max calls in half-open state (integer)
+
+# Retry configuration
+ORB_RETRY__MAX_ATTEMPTS=5              # Maximum retry attempts (integer)
+ORB_RETRY__BACKOFF_MULTIPLIER=2.0      # Exponential backoff multiplier (float)
+ORB_RETRY__MAX_DELAY=60                # Maximum delay between retries in seconds (integer)
+```
+
+#### Scheduler-Specific Variables (Legacy Support)
+
+For backward compatibility with existing HostFactory deployments:
+
+```bash
+# HostFactory scheduler (legacy)
+HF_PROVIDER_WORKDIR=/var/lib/hostfactory/work        # HostFactory working directory
+HF_PROVIDER_CONFDIR=/etc/hostfactory/config          # HostFactory configuration directory
+HF_PROVIDER_LOGDIR=/var/log/hostfactory              # HostFactory log directory
+HF_LOGLEVEL=DEBUG                                    # HostFactory-specific log level
+HF_LOGGING_CONSOLE_ENABLED=false                     # Disable console output for JSON-only mode
+
+# Default scheduler
+DEFAULT_PROVIDER_WORKDIR=/opt/orb/work               # Default scheduler working directory
+DEFAULT_PROVIDER_CONFDIR=/opt/orb/config             # Default scheduler configuration directory
+DEFAULT_PROVIDER_LOGDIR=/opt/orb/logs                # Default scheduler log directory
+```
+
+#### Configuration Precedence
+
+Environment variables take precedence over configuration files:
+
+1. **Environment Variables** (highest precedence)
+2. **Configuration File** (`config.json`)
+3. **Provider Defaults** (from template_defaults)
+4. **System Defaults** (lowest precedence)
+
+#### Example: Production Environment Setup
+
+```bash
+#!/bin/bash
+# Production environment configuration
+export ORB_ENVIRONMENT=production
+export ORB_LOG_LEVEL=INFO
+export ORB_DEBUG=false
+
+# AWS production account with IAM role
+export ORB_AWS_REGION=us-east-1
+export ORB_AWS_ROLE_ARN=arn:aws:iam::123456789012:role/OrbitProductionRole
+export ORB_AWS_SUBNET_IDS='["subnet-prod123", "subnet-prod456"]'
+export ORB_AWS_SECURITY_GROUP_IDS='["sg-prod123"]'
+export ORB_AWS_KEY_NAME=production-key-pair
+
+# Performance and resilience settings
+export ORB_REQUEST_TIMEOUT=300
+export ORB_MAX_MACHINES_PER_REQUEST=100
+export ORB_AWS_MAX_RETRIES=5
+export ORB_CIRCUIT_BREAKER__ENABLED=true
+export ORB_CIRCUIT_BREAKER__FAILURE_THRESHOLD=5
+
+# Start the application
+orb serve --port 8000
 ```
 
 ### Configuration Validation
