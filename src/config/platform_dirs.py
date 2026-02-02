@@ -16,9 +16,9 @@ def in_virtualenv() -> bool:
         return True
     
     # Symlink venv detection (uv, mise, etc.)
-    # If executable is outside sys.prefix, it's a symlink venv
-    executable_path = Path(sys.executable).resolve()
-    prefix_path = Path(sys.prefix).resolve()
+    # Don't resolve symlinks - we want to check the actual executable location
+    executable_path = Path(sys.executable)  # Don't resolve!
+    prefix_path = Path(sys.prefix)
     
     try:
         # Check if executable is under prefix
@@ -47,7 +47,15 @@ def get_config_location() -> Path:
 
     # 2. Virtual environment (check BEFORE user install)
     if in_virtualenv():
-        return Path(sys.prefix).parent / "config"
+        # For symlink venvs (uv/mise), use executable's grandparent's sibling
+        # For standard venvs, use sys.prefix parent
+        if sys.prefix != sys.base_prefix:
+            # Standard venv: sys.prefix is the venv directory
+            return Path(sys.prefix).parent / "config"
+        else:
+            # Symlink venv: executable is .venv/bin/python, we want .venv/../config
+            # .parent = .venv/bin, .parent = .venv, .parent = parent dir
+            return Path(sys.executable).parent.parent.parent / "config"
 
     # 3. Development mode
     cwd = Path.cwd()
