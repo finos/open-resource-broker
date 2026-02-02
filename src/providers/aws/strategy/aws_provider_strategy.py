@@ -191,6 +191,10 @@ class AWSProviderStrategy(ProviderStrategy):
         """Get AWS provider capabilities."""
         return self._get_capability_service().get_capabilities()
 
+    def check_health(self) -> ProviderHealthStatus:
+        """Check AWS provider health status."""
+        return self._get_health_service().check_health()
+
     def generate_provider_name(self, config: dict[str, Any]) -> str:
         """Generate AWS provider name: aws_{profile}_{region}"""
         return self._get_capability_service().generate_provider_name(config)
