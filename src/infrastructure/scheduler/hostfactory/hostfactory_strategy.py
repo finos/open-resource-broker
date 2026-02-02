@@ -8,9 +8,9 @@ if TYPE_CHECKING:
 
 from domain.base.ports.configuration_port import ConfigurationPort
 from domain.base.ports.logging_port import LoggingPort
-from domain.machine.aggregate import Machine
-from domain.request.aggregate import Request
-from domain.template.template_aggregate import Template
+from application.dto.responses import MachineDTO
+from application.request.dto import RequestDTO
+from infrastructure.template.dtos import TemplateDTO
 from infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
 from infrastructure.scheduler.hostfactory.field_mapper import HostFactoryFieldMapper
 from infrastructure.scheduler.hostfactory.transformations import HostFactoryTransformations
@@ -374,15 +374,10 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         else:
             raise ValueError(f"Unsupported HostFactory operation: {operation}")
 
-    def _convert_template_to_hostfactory(self, template: Template) -> dict[str, Any]:
+    def _convert_template_to_hostfactory(self, template: TemplateDTO) -> dict[str, Any]:
         """Convert internal template to HostFactory format."""
-        # Handle both domain Template objects and TemplateDTO objects
-        if hasattr(template, "model_dump"):
-            template_dict = self.format_template_for_display(template)
-        elif hasattr(template, "__dict__"):
-            template_dict = template.__dict__
-        else:
-            template_dict = template
+        # Handle TemplateDTO objects
+        template_dict = self.format_template_for_display(template)
 
         # Start with the formatted template
         hf_template = template_dict.copy()
@@ -460,11 +455,11 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         return os.path.join(config_root, config_file)
 
     # KBG TODO: function is not used
-    def parse_template_config(self, raw_data: dict[str, Any]) -> Template:
+    def parse_template_config(self, raw_data: dict[str, Any]) -> TemplateDTO:
         """
-        Parse HostFactory template to domain Template.
+        Parse HostFactory template to TemplateDTO.
 
-        This method handles the conversion from HostFactory template format to domain Template objects.
+        This method handles the conversion from HostFactory template format to TemplateDTO objects.
         """
         # Map HostFactory field names to domain field names
         domain_data = {
@@ -504,8 +499,8 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "provider_api_spec_file": raw_data.get("provider_api_spec_file"),
         }
 
-        # Create domain Template object with validation
-        return Template(**domain_data)
+        # Create TemplateDTO object with validation
+        return TemplateDTO.from_dict(domain_data)
 
     def parse_request_data(
         self, raw_data: dict[str, Any]
@@ -562,11 +557,11 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         self._logger.debug("parse_request_data output (flat): %s", result)
         return result
 
-    def format_templates_response(self, templates: list[Template]) -> dict[str, Any]:
+    def format_templates_response(self, templates: list[TemplateDTO]) -> dict[str, Any]:
         """
-        Format domain Templates to HostFactory response.
+        Format TemplateDTOs to HostFactory response.
 
-        This method handles the conversion from domain Template objects to HostFactory response format.
+        This method handles the conversion from TemplateDTO objects to HostFactory response format.
         The format matches the expected HostFactory getAvailableTemplates output with minimal fields.
         """
         formatted_templates = []
@@ -592,14 +587,15 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
 
         return processed_templates
 
-    def format_request_status_response(self, requests: list["Request"]) -> dict[str, Any]:
+    def format_request_status_response(self, requests: list[RequestDTO]) -> dict[str, Any]:
         """
-        Format domain Requests to HostFactory response format.
+        Format RequestDTOs to HostFactory response format.
         Uses field mapper for consistent transformations.
         """
         formatted_requests = []
-        for request in requests:
-            req_dict = self.format_request_for_display(request)
+        for request_dto in requests:
+            # Use DTO's to_dict() method instead of domain model_dump()
+            req_dict = request_dto.to_dict()
             
             # Rename machine_references to machines for HostFactory compatibility
             if "machine_references" in req_dict:
@@ -646,11 +642,11 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             result["launchtime"] = str(machine["launch_time"])
         return result
 
-    def format_machine_status_response(self, machines: list[Machine]) -> dict[str, Any]:
+    def format_machine_status_response(self, machines: list[MachineDTO]) -> dict[str, Any]:
         """
-        Format domain Machines to HostFactory machine response.
+        Format MachineDTOs to HostFactory machine response.
 
-        This method handles the conversion from domain Machine objects to HostFactory response format.
+        This method handles the conversion from MachineDTO objects to HostFactory response format.
         """
         return {
             "machines": [
@@ -857,15 +853,15 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         else:
             return ""
 
-    def format_template_for_display(self, template: Template) -> dict[str, Any]:
-        """Format template for display using HostFactory field mapper."""
-        internal_dict = template.model_dump(exclude_none=True)
+    def format_template_for_display(self, template: TemplateDTO) -> dict[str, Any]:
+        """Format TemplateDTO for display using HostFactory field mapper."""
+        internal_dict = template.to_dict()
         return self.field_mapper.map_output_fields(internal_dict)
 
-    def format_template_for_provider(self, template: Template) -> dict[str, Any]:
+    def format_template_for_provider(self, template: TemplateDTO) -> dict[str, Any]:
         """Format template for provider operations using internal format (no field mapping)."""
-        return template.model_dump(exclude_none=True)
+        return template.to_dict()
 
-    def format_request_for_display(self, request: Request) -> dict[str, Any]:
-        """Format request for display using HostFactory field mapper."""
-        return request.model_dump(exclude_none=True)  # Requests don't need field mapping
+    def format_request_for_display(self, request: RequestDTO) -> dict[str, Any]:
+        """Format RequestDTO for display using HostFactory field mapper."""
+        return request.to_dict()  # Use DTO's to_dict() method

@@ -7,9 +7,11 @@ ensuring consistent interface implementation across different scheduler types.
 from abc import ABC
 from typing import Any
 
+# Import from Application layer (correct Clean Architecture)
 from domain.base.ports.scheduler_port import SchedulerPort
-from domain.request.aggregate import Request
-from domain.template.template_aggregate import Template
+from application.dto.responses import MachineDTO
+from application.request.dto import RequestDTO
+from infrastructure.template.dtos import TemplateDTO
 
 
 class BaseSchedulerStrategy(SchedulerPort, ABC):
@@ -31,13 +33,12 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
         self.config_manager = config_manager
         self.logger = logger
 
-    def format_request_status_response(self, requests: list[Request]) -> dict[str, Any]:
+    def format_request_status_response(self, requests: list[RequestDTO]) -> dict[str, Any]:
         """
-        Format domain Requests to native domain response format.
+        Format RequestDTOs to native domain response format.
 
-        Uses the Request's to_dict() method to serialize to native format.
+        Uses the RequestDTO's to_dict() method to serialize to native format.
         """
-        # KBG TODO requestId for hostfactory returned as request_id, but it does not trigger an error, likely ignored by HF
         return {
             "requests": [request.to_dict() for request in requests],
             "message": "Request status retrieved successfully",
@@ -124,14 +125,14 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
 
         return str(get_logs_location())
 
-    def format_template_for_display(self, template: Template) -> dict[str, Any]:
-        """Default implementation - clean model dump without scheduler-specific formatting."""
-        return template.model_dump(exclude_none=True)
+    def format_template_for_display(self, template: TemplateDTO) -> dict[str, Any]:
+        """Default implementation - clean to_dict without scheduler-specific formatting."""
+        return template.to_dict()
 
-    def format_template_for_provider(self, template: Template) -> dict[str, Any]:
-        """Default implementation - clean model dump without scheduler-specific formatting."""
-        return template.model_dump(exclude_none=True)
+    def format_template_for_provider(self, template: TemplateDTO) -> dict[str, Any]:
+        """Default implementation - clean to_dict without scheduler-specific formatting."""
+        return template.to_dict()
 
-    def format_request_for_display(self, request: Request) -> dict[str, Any]:
-        """Default implementation - clean model dump without scheduler-specific formatting."""
-        return request.model_dump(exclude_none=True)
+    def format_request_for_display(self, request: RequestDTO) -> dict[str, Any]:
+        """Default implementation - clean to_dict without scheduler-specific formatting."""
+        return request.to_dict()

@@ -568,7 +568,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             created_requests = []
             for (provider_type, provider_name), machine_ids in provider_groups.items():
                 request = Request.create_return_request(
-                    instance_ids=machine_ids,
+                    machine_ids=machine_ids,
                     provider_type=provider_type,
                     provider_name=provider_name,
                     metadata=command.metadata or {},
