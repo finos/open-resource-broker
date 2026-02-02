@@ -104,8 +104,16 @@ class AWSProviderStrategy(ProviderStrategy):
                     self._logger.warning("Failed to resolve AWSClient: %s", exc)
             else:
                 try:
+                    # Need config_port to create AWS client
+                    from infrastructure.di.container import get_container
+                    container = get_container()
+                    from domain.base.ports.configuration_port import ConfigurationPort
+                    config_port = container.get(ConfigurationPort)
+                    
                     self._aws_client = AWSClient(
-                        region=self._aws_config.region, profile=self._aws_config.profile, logger=self._logger
+                        config=config_port,
+                        logger=self._logger,
+                        provider_name=self._provider_name
                     )
                     self._logger.debug("AWS client created directly")
                 except Exception as exc:
