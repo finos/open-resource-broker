@@ -145,16 +145,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 machines = uow.machines.find_by_request_id(query.request_id)
                 machine_ids = [str(m.machine_id.value) for m in machines]
 
-            request_dto = RequestDTO(
-                request_id=str(request.request_id),
-                template_id=request.template_id,
-                requested_count=request.requested_count,
-                status=request.status.value,
-                created_at=request.created_at,
-                machine_references=machine_references,
-                machine_ids=machine_ids,
-                metadata=request.metadata or {},
-            )
+            request_dto = RequestDTO.from_domain(request)
 
             # Cache the result if caching is enabled
             if self._cache_service and self._cache_service.is_caching_enabled():
