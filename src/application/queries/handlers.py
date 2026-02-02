@@ -223,29 +223,26 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             )
 
             # Resolve strategy identifier using registry
-            from infrastructure.services.provider_strategy_resolver import ProviderStrategyResolver
+            from providers.registry import get_provider_registry
             
-            resolver = ProviderStrategyResolver()
-            strategy_identifier = resolver.resolve_strategy_identifier(
-                request.provider_type, 
-                request.provider_name
-            )
-            if not strategy_identifier:
-                available = resolver.get_available_strategies()
+            registry = get_provider_registry()
+            if registry.is_provider_instance_registered(request.provider_name):
+                # Create strategy from instance
+                provider_config = {}  # Would need actual config
+                strategy = registry.create_strategy_from_instance(request.provider_name, provider_config)
+                result = await strategy.execute_operation(operation)
+            elif registry.is_provider_registered(request.provider_type):
+                # Create strategy from type
+                provider_config = {}  # Would need actual config
+                strategy = registry.create_strategy(request.provider_type, provider_config)
+                result = await strategy.execute_operation(operation)
+            else:
+                available = registry.get_registered_providers() + registry.get_registered_provider_instances()
                 self.logger.error(
                     "Strategy not found for %s-%s. Available: %s",
                     request.provider_type, request.provider_name, available
                 )
                 return [], {}
-            
-            self.logger.info(
-                "Using provider strategy: %s for request %s",
-                strategy_identifier,
-                request.request_id,
-            )
-            self.logger.info("Operation parameters: %s", operation.parameters)
-
-            result = await provider_context.execute_with_strategy(strategy_identifier, operation)
 
             self.logger.info(
                 "Provider strategy result: success=%s, data_keys=%s",
@@ -358,8 +355,44 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             )
             return [], {}
 
+        # Resolve strategy identifier using registry
+        from infrastructure.services.provider_strategy_resolver import ProviderStrategyResolver
+        resolver = ProviderStrategyResolver()
+        strategy_identifier = resolver.resolve_strategy_identifier(
+            request.provider_type, 
+            request.provider_name
+        )
+        
+        if not strategy_identifier:
+            available = resolver.get_available_strategies()
+            self.logger.error(
+                "Strategy not found for %s-%s. Available: %s",
+                request.provider_type, request.provider_name, available
+            )
+            return [], {}
+
         try:
-            result = await provider_context.execute_with_strategy(strategy_identifier, operation)
+            # Get provider strategy from registry
+            from providers.registry import get_provider_registry
+            
+            registry = get_provider_registry()
+            if registry.is_provider_instance_registered(strategy_identifier):
+                # Create strategy from instance
+                provider_config = {}  # Would need actual config
+                strategy = registry.create_strategy_from_instance(strategy_identifier, provider_config)
+            elif registry.is_provider_registered(request.provider_type):
+                # Create strategy from type
+                provider_config = {}  # Would need actual config
+                strategy = registry.create_strategy(request.provider_type, provider_config)
+            else:
+                available = registry.get_registered_providers() + registry.get_registered_provider_instances()
+                self.logger.error(
+                    "Strategy not found: %s. Available: %s",
+                    strategy_identifier, available
+                )
+                return [], {}
+
+            result = await strategy.execute_operation(operation)
         except Exception as exc:
             self.logger.warning("Provider query failed for request %s: %s", request.request_id, exc)
             return [], {}
@@ -721,7 +754,8 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             return {}
 
     def _get_provider_context(self):
-        """Get provider context for AWS operations."""
+        """Get provider context for AWS operations - deprecated, use registry instead."""
+        # This method is kept for backward compatibility but should be phased out
         try:
             from providers.base.strategy.provider_context import ProviderContext
 

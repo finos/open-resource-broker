@@ -305,19 +305,6 @@ class ProviderStrategy(ABC):
         """
         return {}
 
-    @abstractmethod
-    def get_available_credential_sources(self) -> list[dict]:
-        """Get available credential sources for this provider."""
-
-    @abstractmethod
-    def test_credentials(self, credential_source: Optional[str] = None, **kwargs) -> dict:
-        """Test credentials and return metadata."""
-
-    @abstractmethod
-    def get_credential_requirements(self) -> dict:
-        """Get required credential parameters for this provider."""
-
-    @abstractmethod
     def cleanup(self) -> None:
         """
         Clean up resources used by the strategy.
@@ -326,6 +313,7 @@ class ProviderStrategy(ABC):
         to ensure resource cleanup (connections, handles, etc.).
         Default implementation does nothing - override if cleanup is needed.
         """
+        pass
 
     def __enter__(self) -> "ProviderStrategy":
         """Context manager entry."""

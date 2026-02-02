@@ -1,0 +1,62 @@
+{
+  "scheduler": {
+    "type": "default"
+  },
+  "provider": {
+    "selection_policy": "ROUND_ROBIN",
+    "providers": [
+      {
+        "name": "aws_prod_us-east-1",
+        "type": "aws",
+        "enabled": true,
+        "priority": 1,
+        "weight": 100,
+        "config": {
+          "profile": "default",
+          "region": "us-east-1"
+        },
+        "template_defaults": {
+          "subnet_ids": ["subnet-12345", "subnet-67890"],
+          "security_group_ids": ["sg-prod123"]
+        }
+      },
+      {
+        "name": "aws_dev_eu-west-1",
+        "type": "aws",
+        "enabled": true,
+        "priority": 2,
+        "weight": 50,
+        "config": {
+          "profile": "dev",
+          "region": "eu-west-1"
+        },
+        "handler_overrides": {
+          "SpotFleet": null,
+          "ASG": null
+        },
+        "template_defaults": {
+          "subnet_ids": ["subnet-eu123", "subnet-eu456"],
+          "security_group_ids": ["sg-eu789"]
+        }
+      },
+      {
+        "name": "aws_test_us-west-2",
+        "type": "aws",
+        "enabled": false,
+        "priority": 3,
+        "weight": 25,
+        "config": {
+          "profile": "test",
+          "region": "us-west-2"
+        },
+        "handler_overrides": {
+          "EC2Fleet": {
+            "handler_class": "EC2FleetHandler",
+            "default_fleet_type": "maintain",
+            "max_instances": 10
+          }
+        }
+      }
+    ]
+  }
+}

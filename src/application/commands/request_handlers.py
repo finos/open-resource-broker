@@ -23,7 +23,6 @@ from domain.base.ports import (
     ErrorHandlingPort,
     EventPublisherPort,
     LoggingPort,
-    ProviderPort,
 )
 from domain.base.ports.scheduler_port import SchedulerPort
 from domain.request.repository import RequestRepository
@@ -44,7 +43,6 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
         query_bus: QueryBus,  # QueryBus is required for template lookup
         provider_selection_service: ProviderSelectionService,
         provider_capability_service: ProviderCapabilityService,
-        provider_port: ProviderPort,
     ) -> None:
         """Initialize the instance."""
         super().__init__(logger, event_publisher, error_handler)
@@ -53,7 +51,6 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
         self._query_bus = query_bus
         self._provider_selection_service = provider_selection_service
         self._provider_capability_service = provider_capability_service
-        self._provider_context = provider_port
 
     async def validate_command(self, command: CreateRequestCommand) -> None:
         """Validate create request command."""
@@ -77,14 +74,20 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
 
         # <1.> Validate provider availability and initialize request state.
         # CRITICAL VALIDATION: Ensure providers are available
-        if not self._provider_context.available_strategies:
+        from providers.registry import get_provider_registry
+        
+        registry = get_provider_registry()
+        available_providers = registry.get_registered_providers()
+        available_instances = registry.get_registered_provider_instances()
+        
+        if not available_providers and not available_instances:
             error_msg = "No provider strategies available - cannot create machine requests"
             self.logger.error(error_msg)
             raise ValueError(error_msg)
 
         self.logger.debug(
-            "Available provider strategies: %s",
-            self._provider_context.available_strategies,
+            "Available provider types: %s, instances: %s",
+            available_providers, available_instances
         )
 
         request = None
@@ -437,6 +440,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
 
             # Resolve strategy identifier using registry
             from infrastructure.services.provider_strategy_resolver import ProviderStrategyResolver
+            from providers.registry import get_provider_registry
+            
             resolver = ProviderStrategyResolver()
             strategy_identifier = resolver.resolve_strategy_identifier(
                 selection_result.provider_type,
@@ -444,7 +449,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
             )
             
             if not strategy_identifier:
-                available = resolver.get_available_strategies()
+                registry = get_provider_registry()
+                available = registry.get_registered_providers() + registry.get_registered_provider_instances()
                 error_msg = f"Provider strategy not found: {selection_result.provider_type}-{selection_result.provider_name}. Available: {available}"
                 self.logger.error(error_msg)
                 return {
@@ -456,13 +462,32 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                 }
 
             # Log available strategies for debugging
-            available_strategies = self._provider_context.available_strategies
-            self.logger.debug("Available strategies: %s", available_strategies)
+            self.logger.debug("Using registry-based strategy resolution")
             self.logger.debug("Attempting to use strategy: %s", strategy_identifier)
 
-            result = await self._provider_context.execute_with_strategy(
-                strategy_identifier, operation
-            )
+            # Get provider strategy from registry
+            registry = get_provider_registry()
+            if registry.is_provider_instance_registered(strategy_identifier):
+                # Create strategy from instance
+                provider_config = selection_result.provider_config or {}
+                strategy = registry.create_strategy_from_instance(strategy_identifier, provider_config)
+            elif registry.is_provider_registered(selection_result.provider_type):
+                # Create strategy from type
+                provider_config = selection_result.provider_config or {}
+                strategy = registry.create_strategy(selection_result.provider_type, provider_config)
+            else:
+                available = registry.get_registered_providers() + registry.get_registered_provider_instances()
+                error_msg = f"Provider strategy not found: {strategy_identifier}. Available: {available}"
+                self.logger.error(error_msg)
+                return {
+                    "success": False,
+                    "resource_ids": [],
+                    "instances": [],
+                    "provider_data": {},
+                    "error_message": error_msg,
+                }
+
+            result = await strategy.execute_operation(operation)
 
             # Process result
             if result.success:
@@ -527,13 +552,11 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         container: ContainerPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
-        provider_port: ProviderPort,
         query_bus: QueryBus,  # Add QueryBus for template lookup
     ) -> None:
         super().__init__(logger, event_publisher, error_handler)
         self.uow_factory = uow_factory
         self._container = container
-        self._provider_context = provider_port
         self._query_bus = query_bus
 
     async def validate_command(self, command: CreateReturnRequestCommand):
@@ -742,21 +765,31 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                 },
             )
 
-            # Execute via provider context
-            provider_context = self._get_provider_context()
-            if not provider_context:
-                raise ValueError("Provider context not available")
-
-            # Resolve strategy for this provider
+            # Execute via provider registry
             from infrastructure.services.provider_strategy_resolver import ProviderStrategyResolver
+            from providers.registry import get_provider_registry
             
             resolver = ProviderStrategyResolver()
             strategy_identifier = resolver.resolve_strategy_identifier("aws", provider_name)
             
             if not strategy_identifier:
                 raise ValueError(f"Strategy not found for provider: {provider_name}")
+            
+            registry = get_provider_registry()
+            
+            # Get provider strategy from registry
+            if registry.is_provider_instance_registered(strategy_identifier):
+                # Create strategy from instance
+                provider_config = {}  # Would need actual config from machine context
+                strategy = registry.create_strategy_from_instance(strategy_identifier, provider_config)
+            elif registry.is_provider_registered("aws"):
+                # Create strategy from type
+                provider_config = {}  # Would need actual config from machine context
+                strategy = registry.create_strategy("aws", provider_config)
+            else:
+                raise ValueError(f"Strategy not found for provider: {provider_name}")
 
-            result = await provider_context.execute_with_strategy(strategy_identifier, operation)
+            result = await strategy.execute_operation(operation)
 
             if result.success:
                 self.logger.info("Successfully terminated %d instances in resource %s", 
@@ -772,7 +805,8 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             return {"success": False, "error_message": str(e)}
 
     def _get_provider_context(self):
-        """Get provider context for operations."""
+        """Get provider context for operations - deprecated, use registry instead."""
+        # This method is kept for backward compatibility but should be phased out
         try:
             from providers.base.strategy.provider_context import ProviderContext
             return self._container.get(ProviderContext)
