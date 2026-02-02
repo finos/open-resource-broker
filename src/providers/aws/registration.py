@@ -243,23 +243,17 @@ def _register_aws_template_adapter(logger: "LoggingPort" = None) -> None:
             logger.warning("Failed to register AWS template adapter: %s", e)
 
 
-def register_aws_provider_with_di(provider_instance, container) -> bool:
-    """Register AWS provider instance with Provider Registry only."""
-    from domain.base.ports import LoggingPort
-
-    logger = container.get(LoggingPort)
-
+def register_aws_provider_instance(provider_instance, logger=None) -> bool:
+    """Register AWS provider instance with Provider Registry."""
     try:
-        logger.debug("Registering AWS provider instance: %s", provider_instance.name)
+        if logger:
+            logger.debug("Registering AWS provider instance: %s", provider_instance.name)
 
-        # Register provider strategy with registry
         from providers.registry import get_provider_registry
-
         registry = get_provider_registry()
 
-        # FIRST: Register AWS as a provider type if not already registered
+        # Register AWS as provider type if not already registered
         if not registry.is_provider_registered("aws"):
-            logger.debug("Registering AWS provider type")
             registry.register_provider(
                 provider_type="aws",
                 strategy_factory=create_aws_strategy,
@@ -267,7 +261,6 @@ def register_aws_provider_with_di(provider_instance, container) -> bool:
                 resolver_factory=create_aws_resolver,
                 validator_factory=create_aws_validator,
             )
-            logger.debug("AWS provider type registered successfully")
 
         # Register the specific provider instance
         registry.register_provider_instance(
@@ -278,17 +271,14 @@ def register_aws_provider_with_di(provider_instance, container) -> bool:
             resolver_factory=create_aws_resolver,
             validator_factory=create_aws_validator,
         )
-        logger.debug("AWS provider instance registered successfully")
 
-        logger.debug("Successfully registered AWS provider instance: %s", provider_instance.name)
+        if logger:
+            logger.debug("Successfully registered AWS provider instance: %s", provider_instance.name)
         return True
 
     except Exception as e:
-        logger.error(
-            "Failed to register AWS provider instance '%s': %s",
-            provider_instance.name,
-            str(e),
-        )
+        if logger:
+            logger.error("Failed to register AWS provider instance '%s': %s", provider_instance.name, str(e))
         return False
 
 
@@ -404,20 +394,16 @@ def is_aws_provider_registered() -> bool:
 
 
 def register_aws_services_with_di(container) -> None:
-    """Register AWS services with DI container."""
+    """Register AWS utility services with DI container (not provider instances)."""
     from domain.base.ports import LoggingPort
 
     logger = container.get(LoggingPort)
 
     try:
-        # Register AWS-specific services that need to be available globally
+        # Register AWS-specific utility services only
         from domain.base.ports.template_resolver_port import TemplateResolverPort
-        from providers.aws.infrastructure.launch_template.manager import (
-            AWSLaunchTemplateManager,
-        )
-        from providers.aws.infrastructure.template.caching_ami_resolver import (
-            CachingAMIResolver,
-        )
+        from providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
+        from providers.aws.infrastructure.template.caching_ami_resolver import CachingAMIResolver
 
         # Register AMI resolver if not already registered
         if not container.is_registered(CachingAMIResolver):
@@ -431,14 +417,10 @@ def register_aws_services_with_di(container) -> None:
             logger.debug("AWS Launch Template Manager registered with DI container")
 
         # Register AWS Native Spec Service if not already registered
-        from providers.aws.infrastructure.services.aws_native_spec_service import (
-            AWSNativeSpecService,
-        )
+        from providers.aws.infrastructure.services.aws_native_spec_service import AWSNativeSpecService
 
         if not container.is_registered(AWSNativeSpecService):
-
             def create_aws_native_spec_service(c):
-                """Create AWS native spec service."""
                 from application.services.native_spec_service import NativeSpecService
                 from domain.base.ports.configuration_port import ConfigurationPort
 
@@ -450,10 +432,10 @@ def register_aws_services_with_di(container) -> None:
             container.register_factory(AWSNativeSpecService, create_aws_native_spec_service)
             logger.debug("AWS Native Spec Service registered with DI container")
 
-        logger.debug("AWS services registered with DI container")
+        logger.debug("AWS utility services registered with DI container")
 
     except Exception as e:
-        logger.warning("Failed to register AWS services with DI container: %s", e)
+        logger.warning("Failed to register AWS utility services with DI container: %s", e)
 
 
 # Auto-register AWS extensions when module is imported

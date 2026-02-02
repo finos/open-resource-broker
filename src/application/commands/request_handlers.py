@@ -437,7 +437,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
 
             # Resolve strategy identifier using registry
             from infrastructure.services.provider_strategy_resolver import ProviderStrategyResolver
-            resolver = ProviderStrategyResolver(self._provider_context)
+            resolver = ProviderStrategyResolver()
             strategy_identifier = resolver.resolve_strategy_identifier(
                 selection_result.provider_type,
                 selection_result.provider_name
@@ -750,7 +750,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             # Resolve strategy for this provider
             from infrastructure.services.provider_strategy_resolver import ProviderStrategyResolver
             
-            resolver = ProviderStrategyResolver(provider_context)
+            resolver = ProviderStrategyResolver()
             strategy_identifier = resolver.resolve_strategy_identifier("aws", provider_name)
             
             if not strategy_identifier:

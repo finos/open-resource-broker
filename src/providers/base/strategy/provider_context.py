@@ -1,8 +1,8 @@
-"""Provider Context - Strategy pattern context for managing provider strategies.
+"""Provider Context - Strategy pattern context for executing provider operations.
 
 This module implements the Context component of the Strategy pattern,
-providing a integrated interface for executing operations across different
-provider strategies while handling strategy selection, switching, and lifecycle.
+providing a unified interface for executing operations with provider
+strategies while handling metrics collection and error handling.
 """
 
 import time
@@ -22,17 +22,16 @@ from providers.base.strategy.provider_strategy import (
 
 class ProviderContext:
     """
-    Context class for managing provider strategies.
+    Context class for executing operations with provider strategies.
 
     This class implements the Context component of the Strategy pattern,
-    providing a integrated interface for executing operations across different
-    provider strategies. It handles strategy selection, lifecycle management,
-    metrics collection, and error handling.
+    providing a unified interface for executing operations with provider
+    strategies. It handles strategy execution, metrics collection, and 
+    error handling.
 
     Features:
-    - Strategy registration and management
-    - Automatic strategy selection based on capabilities
-    - Health monitoring and failover
+    - Strategy execution with automatic capability checking
+    - Health monitoring and status reporting
     - Performance metrics collection
     - Thread-safe operations
     - Context manager support
@@ -76,89 +75,7 @@ class ProviderContext:
         # Fallback to provider type if not found
         return self._current_strategy.provider_type
 
-    @property
-    def available_strategies(self) -> list[str]:
-        """Get list of available strategy types."""
-        return list(self._strategies.keys())
 
-    def register_strategy(
-        self, strategy: ProviderStrategy, instance_name: Optional[str] = None
-    ) -> None:
-        """
-        Register a provider strategy.
-
-        Args:
-            strategy: The provider strategy to register
-            instance_name: Optional instance name for unique identification
-
-        Raises:
-            ValueError: If strategy is invalid or already registered
-        """
-        if not isinstance(strategy, ProviderStrategy):
-            raise ValueError("Strategy must implement ProviderStrategy interface")
-
-        # Create unique strategy identifier
-        base_type = strategy.provider_type
-        if instance_name:
-            strategy_type = f"{base_type}-{instance_name}"
-        else:
-            strategy_type = base_type
-
-        with self._lock:
-            if strategy_type in self._strategies:
-                self._logger.debug("Strategy %s already registered, replacing", strategy_type)
-
-            self._strategies[strategy_type] = strategy
-
-            # Set as default if it's the first strategy
-            if self._default_strategy_type is None:
-                self._default_strategy_type = strategy_type
-                self._current_strategy = strategy
-
-            self._logger.debug(
-                "Loaded strategy for provider instance: %s:%s",
-                base_type,
-                instance_name or "default",
-            )
-
-    def unregister_strategy(self, strategy_type: str) -> bool:
-        """
-        Unregister a provider strategy.
-
-        Args:
-            strategy_type: Type of strategy to unregister
-
-        Returns:
-            True if strategy was unregistered, False if not found
-        """
-        with self._lock:
-            if strategy_type not in self._strategies:
-                return False
-
-            strategy = self._strategies[strategy_type]
-
-            # Clean up strategy resources
-            try:
-                strategy.cleanup()
-            except Exception as e:
-                self._logger.warning("Error cleaning up strategy %s: %s", strategy_type, e)
-
-            # Remove from registry
-            del self._strategies[strategy_type]
-
-            # Update current strategy if needed
-            if self._current_strategy == strategy:
-                self._current_strategy = None
-                self._default_strategy_type = None
-
-                # Set new default if other strategies exist
-                if self._strategies:
-                    new_default = next(iter(self._strategies.keys()))
-                    self._default_strategy_type = new_default
-                    self._current_strategy = self._strategies[new_default]
-
-            self._logger.info("Unregistered provider strategy: %s", strategy_type)
-            return True
 
     def set_strategy(self, strategy_type: str) -> bool:
         """

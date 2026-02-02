@@ -225,7 +225,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             # Resolve strategy identifier using registry
             from infrastructure.services.provider_strategy_resolver import ProviderStrategyResolver
             
-            resolver = ProviderStrategyResolver(provider_context)
+            resolver = ProviderStrategyResolver()
             strategy_identifier = resolver.resolve_strategy_identifier(
                 request.provider_type, 
                 request.provider_name
@@ -344,7 +344,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
         # Resolve strategy identifier using registry
         from infrastructure.services.provider_strategy_resolver import ProviderStrategyResolver
-        resolver = ProviderStrategyResolver(provider_context)
+        resolver = ProviderStrategyResolver()
         strategy_identifier = resolver.resolve_strategy_identifier(
             request.provider_type, 
             request.provider_name

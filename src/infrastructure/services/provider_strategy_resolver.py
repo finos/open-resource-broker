@@ -2,14 +2,14 @@
 
 from typing import Optional
 
-from providers.base.strategy.provider_context import ProviderContext
+from providers.registry import get_provider_registry
 
 
 class ProviderStrategyResolver:
     """Resolves provider strategy identifiers using the registry pattern."""
 
-    def __init__(self, provider_context: ProviderContext):
-        self._context = provider_context
+    def __init__(self):
+        self._registry = get_provider_registry()
 
     def resolve_strategy_identifier(
         self, 
@@ -26,26 +26,23 @@ class ProviderStrategyResolver:
         Returns:
             Registered strategy identifier or None if not found
         """
-        # Try exact match first (provider name only)
-        if provider_name:
-            if provider_name in self._context.available_strategies():
-                return provider_name
+        # Try exact instance match first
+        if provider_name and self._registry.is_provider_instance_registered(provider_name):
+            return provider_name
         
-        # Try with 'default' fallback
-        default_candidate = f"{provider_type}-default"
-        if default_candidate in self._context.available_strategies():
-            return default_candidate
-            
-        # Try provider type only
-        if provider_type in self._context.available_strategies():
+        # Try provider type
+        if self._registry.is_provider_registered(provider_type):
             return provider_type
             
         return None
 
     def get_available_strategies(self) -> list[str]:
         """Get all available strategy identifiers from registry."""
-        return self._context.available_strategies()
+        types = self._registry.get_registered_providers()
+        instances = self._registry.get_registered_provider_instances()
+        return types + instances
 
     def validate_strategy_exists(self, strategy_identifier: str) -> bool:
         """Check if strategy exists in registry."""
-        return strategy_identifier in self._context.available_strategies()
+        return (self._registry.is_provider_registered(strategy_identifier) or 
+                self._registry.is_provider_instance_registered(strategy_identifier))
