@@ -135,11 +135,16 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             if instance_ids and self._machine_adapter:
                 for instance_id in instance_ids:
                     instance_data = {"InstanceId": instance_id}
-                    instances.append(
-                        self._machine_adapter.create_machine_from_aws_instance(
-                            instance_data, str(request.request_id), "EC2Fleet", fleet_id
+                    try:
+                        instances.append(
+                            self._machine_adapter.create_machine_from_aws_instance(
+                                instance_data, str(request.request_id), "EC2Fleet", fleet_id
+                            )
                         )
-                    )
+                    except Exception as e:
+                        # If adapter fails with partial data, skip machine creation
+                        # Machines will be populated later via status query
+                        self._logger.debug("Skipping machine creation with partial data: %s", e)
             
             return {
                 "success": True,
