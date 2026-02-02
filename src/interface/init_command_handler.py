@@ -313,21 +313,26 @@ def _get_credential_requirements(provider_type: str) -> dict:
 def _discover_infrastructure(provider_type: str, region: str, profile: str) -> Dict[str, Any]:
     """Discover infrastructure interactively using provider strategy."""
     try:
-        from infrastructure.di.container import get_container
-        from domain.base.ports.provider_port import ProviderPort
+        from providers.registry import get_provider_registry
         
-        container = get_container()
-        provider_strategy = container.get(ProviderPort)
+        registry = get_provider_registry()
         
         # Create provider config for discovery
         provider_config = {
-            "type": provider_type,
-            "config": {"region": region, "profile": profile}
+            "region": region,
+            "profile": profile
         }
         
+        # Get strategy from registry
+        strategy = registry.create_strategy(provider_type, provider_config)
+        
         # Check if provider strategy supports infrastructure discovery
-        if hasattr(provider_strategy, 'discover_infrastructure_interactive'):
-            return provider_strategy.discover_infrastructure_interactive(provider_config)
+        if hasattr(strategy, 'discover_infrastructure_interactive'):
+            full_config = {
+                "type": provider_type,
+                "config": provider_config
+            }
+            return strategy.discover_infrastructure_interactive(full_config)
         else:
             print_info(f"Infrastructure discovery not supported for provider type: {provider_type}")
             return {}
