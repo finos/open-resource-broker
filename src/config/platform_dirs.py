@@ -6,8 +6,27 @@ from pathlib import Path
 
 
 def in_virtualenv() -> bool:
-    """Check if running in a virtual environment."""
-    return sys.prefix != sys.base_prefix
+    """Check if running in a virtual environment.
+    
+    Handles both standard venvs (sys.prefix != sys.base_prefix) and
+    symlink-based venvs like uv/mise (sys.executable not in sys.prefix).
+    """
+    # Standard venv detection
+    if sys.prefix != sys.base_prefix:
+        return True
+    
+    # Symlink venv detection (uv, mise, etc.)
+    # If executable is outside sys.prefix, it's a symlink venv
+    executable_path = Path(sys.executable).resolve()
+    prefix_path = Path(sys.prefix).resolve()
+    
+    try:
+        # Check if executable is under prefix
+        executable_path.relative_to(prefix_path)
+        return False  # Executable is under prefix, not a venv
+    except ValueError:
+        # Executable is outside prefix, it's a symlink venv
+        return True
 
 
 def is_user_install() -> bool:
