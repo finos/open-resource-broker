@@ -4,10 +4,10 @@ from datetime import datetime
 from typing import Any, Optional
 
 from domain.base.ports.storage_port import StoragePort
-from domain.base.value_objects import InstanceId
 from domain.machine.aggregate import Machine
+from domain.machine.machine_identifiers import MachineId
 from domain.machine.repository import MachineRepository as MachineRepositoryInterface
-from domain.machine.value_objects import MachineId, MachineStatus
+from domain.machine.value_objects import MachineStatus
 from infrastructure.error.decorators import handle_infrastructure_exceptions
 from infrastructure.logging.logger import get_logger
 
@@ -24,9 +24,10 @@ class MachineSerializer:
         try:
             return {
                 # Core machine identification
-                "instance_id": str(machine.instance_id.value),
+                "machine_id": str(machine.machine_id.value),
                 "template_id": machine.template_id,
                 "request_id": machine.request_id,
+                "return_request_id": machine.return_request_id,
                 "provider_type": machine.provider_type,
                 "provider_name": machine.provider_name,
                 "provider_api": machine.provider_api,
@@ -61,7 +62,7 @@ class MachineSerializer:
                 "schema_version": "2.0.0",
             }
         except Exception as e:
-            self.logger.error("Failed to serialize machine %s: %s", machine.instance_id, e)
+            self.logger.error("Failed to serialize machine %s: %s", machine.machine_id, e)
             raise
 
     def from_dict(self, data: dict[str, Any]) -> Machine:
@@ -88,12 +89,12 @@ class MachineSerializer:
 
             # Build machine data with additional fields
             machine_data = {
-                # Core machine identification
-                "instance_id": InstanceId(value=data["instance_id"]),
+                "machine_id": MachineId(value=data["machine_id"]),
                 "template_id": data["template_id"],
                 "request_id": data.get("request_id"),
+                "return_request_id": data.get("return_request_id"),
                 "provider_type": data.get("provider_type", "aws"),
-                "provider_name": data.get("provider_name", data.get("provider_type", "aws") + "-default"),  # Migration fallback
+                "provider_name": data.get("provider_name"),
                 "provider_api": data.get("provider_api"),
                 "resource_id": data.get("resource_id"),
                 # Machine configuration
@@ -148,9 +149,9 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
     def save(self, machine: Machine) -> list[Any]:
         """Save machine using storage strategy and return extracted events."""
         try:
-            # Save the machine using instance_id as the key
+            # Save the machine using machine_id as the key
             machine_data = self.serializer.to_dict(machine)
-            self.storage_port.save(str(machine.instance_id.value), machine_data)
+            self.storage_port.save(str(machine.machine_id.value), machine_data)
 
             # Extract events from the aggregate
             events = machine.get_domain_events()
@@ -158,13 +159,13 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
 
             self.logger.debug(
                 "Saved machine %s and extracted %s events",
-                machine.instance_id,
+                machine.machine_id,
                 len(events),
             )
             return events
 
         except Exception as e:
-            self.logger.error("Failed to save machine %s: %s", machine.instance_id, e)
+            self.logger.error("Failed to save machine %s: %s", machine.machine_id, e)
             raise
 
     @handle_infrastructure_exceptions(context="machine_repository_save_batch")
@@ -178,7 +179,7 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
             events: list[Any] = []
 
             for machine in machines:
-                entity_id = str(machine.instance_id.value)
+                entity_id = str(machine.machine_id.value)
                 entity_batch[entity_id] = self.serializer.to_dict(machine)
                 events.extend(machine.get_domain_events())
 
@@ -228,16 +229,29 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
         return self.get_by_id(machine_id)
 
     @handle_infrastructure_exceptions(context="machine_repository_find_by_instance_id")
-    def find_by_instance_id(self, instance_id: InstanceId) -> Optional[Machine]:
-        """Find machine by instance ID."""
+    def find_by_instance_id(self, instance_id: MachineId) -> Optional[Machine]:
+        """Find machine by instance ID (backward compatibility)."""
         try:
-            criteria = {"instance_id": str(instance_id.value)}
+            criteria = {"machine_id": str(instance_id.value)}
             data_list = self.storage_port.find_by_criteria(criteria)
             if data_list:
                 return self.serializer.from_dict(data_list[0])
             return None
         except Exception as e:
             self.logger.error("Failed to find machine by instance_id %s: %s", instance_id, e)
+            raise
+
+    @handle_infrastructure_exceptions(context="machine_repository_find_by_machine_id")
+    def find_by_machine_id(self, machine_id: MachineId) -> Optional[Machine]:
+        """Find machine by machine ID."""
+        try:
+            criteria = {"machine_id": str(machine_id.value)}
+            data_list = self.storage_port.find_by_criteria(criteria)
+            if data_list:
+                return self.serializer.from_dict(data_list[0])
+            return None
+        except Exception as e:
+            self.logger.error("Failed to find machine by machine_id %s: %s", machine_id, e)
             raise
 
     @handle_infrastructure_exceptions(context="machine_repository_find_by_template_id")
@@ -269,12 +283,24 @@ class MachineRepositoryImpl(MachineRepositoryInterface):
             criteria = {"request_id": request_id}
             data_list = self.storage_port.find_by_criteria(criteria)
 
-            # Filter to only machine records (must have instance_id field)
-            machine_data_list = [data for data in data_list if "instance_id" in data]
+            # Filter to only machine records (must have machine_id field)
+            machine_data_list = [data for data in data_list if "machine_id" in data]
 
             return [self.serializer.from_dict(data) for data in machine_data_list]
         except Exception as e:
             self.logger.error("Failed to find machines by request_id %s: %s", request_id, e)
+            raise
+
+    @handle_infrastructure_exceptions(context="machine_repository_find_by_return_request_id")
+    def find_by_return_request_id(self, return_request_id: str) -> list[Machine]:
+        """Find machines by return request ID."""
+        try:
+            criteria = {"return_request_id": return_request_id}
+            data_list = self.storage_port.find_by_criteria(criteria)
+            machine_data_list = [data for data in data_list if "machine_id" in data]
+            return [self.serializer.from_dict(data) for data in machine_data_list]
+        except Exception as e:
+            self.logger.error("Failed to find machines by return_request_id %s: %s", return_request_id, e)
             raise
 
     @handle_infrastructure_exceptions(context="machine_repository_find_active_machines")

@@ -185,7 +185,7 @@ class ProviderCapabilityService:
                 return None
             
             # Use provider config for strategy creation
-            strategy = self._provider_registry.create_strategy_from_instance(provider_instance, provider_config.config)
+            strategy = self._provider_registry.get_or_create_strategy(provider_instance, provider_config)
             return strategy.get_capabilities()
         except Exception as e:
             self._logger.warning("Failed to get capabilities for %s: %s", provider_instance, str(e))

@@ -297,7 +297,8 @@ class AWSProviderStrategy(ProviderStrategy):
     # Legacy methods that need to be kept for compatibility
     async def _handle_describe_resource_instances(self, operation: ProviderOperation) -> ProviderResult:
         """Handle resource-to-instance discovery operation using handlers."""
-        return await self._get_instance_service().describe_resource_instances(operation)
+        handlers = self._get_handler_registry().get_available_handlers()
+        return await self._get_instance_service().describe_resource_instances(operation, handlers)
 
     # Infrastructure discovery methods (delegated to service)
     def discover_infrastructure(self, provider_config: dict[str, Any]) -> dict[str, Any]:

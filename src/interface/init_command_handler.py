@@ -329,7 +329,7 @@ def _discover_infrastructure(provider_type: str, region: str, profile: str) -> D
         }
         
         # Get strategy from registry
-        strategy = registry.create_strategy(provider_type, provider_config)
+        strategy = registry.get_or_create_strategy(provider_type, provider_config)
         
         # Check if provider strategy supports infrastructure discovery
         if hasattr(strategy, 'discover_infrastructure_interactive'):

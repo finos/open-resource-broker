@@ -68,7 +68,7 @@ class RequestCacheService:
                     for machine in machines:
                         machines_data.append(
                             {
-                                "instance_id": str(machine.instance_id),
+                                "instance_id": str(machine.machine_id),
                                 "status": machine.status.value,
                                 "private_ip": machine.private_ip,
                                 "public_ip": machine.public_ip,

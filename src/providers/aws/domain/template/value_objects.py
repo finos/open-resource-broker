@@ -59,16 +59,6 @@ class AWSSecurityGroupId(ResourceId):
     pattern_key: ClassVar[str] = "security_group"
 
 
-class InstanceId(ResourceId):
-    """AWS Instance ID value object."""
-
-    resource_type: ClassVar[str] = "Instance"
-    pattern_key: ClassVar[str] = "ec2_instance"
-
-    def to_aws_format(self) -> str:
-        """Convert to AWS API format."""
-        return self.value
-
 
 class AWSImageId(ResourceId):
     """AWS AMI ID value object."""

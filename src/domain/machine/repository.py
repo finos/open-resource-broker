@@ -4,7 +4,7 @@ from abc import abstractmethod
 from typing import Any, Optional
 
 from domain.base.domain_interfaces import AggregateRepository
-from domain.base.value_objects import InstanceId
+from domain.machine.machine_identifiers import MachineId
 
 from .aggregate import Machine
 from .machine_status import MachineStatus
@@ -18,8 +18,12 @@ class MachineRepository(AggregateRepository[Machine]):
         """Save multiple machines in a single operation."""
 
     @abstractmethod
-    def find_by_instance_id(self, instance_id: InstanceId) -> Optional[Machine]:
-        """Find machine by instance ID."""
+    def find_by_instance_id(self, instance_id: MachineId) -> Optional[Machine]:
+        """Find machine by instance ID (backward compatibility)."""
+
+    @abstractmethod
+    def find_by_machine_id(self, machine_id: MachineId) -> Optional[Machine]:
+        """Find machine by machine ID."""
 
     @abstractmethod
     def find_by_template_id(self, template_id: str) -> list[Machine]:

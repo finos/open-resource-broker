@@ -595,17 +595,26 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
     def format_request_status_response(self, requests: list["Request"]) -> dict[str, Any]:
         """
         Format domain Requests to HostFactory response format.
-        Converts machine fields from snake_case to camelCase.
+        Uses field mapper for consistent transformations.
         """
         formatted_requests = []
         for request in requests:
             req_dict = self.format_request_for_display(request)
-            # Convert machines to camelCase
-            if "machines" in req_dict:
-                req_dict["machines"] = [
-                    self._convert_machine_to_camel(m) for m in req_dict["machines"]
+            
+            # Rename machine_references to machines for HostFactory compatibility
+            if "machine_references" in req_dict:
+                req_dict["machines"] = req_dict.pop("machine_references")
+            
+            # Use field mapper to convert all fields to HostFactory format
+            formatted_request = self.field_mapper.map_output_fields(req_dict)
+            
+            # Convert machines to camelCase using existing method
+            if "machines" in formatted_request:
+                formatted_request["machines"] = [
+                    self._convert_machine_to_camel(m) for m in formatted_request["machines"]
                 ]
-            formatted_requests.append(req_dict)
+            
+            formatted_requests.append(formatted_request)
 
         return {
             "requests": formatted_requests,
@@ -647,7 +656,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "machines": [
                 {
                     # Domain -> HostFactory field mapping using consistent serialization
-                    "instanceId": serialize_enum(machine.instance_id) or str(machine.instance_id),
+                    "instanceId": serialize_enum(machine.machine_id) or str(machine.machine_id),
                     "templateId": str(machine.template_id),
                     "requestId": str(machine.request_id),
                     "vmType": serialize_enum(machine.instance_type) or str(machine.instance_type),

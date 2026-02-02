@@ -129,8 +129,8 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
             machine_references = [
                 MachineReferenceDTO(
-                    machine_id=str(machine.instance_id.value),
-                    name=machine.private_ip or str(machine.instance_id.value),
+                    machine_id=str(machine.machine_id.value),
+                    name=machine.private_ip or str(machine.machine_id.value),
                     result=self._map_machine_status_to_result(machine.status.value),
                     status=machine.status.value,
                     private_ip_address=machine.private_ip or "",
@@ -140,6 +140,11 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 for machine in machine_objects_from_provider
             ]
 
+            # Compute machine_ids from machines
+            with self.uow_factory.create_unit_of_work() as uow:
+                machines = uow.machines.find_by_request_id(query.request_id)
+                machine_ids = [str(m.machine_id.value) for m in machines]
+
             request_dto = RequestDTO(
                 request_id=str(request.request_id),
                 template_id=request.template_id,
@@ -147,6 +152,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 status=request.status.value,
                 created_at=request.created_at,
                 machine_references=machine_references,
+                machine_ids=machine_ids,
                 metadata=request.metadata or {},
             )
 
@@ -202,7 +208,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             else:
                 # Fallback to instance-level discovery
                 operation_type = ProviderOperationType.GET_INSTANCE_STATUS
-                instance_ids = [m.instance_id.value for m in existing_machines]
+                instance_ids = [m.machine_id.value for m in existing_machines]
                 parameters = {
                     "instance_ids": instance_ids,
                     "template_id": request.template_id,
@@ -221,12 +227,12 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             from domain.base.ports.configuration_port import ConfigurationPort
             config_port = self._container.get(ConfigurationPort)
             provider_instance_config = config_port.get_provider_instance_config(request.provider_name)
-            provider_config = provider_instance_config.config if provider_instance_config else {}
             
             # Execute operation using Provider Registry
+            # Pass the full ProviderInstanceConfig object, not just the nested config dict
             from providers.registry import get_provider_registry
             registry = get_provider_registry()
-            result = await registry.execute_operation(request.provider_name, operation, provider_config)
+            result = await registry.execute_operation(request.provider_name, operation, provider_instance_config)
 
             self.logger.info(
                 "Provider strategy result: success=%s, data_keys=%s",
@@ -306,7 +312,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             except Exception:
                 status_obj = MachineStatus.UNKNOWN
             return {
-                "instance_id": str(entry.instance_id.value),
+                "instance_id": str(entry.machine_id.value),
                 "status": status_obj,
                 "private_ip": entry.private_ip,
                 "public_ip": entry.public_ip,
@@ -388,7 +394,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
             # <2.> Prepare lookup maps and domain helpers.
             # Ensure we have a map of existing machines for quick lookup
-            existing_by_id = {str(m.instance_id.value): m for m in machines}
+            existing_by_id = {str(m.machine_id.value): m for m in machines}
             updated_machines = []
             new_machines = []
             to_upsert = []
@@ -460,7 +466,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                             else:
                                 # Fallback to building minimal Machine
                                 created_machine = DomainMachine(
-                                    instance_id=dm_id,
+                                    machine_id=dm_id,
                                     template_id=request.template_id,
                                     request_id=str(request.request_id),
                                     provider_type=request.provider_type,
@@ -492,9 +498,9 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 updated_machines.extend(new_machines)
 
             # Ensure any original machines not updated are retained
-            seen_ids = {str(m.instance_id.value) for m in updated_machines}
+            seen_ids = {str(m.machine_id.value) for m in updated_machines}
             for m in machines:
-                if str(m.instance_id.value) not in seen_ids:
+                if str(m.machine_id.value) not in seen_ids:
                     updated_machines.append(m)
 
             # Update ASG metadata if this is an ASG request
@@ -633,7 +639,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
     def _create_machine_from_aws_data(self, aws_instance: dict[str, Any], request):
         """Create machine aggregate using Pydantic validation with format detection."""
-        from domain.base.value_objects import InstanceId
+        from domain.machine.machine_identifiers import MachineId
         from domain.machine.aggregate import Machine
 
         # Detect format and normalize to snake_case for Pydantic
@@ -687,7 +693,8 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
         from domain.base.value_objects import InstanceType
 
         # Convert strings to proper value objects
-        machine_data["instance_id"] = InstanceId(value=machine_data["instance_id"])
+        machine_data["machine_id"] = MachineId(value=machine_data["instance_id"])
+        del machine_data["instance_id"]  # Remove old field name
         machine_data["instance_type"] = InstanceType(value=machine_data["instance_type"])
 
         # Let Pydantic handle validation, type conversion, and field mapping

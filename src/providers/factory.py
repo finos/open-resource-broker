@@ -192,7 +192,7 @@ class ProviderStrategyFactory:
 
             # Try to create from named instance first (preferred for multi-instance)
             if registry.is_provider_instance_registered(provider_config.name):
-                strategy = registry.create_strategy_from_instance(
+                strategy = registry.get_or_create_strategy(
                     provider_config.name, config
                 )
                 self._logger.debug(
@@ -200,7 +200,7 @@ class ProviderStrategyFactory:
                 )
             else:
                 # Fallback to provider type (backward compatibility)
-                strategy = registry.create_strategy(provider_config.type, config)
+                strategy = registry.get_or_create_strategy(provider_config.type, config)
                 self._logger.debug("Created provider strategy from type: %s", provider_config.type)
 
             # Set provider name for identification
@@ -312,10 +312,7 @@ class ProviderStrategyFactory:
                 try:
                     # Test provider strategy creation
                     config = self._create_provider_config(provider_instance)
-                    if registry.is_provider_instance_registered(provider_instance.name):
-                        registry.create_strategy_from_instance(provider_instance.name, config)
-                    else:
-                        registry.create_strategy(provider_instance.type, config)
+                    registry.get_or_create_strategy(provider_instance.name, config)
                 except Exception as e:
                     validation_result["errors"].append(
                         f"Provider '{provider_instance.name}' validation failed: {e!s}"

@@ -95,12 +95,8 @@ class MachineReference(ValueObject):
     """
     Reference to a machine within a request.
 
-    This represents a machine that is part of a request, including its
-    current status and any associated metadata.
-
     Attributes:
         machine_id: Unique identifier for the machine
-        instance_id: Cloud provider instance ID (optional)
         status: Current status of the machine
         result: Result of the machine operation
         error_message: Error message if operation failed (optional)
@@ -109,12 +105,11 @@ class MachineReference(ValueObject):
     """
 
     machine_id: str
-    instance_id: Optional[str] = None
-    status: str  # MachineStatus enum value as string
-    result: str  # MachineResult enum value as string
+    status: str
+    result: str
     error_message: Optional[str] = None
-    created_at: Optional[str] = None  # ISO format datetime string
-    updated_at: Optional[str] = None  # ISO format datetime string
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
     @field_validator("machine_id")
     @classmethod
@@ -123,23 +118,10 @@ class MachineReference(ValueObject):
         if not v or not isinstance(v, str):
             raise ValueError("Machine ID must be a non-empty string")
 
-        # Basic format validation - can be extended based on requirements
         if len(v) < 3:
             raise ValueError("Machine ID must be at least 3 characters long")
 
         return v
-
-    @field_validator("instance_id")
-    @classmethod
-    def validate_instance_id(cls, v: Optional[str]) -> Optional[str]:
-        """Validate instance ID format if provided."""
-        if v is None:
-            return v
-
-        if not isinstance(v, str) or not v.strip():
-            raise ValueError("Instance ID must be a non-empty string if provided")
-
-        return v.strip()
 
     def __str__(self) -> str:
         return f"MachineRef({self.machine_id}, {self.status})"
@@ -171,22 +153,11 @@ class MachineReference(ValueObject):
     def update_status(
         self, new_status: str, result: str, error_message: Optional[str] = None
     ) -> MachineReference:
-        """
-        Create a new MachineReference with updated status.
-
-        Args:
-            new_status: New machine status
-            result: New machine result
-            error_message: Optional error message
-
-        Returns:
-            New MachineReference instance with updated values
-        """
+        """Create a new MachineReference with updated status."""
         from datetime import datetime
 
         return MachineReference(
             machine_id=self.machine_id,
-            instance_id=self.instance_id,
             status=new_status,
             result=result,
             error_message=error_message,

@@ -25,7 +25,6 @@ from .base import (
     DomainException,
     Entity,
     EventPublisher,
-    InstanceId,
     InstanceType,
     IPAddress,
     PriceType,
@@ -50,7 +49,6 @@ __all__: list[str] = [
     "Entity",
     "EventPublisher",
     "IPAddress",
-    "InstanceId",
     "InstanceType",
     # Machine context
     "Machine",

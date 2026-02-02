@@ -13,7 +13,6 @@ from domain.base.events import (
     SlowQueryDetectedEvent,
 )
 from domain.base.ports.storage_port import StoragePort
-from domain.base.value_objects import InstanceId  # Add InstanceId import
 from domain.request.aggregate import Request
 from domain.request.repository import RequestRepository as RequestRepositoryInterface
 from domain.request.value_objects import RequestId, RequestStatus, RequestType
@@ -49,7 +48,6 @@ class RequestSerializer:
                 # HF output fields
                 "message": request.message,
                 # Results and instances
-                "machine_ids": [str(instance_id.value) for instance_id in request.instance_ids],
                 "successful_count": request.successful_count,
                 "failed_count": request.failed_count,
                 # Metadata and error details
@@ -108,9 +106,6 @@ class RequestSerializer:
                 # HF output fields
                 "message": data.get("message"),
                 # Results and instances
-                "instance_ids": [
-                    InstanceId(value=machine_id) for machine_id in data.get("machine_ids", [])
-                ],
                 "successful_count": data.get("successful_count", 0),
                 "failed_count": data.get("failed_count", 0),
                 # Metadata and error details

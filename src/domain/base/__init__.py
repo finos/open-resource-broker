@@ -51,7 +51,6 @@ from .exceptions import (
 from .value_objects import (
     ARN,
     AllocationStrategy,
-    InstanceId,
     InstanceType,
     IPAddress,
     PriceType,
@@ -107,7 +106,6 @@ __all__: list[str] = [
     "IUnitOfWork",
     "InfrastructureError",
     "InfrastructureEvent",
-    "InstanceId",
     "InstanceType",
     "InvariantViolationError",
     "PriceType",

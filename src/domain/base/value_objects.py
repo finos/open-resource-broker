@@ -97,12 +97,6 @@ class ResourceQuota(ValueObject):
         )
 
 
-class InstanceId(ResourceId):
-    """Instance identifier value object."""
-
-    resource_type: ClassVar[str] = "Instance"
-
-
 class IPAddress(ValueObject):
     """IP address value object."""
 

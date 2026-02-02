@@ -94,7 +94,7 @@ class ProviderRegistry(BaseRegistry):
         
         try:
             # Get or create strategy
-            strategy = self._get_or_create_strategy(provider_identifier, config)
+            strategy = self.get_or_create_strategy(provider_identifier, config)
             if not strategy:
                 return self._create_error_result(
                     f"Failed to create strategy for provider: {provider_identifier}",
@@ -150,7 +150,7 @@ class ProviderRegistry(BaseRegistry):
     def get_strategy_capabilities(self, provider_identifier: str, config: Any = None) -> Optional[Any]:
         """Get capabilities for a provider strategy."""
         try:
-            strategy = self._get_or_create_strategy(provider_identifier, config)
+            strategy = self.get_or_create_strategy(provider_identifier, config)
             return strategy.get_capabilities() if strategy else None
         except Exception as e:
             if self._logger:
@@ -160,7 +160,7 @@ class ProviderRegistry(BaseRegistry):
     def check_strategy_health(self, provider_identifier: str, config: Any = None) -> Optional[Any]:
         """Check health of a provider strategy."""
         try:
-            strategy = self._get_or_create_strategy(provider_identifier, config)
+            strategy = self.get_or_create_strategy(provider_identifier, config)
             if not strategy:
                 return None
                 
@@ -174,21 +174,39 @@ class ProviderRegistry(BaseRegistry):
                 self._logger.error("Error checking health of %s: %s", provider_identifier, e)
             return self._create_unhealthy_status(f"Health check failed: {str(e)}")
 
-    def _get_or_create_strategy(self, provider_identifier: str, config: Any = None) -> Optional[Any]:
-        """Get cached strategy or create new one."""
+    def get_or_create_strategy(self, provider_identifier: str, config: Any = None) -> Optional[Any]:
+        """
+        Get cached strategy or create new one with auto-registration.
+        
+        Args:
+            provider_identifier: Provider type or instance name
+            config: Configuration (ProviderInstanceConfig object or dict)
+            
+        Returns:
+            Strategy instance or None if creation failed
+        """
         # Check cache first
         if provider_identifier in self._strategy_cache:
             return self._strategy_cache[provider_identifier]
+
+        # Auto-register if needed
+        if config and hasattr(config, 'name') and hasattr(config, 'type'):
+            # It's a ProviderInstanceConfig object - register the instance
+            self.ensure_provider_instance_registered_from_config(config)
+        elif not self.is_provider_instance_registered(provider_identifier) and not self.is_provider_registered(provider_identifier):
+            # Try to auto-register the provider type
+            provider_type = provider_identifier.split('_')[0] if '_' in provider_identifier else provider_identifier
+            self.ensure_provider_type_registered(provider_type)
 
         # Create new strategy
         strategy = None
         
         # Try instance creation first
         if self.is_provider_instance_registered(provider_identifier):
-            strategy = self.create_strategy_from_instance(provider_identifier, config)
+            strategy = self.create_strategy_by_instance(provider_identifier, config)
         # Fall back to type creation
         elif self.is_provider_registered(provider_identifier):
-            strategy = self.create_strategy(provider_identifier, config)
+            strategy = self.create_strategy_by_type(provider_identifier, config)
         
         if strategy:
             # Initialize strategy
@@ -489,50 +507,8 @@ class ProviderRegistry(BaseRegistry):
             raise ValueError(f"Provider instance '{instance_name}' is already registered")
 
     def create_strategy(self, provider_type: str, config: Any) -> Any:
-        """
-        Create a provider strategy using registered factory - implements abstract method.
-
-        Args:
-            provider_type: Type identifier for the provider
-            config: Configuration object for the provider
-
-        Returns:
-            Created provider strategy instance
-
-        Raises:
-            UnsupportedProviderError: If provider type is not registered
-        """
-        try:
-            return self.create_strategy_by_type(provider_type, config)
-        except ValueError:
-            available_providers = ", ".join(self.get_registered_types())
-            raise UnsupportedProviderError(
-                f"Provider type '{provider_type}' is not registered. "
-                f"Available providers: {available_providers}"
-            )
-
-    def create_strategy_from_instance(self, instance_name: str, config: Any) -> Any:
-        """
-        Create a provider strategy from a named instance using registered factory.
-
-        Args:
-            instance_name: Name of the provider instance
-            config: Configuration object for the provider
-
-        Returns:
-            Created provider strategy instance
-
-        Raises:
-            UnsupportedProviderError: If provider instance is not registered
-        """
-        try:
-            return self.create_strategy_by_instance(instance_name, config)
-        except ValueError:
-            available_instances = ", ".join(self.get_registered_instances())
-            raise UnsupportedProviderError(
-                f"Provider instance '{instance_name}' is not registered. "
-                f"Available instances: {available_instances}"
-            )
+        """Create strategy - implements abstract method by delegating to cached method."""
+        return self.get_or_create_strategy(provider_type, config)
 
     def create_config(self, provider_type: str, data: dict[str, Any]) -> Any:
         """

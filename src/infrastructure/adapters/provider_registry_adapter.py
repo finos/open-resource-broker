@@ -57,9 +57,9 @@ class ProviderRegistryAdapter(ProviderPort):
         """Get specific provider strategy from Provider Registry."""
         try:
             if self.registry.is_provider_instance_registered(strategy_name):
-                return self.registry.create_strategy_from_instance(strategy_name, {})
+                return self.registry.get_or_create_strategy(strategy_name, {})
             elif self.registry.is_provider_registered(strategy_name):
-                return self.registry.create_strategy(strategy_name, {})
+                return self.registry.get_or_create_strategy(strategy_name, {})
             return None
         except Exception:
             return None

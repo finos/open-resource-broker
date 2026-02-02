@@ -232,7 +232,7 @@ class RegisterProviderStrategyHandler(
                 config=command.strategy_config,
             )
 
-            strategy = registry.create_strategy(command.provider_type.lower(), provider_config)
+            strategy = registry.get_or_create_strategy(command.provider_type.lower(), provider_config)
 
             # Register strategy with registry
             # Note: Provider Registry handles strategy registration automatically

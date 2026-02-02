@@ -4,7 +4,7 @@ from typing import Any, Optional, Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict
 
-from domain.base.value_objects import InstanceId
+from domain.machine.machine_identifiers import MachineId
 
 
 class BaseProviderConfig(BaseModel):
@@ -33,15 +33,15 @@ class ProviderPort(Protocol):
         """Initialize the provider with configuration."""
         ...
 
-    def create_instances(self, template_config: dict[str, Any], count: int) -> list[InstanceId]:
+    def create_instances(self, template_config: dict[str, Any], count: int) -> list[MachineId]:
         """Create instances based on template configuration."""
         ...
 
-    def terminate_instances(self, instance_ids: list[InstanceId]) -> bool:
+    def terminate_instances(self, instance_ids: list[MachineId]) -> bool:
         """Terminate the specified instances."""
         ...
 
-    def get_instance_status(self, instance_ids: list[InstanceId]) -> dict[InstanceId, str]:
+    def get_instance_status(self, instance_ids: list[MachineId]) -> dict[MachineId, str]:
         """Get the current status of the specified instances."""
         ...
 

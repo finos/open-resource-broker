@@ -144,12 +144,12 @@ class ProviderExecutionService:
             # Try instance first
             if self._registry.is_provider_instance_registered(provider_identifier):
                 provider_config = self._get_provider_config(provider_identifier)
-                return self._registry.create_strategy_from_instance(provider_identifier, provider_config)
+                return self._registry.get_or_create_strategy(provider_identifier, provider_config)
             
             # Try provider type
             if self._registry.is_provider_registered(provider_identifier):
                 provider_config = self._get_provider_config(provider_identifier)
-                return self._registry.create_strategy(provider_identifier, provider_config)
+                return self._registry.get_or_create_strategy(provider_identifier, provider_config)
             
             return None
         except Exception as e:

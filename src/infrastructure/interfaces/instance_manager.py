@@ -5,7 +5,7 @@ from typing import Any, Optional, Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict
 
-from domain.base.value_objects import InstanceId, InstanceType, Tags
+from domain.machine.machine_identifiers import MachineId
 
 
 class InstanceState(str, Enum):
@@ -37,9 +37,9 @@ class InstanceSpec(BaseModel):
 class Instance(BaseModel):
     """Instance information."""
 
-    model_config = ConfigDict(extra="allow")  # Allow provider-specific fields
+    model_config = ConfigDict(extra="allow")
 
-    instance_id: InstanceId
+    instance_id: MachineId
     instance_type: InstanceType
     state: InstanceState
     image_id: str
@@ -71,15 +71,15 @@ class InstanceConfig(BaseModel):
 class InstanceManagerPort(Protocol):
     """Interface for managing cloud instances."""
 
-    def launch_instances(self, config: InstanceConfig) -> list[InstanceId]:
+    def launch_instances(self, config: InstanceConfig) -> list[MachineId]:
         """Launch cloud instances."""
         ...
 
-    def terminate_instances(self, instance_ids: list[InstanceId]) -> bool:
+    def terminate_instances(self, instance_ids: list[MachineId]) -> bool:
         """Terminate cloud instances."""
         ...
 
-    def get_instance_status(self, instance_ids: list[InstanceId]) -> InstanceStatusResponse:
+    def get_instance_status(self, instance_ids: list[MachineId]) -> InstanceStatusResponse:
         """Get status of specific instances."""
         ...
 
@@ -91,18 +91,18 @@ class InstanceManagerPort(Protocol):
         """List instances with optional filters."""
         ...
 
-    def stop_instances(self, instance_ids: list[InstanceId]) -> bool:
+    def stop_instances(self, instance_ids: list[MachineId]) -> bool:
         """Stop cloud instances (if supported by provider)."""
         ...
 
-    def start_instances(self, instance_ids: list[InstanceId]) -> bool:
+    def start_instances(self, instance_ids: list[MachineId]) -> bool:
         """Start stopped cloud instances (if supported by provider)."""
         ...
 
-    def get_instance_details(self, instance_ids: list[InstanceId]) -> list[dict[str, Any]]:
+    def get_instance_details(self, instance_ids: list[MachineId]) -> list[dict[str, Any]]:
         """Get detailed information about cloud instances."""
         ...
 
-    def update_instance_tags(self, instance_ids: list[InstanceId], tags: Tags) -> bool:
+    def update_instance_tags(self, instance_ids: list[MachineId], tags: Tags) -> bool:
         """Update tags on cloud instances."""
         ...

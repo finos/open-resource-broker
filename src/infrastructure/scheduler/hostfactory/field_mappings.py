@@ -10,6 +10,11 @@ class HostFactoryFieldMappings:
     MAPPINGS = {
         # Generic fields (work with any provider)
         "generic": {
+            # Request fields
+            "requestId": "request_id",
+            "requestType": "request_type",
+            "requestedCount": "requested_count",
+            "createdAt": "created_at",
             # Core template fields
             "templateId": "template_id",
             "maxNumber": "max_instances",

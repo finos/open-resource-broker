@@ -7,7 +7,6 @@ from pydantic import ConfigDict, Field
 
 from domain.base.entity import AggregateRoot
 from domain.base.events import RequestCompletedEvent, RequestCreatedEvent, RequestStatusChangedEvent
-from domain.base.value_objects import InstanceId
 from domain.request.request_types import RequestStatus
 from domain.request.value_objects import RequestId, RequestType
 
@@ -49,7 +48,6 @@ class Request(AggregateRoot):
     message: Optional[str] = None
 
     # Results
-    instance_ids: list[InstanceId] = Field(default_factory=list)
     successful_count: int = 0
     failed_count: int = 0
 
@@ -107,22 +105,6 @@ class Request(AggregateRoot):
         updated_request.add_domain_event(status_event)
 
         return updated_request
-
-    def add_instance(self, instance_id: InstanceId) -> "Request":
-        """Add a successfully created instance."""
-        data = self.model_dump()
-        data["instance_ids"] = [*self.instance_ids, instance_id]
-        data["successful_count"] = self.successful_count + 1
-        data["version"] = self.version + 1
-
-        # Check if request is complete
-        if data["successful_count"] + self.failed_count >= self.requested_count:
-            data["status"] = (
-                RequestStatus.COMPLETED if self.failed_count == 0 else RequestStatus.PARTIAL
-            )
-            data["completed_at"] = datetime.utcnow()
-
-        return Request.model_validate(data)
 
     def add_failure(
         self, error_message: str, error_details: Optional[dict[str, Any]] = None
@@ -283,7 +265,6 @@ class Request(AggregateRoot):
             "desired_capacity": self.desired_capacity,
             "status": self.status.value,
             "status_message": self.status_message,
-            "instance_ids": [id.value for id in self.instance_ids],
             "successful_count": self.successful_count,
             "failed_count": self.failed_count,
             "created_at": self.created_at.isoformat(),
@@ -381,34 +362,23 @@ class Request(AggregateRoot):
     @classmethod
     def create_return_request(
         cls,
-        instance_ids: list[str],
+        machine_ids: list[str],
         provider_type: str,
         provider_name: str,
         metadata: Optional[dict[str, Any]] = None,
     ) -> "Request":
-        """
-        Create a return/terminate request.
-
-        Args:
-            instance_ids: List of machine IDs
-            metadata: Optional metadata
-
-        Returns:
-            New return Request instance with creation event
-        """
+        """Create a return/terminate request."""
         request_id = RequestId.generate(RequestType.RETURN)
 
-        # Create return request
         request = cls(
             request_id=request_id,
             request_type=RequestType.RETURN,
             template_id="return-request",
-            requested_count=len(instance_ids),
-            desired_capacity=len(instance_ids),  # Initially set to same as requested_count
+            requested_count=len(machine_ids),
+            desired_capacity=len(machine_ids),
             provider_type=provider_type,
             provider_name=provider_name,
             status=RequestStatus.PENDING,
-            instance_ids=[InstanceId(value=id_str) for id_str in instance_ids],
             metadata=metadata or {},
             created_at=datetime.utcnow(),
             version=0,
@@ -416,12 +386,12 @@ class Request(AggregateRoot):
 
         # Add domain event
         creation_event = RequestCreatedEvent(
-            aggregate_id=str(request_id.value),  # Use .value for string representation
+            aggregate_id=str(request_id.value),
             aggregate_type="Request",
-            request_id=str(request_id.value),  # Use .value for string representation
+            request_id=str(request_id.value),
             request_type=RequestType.RETURN.value,
             template_id="return-request",
-            machine_count=len(instance_ids),
+            machine_count=len(machine_ids),
             timeout=metadata.get("timeout") if metadata else None,
             tags=metadata.get("tags", {}) if metadata else {},
         )
@@ -440,10 +410,9 @@ class Request(AggregateRoot):
             "requested_count": data.get("requested_count", 1),
             "desired_capacity": data.get(
                 "desired_capacity", data.get("requested_count", 1)
-            ),  # Default to requested_count if not present
+            ),
             "status": RequestStatus(data.get("status", RequestStatus.PENDING.value)),
             "status_message": data.get("status_message"),
-            "instance_ids": [InstanceId(value=id) for id in data.get("instance_ids", [])],
             "successful_count": data.get("successful_count", 0),
             "failed_count": data.get("failed_count", 0),
             "created_at": datetime.fromisoformat(
@@ -475,11 +444,9 @@ class Request(AggregateRoot):
         """
         data = self.model_dump()
 
-        # Extract instance IDs from provisioning result
+        # Update successful count from provisioning result
         if "instance_ids" in provisioning_result:
-            instance_ids = [InstanceId(value=id) for id in provisioning_result["instance_ids"]]
-            data["instance_ids"] = self.instance_ids + instance_ids
-            data["successful_count"] = len(data["instance_ids"])
+            data["successful_count"] = self.successful_count + len(provisioning_result["instance_ids"])
 
         # Update provider data
         if "provider_data" in provisioning_result:

@@ -6,7 +6,8 @@ from typing import Any, Optional
 from pydantic import ConfigDict, Field
 
 from domain.base.entity import AggregateRoot
-from domain.base.value_objects import InstanceId, InstanceType, IPAddress, Tags
+from domain.base.value_objects import InstanceType, IPAddress, Tags
+from domain.machine.machine_identifiers import MachineId
 
 from .machine_status import MachineStatus
 
@@ -21,13 +22,14 @@ class Machine(AggregateRoot):
     )
 
     # Core machine identification
-    instance_id: InstanceId
+    machine_id: MachineId
     template_id: str
-    request_id: Optional[str] = None  # Link to the request that created this machine
+    request_id: Optional[str] = None
+    return_request_id: Optional[str] = None
     provider_type: str
-    provider_name: str  # Provider instance name (e.g., "aws_prod_us-west-2")
-    provider_api: Optional[str] = None  # How was this machine provisioned (EC2Fleet, SpotFleet, etc.)
-    resource_id: Optional[str] = None  # Which resource does this machine belong to (fleet-xxx, asg-xxx, etc.)
+    provider_name: str
+    provider_api: Optional[str] = None
+    resource_id: Optional[str] = None
 
     # Machine configuration
     instance_type: InstanceType
@@ -61,7 +63,7 @@ class Machine(AggregateRoot):
         """Initialize the instance."""
         # Set default ID if not provided
         if "id" not in data:
-            data["id"] = data.get("instance_id", f"machine-{data.get('template_id', 'unknown')}")
+            data["id"] = data.get("machine_id", f"machine-{data.get('template_id', 'unknown')}")
 
         # Set default timestamps if not provided
         from datetime import datetime
@@ -96,10 +98,10 @@ class Machine(AggregateRoot):
 
             status_event = MachineStatusChangedEvent(
                 # DomainEvent required fields
-                aggregate_id=str(self.instance_id),
+                aggregate_id=str(self.machine_id),
                 aggregate_type="Machine",
                 # MachineEvent required fields
-                machine_id=str(self.instance_id),
+                machine_id=str(self.machine_id),
                 request_id=str(self.request_id) if self.request_id else "unknown",
                 # StatusChangeEvent required fields
                 old_status=old_status.value,
@@ -119,7 +121,7 @@ class Machine(AggregateRoot):
 
     def get_id(self) -> str:
         """Get the machine identifier."""
-        return str(self.instance_id)
+        return str(self.machine_id)
 
     def update_network_info(
         self, private_ip: Optional[str] = None, public_ip: Optional[str] = None
@@ -179,7 +181,7 @@ class Machine(AggregateRoot):
     def to_provider_format(self, provider_type: str) -> dict[str, Any]:
         """Convert machine to provider-specific format."""
         base_format = {
-            "instance_id": self.instance_id.value,
+            "instance_id": self.machine_id.value,
             "template_id": self.template_id,
             "provider_type": self.provider_type,
             "instance_type": self.instance_type.value,
@@ -210,7 +212,7 @@ class Machine(AggregateRoot):
     def from_provider_format(cls, data: dict[str, Any], provider_type: str) -> "Machine":
         """Create machine from provider-specific format."""
         core_data = {
-            "instance_id": InstanceId(value=data.get("instance_id")),
+            "machine_id": MachineId(value=data.get("instance_id")),
             "template_id": data.get("template_id"),
             "provider_type": provider_type,
             "instance_type": InstanceType(value=data.get("instance_type")),

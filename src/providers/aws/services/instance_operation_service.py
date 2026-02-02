@@ -201,6 +201,53 @@ class AWSInstanceOperationService:
         except Exception as e:
             return ProviderResult.error_result(f"Failed to get instance status: {e}", "GET_INSTANCE_STATUS_ERROR")
 
+    async def describe_resource_instances(self, operation: ProviderOperation, handlers: dict) -> ProviderResult:
+        """Discover instances from resource IDs (ASG, Fleet, etc.)."""
+        try:
+            resource_ids = operation.parameters.get("resource_ids", [])
+            provider_api = operation.parameters.get("provider_api", "RunInstances")
+            
+            if not resource_ids:
+                return ProviderResult.error_result(
+                    "Resource IDs are required for instance discovery",
+                    "MISSING_RESOURCE_IDS",
+                )
+
+            # Get handler for the provider API
+            handler = handlers.get(provider_api) or handlers.get("RunInstances")
+            if not handler:
+                return ProviderResult.error_result(
+                    f"No handler available for provider_api: {provider_api}",
+                    "HANDLER_NOT_FOUND",
+                )
+
+            # Create minimal request for handler
+            from domain.request.aggregate import Request
+            from domain.request.value_objects import RequestType
+
+            request = Request.create_new_request(
+                request_type=RequestType.ACQUIRE,
+                template_id=operation.parameters.get("template_id", "unknown"),
+                machine_count=0,
+                provider_type=self._provider_type,
+                provider_name=self._provider_name,
+            )
+            request.resource_ids = resource_ids
+
+            # Query handler for instances using check_hosts_status
+            instances = handler.check_hosts_status(request)
+            
+            return ProviderResult.success_result(
+                {"instances": instances, "resource_ids": resource_ids},
+                {"operation": "describe_resource_instances"},
+            )
+
+        except Exception as e:
+            return ProviderResult.error_result(
+                f"Failed to describe resource instances: {e}",
+                "DESCRIBE_RESOURCE_INSTANCES_ERROR",
+            )
+
     def _convert_aws_instance_to_machine(self, aws_instance: dict) -> dict:
         """Convert AWS instance to domain machine format."""
         from domain.machine.machine_status import MachineStatus

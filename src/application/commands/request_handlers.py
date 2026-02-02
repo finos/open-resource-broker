@@ -25,6 +25,10 @@ from domain.base.ports import (
     LoggingPort,
 )
 from domain.base.ports.scheduler_port import SchedulerPort
+from domain.base.value_objects import InstanceType
+from domain.machine.aggregate import Machine
+from domain.machine.machine_identifiers import MachineId
+from domain.machine.machine_status import MachineStatus
 from domain.request.repository import RequestRepository
 from infrastructure.di.buses import QueryBus
 
@@ -229,15 +233,6 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                                 resource_ids,
                             )
 
-                        # Add instance IDs to request for tracking
-                        instance_ids = provisioning_result.get("instance_ids", [])
-                        if instance_ids:
-                            from domain.machine.value_objects import InstanceId
-                            for instance_id in instance_ids:
-                                if isinstance(instance_id, str):
-                                    request = request.add_instance(InstanceId(instance_id))
-                                    self.logger.debug("Added instance ID to request: %s", instance_id)
-
                         # Create machine aggregates for each instance
                         instance_data_list = provisioning_result.get("instances", [])
                         provider_data = provisioning_result.get("provider_data", {})
@@ -405,7 +400,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
         """Create machine aggregate from instance data."""
         from datetime import datetime
 
-        from domain.base.value_objects import InstanceId, InstanceType
+        from domain.base.value_objects import InstanceType
+        from domain.machine.machine_identifiers import MachineId
         from domain.machine.aggregate import Machine
         from domain.machine.machine_status import MachineStatus
 
@@ -418,7 +414,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                 launch_time = None
         self.logger.debug("Creating machine aggregate instance_data: [%s]", instance_data)
         return Machine(
-            instance_id=InstanceId(value=instance_data["instance_id"]),
+            machine_id=MachineId(value=instance_data["instance_id"]),
             request_id=str(request.request_id),
             template_id=template_id,
             provider_type=request.provider_type,
@@ -705,7 +701,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         """Process machines from same resource for termination."""
 
         try:
-            instance_ids = [machine.instance_id.value for machine in machines]
+            instance_ids = [machine.machine_id.value for machine in machines]
             template_id = machines[0].template_id
             
             self.logger.info(

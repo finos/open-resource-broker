@@ -87,9 +87,9 @@ class SQLUnitOfWork(BaseUnitOfWork):
         """Get machine table column definitions."""
         return {
             "machine_id": "VARCHAR(255) PRIMARY KEY",
-            "instance_id": "VARCHAR(255)",
             "template_id": "VARCHAR(255)",
             "request_id": "VARCHAR(255)",
+            "return_request_id": "VARCHAR(255)",
             "status": "VARCHAR(50)",
             "instance_type": "VARCHAR(50)",
             "availability_zone": "VARCHAR(50)",

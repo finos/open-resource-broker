@@ -202,7 +202,7 @@ class AWSMachineAdapter:
             EC2InstanceNotFoundError: If the instance cannot be found
             AWSError: For other AWS-related errors
         """
-        self._logger.debug("Performing health check for machine: %s", machine.instance_id)
+        self._logger.debug("Performing health check for machine: %s", machine.machine_id)
 
         try:
             health_checks = {}
