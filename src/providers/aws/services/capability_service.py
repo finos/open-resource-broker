@@ -1,6 +1,7 @@
 """AWS Capability Service - Handles provider capabilities reporting."""
 
-from typing import TYPE_CHECKING
+import re
+from typing import TYPE_CHECKING, Any
 
 from domain.base.ports import LoggingPort
 from providers.base.strategy import ProviderCapabilities, ProviderOperationType
@@ -10,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class AWSCapabilityService:
-    """Service for AWS provider capabilities reporting."""
+    """Service for AWS provider capabilities reporting and utility methods."""
 
     def __init__(self, handler_registry: "AWSHandlerRegistry", logger: LoggingPort):
         self._handler_registry = handler_registry
@@ -67,3 +68,30 @@ class AWSCapabilityService:
                 "health_check_timeout_seconds": 10,
             },
         )
+
+    def generate_provider_name(self, config: dict[str, Any]) -> str:
+        """Generate AWS provider name: aws_{profile}_{region}"""
+        profile = config.get("profile", "default")
+        region = config.get("region", "us-east-1")
+        
+        sanitized_profile = re.sub(r'[^a-zA-Z0-9\-_]', '-', profile)
+        return f"aws_{sanitized_profile}_{region}"
+
+    def parse_provider_name(self, provider_name: str) -> dict[str, str]:
+        """Parse AWS provider name back to components."""
+        parts = provider_name.split("_")
+        if len(parts) >= 3 and parts[0] == "aws":
+            return {
+                "type": "aws",
+                "profile": parts[1],
+                "region": "_".join(parts[2:])  # Handle regions with underscores
+            }
+        return {"type": "aws", "profile": "default", "region": "us-east-1"}
+
+    def get_provider_name_pattern(self) -> str:
+        """Get the naming pattern for AWS providers."""
+        return "aws_{profile}_{region}"
+
+    def get_supported_apis(self) -> list[str]:
+        """Get supported APIs from handler registry."""
+        return list(self._handler_registry.get_available_handlers().keys())

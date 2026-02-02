@@ -66,18 +66,43 @@ class ProviderRegistryAdapter(ProviderPort):
 
     def discover_infrastructure(self, provider_config: dict[str, Any]) -> dict[str, Any]:
         """Discover infrastructure using Provider Registry."""
-        # Implementation would delegate to Provider Registry strategies
+        provider_type = provider_config.get("type", "aws")
+        
+        if provider_type == "aws":
+            return self._get_aws_infrastructure_service(provider_config).discover_infrastructure(provider_config)
+        
+        # For other provider types, return empty dict
         return {}
 
     def discover_infrastructure_interactive(self, provider_config: dict[str, Any]) -> dict[str, Any]:
         """Discover infrastructure interactively using Provider Registry."""
-        # Implementation would delegate to Provider Registry strategies
+        provider_type = provider_config.get("type", "aws")
+        
+        if provider_type == "aws":
+            return self._get_aws_infrastructure_service(provider_config).discover_infrastructure_interactive(provider_config)
+        
+        # For other provider types, return empty dict
         return {}
 
     def validate_infrastructure(self, provider_config: dict[str, Any]) -> dict[str, Any]:
         """Validate infrastructure using Provider Registry."""
-        # Implementation would delegate to Provider Registry strategies
+        provider_type = provider_config.get("type", "aws")
+        
+        if provider_type == "aws":
+            return self._get_aws_infrastructure_service(provider_config).validate_infrastructure(provider_config)
+        
+        # For other provider types, return empty dict
         return {}
+
+    def _get_aws_infrastructure_service(self, provider_config: dict[str, Any]):
+        """Get AWS infrastructure discovery service."""
+        from providers.aws.services.infrastructure_discovery_service import AWSInfrastructureDiscoveryService
+        
+        config = provider_config.get("config", {})
+        region = config.get("region", "us-east-1")
+        profile = config.get("profile", "default")
+        
+        return AWSInfrastructureDiscoveryService(region=region, profile=profile)
 
     def execute_with_strategy(self, *args, **kwargs):
         """Execute with strategy using Provider Registry."""

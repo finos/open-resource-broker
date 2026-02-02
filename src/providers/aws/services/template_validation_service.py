@@ -12,6 +12,62 @@ class AWSTemplateValidationService:
     def __init__(self, logger: LoggingPort):
         self._logger = logger
 
+    def get_available_templates(self, operation: ProviderOperation) -> ProviderResult:
+        """Handle available templates query operation."""
+        try:
+            templates = self._get_aws_templates()
+            return ProviderResult.success_result(
+                {"templates": templates, "count": len(templates)},
+                {"operation": "get_available_templates"},
+            )
+        except Exception as e:
+            return ProviderResult.error_result(f"Failed to get available templates: {e}", "GET_TEMPLATES_ERROR")
+
+    def _get_aws_templates(self) -> list[dict[str, Any]]:
+        """Get available AWS templates using scheduler strategy."""
+        try:
+            from infrastructure.scheduler.registry import get_scheduler_registry
+
+            scheduler_registry = get_scheduler_registry()
+            scheduler_strategy = scheduler_registry.get_active_strategy()
+
+            if scheduler_strategy:
+                template_paths = scheduler_strategy.get_template_paths()
+                templates = []
+                for template_path in template_paths:
+                    try:
+                        template_data = scheduler_strategy.load_templates_from_path(template_path)
+                        templates.extend(template_data)
+                    except Exception as e:
+                        self._logger.warning("Failed to load templates from %s: %s", template_path, e)
+                return templates
+            else:
+                self._logger.warning("No scheduler strategy available, using fallback templates")
+                return self._get_fallback_templates()
+
+        except Exception as e:
+            self._logger.error("Failed to load templates via scheduler strategy: %s", e)
+            return self._get_fallback_templates()
+
+    def _get_fallback_templates(self) -> list[dict[str, Any]]:
+        """Get fallback AWS templates when scheduler strategy is not available."""
+        return [
+            {
+                "template_id": "aws-linux-basic",
+                "name": "Amazon Linux 2 Basic",
+                "image_id": "ami-0abcdef1234567890",
+                "instance_type": "t3.micro",
+                "description": "Basic Amazon Linux 2 instance",
+            },
+            {
+                "template_id": "aws-ubuntu-basic",
+                "name": "Ubuntu 20.04 Basic",
+                "image_id": "ami-0fedcba0987654321",
+                "instance_type": "t3.small",
+                "description": "Basic Ubuntu 20.04 instance",
+            },
+        ]
+
     def validate_template(self, operation: ProviderOperation) -> ProviderResult:
         """Handle template validation operation."""
         try:

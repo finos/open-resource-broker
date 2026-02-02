@@ -1,7 +1,7 @@
-"""AWS Health Check Service - Handles provider health monitoring."""
+"""AWS Health Check Service - Handles provider health monitoring and credentials."""
 
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 from domain.base.ports import LoggingPort
 from providers.base.strategy import ProviderHealthStatus
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 class AWSHealthCheckService:
-    """Service for AWS provider health monitoring."""
+    """Service for AWS provider health monitoring and credential management."""
 
     def __init__(self, aws_client: "AWSClient", config: "AWSProviderConfig", logger: LoggingPort):
         self._aws_client = aws_client
@@ -71,3 +71,18 @@ class AWSHealthCheckService:
                 f"Health check error: {e}",
                 {"error": str(e), "response_time_ms": response_time_ms},
             )
+
+    def get_available_credential_sources(self) -> list[dict]:
+        """Get available AWS credential sources."""
+        from providers.aws.profile_discovery import get_available_profiles
+        return get_available_profiles()
+
+    def test_credentials(self, credential_source: Optional[str] = None, **kwargs) -> dict:
+        """Test AWS credentials."""
+        from providers.aws.session_factory import AWSSessionFactory
+        region = kwargs.get("region")
+        return AWSSessionFactory.discover_credentials(credential_source, region)
+
+    def get_credential_requirements(self) -> dict:
+        """AWS requires region."""
+        return {"region": {"required": True, "description": "AWS region"}}

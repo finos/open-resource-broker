@@ -103,12 +103,9 @@ class AWSProviderStrategy(ProviderStrategy):
                 except Exception as exc:
                     self._logger.warning("Failed to resolve AWSClient: %s", exc)
             else:
-                # Create AWS client directly if no resolver provided
                 try:
                     self._aws_client = AWSClient(
-                        region=self._aws_config.region,
-                        profile=self._aws_config.profile,
-                        logger=self._logger
+                        region=self._aws_config.region, profile=self._aws_config.profile, logger=self._logger
                     )
                     self._logger.debug("AWS client created directly")
                 except Exception as exc:
@@ -120,7 +117,6 @@ class AWSProviderStrategy(ProviderStrategy):
         try:
             self._logger.info("AWS provider strategy ready for region: %s", self._aws_config.region)
             self._initialized = True
-            self._logger.debug("AWS provider strategy initialized successfully (lazy mode)")
             return True
         except Exception as e:
             self._logger.error("Failed to initialize AWS provider strategy: %s", e)
@@ -131,15 +127,12 @@ class AWSProviderStrategy(ProviderStrategy):
         self._logger.debug("AWS strategy executing operation: %s", operation.operation_type)
         
         if not self._initialized:
-            return ProviderResult.error_result(
-                "AWS provider strategy not initialized", "NOT_INITIALIZED"
-            )
+            return ProviderResult.error_result("AWS provider strategy not initialized", "NOT_INITIALIZED")
 
         start_time = time.time()
         is_dry_run = bool(operation.context and operation.context.get("dry_run", False))
 
         try:
-            # Execute operation within appropriate context
             if is_dry_run:
                 from providers.aws.infrastructure.dry_run_adapter import aws_dry_run_context
                 with aws_dry_run_context():
@@ -147,7 +140,6 @@ class AWSProviderStrategy(ProviderStrategy):
             else:
                 result = await self._execute_operation_internal(operation)
 
-            # Add execution metadata
             execution_time_ms = int((time.time() - start_time) * 1000)
             if result.metadata is None:
                 result.metadata = {}
@@ -156,7 +148,6 @@ class AWSProviderStrategy(ProviderStrategy):
                 "provider": "aws",
                 "dry_run": is_dry_run,
             })
-
             return result
 
         except Exception as e:
@@ -165,16 +156,11 @@ class AWSProviderStrategy(ProviderStrategy):
             return ProviderResult.error_result(
                 f"AWS operation failed: {e}",
                 "OPERATION_FAILED",
-                {
-                    "execution_time_ms": execution_time_ms,
-                    "provider": "aws",
-                    "dry_run": is_dry_run,
-                },
+                {"execution_time_ms": execution_time_ms, "provider": "aws", "dry_run": is_dry_run},
             )
 
     async def _execute_operation_internal(self, operation: ProviderOperation) -> ProviderResult:
         """Route operations to appropriate services."""
-        # Route to focused services
         if operation.operation_type == ProviderOperationType.CREATE_INSTANCES:
             handlers = self._get_handler_registry().get_available_handlers()
             return await self._get_instance_service().create_instances(operation, handlers)
@@ -196,66 +182,30 @@ class AWSProviderStrategy(ProviderStrategy):
             )
         elif operation.operation_type == ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES:
             return await self._handle_describe_resource_instances(operation)
-        elif operation.operation_type == ProviderOperationType.GET_AVAILABLE_TEMPLATES:
-            return self._handle_get_available_templates(operation)
         else:
             return ProviderResult.error_result(
-                f"Unsupported operation: {operation.operation_type}",
-                "UNSUPPORTED_OPERATION",
+                f"Unsupported operation: {operation.operation_type}", "UNSUPPORTED_OPERATION"
             )
 
     def get_capabilities(self) -> ProviderCapabilities:
         """Get AWS provider capabilities."""
-        # Get effective handlers for this provider instance
-        if self._provider_instance_config:
-            # Try to get provider defaults from config manager
-            try:
-                from infrastructure.di.container import get_container
-                from domain.base.ports import ConfigurationPort
-                
-                container = get_container()
-                config_manager = container.get(ConfigurationPort)
-                app_config = config_manager.app_config
-                provider_defaults = app_config.provider.provider_defaults.get('aws')
-                
-                effective_handlers = self._provider_instance_config.get_effective_handlers(provider_defaults)
-                supported_apis = list(effective_handlers.keys())
-            except Exception:
-                # Fallback to default handlers if config loading fails
-                supported_apis = ["EC2Fleet", "SpotFleet", "ASG", "RunInstances"]
-        else:
-            # Default AWS handlers
-            supported_apis = ["EC2Fleet", "SpotFleet", "ASG", "RunInstances"]
-        
-        return ProviderCapabilities(
-            provider_type="aws",
-            supported_operations=[
-                ProviderOperationType.CREATE_INSTANCES,
-                ProviderOperationType.TERMINATE_INSTANCES,
-                ProviderOperationType.GET_INSTANCE_STATUS,
-                ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
-                ProviderOperationType.VALIDATE_TEMPLATE,
-                ProviderOperationType.HEALTH_CHECK,
-            ],
-            supported_apis=supported_apis,
-            features={
-                "instance_management": True,
-                "spot_instances": True,
-                "fleet_management": True,
-                "auto_scaling": True,
-                "load_balancing": True,
-                "vpc_support": True,
-                "security_groups": True,
-                "key_pairs": True,
-                "tags_support": True,
-                "monitoring": True,
-                "regions": ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1"],
-                "instance_types": ["t3.micro", "t3.small", "t3.medium", "m5.large", "c5.large"],
-                "max_instances_per_request": 1000,
-                "supports_windows": True,
-                "supports_linux": True,
-            }
-        )
+        return self._get_capability_service().get_capabilities()
+
+    def generate_provider_name(self, config: dict[str, Any]) -> str:
+        """Generate AWS provider name: aws_{profile}_{region}"""
+        return self._get_capability_service().generate_provider_name(config)
+
+    def parse_provider_name(self, provider_name: str) -> dict[str, str]:
+        """Parse AWS provider name back to components."""
+        return self._get_capability_service().parse_provider_name(provider_name)
+
+    def get_provider_name_pattern(self) -> str:
+        """Get the naming pattern for AWS providers."""
+        return self._get_capability_service().get_provider_name_pattern()
+
+    def get_supported_apis(self) -> list[str]:
+        """Get supported APIs from handler registry."""
+        return self._get_capability_service().get_supported_apis()
 
 
 
@@ -276,21 +226,16 @@ class AWSProviderStrategy(ProviderStrategy):
         """Get handler factory with provider-specific AWS client."""
         if self.aws_client:
             from providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
-            return AWSHandlerFactory(
-                aws_client=self.aws_client,
-                logger=self._logger,
-                config=None
-            )
+            return AWSHandlerFactory(aws_client=self.aws_client, logger=self._logger, config=None)
         return None
 
     def _get_instance_service(self) -> AWSInstanceOperationService:
         """Get instance operation service with lazy initialization."""
         if self._instance_service is None:
-            provisioning_adapter = self._resolve_provisioning_port()
             self._instance_service = AWSInstanceOperationService(
                 aws_client=self.aws_client,
                 logger=self._logger,
-                provisioning_adapter=provisioning_adapter,
+                provisioning_adapter=self._resolve_provisioning_port(),
                 provider_name=self._provider_name,
                 provider_type=self.provider_type,
             )
@@ -300,9 +245,7 @@ class AWSProviderStrategy(ProviderStrategy):
         """Get health check service with lazy initialization."""
         if self._health_service is None:
             self._health_service = AWSHealthCheckService(
-                aws_client=self.aws_client,
-                config=self._aws_config,
-                logger=self._logger,
+                aws_client=self.aws_client, config=self._aws_config, logger=self._logger
             )
         return self._health_service
 
@@ -315,12 +258,18 @@ class AWSProviderStrategy(ProviderStrategy):
     def _get_capability_service(self) -> AWSCapabilityService:
         """Get capability service with lazy initialization."""
         if self._capability_service is None:
-            handler_registry = self._get_handler_registry()
             self._capability_service = AWSCapabilityService(
-                handler_registry=handler_registry,
-                logger=self._logger,
+                handler_registry=self._get_handler_registry(), logger=self._logger
             )
         return self._capability_service
+
+    def _get_infrastructure_service(self) -> AWSInfrastructureDiscoveryService:
+        """Get infrastructure discovery service with lazy initialization."""
+        if self._infrastructure_service is None:
+            self._infrastructure_service = AWSInfrastructureDiscoveryService(
+                region=self._aws_config.region, profile=self._aws_config.profile, logger=self._logger
+            )
+        return self._infrastructure_service
 
     def _resolve_provisioning_port(self) -> Optional["AWSProvisioningAdapter"]:
         """Lazily resolve the AWS provisioning adapter when first needed."""
@@ -338,74 +287,6 @@ class AWSProviderStrategy(ProviderStrategy):
         """Handle resource-to-instance discovery operation using handlers."""
         return await self._get_instance_service().describe_resource_instances(operation)
 
-    def _handle_get_available_templates(self, operation: ProviderOperation) -> ProviderResult:
-        """Handle available templates query operation."""
-        try:
-            templates = self._get_aws_templates()
-            return ProviderResult.success_result(
-                {"templates": templates, "count": len(templates)},
-                {"operation": "get_available_templates"},
-            )
-        except Exception as e:
-            return ProviderResult.error_result(f"Failed to get available templates: {e}", "GET_TEMPLATES_ERROR")
-
-    def _get_aws_templates(self) -> list[dict[str, Any]]:
-        """Get available AWS templates using scheduler strategy."""
-        try:
-            from infrastructure.scheduler.registry import get_scheduler_registry
-
-            scheduler_registry = get_scheduler_registry()
-            scheduler_strategy = scheduler_registry.get_active_strategy()
-
-            if scheduler_strategy:
-                template_paths = scheduler_strategy.get_template_paths()
-                templates = []
-                for template_path in template_paths:
-                    try:
-                        template_data = scheduler_strategy.load_templates_from_path(template_path)
-                        templates.extend(template_data)
-                    except Exception as e:
-                        self._logger.warning("Failed to load templates from %s: %s", template_path, e)
-                return templates
-            else:
-                self._logger.warning("No scheduler strategy available, using fallback templates")
-                return self._get_fallback_templates()
-
-        except Exception as e:
-            self._logger.error("Failed to load templates via scheduler strategy: %s", e)
-            return self._get_fallback_templates()
-
-    def _get_fallback_templates(self) -> list[dict[str, Any]]:
-        """Get fallback AWS templates when scheduler strategy is not available."""
-        return [
-            {
-                "template_id": "aws-linux-basic",
-                "name": "Amazon Linux 2 Basic",
-                "image_id": "ami-0abcdef1234567890",
-                "instance_type": "t3.micro",
-                "description": "Basic Amazon Linux 2 instance",
-            },
-            {
-                "template_id": "aws-ubuntu-basic",
-                "name": "Ubuntu 20.04 Basic",
-                "image_id": "ami-0fedcba0987654321",
-                "instance_type": "t3.small",
-                "description": "Basic Ubuntu 20.04 instance",
-            },
-        ]
-
-
-
-    def _get_infrastructure_service(self) -> AWSInfrastructureDiscoveryService:
-        """Get infrastructure discovery service with lazy initialization."""
-        if self._infrastructure_service is None:
-            self._infrastructure_service = AWSInfrastructureDiscoveryService(
-                region=self._aws_config.region,
-                profile=self._aws_config.profile,
-                logger=self._logger,
-            )
-        return self._infrastructure_service
-
     # Infrastructure discovery methods (delegated to service)
     def discover_infrastructure(self, provider_config: dict[str, Any]) -> dict[str, Any]:
         """Discover AWS infrastructure for provider."""
@@ -419,73 +300,29 @@ class AWSProviderStrategy(ProviderStrategy):
         """Validate AWS infrastructure configuration."""
         return self._get_infrastructure_service().validate_infrastructure(provider_config)
 
-    # Credential and provider management methods
+    # Credential methods (delegated to health service)
     def get_available_credential_sources(self) -> list[dict]:
         """Get available AWS credential sources."""
-        from providers.aws.profile_discovery import get_available_profiles
-        return get_available_profiles()
+        return self._get_health_service().get_available_credential_sources()
 
     def test_credentials(self, credential_source: Optional[str] = None, **kwargs) -> dict:
         """Test AWS credentials."""
-        from providers.aws.session_factory import AWSSessionFactory
-        region = kwargs.get("region")
-        return AWSSessionFactory.discover_credentials(credential_source, region)
+        return self._get_health_service().test_credentials(credential_source, **kwargs)
 
     def get_credential_requirements(self) -> dict:
         """AWS requires region."""
-        return {"region": {"required": True, "description": "AWS region"}}
-
-    def generate_provider_name(self, config: dict[str, Any]) -> str:
-        """Generate AWS provider name: aws_{profile}_{region}"""
-        profile = config.get("profile", "default")
-        region = config.get("region", "us-east-1")
-        
-        import re
-        sanitized_profile = re.sub(r'[^a-zA-Z0-9\-_]', '-', profile)
-        return f"aws_{sanitized_profile}_{region}"
-
-    def parse_provider_name(self, provider_name: str) -> dict[str, str]:
-        """Parse AWS provider name back to components."""
-        parts = provider_name.split("_")
-        if len(parts) >= 3 and parts[0] == "aws":
-            return {
-                "type": "aws",
-                "profile": parts[1],
-                "region": "_".join(parts[2:])  # Handle regions with underscores
-            }
-        return {"type": "aws", "profile": "default", "region": "us-east-1"}
-
-    def get_provider_name_pattern(self) -> str:
-        """Get the naming pattern for AWS providers."""
-        return "aws_{profile}_{region}"
-
-    def get_supported_apis(self) -> list[str]:
-        """Get supported APIs from handler registry."""
-        return list(self._get_handler_registry().get_available_handlers().keys())
+        return self._get_health_service().get_credential_requirements()
 
     def cleanup(self) -> None:
         """Clean up AWS provider resources."""
         try:
             if self.aws_client:
                 self.aws_client.cleanup()
-                self._logger.debug("AWS client cleaned up")
-
             self._aws_client = None
             self._initialized = False
-
         except Exception as e:
             self._logger.warning("Failed during AWS provider cleanup: %s", e)
 
     def __str__(self) -> str:
         """Return string representation for debugging."""
         return f"AWSProviderStrategy(region={self._aws_config.region}, initialized={self._initialized})"
-
-    def __repr__(self) -> str:
-        """Return detailed representation for debugging."""
-        return (
-            f"AWSProviderStrategy("
-            f"region={self._aws_config.region}, "
-            f"profile={self._aws_config.profile}, "
-            f"initialized={self._initialized}"
-            f")"
-        )
