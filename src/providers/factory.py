@@ -174,6 +174,41 @@ class ProviderStrategyFactory:
 
         return context
 
+    def _create_provider_config(self, instance_config: ProviderInstanceConfig):
+        """Create provider configuration with automatic env var loading.
+        
+        Environment variables have precedence over config file values.
+        """
+        
+        if instance_config.type == "aws":
+            # Use AWSProviderConfig directly - it inherits from BaseSettings
+            from providers.aws.configuration.config import AWSProviderConfig
+            
+            # First create with no args to load environment variables
+            env_config = AWSProviderConfig()
+            
+            # Then create with config dict, but only use values that weren't set by env vars
+            config_dict = instance_config.config.copy()
+            
+            # Remove any keys from config_dict that have non-default values in env_config
+            # This ensures environment variables take precedence
+            default_config = AWSProviderConfig.__pydantic_fields__
+            for key in list(config_dict.keys()):
+                if hasattr(env_config, key):
+                    env_value = getattr(env_config, key)
+                    default_value = default_config.get(key)
+                    default_val = default_value.default if default_value else None
+                    
+                    # If env value differs from default, remove from config_dict
+                    if env_value != default_val:
+                        config_dict.pop(key, None)
+            
+            # Create final config with remaining config_dict values
+            return AWSProviderConfig(**config_dict)
+        
+        # Fallback to dict config for other providers
+        return instance_config.config
+
     def _create_provider_strategy(
         self, provider_config: ProviderInstanceConfig
     ) -> ProviderStrategy:
