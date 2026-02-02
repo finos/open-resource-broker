@@ -199,7 +199,7 @@ class AWSProviderStrategy(ProviderStrategy):
             self._handler_factory = AWSHandlerFactory(
                 aws_client=self.aws_client,
                 logger=self._logger,
-                config=self._config_manager
+                config=None
             )
         return self._handler_factory
         

@@ -66,7 +66,7 @@ class SelectProviderStrategyHandler(
             )
 
             # Get available strategies from context
-            available_strategies = self._provider_context.get_available_strategies()
+            available_strategies = self._provider_context.available_strategies
 
             if not available_strategies:
                 raise ValueError("No provider strategies available")

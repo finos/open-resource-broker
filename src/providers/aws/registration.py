@@ -281,7 +281,7 @@ def register_aws_provider_with_di(provider_instance, container) -> bool:
                 raise
 
         # Create provider strategy factory using DI container
-        def aws_strategy_factory():
+        def aws_strategy_factory(config=None):
             """Factory function to create AWS strategy with DI container."""
             try:
                 return _create_aws_strategy_with_di(container, aws_config, provider_instance.name)
