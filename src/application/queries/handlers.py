@@ -54,18 +54,10 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
         self.event_publisher = self._get_event_publisher()
 
     async def execute_query(self, query: GetRequestQuery) -> RequestDTO:
-        """Execute get request query with machine status checking and caching.
-
-        Stages:
-            1. Check cache and return early on cache hit.
-            2. Load request and associated machines from storage.
-            3. Fetch provider view and reconcile machine state.
-            4. Update request status, build DTO, cache, and return.
-        """
+        """Execute get request query with command-driven population."""
         self.logger.info("Getting request details for: %s", query.request_id)
 
         try:
-            # <1.> Check cache and return early on cache hit.
             # Check cache first if enabled
             if self._cache_service and self._cache_service.is_caching_enabled():
                 cached_result = self._cache_service.get_cached_request(query.request_id)
@@ -73,28 +65,31 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     self.logger.info("Cache hit for request: %s", query.request_id)
                     return cached_result
 
-            # <2.> Load request and associated machines from storage.
-            # Cache miss - get request from storage
+            # Get request from storage
             with self.uow_factory.create_unit_of_work() as uow:
                 from domain.request.value_objects import RequestId
 
                 request_id = RequestId(value=query.request_id)
-
                 request = uow.requests.get_by_id(request_id)
-
-                self.logger.debug(
-                    f"Searching for request_id: {request_id} request object retrieved: {request}"
-                )
 
                 if not request:
                     raise EntityNotFoundError("Request", request_id)
+
+            # Trigger population command if needed (no direct writes in query)
+            if request.needs_machine_id_population():
+                from application.dto.commands import PopulateMachineIdsCommand
+                populate_command = PopulateMachineIdsCommand(request_id=query.request_id)
+                await self.command_bus.execute(populate_command)
+                
+                # Re-query after population
+                with self.uow_factory.create_unit_of_work() as uow:
+                    request = uow.requests.get_by_id(request_id)
 
             # Get machines using performance-optimized method
             machine_obj_from_db = await self._get_machines_for_request(request)
 
             self.logger.debug(f"Machines associated with this request in DB: {machine_obj_from_db}")
 
-            # <3.> Fetch provider view and reconcile machine state.
             # Always fetch provider view first
             machine_objects_from_provider, provider_metadata = await self._fetch_provider_machines(
                 request, machine_obj_from_db
@@ -110,7 +105,6 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             self.logger.debug(f"Machines from DB:  {machine_obj_from_db}")
             self.logger.debug(f"Machines from cloud provider:  {machine_objects_from_provider}")
 
-            # <4.> Update request status, build DTO, cache, and return.
             # Determine if request status needs updating based on machine states
             new_status, status_message = self._determine_request_status_from_machines(
                 machine_obj_from_db, machine_objects_from_provider, request, provider_metadata
@@ -144,11 +138,6 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 )
                 for machine in machine_objects_from_provider
             ]
-
-            # Compute machine_ids from machines
-            with self.uow_factory.create_unit_of_work() as uow:
-                machines = uow.machines.find_by_request_id(query.request_id)
-                machine_ids = [str(m.machine_id.value) for m in machines]
 
             # Create RequestDTO with fresh machine data using proper factory method
             request_dto = RequestDTO.from_domain(request, machine_references=machine_references)
