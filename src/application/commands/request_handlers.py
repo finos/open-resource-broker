@@ -200,15 +200,10 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                             type(resource_ids),
                         )
 
-                        # Store provider API information for handler selection
-                        if not hasattr(request, "metadata"):
-                            request.metadata = {}
-                        request.metadata["provider_api"] = template.provider_api or "RunInstances"
-                        request.metadata["handler_used"] = provisioning_result.get(
-                            "provider_data", {}
-                        ).get("handler_used", "RunInstancesHandler")
+                        # Store provider API in domain field
+                        request.provider_api = template.provider_api or "RunInstances"
                         self.logger.info(
-                            "Stored provider API: %s", request.metadata["provider_api"]
+                            "Stored provider API: %s", request.provider_api
                         )
 
                         # Add resource IDs to request
@@ -262,9 +257,11 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                                 )
                                 or "Unknown API errors"
                             )
-                            if error_summary and "error_message" not in request.metadata:
-                                request.metadata["error_message"] = error_summary
-                                request.metadata["error_type"] = "ProvisioningPartialFailure"
+                            if error_summary and not request.status_message:
+                                request = request.update_status(
+                                    request.status, error_summary
+                                )
+                                request.error_details = {"type": "ProvisioningPartialFailure"}
 
                         # Store ASG capacity metadata for tracking
                         if template.provider_api == "ASG":
@@ -337,11 +334,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                             RequestStatus.FAILED,
                             f"Provisioning failed: {error_message}",
                         )
-                        # Store error details in metadata
-                        if not hasattr(request, "metadata"):
-                            request.metadata = {}
-                        request.metadata["error_message"] = error_message
-                        request.metadata["error_type"] = "ProvisioningFailure"
+                        # Store error details in domain fields
+                        request.error_details = {"type": "ProvisioningFailure", "message": error_message}
 
                 except Exception as provisioning_error:
                     # Handle unexpected provisioning errors
@@ -351,11 +345,11 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                     request = request.update_status(
                         RequestStatus.FAILED, f"Provisioning failed: {error_message}"
                     )
-                    # Store error details in metadata
-                    if not hasattr(request, "metadata"):
-                        request.metadata = {}
-                    request.metadata["error_message"] = error_message
-                    request.metadata["error_type"] = type(provisioning_error).__name__
+                    # Store error details in domain fields
+                    request.error_details = {
+                        "type": type(provisioning_error).__name__, 
+                        "message": error_message
+                    }
 
                     self.logger.error(
                         "Provisioning failed for request %s: %s",
@@ -446,7 +440,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
             template_id=template_id,
             provider_type=request.provider_type,
             provider_name=request.provider_name,
-            provider_api=request.metadata.get("provider_api") or request.provider_api,
+            provider_api=request.provider_api,
             resource_id=instance_data.get("resource_id"),
             instance_type=InstanceType(value=instance_data.get("instance_type", "t2.micro")),
             image_id=instance_data.get("image_id", "unknown"),
