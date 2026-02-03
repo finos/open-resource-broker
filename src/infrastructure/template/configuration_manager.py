@@ -126,9 +126,25 @@ class TemplateConfigurationManager:
         if force_refresh:
             self.cache_service.invalidate()
 
-        # For now, bypass cache since AMI resolution is async
-        # TODO: Implement async cache service
+        # Try to get from cache first (sync)
+        try:
+            cached_templates = self.cache_service.get_cached()
+            if cached_templates:
+                self.logger.debug("Returning %s cached templates", len(cached_templates))
+                return cached_templates
+        except Exception as e:
+            self.logger.debug("Cache check failed: %s", e)
+
+        # Load templates with async AMI resolution
         templates = await self._load_templates_from_scheduler()
+        
+        # Cache the result (sync)
+        try:
+            self.cache_service.cache_templates(templates)
+            self.logger.debug("Cached %s templates", len(templates))
+        except Exception as e:
+            self.logger.debug("Cache storage failed: %s", e)
+        
         self.logger.info("Loaded %s templates", len(templates))
         return templates
 
@@ -288,6 +304,42 @@ class TemplateConfigurationManager:
             if image_id and image_id.startswith("/aws/service/"):
                 ssm_parameters.add(image_id)
         return list(ssm_parameters)
+
+    def _is_ami_resolution_enabled(self) -> bool:
+        """Check if AMI resolution is enabled using provider strategy."""
+        try:
+            # Use provider strategy to check if AMI resolution is supported
+            from providers.registry import get_provider_registry
+            from providers.base.strategy import ProviderOperationType
+            
+            registry = get_provider_registry()
+            
+            # Get first active provider to check capabilities
+            provider_config = self.config_manager.get_provider_config()
+            active_providers = provider_config.get_active_providers()
+            
+            if not active_providers:
+                return False
+            
+            # Check if any active provider supports AMI resolution
+            for provider in active_providers:
+                try:
+                    strategy = registry.create_strategy_by_instance(provider.name, provider.config)
+                    capabilities = strategy.get_capabilities()
+                    
+                    # Check if provider supports RESOLVE_AMI operation
+                    if ProviderOperationType.RESOLVE_AMI in capabilities.supported_operations:
+                        return True
+                except Exception as e:
+                    self.logger.debug("Could not check AMI resolution for provider %s: %s", provider.name, e)
+                    continue
+            
+            return False
+            
+        except Exception as e:
+            self.logger.debug("Could not determine AMI resolution status: %s", e)
+            # Default to enabled for backward compatibility
+            return True
 
     async def _resolve_amis_via_provider(self, provider_instance: str, ssm_parameters: list[str]) -> dict[str, str]:
         """Resolve AMI parameters using provider registry."""
