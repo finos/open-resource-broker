@@ -78,6 +78,9 @@ class AWSProviderStrategy(ProviderStrategy):
         self._instance_service: Optional[AWSInstanceOperationService] = None
         self._health_service: Optional[AWSHealthCheckService] = None
         self._template_service: Optional[AWSTemplateValidationService] = None
+        
+        # AMI resolution cache (strategy-owned)
+        self._ami_cache: dict[str, str] = {}
         self._infrastructure_service: Optional[AWSInfrastructureDiscoveryService] = None
         self._handler_registry: Optional[AWSHandlerRegistry] = None
         self._capability_service: Optional[AWSCapabilityService] = None
@@ -188,6 +191,8 @@ class AWSProviderStrategy(ProviderStrategy):
                 },
                 {"operation": "health_check"},
             )
+        elif operation.operation_type == ProviderOperationType.RESOLVE_AMI:
+            return await self._handle_resolve_ami(operation)
         elif operation.operation_type == ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES:
             return await self._handle_describe_resource_instances(operation)
         else:
@@ -293,6 +298,49 @@ class AWSProviderStrategy(ProviderStrategy):
                 self._logger.warning("Failed to resolve AWS provisioning adapter: %s", exc)
                 self._aws_provisioning_port_resolver = None
         return self._aws_provisioning_port
+
+    async def _handle_resolve_ami(self, operation: ProviderOperation) -> ProviderResult:
+        """Handle AMI resolution from SSM parameters using strategy's AWS client."""
+        try:
+            ssm_parameters = operation.parameters.get("ssm_parameters", [])
+            if not ssm_parameters:
+                return ProviderResult.success_result({"resolved_amis": {}})
+            
+            resolved_amis = {}
+            
+            for ssm_param in ssm_parameters:
+                # Check cache first
+                if ssm_param in self._ami_cache:
+                    resolved_amis[ssm_param] = self._ami_cache[ssm_param]
+                    continue
+                
+                # Resolve using strategy's AWS client
+                try:
+                    aws_client = self.aws_client
+                    if not aws_client:
+                        self._logger.warning("No AWS client available for AMI resolution")
+                        continue
+                    
+                    # Get SSM parameter value
+                    response = aws_client.ssm_client.get_parameter(Name=ssm_param)
+                    resolved_ami = response["Parameter"]["Value"]
+                    
+                    # Cache the result
+                    self._ami_cache[ssm_param] = resolved_ami
+                    resolved_amis[ssm_param] = resolved_ami
+                    
+                    self._logger.debug("Resolved AMI: %s -> %s", ssm_param, resolved_ami)
+                    
+                except Exception as e:
+                    self._logger.warning("Failed to resolve AMI parameter %s: %s", ssm_param, e)
+                    # Keep original parameter as fallback
+                    resolved_amis[ssm_param] = ssm_param
+            
+            return ProviderResult.success_result({"resolved_amis": resolved_amis})
+            
+        except Exception as e:
+            self._logger.error("AMI resolution operation failed: %s", e)
+            return ProviderResult.error_result(f"AMI resolution failed: {e}", "AMI_RESOLUTION_FAILED")
 
     # Legacy methods that need to be kept for compatibility
     async def _handle_describe_resource_instances(self, operation: ProviderOperation) -> ProviderResult:

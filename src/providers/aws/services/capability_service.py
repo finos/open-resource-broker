@@ -40,6 +40,7 @@ class AWSCapabilityService:
                 ProviderOperationType.VALIDATE_TEMPLATE,
                 ProviderOperationType.GET_AVAILABLE_TEMPLATES,
                 ProviderOperationType.HEALTH_CHECK,
+                ProviderOperationType.RESOLVE_AMI,
             ],
             supported_apis=supported_apis,
             features={

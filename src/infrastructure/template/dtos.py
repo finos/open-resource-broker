@@ -81,9 +81,8 @@ class TemplateDTO(BaseDTO):
     vm_types: dict[str, Any] = Field(default_factory=dict)
     key_name: Optional[str] = None
 
-    # Legacy fields
-    configuration: dict[str, Any] = Field(default_factory=dict)
-    version: Optional[str] = None
+    # Missing domain field
+    user_data: Optional[str] = None
 
     def __post_init__(self) -> None:
         """Validate required fields."""
@@ -160,43 +159,5 @@ class TemplateDTO(BaseDTO):
             # Host Factory fields
             vm_type=getattr(template, 'vm_type', None),
             vm_types=getattr(template, 'vm_types', {}),
-            key_name=getattr(template, 'key_name', None),
-            
-            # Legacy fields
-            configuration=getattr(template, 'configuration', template.__dict__ if hasattr(template, '__dict__') else {}),
-            version=getattr(template, 'version', None)
+            key_name=getattr(template, 'key_name', None)
         )
-
-
-@dataclass
-class TemplateValidationResultDTO:
-    """Template validation result DTO."""
-
-    is_valid: bool
-    errors: list[str]
-    warnings: list[str]
-    template_id: str
-
-    def has_errors(self) -> bool:
-        """Check if validation has errors."""
-        return len(self.errors) > 0
-
-    def has_warnings(self) -> bool:
-        """Check if validation has warnings."""
-        return len(self.warnings) > 0
-
-
-@dataclass
-class TemplateCacheEntryDTO:
-    """Template cache entry DTO."""
-
-    template: TemplateDTO
-    cached_at: datetime
-    expires_at: Optional[datetime] = None
-    access_count: int = 0
-
-    def is_expired(self) -> bool:
-        """Check if cache entry is expired."""
-        if self.expires_at is None:
-            return False
-        return datetime.now() > self.expires_at

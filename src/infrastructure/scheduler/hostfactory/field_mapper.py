@@ -35,11 +35,6 @@ class HostFactoryFieldMapper(SchedulerFieldMapper):
             if internal_field in internal_template:
                 mapped[external_field] = internal_template[internal_field]
 
-        # Copy unmapped fields (preserve fields not in mappings)
-        for key, value in internal_template.items():
-            if key not in reverse_mappings:
-                mapped[key] = value
-
         # Apply HostFactory-specific transformations
         return self._apply_output_transformations(mapped)
 

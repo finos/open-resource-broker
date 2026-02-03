@@ -131,7 +131,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             machine_references = [
                 MachineReferenceDTO(
                     machine_id=str(machine.machine_id.value),
-                    name=machine.private_ip or str(machine.machine_id.value),
+                    name=machine.name or str(machine.machine_id.value) or machine.private_ip,
                     result=self._map_machine_status_to_result(machine.status.value, request.request_type),
                     status=machine.status.value,
                     private_ip_address=machine.private_ip or "",
@@ -705,6 +705,30 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             }
         )
 
+        # Set name field properly from AWS data
+        if "name" not in machine_data or not machine_data.get("name"):
+            # Try to get name from AWS tags first
+            tags = machine_data.get("tags", {})
+            aws_name = None
+            
+            # Handle nested tags structure: {"tags": {"Name": "value"}}
+            if isinstance(tags, dict) and "tags" in tags and isinstance(tags["tags"], dict):
+                aws_name = tags["tags"].get("Name")
+            # Handle direct tags structure: {"Name": "value"}
+            elif isinstance(tags, dict) and "Name" in tags:
+                aws_name = tags["Name"]
+            # Check metadata for tags
+            elif "metadata" in machine_data and isinstance(machine_data["metadata"], dict):
+                metadata_tags = machine_data["metadata"].get("tags", {})
+                if isinstance(metadata_tags, dict):
+                    aws_name = metadata_tags.get("Name")
+            
+            if aws_name:
+                machine_data["name"] = aws_name
+            else:
+                # Fallback to instance ID
+                machine_data["name"] = machine_data.get("instance_id", "")
+
         # Validate required fields before Pydantic validation
         if not machine_data.get("instance_id"):
             raise ValueError("Missing instance_id in AWS instance data")
@@ -712,6 +736,11 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             raise ValueError("Missing instance_type in AWS instance data")
         if not machine_data.get("image_id"):
             machine_data["image_id"] = "unknown"  # Provide default
+
+        # Compute name field if not present (let migration validator handle it)
+        if "name" not in machine_data or not machine_data.get("name"):
+            # Don't set name to None - let migration validator compute it
+            machine_data.pop("name", None)
 
         # Create value objects explicitly for Pydantic
         from domain.base.value_objects import InstanceType

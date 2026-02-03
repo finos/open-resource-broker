@@ -808,7 +808,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             # Follow exact HostFactory getRequestStatus output format
             formatted_machine = {
                 "machineId": machine.get("instance_id"),
-                "name": machine.get("private_ip", machine.get("instance_id", "")),
+                "name": machine.get("name", machine.get("instance_id", machine.get("private_ip", ""))),
                 "result": self._map_machine_status_to_result(machine.get("status")),
                 "status": machine.get("status", "unknown"),
                 "privateIpAddress": machine.get("private_ip"),

@@ -25,6 +25,7 @@ class ProviderOperationType(str, Enum):
     VALIDATE_TEMPLATE = "validate_template"
     GET_AVAILABLE_TEMPLATES = "get_available_templates"
     HEALTH_CHECK = "health_check"
+    RESOLVE_AMI = "resolve_ami"
 
 
 @dataclass
