@@ -9,6 +9,7 @@ from application.dto.commands import (
     CompleteRequestCommand,
     CreateRequestCommand,
     CreateReturnRequestCommand,
+    PopulateMachineIdsCommand,
     UpdateRequestStatusCommand,
 )
 from application.services.provider_capability_service import (
@@ -233,6 +234,14 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
                                 resource_ids,
                             )
 
+                        # Graceful immediate population (don't error if no instance IDs)
+                        instance_ids = self._extract_instance_ids(provisioning_result)
+                        if instance_ids:
+                            request = request.add_machine_ids(instance_ids)
+                            self.logger.info("Populated %d machine IDs immediately", len(instance_ids))
+                        else:
+                            self.logger.debug("No immediate instance IDs available, will populate later")
+
                         # Create machine aggregates for each instance
                         instance_data_list = provisioning_result.get("instances", [])
                         provider_data = provisioning_result.get("provider_data", {})
@@ -394,6 +403,24 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
 
         self.logger.info("Machine request created successfully: %s", request.request_id)
         return str(request.request_id)
+
+    def _extract_instance_ids(self, result: dict) -> list[str]:
+        """Extract instance IDs if available in provider result."""
+        try:
+            if result.get("instance_ids"):
+                return result["instance_ids"]
+            elif result.get("instances"):
+                instances = result["instances"]
+                if isinstance(instances, list) and instances:
+                    return [
+                        instance.get("instance_id") 
+                        for instance in instances 
+                        if instance.get("instance_id")
+                    ]
+            return []
+        except Exception as e:
+            self.logger.debug("Could not extract instance IDs: %s", e)
+            return []
 
 
     def _create_machine_aggregate(self, instance_data: dict[str, Any], request, template_id: str):
@@ -776,6 +803,74 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             self.logger.error("Failed to process resource group %s: %s", resource_id, e)
             return {"success": False, "error_message": str(e)}
 
+
+@command_handler(PopulateMachineIdsCommand)
+class PopulateMachineIdsHandler(BaseCommandHandler[PopulateMachineIdsCommand, None]):
+    """Handler for populating requests with machine IDs."""
+    
+    def __init__(
+        self,
+        uow_factory: UnitOfWorkFactory,
+        logger: LoggingPort,
+        container: ContainerPort,
+        event_publisher: EventPublisherPort,
+        error_handler: ErrorHandlingPort,
+    ):
+        super().__init__(logger, event_publisher, error_handler)
+        self.uow_factory = uow_factory
+        self._container = container
+
+    async def execute_command(self, command: PopulateMachineIdsCommand) -> None:
+        """Discover and store machine IDs from provider resources."""
+        
+        with self.uow_factory.create_unit_of_work() as uow:
+            request = uow.requests.get_by_id(command.request_id)
+            if not request or not request.needs_machine_id_population():
+                return
+            
+            # Discover machine IDs from provider
+            discovered_ids = await self._discover_machine_ids(request)
+            if discovered_ids:
+                updated_request = request.update_machine_ids(discovered_ids)
+                uow.requests.save(updated_request)
+                
+                self.logger.info(
+                    "Populated request %s with %d machine IDs", 
+                    command.request_id, len(discovered_ids)
+                )
+
+    async def _discover_machine_ids(self, request) -> list[str]:
+        """Discover machine IDs from provider resources."""
+        try:
+            from providers.registry import get_provider_registry
+            from providers.base.strategy import ProviderOperation, ProviderOperationType
+            
+            if not request.resource_ids:
+                return []
+            
+            operation = ProviderOperation(
+                operation_type=ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES,
+                parameters={"resource_ids": request.resource_ids}
+            )
+            
+            registry = get_provider_registry()
+            from domain.base.ports.configuration_port import ConfigurationPort
+            config_manager = self._container.get(ConfigurationPort)
+            provider_config = config_manager.get_provider_instance_config(request.provider_name)
+            
+            result = await registry.execute_operation(
+                request.provider_name, operation, provider_config.config
+            )
+            
+            if result.success and result.data and "instances" in result.data:
+                return [instance.get("instance_id") for instance in result.data["instances"]]
+            
+            return []
+            
+        except Exception as e:
+            self.logger.error("Failed to discover machine IDs for request %s: %s", 
+                            request.request_id, e)
+            return []
 
 
 @command_handler(UpdateRequestStatusCommand)

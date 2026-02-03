@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, ConfigDict
@@ -78,3 +79,11 @@ class CompleteRequestCommand(Command, BaseModel):
     request_id: str
     result_data: Optional[Dict[str, Any]] = None
     metadata: Optional[Dict[str, Any]] = None
+
+
+class PopulateMachineIdsCommand(Command, BaseModel):
+    """Command to populate request with machine IDs from resources."""
+
+    model_config = ConfigDict(frozen=True)
+
+    request_id: str
