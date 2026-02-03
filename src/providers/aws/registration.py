@@ -29,20 +29,26 @@ def create_aws_strategy(provider_config: Any) -> Any:
     from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
     try:
-        # Handle both ProviderInstanceConfig object and raw dict
-        if hasattr(provider_config, "config"):
+        # Handle AWSProviderConfig object directly
+        if isinstance(provider_config, AWSProviderConfig):
+            aws_config = provider_config
+            provider_instance_config = None
+            provider_name = None
+        # Handle ProviderInstanceConfig object
+        elif hasattr(provider_config, "config"):
             # ProviderInstanceConfig object
             config_data = provider_config.config
             provider_instance_config = provider_config
             provider_name = provider_config.name
+            # Create AWS configuration
+            aws_config = AWSProviderConfig(**config_data)
         else:
             # Raw config dict
             config_data = provider_config
             provider_instance_config = None
             provider_name = None
-
-        # Create AWS configuration
-        aws_config = AWSProviderConfig(**config_data)
+            # Create AWS configuration
+            aws_config = AWSProviderConfig(**config_data)
 
         # Create a simple logger adapter for now
         # The DI container will inject the appropriate logger later if needed

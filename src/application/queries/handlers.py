@@ -130,7 +130,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 MachineReferenceDTO(
                     machine_id=str(machine.machine_id.value),
                     name=machine.private_ip or str(machine.machine_id.value),
-                    result=self._map_machine_status_to_result(machine.status.value),
+                    result=self._map_machine_status_to_result(machine.status.value, request.request_type),
                     status=machine.status.value,
                     private_ip_address=machine.private_ip or "",
                     public_ip_address=machine.public_ip,
@@ -270,7 +270,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 return [], result.metadata or {}
 
             # Get instance details from result
-            instance_details = result.data.get("instances", [])
+            instance_details = result.data.get("instances", []) or result.data.get("machines", [])
             if hasattr(instance_details, "__await__"):
                 self.logger.debug("Provider returned awaitable instances result, awaiting it")
                 instance_details = await instance_details
@@ -737,14 +737,20 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
         return state_mapping.get(aws_state, MachineStatus.UNKNOWN)
 
-    def _map_machine_status_to_result(self, status: str) -> str:
+    def _map_machine_status_to_result(self, status: str, request_type=None) -> str:
         """Map machine status to HostFactory result field."""
         # Per docs: "Possible values: 'executing', 'fail', 'succeed'"
         if status == "running":
             return "succeed"
         elif status in ["pending", "launching"]:
             return "executing"
-        elif status in ["terminated", "failed", "error"]:
+        elif status == "terminated":
+            # Context-aware mapping for terminated status
+            if request_type and hasattr(request_type, 'value') and request_type.value == "return":
+                return "succeed"  # Successful termination for return requests
+            else:
+                return "fail"     # Unexpected termination for acquire requests
+        elif status in ["failed", "error"]:
             return "fail"
         else:
             return "executing"  # Default for unknown states

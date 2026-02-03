@@ -627,9 +627,65 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                         machine_ids, request
                     )
                     self.logger.info(f"Deprovisioning results for {provider_name}: {provisioning_result}")
+                    
+                    # Update request status based on deprovisioning result
+                    if provisioning_result.get("success", False):
+                        # Update machine statuses to pending (termination in progress)
+                        with self.uow_factory.create_unit_of_work() as uow:
+                            for machine_id in machine_ids:
+                                machine = uow.machines.get_by_id(machine_id)
+                                if machine:
+                                    from domain.machine.machine_status import MachineStatus
+                                    updated_machine = machine.update_status(
+                                        MachineStatus.PENDING, 
+                                        "Termination in progress"
+                                    )
+                                    uow.machines.save(updated_machine)
+                        
+                        self.logger.info("Termination initiated for request %s", request.request_id)
+                    else:
+                        # Update request status to failed
+                        from application.dto.commands import UpdateRequestStatusCommand
+                        from domain.request.request_types import RequestStatus
+                        
+                        errors = provisioning_result.get("errors", [])
+                        error_message = "; ".join(errors) if errors else "Deprovisioning failed"
+                        
+                        update_command = UpdateRequestStatusCommand(
+                            request_id=str(request.request_id),
+                            status=RequestStatus.FAILED,
+                            message=f"Return request failed: {error_message}"
+                        )
+                        
+                        # Execute the status update command using existing command bus
+                        from infrastructure.di.buses import CommandBus
+                        command_bus = self._container.get(CommandBus)
+                        await command_bus.execute(update_command)
+                        
+                        self.logger.info("Updated request %s status to failed", request.request_id)
+                        
                 except Exception as e:
                     self.logger.error("Deprovisioning failed for provider %s request %s: %s", 
                                     provider_name, request.request_id, e)
+                    
+                    # Update request status to failed due to exception
+                    try:
+                        from application.dto.commands import UpdateRequestStatusCommand
+                        from domain.request.request_types import RequestStatus
+                        
+                        update_command = UpdateRequestStatusCommand(
+                            request_id=str(request.request_id),
+                            status=RequestStatus.FAILED,
+                            message=f"Return request failed: {str(e)}"
+                        )
+                        
+                        from infrastructure.di.buses import CommandBus
+                        command_bus = self._container.get(CommandBus)
+                        await command_bus.execute(update_command)
+                        
+                        self.logger.info("Updated request %s status to failed due to exception", request.request_id)
+                    except Exception as update_error:
+                        self.logger.error("Failed to update request status: %s", update_error)
 
             # Return first request ID for backward compatibility
             return created_requests[0] if created_requests else None
@@ -783,7 +839,8 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             from domain.base.ports.configuration_port import ConfigurationPort
             config_manager = self._container.get(ConfigurationPort)
             provider_instance_config = config_manager.get_provider_instance_config(provider_name)
-            provider_config = provider_instance_config.config if provider_instance_config else {}
+            # Pass the full ProviderInstanceConfig object, not just the config dict
+            provider_config = provider_instance_config if provider_instance_config else {}
 
             # Execute via provider registry
             from providers.registry import get_provider_registry
@@ -910,15 +967,14 @@ class UpdateRequestStatusHandler(BaseCommandHandler[UpdateRequestStatusCommand, 
                     raise EntityNotFoundError("Request", command.request_id)
 
             # Update status
-            request.update_status(
+            request = request.update_status(
                 status=command.status,
-                status_message=command.status_message,
-                metadata=command.metadata,
+                message=command.message,
             )
 
             # Save changes and get extracted events
             with self.uow_factory.create_unit_of_work() as uow:
-                events = self.requests.save(request)
+                events = uow.requests.save(request)
                 # Publish events
                 for event in events:
                     self.event_publisher.publish(event)
