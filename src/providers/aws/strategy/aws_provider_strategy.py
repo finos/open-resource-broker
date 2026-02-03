@@ -97,30 +97,13 @@ class AWSProviderStrategy(ProviderStrategy):
 
     @property
     def aws_client(self) -> Optional[AWSClient]:
-        """Get the AWS client instance with lazy initialization."""
-        if self._aws_client is None:
-            if self._aws_client_resolver:
-                try:
-                    self._aws_client = self._aws_client_resolver()
-                    self._logger.debug("AWS client created via resolver")
-                except Exception as exc:
-                    self._logger.warning("Failed to resolve AWSClient: %s", exc)
-            else:
-                try:
-                    # Need config_port to create AWS client
-                    from infrastructure.di.container import get_container
-                    container = get_container()
-                    from domain.base.ports.configuration_port import ConfigurationPort
-                    config_port = container.get(ConfigurationPort)
-                    
-                    self._aws_client = AWSClient(
-                        config=config_port,
-                        logger=self._logger,
-                        provider_name=self._provider_name
-                    )
-                    self._logger.debug("AWS client created directly")
-                except Exception as exc:
-                    self._logger.warning("Failed to create AWSClient: %s", exc)
+        """Get the AWS client instance with lazy initialization and caching."""
+        if self._aws_client is None and self._aws_client_resolver:
+            try:
+                self._aws_client = self._aws_client_resolver()
+                self._logger.debug("AWS client cached in strategy")
+            except Exception as exc:
+                self._logger.warning("Failed to resolve AWSClient: %s", exc)
         return self._aws_client
 
     def initialize(self) -> bool:
@@ -224,7 +207,38 @@ class AWSProviderStrategy(ProviderStrategy):
         """Get supported APIs from handler registry."""
         return self._get_capability_service().get_supported_apis()
 
+    @property
+    def launch_template_manager(self):
+        """Get launch template manager using strategy's AWS client."""
+        if not hasattr(self, '_launch_template_manager'):
+            from providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
+            self._launch_template_manager = AWSLaunchTemplateManager(
+                aws_client=self.aws_client,
+                logger=self._logger
+            )
+        return self._launch_template_manager
 
+    @property  
+    def aws_operations(self):
+        """Get AWS operations using strategy's AWS client."""
+        if not hasattr(self, '_aws_operations'):
+            from providers.aws.utilities.aws_operations import AWSOperations
+            self._aws_operations = AWSOperations(
+                aws_client=self.aws_client,
+                logger=self._logger
+            )
+        return self._aws_operations
+
+    @property
+    def machine_adapter(self):
+        """Get machine adapter using strategy's AWS client.""" 
+        if not hasattr(self, '_machine_adapter'):
+            from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
+            self._machine_adapter = AWSMachineAdapter(
+                aws_client=self.aws_client,
+                logger=self._logger
+            )
+        return self._machine_adapter
 
     # Service getters with lazy initialization
     def _get_handler_registry(self) -> AWSHandlerRegistry:

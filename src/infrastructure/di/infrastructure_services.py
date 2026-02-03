@@ -8,9 +8,7 @@ from domain.template.repository import TemplateRepository
 from infrastructure.di.container import DIContainer
 from infrastructure.logging.logger import get_logger
 from infrastructure.template.configuration_manager import TemplateConfigurationManager
-from providers.aws.infrastructure.template.caching_ami_resolver import (
-    CachingAMIResolver,
-)
+
 
 
 def register_infrastructure_services(container: DIContainer) -> None:
@@ -62,122 +60,10 @@ def _register_template_services(container: DIContainer):
         TemplateConfigurationManager, create_template_configuration_manager
     )
 
-    # Check if AMI resolution is enabled via AWS extensions
-    _register_ami_resolver_if_enabled(container)
 
 
-def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
-    """Register AMI resolver if enabled in AWS provider extensions."""
-    try:
-        from domain.base.ports.configuration_port import ConfigurationPort
-        from domain.template.extensions import TemplateExtensionRegistry
 
-        config_manager = container.get(ConfigurationPort)
-        logger = get_logger(__name__)
 
-        # Check if AWS extensions are registered
-        if not TemplateExtensionRegistry.has_extension("aws"):
-            logger.debug("AWS extensions not registered, skipping AMI resolver registration")
-            return
-
-        # Try to get AWS provider configuration
-        try:
-            provider_config = config_manager.get_provider_config()
-
-            # Look for AWS provider defaults
-            if (
-                hasattr(provider_config, "provider_defaults")
-                and "aws" in provider_config.provider_defaults
-            ):
-                aws_defaults = provider_config.provider_defaults["aws"]
-                if hasattr(aws_defaults, "extensions"):
-                    # Create AWS extension config from provider defaults using registry
-                    aws_extension_config = TemplateExtensionRegistry.create_extension_config(
-                        "aws", aws_defaults.extensions or {}
-                    )
-
-                    # Check if AMI resolution is enabled
-                    if aws_extension_config and aws_extension_config.ami_resolution.enabled:
-                        container.register_singleton(CachingAMIResolver)
-                        # Register interface to resolve to concrete implementation
-                        from domain.base.ports.template_resolver_port import (
-                            TemplateResolverPort,
-                        )
-
-                        container.register_singleton(
-                            TemplateResolverPort, lambda c: c.get(CachingAMIResolver)
-                        )
-                        logger.info(
-                            "AMI resolver registered - AMI resolution enabled in AWS extensions"
-                        )
-                        return
-
-            # Fallback: check if any AWS provider instances have AMI resolution enabled
-            if hasattr(provider_config, "providers"):
-                for provider in provider_config.providers:
-                    if provider.type == "aws" and hasattr(provider, "extensions"):
-                        try:
-                            instance_extension_config = (
-                                TemplateExtensionRegistry.create_extension_config(
-                                    "aws", provider.extensions or {}
-                                )
-                            )
-                            if (
-                                instance_extension_config
-                                and instance_extension_config.ami_resolution.enabled
-                            ):
-                                container.register_singleton(CachingAMIResolver)
-                                # Register interface to resolve to concrete
-                                # implementation
-                                from domain.base.ports.template_resolver_port import (
-                                    TemplateResolverPort,
-                                )
-
-                                container.register_singleton(
-                                    TemplateResolverPort,
-                                    lambda c: c.get(CachingAMIResolver),
-                                )
-                                logger.info(
-                                    "AMI resolver registered - enabled in AWS provider instance: %s",
-                                    provider.name,
-                                )
-                                return
-                        except Exception as e:
-                            logger.debug(
-                                "Could not parse extensions for provider %s: %s",
-                                provider.name,
-                                e,
-                            )
-
-            # Default: register with default AWS extension config
-            default_aws_config = TemplateExtensionRegistry.create_extension_config("aws", {})
-            if default_aws_config and default_aws_config.ami_resolution.enabled:
-                container.register_singleton(CachingAMIResolver)
-                # Register interface to resolve to concrete implementation
-                from domain.base.ports.template_resolver_port import (
-                    TemplateResolverPort,
-                )
-
-                container.register_singleton(
-                    TemplateResolverPort, lambda c: c.get(CachingAMIResolver)
-                )
-                logger.info("AMI resolver registered with default AWS extension configuration")
-            else:
-                logger.debug("AMI resolution disabled in default AWS configuration")
-
-        except Exception as e:
-            logger.warning("Could not determine AMI resolution configuration: %s", e)
-            # Register with default configuration as fallback
-            container.register_singleton(CachingAMIResolver)
-            # Register interface to resolve to concrete implementation
-            from domain.base.ports.template_resolver_port import TemplateResolverPort
-
-            container.register_singleton(TemplateResolverPort, lambda c: c.get(CachingAMIResolver))
-            logger.info("AMI resolver registered with fallback configuration")
-
-    except Exception as e:
-        logger = get_logger(__name__)
-        logger.error("Failed to register AMI resolver: %s", e)
 
 
 def _register_repository_services(container: DIContainer) -> None:

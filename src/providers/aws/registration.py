@@ -120,20 +120,10 @@ def create_aws_resolver() -> Any:
     Create AWS template resolver.
 
     Returns:
-        AWS template resolver instance
+        None - AMI resolution now handled by provider strategy RESOLVE_AMI operation
     """
-    try:
-        from providers.aws.infrastructure.template.caching_ami_resolver import (
-            CachingAMIResolver,
-        )
-
-        return CachingAMIResolver()
-    except ImportError:
-        # AWS resolver not available, return None
-        return None
-    except Exception as e:
-        # Re-raise with context - let caller handle logging
-        raise RuntimeError(f"Failed to create AWS resolver: {e!s}")
+    # AMI resolution is now handled by provider strategy operations
+    return None
 
 
 def create_aws_validator() -> Any:
@@ -410,18 +400,9 @@ def register_aws_services_with_di(container) -> None:
     logger = container.get(LoggingPort)
 
     try:
-        # Register AWS-specific utility services only
-        from domain.base.ports.template_resolver_port import TemplateResolverPort
-        from providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
-        from providers.aws.infrastructure.template.caching_ami_resolver import CachingAMIResolver
-
-        # Register AMI resolver if not already registered
-        if not container.is_registered(CachingAMIResolver):
-            container.register_singleton(CachingAMIResolver)
-            container.register_singleton(TemplateResolverPort, lambda c: c.get(CachingAMIResolver))
-            logger.debug("AWS AMI resolver registered with DI container")
-
         # Register AWS Launch Template Manager if not already registered
+        from providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
+
         if not container.is_registered(AWSLaunchTemplateManager):
             container.register_singleton(AWSLaunchTemplateManager)
             logger.debug("AWS Launch Template Manager registered with DI container")
