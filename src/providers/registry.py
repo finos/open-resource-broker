@@ -63,7 +63,6 @@ class ProviderRegistry(BaseRegistry):
     def __init__(self) -> None:
         # Provider is MULTI_CHOICE - multiple provider strategies simultaneously
         super().__init__(mode=RegistryMode.MULTI_CHOICE)
-        self._strategy_cache: dict[str, Any] = {}
         self._metrics: Optional[MetricsCollector] = None
         self._logger: Optional[LoggingPort] = None
 

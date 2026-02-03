@@ -64,8 +64,9 @@ class BaseRegistry(ABC):
         Args:
             mode: Registry operation mode (single or multi choice)
         """
-        if hasattr(self, "_initialized"):
-            return  # Don't reset cache on subsequent __init__ calls
+        # Use a more robust check to prevent reinitialization
+        if hasattr(self, "_strategy_cache"):
+            return  # Already initialized - cache exists
 
         self.mode = mode
         # Type-based registrations
@@ -81,7 +82,6 @@ class BaseRegistry(ABC):
         from infrastructure.logging.logger import get_logger
 
         self.logger = get_logger(__name__)
-        self._initialized = True
 
     @abstractmethod
     def register(
@@ -178,9 +178,7 @@ class BaseRegistry(ABC):
 
         # Check cache first
         cache_key = f"instance:{instance_name}"
-        self.logger.debug("Looking for cached strategy with key: %s, cache size: %d", cache_key, len(self._strategy_cache))
         if cache_key in self._strategy_cache:
-            self.logger.debug("Returning cached strategy for instance: %s", instance_name)
             return self._strategy_cache[cache_key]
 
         registration = self._get_instance_registration(instance_name)
@@ -188,7 +186,6 @@ class BaseRegistry(ABC):
         
         # Cache the strategy
         self._strategy_cache[cache_key] = strategy
-        self.logger.debug("Cached new strategy for instance: %s, cache size now: %d", instance_name, len(self._strategy_cache))
         return strategy
 
     def is_registered(self, type_name: str) -> bool:
