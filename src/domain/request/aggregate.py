@@ -39,6 +39,7 @@ class Request(AggregateRoot):
     # Resource tracking (what was created)
     # Provider resource identifiers
     resource_ids: list[str] = Field(default_factory=list)
+    machine_ids: list[str] = Field(default_factory=list)
 
     # Request state
     status: RequestStatus = Field(default=RequestStatus.PENDING)
@@ -223,6 +224,23 @@ class Request(AggregateRoot):
             return Request.model_validate(data)
         return self
 
+    def add_machine_ids(self, machine_ids: list[str]) -> "Request":
+        """Add machine IDs to request."""
+        updated_ids = list(set(self.machine_ids + machine_ids))
+        return self.model_copy(update={"machine_ids": updated_ids})
+
+    def update_machine_ids(self, machine_ids: list[str]) -> "Request":
+        """Update machine IDs (for population)."""
+        return self.model_copy(update={"machine_ids": machine_ids})
+
+    def needs_machine_id_population(self) -> bool:
+        """Check if request needs machine ID population."""
+        return (
+            not self.machine_ids and 
+            self.resource_ids and 
+            self.request_type != RequestType.RETURN
+        )
+
     @property
     def is_complete(self) -> bool:
         """Check if request is complete."""
@@ -367,7 +385,7 @@ class Request(AggregateRoot):
         provider_name: str,
         metadata: Optional[dict[str, Any]] = None,
     ) -> "Request":
-        """Create a return/terminate request."""
+        """Create a return/terminate request with machine IDs."""
         request_id = RequestId.generate(RequestType.RETURN)
 
         request = cls(
@@ -378,6 +396,7 @@ class Request(AggregateRoot):
             desired_capacity=len(machine_ids),
             provider_type=provider_type,
             provider_name=provider_name,
+            machine_ids=machine_ids,
             status=RequestStatus.PENDING,
             metadata=metadata or {},
             created_at=datetime.utcnow(),
