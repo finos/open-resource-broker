@@ -182,7 +182,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     fallback_machines = uow.machines.find_by_request_id(str(request.request_id))
                 
                 for machine in fallback_machines:
-                    machine_id = str(machine.machine_id.value)
+                    machine_id = machine.machine_id.value
                     if machine_id not in seen_ids:
                         seen_ids[machine_id] = machine
         
