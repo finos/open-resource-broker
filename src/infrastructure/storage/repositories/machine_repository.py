@@ -1,6 +1,5 @@
 """Single machine repository implementation using storage strategy composition."""
 
-from datetime import datetime
 from typing import Any, Optional
 
 from domain.base.ports.storage_port import StoragePort
@@ -15,122 +14,22 @@ from infrastructure.logging.logger import get_logger
 class MachineSerializer:
     """Handles Machine aggregate serialization/deserialization."""
 
-    def __init__(self) -> None:
-        """Initialize the instance."""
-        self.logger = get_logger(__name__)
-
     def to_dict(self, machine: Machine) -> dict[str, Any]:
-        """Convert Machine aggregate to dictionary with additional fields."""
-        try:
-            return {
-                # Core machine identification
-                "machine_id": str(machine.machine_id.value),
-                "template_id": machine.template_id,
-                "request_id": machine.request_id,
-                "return_request_id": machine.return_request_id,
-                "provider_type": machine.provider_type,
-                "provider_name": machine.provider_name,
-                "provider_api": machine.provider_api,
-                "resource_id": machine.resource_id,
-                # Machine configuration
-                "instance_type": str(machine.instance_type.value),
-                "image_id": machine.image_id,
-                # Network configuration
-                "private_ip": machine.private_ip,
-                "public_ip": machine.public_ip,
-                "subnet_id": machine.subnet_id,
-                "security_group_ids": machine.security_group_ids,
-                # Machine state
-                "status": machine.status.value,
-                "status_reason": machine.status_reason,
-                # Lifecycle timestamps
-                "launch_time": (machine.launch_time.isoformat() if machine.launch_time else None),
-                "termination_time": (
-                    machine.termination_time.isoformat() if machine.termination_time else None
-                ),
-                # Tags and metadata
-                "tags": machine.tags.to_dict() if machine.tags else {},
-                "metadata": machine.metadata or {},
-                # Provider-specific data
-                "provider_data": machine.provider_data or {},
-                # Versioning
-                "version": machine.version,
-                # Base entity fields
-                "created_at": (machine.created_at.isoformat() if machine.created_at else None),
-                "updated_at": (machine.updated_at.isoformat() if machine.updated_at else None),
-                # Schema version for migration support
-                "schema_version": "2.0.0",
-            }
-        except Exception as e:
-            self.logger.error("Failed to serialize machine %s: %s", machine.machine_id, e)
-            raise
-
+        """Convert Machine to storage format using domain serialization."""
+        data = machine.model_dump()
+        
+        # Process value objects (unwrap .value attributes)
+        from infrastructure.utilities.common.serialization import process_value_objects
+        data = process_value_objects(data)
+        
+        # Add storage-specific metadata
+        data["schema_version"] = "2.0.0"
+        
+        return data
+    
     def from_dict(self, data: dict[str, Any]) -> Machine:
-        """Convert dictionary to Machine aggregate with field support."""
-        try:
-            from domain.base.value_objects import InstanceType, Tags
-            from domain.machine.machine_status import MachineStatus
-
-            # Parse datetime fields
-            launch_time = (
-                datetime.fromisoformat(data["launch_time"]) if data.get("launch_time") else None
-            )
-            termination_time = (
-                datetime.fromisoformat(data["termination_time"])
-                if data.get("termination_time")
-                else None
-            )
-            created_at = (
-                datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None
-            )
-            updated_at = (
-                datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None
-            )
-
-            # Build machine data with additional fields
-            machine_data = {
-                "machine_id": MachineId(value=data["machine_id"]),
-                "template_id": data["template_id"],
-                "request_id": data.get("request_id"),
-                "return_request_id": data.get("return_request_id"),
-                "provider_type": data.get("provider_type", "aws"),
-                "provider_name": data.get("provider_name"),
-                "provider_api": data.get("provider_api"),
-                "resource_id": data.get("resource_id"),
-                # Machine configuration
-                "instance_type": InstanceType(value=data["instance_type"]),
-                "image_id": data["image_id"],
-                # Network configuration
-                "private_ip": data.get("private_ip"),
-                "public_ip": data.get("public_ip"),
-                "subnet_id": data.get("subnet_id"),
-                "security_group_ids": data.get("security_group_ids", []),
-                # Machine state
-                "status": MachineStatus(data.get("status", MachineStatus.PENDING.value)),
-                "status_reason": data.get("status_reason"),
-                # Lifecycle timestamps
-                "launch_time": launch_time,
-                "termination_time": termination_time,
-                # Tags and metadata
-                "tags": Tags(tags=data.get("tags", {})),
-                "metadata": data.get("metadata", {}),
-                # Provider-specific data
-                "provider_data": data.get("provider_data", {}),
-                # Versioning
-                "version": data.get("version", 0),
-                # Base entity fields
-                "created_at": created_at,
-                "updated_at": updated_at,
-            }
-
-            # Create machine using model_validate to handle all fields correctly
-            machine = Machine.model_validate(machine_data)
-
-            return machine
-
-        except Exception as e:
-            self.logger.error("Failed to deserialize machine data: %s", e)
-            raise
+        """Convert storage format to Machine using domain validation."""
+        return Machine.model_validate(data)
 
 
 class MachineRepositoryImpl(MachineRepositoryInterface):
