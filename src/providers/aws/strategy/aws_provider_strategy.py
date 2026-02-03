@@ -257,7 +257,7 @@ class AWSProviderStrategy(ProviderStrategy):
         """Get handler factory with provider-specific AWS client."""
         if self.aws_client:
             from providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
-            return AWSHandlerFactory(aws_client=self.aws_client, logger=self._logger, config=None)
+            return AWSHandlerFactory(aws_client=self.aws_client, logger=self._logger, config=None, strategy=self)
         return None
 
     def _get_instance_service(self) -> AWSInstanceOperationService:
