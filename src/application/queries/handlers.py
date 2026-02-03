@@ -123,7 +123,9 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 # Update the request object for DTO creation
                 request = updated_request
 
-            # Convert machines directly to DTOs
+            # Convert machines directly to DTOs - use provider machines if available, otherwise DB machines
+            machines_for_response = machine_objects_from_provider if machine_objects_from_provider else machine_obj_from_db
+            
             from application.request.dto import MachineReferenceDTO
 
             machine_references = [
@@ -136,7 +138,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     public_ip_address=machine.public_ip,
                     launch_time=int(machine.launch_time.timestamp() if machine.launch_time else 0),
                 )
-                for machine in machine_objects_from_provider
+                for machine in machines_for_response
             ]
 
             # Create RequestDTO with fresh machine data using proper factory method
