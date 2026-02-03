@@ -10,6 +10,7 @@ Architecture Principles:
 - Preserves existing public interface
 """
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -126,24 +127,19 @@ class TemplateConfigurationManager:
         if force_refresh:
             self.cache_service.invalidate()
 
-        # Try to get from cache first (sync)
-        try:
-            cached_templates = self.cache_service.get_cached()
-            if cached_templates:
-                self.logger.debug("Returning %s cached templates", len(cached_templates))
-                return cached_templates
-        except Exception as e:
-            self.logger.debug("Cache check failed: %s", e)
+        # Check if cached first
+        if self.cache_service.is_cached():
+            # Use sync loader that returns cached templates
+            templates = self.cache_service.get_or_load(lambda: [])
+            if templates:
+                self.logger.debug("Returning %s cached templates", len(templates))
+                return templates
 
         # Load templates with async AMI resolution
         templates = await self._load_templates_from_scheduler()
         
-        # Cache the result (sync)
-        try:
-            self.cache_service.cache_templates(templates)
-            self.logger.debug("Cached %s templates", len(templates))
-        except Exception as e:
-            self.logger.debug("Cache storage failed: %s", e)
+        # Cache the result using get_or_load pattern
+        self.cache_service.get_or_load(lambda: templates)
         
         self.logger.info("Loaded %s templates", len(templates))
         return templates

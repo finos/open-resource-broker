@@ -65,7 +65,7 @@ class BaseRegistry(ABC):
             mode: Registry operation mode (single or multi choice)
         """
         if hasattr(self, "_initialized"):
-            return
+            return  # Don't reset cache on subsequent __init__ calls
 
         self.mode = mode
         # Type-based registrations
@@ -74,6 +74,9 @@ class BaseRegistry(ABC):
             str, BaseRegistration
         ] = {}  # Instance-based registrations (multi-choice only)
         self._registry_lock = threading.RLock()  # Use RLock for nested locking
+        
+        # Strategy caching for performance
+        self._strategy_cache: dict[str, Any] = {}
 
         from infrastructure.logging.logger import get_logger
 
@@ -155,17 +158,38 @@ class BaseRegistry(ABC):
             self.logger.info("Registered instance: %s (type: %s)", instance_name, type_name)
 
     def create_strategy_by_type(self, type_name: str, config: Any) -> Any:
-        """Create strategy by type name."""
+        """Create strategy by type name with caching."""
+        # Check cache first
+        cache_key = f"type:{type_name}"
+        if cache_key in self._strategy_cache:
+            return self._strategy_cache[cache_key]
+
         registration = self._get_type_registration(type_name)
-        return self._create_strategy_from_registration(registration, config, type_name)
+        strategy = self._create_strategy_from_registration(registration, config, type_name)
+        
+        # Cache the strategy
+        self._strategy_cache[cache_key] = strategy
+        return strategy
 
     def create_strategy_by_instance(self, instance_name: str, config: Any) -> Any:
-        """Create strategy by instance name (multi-choice mode only)."""
+        """Create strategy by instance name (multi-choice mode only) with caching."""
         if self.mode != RegistryMode.MULTI_CHOICE:
             raise ValueError("Instance-based creation only supported in MULTI_CHOICE mode")
 
+        # Check cache first
+        cache_key = f"instance:{instance_name}"
+        self.logger.debug("Looking for cached strategy with key: %s, cache size: %d", cache_key, len(self._strategy_cache))
+        if cache_key in self._strategy_cache:
+            self.logger.debug("Returning cached strategy for instance: %s", instance_name)
+            return self._strategy_cache[cache_key]
+
         registration = self._get_instance_registration(instance_name)
-        return self._create_strategy_from_registration(registration, config, instance_name)
+        strategy = self._create_strategy_from_registration(registration, config, instance_name)
+        
+        # Cache the strategy
+        self._strategy_cache[cache_key] = strategy
+        self.logger.debug("Cached new strategy for instance: %s, cache size now: %d", instance_name, len(self._strategy_cache))
+        return strategy
 
     def is_registered(self, type_name: str) -> bool:
         """Check if a type is registered."""
@@ -176,6 +200,12 @@ class BaseRegistry(ABC):
         """Check if an instance is registered."""
         with self._registry_lock:
             return instance_name in self._instance_registrations
+
+    def clear_strategy_cache(self) -> None:
+        """Clear the strategy cache."""
+        with self._registry_lock:
+            self._strategy_cache.clear()
+            self.logger.debug("Strategy cache cleared")
 
     def get_registered_types(self) -> list[str]:
         """Get list of registered types."""
