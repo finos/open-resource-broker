@@ -95,6 +95,9 @@ class AWSMachineAdapter:
                 if "launch_time" not in machine_data:
                     machine_data["launch_time"] = None
 
+                # Store high-value AWS fields in provider_data
+                machine_data["provider_data"] = self._extract_aws_provider_data(aws_instance_data)
+
                 self._logger.debug(
                     "Successfully processed snake_case data for %s", machine_data["instance_id"]
                 )
@@ -176,6 +179,9 @@ class AWSMachineAdapter:
                     },
                 }
 
+                # Store high-value AWS fields in provider_data
+                machine_data["provider_data"] = self._extract_aws_provider_data(aws_instance_data)
+
                 self._logger.debug(
                     "Successfully converted PascalCase data for %s", machine_data["instance_id"]
                 )
@@ -187,6 +193,62 @@ class AWSMachineAdapter:
         except Exception as e:
             self._logger.error("Failed to create machine from AWS instance: %s", str(e))
             raise AWSError(f"Failed to create machine from AWS instance: {e!s}")
+
+    def _extract_aws_provider_data(self, aws_instance_data: dict[str, Any]) -> dict[str, Any]:
+        """
+        Extract high-value AWS fields for storage in provider_data.
+        
+        Args:
+            aws_instance_data: AWS instance data (either PascalCase or snake_case)
+            
+        Returns:
+            Dictionary with high-value AWS fields, None values removed
+        """
+        provider_data = {}
+        
+        # Detect format and extract fields accordingly
+        if "instance_id" in aws_instance_data:
+            # snake_case format
+            field_mappings = {
+                "network_interfaces": "network_interfaces",
+                "block_device_mappings": "block_device_mappings", 
+                "state_reason": "state_reason",
+                "state_transition_reason": "state_transition_reason",
+                "iam_instance_profile": "iam_instance_profile",
+                "platform_details": "platform_details",
+                "usage_operation": "usage_operation",
+                "boot_mode": "boot_mode",
+                "sriov_net_support": "sriov_net_support",
+                "ena_support": "ena_support",
+                "spot_instance_request_id": "spot_instance_request_id",
+                "public_dns_name": "public_dns_name",
+                "private_dns_name": "private_dns_name"
+            }
+        else:
+            # PascalCase format
+            field_mappings = {
+                "network_interfaces": "NetworkInterfaces",
+                "block_device_mappings": "BlockDeviceMappings",
+                "state_reason": "StateReason", 
+                "state_transition_reason": "StateTransitionReason",
+                "iam_instance_profile": "IamInstanceProfile",
+                "platform_details": "PlatformDetails",
+                "usage_operation": "UsageOperation",
+                "boot_mode": "BootMode",
+                "sriov_net_support": "SriovNetSupport",
+                "ena_support": "EnaSupport",
+                "spot_instance_request_id": "SpotInstanceRequestId",
+                "public_dns_name": "PublicDnsName",
+                "private_dns_name": "PrivateDnsName"
+            }
+        
+        # Extract fields and remove None values
+        for target_field, source_field in field_mappings.items():
+            value = aws_instance_data.get(source_field)
+            if value is not None:
+                provider_data[target_field] = value
+        
+        return provider_data
 
     def perform_health_check(self, machine: Machine) -> dict[str, Any]:
         """

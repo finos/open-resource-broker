@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, model_validator
 
 from domain.base.entity import AggregateRoot
 from domain.base.value_objects import InstanceType, IPAddress, Tags
@@ -18,11 +18,13 @@ class Machine(AggregateRoot):
     model_config = ConfigDict(
         frozen=False,
         validate_assignment=True,
-        populate_by_name=True,  # Allow both field names and aliases
+        populate_by_name=True,  # Accept both field names and aliases
+        extra='ignore',         # Ignore unknown fields (forward compatibility)
     )
 
     # Core machine identification
     machine_id: MachineId
+    name: str = ""  # Machine name/hostname
     template_id: str
     request_id: Optional[str] = None
     return_request_id: Optional[str] = None
@@ -58,6 +60,16 @@ class Machine(AggregateRoot):
 
     # Versioning
     version: int = Field(default=0)
+
+    @model_validator(mode='before')
+    @classmethod
+    def migrate_legacy_fields(cls, data):
+        """Handle legacy field names and compute missing fields."""
+        if isinstance(data, dict):
+            # Compute name if missing
+            if 'name' not in data or not data['name']:
+                data['name'] = data.get('private_ip', data.get('machine_id', ''))
+        return data
 
     def __init__(self, **data) -> None:
         """Initialize the instance."""

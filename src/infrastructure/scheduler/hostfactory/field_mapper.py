@@ -17,6 +17,14 @@ class HostFactoryFieldMapper(SchedulerFieldMapper):
         """Get HostFactory field mappings for the provider."""
         return HostFactoryFieldMappings.get_mappings(self.provider_type)
 
+    def map_input_fields(self, external_template: Dict[str, Any]) -> Dict[str, Any]:
+        """Map HostFactory format → internal format with transformations."""
+        # First apply base mapping
+        mapped = super().map_input_fields(external_template)
+        
+        # Apply HostFactory-specific input transformations
+        return self._apply_input_transformations(mapped)
+
     def map_output_fields(self, internal_template: Dict[str, Any]) -> Dict[str, Any]:
         """Map internal format → HostFactory format with transformations."""
         # Apply internal → external mappings (only mapped fields)
@@ -34,6 +42,13 @@ class HostFactoryFieldMapper(SchedulerFieldMapper):
 
         # Apply HostFactory-specific transformations
         return self._apply_output_transformations(mapped)
+
+    def _apply_input_transformations(self, mapped: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply HostFactory-specific input transformations."""
+        from infrastructure.scheduler.hostfactory.transformations import HostFactoryTransformations
+        
+        # Apply all transformations from the transformations module
+        return HostFactoryTransformations.apply_transformations(mapped)
 
     def _apply_output_transformations(self, mapped: Dict[str, Any]) -> Dict[str, Any]:
         """Apply HostFactory-specific transformations."""

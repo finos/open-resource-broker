@@ -14,6 +14,12 @@ class HostFactoryFieldMappings:
             "requestId": "request_id",
             "requestType": "request_type",
             "requestedCount": "requested_count",
+            "machineCount": "requested_count",  # Alternative HostFactory field name
+            "returnRequestId": "return_request_id",
+            "requestTimeout": "timeout",
+            "timeout": "timeout",  # Direct mapping
+            "requestPriority": "priority",
+            "priority": "priority",  # Direct mapping
             "createdAt": "created_at",
             # Core template fields
             "templateId": "template_id",
