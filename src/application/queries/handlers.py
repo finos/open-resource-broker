@@ -26,6 +26,7 @@ from domain.base.exceptions import EntityNotFoundError
 from domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
 from domain.template.factory import TemplateFactory, get_default_template_factory
 from domain.template.template_aggregate import Template
+from infrastructure.template.dtos import TemplateDTO
 
 T = TypeVar("T")
 
@@ -85,7 +86,13 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 if not request:
                     raise EntityNotFoundError("Request", request_id)
 
-                machine_obj_from_db = uow.machines.find_by_request_id(query.request_id)
+                # For return requests, find machines by return_request_id
+                # For regular requests, find machines by request_id
+                from domain.request.request_types import RequestType
+                if request.request_type == RequestType.RETURN:
+                    machine_obj_from_db = uow.machines.find_by_return_request_id(query.request_id)
+                else:
+                    machine_obj_from_db = uow.machines.find_by_request_id(query.request_id)
 
             self.logger.debug(f"Machines associated with this request in DB: {machine_obj_from_db}")
 
@@ -1139,7 +1146,7 @@ class ListReturnRequestsHandler(BaseQueryHandler[ListReturnRequestsQuery, list[R
 
 
 @query_handler(GetTemplateQuery)
-class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, Template]):
+class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, TemplateDTO]):
     """Handler for getting template details."""
 
     def __init__(
@@ -1191,7 +1198,9 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, Template]):
             domain_template = template_factory.create_template(resolved_data)
 
             self.logger.info("Retrieved template: %s", query.template_id)
-            return domain_template
+            
+            # Convert domain template to DTO for CQRS compliance
+            return TemplateDTO.from_domain(domain_template)
 
         except EntityNotFoundError:
             self.logger.error("Template not found: %s", query.template_id)
@@ -1202,7 +1211,7 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, Template]):
 
 
 @query_handler(ListTemplatesQuery)
-class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[Template]]):
+class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[TemplateDTO]]):
     """Handler for listing templates."""
 
     def __init__(
@@ -1260,7 +1269,10 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[Template]])
                     continue
 
             self.logger.info("Found %s templates", len(domain_templates))
-            return domain_templates
+            
+            # Convert domain templates to DTOs for CQRS compliance
+            template_dtos = [TemplateDTO.from_domain(template) for template in domain_templates]
+            return template_dtos
 
         except Exception as e:
             self.logger.error("Failed to list templates: %s", e)
