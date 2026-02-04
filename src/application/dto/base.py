@@ -36,7 +36,7 @@ class BaseDTO(BaseModel):
         Returns:
             Dict with snake_case keys (Pythonic format)
         """
-        return self.model_dump(exclude_none=True)
+        return self.model_dump()
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "BaseDTO":

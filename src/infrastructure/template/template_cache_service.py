@@ -3,7 +3,7 @@
 import threading
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from typing import Awaitable, Callable, Optional
+from typing import Callable, Optional
 
 from domain.base.ports import LoggingPort
 
@@ -19,12 +19,12 @@ class TemplateCacheService(ABC):
     """
 
     @abstractmethod
-    async def get_or_load(self, loader_func: Callable[[], Awaitable[list[TemplateDTO]]]) -> list[TemplateDTO]:
+    def get_or_load(self, loader_func: Callable[[], list[TemplateDTO]]) -> list[TemplateDTO]:
         """
-        Get templates from cache or load using the provided async function.
+        Get templates from cache or load using the provided function.
 
         Args:
-            loader_func: Async function to load templates if not in cache
+            loader_func: Function to load templates if not in cache
 
         Returns:
             List of TemplateDTO objects
@@ -55,10 +55,10 @@ class NoOpTemplateCacheService(TemplateCacheService):
         """
         self._logger = logger
 
-    async def get_or_load(self, loader_func: Callable[[], Awaitable[list[TemplateDTO]]]) -> list[TemplateDTO]:
+    def get_or_load(self, loader_func: Callable[[], list[TemplateDTO]]) -> list[TemplateDTO]:
         """Load fresh data, no caching."""
         self._logger.debug("NoOpTemplateCacheService: Loading fresh templates")
-        return await loader_func()
+        return loader_func()
 
     def get_all(self) -> Optional[list[TemplateDTO]]:
         """Return None as nothing is cached."""
@@ -97,12 +97,12 @@ class TTLTemplateCacheService(TemplateCacheService):
         self._cache_time: Optional[datetime] = None
         self._lock = threading.Lock()
 
-    async def get_or_load(self, loader_func: Callable[[], Awaitable[list[TemplateDTO]]]) -> list[TemplateDTO]:
+    def get_or_load(self, loader_func: Callable[[], list[TemplateDTO]]) -> list[TemplateDTO]:
         """
         Get templates from cache or load if expired.
 
         Args:
-            loader_func: Async function to load templates if cache is expired
+            loader_func: Function to load templates if cache is expired
 
         Returns:
             List of templates from cache or freshly loaded
@@ -117,14 +117,10 @@ class TTLTemplateCacheService(TemplateCacheService):
             if self._logger:
                 self._logger.debug("TTL cache miss: loading fresh templates")
 
-        # Load outside the lock to avoid blocking
-        fresh_templates = await loader_func()
-        
-        with self._lock:
-            self._cached_templates = fresh_templates
+            self._cached_templates = loader_func()
             self._cache_time = datetime.now()
 
-        return fresh_templates
+            return self._cached_templates
 
     def invalidate(self) -> None:
         """Invalidate the cache by clearing cached data."""

@@ -219,18 +219,6 @@ class ConfigurationAdapter(ConfigurationPort):
         """Get scheduler strategy - delegate to ConfigurationManager."""
         return self._config_manager.get_scheduler_strategy()
 
-    def override_scheduler_strategy(self, scheduler_type: str) -> None:
-        """Temporarily override scheduler strategy."""
-        self._config_manager.override_scheduler_strategy(scheduler_type)
-
-    def restore_scheduler_strategy(self) -> None:
-        """Restore original scheduler strategy."""
-        self._config_manager.restore_scheduler_strategy()
-
-    def override_provider_instance(self, provider_name: str) -> None:
-        """Temporarily override provider instance."""
-        self._config_manager.override_provider_instance(provider_name)
-
     def get_typed(self, config_type):
         """Get typed configuration for compatibility with ConfigurationManager."""
         return self._config_manager.get_typed(config_type)

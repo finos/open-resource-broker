@@ -131,22 +131,59 @@ async def handle_request_machines(args: "argparse.Namespace") -> dict[str, Any]:
     # Execute command and get request ID - let exceptions bubble up
     request_id = await command_bus.execute(command)
 
-    # Let scheduler strategy handle all formatting and messaging
-    request_data = {
-        "request_id": request_id,
-        "template_id": template_id,
-        "status": "pending"  # Use standard status that scheduler can map
-    }
+    # Get the request details to include resource ID information
+    try:
+        from application.dto.queries import GetRequestQuery
 
-    if scheduler_strategy:
-        response = scheduler_strategy.format_request_response(request_data)
-        return response, 0
-    else:
-        return {
+        query_bus = container.get(QueryBus)
+        query = GetRequestQuery(request_id=request_id)
+        request_dto = await query_bus.execute(query)
+
+        # Extract resource IDs for the message
+        resource_ids = getattr(request_dto, "resource_ids", []) if request_dto else []
+
+        # Create response data with resource ID information
+        status = request_dto.status if request_dto else "unknown"
+        error_msg = None
+        if request_dto and hasattr(request_dto, "metadata"):
+            if isinstance(request_dto.metadata, dict):
+                error_msg = request_dto.metadata.get("error_message")
+            else:
+                error_msg = getattr(request_dto.metadata, "error_message", None)
+
+        request_data = {
             "request_id": request_id,
-            "status": "success",
-            "message": "Machine request created successfully"
-        }, 0
+            "resource_ids": resource_ids,
+            "template_id": template_id,
+            "status": status,
+            "error_message": error_msg,
+        }
+
+        # Return success response using scheduler strategy formatting
+        if scheduler_strategy:
+            response = scheduler_strategy.format_request_response(request_data)
+            status = request_dto.status if request_dto else "unknown"
+            exit_code = scheduler_strategy.get_exit_code_for_status(status)
+            return response, exit_code
+        else:
+            # Fallback if no scheduler strategy (shouldn't happen)
+            return {
+                "error": "No scheduler strategy available",
+                "message": "Unable to format response",
+            }, 1
+    except Exception as e:
+        # Fallback if we can't get request details
+        from domain.base.ports import LoggingPort
+
+        container.get(LoggingPort).warning("Could not get request details for resource ID: %s", e)
+        if scheduler_strategy:
+            response = scheduler_strategy.format_request_response({"request_id": request_id})
+            return response, 0  # Command succeeded, just couldn't get details
+        else:
+            return {
+                "error": "No scheduler strategy available",
+                "message": "Unable to format response",
+            }, 1
 
 
 @handle_interface_exceptions(context="get_return_requests", interface_type="cli")

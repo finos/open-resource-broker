@@ -5,7 +5,7 @@ This module provides a factory for creating AWS handlers based on template types
 It follows the Factory Method pattern to create the appropriate handler for each template.
 """
 
-from typing import Any, Optional
+from typing import Optional
 
 from domain.base.ports import ConfigurationPort, LoggingPort
 from domain.template.template_aggregate import Template
@@ -27,8 +27,7 @@ class AWSHandlerFactory:
         self, 
         aws_client: AWSClient, 
         logger: LoggingPort,
-        config: Optional[ConfigurationPort] = None,
-        strategy: Optional[Any] = None
+        config: Optional[ConfigurationPort] = None
     ) -> None:
         """
         Initialize the factory.
@@ -37,12 +36,10 @@ class AWSHandlerFactory:
             aws_client: AWS client instance
             logger: Logger for logging messages
             config: Configuration port for accessing configuration (optional)
-            strategy: Provider strategy for accessing provider-specific services (optional)
         """
         self._aws_client = aws_client
         self._logger = logger
         self._config = config
-        self._strategy = strategy
         self._handlers: dict[str, AWSHandler] = {}
         self._handler_classes: dict[str, type[AWSHandler]] = {}
 
@@ -89,32 +86,21 @@ class AWSHandlerFactory:
         # Create the handler directly with factory's AWS client
         handler_class = self._handler_classes[handler_type]
         
-        # Get dependencies from provider strategy if available, otherwise fall back to DI
-        if self._strategy:
-            # Use provider strategy services (preferred)
-            handler = handler_class(
-                aws_client=self._aws_client,
-                logger=self._logger,
-                aws_ops=self._strategy.aws_operations,
-                launch_template_manager=self._strategy.launch_template_manager,
-                machine_adapter=self._strategy.machine_adapter
-            )
-        else:
-            # Fallback to DI container (for backward compatibility)
-            from infrastructure.di.container import get_container
-            from providers.aws.utilities.aws_operations import AWSOperations
-            from providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
-            from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
-            
-            container = get_container()
-            
-            handler = handler_class(
-                aws_client=self._aws_client,
-                logger=self._logger,
-                aws_ops=container.get(AWSOperations),
-                launch_template_manager=container.get(AWSLaunchTemplateManager),
-                machine_adapter=container.get(AWSMachineAdapter)
-            )
+        # Get other dependencies from DI (not AWS client)
+        from infrastructure.di.container import get_container
+        from providers.aws.utilities.aws_operations import AWSOperations
+        from providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
+        from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
+        
+        container = get_container()
+        
+        handler = handler_class(
+            aws_client=self._aws_client,
+            logger=self._logger,
+            aws_ops=container.get(AWSOperations),
+            launch_template_manager=container.get(AWSLaunchTemplateManager),
+            machine_adapter=container.get(AWSMachineAdapter)
+        )
 
         # Cache the handler for future use
         self._handlers[handler_type] = handler

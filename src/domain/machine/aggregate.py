@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field
 
 from domain.base.entity import AggregateRoot
 from domain.base.value_objects import InstanceType, IPAddress, Tags
@@ -18,13 +18,11 @@ class Machine(AggregateRoot):
     model_config = ConfigDict(
         frozen=False,
         validate_assignment=True,
-        populate_by_name=True,  # Accept both field names and aliases
-        extra='ignore',         # Ignore unknown fields (forward compatibility)
+        populate_by_name=True,  # Allow both field names and aliases
     )
 
     # Core machine identification
     machine_id: MachineId
-    name: str = ""  # Machine name/hostname
     template_id: str
     request_id: Optional[str] = None
     return_request_id: Optional[str] = None

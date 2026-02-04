@@ -22,5 +22,5 @@ class DefaultFieldMapper(SchedulerFieldMapper):
         return internal_template
 
     def format_for_generation(self, internal_templates: list[dict]) -> list[dict]:
-        """Identity mapping - templates are already in domain format."""
+        """No conversion needed for default scheduler."""
         return internal_templates

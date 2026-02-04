@@ -131,7 +131,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             machine_references = [
                 MachineReferenceDTO(
                     machine_id=str(machine.machine_id.value),
-                    name=machine.name or str(machine.machine_id.value) or machine.private_ip,
+                    name=machine.private_ip or str(machine.machine_id.value),
                     result=self._map_machine_status_to_result(machine.status.value, request.request_type),
                     status=machine.status.value,
                     private_ip_address=machine.private_ip or "",
@@ -705,30 +705,6 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             }
         )
 
-        # Set name field properly from AWS data
-        if "name" not in machine_data or not machine_data.get("name"):
-            # Try to get name from AWS tags first
-            tags = machine_data.get("tags", {})
-            aws_name = None
-            
-            # Handle nested tags structure: {"tags": {"Name": "value"}}
-            if isinstance(tags, dict) and "tags" in tags and isinstance(tags["tags"], dict):
-                aws_name = tags["tags"].get("Name")
-            # Handle direct tags structure: {"Name": "value"}
-            elif isinstance(tags, dict) and "Name" in tags:
-                aws_name = tags["Name"]
-            # Check metadata for tags
-            elif "metadata" in machine_data and isinstance(machine_data["metadata"], dict):
-                metadata_tags = machine_data["metadata"].get("tags", {})
-                if isinstance(metadata_tags, dict):
-                    aws_name = metadata_tags.get("Name")
-            
-            if aws_name:
-                machine_data["name"] = aws_name
-            else:
-                # Fallback to instance ID
-                machine_data["name"] = machine_data.get("instance_id", "")
-
         # Validate required fields before Pydantic validation
         if not machine_data.get("instance_id"):
             raise ValueError("Missing instance_id in AWS instance data")
@@ -736,11 +712,6 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             raise ValueError("Missing instance_type in AWS instance data")
         if not machine_data.get("image_id"):
             machine_data["image_id"] = "unknown"  # Provide default
-
-        # Compute name field if not present (let migration validator handle it)
-        if "name" not in machine_data or not machine_data.get("name"):
-            # Don't set name to None - let migration validator compute it
-            machine_data.pop("name", None)
 
         # Create value objects explicitly for Pydantic
         from domain.base.value_objects import InstanceType
@@ -854,8 +825,8 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             metadata = getattr(request, "metadata", {}) or {}
             error_details = getattr(request, "error_details", {}) or {}
 
-            provisioning_error_type = error_details.get("type")
-            provisioning_error_message = request.status_message
+            provisioning_error_type = metadata.get("error_type")
+            provisioning_error_message = metadata.get("error_message")
             fleet_errors = metadata.get("fleet_errors")
             ec2_fleet_errors = (error_details.get("ec2_fleet") or {}).get("errors")
 
@@ -1219,7 +1190,7 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, TemplateDTO]):
         super().__init__(logger, error_handler)
         self._container = container
 
-    async def execute_query(self, query: GetTemplateQuery) -> TemplateDTO:
+    async def execute_query(self, query: GetTemplateQuery) -> Template:
         """Execute get template query."""
         from infrastructure.template.configuration_manager import TemplateConfigurationManager
 
@@ -1228,14 +1199,40 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, TemplateDTO]):
         try:
             template_manager = self._container.get(TemplateConfigurationManager)
 
-            # Get template by ID
+            # Get template by ID using the same approach as ListTemplatesHandler
             template_dto = await template_manager.get_template_by_id(query.template_id)
 
             if not template_dto:
                 raise EntityNotFoundError("Template", query.template_id)
 
+            # Convert TemplateDTO to Template domain object
+            config = dict(template_dto.configuration or {})
+            template_data = dict(config)
+            template_data.setdefault("template_id", template_dto.template_id)
+            template_data.setdefault("name", template_dto.name or template_dto.template_id)
+            template_data.setdefault("provider_api", template_dto.provider_api or "aws")
+
+            # Apply template defaults resolution
+            from application.services.template_defaults_service import TemplateDefaultsService
+            if self._container.has(TemplateDefaultsService):
+                template_defaults_service = self._container.get(TemplateDefaultsService)
+                resolved_data = template_defaults_service.resolve_template_defaults(
+                    template_data, provider_name=None
+                )
+            else:
+                resolved_data = template_data
+
+            if self._container.has(TemplateFactory):
+                template_factory = self._container.get(TemplateFactory)
+            else:
+                template_factory = get_default_template_factory()
+
+            domain_template = template_factory.create_template(resolved_data)
+
             self.logger.info("Retrieved template: %s", query.template_id)
-            return template_dto
+            
+            # Convert domain template to DTO for CQRS compliance
+            return TemplateDTO.from_domain(domain_template)
 
         except EntityNotFoundError:
             self.logger.error("Template not found: %s", query.template_id)
@@ -1258,7 +1255,7 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[TemplateDTO
         super().__init__(logger, error_handler)
         self._container = container
 
-    async def execute_query(self, query: ListTemplatesQuery) -> list[TemplateDTO]:
+    async def execute_query(self, query: ListTemplatesQuery) -> list[Template]:
         """Execute list templates query."""
         from infrastructure.template.configuration_manager import TemplateConfigurationManager
 
@@ -1267,12 +1264,46 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[TemplateDTO
         try:
             template_manager = self._container.get(TemplateConfigurationManager)
 
+            if self._container.has(TemplateFactory):
+                template_factory = self._container.get(TemplateFactory)
+            else:
+                template_factory = get_default_template_factory()
+
             if query.provider_api:
                 template_dtos = await template_manager.get_templates_by_provider(query.provider_api)
             else:
                 template_dtos = await template_manager.load_templates()
 
-            self.logger.info("Found %s templates", len(template_dtos))
+            domain_templates = []
+            for dto in template_dtos:
+                try:
+                    config = dict(dto.configuration or {})
+                    template_data = dict(config)
+                    template_data.setdefault("template_id", dto.template_id)
+                    template_data.setdefault("name", dto.name or dto.template_id)
+                    template_data.setdefault("provider_api", dto.provider_api or "aws")
+
+                    # Apply template defaults resolution
+                    from application.services.template_defaults_service import TemplateDefaultsService
+                    if self._container.has(TemplateDefaultsService):
+                        template_defaults_service = self._container.get(TemplateDefaultsService)
+                        resolved_data = template_defaults_service.resolve_template_defaults(
+                            template_data, provider_name=None
+                        )
+                    else:
+                        resolved_data = template_data
+
+                    domain_template = template_factory.create_template(resolved_data)
+                    domain_templates.append(domain_template)
+
+                except Exception as e:
+                    self.logger.warning("Skipping invalid template %s: %s", dto.template_id, e)
+                    continue
+
+            self.logger.info("Found %s templates", len(domain_templates))
+            
+            # Convert domain templates to DTOs for CQRS compliance
+            template_dtos = [TemplateDTO.from_domain(template) for template in domain_templates]
             return template_dtos
 
         except Exception as e:
@@ -1293,14 +1324,13 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
         super().__init__(logger, error_handler)
         self.container = container
 
-    async def execute_query(self, query: ValidateTemplateQuery) -> ValidationDTO:
+    async def execute_query(self, query: ValidateTemplateQuery) -> dict[str, Any]:
         """Execute validate template query."""
         self.logger.info("Validating template: %s", query.template_id)
 
         try:
             # Get template configuration port for validation
             from domain.base.ports.template_configuration_port import TemplateConfigurationPort
-            from application.dto.responses import ValidationDTO
 
             template_port = self.container.get(TemplateConfigurationPort)
 
@@ -1317,21 +1347,21 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
             else:
                 self.logger.info("Template validation passed for %s", query.template_id)
 
-            return ValidationDTO(
-                template_id=query.template_id,
-                is_valid=len(validation_errors) == 0,
-                validation_errors=validation_errors,
-                configuration=query.configuration,
-            )
+            return {
+                "template_id": query.template_id,
+                "is_valid": len(validation_errors) == 0,
+                "validation_errors": validation_errors,
+                "configuration": query.configuration,
+            }
 
         except Exception as e:
             self.logger.error("Template validation failed for %s: %s", query.template_id, e)
-            return ValidationDTO(
-                template_id=query.template_id,
-                is_valid=False,
-                validation_errors=[f"Validation error: {e!s}"],
-                configuration=query.configuration,
-            )
+            return {
+                "template_id": query.template_id,
+                "is_valid": False,
+                "validation_errors": [f"Validation error: {e!s}"],
+                "configuration": query.configuration,
+            }
 
 
 @query_handler(GetMachineQuery)

@@ -127,16 +127,6 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
             fleet_id = response["SpotFleetRequestId"]
             
-            # Store AWS-specific data in request.provider_data
-            request.provider_data.update({
-                "resource_type": "spot_fleet",
-                "fleet_id": fleet_id,
-                "fleet_type": aws_template.fleet_type.value if hasattr(aws_template.fleet_type, "value") else str(aws_template.fleet_type),
-                "allocation_strategy": aws_template.allocation_strategy or "lowestPrice",
-                "price_type": aws_template.price_type or "spot",
-                "max_price": str(aws_template.max_price) if hasattr(aws_template, "max_price") and aws_template.max_price else None,
-            })
-            
             instances = []
             
             return {
@@ -895,8 +885,8 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         request: Request,
     ) -> list[dict[str, Any]]:
         """Format Spot Fleet instance details to standard structure."""
-        # Use domain field instead of metadata
-        provider_api_value = request.provider_api or "SpotFleet"
+        metadata = getattr(request, "metadata", {}) or {}
+        provider_api_value = metadata.get("provider_api", "SpotFleet")
 
         if self._machine_adapter:
             try:

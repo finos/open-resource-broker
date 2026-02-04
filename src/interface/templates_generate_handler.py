@@ -85,17 +85,29 @@ async def _generate_templates_for_provider(provider: dict, args) -> dict:
     # Generate examples using provider-specific logic
     examples = await _generate_examples_from_factory(provider_type, provider_name, provider_api)
 
-    # Get scheduler strategy from DI container (respects CLI --scheduler flag)
-    from infrastructure.di.container import get_container
-    from domain.base.ports.scheduler_port import SchedulerPort
-    
-    container = get_container()
-    scheduler_strategy = container.get(SchedulerPort)
+    # Get scheduler strategy for filename
+    from config.platform_dirs import get_config_location
+    from infrastructure.scheduler.registry import get_scheduler_registry
+
+    config_dir = get_config_location()
+    config_file = config_dir / "config.json"
+
+    # Load config to get scheduler type
+    scheduler_type = "default"
+    config_dict = None
+    if config_file.exists():
+        with open(config_file) as f:
+            config_dict = json.load(f)
+            scheduler_type = config_dict.get("scheduler", {}).get("type", "default")
+
+    # Get strategy class from registry
+    registry = get_scheduler_registry()
+    strategy_class = registry.get_strategy_class(scheduler_type)
 
     # Determine filename based on generation mode
     if getattr(args, "provider_specific", False):
         # Provider-specific mode: use provider name pattern
-        filename = scheduler_strategy.get_templates_filename(provider_name, provider_type)
+        filename = strategy_class.get_templates_filename(provider_name, provider_type, config_dict)
     elif getattr(args, "provider_type", None):
         # Provider-type mode: use specified provider type
         filename = f"{args.provider_type}_templates.json"
@@ -104,8 +116,6 @@ async def _generate_templates_for_provider(provider: dict, args) -> dict:
         filename = f"{provider_type}_templates.json"
 
     # Write templates file
-    from config.platform_dirs import get_config_location
-    config_dir = get_config_location()
     config_dir.mkdir(parents=True, exist_ok=True)
     templates_file = config_dir / filename
 

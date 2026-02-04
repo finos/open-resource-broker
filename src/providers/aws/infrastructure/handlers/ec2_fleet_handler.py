@@ -120,18 +120,11 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         Returns structured result with resource IDs and instance data.
         """
         try:
-            result = self.aws_ops.execute_with_standard_error_handling(
+            response = self.aws_ops.execute_with_standard_error_handling(
                 operation=lambda: self._create_fleet_with_response(request, aws_template),
                 operation_name="create EC2 fleet",
                 context="EC2Fleet",
             )
-
-            # Handle both old response format and new tuple format
-            if isinstance(result, tuple):
-                response, launch_template_result = result
-            else:
-                response = result
-                launch_template_result = None
 
             fleet_id = response["FleetId"]
             
@@ -158,12 +151,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 "resource_ids": [fleet_id],
                 "instance_ids": instance_ids,  # Store instance IDs for tracking
                 "instances": instances,
-                "provider_data": {
-                    "resource_type": "ec2_fleet",
-                    "fleet_type": str(aws_template.fleet_type),
-                    "fleet_id": fleet_id,
-                    "launch_template_id": launch_template_result.template_id if launch_template_result else None,
-                },
+                "provider_data": {"resource_type": "ec2_fleet", "fleet_type": str(aws_template.fleet_type)},
             }
         except Exception as e:
             self._logger.error("EC2Fleet creation failed: %s", e)
@@ -371,18 +359,18 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         if aws_template.fleet_type in ["maintain", "request"]:
             self._tag_fleet_instances_if_needed(fleet_id, request, aws_template)
 
-        # For instant fleets, store instance IDs in provider_data or warn if nothing was returned
+        # For instant fleets, store instance IDs or warn if nothing was returned
         if fleet_type == AWSFleetType.INSTANT:
             if instance_ids:
-                # Instance IDs already stored in provider_data by acquire_hosts method
-                self._logger.debug("Instance IDs stored in provider_data: %s", instance_ids)
+                request.metadata["instance_ids"] = instance_ids
+                self._logger.debug("Stored instance IDs in request metadata: %s", instance_ids)
             else:
                 self._logger.warning(
                     "No instance IDs found in instant fleet response (no errors reported). Response: %s",
                     response,
                 )
 
-        return response, launch_template_result
+        return fleet_id
 
     def _extract_instant_instance_ids(self, response: dict[str, Any]) -> list[str]:
         """Extract instance IDs from an instant fleet response."""
@@ -436,20 +424,16 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         instance_ids: list[str],
     ) -> None:
         """Persist fleet error context in the request for downstream status handling."""
-        # Store AWS-specific data in provider_data
-        request.provider_data.update({
-            "fleet_id": fleet_id,
-            "fleet_errors": errors,
-            "instance_ids": instance_ids,
-        })
-        
-        # Keep operational metadata in metadata
         if not hasattr(request, "metadata") or request.metadata is None:
             request.metadata = {}
 
         response_metadata = response.get("ResponseMetadata")
+        request.metadata["fleet_id"] = fleet_id
+        request.metadata["fleet_errors"] = errors
         if response_metadata:
             request.metadata["fleet_response_metadata"] = response_metadata
+        if instance_ids:
+            request.metadata["instance_ids"] = instance_ids
 
         error_details = dict(getattr(request, "error_details", {}) or {})
         error_details["ec2_fleet"] = {
@@ -468,7 +452,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         aws_template: Optional[AWSTemplate] = None,
     ) -> list[dict[str, Any]]:
         """Format AWS instance details to standard structure."""
-        # Use domain field instead of metadata, with template fallback
+        metadata = getattr(request, "metadata", {}) or {}
         if aws_template and aws_template.provider_api is not None:
             provider_api_value = (
                 aws_template.provider_api.value
@@ -476,7 +460,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 else str(aws_template.provider_api)
             )
         else:
-            provider_api_value = request.provider_api or "EC2Fleet"
+            provider_api_value = metadata.get("provider_api", "EC2Fleet")
 
         if self._machine_adapter:
             try:
@@ -853,17 +837,18 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
             fleet_id = request.resource_ids[0]  # Use first resource ID as fleet ID
 
-            # Get fleet_type from provider_data (AWS-specific data)
-            fleet_type_value = request.provider_data.get("fleet_type")
+            # Get fleet_type from request metadata (simpler approach like other handlers)
+            # The fleet_type should be available in the request metadata from when the fleet was created
+            fleet_type_value = request.metadata.get("fleet_type")
 
-            # If not in provider_data, derive it from the DescribeFleets response (preferred), else default
+            # If not in metadata, derive it from the DescribeFleets response (preferred), else default
             fleet_type = None
             if fleet_type_value:
                 try:
                     fleet_type = AWSFleetType(fleet_type_value.lower())
                 except Exception:
                     self._logger.warning(
-                        "Invalid fleet_type '%s' in provider_data for request %s; will derive from AWS response",
+                        "Invalid fleet_type '%s' in metadata for request %s; will derive from AWS response",
                         fleet_type_value,
                         request.request_id,
                     )
@@ -910,12 +895,12 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             # Get instance IDs based on fleet type
             instance_ids = []
             if fleet_type == AWSFleetType.INSTANT:
-                # Instant fleets do not support DescribeFleetInstances. Use provider_data or the DescribeFleets response.
-                provider_instance_ids = request.provider_data.get("instance_ids", [])
-                if provider_instance_ids:
-                    instance_ids = provider_instance_ids
+                # Instant fleets do not support DescribeFleetInstances. Use metadata or the DescribeFleets response.
+                metadata_instance_ids = request.metadata.get("instance_ids", [])
+                if metadata_instance_ids:
+                    instance_ids = metadata_instance_ids
                     self._logger.debug(
-                        "Instant fleet %s using instance_ids from provider_data: %s",
+                        "Instant fleet %s using instance_ids from metadata: %s",
                         fleet_id,
                         instance_ids,
                     )

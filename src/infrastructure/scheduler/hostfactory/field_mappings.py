@@ -14,20 +14,14 @@ class HostFactoryFieldMappings:
             "requestId": "request_id",
             "requestType": "request_type",
             "requestedCount": "requested_count",
-            "machineCount": "requested_count",  # Alternative HostFactory field name
-            "returnRequestId": "return_request_id",
-            "requestTimeout": "timeout",
-            "timeout": "timeout",  # Direct mapping
-            "requestPriority": "priority",
-            "priority": "priority",  # Direct mapping
             "createdAt": "created_at",
             # Core template fields
             "templateId": "template_id",
             "maxNumber": "max_instances",
             "imageId": "image_id",
             "keyName": "key_name",
-            "fleetType": "provider_data.fleet_type",  # AWS-specific fleet type in provider_data
-            "providerApi": "provider_api",  # Provider API type (domain field)
+            "fleetType": "fleet_type",
+            "providerApi": "provider_api",  # Provider API type
             # Network configuration
             "subnetId": "subnet_ids",  # Will be converted to list
             "subnetIds": "subnet_ids",  # Preserve full list when provided

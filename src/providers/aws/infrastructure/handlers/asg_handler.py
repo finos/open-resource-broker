@@ -119,16 +119,6 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 context="ASG",
             )
 
-            # Store AWS-specific data in request.provider_data
-            request.provider_data.update({
-                "resource_type": "asg",
-                "asg_name": asg_name,
-                "price_type": getattr(aws_template, "price_type", "ondemand") or "ondemand",
-                "percent_on_demand": getattr(aws_template, "percent_on_demand", None),
-                "allocation_strategy": getattr(aws_template, "allocation_strategy", None),
-                "instance_protection": getattr(aws_template, "instance_protection", False),
-            })
-            
             instances = []
             
             return {
@@ -517,8 +507,8 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         request: Request,
     ) -> list[dict[str, Any]]:
         """Format ASG instance details to standard structure."""
-        # Use domain field instead of metadata
-        provider_api_value = request.provider_api or "ASG"
+        metadata = getattr(request, "metadata", {}) or {}
+        provider_api_value = metadata.get("provider_api", "ASG")
 
         if self._machine_adapter:
             try:

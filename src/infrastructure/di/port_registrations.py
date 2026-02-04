@@ -1,32 +1,26 @@
 """Port adapter registrations for dependency injection."""
 
-from typing import TYPE_CHECKING
+from config.managers.configuration_manager import ConfigurationManager
+from domain.base.ports import (
+    ConfigurationPort,
+    ContainerPort,
+    ErrorHandlingPort,
+    EventPublisherPort,
+    SchedulerPort,
+    TemplateConfigurationPort,
+)
+from domain.base.ports.logging_port import LoggingPort
+from domain.base.ports.spec_rendering_port import SpecRenderingPort
+from infrastructure.adapters.error_handling_adapter import ErrorHandlingAdapter
+from infrastructure.adapters.factories.container_adapter_factory import (
+    ContainerAdapterFactory,
+)
+from infrastructure.adapters.logging_adapter import LoggingAdapter
+from infrastructure.template.configuration_manager import TemplateConfigurationManager
 
-if TYPE_CHECKING:
-    from infrastructure.di.container import DIContainer
 
-
-def register_port_adapters(container: "DIContainer") -> None:
+def register_port_adapters(container):
     """Register all port adapters in the DI container."""
-    
-    # Lazy imports to avoid import cascade
-    from config.managers.configuration_manager import ConfigurationManager
-    from domain.base.ports import (
-        ConfigurationPort,
-        ContainerPort,
-        ErrorHandlingPort,
-        EventPublisherPort,
-        SchedulerPort,
-        TemplateConfigurationPort,
-    )
-    from domain.base.ports.logging_port import LoggingPort
-    from domain.base.ports.spec_rendering_port import SpecRenderingPort
-    from infrastructure.adapters.error_handling_adapter import ErrorHandlingAdapter
-    from infrastructure.adapters.factories.container_adapter_factory import (
-        ContainerAdapterFactory,
-    )
-    from infrastructure.adapters.logging_adapter import LoggingAdapter
-    from infrastructure.template.configuration_manager import TemplateConfigurationManager
 
     # Register configuration port with adapter
     def create_configuration_adapter(container):
@@ -77,8 +71,25 @@ def register_port_adapters(container: "DIContainer") -> None:
             provider_capability_service=c.get_optional(ProviderCapabilityService),
         )
 
-    container.register_singleton(TemplateConfigurationManager, create_template_configuration_manager)
-    container.register_singleton(TemplateConfigurationPort, lambda c: c.get(TemplateConfigurationManager))
+    container.register_singleton(
+        TemplateConfigurationManager, create_template_configuration_manager
+    )
+
+    # Register template configuration port adapter
+    from infrastructure.adapters.template_configuration_adapter import (
+        TemplateConfigurationAdapter,
+    )
+
+    container.register_singleton(
+        TemplateConfigurationAdapter,
+        lambda c: TemplateConfigurationAdapter(
+            template_manager=c.get(TemplateConfigurationManager),
+            logger=c.get(LoggingPort),
+        ),
+    )
+    container.register_singleton(
+        TemplateConfigurationPort, lambda c: c.get(TemplateConfigurationAdapter)
+    )
 
     # Register spec rendering port
     def create_spec_renderer(c):

@@ -1,24 +1,16 @@
 """Provider service registrations for dependency injection."""
 
-from typing import TYPE_CHECKING
-
-# Keep these imports for helper functions
+from application.services.provider_capability_service import ProviderCapabilityService
+from application.services.provider_selection_service import ProviderSelectionService
+from domain.base.ports import ConfigurationPort
+from domain.base.ports.logging_port import LoggingPort
+from infrastructure.di.container import DIContainer
 from infrastructure.logging.logger import get_logger
-
-if TYPE_CHECKING:
-    from infrastructure.di.container import DIContainer
+from providers.registry import ProviderRegistry
 
 
-def register_provider_services(container: "DIContainer") -> None:
+def register_provider_services(container: DIContainer) -> None:
     """Register provider application services and utilities only."""
-    
-    # Lazy imports to avoid import cascade
-    from application.services.provider_capability_service import ProviderCapabilityService
-    from application.services.provider_selection_service import ProviderSelectionService
-    from domain.base.ports import ConfigurationPort
-    from domain.base.ports.logging_port import LoggingPort
-    from infrastructure.logging.logger import get_logger
-    from providers.registry import ProviderRegistry
 
     # Register provider application services (NOT provider instances)
     container.register_singleton(
@@ -43,7 +35,7 @@ def register_provider_services(container: "DIContainer") -> None:
     _register_provider_utility_services(container)
 
 
-def _register_provider_utility_services(container: "DIContainer") -> None:
+def _register_provider_utility_services(container: DIContainer) -> None:
     """Register provider-specific utility services only (not provider instances)."""
     logger = get_logger(__name__)
 

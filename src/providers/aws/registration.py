@@ -54,28 +54,10 @@ def create_aws_strategy(provider_config: Any) -> Any:
         # The DI container will inject the appropriate logger later if needed
         logger = LoggingAdapter()
 
-        # Create AWS client resolver
-        def aws_client_resolver():
-            from infrastructure.di.container import get_container
-            from domain.base.ports.configuration_port import ConfigurationPort
-            from domain.base.ports import LoggingPort
-            from providers.aws.infrastructure.aws_client import AWSClient
-            
-            container = get_container()
-            config_port = container.get(ConfigurationPort)
-            logger_port = container.get(LoggingPort)
-            
-            return AWSClient(
-                config=config_port,
-                logger=logger_port,
-                provider_name=provider_name
-            )
-
         # Create AWS provider strategy
         strategy = AWSProviderStrategy(
             config=aws_config, 
             logger=logger,
-            aws_client_resolver=aws_client_resolver,
             provider_name=provider_name,
             provider_instance_config=provider_instance_config
         )
@@ -138,30 +120,20 @@ def create_aws_resolver() -> Any:
     Create AWS template resolver.
 
     Returns:
-        Factory function that creates CachingAMIResolver with provider-specific context
+        AWS template resolver instance
     """
-    import os
-    
-    def resolver_factory(aws_client, config, logger, provider_name=None):
-        # Create provider-aware config wrapper for cache isolation
-        if provider_name:
-            # Override cache path resolution in CachingAMIResolver
-            from providers.aws.infrastructure.template.caching_ami_resolver import CachingAMIResolver
-            
-            class ProviderSpecificAMIResolver(CachingAMIResolver):
-                def _resolve_cache_path(self, config):
-                    work_dir = config.get_work_dir()
-                    cache_dir = os.path.join(work_dir, ".cache")
-                    os.makedirs(cache_dir, exist_ok=True)
-                    cache_file = f"ami_cache_{provider_name}.json"
-                    return os.path.join(cache_dir, cache_file)
-            
-            return ProviderSpecificAMIResolver(aws_client, config, logger)
-        else:
-            from providers.aws.infrastructure.template.caching_ami_resolver import CachingAMIResolver
-            return CachingAMIResolver(aws_client, config, logger)
-    
-    return resolver_factory
+    try:
+        from providers.aws.infrastructure.template.caching_ami_resolver import (
+            CachingAMIResolver,
+        )
+
+        return CachingAMIResolver()
+    except ImportError:
+        # AWS resolver not available, return None
+        return None
+    except Exception as e:
+        # Re-raise with context - let caller handle logging
+        raise RuntimeError(f"Failed to create AWS resolver: {e!s}")
 
 
 def create_aws_validator() -> Any:
@@ -438,9 +410,18 @@ def register_aws_services_with_di(container) -> None:
     logger = container.get(LoggingPort)
 
     try:
-        # Register AWS Launch Template Manager if not already registered
+        # Register AWS-specific utility services only
+        from domain.base.ports.template_resolver_port import TemplateResolverPort
         from providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
+        from providers.aws.infrastructure.template.caching_ami_resolver import CachingAMIResolver
 
+        # Register AMI resolver if not already registered
+        if not container.is_registered(CachingAMIResolver):
+            container.register_singleton(CachingAMIResolver)
+            container.register_singleton(TemplateResolverPort, lambda c: c.get(CachingAMIResolver))
+            logger.debug("AWS AMI resolver registered with DI container")
+
+        # Register AWS Launch Template Manager if not already registered
         if not container.is_registered(AWSLaunchTemplateManager):
             container.register_singleton(AWSLaunchTemplateManager)
             logger.debug("AWS Launch Template Manager registered with DI container")

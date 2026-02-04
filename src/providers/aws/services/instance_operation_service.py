@@ -111,8 +111,6 @@ class AWSInstanceOperationService:
             if isinstance(handler_result, dict):
                 resource_ids = handler_result.get("resource_ids", [])
                 instances = handler_result.get("instances", [])
-                instance_ids = handler_result.get("instance_ids", [])
-                provider_data = handler_result.get("provider_data", {})
                 success = handler_result.get("success", True)
                 if not success:
                     return ProviderResult.error_result(
@@ -121,19 +119,16 @@ class AWSInstanceOperationService:
             else:
                 resource_ids = [handler_result] if handler_result else []
                 instances = []
-                instance_ids = []
-                provider_data = {}
 
             return ProviderResult.success_result(
                 {
                     "resource_ids": resource_ids,
                     "instances": instances,
-                    "instance_ids": instance_ids,
                     "provider_api": provider_api,
                     "count": count,
                     "template_id": aws_template.template_id,
                 },
-                {**provider_data, "method": "handler"},
+                {"method": "handler"},
             )
 
         except Exception as e:

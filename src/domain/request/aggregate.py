@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field
 
 from domain.base.entity import AggregateRoot
 from domain.base.events import RequestCompletedEvent, RequestCreatedEvent, RequestStatusChangedEvent
@@ -17,8 +17,7 @@ class Request(AggregateRoot):
     model_config = ConfigDict(
         frozen=False,
         validate_assignment=True,
-        populate_by_name=True,  # Accept both field names and aliases
-        extra='ignore',         # Ignore unknown fields (forward compatibility)
+        populate_by_name=True,  # Allow both field names and aliases
     )
 
     # Core request identification
@@ -53,13 +52,6 @@ class Request(AggregateRoot):
     successful_count: int = 0
     failed_count: int = 0
 
-    # Business fields
-    return_request_id: Optional[str] = None  # Link to return request
-    timeout: Optional[int] = None            # First-class timeout field
-    priority: Optional[int] = None           # Request priority
-    user_id: Optional[str] = None            # User tracking
-    tenant_id: Optional[str] = None          # Multi-tenancy
-
     # Lifecycle timestamps
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     started_at: Optional[datetime] = None
@@ -74,30 +66,6 @@ class Request(AggregateRoot):
 
     # Versioning
     version: int = Field(default=0)
-
-    @model_validator(mode='before')
-    @classmethod
-    def migrate_legacy_fields(cls, data):
-        """Handle legacy field names from old database records."""
-        if isinstance(data, dict):
-            # Migrate legacy field names
-            if 'machine_count' in data and 'requested_count' not in data:
-                data['requested_count'] = data.pop('machine_count')
-            if 'error_message' in data and 'status_message' not in data:
-                data['status_message'] = data.pop('error_message')
-            
-            # Promote metadata fields to first-class
-            if 'metadata' in data and isinstance(data['metadata'], dict):
-                metadata = data['metadata']
-                if 'timeout' in metadata and 'timeout' not in data:
-                    data['timeout'] = metadata['timeout']
-                if 'priority' in metadata and 'priority' not in data:
-                    data['priority'] = metadata['priority']
-                if 'user_id' in metadata and 'user_id' not in data:
-                    data['user_id'] = metadata['user_id']
-                if 'tenant_id' in metadata and 'tenant_id' not in data:
-                    data['tenant_id'] = metadata['tenant_id']
-        return data
 
     def __init__(self, **data) -> None:
         """Initialize the instance."""

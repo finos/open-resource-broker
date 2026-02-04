@@ -48,7 +48,7 @@ async def handle_init(args) -> int:
         if args.non_interactive:
             config = _get_default_config(args)
         else:
-            config = _interactive_setup(args)
+            config = _interactive_setup()
 
         # Create directories
         _create_directories(config_dir, work_dir, logs_dir)
@@ -87,6 +87,7 @@ async def handle_init(args) -> int:
         print_info("")
         print_info("To retry:")
         print_command("  orb init --force")
+        logger.error("Failed to initialize ORB: %s", e)
         return 1
 
 
@@ -142,7 +143,7 @@ def _get_available_providers() -> list[dict[str, str]]:
         return [{"type": "aws", "display_name": "aws", "description": "Amazon Web Services"}]
 
 
-def _interactive_setup(args) -> Dict[str, Any]:
+def _interactive_setup() -> Dict[str, Any]:
     """Interactive configuration setup."""
     try:
         print_separator(width=60, char="=", color="cyan")
@@ -154,20 +155,16 @@ def _interactive_setup(args) -> Dict[str, Any]:
         print_info("[1/4] Scheduler Type")
         print_separator(width=60, char="-", color="cyan")
         
-        if args.scheduler:
-            scheduler_type = args.scheduler
-            print_info(f"  Using provided scheduler: {scheduler_type}")
-        else:
-            schedulers = _get_available_schedulers()
-            for i, scheduler in enumerate(schedulers, 1):
-                print_info(f"  ({i}) {scheduler['display_name']} - {scheduler['description']}")
-            
-            print_info("")
-            scheduler_choice = input("  Select scheduler (1): ").strip() or "1"
-            try:
-                scheduler_type = schedulers[int(scheduler_choice) - 1]["type"]
-            except (ValueError, IndexError):
-                scheduler_type = "default"
+        schedulers = _get_available_schedulers()
+        for i, scheduler in enumerate(schedulers, 1):
+            print_info(f"  ({i}) {scheduler['display_name']} - {scheduler['description']}")
+        
+        print_info("")
+        scheduler_choice = input("  Select scheduler (1): ").strip() or "1"
+        try:
+            scheduler_type = schedulers[int(scheduler_choice) - 1]["type"]
+        except (ValueError, IndexError):
+            scheduler_type = "default"
 
         print_newline()
         print_separator(width=60, char="-", color="cyan")
@@ -177,22 +174,18 @@ def _interactive_setup(args) -> Dict[str, Any]:
         print_info("[2/4] Cloud Provider")
         print_separator(width=60, char="-", color="cyan")
         
-        if args.provider:
-            provider_type = args.provider
-            print_info(f"  Using provided provider: {provider_type}")
-        else:
+        providers = _get_available_providers()
+        for i, provider in enumerate(providers, 1):
+            print_info(f"  ({i}) {provider['display_name']} - {provider['description']}")
+        
+        print_info("")
+        provider_choice = input("  Select provider (1): ").strip() or "1"
+        try:
+            provider_type = providers[int(provider_choice) - 1]["type"]
+        except (ValueError, IndexError):
+            # Use first available provider as default
             providers = _get_available_providers()
-            for i, provider in enumerate(providers, 1):
-                print_info(f"  ({i}) {provider['display_name']} - {provider['description']}")
-            
-            print_info("")
-            provider_choice = input("  Select provider (1): ").strip() or "1"
-            try:
-                provider_type = providers[int(provider_choice) - 1]["type"]
-            except (ValueError, IndexError):
-                # Use first available provider as default
-                providers = _get_available_providers()
-                provider_type = providers[0]["type"] if providers else "aws"
+            provider_type = providers[0]["type"] if providers else "aws"
 
         print_newline()
         print_separator(width=60, char="-", color="cyan")
@@ -209,54 +202,41 @@ def _interactive_setup(args) -> Dict[str, Any]:
         provider_config = {"type": provider_type}
         for param, info in requirements.items():
             if info.get("required"):
-                # Use provided args if available
-                if param == "region" and args.region:
-                    provider_config[param] = args.region
-                    print_info(f"  Using provided {info['description']}: {args.region}")
-                else:
-                    default_value = "us-east-1" if param == "region" else ""
-                    prompt = f"  {info['description']} ({default_value}): " if default_value else f"  {info['description']}: "
-                    value = input(prompt).strip() or default_value
-                    provider_config[param] = value
+                default_value = "us-east-1" if param == "region" else ""
+                prompt = f"  {info['description']} ({default_value}): " if default_value else f"  {info['description']}: "
+                value = input(prompt).strip() or default_value
+                provider_config[param] = value
         
         # Fallback for AWS if no requirements defined
         if provider_type == "aws" and not requirements:
-            if args.region:
-                region = args.region
-                print_info(f"  Using provided region: {region}")
-            else:
-                region = input("  Region (us-east-1): ").strip() or "us-east-1"
+            region = input("  Region (us-east-1): ").strip() or "us-east-1"
             provider_config["region"] = region
         
         # Get available credential sources
         credential_sources = _get_available_credential_sources(provider_type)
         
-        if args.profile:
-            selected_source = args.profile
-            print_info("")
-            print_info(f"Using provided profile: {selected_source}")
-        else:
-            print_info("")
-            print_info("Available credentials:")
-            for i, source in enumerate(credential_sources, 1):
-                print_info(f"  ({i}) {source['description']}")
-            
-            choice = input("  Select credentials (1): ").strip() or "1"
-            try:
-                selected_source = credential_sources[int(choice) - 1]["name"]
-            except (ValueError, IndexError):
-                selected_source = None
+        print_info("")
+        print_info("Available credentials:")
+        for i, source in enumerate(credential_sources, 1):
+            print_info(f"  ({i}) {source['description']}")
+        
+        choice = input("  Select credentials (1): ").strip() or "1"
+        try:
+            selected_source = credential_sources[int(choice) - 1]["name"]
+        except (ValueError, IndexError):
+            selected_source = None
         
         # Test credentials
         print_info("")
         print_info("Testing credentials...")
-        success, error_msg = _test_provider_credentials(provider_type, selected_source, **provider_config)
-        if success:
+        if _test_provider_credentials(provider_type, selected_source, **provider_config):
             print_success("Credentials verified")
             if selected_source:
                 provider_config["profile"] = selected_source
         else:
-            raise ValueError(f"Credential verification failed: {error_msg}")
+            print_error("Credential verification failed")
+            print_error("Cannot proceed without valid credentials")
+            return {}
         
         # Extract final values for backward compatibility
         region = provider_config.get("region", "us-east-1")
@@ -308,22 +288,18 @@ def _get_available_credential_sources(provider_type: str) -> list[dict]:
         return [{"name": None, "description": "Default credentials"}]
 
 
-def _test_provider_credentials(provider_type: str, credential_source: Optional[str], **kwargs) -> tuple[bool, str]:
-    """Test provider credentials and return success status with error message."""
+def _test_provider_credentials(provider_type: str, credential_source: Optional[str], **kwargs) -> bool:
+    """Test provider credentials."""
     if provider_type == "aws":
         try:
             from providers.aws.session_factory import AWSSessionFactory
             region = kwargs.get("region")
             result = AWSSessionFactory.discover_credentials(credential_source, region)
-            if result.get("success", False):
-                return True, ""
-            else:
-                error_msg = result.get("error", "Unknown credential error")
-                return False, error_msg
-        except Exception as e:
-            return False, f"Failed to test credentials: {str(e)}"
+            return result.get("success", False)
+        except Exception:
+            return False
     else:
-        return False, f"Unsupported provider type: {provider_type}"
+        return False
 
 
 def _get_credential_requirements(provider_type: str) -> dict:

@@ -23,18 +23,111 @@ from infrastructure.logging.logger import get_logger
 class RequestSerializer:
     """Handles Request aggregate serialization/deserialization."""
 
+    def __init__(self) -> None:
+        """Initialize the instance."""
+        self.logger = get_logger(__name__)
+
     def to_dict(self, request: Request) -> dict[str, Any]:
-        """Convert Request to storage format using domain serialization."""
-        from infrastructure.utilities.common.serialization import process_value_objects
-        
-        data = request.model_dump()
-        data = process_value_objects(data)
-        data["schema_version"] = "2.0.0"
-        return data
-    
+        """Convert Request aggregate to dictionary with additional fields."""
+        try:
+            return {
+                # Core request fields
+                "request_id": str(request.request_id.value),
+                "template_id": request.template_id,
+                "machine_count": request.requested_count,
+                "desired_capacity": request.desired_capacity,
+                "request_type": request.request_type.value,
+                "status": request.status.value,
+                "status_message": request.status_message,
+                # Provider tracking fields
+                "provider_name": request.provider_name,
+                "provider_api": request.provider_api,
+                "provider_type": request.provider_type,
+                # Resource tracking fields
+                "resource_ids": request.resource_ids,
+                # HF output fields
+                "message": request.message,
+                # Results and instances
+                "successful_count": request.successful_count,
+                "failed_count": request.failed_count,
+                # Metadata and error details
+                "metadata": request.metadata or {},
+                "error_details": request.error_details or {},
+                "provider_data": request.provider_data or {},
+                # Timestamps
+                "created_at": request.created_at.isoformat(),
+                "started_at": (request.started_at.isoformat() if request.started_at else None),
+                "completed_at": (
+                    request.completed_at.isoformat() if request.completed_at else None
+                ),
+                # Versioning
+                "version": request.version,
+                # Legacy fields for backward compatibility
+                "timeout": request.metadata.get("timeout"),
+                "tags": request.metadata.get("tags", {}),
+                "error_message": request.status_message,  # Legacy field name
+                # Schema version for migration support
+                "schema_version": "2.0.0",
+            }
+        except Exception as e:
+            self.logger.error("Failed to serialize request %s: %s", request.request_id, e)
+            raise
+
     def from_dict(self, data: dict[str, Any]) -> Request:
-        """Convert storage format to Request using domain validation."""
-        return Request.model_validate(data)
+        """Convert dictionary to Request aggregate with additional field support."""
+        try:
+            # Parse datetime fields
+            created_at = datetime.fromisoformat(data["created_at"])
+            started_at = (
+                datetime.fromisoformat(data["started_at"]) if data.get("started_at") else None
+            )
+            completed_at = (
+                datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else None
+            )
+
+            # Build request data with additional fields
+            request_data = {
+                # Core request fields
+                "request_id": RequestId(value=data["request_id"]),
+                "template_id": data["template_id"],
+                "requested_count": data.get("machine_count", data.get("requested_count", 1)),
+                "desired_capacity": data.get(
+                    "desired_capacity", data.get("machine_count", data.get("requested_count", 1))
+                ),  # Default to requested_count if not present
+                "request_type": RequestType(data["request_type"]),
+                "status": RequestStatus(data["status"]),
+                "status_message": data.get("status_message", data.get("error_message")),
+                # Provider tracking fields
+                "provider_name": data.get("provider_name"),
+                "provider_api": data.get("provider_api"),
+                "provider_type": data.get("provider_type", "aws"),
+                # Resource tracking fields
+                "resource_ids": data.get("resource_ids", []),
+                # HF output fields
+                "message": data.get("message"),
+                # Results and instances
+                "successful_count": data.get("successful_count", 0),
+                "failed_count": data.get("failed_count", 0),
+                # Metadata and error details
+                "metadata": data.get("metadata", {}),
+                "error_details": data.get("error_details", {}),
+                "provider_data": data.get("provider_data", {}),
+                # Timestamps
+                "created_at": created_at,
+                "started_at": started_at,
+                "completed_at": completed_at,
+                # Versioning
+                "version": data.get("version", 0),
+            }
+
+            # Create request using model_validate to handle all fields correctly
+            request = Request.model_validate(request_data)
+
+            return request
+
+        except Exception as e:
+            self.logger.error("Failed to deserialize request data: %s", e)
+            raise
 
 
 class RequestRepositoryImpl(RequestRepositoryInterface):

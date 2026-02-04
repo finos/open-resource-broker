@@ -78,9 +78,6 @@ class AWSProviderStrategy(ProviderStrategy):
         self._instance_service: Optional[AWSInstanceOperationService] = None
         self._health_service: Optional[AWSHealthCheckService] = None
         self._template_service: Optional[AWSTemplateValidationService] = None
-        
-        # AMI resolution cache (strategy-owned)
-        self._ami_cache: dict[str, str] = {}
         self._infrastructure_service: Optional[AWSInfrastructureDiscoveryService] = None
         self._handler_registry: Optional[AWSHandlerRegistry] = None
         self._capability_service: Optional[AWSCapabilityService] = None
@@ -97,13 +94,30 @@ class AWSProviderStrategy(ProviderStrategy):
 
     @property
     def aws_client(self) -> Optional[AWSClient]:
-        """Get the AWS client instance with lazy initialization and caching."""
-        if self._aws_client is None and self._aws_client_resolver:
-            try:
-                self._aws_client = self._aws_client_resolver()
-                self._logger.debug("AWS client cached in strategy")
-            except Exception as exc:
-                self._logger.warning("Failed to resolve AWSClient: %s", exc)
+        """Get the AWS client instance with lazy initialization."""
+        if self._aws_client is None:
+            if self._aws_client_resolver:
+                try:
+                    self._aws_client = self._aws_client_resolver()
+                    self._logger.debug("AWS client created via resolver")
+                except Exception as exc:
+                    self._logger.warning("Failed to resolve AWSClient: %s", exc)
+            else:
+                try:
+                    # Need config_port to create AWS client
+                    from infrastructure.di.container import get_container
+                    container = get_container()
+                    from domain.base.ports.configuration_port import ConfigurationPort
+                    config_port = container.get(ConfigurationPort)
+                    
+                    self._aws_client = AWSClient(
+                        config=config_port,
+                        logger=self._logger,
+                        provider_name=self._provider_name
+                    )
+                    self._logger.debug("AWS client created directly")
+                except Exception as exc:
+                    self._logger.warning("Failed to create AWSClient: %s", exc)
         return self._aws_client
 
     def initialize(self) -> bool:
@@ -174,8 +188,6 @@ class AWSProviderStrategy(ProviderStrategy):
                 },
                 {"operation": "health_check"},
             )
-        elif operation.operation_type == ProviderOperationType.RESOLVE_AMI:
-            return await self._handle_resolve_ami(operation)
         elif operation.operation_type == ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES:
             return await self._handle_describe_resource_instances(operation)
         else:
@@ -207,38 +219,7 @@ class AWSProviderStrategy(ProviderStrategy):
         """Get supported APIs from handler registry."""
         return self._get_capability_service().get_supported_apis()
 
-    @property
-    def launch_template_manager(self):
-        """Get launch template manager using strategy's AWS client."""
-        if not hasattr(self, '_launch_template_manager'):
-            from providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
-            self._launch_template_manager = AWSLaunchTemplateManager(
-                aws_client=self.aws_client,
-                logger=self._logger
-            )
-        return self._launch_template_manager
 
-    @property  
-    def aws_operations(self):
-        """Get AWS operations using strategy's AWS client."""
-        if not hasattr(self, '_aws_operations'):
-            from providers.aws.utilities.aws_operations import AWSOperations
-            self._aws_operations = AWSOperations(
-                aws_client=self.aws_client,
-                logger=self._logger
-            )
-        return self._aws_operations
-
-    @property
-    def machine_adapter(self):
-        """Get machine adapter using strategy's AWS client.""" 
-        if not hasattr(self, '_machine_adapter'):
-            from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
-            self._machine_adapter = AWSMachineAdapter(
-                aws_client=self.aws_client,
-                logger=self._logger
-            )
-        return self._machine_adapter
 
     # Service getters with lazy initialization
     def _get_handler_registry(self) -> AWSHandlerRegistry:
@@ -257,7 +238,7 @@ class AWSProviderStrategy(ProviderStrategy):
         """Get handler factory with provider-specific AWS client."""
         if self.aws_client:
             from providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
-            return AWSHandlerFactory(aws_client=self.aws_client, logger=self._logger, config=None, strategy=self)
+            return AWSHandlerFactory(aws_client=self.aws_client, logger=self._logger, config=None)
         return None
 
     def _get_instance_service(self) -> AWSInstanceOperationService:
@@ -312,60 +293,6 @@ class AWSProviderStrategy(ProviderStrategy):
                 self._logger.warning("Failed to resolve AWS provisioning adapter: %s", exc)
                 self._aws_provisioning_port_resolver = None
         return self._aws_provisioning_port
-
-    async def _handle_resolve_ami(self, operation: ProviderOperation) -> ProviderResult:
-        """Handle AMI resolution using registry-based resolver."""
-        try:
-            ssm_parameters = operation.parameters.get("ssm_parameters", [])
-            if not ssm_parameters:
-                return ProviderResult.success_result({"resolved_amis": {}})
-            
-            # Get resolver from registry (clean architecture)
-            from providers.registry import get_provider_registry
-            registry = get_provider_registry()
-            resolver_factory = registry.create_resolver("aws")
-            
-            if resolver_factory:
-                # Create provider-specific resolver
-                resolver = resolver_factory(
-                    aws_client=self.aws_client,
-                    config=self._config,
-                    logger=self._logger,
-                    provider_name=getattr(self, 'provider_name', 'aws')
-                )
-                
-                resolved_amis = {}
-                for ssm_param in ssm_parameters:
-                    resolved_amis[ssm_param] = resolver.resolve_with_fallback(ssm_param)
-                
-                return ProviderResult.success_result({"resolved_amis": resolved_amis})
-            else:
-                # Fallback to current in-memory cache
-                resolved_amis = {}
-                for ssm_param in ssm_parameters:
-                    if ssm_param in self._ami_cache:
-                        resolved_amis[ssm_param] = self._ami_cache[ssm_param]
-                        continue
-                    
-                    try:
-                        aws_client = self.aws_client
-                        if not aws_client:
-                            continue
-                        
-                        response = aws_client.ssm_client.get_parameter(Name=ssm_param)
-                        resolved_ami = response["Parameter"]["Value"]
-                        
-                        self._ami_cache[ssm_param] = resolved_ami
-                        resolved_amis[ssm_param] = resolved_ami
-                        
-                    except Exception as e:
-                        self._logger.warning("Failed to resolve AMI parameter %s: %s", ssm_param, e)
-                
-                return ProviderResult.success_result({"resolved_amis": resolved_amis})
-            
-        except Exception as e:
-            self._logger.error("AMI resolution operation failed: %s", e)
-            return ProviderResult.error_result(f"AMI resolution failed: {e}", "AMI_RESOLUTION_FAILED")
 
     # Legacy methods that need to be kept for compatibility
     async def _handle_describe_resource_instances(self, operation: ProviderOperation) -> ProviderResult:
