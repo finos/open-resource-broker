@@ -17,6 +17,7 @@ from application.dto.queries import (
     ListTemplatesQuery,
     ValidateTemplateQuery,
 )
+from application.request.queries import ListRequestsQuery
 from application.dto.responses import MachineDTO, RequestDTO
 from application.dto.system import ValidationDTO
 from domain.base import UnitOfWorkFactory
@@ -1128,6 +1129,65 @@ class ListActiveRequestsHandler(BaseQueryHandler[ListActiveRequestsQuery, list[R
 
         except Exception as e:
             self.logger.error("Failed to list active requests: %s", e)
+            raise
+
+
+@query_handler(ListRequestsQuery)
+class ListRequestsHandler(BaseQueryHandler[ListRequestsQuery, list[RequestDTO]]):
+    """Handler for listing requests with filtering."""
+
+    def __init__(
+        self,
+        uow_factory: UnitOfWorkFactory,
+        logger: LoggingPort,
+        error_handler: ErrorHandlingPort,
+    ) -> None:
+        super().__init__(logger, error_handler)
+        self.uow_factory = uow_factory
+
+    async def execute_query(self, query: ListRequestsQuery) -> list[RequestDTO]:
+        """Execute list requests query."""
+        self.logger.info("Listing requests with filters")
+
+        try:
+            with self.uow_factory.create_unit_of_work() as uow:
+                # Get requests from repository with filters
+                requests = uow.requests.find_all()
+
+                # Apply filters if provided
+                if query.status:
+                    from domain.request.value_objects import RequestStatus
+                    status_filter = RequestStatus(query.status)
+                    requests = [r for r in requests if r.status == status_filter]
+
+                if query.template_id:
+                    requests = [r for r in requests if r.template_id == query.template_id]
+
+                # Apply pagination
+                total_count = len(requests)
+                start_idx = query.offset or 0
+                end_idx = start_idx + (query.limit or 50)
+                requests = requests[start_idx:end_idx]
+
+                # Convert to DTOs
+                request_dtos = []
+                for request in requests:
+                    request_dto = RequestDTO(
+                        request_id=str(request.request_id),
+                        template_id=request.template_id,
+                        requested_count=request.requested_count,
+                        status=request.status.value,
+                        created_at=request.created_at,
+                        updated_at=request.updated_at,
+                        metadata=request.metadata or {},
+                    )
+                    request_dtos.append(request_dto)
+
+                self.logger.info("Found %s requests (total: %s)", len(request_dtos), total_count)
+                return request_dtos
+
+        except Exception as e:
+            self.logger.error("Failed to list requests: %s", e)
             raise
 
 
