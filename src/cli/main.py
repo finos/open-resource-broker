@@ -785,7 +785,8 @@ async def execute_command(args, app, resource_parsers) -> Union[str, tuple[str, 
     command_or_query = cli_command_factory.create_command_or_query(args)
     
     # Execute through appropriate bus
-    if isinstance(command_or_query, Command):
+    from application.dto.base import BaseCommand
+    if isinstance(command_or_query, (Command, BaseCommand)):
         result = await command_bus.execute(command_or_query)
     else:
         result = await query_bus.execute(command_or_query)
