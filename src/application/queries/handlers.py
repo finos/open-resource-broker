@@ -1169,26 +1169,10 @@ class ListRequestsHandler(BaseQueryHandler[ListRequestsQuery, list[RequestDTO]])
                 end_idx = start_idx + (query.limit or 50)
                 requests = requests[start_idx:end_idx]
 
-                # Convert to DTOs
+                # Convert to DTOs using standard from_domain method
                 request_dtos = []
                 for request in requests:
-                    # Handle RequestId properly - it might be serialized as dict
-                    request_id_str = request.request_id
-                    if hasattr(request_id_str, 'value'):
-                        request_id_str = request_id_str.value
-                    elif isinstance(request_id_str, dict) and 'value' in request_id_str:
-                        request_id_str = request_id_str['value']
-                    else:
-                        request_id_str = str(request_id_str)
-                    
-                    request_dto = RequestDTO(
-                        request_id=request_id_str,
-                        template_id=request.template_id,
-                        requested_count=request.requested_count,
-                        status=request.status.value if hasattr(request.status, 'value') else str(request.status),
-                        created_at=request.created_at,
-                        metadata=request.metadata or {},
-                    )
+                    request_dto = RequestDTO.from_domain(request)
                     request_dtos.append(request_dto)
 
                 self.logger.info("Found %s requests (total: %s)", len(request_dtos), total_count)

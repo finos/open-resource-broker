@@ -6,7 +6,7 @@ import re
 import uuid
 from typing import Optional
 
-from pydantic import field_validator
+from pydantic import field_validator, field_serializer
 
 from domain.base.value_objects import ValueObject
 from domain.request.request_types import RequestType
@@ -36,6 +36,12 @@ class RequestId(ValueObject):
                 f"Invalid request ID format: {v}. Must be in format: req-uuid or ret-uuid"
             )
         return v
+
+    @field_serializer("value")
+    @classmethod
+    def serialize_value(cls, value: str) -> str:
+        """Serialize RequestId as just the string value, not a dict."""
+        return value
 
     def __str__(self) -> str:
         return self.value
