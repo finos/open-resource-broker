@@ -25,16 +25,16 @@ class HostFactoryFieldMapper(SchedulerFieldMapper):
         # Apply HostFactory-specific input transformations
         return self._apply_input_transformations(mapped)
 
-    def map_output_fields(self, internal_template: Dict[str, Any]) -> Dict[str, Any]:
+    def map_output_fields(self, internal_template: Dict[str, Any], copy_unmapped: bool = False) -> Dict[str, Any]:
         """Map internal format → HostFactory format with transformations."""
         # Apply internal → external mappings with nested field support
         reverse_mappings = {v: k for k, v in self.field_mappings.items()}
-        mapped = self._map_with_nested_support(internal_template, reverse_mappings, reverse=True)
+        mapped = self._map_with_nested_support(internal_template, reverse_mappings, reverse=True, copy_unmapped=copy_unmapped)
 
         # Apply HostFactory-specific transformations
         return self._apply_output_transformations(mapped)
 
-    def _map_with_nested_support(self, source: Dict[str, Any], mappings: Dict[str, str], reverse: bool = False) -> Dict[str, Any]:
+    def _map_with_nested_support(self, source: Dict[str, Any], mappings: Dict[str, str], reverse: bool = False, copy_unmapped: bool = True) -> Dict[str, Any]:
         """Map fields with support for nested provider_data access."""
         mapped = {}
 
@@ -57,14 +57,15 @@ class HostFactoryFieldMapper(SchedulerFieldMapper):
                     else:
                         mapped[target_field] = source[source_field]
 
-        # Copy unmapped fields
-        for key, value in source.items():
-            if not reverse and key not in mappings and key not in mapped:
-                mapped[key] = value
-            elif reverse and key not in {v for v in mappings.keys() if "." not in v}:
-                # Only copy if not a nested source field
-                if key not in mapped:
+        # Only copy unmapped fields if requested
+        if copy_unmapped:
+            for key, value in source.items():
+                if not reverse and key not in mappings and key not in mapped:
                     mapped[key] = value
+                elif reverse and key not in {v for v in mappings.keys() if "." not in v}:
+                    # Only copy if not a nested source field
+                    if key not in mapped:
+                        mapped[key] = value
 
         return mapped
 

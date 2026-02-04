@@ -570,7 +570,10 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             formatted_template = self.format_template_for_display(template)
             formatted_templates.append(formatted_template)
 
-        return {"templates": formatted_templates}
+        return {
+            "templates": formatted_templates,
+            "message": f"Retrieved {len(formatted_templates)} templates successfully"
+        }
 
     def format_templates_for_generation(self, templates: list[dict]) -> list[dict]:
         """Convert internal templates to HostFactory input format with full business logic."""
@@ -863,7 +866,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
     def format_template_for_display(self, template: TemplateDTO) -> dict[str, Any]:
         """Format TemplateDTO for display using HostFactory field mapper."""
         internal_dict = template.to_dict()
-        return self.field_mapper.map_output_fields(internal_dict)
+        return self.field_mapper.map_output_fields(internal_dict, copy_unmapped=False)
 
     def format_template_for_provider(self, template: TemplateDTO) -> dict[str, Any]:
         """Format template for provider operations using internal format (no field mapping)."""

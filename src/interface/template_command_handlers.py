@@ -83,20 +83,20 @@ async def handle_list_templates(args: argparse.Namespace) -> dict[str, Any]:
 
         # Use scheduler strategy for format conversion
         if scheduler_strategy:
-            formatted_response = scheduler_strategy.format_templates_response(templates)
-            templates_data = formatted_response.get("templates", [])
+            # Use scheduler's complete response format (HostFactory, etc.)
+            result = scheduler_strategy.format_templates_response(templates)
         else:
+            # Use default CLI format
             templates_data = [
                 template.model_dump() if hasattr(template, "model_dump") else template
                 for template in templates
             ]
-
-        result = {
-            "success": True,
-            "templates": templates_data,
-            "total_count": len(templates),
-            "message": f"Retrieved {len(templates)} templates successfully",
-        }
+            result = {
+                "success": True,
+                "templates": templates_data,
+                "total_count": len(templates),
+                "message": f"Retrieved {len(templates)} templates successfully",
+            }
 
         # Print helpful message to stderr when no templates found
         if len(templates) == 0:
