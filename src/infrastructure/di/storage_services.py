@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from infrastructure.di.container import DIContainer
+    from infrastructure.storage.factory import StorageStrategyFactory
 
 
 def register_storage_services(container: "DIContainer") -> None:
@@ -34,7 +35,7 @@ def register_storage_services(container: "DIContainer") -> None:
     # Lazy mode (default): JSON already registered above, other types will register on-demand
 
 
-def create_storage_strategy_factory(container: "DIContainer") -> StorageStrategyFactory:
+def create_storage_strategy_factory(container: "DIContainer") -> "StorageStrategyFactory":
     """Create storage strategy factory with configuration."""
     config = container.get(ConfigurationPort)
     return StorageStrategyFactory(config_manager=config)

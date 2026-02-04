@@ -12,7 +12,7 @@ import asyncio
 import logging
 import os
 import sys
-from typing import Any
+from typing import Any, Union
 
 from _package import DOCS_URL
 from cli.completion import generate_bash_completion, generate_zsh_completion
@@ -729,245 +729,73 @@ For more information, visit: {DOCS_URL}
     return parser.parse_args(), resource_parsers
 
 
-class CLICommandFactory:
-    """Factory for creating Commands and Queries from CLI arguments."""
-    
-    def __init__(self, command_bus, query_bus, scheduler_port):
-        self.command_bus = command_bus
-        self.query_bus = query_bus
-        self.scheduler_port = scheduler_port
-    
-    def create_command_or_query(self, args):
-        """Create appropriate Command or Query from CLI arguments."""
-        # Process input data from -f/--file or -d/--data flags (HostFactory compatibility)
-        input_data = self._process_input_data(args)
-        args.input_data = input_data
-        
-        # Handle nested MCP commands
-        if args.resource == "mcp" and args.action == "tools":
-            handler_key = ("mcp", "tools", getattr(args, "tools_action", None))
-        elif args.resource == "init":
-            handler_key = ("init", None)
-        else:
-            handler_key = (args.resource, args.action)
-        
-        return handler_key, args
-    
-    def _process_input_data(self, args):
-        """Process input data from -f/--file or -d/--data flags."""
-        input_data = None
-        if hasattr(args, "file") and args.file:
-            try:
-                import json
-                with open(args.file) as f:
-                    input_data = json.load(f)
-            except Exception as e:
-                from infrastructure.logging.logger import get_logger
-                logger = get_logger(__name__)
-                logger.error("Failed to load input file %s: %s", args.file, e)
-                raise DomainException(f"Failed to load input file: {e}")
-        elif hasattr(args, "data") and args.data:
-            try:
-                import json
-                input_data = json.loads(args.data)
-            except Exception as e:
-                from infrastructure.logging.logger import get_logger
-                logger = get_logger(__name__)
-                logger.error("Failed to parse input data: %s", e)
-                raise DomainException(f"Failed to parse input data: {e}")
-        return input_data
+async def execute_command(args, app, resource_parsers) -> Union[str, tuple[str, int]]:
+    """Execute command using pure CQRS pattern."""
+    # Process input data from -f/--file or -d/--data flags
+    input_data = None
+    if hasattr(args, "file") and args.file:
+        try:
+            import json
+            with open(args.file) as f:
+                input_data = json.load(f)
+        except Exception as e:
+            raise DomainException(f"Failed to load input file: {e}")
+    elif hasattr(args, "data") and args.data:
+        try:
+            import json
+            input_data = json.loads(args.data)
+        except Exception as e:
+            raise DomainException(f"Failed to parse input data: {e}")
 
+    args.input_data = input_data
 
-async def execute_command(args, app, resource_parsers) -> dict[str, Any]:
-    """Execute the appropriate command handler using CQRS pattern."""
-    try:
-        # Get CQRS infrastructure from DI container
-        from infrastructure.di.container import get_container
-        from infrastructure.di.buses import CommandBus, QueryBus
-        from domain.base.ports.scheduler_port import SchedulerPort
-        
-        container = get_container()
-        command_bus = container.get(CommandBus)
-        query_bus = container.get(QueryBus)
-        scheduler_port = container.get(SchedulerPort)
-        
-        # Create CLI command factory
-        cli_factory = CLICommandFactory(command_bus, query_bus, scheduler_port)
-        handler_key, processed_args = cli_factory.create_command_or_query(args)
-        
-        # Keep reference mapping for handlers that haven't been converted to CQRS yet
+    # Handle special cases that return direct results
+    if args.resource == "init":
         from interface.init_command_handler import handle_init
+        result = await handle_init(args)
+        
+        # Format using response formatter
+        from cli.response_formatter import create_cli_formatter
+        formatter = create_cli_formatter()
+        return formatter.format_response(result, args)
+    
+    if args.resource == "mcp" and args.action == "serve":
         from interface.mcp.server.handler import handle_mcp_serve
-        from interface.mcp_command_handlers import (
-            handle_mcp_tools_call,
-            handle_mcp_tools_info,
-            handle_mcp_tools_list,
-            handle_mcp_validate,
-        )
-        from interface.request_command_handlers import (
-            handle_get_request_status,
-            handle_get_return_requests,
-            handle_request_machines,
-            handle_request_return_machines,
-        )
-        from interface.scheduler_command_handlers import (
-            handle_list_scheduler_strategies,
-            handle_show_scheduler_config,
-            handle_validate_scheduler_config,
-        )
-        from interface.serve_command_handler import handle_serve_api
-        from interface.storage_command_handlers import (
-            handle_list_storage_strategies,
-            handle_show_storage_config,
-            handle_storage_health,
-            handle_storage_metrics,
-            handle_test_storage,
-            handle_validate_storage_config,
-        )
-        from interface.system_command_handlers import (
-            handle_execute_provider_operation,
-            handle_list_providers,
-            handle_provider_config,
-            handle_provider_health,
-            handle_provider_metrics,
-            handle_reload_provider_config,
-            handle_select_provider_strategy,
-            handle_system_health,
-            handle_system_metrics,
-            handle_system_status,
-            handle_validate_provider_config,
-        )
-        from interface.template_command_handlers import (
-            handle_create_template,
-            handle_delete_template,
-            handle_get_template,
-            handle_list_templates,
-            handle_refresh_templates,
-            handle_update_template,
-            handle_validate_template,
-        )
-        from interface.templates_generate_handler import handle_templates_generate
-        from interface.infrastructure_command_handler import (
-            handle_infrastructure_discover,
-            handle_infrastructure_show,
-            handle_infrastructure_validate,
-        )
-
-        # Command handler mapping for reference - handlers use CommandBus/QueryBus internally
-        command_handlers = {
-            # Templates - Complete CRUD operations (both plural and singular)
-            ("templates", "list"): handle_list_templates,
-            ("templates", "show"): handle_get_template,
-            ("templates", "create"): handle_create_template,
-            ("templates", "update"): handle_update_template,
-            ("templates", "delete"): handle_delete_template,
-            ("templates", "validate"): handle_validate_template,
-            ("templates", "refresh"): handle_refresh_templates,
-            ("templates", "generate"): handle_templates_generate,
-            ("template", "list"): handle_list_templates,
-            ("template", "show"): handle_get_template,
-            ("template", "create"): handle_create_template,
-            ("template", "update"): handle_update_template,
-            ("template", "delete"): handle_delete_template,
-            ("template", "validate"): handle_validate_template,
-            ("template", "refresh"): handle_refresh_templates,
-            ("template", "generate"): handle_templates_generate,
-            # Machines (both plural and singular)
-            ("machines", "request"): handle_request_machines,
-            ("machines", "return"): handle_request_return_machines,
-            ("machines", "list"): handle_request_machines,
-            ("machines", "show"): handle_request_machines,
-            ("machines", "status"): handle_request_machines,
-            ("machine", "request"): handle_request_machines,
-            ("machine", "return"): handle_request_return_machines,
-            ("machine", "list"): handle_request_machines,
-            ("machine", "show"): handle_request_machines,
-            ("machine", "status"): handle_request_machines,
-            # Requests (both plural and singular)
-            ("requests", "status"): handle_get_request_status,
-            ("requests", "list"): handle_get_return_requests,
-            ("requests", "show"): handle_get_request_status,
-            ("requests", "cancel"): handle_get_request_status,
-            ("request", "status"): handle_get_request_status,
-            ("request", "list"): handle_get_return_requests,
-            ("request", "show"): handle_get_request_status,
-            ("request", "cancel"): handle_get_request_status,
-            # Providers (both plural and singular)
-            ("providers", "health"): handle_provider_health,
-            ("providers", "list"): handle_list_providers,
-            ("providers", "show"): handle_list_providers,
-            ("providers", "select"): handle_select_provider_strategy,
-            ("providers", "exec"): handle_execute_provider_operation,
-            ("providers", "metrics"): handle_provider_metrics,
-            ("provider", "health"): handle_provider_health,
-            ("provider", "list"): handle_list_providers,
-            ("provider", "show"): handle_list_providers,
-            ("provider", "select"): handle_select_provider_strategy,
-            ("provider", "exec"): handle_execute_provider_operation,
-            ("provider", "metrics"): handle_provider_metrics,
-            # Storage commands
-            ("storage", "list"): handle_list_storage_strategies,
-            ("storage", "show"): handle_show_storage_config,
-            ("storage", "validate"): handle_validate_storage_config,
-            ("storage", "test"): handle_test_storage,
-            ("storage", "health"): handle_storage_health,
-            ("storage", "metrics"): handle_storage_metrics,
-            # Scheduler commands
-            ("scheduler", "list"): handle_list_scheduler_strategies,
-            ("scheduler", "show"): handle_show_scheduler_config,
-            ("scheduler", "validate"): handle_validate_scheduler_config,
-            # System commands
-            ("system", "status"): handle_system_status,
-            ("system", "serve"): handle_serve_api,
-            ("system", "health"): handle_system_health,
-            ("system", "metrics"): handle_system_metrics,
-            # Infrastructure commands
-            ("infrastructure", "discover"): handle_infrastructure_discover,
-            ("infrastructure", "show"): handle_infrastructure_show,
-            ("infrastructure", "validate"): handle_infrastructure_validate,
-            # Infra commands (shortcut aliases)
-            ("infra", "discover"): handle_infrastructure_discover,
-            ("infra", "show"): handle_infrastructure_show,
-            ("infra", "validate"): handle_infrastructure_validate,
-            # Configuration commands
-            ("config", "show"): handle_provider_config,
-            ("config", "validate"): handle_validate_provider_config,
-            ("config", "reload"): handle_reload_provider_config,
-            # MCP commands - Function handlers
-            ("mcp", "serve"): handle_mcp_serve,
-            ("mcp", "tools", "list"): handle_mcp_tools_list,
-            ("mcp", "tools", "call"): handle_mcp_tools_call,
-            ("mcp", "tools", "info"): handle_mcp_tools_info,
-            ("mcp", "validate"): handle_mcp_validate,
-            # Init command
-            ("init", None): handle_init,
-        }
-
-        # Execute through handler (handlers use CommandBus/QueryBus internally)
-        if handler_key not in command_handlers:
-            raise ValueError(f"Unknown command: {args.resource} {args.action}")
-
-        handler_func = command_handlers[handler_key]
-        if handler_func is None:
-            raise NotImplementedError(f"Command not yet implemented: {args.resource} {args.action}")
-
-        # Execute handler - handlers internally use CommandBus/QueryBus for CQRS compliance
-        result = await handler_func(processed_args)
+        result = await handle_mcp_serve(args)
         
-        # Format response using scheduler strategy if available
-        if scheduler_port and hasattr(result, 'get') and result.get('success'):
-            try:
-                formatted_result = scheduler_port.format_response(result)
-                return formatted_result
-            except Exception:
-                # Fallback to original result if formatting fails
-                pass
-        
-        return result
-        
-    except Exception as e:
-        # Re-raise the exception to be handled by the caller
-        raise
+        # Format using response formatter
+        from cli.response_formatter import create_cli_formatter
+        formatter = create_cli_formatter()
+        return formatter.format_response(result, args)
+
+    # Use pure CQRS pattern for all other commands
+    from infrastructure.di.container import get_container
+    from infrastructure.di.buses import CommandBus, QueryBus
+    from domain.base.ports.scheduler_port import SchedulerPort
+    from cli.command_factory import cli_command_factory
+    from application.interfaces.command_query import Command
+    from cli.response_formatter import create_cli_formatter
+    
+    container = get_container()
+    command_bus = container.get(CommandBus)
+    query_bus = container.get(QueryBus)
+    scheduler_port = container.get(SchedulerPort)
+    
+    # Create command or query from CLI args
+    command_or_query = cli_command_factory.create_command_or_query(args)
+    
+    # Execute through appropriate bus
+    if isinstance(command_or_query, Command):
+        result = await command_bus.execute(command_or_query)
+    else:
+        result = await query_bus.execute(command_or_query)
+    
+    # Format response for CLI output using improved formatter
+    formatter = create_cli_formatter(scheduler_port)
+    return formatter.format_response(result, args)
+
+
+
 
 
 async def main() -> None:
@@ -1137,16 +965,16 @@ async def main() -> None:
             else:
                 result = await execute_command(args, app, resource_parsers)
 
-            # Handle exit codes from command handlers
-            output_format = getattr(args, "format", None) or args.format
+            # Handle different result formats from improved response formatter
             if isinstance(result, tuple) and len(result) == 2:
-                formatted_result, exit_code = result
-                formatted_output = format_output(formatted_result, output_format)
+                # Response formatter returned (formatted_output, exit_code)
+                formatted_output, exit_code = result
             else:
-                # Backward compatibility - assume success
-                formatted_output = format_output(result, output_format)
+                # Response formatter returned formatted string only
+                formatted_output = result
                 exit_code = 0
 
+            # Output the result
             if args.output:
                 with open(args.output, "w") as f:
                     f.write(formatted_output)
@@ -1161,18 +989,31 @@ async def main() -> None:
 
         except DomainException as e:
             logger.exception("Domain error: %s", e)
+            
+            # Use response formatter for consistent error formatting
+            from cli.response_formatter import create_cli_formatter
+            formatter = create_cli_formatter()
+            output_format = getattr(args, "format", "json")
+            error_output, exit_code = formatter.format_error(e, output_format)
+            
             if not args.quiet:
-                print(f"Error: {e}")
-            sys.exit(1)
+                print(error_output)
+            sys.exit(exit_code)
         except Exception as e:
             logger.exception("Unexpected error: %s", e)
+            
+            # Use response formatter for consistent error formatting
+            from cli.response_formatter import create_cli_formatter
+            formatter = create_cli_formatter()
+            output_format = getattr(args, "format", "json")
+            error_output, exit_code = formatter.format_error(e, output_format)
+            
             if args.verbose:
                 import traceback
-
                 traceback.print_exc()
             if not args.quiet:
-                print(f"Unexpected error: {e}")
-            sys.exit(1)
+                print(error_output)
+            sys.exit(exit_code)
         finally:
             # Restore original overrides if they were active
             if scheduler_override_active:

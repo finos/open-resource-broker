@@ -43,7 +43,7 @@ def register_provider_services(container: "DIContainer") -> None:
     _register_provider_utility_services(container)
 
 
-def _register_provider_utility_services(container: DIContainer) -> None:
+def _register_provider_utility_services(container: "DIContainer") -> None:
     """Register provider-specific utility services only (not provider instances)."""
     logger = get_logger(__name__)
 
