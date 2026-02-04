@@ -768,28 +768,6 @@ async def execute_command(args, app, resource_parsers) -> dict[str, Any]:
     else:
         handler_key = (args.resource, args.action)
 
-    # Handle global scheduler override
-    scheduler_override_active = False
-    if hasattr(args, "scheduler") and args.scheduler:
-        try:
-            app.config_manager().override_scheduler_strategy(args.scheduler)
-            scheduler_override_active = True
-        except Exception as e:
-            from infrastructure.logging.logger import get_logger
-
-            logger = get_logger(__name__)
-            logger.warning("Failed to override scheduler strategy: %s", e)
-
-    # Handle global provider override
-    if hasattr(args, "provider") and args.provider:
-        try:
-            app.config_manager().override_provider_instance(args.provider)
-        except Exception as e:
-            from infrastructure.logging.logger import get_logger
-
-            logger = get_logger(__name__)
-            logger.warning("Failed to override provider instance: %s", e)
-
     try:
         # Import function handlers - all are now async functions with decorators
         from interface.init_command_handler import handle_init
@@ -951,17 +929,9 @@ async def execute_command(args, app, resource_parsers) -> dict[str, Any]:
         # All handlers are async functions with decorators
         result = await handler_func(args)
         return result
-
-    finally:
-        # Restore original scheduler if override was active
-        if scheduler_override_active:
-            try:
-                app.config_manager.restore_scheduler_strategy()
-            except Exception as e:
-                from infrastructure.logging.logger import get_logger
-
-                logger = get_logger(__name__)
-                logger.warning("Failed to restore scheduler strategy: %s", e)
+    except Exception as e:
+        # Re-raise the exception to be handled by the caller
+        raise
 
 
 async def main() -> None:
@@ -1040,6 +1010,39 @@ async def main() -> None:
                 resource_parsers[help_resource].print_help()
                 sys.exit(0)
 
+        # Apply global overrides BEFORE any command execution (including special cases)
+        # Handle global scheduler override
+        scheduler_override_active = False
+        if hasattr(args, "scheduler") and args.scheduler:
+            try:
+                # Use DI container's ConfigurationPort for consistency
+                from infrastructure.di.container import get_container
+                from domain.base.ports.configuration_port import ConfigurationPort
+                
+                container = get_container()
+                config = container.get(ConfigurationPort)
+                config.override_scheduler_strategy(args.scheduler)
+                scheduler_override_active = True
+            except Exception as e:
+                logger = get_logger(__name__)
+                logger.warning("Failed to override scheduler strategy: %s", e)
+
+        # Handle global provider override
+        provider_override_active = False
+        if hasattr(args, "provider") and args.provider:
+            try:
+                # Use DI container's ConfigurationPort for consistency
+                from infrastructure.di.container import get_container
+                from domain.base.ports.configuration_port import ConfigurationPort
+                
+                container = get_container()
+                config = container.get(ConfigurationPort)
+                config.override_provider_instance(args.provider)
+                provider_override_active = True
+            except Exception as e:
+                logger = get_logger(__name__)
+                logger.warning("Failed to override provider instance: %s", e)
+
         # Skip application initialization for init and templates generate commands only
         if args.resource == "init":
             # Execute init command directly without Application
@@ -1050,6 +1053,7 @@ async def main() -> None:
 
         if args.resource == "templates" and args.action == "generate":
             # Templates generate doesn't need existing config (creates templates)
+            # But it DOES need scheduler/provider overrides which are now applied above
             from interface.templates_generate_handler import handle_templates_generate
 
             try:
@@ -1133,6 +1137,19 @@ async def main() -> None:
             if not args.quiet:
                 print(f"Unexpected error: {e}")
             sys.exit(1)
+        finally:
+            # Restore original overrides if they were active
+            if scheduler_override_active:
+                try:
+                    from infrastructure.di.container import get_container
+                    from domain.base.ports.configuration_port import ConfigurationPort
+                    
+                    container = get_container()
+                    config = container.get(ConfigurationPort)
+                    config.restore_scheduler_strategy()
+                except Exception as e:
+                    logger = get_logger(__name__)
+                    logger.warning("Failed to restore scheduler strategy: %s", e)
 
     except KeyboardInterrupt:
         print("\nOperation cancelled by user.")

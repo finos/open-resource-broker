@@ -34,7 +34,7 @@ class DefaultFieldMapper(SchedulerFieldMapper):
                 "image_id": template.get("imageId"),
                 "max_instances": template.get("maxNumber", 1),
                 "key_name": template.get("keyName"),
-                "subnet_ids": template.get("subnetIds", []),
+                "subnet_ids": template.get("subnetIds") or [template.get("subnetId")] if template.get("subnetId") else [],
                 "security_group_ids": template.get("securityGroupIds", []),
                 "price_type": template.get("priceType"),
                 "max_price": template.get("maxSpotPrice"),
