@@ -27,6 +27,27 @@ class RequestSerializer:
         """Initialize the instance."""
         self.logger = get_logger(__name__)
 
+    def _parse_request_id(self, request_id_data: Any) -> RequestId:
+        """Parse RequestId from various formats."""
+        if isinstance(request_id_data, str):
+            # Handle stringified dict format: "{'value': 'req-...'}"
+            if request_id_data.startswith("{'value':") or request_id_data.startswith('{"value":'):
+                import ast
+                try:
+                    parsed = ast.literal_eval(request_id_data)
+                    if isinstance(parsed, dict) and 'value' in parsed:
+                        return RequestId(value=parsed['value'])
+                except:
+                    pass
+            # Handle direct string format
+            return RequestId(value=request_id_data)
+        elif isinstance(request_id_data, dict) and 'value' in request_id_data:
+            # Handle dict format: {'value': 'req-...'}
+            return RequestId(value=request_id_data['value'])
+        else:
+            # Fallback to string conversion
+            return RequestId(value=str(request_id_data))
+
     def to_dict(self, request: Request) -> dict[str, Any]:
         """Convert Request aggregate to dictionary with additional fields."""
         try:
@@ -87,8 +108,8 @@ class RequestSerializer:
 
             # Build request data with additional fields
             request_data = {
-                # Core request fields
-                "request_id": RequestId(value=data["request_id"]),
+                # Core request fields - handle RequestId properly
+                "request_id": self._parse_request_id(data["request_id"]),
                 "template_id": data["template_id"],
                 "requested_count": data.get("machine_count", data.get("requested_count", 1)),
                 "desired_capacity": data.get(
