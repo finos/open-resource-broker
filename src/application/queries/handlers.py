@@ -1169,10 +1169,29 @@ class ListRequestsHandler(BaseQueryHandler[ListRequestsQuery, list[RequestDTO]])
                 end_idx = start_idx + (query.limit or 50)
                 requests = requests[start_idx:end_idx]
 
-                # Convert to DTOs using standard from_domain method
+                # Convert to DTOs using standard from_domain method with machine JOIN
                 request_dtos = []
                 for request in requests:
-                    request_dto = RequestDTO.from_domain(request)
+                    # Query machines for this request if machine_ids exist
+                    machine_references = []
+                    if request.machine_ids:
+                        machines = uow.machines.find_by_ids([request.machine_ids])
+                        if machines:
+                            from application.request.dto import MachineReferenceDTO
+                            machine_references = [
+                                MachineReferenceDTO(
+                                    machine_id=str(machine.machine_id.value),
+                                    name=machine.private_ip or str(machine.machine_id.value),
+                                    result=self._map_machine_status_to_result(machine.status.value, request.request_type),
+                                    status=machine.status.value,
+                                    private_ip_address=machine.private_ip or "",
+                                    public_ip_address=machine.public_ip,
+                                    launch_time=int(machine.launch_time.timestamp() if machine.launch_time else 0),
+                                )
+                                for machine in machines
+                            ]
+                    
+                    request_dto = RequestDTO.from_domain(request, machine_references=machine_references)
                     request_dtos.append(request_dto)
 
                 self.logger.info("Found %s requests (total: %s)", len(request_dtos), total_count)
@@ -1181,6 +1200,20 @@ class ListRequestsHandler(BaseQueryHandler[ListRequestsQuery, list[RequestDTO]])
         except Exception as e:
             self.logger.error("Failed to list requests: %s", e)
             raise
+
+    def _map_machine_status_to_result(self, machine_status: str, request_type) -> str:
+        """Map machine status to result string for HostFactory compatibility."""
+        # Use same mapping as GetRequestHandler
+        if machine_status in ["running", "active"]:
+            return "Executing"
+        elif machine_status in ["pending", "launching"]:
+            return "Executing"
+        elif machine_status in ["terminated", "stopped"]:
+            return "Closed"
+        elif machine_status in ["failed", "error"]:
+            return "Failed"
+        else:
+            return "Executing"  # Default for unknown statuses
 
 
 @query_handler(ListReturnRequestsQuery)
