@@ -341,11 +341,12 @@ class HandlerDiscoveryService:
         mtimes = {}
 
         try:
-            # Convert package name to file path
-            package_path = base_package.replace(".", "/")
+            # Get actual package path from importlib
+            package = importlib.import_module(base_package)
+            package_path = Path(package.__file__).parent
 
             # Walk through all Python files in the package
-            for root, _dirs, files in os.walk(package_path):
+            for root, _dirs, files in os.walk(str(package_path)):
                 for file in files:
                     if file.endswith(".py"):
                         filepath = os.path.join(root, file)
