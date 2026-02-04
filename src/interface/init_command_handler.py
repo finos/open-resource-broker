@@ -87,7 +87,6 @@ async def handle_init(args) -> int:
         print_info("")
         print_info("To retry:")
         print_command("  orb init --force")
-        logger.error("Failed to initialize ORB: %s", e)
         return 1
 
 
@@ -229,14 +228,13 @@ def _interactive_setup() -> Dict[str, Any]:
         # Test credentials
         print_info("")
         print_info("Testing credentials...")
-        if _test_provider_credentials(provider_type, selected_source, **provider_config):
+        success, error_msg = _test_provider_credentials(provider_type, selected_source, **provider_config)
+        if success:
             print_success("Credentials verified")
             if selected_source:
                 provider_config["profile"] = selected_source
         else:
-            print_error("Credential verification failed")
-            print_error("Cannot proceed without valid credentials")
-            return {}
+            raise ValueError(f"Credential verification failed: {error_msg}")
         
         # Extract final values for backward compatibility
         region = provider_config.get("region", "us-east-1")
@@ -288,18 +286,22 @@ def _get_available_credential_sources(provider_type: str) -> list[dict]:
         return [{"name": None, "description": "Default credentials"}]
 
 
-def _test_provider_credentials(provider_type: str, credential_source: Optional[str], **kwargs) -> bool:
-    """Test provider credentials."""
+def _test_provider_credentials(provider_type: str, credential_source: Optional[str], **kwargs) -> tuple[bool, str]:
+    """Test provider credentials and return success status with error message."""
     if provider_type == "aws":
         try:
             from providers.aws.session_factory import AWSSessionFactory
             region = kwargs.get("region")
             result = AWSSessionFactory.discover_credentials(credential_source, region)
-            return result.get("success", False)
-        except Exception:
-            return False
+            if result.get("success", False):
+                return True, ""
+            else:
+                error_msg = result.get("error", "Unknown credential error")
+                return False, error_msg
+        except Exception as e:
+            return False, f"Failed to test credentials: {str(e)}"
     else:
-        return False
+        return False, f"Unsupported provider type: {provider_type}"
 
 
 def _get_credential_requirements(provider_type: str) -> dict:
