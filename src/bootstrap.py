@@ -115,8 +115,9 @@ class Application:
                 self.logger.info("Eager loading - registering providers immediately")
                 self._register_configured_providers()
             else:
-                # Lazy loading - providers will register on first use
-                self.logger.info("Lazy loading enabled - providers will register on first use")
+                # Lazy loading - still need to register providers for discovery
+                self.logger.info("Lazy loading enabled - registering providers for discovery")
+                self._register_configured_providers()
 
             # Pre-load templates into cache during initialization
             await self._preload_templates()
