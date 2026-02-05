@@ -277,6 +277,14 @@ class ConfigurationAdapter(ConfigurationPort):
             # If _package.py itself fails, we have bigger problems - let it fail
             raise
 
+    def override_scheduler_strategy(self, scheduler_type: str) -> None:
+        """Override scheduler strategy - delegate to ConfigurationManager."""
+        self._config_manager.override_scheduler_strategy(scheduler_type)
+
+    def override_provider_instance(self, provider_name: str) -> None:
+        """Override provider instance - delegate to ConfigurationManager."""
+        self._config_manager.override_provider_instance(provider_name)
+
     def get_active_provider_override(self) -> str | None:
         """Get current provider override from CLI."""
         return self._config_manager.get_active_provider_override()

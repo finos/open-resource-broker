@@ -357,7 +357,7 @@ For more information, visit: {DOCS_URL}
         """,
     )
 
-    # Global options
+    # System-level options only
     parser.add_argument("--config", help="Configuration file path")
     parser.add_argument(
         "--log-level",
@@ -365,28 +365,7 @@ For more information, visit: {DOCS_URL}
         default="INFO",
         help="Set logging level",
     )
-    parser.add_argument(
-        "--format",
-        choices=["json", "yaml", "table", "list"],
-        default="json",
-        help="Output format",
-    )
     parser.add_argument("--output", help="Output file (default: stdout)")
-    parser.add_argument("--quiet", action="store_true", help="Suppress non-essential output")
-    parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Show what would be done without executing",
-    )
-    parser.add_argument(
-        "--scheduler",
-        choices=["default", "hostfactory", "hf"],
-        help="Override scheduler strategy for this command",
-    )
-    parser.add_argument(
-        "--provider", help="Override provider instance for this command (e.g., aws-prod, aws-dev)"
-    )
     parser.add_argument(
         "--completion", choices=["bash", "zsh"], help="Generate shell completion script"
     )
