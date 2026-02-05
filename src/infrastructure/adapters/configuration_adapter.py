@@ -280,3 +280,7 @@ class ConfigurationAdapter(ConfigurationPort):
     def get_active_provider_override(self) -> str | None:
         """Get current provider override from CLI."""
         return self._config_manager.get_active_provider_override()
+
+    def override_provider_instance(self, provider_name: str) -> None:
+        """Override the active provider instance."""
+        return self._config_manager.override_provider_instance(provider_name)

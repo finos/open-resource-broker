@@ -50,3 +50,7 @@ class ConfigurationPort(ABC):
     @abstractmethod
     def get_active_provider_override(self) -> str | None:
         """Get current provider override from CLI."""
+
+    @abstractmethod
+    def override_provider_instance(self, provider_name: str) -> None:
+        """Override the active provider instance."""

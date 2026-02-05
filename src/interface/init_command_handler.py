@@ -50,6 +50,10 @@ async def handle_init(args) -> int:
         else:
             config = _interactive_setup()
 
+        # Check if configuration was successful
+        if not config:
+            return 1
+
         # Create directories
         _create_directories(config_dir, work_dir, logs_dir)
 
@@ -296,7 +300,8 @@ def _test_provider_credentials(provider_type: str, credential_source: Optional[s
             region = kwargs.get("region")
             result = AWSSessionFactory.discover_credentials(credential_source, region)
             return result.get("success", False)
-        except Exception:
+        except Exception as e:
+            print_error(f"  {e}")
             return False
     else:
         return False
