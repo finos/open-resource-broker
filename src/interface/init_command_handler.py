@@ -233,13 +233,14 @@ def _interactive_setup() -> Dict[str, Any]:
         # Test credentials
         print_info("")
         print_info("Testing credentials...")
-        if _test_provider_credentials(provider_type, selected_source, **provider_config):
-            print_success("Credentials verified")
+        success, error_msg = _test_provider_credentials(provider_type, selected_source, **provider_config)
+        if success:
+            print_success("Credentials verified successfully")
             if selected_source:
                 provider_config["profile"] = selected_source
         else:
-            print_error("Credential verification failed")
-            print_error("Cannot proceed without valid credentials")
+            print_error("[bold red]ERROR[/bold red] Authentication failed:")
+            print_error(f"        {error_msg}")
             return {}
         
         # Extract final values for backward compatibility
@@ -292,19 +293,21 @@ def _get_available_credential_sources(provider_type: str) -> list[dict]:
         return [{"name": None, "description": "Default credentials"}]
 
 
-def _test_provider_credentials(provider_type: str, credential_source: Optional[str], **kwargs) -> bool:
+def _test_provider_credentials(provider_type: str, credential_source: Optional[str], **kwargs) -> tuple[bool, str]:
     """Test provider credentials."""
     if provider_type == "aws":
         try:
             from providers.aws.session_factory import AWSSessionFactory
             region = kwargs.get("region")
             result = AWSSessionFactory.discover_credentials(credential_source, region)
-            return result.get("success", False)
+            if result.get("success", False):
+                return True, ""
+            else:
+                return False, result.get("error", "Unknown error")
         except Exception as e:
-            print_error(f"  {e}")
-            return False
+            return False, str(e)
     else:
-        return False
+        return False, "Provider type not supported"
 
 
 def _get_credential_requirements(provider_type: str) -> dict:
