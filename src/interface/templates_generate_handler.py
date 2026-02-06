@@ -265,8 +265,8 @@ async def _generate_examples_from_factory(
         registry.ensure_provider_type_registered(provider_type)
     
     if not registry.is_provider_registered(provider_type):
-        available_types = registry.get_registered_providers()
-        raise ValueError(f"Provider type '{provider_type}' is not registered. Available types: {available_types}")
+        error_msg = registry.format_registry_error(provider_type, "provider")
+        raise ValueError(error_msg)
     
     # For AWS provider, use the existing logic
     if provider_type == "aws":

@@ -97,7 +97,10 @@ async def handle_init(args) -> int:
 
 def _get_available_schedulers() -> list[dict[str, str]]:
     """Get available schedulers from registry."""
-    scheduler_types = ["default", "hostfactory"]
+    from infrastructure.scheduler.registry import get_scheduler_registry
+    
+    registry = get_scheduler_registry()
+    scheduler_types = registry.get_registered_types()
     
     schedulers = []
     for scheduler_type in scheduler_types:

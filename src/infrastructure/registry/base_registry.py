@@ -187,6 +187,32 @@ class BaseRegistry(ABC):
         with self._registry_lock:
             return list(self._instance_registrations.keys())
 
+    def format_registry_error(self, requested_item: str, registry_type: str) -> str:
+        """Format error message for unregistered registry item.
+        
+        Args:
+            requested_item: The item that was requested
+            registry_type: Type of registry (provider, scheduler, etc.)
+            
+        Returns:
+            Formatted error message with available options
+        """
+        available_types = self.get_registered_types()
+        available_instances = self.get_registered_instances()
+        
+        if not available_types and not available_instances:
+            return f"No {registry_type}s registered"
+        
+        parts = [f"{registry_type.title()} '{requested_item}' not found"]
+        
+        if available_types:
+            parts.append(f"Available {registry_type} types: {', '.join(available_types)}")
+        
+        if available_instances:
+            parts.append(f"Available {registry_type} instances: {', '.join(available_instances)}")
+        
+        return ". ".join(parts)
+
     def unregister_type(self, type_name: str) -> bool:
         """Unregister a type."""
         with self._registry_lock:
