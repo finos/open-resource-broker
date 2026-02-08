@@ -34,21 +34,37 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
         """Get template file paths with fallback hierarchy."""
         paths = []
         
-        # 1. Provider-specific file (highest priority)
-        provider_name = self._get_provider_name()
-        provider_type = self._get_active_provider_type()
+        try:
+            # 1. Provider-specific file (highest priority) - only if provider info available
+            provider_name = self._get_provider_name()
+            provider_type = self._get_active_provider_type()
+            
+            provider_specific_filename = self.get_templates_filename(provider_name, provider_type)
+            provider_specific_path = self.config_manager.resolve_file("template", provider_specific_filename)
+            paths.append(provider_specific_path)
+            
+            # 2. Generic provider-type file (fallback)
+            generic_filename = f"{provider_type}_templates.json"
+            generic_path = self.config_manager.resolve_file("template", generic_filename)
+            
+            # Avoid duplicates
+            if generic_path != provider_specific_path:
+                paths.append(generic_path)
+                
+        except Exception:
+            # Fallback to default paths if provider info not available
+            pass
         
-        provider_specific_filename = self.get_templates_filename(provider_name, provider_type)
-        provider_specific_path = self.config_manager.resolve_file("template", provider_specific_filename)
-        paths.append(provider_specific_path)
+        # 3. Default fallback paths (always available)
+        default_paths = [
+            self.config_manager.resolve_file("template", "aws_templates.json"),
+            self.config_manager.resolve_file("template", "templates.json"),
+        ]
         
-        # 2. Generic provider-type file (fallback)
-        generic_filename = f"{provider_type}_templates.json"
-        generic_path = self.config_manager.resolve_file("template", generic_filename)
-        
-        # Avoid duplicates
-        if generic_path != provider_specific_path:
-            paths.append(generic_path)
+        # Add default paths if not already included
+        for default_path in default_paths:
+            if default_path not in paths:
+                paths.append(default_path)
         
         return paths
 
