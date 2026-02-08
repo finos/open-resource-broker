@@ -143,32 +143,4 @@ def register_active_scheduler_only(scheduler_type: str = "default") -> bool:
         return False
 
 
-def register_scheduler_on_demand(scheduler_type: str) -> bool:
-    """
-    Register a specific scheduler type on demand .
 
-    Args:
-        scheduler_type: Name of the scheduler type to register
-
-    Returns:
-        True if registration was successful, False otherwise
-    """
-    from infrastructure.logging.logger import get_logger
-
-    logger = get_logger(__name__)
-
-    try:
-        if scheduler_type in ["hostfactory", "hf"]:
-            register_symphony_hostfactory_scheduler()
-        elif scheduler_type == "default":
-            register_default_scheduler()
-        else:
-            logger.error("Unknown scheduler type: %s", scheduler_type)
-            return False
-
-        logger.info("Successfully registered scheduler type on demand: %s", scheduler_type)
-        return True
-
-    except Exception as e:
-        logger.error("Failed to register scheduler type '%s' on demand: %s", scheduler_type, e)
-        return False

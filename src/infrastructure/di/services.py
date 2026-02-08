@@ -48,6 +48,15 @@ def _register_services_lazy(container: "DIContainer") -> "DIContainer":
 
     logger.info("Registering services with lazy loading enabled")
 
+    # 0. ALWAYS register all types first (required for any registry operations)
+    from infrastructure.scheduler.registration import register_all_scheduler_types
+    from infrastructure.storage.registration import register_all_storage_types  
+    from providers.registration import register_all_provider_types
+    
+    register_all_scheduler_types()
+    register_all_storage_types()
+    register_all_provider_types()
+
     # 1. Register ConfigurationManager FIRST (port adapters depend on it)
     from config.managers.configuration_manager import ConfigurationManager
     
@@ -96,35 +105,35 @@ def _register_services_eager(container: "DIContainer") -> "DIContainer":
 
     logger.info("Registering services with eager loading (fallback mode)")
 
-    # Register services in dependency order (original behavior)
-    # 1. Register scheduler strategies first (needed by port adapters)
+    # Use standardized registration functions
     from infrastructure.scheduler.registration import register_all_scheduler_types
-
+    from infrastructure.storage.registration import register_all_storage_types  
+    from providers.registration import register_all_provider_types
+    
     register_all_scheduler_types()
+    register_all_storage_types()
+    register_all_provider_types()
 
-    # 2. Register port adapters FIRST (provides LoggingPort, ConfigurationPort, etc.)
+    # Register port adapters FIRST (provides LoggingPort, ConfigurationPort, etc.)
     from infrastructure.di.port_registrations import register_port_adapters
 
     register_port_adapters(container)
 
-    # 3. Register core services (uses LoggingPort from port adapters)
+    # Register core services (uses LoggingPort from port adapters)
     register_core_services(container)
 
-    # 4. Setup CQRS infrastructure (handlers and buses)
+    # Setup CQRS infrastructure (handlers and buses)
     from infrastructure.di.container import _setup_cqrs_infrastructure
 
     _setup_cqrs_infrastructure(container)
 
-    # 5. Register provider services (needed by infrastructure services)
+    # Register provider services (needed by infrastructure services)
     register_provider_services(container)
 
-    # 6. Register infrastructure services
+    # Register infrastructure services
     register_infrastructure_services(container)
 
-    # CQRS handlers are automatically discovered and registered by _setup_cqrs_infrastructure
-    # No manual registration needed - Handler Discovery System handles everything
-
-    # 7. Register server services (conditionally based on config)
+    # Register server services (conditionally based on config)
     register_server_services(container)
 
     return container
