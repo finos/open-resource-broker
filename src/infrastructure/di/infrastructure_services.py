@@ -54,7 +54,6 @@ def _register_template_services(container: DIContainer):
             scheduler_strategy=container.get(SchedulerPort),
             logger=container.get(LoggingPort),
             event_publisher=None,
-            provider_capability_service=None,
             template_defaults_service=container.get(TemplateDefaultsPort),
         )
 

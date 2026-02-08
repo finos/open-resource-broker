@@ -1,36 +1,15 @@
 """Provider service registrations for dependency injection."""
 
-from application.services.provider_capability_service import ProviderCapabilityService
-from application.services.provider_selection_service import ProviderSelectionService
-from domain.base.ports import ConfigurationPort
-from domain.base.ports.logging_port import LoggingPort
 from infrastructure.di.container import DIContainer
 from infrastructure.logging.logger import get_logger
-from providers.registry import ProviderRegistry
 
 
 def register_provider_services(container: DIContainer) -> None:
     """Register provider application services and utilities only."""
 
-    # Register provider application services (NOT provider instances)
-    container.register_singleton(
-        ProviderSelectionService,
-        lambda c: ProviderSelectionService(
-            config_manager=c.get(ConfigurationPort),
-            logger=c.get(LoggingPort),
-            provider_registry=c.get(ProviderRegistry),
-        ),
-    )
-
-    container.register_singleton(
-        ProviderCapabilityService,
-        lambda c: ProviderCapabilityService(
-            logger=c.get(LoggingPort), 
-            config_manager=c.get(ConfigurationPort),
-            provider_registry=c.get(ProviderRegistry)
-        ),
-    )
-
+    # Provider services moved to Provider Registry
+    # No longer registering ProviderSelectionService or ProviderCapabilityService
+    
     # Register provider-specific utility services only
     _register_provider_utility_services(container)
 

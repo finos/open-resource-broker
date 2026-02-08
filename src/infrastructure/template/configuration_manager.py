@@ -28,9 +28,6 @@ from .services.template_storage_service import TemplateStorageService
 from .template_cache_service import TemplateCacheService, create_template_cache_service
 
 if TYPE_CHECKING:
-    from application.services.provider_capability_service import (
-        ProviderCapabilityService,
-    )
     from application.services.template_defaults_service import TemplateDefaultsService
 
 
@@ -83,7 +80,6 @@ class TemplateConfigurationManager:
         cache_service: Optional[TemplateCacheService] = None,
         storage_service: Optional[TemplateStorageService] = None,
         event_publisher: Optional[EventPublisherPort] = None,
-        provider_capability_service: Optional["ProviderCapabilityService"] = None,
         template_defaults_service: Optional["TemplateDefaultsService"] = None,
     ) -> None:
         """
@@ -96,14 +92,12 @@ class TemplateConfigurationManager:
             cache_service: Optional cache service (creates default if None)
             storage_service: Optional storage service (creates default if None)
             event_publisher: Optional event publisher for domain events
-            provider_capability_service: Optional service for provider validation
             template_defaults_service: Optional service for template defaults
         """
         self.config_manager = config_manager
         self.scheduler_strategy = scheduler_strategy
         self.logger = logger
         self.event_publisher = event_publisher
-        self.provider_capability_service = provider_capability_service
         self.template_defaults_service = template_defaults_service
 
         # Initialize services
@@ -210,17 +204,13 @@ class TemplateConfigurationManager:
 
         # 2. Use active provider from configuration with appropriate selection logic
         try:
-            from application.services.provider_selection_service import (
-                ProviderSelectionService,
-            )
-            from infrastructure.di.container import get_container
+            from providers.registry import get_provider_registry
 
-            container = get_container()
-            selection_service = container.get(ProviderSelectionService)
-            selection_result = selection_service.select_active_provider()
-            return selection_result.provider_name
+            registry = get_provider_registry()
+            selection_result = registry.select_active_provider()
+            return selection_result.provider_instance
         except Exception as e:
-            self.logger.debug("Could not determine provider instance via selection service: %s", e)
+            self.logger.debug("Could not determine provider instance via registry: %s", e)
 
             # Fallback: try direct provider config access
             try:
@@ -610,9 +600,9 @@ class TemplateConfigurationManager:
             # Basic validation
             self._validate_basic_template_structure(template, validation_result)
 
-            # Provider capability validation (if service available)
-            if self.provider_capability_service and provider_instance:
-                await self._validate_with_provider_capabilities(
+            # Provider capability validation (if available via registry)
+            if provider_instance:
+                await self._validate_with_provider_registry(
                     template, provider_instance, validation_result
                 )
 
@@ -664,12 +654,12 @@ class TemplateConfigurationManager:
 
         self.logger.debug("Basic validation completed for template %s", template.template_id)
 
-    async def _validate_with_provider_capabilities(
+    async def _validate_with_provider_registry(
         self, template: TemplateDTO, provider_instance: str, result: dict[str, Any]
     ) -> None:
-        """Validate template against provider capabilities."""
+        """Validate template against provider capabilities via registry."""
         try:
-            # Convert TemplateDTO to Template domain object for capability service
+            # Convert TemplateDTO to Template domain object for validation
             from domain.template.template_aggregate import Template
 
             # Create minimal Template object for validation
@@ -680,11 +670,12 @@ class TemplateConfigurationManager:
                 configuration=template.configuration,
             )
 
-            # Use provider capability service for validation
-            from application.services.provider_capability_service import ValidationLevel
+            # Use provider registry for validation
+            from providers.registry import get_provider_registry
 
-            capability_result = self.provider_capability_service.validate_template_requirements(
-                domain_template, provider_instance, ValidationLevel.STRICT
+            registry = get_provider_registry()
+            capability_result = registry.validate_template_requirements(
+                domain_template, provider_instance, "strict"
             )
 
             # Merge capability validation results

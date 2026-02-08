@@ -113,6 +113,7 @@ def _create_provider_strategy(container: "DIContainer") -> ProviderPort:
 
     registry = get_provider_registry()
     logger = container.get(LoggingPort)
+    config_manager = container.get(ConfigurationPort)
     metrics = container.get(MetricsCollector)
-    registry.set_dependencies(logger, metrics)
+    registry.set_dependencies(logger, config_manager, metrics)
     return ProviderRegistryAdapter(registry)

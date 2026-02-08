@@ -25,13 +25,11 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         config_manager: ConfigurationPort,
         logger: LoggingPort,
         template_defaults_service=None,
-        provider_selection_service=None,
     ) -> None:
         """Initialize the instance."""
         self.config_manager = config_manager
         self._logger = logger
         self.template_defaults_service = template_defaults_service
-        self._provider_selection_service = provider_selection_service
 
         # Initialize field mapper
         provider_type = self._get_active_provider_type()
@@ -165,7 +163,9 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
     def _get_provider_name(self) -> str:
         """Get the active provider instance name."""
         try:
-            selection_result = self._provider_selection_service.select_active_provider()
+            from providers.registry import get_provider_registry
+            provider_registry = get_provider_registry()
+            selection_result = provider_registry.select_active_provider()
             return selection_result.provider_name
         except Exception as e:
             self._logger.warning("Failed to get provider instance name: %s", e)
@@ -178,8 +178,9 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
     def _get_active_provider_type(self) -> str:
         """Get the active provider type from configuration."""
         try:
-            # Use provider selection service for provider selection
-            selection_result = self._provider_selection_service.select_active_provider()
+            from providers.registry import get_provider_registry
+            provider_registry = get_provider_registry()
+            selection_result = provider_registry.select_active_provider()
             provider_type = selection_result.provider_type
             self._logger.debug("Active provider type: %s", provider_type)
             return provider_type
@@ -441,9 +442,11 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         provider_config = config.get("provider", {})
         active_provider = provider_config.get("active_provider")
         if not active_provider:
-            # Get from provider selection service instead of hardcoded default
+            # Get from provider registry instead of hardcoded default
             try:
-                selection_result = self._provider_selection_service.select_active_provider()
+                from providers.registry import get_provider_registry
+                provider_registry = get_provider_registry()
+                selection_result = provider_registry.select_active_provider()
                 active_provider = selection_result.provider_name
             except Exception:
                 active_provider = "aws_default"

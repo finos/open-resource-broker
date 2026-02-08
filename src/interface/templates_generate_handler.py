@@ -178,12 +178,12 @@ def _get_active_providers() -> list[dict]:
     config_file = config_dir / "config.json"
 
     if not config_file.exists():
-        # Get active provider from provider selection service
+        # Get active provider from provider registry
         try:
-            from infrastructure.di.container import get_container
-            provider_selection = get_container().get("ProviderSelectionService")
-            selection_result = provider_selection.select_active_provider()
-            return [{"name": selection_result.provider_name, "type": selection_result.provider_type}]
+            from providers.registry import get_provider_registry
+            registry = get_provider_registry()
+            selection_result = registry.select_active_provider()
+            return [{"name": selection_result.provider_instance, "type": selection_result.provider_type}]
         except Exception:
             # Final fallback to first available provider
             from providers.registry import get_provider_registry

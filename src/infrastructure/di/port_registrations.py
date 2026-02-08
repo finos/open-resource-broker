@@ -58,17 +58,11 @@ def register_port_adapters(container):
     # optional dependencies)
     def create_template_configuration_manager(c):
         """Create template configuration manager with dependencies."""
-        # Import here to avoid circular imports
-        from application.services.provider_capability_service import (
-            ProviderCapabilityService,
-        )
-
         return TemplateConfigurationManager(
             config_manager=c.get(ConfigurationPort),
             scheduler_strategy=c.get(SchedulerPort),
             logger=c.get(LoggingPort),
             event_publisher=c.get_optional(EventPublisherPort),
-            provider_capability_service=c.get_optional(ProviderCapabilityService),
         )
 
     container.register_singleton(

@@ -22,11 +22,10 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
     - Simple integration for systems using domain format directly
     """
 
-    def __init__(self, config_manager: ConfigurationManager, logger: "LoggingPort", provider_selection_service) -> None:
+    def __init__(self, config_manager: ConfigurationManager, logger: "LoggingPort") -> None:
         """Initialize the instance."""
         self.config_manager = config_manager
         self._logger = logger
-        self._provider_selection_service = provider_selection_service
 
         # Initialize field mapper
         self.field_mapper = DefaultFieldMapper()
@@ -89,7 +88,9 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
     def _get_provider_name(self) -> str:
         """Get the active provider instance name."""
         try:
-            selection_result = self._provider_selection_service.select_active_provider()
+            from providers.registry import get_provider_registry
+            provider_registry = get_provider_registry()
+            selection_result = provider_registry.select_active_provider()
             return selection_result.provider_name
         except Exception as e:
             self._logger.warning("Failed to get provider instance name: %s", e)
@@ -98,7 +99,9 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
     def _get_active_provider_type(self) -> str:
         """Get the active provider type from configuration."""
         try:
-            selection_result = self._provider_selection_service.select_active_provider()
+            from providers.registry import get_provider_registry
+            provider_registry = get_provider_registry()
+            selection_result = provider_registry.select_active_provider()
             provider_type = selection_result.provider_type
             self._logger.debug("Active provider type: %s", provider_type)
             return provider_type

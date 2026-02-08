@@ -12,11 +12,7 @@ from application.dto.commands import (
     PopulateMachineIdsCommand,
     UpdateRequestStatusCommand,
 )
-from application.services.provider_capability_service import (
-    ProviderCapabilityService,
-    ValidationLevel,
-)
-from application.services.provider_selection_service import ProviderSelectionService
+
 from domain.base import UnitOfWorkFactory
 from domain.base.exceptions import EntityNotFoundError
 from domain.base.ports import (
@@ -46,16 +42,12 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
         query_bus: QueryBus,  # QueryBus is required for template lookup
-        provider_selection_service: ProviderSelectionService,
-        provider_capability_service: ProviderCapabilityService,
     ) -> None:
         """Initialize the instance."""
         super().__init__(logger, event_publisher, error_handler)
         self.uow_factory = uow_factory  # Use UoW factory pattern
         self._container = container
         self._query_bus = query_bus
-        self._provider_selection_service = provider_selection_service
-        self._provider_capability_service = provider_capability_service
 
     async def validate_command(self, command: CreateRequestCommand) -> None:
         """Validate create request command."""
@@ -125,9 +117,9 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
             self.logger.debug("Template found: %s (id=%s)", type(template), template.template_id)
 
             # Select provider based on template requirements
-            selection_result = self._provider_selection_service.select_provider_for_template(
-                template
-            )
+            from providers.registry import get_provider_registry
+            registry = get_provider_registry()
+            selection_result = registry.select_provider_for_template(template)
             self.logger.info(
                 "Selected provider: %s (%s)",
                 selection_result.provider_name,
@@ -135,8 +127,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
             )
 
             # Validate template compatibility with selected provider
-            validation_result = self._provider_capability_service.validate_template_requirements(
-                template, selection_result.provider_name, ValidationLevel.STRICT
+            validation_result = registry.validate_template_requirements(
+                template, selection_result.provider_name, "strict"
             )
 
             if not validation_result.is_valid:

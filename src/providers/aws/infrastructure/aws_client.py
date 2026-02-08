@@ -179,7 +179,7 @@ class AWSClient:
     def _get_selected_aws_provider_config(self) -> Optional["AWSProviderConfig"]:
         """Get selected AWS provider configuration.
 
-        Primary path: use ProviderSelectionService to pick the active instance and
+        Primary path: use provider registry to pick the active instance and
         build AWSProviderConfig from its config payload.
         Fallback path: use the legacy ConfigurationManager.get_typed(AWSProviderConfig) resolution.
 
@@ -203,18 +203,16 @@ class AWSClient:
                 provider_name = self._provider_name
                 self._logger.debug("Using specific provider: %s", provider_name)
             else:
-                # Use provider selection service from DI container
-                from application.services.provider_selection_service import ProviderSelectionService
-                from infrastructure.di.container import get_container
+                # Use provider registry for provider selection
+                from providers.registry import get_provider_registry
 
-                container = get_container()
-                selection_service = container.get(ProviderSelectionService)
-                selection_result = selection_service.select_active_provider()
+                registry = get_provider_registry()
+                selection_result = registry.select_active_provider()
 
                 self._logger.debug(
                     "Provider selection result: %s, %s",
                     selection_result.provider_type,
-                    selection_result.provider_name,
+                    selection_result.provider_instance,
                 )
 
                 # Ensure we have an AWS provider
@@ -223,7 +221,7 @@ class AWSClient:
                         f"Selected provider is not AWS: {selection_result.provider_type}"
                     )
                 
-                provider_name = selection_result.provider_name
+                provider_name = selection_result.provider_instance
 
             # Get the provider instance configuration
             provider_config = self._config_manager.get_provider_config()
@@ -268,7 +266,7 @@ class AWSClient:
                 else:
                     self._logger.debug(
                         "Provider %s not found in config",
-                        selection_result.provider_name,
+                        provider_name,
                     )
         except AWSConfigurationError:
             raise

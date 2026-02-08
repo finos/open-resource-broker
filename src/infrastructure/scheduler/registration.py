@@ -28,7 +28,6 @@ def create_symphony_hostfactory_strategy(container: "DIContainer") -> "Scheduler
     """
     from domain.base.ports import LoggingPort
     from domain.template.ports.template_defaults_port import TemplateDefaultsPort
-    from application.services.provider_selection_service import ProviderSelectionService
     from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
         HostFactorySchedulerStrategy,
     )
@@ -36,8 +35,7 @@ def create_symphony_hostfactory_strategy(container: "DIContainer") -> "Scheduler
     config_manager = container.get(ConfigurationPort)
     logger = container.get(LoggingPort)
     template_defaults_service = container.get(TemplateDefaultsPort)
-    provider_selection_service = container.get(ProviderSelectionService)
-    return HostFactorySchedulerStrategy(config_manager, logger, template_defaults_service, provider_selection_service)
+    return HostFactorySchedulerStrategy(config_manager, logger, template_defaults_service)
 
 
 def create_hostfactory_config(data: dict[str, Any]) -> Any:
@@ -94,13 +92,11 @@ def create_default_strategy(container: "DIContainer") -> "SchedulerPort":
         SchedulerPort: Default scheduler strategy instance
     """
     from domain.base.ports import LoggingPort
-    from application.services.provider_selection_service import ProviderSelectionService
     from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 
     config_manager = container.get(ConfigurationPort)
     logger = container.get(LoggingPort)
-    provider_selection_service = container.get(ProviderSelectionService)
-    return DefaultSchedulerStrategy(config_manager, logger, provider_selection_service)
+    return DefaultSchedulerStrategy(config_manager, logger)
 
 
 def create_default_config(data: dict[str, Any]) -> Any:
