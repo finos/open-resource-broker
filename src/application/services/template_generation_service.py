@@ -1,10 +1,9 @@
 """Template Generation Service - Application Layer."""
 
 from typing import Any, Dict, List, Optional
+from pathlib import Path
 
 from domain.base.ports import ConfigurationPort, LoggingPort, SchedulerPort
-from domain.base.ports.template_adapter_port import TemplateAdapterPort
-from domain.base.contracts.template_contract import TemplateContract
 from application.dto.template_generation_dto import (
     TemplateGenerationRequest,
     TemplateGenerationResult,
@@ -24,12 +23,10 @@ class TemplateGenerationService:
         self,
         config_manager: ConfigurationPort,
         scheduler_strategy: SchedulerPort,
-        template_adapter: TemplateAdapterPort,
         logger: LoggingPort,
     ):
         self._config_manager = config_manager
         self._scheduler_strategy = scheduler_strategy
-        self._template_adapter = template_adapter
         self._logger = logger
 
     async def generate_templates(self, request: TemplateGenerationRequest) -> TemplateGenerationResult:
@@ -107,42 +104,32 @@ class TemplateGenerationService:
             # Determine output filename
             filename = self._determine_filename(provider, request)
             
-            # Check if templates should be overwritten
-            if not request.force_overwrite:
-                # Use template adapter to check existing templates (Clean Architecture)
-                try:
-                    existing_templates = await self._template_adapter.get_templates()
-                    if existing_templates:
-                        return ProviderTemplateResult(
-                            provider=provider_name,
-                            filename=filename,
-                            templates_count=0,
-                            path="",
-                            status="skipped",
-                            reason="file_exists"
-                        )
-                except Exception:
-                    # If we can't check, proceed with generation
-                    pass
-            
             # Format templates using scheduler strategy
             formatted_examples = self._format_templates(examples, request)
             
-            # Save templates using template adapter (Clean Architecture)
-            for template_data in formatted_examples:
-                template_contract = TemplateContract(
-                    template_id=template_data.get("template_id", ""),
-                    name=template_data.get("name", template_data.get("template_id", "")),
-                    provider_api=template_data.get("provider_api", "RunInstances"),
-                    configuration=template_data
+            # Determine output file path
+            filename = self._determine_filename(provider, request)
+            templates_file = self._get_templates_file_path(filename)
+            
+            # Check for existing file
+            if templates_file.exists() and not request.force_overwrite:
+                return ProviderTemplateResult(
+                    provider=provider_name,
+                    filename=filename,
+                    templates_count=0,
+                    path=str(templates_file),
+                    status="skipped",
+                    reason="file_exists"
                 )
-                await self._template_adapter.save_template(template_contract)
+            
+            # Write templates to file (bulk operation)
+            self._write_templates_file(templates_file, formatted_examples)
             
             return ProviderTemplateResult(
                 provider=provider_name,
                 filename=filename,
                 templates_count=len(examples),
-                path="",
+                path=str(templates_file),
                 status="created"
             )
             
@@ -231,6 +218,36 @@ class TemplateGenerationService:
         
         # Apply scheduler formatting
         return self._scheduler_strategy.format_templates_for_generation(template_dicts)
+
+    def _get_templates_file_path(self, filename: str) -> Path:
+        """Get the full path for templates file."""
+        from config.platform_dirs import get_config_location
+        
+        config_dir = get_config_location()
+        return config_dir / filename
+
+    def _write_templates_file(self, templates_file: Path, formatted_examples: List[Dict[str, Any]]) -> None:
+        """Write templates to file (bulk operation)."""
+        import json
+        from datetime import datetime
+        
+        templates_data = {"templates": formatted_examples}
+        
+        class DateTimeEncoder(json.JSONEncoder):
+            def default(self, obj):
+                if isinstance(obj, datetime):
+                    return obj.isoformat()
+                try:
+                    return super().default(obj)
+                except TypeError:
+                    return str(obj)
+        
+        # Ensure directory exists
+        templates_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Write templates file
+        with open(templates_file, "w") as f:
+            json.dump(templates_data, f, indent=2, cls=DateTimeEncoder)
 
     def _get_active_providers(self) -> List[Dict[str, str]]:
         """Get all active providers from configuration."""
