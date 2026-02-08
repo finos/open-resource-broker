@@ -410,6 +410,25 @@ def register_aws_services_with_di(container) -> None:
     logger = container.get(LoggingPort)
 
     try:
+        # Register AWS Template Adapter
+        from domain.base.ports.template_adapter_port import TemplateAdapterPort
+        from providers.aws.infrastructure.adapters.template_adapter import AWSTemplateAdapter
+        
+        if not container.is_registered(TemplateAdapterPort):
+            def create_aws_template_adapter(c):
+                from domain.base.ports import ConfigurationPort
+                from providers.aws.infrastructure.aws_client import AWSClient
+                from infrastructure.template.configuration_manager import TemplateConfigurationManager
+                
+                template_config_manager = c.get(TemplateConfigurationManager)
+                aws_client = c.get(AWSClient)
+                logger_port = c.get(LoggingPort)
+                
+                return AWSTemplateAdapter(template_config_manager, aws_client, logger_port)
+            
+            container.register_singleton(TemplateAdapterPort, create_aws_template_adapter)
+            logger.debug("AWS Template Adapter registered with DI container")
+
         # Register AWS-specific utility services only
         from domain.base.ports.template_resolver_port import TemplateResolverPort
         from providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager

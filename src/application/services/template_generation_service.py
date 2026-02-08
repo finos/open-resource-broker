@@ -132,6 +132,8 @@ class TemplateGenerationService:
             for template_data in formatted_examples:
                 template_contract = TemplateContract(
                     template_id=template_data.get("template_id", ""),
+                    name=template_data.get("name", template_data.get("template_id", "")),
+                    provider_api=template_data.get("provider_api", "RunInstances"),
                     configuration=template_data
                 )
                 await self._template_adapter.save_template(template_contract)
