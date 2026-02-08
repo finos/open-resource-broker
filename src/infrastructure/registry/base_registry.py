@@ -79,6 +79,22 @@ class BaseRegistry(ABC):
 
         self.logger = get_logger(__name__)
         self._initialized = True
+        self._dependencies_initialized = False
+
+    def _ensure_dependencies_initialized(self) -> None:
+        """Ensure registry dependencies are initialized (lazy loading)."""
+        if not self._dependencies_initialized:
+            try:
+                from infrastructure.di.container import get_container
+                from domain.base.ports import LoggingPort, ConfigurationPort
+                
+                container = get_container()
+                self._logger_port = container.get(LoggingPort)
+                self._config_port = container.get(ConfigurationPort)
+                self._dependencies_initialized = True
+            except Exception:
+                # Fallback to basic logger if DI container not available
+                pass
 
     @abstractmethod
     def register(

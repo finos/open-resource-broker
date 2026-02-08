@@ -296,8 +296,20 @@ class ProviderRegistry(BaseRegistry):
         # Strategy 5: Fallback to default
         return self._select_default_provider(template)
 
+    def _ensure_provider_dependencies(self) -> None:
+        """Ensure provider-specific dependencies are initialized."""
+        self._ensure_dependencies_initialized()
+        
+        if not self._provider_config and hasattr(self, '_config_port'):
+            self._config_manager = self._config_port
+            self._logger = self._logger_port
+            self._metrics = self._metrics or MetricsCollector(config={"METRICS_ENABLED": True})
+            self._provider_config = self._config_port.get_provider_config() if self._config_port else None
+
     def select_active_provider(self) -> Any:
         """Select active provider instance from configuration."""
+        self._ensure_provider_dependencies()
+        
         if self._active_provider_cache is not None:
             return self._active_provider_cache
 
