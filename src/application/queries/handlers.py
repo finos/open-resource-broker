@@ -1042,7 +1042,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
 
 
 @query_handler(GetRequestStatusQuery)
-class GetRequestStatusQueryHandler(BaseQueryHandler[GetRequestStatusQuery, Any]):
+class GetRequestStatusQueryHandler(BaseQueryHandler[GetRequestStatusQuery, RequestDTO]):
     """Handler for getting request status."""
 
     def __init__(
@@ -1069,7 +1069,11 @@ class GetRequestStatusQueryHandler(BaseQueryHandler[GetRequestStatusQuery, Any])
                     raise EntityNotFoundError("Request", query.request_id)
 
                 self.logger.info("Request %s status: %s", query.request_id, request.status.value)
-                return request
+                
+                # Convert to RequestDTO like GetRequestHandler does
+                from application.request.dto import RequestDTO
+                request_dto = RequestDTO.from_domain(request)
+                return request_dto
 
         except EntityNotFoundError:
             self.logger.error("Request not found: %s", query.request_id)
