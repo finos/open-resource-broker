@@ -50,34 +50,50 @@ class GetProviderHealthHandler(BaseQueryHandler[GetProviderHealthQuery, Provider
             from providers.registry import get_provider_registry
             registry = get_provider_registry()
 
+            # If no provider specified, get the active provider
+            provider_name = query.provider_name
+            if not provider_name:
+                try:
+                    selection_result = registry.select_active_provider()
+                    provider_name = selection_result.provider_name
+                    self.logger.debug("Using active provider: %s", provider_name)
+                except Exception as e:
+                    self.logger.warning("Failed to get active provider: %s", e)
+                    return {
+                        "provider_name": None,
+                        "status": "not_found",
+                        "health": "unknown",
+                        "message": "No active provider found",
+                    }
+
             # Check if provider exists
-            if not (registry.is_provider_registered(query.provider_name) or 
-                   registry.is_provider_instance_registered(query.provider_name)):
+            if not (registry.is_provider_registered(provider_name) or 
+                   registry.is_provider_instance_registered(provider_name)):
                 return {
-                    "provider_name": query.provider_name,
+                    "provider_name": provider_name,
                     "status": "not_found",
                     "health": "unknown",
-                    "message": f"Provider '{query.provider_name}' not found",
+                    "message": f"Provider '{provider_name}' not found",
                 }
 
             # Get health information from registry
-            health_status = registry.check_strategy_health(query.provider_name)
+            health_status = registry.check_strategy_health(provider_name)
             
             health_info = {
-                "provider_name": query.provider_name,
+                "provider_name": provider_name,
                 "status": "active",
                 "health": "healthy" if health_status and health_status.is_healthy else "unhealthy",
                 "last_check": time.time(),
-                "message": health_status.message if health_status else "No health data available",
+                "message": getattr(health_status, 'message', None) or getattr(health_status, 'error_message', None) or "No health data available",
             }
 
             if health_status:
                 health_info.update({
-                    "details": health_status.details,
-                    "timestamp": health_status.timestamp,
+                    "details": getattr(health_status, 'details', {}),
+                    "timestamp": getattr(health_status, 'timestamp', time.time()),
                 })
 
-            self.logger.info("Provider %s health: %s", query.provider_name, health_info["health"])
+            self.logger.info("Provider %s health: %s", provider_name, health_info["health"])
             return health_info
 
         except Exception as e:
