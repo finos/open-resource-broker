@@ -36,7 +36,7 @@ class RequestStatusManagementService:
         )
 
         # Store provider API in domain field
-        request.provider_api = template.provider_api or "RunInstances"
+        # Provider API already set by RequestCreationService
 
         # Add resource IDs to request
         for resource_id in resource_ids:
@@ -64,7 +64,7 @@ class RequestStatusManagementService:
         if instances:
             machines_to_save = []
             for instance_data in instances:
-                machine = self._create_machine_aggregate(instance_data, request, template.template_id)
+                machine = self._create_machine_aggregate(instance_data, request, request.template_id)
                 machines_to_save.append(machine)
 
             if machines_to_save:
@@ -72,7 +72,7 @@ class RequestStatusManagementService:
                     uow.machines.save_batch(machines_to_save)
 
         # Update request status based on fulfillment
-        return self._update_request_status(request, len(instances), requested_count, has_api_errors, provider_errors)
+        return self._update_request_status(request, len(instances), request.requested_count, has_api_errors, provider_errors)
 
     def _handle_provisioning_failure(self, request: Any, provisioning_result: Dict[str, Any]) -> Any:
         """Handle provisioning failure."""
