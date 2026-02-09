@@ -48,6 +48,15 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
         self.uow_factory = uow_factory  # Use UoW factory pattern
         self._container = container
         self._query_bus = query_bus
+        
+        # Initialize services
+        from application.services.request_creation_service import RequestCreationService
+        from application.services.provisioning_orchestration_service import ProvisioningOrchestrationService
+        from application.services.request_status_management_service import RequestStatusManagementService
+        
+        self._request_creation_service = RequestCreationService(logger)
+        self._provisioning_service = ProvisioningOrchestrationService(container, logger)
+        self._status_service = RequestStatusManagementService(uow_factory, logger)
 
     async def validate_command(self, command: CreateRequestCommand) -> None:
         """Validate create request command."""
@@ -58,30 +67,49 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
             raise ValueError("requested_count must be positive")
 
     async def execute_command(self, command: CreateRequestCommand) -> str:
-        """Handle machine request creation command.
-
-        Stages:
-            1. Validate provider availability and initialize request state.
-            2. Load template, select provider, and validate compatibility.
-            3. Create request aggregate and handle dry-run fast path.
-            4. Provision resources and reconcile machines/status from provider results.
-            5. Persist the final request, publish events, and return the request id.
-        """
+        """Handle machine request creation by orchestrating services."""
         self.logger.info("Creating machine request for template: %s", command.template_id)
 
-        # <1.> Validate provider availability and initialize request state.
-        # CRITICAL VALIDATION: Ensure providers are available
+        # Validate provider availability
+        await self._validate_provider_availability()
+
+        # Load template and select provider
+        template = await self._load_template(command.template_id)
+        selection_result = await self._select_and_validate_provider(template)
+
+        # Create request aggregate
+        request = self._request_creation_service.create_machine_request(
+            command, template, selection_result
+        )
+
+        # Handle dry-run fast path
+        if request.metadata.get("dry_run", False):
+            request = self._handle_dry_run(request)
+        else:
+            # Execute provisioning and update status
+            provisioning_result = await self._provisioning_service.execute_provisioning(
+                template, request, selection_result
+            )
+            request = await self._status_service.update_request_from_provisioning(
+                request, provisioning_result
+            )
+
+        # Persist and publish events
+        await self._persist_and_publish(request)
+
+        self.logger.info("Machine request created successfully: %s", request.request_id)
+        return str(request.request_id)
+
+    async def _validate_provider_availability(self) -> None:
+        """Validate that providers are available."""
         from providers.registry import get_provider_registry
+        from domain.base.ports.configuration_port import ConfigurationPort
         
         registry = get_provider_registry()
-        
-        # Ensure providers from configuration are registered in registry
-        from domain.base.ports.configuration_port import ConfigurationPort
         config_manager = self._container.get(ConfigurationPort)
         provider_config = config_manager.get_provider_config()
         
         if provider_config:
-            # Register all configured providers with registry
             for provider_instance in provider_config.get_active_providers():
                 registry.ensure_provider_instance_registered_from_config(provider_instance)
         
@@ -98,445 +126,65 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
             available_providers, available_instances
         )
 
-        request = None
+    async def _load_template(self, template_id: str) -> Any:
+        """Load template using CQRS QueryBus."""
+        if not self._query_bus:
+            raise ValueError("QueryBus is required for template lookup")
 
-        try:
-            # <2.> Load template, select provider, and validate compatibility.
-            # Get template using CQRS QueryBus
-            if not self._query_bus:
-                raise ValueError("QueryBus is required for template lookup")
+        from application.dto.queries import GetTemplateQuery
+        template_query = GetTemplateQuery(template_id=template_id)
+        template = await self._query_bus.execute(template_query)
 
-            from application.dto.queries import GetTemplateQuery
+        if not template:
+            raise EntityNotFoundError("Template", template_id)
 
-            template_query = GetTemplateQuery(template_id=command.template_id)
-            template = await self._query_bus.execute(template_query)
+        self.logger.debug("Template found: %s (id=%s)", type(template), template.template_id)
+        return template
 
-            if not template:
-                raise EntityNotFoundError("Template", command.template_id)
+    async def _select_and_validate_provider(self, template: Any) -> Any:
+        """Select provider and validate template compatibility."""
+        from providers.registry import get_provider_registry
+        
+        registry = get_provider_registry()
+        selection_result = registry.select_provider_for_template(template)
+        
+        self.logger.info(
+            "Selected provider: %s (%s)",
+            selection_result.provider_name,
+            selection_result.selection_reason,
+        )
 
-            self.logger.debug("Template found: %s (id=%s)", type(template), template.template_id)
+        validation_result = registry.validate_template_requirements(
+            template, selection_result.provider_name, "strict"
+        )
 
-            # Select provider based on template requirements
-            from providers.registry import get_provider_registry
-            registry = get_provider_registry()
-            selection_result = registry.select_provider_for_template(template)
-            self.logger.info(
-                "Selected provider: %s (%s)",
-                selection_result.provider_name,
-                selection_result.selection_reason,
-            )
+        if not validation_result.is_valid:
+            error_msg = f"Template incompatible with provider {selection_result.provider_name}: {'; '.join(validation_result.errors)}"
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
 
-            # Validate template compatibility with selected provider
-            validation_result = registry.validate_template_requirements(
-                template, selection_result.provider_name, "strict"
-            )
+        self.logger.info("Template validation passed: %s", validation_result.supported_features)
+        return selection_result
 
-            if not validation_result.is_valid:
-                error_msg = f"Template incompatible with provider {selection_result.provider_name}: {'; '.join(validation_result.errors)}"
-                self.logger.error(error_msg)
-                raise ValueError(error_msg)
+    def _handle_dry_run(self, request: Any) -> Any:
+        """Handle dry-run request."""
+        from domain.request.value_objects import RequestStatus
+        
+        self.logger.info(
+            "Skipping actual provisioning for request %s (dry-run mode)",
+            request.request_id,
+        )
+        return request.update_status(
+            RequestStatus.COMPLETED, "Request created successfully (dry-run)"
+        )
 
-            self.logger.info("Template validation passed: %s", validation_result.supported_features)
-
-            # <3.> Create request aggregate and handle dry-run fast path.
-            # Create request aggregate with selected provider
-            from domain.request.aggregate import Request
-            from domain.request.value_objects import RequestType
-
-            request = Request.create_new_request(
-                request_type=RequestType.ACQUIRE,
-                template_id=command.template_id,
-                machine_count=command.requested_count,
-                provider_type=selection_result.provider_type,
-                provider_name=selection_result.provider_name,
-                metadata={
-                    **command.metadata,
-                    "dry_run": getattr(command, "dry_run", False),
-                    "provider_selection_reason": selection_result.selection_reason,
-                    "provider_confidence": selection_result.confidence,
-                },
-                request_id=command.request_id,  # Use the provided request_id (None if not provided)
-            )
-
-            # Check if this is a dry-run request
-            is_dry_run = request.metadata.get("dry_run", False)
-
-            if is_dry_run:
-                # In dry-run mode, skip actual provisioning
-                self.logger.info(
-                    "Skipping actual provisioning for request %s (dry-run mode)",
-                    request.request_id,
-                )
-                from domain.request.value_objects import RequestStatus
-
-                request = request.update_status(
-                    RequestStatus.COMPLETED, "Request created successfully (dry-run)"
-                )
-            else:
-                # <4.> Provision resources and reconcile machines/status from provider results.
-                # Execute actual provisioning using selected provider
-                try:
-                    # Execute provisioning using selected provider
-                    provisioning_result = await self._execute_provisioning(
-                        template, request, selection_result
-                    )
-
-                    # Update request with provisioning results
-                    if provisioning_result.get("success"):
-                        # Store resource IDs and provider metadata
-                        resource_ids = provisioning_result.get("resource_ids", [])
-                        self.logger.info("Provisioning result: %s", provisioning_result)
-                        self.logger.info(
-                            "Extracted resource_ids: %s (type: %s)",
-                            resource_ids,
-                            type(resource_ids),
-                        )
-
-                        # Store provider API in domain field
-                        request.provider_api = template.provider_api or "RunInstances"
-                        self.logger.info(
-                            "Stored provider API: %s", request.provider_api
-                        )
-
-                        # Add resource IDs to request
-                        if isinstance(resource_ids, list):
-                            for resource_id in resource_ids:
-                                self.logger.info(
-                                    "Adding resource_id: %s (type: %s)",
-                                    resource_id,
-                                    type(resource_id),
-                                )
-                                if isinstance(resource_id, str):
-                                    request = request.add_resource_id(resource_id)
-                                else:
-                                    self.logger.error(
-                                        "Expected string resource_id, got: %s - %s",
-                                        type(resource_id),
-                                        resource_id,
-                                    )
-                        else:
-                            self.logger.error(
-                                "Expected list for resource_ids, got: %s - %s",
-                                type(resource_ids),
-                                resource_ids,
-                            )
-
-                        # Graceful immediate population (don't error if no instance IDs)
-                        instance_ids = self._extract_instance_ids(provisioning_result)
-                        if instance_ids:
-                            request = request.add_machine_ids(instance_ids)
-                            self.logger.info("Populated %d machine IDs immediately", len(instance_ids))
-                        else:
-                            self.logger.debug("No immediate instance IDs available, will populate later")
-
-                        # Create machine aggregates for each instance
-                        instance_data_list = provisioning_result.get("instances", [])
-                        provider_data = provisioning_result.get("provider_data", {})
-
-                        # Store provider-specific data in request
-                        if provider_data:
-                            request.provider_data.update(provider_data)
-
-                        # Preserve provider errors (if any) for partial success handling
-                        if isinstance(provider_data, dict):
-                            provider_errors = provider_data.get("fleet_errors") or []
-                            if provider_errors and not request.metadata.get("fleet_errors"):
-                                request.metadata["fleet_errors"] = provider_errors
-
-                        has_api_errors = bool(request.metadata.get("fleet_errors"))
-                        error_summary = None
-                        if has_api_errors:
-                            error_summary = (
-                                "; ".join(
-                                    f"{err.get('error_code', 'Unknown')}: {err.get('error_message', 'No message')}"
-                                    for err in request.metadata.get("fleet_errors", [])
-                                )
-                                or "Unknown API errors"
-                            )
-                            if error_summary and "error_message" not in request.metadata:
-                                request.metadata["error_message"] = error_summary
-                                request.metadata["error_type"] = "ProvisioningPartialFailure"
-
-                        # Store ASG capacity metadata for tracking
-                        if template.provider_api == "ASG":
-                            request.metadata.update(
-                                {
-                                    "asg_current_capacity": len(instance_data_list),
-                                }
-                            )
-
-                            self.logger.info(
-                                "Stored ASG capacity metadata for %s: desired=%s, actual=%s",
-                                resource_ids[0] if resource_ids else "unknown",
-                                request.requested_count,
-                                len(instance_data_list),
-                            )
-
-                        machines_to_save = []
-                        for instance_data in instance_data_list:
-                            machine = self._create_machine_aggregate(
-                                instance_data, request, template.template_id
-                            )
-                            machines_to_save.append(machine)
-
-                        if machines_to_save:
-                            with self.uow_factory.create_unit_of_work() as uow:
-                                batch_events = uow.machines.save_batch(machines_to_save)
-                            for event in batch_events:
-                                self.event_publisher.publish(event)
-
-                        # Update request status based on fulfillment and API errors
-                        if len(instance_data_list) == command.requested_count:
-                            from domain.request.value_objects import RequestStatus
-
-                            if has_api_errors:
-                                request = request.update_status(
-                                    RequestStatus.PARTIAL,
-                                    f"Partial success: {len(instance_data_list)}/{command.requested_count} instances created with API errors: {error_summary}",
-                                )
-                            else:
-                                request = request.update_status(
-                                    RequestStatus.COMPLETED,
-                                    "All instances provisioned successfully",
-                                )
-                        elif len(instance_data_list) > 0:
-                            from domain.request.value_objects import RequestStatus
-
-                            if has_api_errors:
-                                request = request.update_status(
-                                    RequestStatus.PARTIAL,
-                                    f"Partial success: {len(instance_data_list)}/{command.requested_count} instances created with API errors: {error_summary}",
-                                )
-                            else:
-                                request = request.update_status(
-                                    RequestStatus.PARTIAL,
-                                    f"Partially fulfilled: {len(instance_data_list)}/{command.requested_count} instances",
-                                )
-                        else:
-                            from domain.request.value_objects import RequestStatus
-
-                            request = request.update_status(
-                                RequestStatus.IN_PROGRESS,
-                                "Resources created, instances pending",
-                            )
-                    else:
-                        # Handle provisioning failure
-                        from domain.request.value_objects import RequestStatus
-
-                        error_message = provisioning_result.get("error_message", "Unknown error")
-                        request = request.update_status(
-                            RequestStatus.FAILED,
-                            f"Provisioning failed: {error_message}",
-                        )
-                        # Store error details in metadata
-                        if not hasattr(request, "metadata"):
-                            request.metadata = {}
-                        request.metadata["error_message"] = error_message
-                        request.metadata["error_type"] = "ProvisioningFailure"
-
-                except Exception as provisioning_error:
-                    # Handle unexpected provisioning errors
-                    from domain.request.value_objects import RequestStatus
-
-                    error_message = str(provisioning_error)
-                    request = request.update_status(
-                        RequestStatus.FAILED, f"Provisioning failed: {error_message}"
-                    )
-                    # Store error details in metadata
-                    if not hasattr(request, "metadata"):
-                        request.metadata = {}
-                    request.metadata["error_message"] = error_message
-                    request.metadata["error_type"] = type(provisioning_error).__name__
-
-                    self.logger.error(
-                        "Provisioning failed for request %s: %s",
-                        request.request_id,
-                        provisioning_error,
-                    )
-
-        except Exception as provisioning_error:
-            # Update request status to failed if request was created
-            if request:
-                from domain.request.value_objects import RequestStatus
-
-                request = request.update_status(
-                    RequestStatus.FAILED,
-                    f"Provisioning failed: {provisioning_error!s}",
-                )
-                self.logger.error(
-                    "Provisioning failed for request %s: %s",
-                    request.request_id,
-                    provisioning_error,
-                )
-
-                # Save failed request for audit trail
-                with self.uow_factory.create_unit_of_work() as uow:
-                    events = uow.requests.save(request)
-
-                # Publish events for failed request
-                for event in events:
-                    self.event_publisher.publish(event)
-
-                raise ValueError(f"Machine provisioning failed: {provisioning_error!s}")
-            else:
-                self.logger.error("Failed to create request: %s", provisioning_error)
-                raise
-
-        # Only save and return success if we reach here (no exceptions)
-        # <5.> Persist the final request, publish events, and return the request id.
-        # Save request using UnitOfWork pattern (same as query handlers)
+    async def _persist_and_publish(self, request: Any) -> None:
+        """Persist request and publish events."""
         with self.uow_factory.create_unit_of_work() as uow:
             events = uow.requests.save(request)
 
-        # Publish events
         for event in events:
             self.event_publisher.publish(event)
-
-        self.logger.info("Machine request created successfully: %s", request.request_id)
-        return request
-
-    def _extract_instance_ids(self, result: dict) -> list[str]:
-        """Extract instance IDs if available in provider result."""
-        try:
-            if result.get("instance_ids"):
-                return result["instance_ids"]
-            elif result.get("instances"):
-                instances = result["instances"]
-                if isinstance(instances, list) and instances:
-                    return [
-                        instance.get("instance_id") 
-                        for instance in instances 
-                        if instance.get("instance_id")
-                    ]
-            return []
-        except Exception as e:
-            self.logger.debug("Could not extract instance IDs: %s", e)
-            return []
-
-
-    def _create_machine_aggregate(self, instance_data: dict[str, Any], request, template_id: str):
-        """Create machine aggregate from instance data."""
-        from datetime import datetime
-
-        from domain.base.value_objects import InstanceType
-        from domain.machine.machine_identifiers import MachineId
-        from domain.machine.aggregate import Machine
-        from domain.machine.machine_status import MachineStatus
-
-        # Parse launch_time if it's a string
-        launch_time = instance_data.get("launch_time")
-        if isinstance(launch_time, str):
-            try:
-                launch_time = datetime.fromisoformat(launch_time.replace("Z", "+00:00"))
-            except ValueError:
-                launch_time = None
-        self.logger.debug("Creating machine aggregate instance_data: [%s]", instance_data)
-        return Machine(
-            machine_id=MachineId(value=instance_data["instance_id"]),
-            request_id=str(request.request_id),
-            template_id=template_id,
-            provider_type=request.provider_type,
-            provider_name=request.provider_name,
-            provider_api=request.provider_api,
-            resource_id=instance_data.get("resource_id"),
-            instance_type=InstanceType(value=instance_data.get("instance_type", "t2.micro")),
-            image_id=instance_data.get("image_id", "unknown"),
-            status=MachineStatus.PENDING,
-            private_ip=instance_data.get("private_ip"),
-            public_ip=instance_data.get("public_ip"),
-            launch_time=launch_time,
-            metadata=instance_data.get("metadata", {}),
-        )
-
-    async def _execute_provisioning(self, template, request, selection_result) -> dict[str, Any]:
-        """Execute provisioning via selected provider using registry execution."""
-        try:
-            # Import required types
-            from domain.base.ports.scheduler_port import SchedulerPort
-            from domain.base.ports.configuration_port import ConfigurationPort
-            from providers.base.strategy import ProviderOperation, ProviderOperationType
-
-            # Get scheduler for template formatting
-            scheduler = self._container.get(SchedulerPort)
-            config_manager = self._container.get(ConfigurationPort)
-
-            # Create provider operation
-            operation = ProviderOperation(
-                operation_type=ProviderOperationType.CREATE_INSTANCES,
-                parameters={
-                    "template_config": scheduler.format_template_for_provider(template),
-                    "count": request.requested_count,
-                    "request_id": str(request.request_id),
-                },
-                context={
-                    "correlation_id": str(request.request_id),
-                    "request_id": str(request.request_id),
-                    "dry_run": request.metadata.get("dry_run", False),
-                },
-            )
-
-            # Get provider configuration
-            provider_instance_config = config_manager.get_provider_instance_config(selection_result.provider_name)
-            provider_config = provider_instance_config.config if provider_instance_config else {}
-
-            # Execute operation via registry
-            from providers.registry import get_provider_registry
-            registry = get_provider_registry()
-            result = await registry.execute_operation(selection_result.provider_name, operation, provider_config)
-
-            # Process result
-            if result.success:
-                # Extract resource information from result
-                self.logger.info("Provider result.data: %s", result.data)
-                self.logger.info("Provider result.metadata: %s", result.metadata)
-
-                resource_ids = result.data.get("resource_ids", [])
-                instances = result.data.get("instances", [])
-
-                self.logger.info(
-                    "Extracted resource_ids: %s (type: %s)",
-                    resource_ids,
-                    type(resource_ids),
-                )
-                self.logger.info("Extracted instances: %s instances", len(instances))
-
-                # Log each resource ID for debugging
-                if resource_ids:
-                    for i, resource_id in enumerate(resource_ids):
-                        self.logger.info(
-                            "Resource ID %s: %s (type: %s)",
-                            i + 1,
-                            resource_id,
-                            type(resource_id),
-                        )
-
-                return {
-                    "success": True,
-                    "resource_ids": resource_ids,
-                    "instance_ids": result.data.get("instance_ids", []),  # Include instance IDs
-                    "instances": instances,
-                    "provider_data": result.metadata or {},
-                    "error_message": None,
-                }
-            else:
-                return {
-                    "success": False,
-                    "resource_ids": [],
-                    "instances": [],
-                    "provider_data": result.metadata or {},
-                    "error_message": result.error_message,
-                }
-
-        except Exception as e:
-            self.logger.error("Provisioning execution failed: %s", e)
-            return {
-                "success": False,
-                "instance_ids": [],
-                "provider_data": {},
-                "error_message": str(e),
-            }
-
-
 @command_handler(CreateReturnRequestCommand)
 class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, str]):
     """Handler for creating return requests."""
