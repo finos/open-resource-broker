@@ -1,6 +1,6 @@
 """Service for managing request status updates and persistence."""
 
-from typing import Any
+from typing import Any, Dict, List
 
 from domain.base.ports import LoggingPort
 from domain.base import UnitOfWorkFactory
