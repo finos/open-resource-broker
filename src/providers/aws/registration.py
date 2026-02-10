@@ -434,8 +434,10 @@ def register_aws_services_with_di(container) -> None:
         
         if not container.is_registered(AWSMachineAdapter):
             def create_machine_adapter(c):
+                from providers.aws.infrastructure.aws_client import AWSClient
+                aws_client = c.get(AWSClient)
                 logger_port = c.get(LoggingPort)
-                return AWSMachineAdapter(logger_port)
+                return AWSMachineAdapter(aws_client, logger_port)
             
             container.register_singleton(AWSMachineAdapter, create_machine_adapter)
             logger.debug("AWS Machine Adapter registered with DI container")

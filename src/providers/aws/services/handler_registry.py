@@ -16,10 +16,12 @@ class AWSHandlerRegistry:
         self,
         handler_factory: "AWSHandlerFactory",
         provider_instance_config: Optional[Any],
+        provider_defaults: Optional[Any],
         logger: LoggingPort,
     ):
         self._handler_factory = handler_factory
         self._provider_instance_config = provider_instance_config
+        self._provider_defaults = provider_defaults
         self._logger = logger
         self._handler_cache = {}
 
@@ -63,10 +65,7 @@ class AWSHandlerRegistry:
         """Get effective handler configurations from provider instance config."""
         if self._provider_instance_config and hasattr(self._provider_instance_config, 'get_effective_handlers'):
             try:
-                # Get provider defaults - but don't fail if not available
-                provider_defaults = None
-                
-                result = self._provider_instance_config.get_effective_handlers(provider_defaults)
+                result = self._provider_instance_config.get_effective_handlers(self._provider_defaults)
                 if isinstance(result, dict):
                     return result
                 else:

@@ -229,12 +229,34 @@ class AWSProviderStrategy(ProviderStrategy):
         if self._handler_registry is None:
             handler_factory = self._get_handler_factory()
             if handler_factory:
+                # Get provider defaults for handler registry
+                provider_defaults = self._get_provider_defaults()
+                
                 self._handler_registry = AWSHandlerRegistry(
                     handler_factory=handler_factory,
                     provider_instance_config=self._provider_instance_config,
+                    provider_defaults=provider_defaults,
                     logger=self._logger,
                 )
         return self._handler_registry
+
+    def _get_provider_defaults(self) -> Optional[Any]:
+        """Get provider defaults from configuration."""
+        if not self._provider_instance_config:
+            return None
+            
+        try:
+            from infrastructure.di.container import get_container
+            from domain.base.ports import ConfigurationPort
+            
+            container = get_container()
+            config_port = container.get(ConfigurationPort)
+            provider_config_root = config_port.get_provider_config()
+            return provider_config_root.provider_defaults.get(self._provider_instance_config.type)
+        except Exception as e:
+            if self._logger:
+                self._logger.warning("Failed to get provider defaults: %s", e)
+            return None
 
     def _get_handler_factory(self) -> Optional["AWSHandlerFactory"]:
         """Get handler factory with provider-specific AWS client."""

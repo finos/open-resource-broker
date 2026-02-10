@@ -187,13 +187,59 @@ class AWSARN(ARN):
 
 
 class ProviderApi(str, Enum):
-    """AWS-specific provider API types."""
-    
-    # Actual enum members
-    RUN_INSTANCES = "RunInstances"
+    """AWS-specific provider API types - dynamically loaded from configuration."""
+
+    @classmethod
+    def _missing_(cls, value) -> None:
+        """Handle missing enum values by checking configuration."""
+        # Get valid APIs from configuration
+        try:
+            from infrastructure.di.container import get_container
+            from config.managers.configuration_manager import ConfigurationManager
+
+            container = get_container()
+            config_manager = container.get(ConfigurationManager)
+            raw_config = config_manager.get_raw_config()
+
+            # Navigate to AWS handlers in configuration
+            aws_handlers = (
+                raw_config.get("provider", {})
+                .get("provider_defaults", {})
+                .get("aws", {})
+                .get("handlers", {})
+            )
+
+            if value in aws_handlers:
+                # Dynamically create enum member
+                new_member = object.__new__(cls)
+                new_member._name_ = value
+                new_member._value_ = value
+                return new_member
+        except Exception:
+            # Fall through to hardcoded fallback
+            pass  # nosec B110
+
+        # Fallback to hardcoded values for safety
+        fallback_values = {
+            "EC2Fleet": "EC2Fleet",
+            "SpotFleet": "SpotFleet",
+            "ASG": "ASG",
+            "RunInstances": "RunInstances",
+        }
+
+        if value in fallback_values:
+            new_member = object.__new__(cls)
+            new_member._name_ = value
+            new_member._value_ = value
+            return new_member
+
+        return None
+
+    # Define common values as class attributes for IDE support
     EC2_FLEET = "EC2Fleet"
     SPOT_FLEET = "SpotFleet"
     ASG = "ASG"
+    RUN_INSTANCES = "RunInstances"
 
 
 class AWSFleetType(str, Enum):

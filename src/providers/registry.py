@@ -66,17 +66,7 @@ class ProviderRegistry(BaseRegistry):
         super().__init__(mode=RegistryMode.MULTI_CHOICE)
         self._strategy_cache: dict[str, Any] = {}
         self._metrics: Optional[MetricsCollector] = None
-        self._logger: Optional[LoggingPort] = None
-        self._config_manager: Optional[Any] = None
-        self._provider_config: Optional[Any] = None
         self._active_provider_cache: Optional[Any] = None
-
-    def set_dependencies(self, logger: LoggingPort, config_manager: Any, metrics: Optional[MetricsCollector] = None) -> None:
-        """Set dependencies for registry operations."""
-        self._logger = logger
-        self._config_manager = config_manager
-        self._metrics = metrics or MetricsCollector(config={"METRICS_ENABLED": True})
-        self._provider_config = config_manager.get_provider_config() if config_manager else None
 
     async def execute_operation(self, provider_identifier: str, operation: Any, config: Any = None) -> Any:
         """
@@ -90,12 +80,8 @@ class ProviderRegistry(BaseRegistry):
         Returns:
             ProviderResult from strategy execution
         """
-        if not self._logger:
-            from infrastructure.di.container import get_container
-            container = get_container()
-            self._logger = container.get(LoggingPort)
-            self._metrics = self._metrics or MetricsCollector(config={"METRICS_ENABLED": True})
-
+        self._ensure_dependencies_initialized()
+        
         start_time = time.time()
         
         try:
@@ -136,8 +122,8 @@ class ProviderRegistry(BaseRegistry):
                 self._metrics.increment_counter(f"{op_base}.error_total")
             self._metrics.record_time(f"{op_base}.duration", response_time_ms / 1000.0)
             
-            if self._logger:
-                self._logger.debug(
+            if self._logger_port:
+                self._logger_port.debug(
                     "Operation %s executed by %s: success=%s, time=%.2fms",
                     operation.operation_type,
                     provider_identifier,
@@ -155,8 +141,8 @@ class ProviderRegistry(BaseRegistry):
             self._metrics.increment_counter(f"{op_base}.error_total")
             self._metrics.record_time(f"{op_base}.duration", response_time_ms / 1000.0)
             
-            if self._logger:
-                self._logger.error(
+            if self._logger_port:
+                self._logger_port.error(
                     "Error executing operation %s with %s: %s",
                     operation.operation_type,
                     provider_identifier,
@@ -174,8 +160,8 @@ class ProviderRegistry(BaseRegistry):
             strategy = self.get_or_create_strategy(provider_identifier, config)
             return strategy.get_capabilities() if strategy else None
         except Exception as e:
-            if self._logger:
-                self._logger.error("Error getting capabilities for %s: %s", provider_identifier, e)
+            if self._logger_port:
+                self._logger_port.error("Error getting capabilities for %s: %s", provider_identifier, e)
             return None
 
     def check_strategy_health(self, provider_identifier: str, config: Any = None) -> Optional[Any]:
@@ -191,8 +177,8 @@ class ProviderRegistry(BaseRegistry):
             return health_status
             
         except Exception as e:
-            if self._logger:
-                self._logger.error("Error checking health of %s: %s", provider_identifier, e)
+            if self._logger_port:
+                self._logger_port.error("Error checking health of %s: %s", provider_identifier, e)
             return self._create_unhealthy_status(f"Health check failed: {str(e)}")
 
     def get_or_create_strategy(self, provider_identifier: str, config: Any = None) -> Optional[Any]:
@@ -240,8 +226,8 @@ class ProviderRegistry(BaseRegistry):
                                 config = instance
                                 break
                 except Exception as e:
-                    if self._logger:
-                        self._logger.warning("Failed to retrieve provider instance config for %s: %s", provider_identifier, e)
+                    if self._logger_port:
+                        self._logger_port.warning("Failed to retrieve provider instance config for %s: %s", provider_identifier, e)
             
             strategy = self.create_strategy_by_instance(provider_identifier, config)
         # Fall back to type creation
@@ -252,8 +238,8 @@ class ProviderRegistry(BaseRegistry):
             # Initialize strategy
             if hasattr(strategy, 'initialize') and not strategy.is_initialized:
                 if not strategy.initialize():
-                    if self._logger:
-                        self._logger.error("Failed to initialize strategy: %s", provider_identifier)
+                    if self._logger_port:
+                        self._logger_port.error("Failed to initialize strategy: %s", provider_identifier)
                     return None
             
             # Cache strategy
@@ -289,11 +275,11 @@ class ProviderRegistry(BaseRegistry):
         4. Auto-selection based on API capabilities (template.provider_api)
         5. Fallback to configuration default
         """
-        if self._logger:
-            self._logger.info("Selecting provider for template: %s", template.template_id)
+        if self._logger_port:
+            self._logger_port.info("Selecting provider for template: %s", template.template_id)
 
         # Strategy 1: CLI override (highest precedence)
-        if self._config_manager and (override := self._config_manager.get_active_provider_override()):
+        if self._config_port and (override := self._config_port.get_active_provider_override()):
             return self._select_override_provider(template, override)
 
         # Strategy 2: Explicit provider instance selection
@@ -315,11 +301,11 @@ class ProviderRegistry(BaseRegistry):
         """Ensure provider-specific dependencies are initialized."""
         self._ensure_dependencies_initialized()
         
-        if not self._provider_config and hasattr(self, '_config_port'):
-            self._config_manager = self._config_port
-            self._logger = self._logger_port
-            self._metrics = self._metrics or MetricsCollector(config={"METRICS_ENABLED": True})
+        if not hasattr(self, '_provider_config') or not self._provider_config:
             self._provider_config = self._config_port.get_provider_config() if self._config_port else None
+            
+        if not self._metrics:
+            self._metrics = MetricsCollector(config={"METRICS_ENABLED": True})
 
     def select_active_provider(self) -> Any:
         """Select active provider instance from configuration."""
@@ -328,8 +314,8 @@ class ProviderRegistry(BaseRegistry):
         if self._active_provider_cache is not None:
             return self._active_provider_cache
 
-        if self._logger:
-            self._logger.debug("Selecting active provider using selection policy")
+        if self._logger_port:
+            self._logger_port.debug("Selecting active provider using selection policy")
 
         if not self._provider_config:
             raise ValueError("No provider configuration available")
@@ -358,8 +344,8 @@ class ProviderRegistry(BaseRegistry):
 
         self._active_provider_cache = result
 
-        if self._logger:
-            self._logger.info("Selected active provider: %s (%s)", selected.name, reason)
+        if self._logger_port:
+            self._logger_port.info("Selected active provider: %s (%s)", selected.name, reason)
 
         return result
 
@@ -377,8 +363,22 @@ class ProviderRegistry(BaseRegistry):
         """
         self._ensure_provider_dependencies()
         
-        if self._logger:
-            self._logger.info(
+        # Get provider config for lazy registration
+        provider_config = None
+        try:
+            provider_config_root = self._config_port.get_provider_config()
+            for instance in provider_config_root.get_active_providers():
+                if instance.name == provider_instance:
+                    provider_config = instance
+                    break
+        except Exception:
+            pass
+        
+        # Trigger lazy registration before validation
+        strategy = self.get_or_create_strategy(provider_instance, provider_config)
+        
+        if self._logger_port:
+            self._logger_port.info(
                 "Validating template %s against provider %s",
                 template.template_id,
                 provider_instance,
@@ -398,9 +398,8 @@ class ProviderRegistry(BaseRegistry):
         )
 
         try:
-            capabilities = self._get_provider_capabilities_for_validation(provider_instance)
-            if not capabilities:
-                capabilities = self._get_config_based_capabilities(provider_instance)
+            # Use config-based capabilities directly (they have correct supported_apis)
+            capabilities = self._get_config_based_capabilities(provider_instance)
 
             self._validate_api_support(template, capabilities, result)
             self._validate_pricing_model(template, capabilities, result)
@@ -416,16 +415,16 @@ class ProviderRegistry(BaseRegistry):
 
             result.is_valid = len(result.errors) == 0
 
-            if self._logger:
-                self._logger.info(
+            if self._logger_port:
+                self._logger_port.info(
                     "Validation result for %s: %s",
                     template.template_id,
                     "VALID" if result.is_valid else "INVALID",
                 )
 
         except Exception as e:
-            if self._logger:
-                self._logger.error("Validation failed with exception: %s", str(e))
+            if self._logger_port:
+                self._logger_port.error("Validation failed with exception: %s", str(e))
             result.is_valid = False
             result.errors.append(f"Validation error: {e!s}")
 
@@ -456,8 +455,8 @@ class ProviderRegistry(BaseRegistry):
         if not provider_instance.enabled:
             raise ValueError(f"Provider instance '{provider_name}' is disabled")
 
-        if self._logger:
-            self._logger.info("Selected explicit provider: %s", provider_name)
+        if self._logger_port:
+            self._logger_port.info("Selected explicit provider: %s", provider_name)
 
         from providers.results import ProviderSelectionResult
         return ProviderSelectionResult(
@@ -476,8 +475,8 @@ class ProviderRegistry(BaseRegistry):
 
         selected_instance = self._apply_load_balancing_strategy(instances)
 
-        if self._logger:
-            self._logger.info(
+        if self._logger_port:
+            self._logger_port.info(
                 "Selected load-balanced provider: %s (type: %s)",
                 selected_instance.name,
                 provider_type,
@@ -501,8 +500,8 @@ class ProviderRegistry(BaseRegistry):
 
         selected_instance = self._select_best_compatible_instance(compatible_instances)
 
-        if self._logger:
-            self._logger.info(
+        if self._logger_port:
+            self._logger_port.info(
                 "Selected capability-based provider: %s for API: %s",
                 selected_instance.name,
                 provider_api,
@@ -535,8 +534,8 @@ class ProviderRegistry(BaseRegistry):
             default_provider_type = default_instance.type
             default_provider_instance = default_instance.name
 
-        if self._logger:
-            self._logger.info("Selected default provider: %s", default_provider_instance)
+        if self._logger_port:
+            self._logger_port.info("Selected default provider: %s", default_provider_instance)
 
         from providers.results import ProviderSelectionResult
         return ProviderSelectionResult(
@@ -589,8 +588,8 @@ class ProviderRegistry(BaseRegistry):
 
         if len(highest_priority_instances) == 1:
             selected = highest_priority_instances[0]
-            if self._logger:
-                self._logger.debug(
+            if self._logger_port:
+                self._logger_port.debug(
                     "Selected provider %s (priority %s, weight %s)",
                     selected.name,
                     selected.priority,
@@ -599,8 +598,8 @@ class ProviderRegistry(BaseRegistry):
             return selected
 
         selected = max(highest_priority_instances, key=lambda x: x.weight)
-        if self._logger:
-            self._logger.debug(
+        if self._logger_port:
+            self._logger_port.debug(
                 "Selected provider %s (priority %s, weight %s) from %s candidates",
                 selected.name,
                 selected.priority,
@@ -654,35 +653,35 @@ class ProviderRegistry(BaseRegistry):
         """Get capabilities for specified provider instance."""
         try:
             if not self.is_instance_registered(provider_instance):
-                if self._config_manager:
-                    provider_config = self._config_manager.get_provider_instance_config(provider_instance)
+                if self._config_port:
+                    provider_config = self._config_port.get_provider_instance_config(provider_instance)
                     if provider_config:
                         self.ensure_provider_instance_registered_from_config(provider_config)
             
-            if self._config_manager:
-                provider_config = self._config_manager.get_provider_instance_config(provider_instance)
+            if self._config_port:
+                provider_config = self._config_port.get_provider_instance_config(provider_instance)
                 if not provider_config:
-                    if self._logger:
-                        self._logger.warning("Provider instance '%s' not found in configuration", provider_instance)
+                    if self._logger_port:
+                        self._logger_port.warning("Provider instance '%s' not found in configuration", provider_instance)
                     return None
                 
                 strategy = self.get_or_create_strategy(provider_instance, provider_config)
                 return strategy.get_capabilities()
         except Exception as e:
-            if self._logger:
-                self._logger.warning("Failed to get capabilities for %s: %s", provider_instance, str(e))
+            if self._logger_port:
+                self._logger_port.warning("Failed to get capabilities for %s: %s", provider_instance, str(e))
             return None
 
     def _get_config_based_capabilities(self, provider_instance: str) -> Any:
         """Get capabilities from merged provider configuration."""
-        if not self._config_manager:
+        if not self._config_port:
             raise ValueError("No configuration manager available")
             
-        provider_config = self._config_manager.get_provider_instance_config(provider_instance)
+        provider_config = self._config_port.get_provider_instance_config(provider_instance)
         if not provider_config:
             raise ValueError(f"Provider instance {provider_instance} not found in configuration")
         
-        provider_config_root = self._config_manager.get_provider_config()
+        provider_config_root = self._config_port.get_provider_config()
         provider_defaults = provider_config_root.provider_defaults.get(provider_config.type)
         effective_handlers = provider_config.get_effective_handlers(provider_defaults)
         supported_apis = list(effective_handlers.keys())
@@ -714,8 +713,8 @@ class ProviderRegistry(BaseRegistry):
             else:
                 result.supported_features.append(f"API: {template.provider_api}")
         except Exception as e:
-            if self._logger:
-                self._logger.error("Error in API validation: %s", e)
+            if self._logger_port:
+                self._logger_port.error("Error in API validation: %s", e)
             result.errors.append(f"API validation error: {e}")
 
     def _validate_pricing_model(self, template: Any, capabilities: Any, result: Any) -> None:
@@ -878,14 +877,14 @@ class ProviderRegistry(BaseRegistry):
         """
         # Check if already registered
         if self.is_provider_registered(provider_type):
-            if self._logger:
-                self._logger.debug("Provider type '%s' already registered", provider_type)
+            if self._logger_port:
+                self._logger_port.debug("Provider type '%s' already registered", provider_type)
             return True
         
         # Try to dynamically import and register
         try:
-            if self._logger:
-                self._logger.debug("Attempting to register provider type: %s", provider_type)
+            if self._logger_port:
+                self._logger_port.debug("Attempting to register provider type: %s", provider_type)
             
             # Import the provider's registration module
             module_name = f"providers.{provider_type}.registration"
@@ -895,14 +894,14 @@ class ProviderRegistry(BaseRegistry):
             register_function_name = f"register_{provider_type}_provider"
             if hasattr(registration_module, register_function_name):
                 register_function = getattr(registration_module, register_function_name)
-                register_function(self, self._logger)
+                register_function(self, self._logger_port)
                 
-                if self._logger:
-                    self._logger.info("Successfully registered provider type: %s", provider_type)
+                if self._logger_port:
+                    self._logger_port.info("Successfully registered provider type: %s", provider_type)
                 return True
             else:
-                if self._logger:
-                    self._logger.warning(
+                if self._logger_port:
+                    self._logger_port.warning(
                         "Provider registration function '%s' not found in module '%s'",
                         register_function_name,
                         module_name,
@@ -910,12 +909,12 @@ class ProviderRegistry(BaseRegistry):
                 return False
                 
         except ImportError as e:
-            if self._logger:
-                self._logger.warning("Failed to import provider registration module '%s': %s", module_name, e)
+            if self._logger_port:
+                self._logger_port.warning("Failed to import provider registration module '%s': %s", module_name, e)
             return False
         except Exception as e:
-            if self._logger:
-                self._logger.error("Error registering provider type '%s': %s", provider_type, e)
+            if self._logger_port:
+                self._logger_port.error("Error registering provider type '%s': %s", provider_type, e)
             return False
 
     def ensure_provider_instance_registered_from_config(self, provider_instance) -> bool:
@@ -931,30 +930,30 @@ class ProviderRegistry(BaseRegistry):
         """
         # Already registered?
         if self.is_provider_instance_registered(provider_instance.name):
-            if self._logger:
-                self._logger.debug("Provider instance '%s' already registered", provider_instance.name)
+            if self._logger_port:
+                self._logger_port.debug("Provider instance '%s' already registered", provider_instance.name)
             return True
         
         try:
             import importlib
             provider_type = provider_instance.type
             
-            if self._logger:
-                self._logger.debug("Registering provider instance: %s", provider_instance.name)
+            if self._logger_port:
+                self._logger_port.debug("Registering provider instance: %s", provider_instance.name)
             
             # Dynamically import provider registration module
             module = importlib.import_module(f'providers.{provider_type}.registration')
             
             # Call provider's instance registration function
             register_func = getattr(module, f'register_{provider_type}_provider_instance')
-            register_func(provider_instance, self._logger)
+            register_func(provider_instance, self._logger_port)
             
-            if self._logger:
-                self._logger.info("Successfully registered provider instance: %s", provider_instance.name)
+            if self._logger_port:
+                self._logger_port.info("Successfully registered provider instance: %s", provider_instance.name)
             return True
         except (ImportError, AttributeError) as e:
-            if self._logger:
-                self._logger.warning(f"Failed to register provider instance '{provider_instance.name}': {e}")
+            if self._logger_port:
+                self._logger_port.warning(f"Failed to register provider instance '{provider_instance.name}': {e}")
             return False
 
     def register(
