@@ -20,6 +20,7 @@ class ListMachinesQuery(BaseQuery):
     status: Optional[str] = None
     request_id: Optional[str] = None
     filter_expressions: list[str] = Field(default_factory=list)  # Raw filter expressions from CLI
+    timestamp_format: Optional[str] = None
     limit: int = 50
     offset: int = 0
 

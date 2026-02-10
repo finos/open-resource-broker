@@ -58,6 +58,7 @@ def add_machine_actions(subparsers):
     machines_list.add_argument("--status", help="Filter by machine status")
     machines_list.add_argument("--template-id", help="Filter by template ID")
     machines_list.add_argument("--filter", action="append", help="Generic filter: field=value, field~value, field=~regex (can be used multiple times)")
+    machines_list.add_argument("--timestamp-format", choices=["auto", "unix", "iso"], default="auto", help="Timestamp format: auto (scheduler default), unix (seconds), iso (ISO 8601)")
 
     # Machines show
     machines_show = subparsers.add_parser("show", help="Show machine details")

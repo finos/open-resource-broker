@@ -41,3 +41,12 @@ class ISOTimestampService(TimestampService):
     def current_timestamp(self) -> str:
         """Get current timestamp in ISO format with UTC timezone."""
         return datetime.now(timezone.utc).isoformat()
+    
+    def format_with_type(self, timestamp: Union[datetime, float, int, None], format_type: str) -> int | str | None:
+        """Format timestamp based on requested format type."""
+        if format_type == "unix":
+            return self.format_for_dto(timestamp)
+        elif format_type == "iso":
+            return self.format_for_display(timestamp)
+        else:  # auto
+            return self.format_for_dto(timestamp)

@@ -1,7 +1,7 @@
 """Data Transfer Objects for machine domain operations."""
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from pydantic import Field
 
@@ -20,7 +20,7 @@ class MachineDTO(BaseDTO):
     private_ip: str
     public_ip: Optional[str] = None
     result: str  # 'executing', 'fail', or 'succeed'
-    launch_time: Optional[int] = None  # Unix timestamp (backward compatible)
+    launch_time: Optional[Union[int, str]] = None  # Unix timestamp or ISO string
     message: str = ""
     provider_api: Optional[str] = None
     provider_name: Optional[str] = None

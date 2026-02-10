@@ -361,6 +361,7 @@ class CLICommandFactory:
             status=status,
             request_id=request_id,
             filter_expressions=kwargs.get("filter_expressions", []),
+            timestamp_format=kwargs.get("timestamp_format"),
             limit=limit,
             offset=offset,
         )
@@ -812,6 +813,7 @@ class CLICommandFactory:
                     limit=args.get("limit", 50),
                     offset=args.get("offset", 0),
                     filter_expressions=args.get("filter") or [],
+                    timestamp_format=args.get("timestamp_format"),
                 )
             elif command_action == "request":
                 # Alias for requests create

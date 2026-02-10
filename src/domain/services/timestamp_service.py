@@ -22,3 +22,8 @@ class TimestampService(ABC):
     def current_timestamp(self) -> str:
         """Get current timestamp formatted for display."""
         pass
+    
+    @abstractmethod
+    def format_with_type(self, timestamp: Union[datetime, float, int, None], format_type: str) -> int | str | None:
+        """Format timestamp based on requested format type."""
+        pass
