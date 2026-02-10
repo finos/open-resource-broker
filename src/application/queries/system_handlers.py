@@ -151,7 +151,7 @@ class GetProviderConfigHandler(BaseQueryHandler[GetProviderConfigQuery, Provider
                         if hasattr(provider_config, "get_active_providers")
                         else 0
                     ),
-                    configuration_source=getattr(provider_config, "source", "unknown"),
+                    configuration_source=self._get_configuration_source(config_manager),
                 )
             else:
                 # Fallback for legacy configuration
@@ -171,6 +171,15 @@ class GetProviderConfigHandler(BaseQueryHandler[GetProviderConfigQuery, Provider
         except Exception as e:
             self.logger.error("Failed to get provider configuration: %s", e)
             raise
+
+    def _get_configuration_source(self, config_manager) -> str:
+        """Get source of configuration."""
+        try:
+            if hasattr(config_manager, '_config_manager') and hasattr(config_manager._config_manager, '_config_file'):
+                return "config_file" if config_manager._config_manager._config_file else "environment"
+            return "environment"
+        except Exception:
+            return "unknown"
 
 
 @query_handler(ValidateProviderConfigQuery)
@@ -239,7 +248,6 @@ class ValidateProviderConfigHandler(
                 "is_valid": is_valid,
                 "validation_errors": validation_errors,
                 "warnings": warnings,
-                "validation_timestamp": query.timestamp or "unknown",
             }
 
         except Exception as e:
