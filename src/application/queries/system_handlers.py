@@ -173,13 +173,9 @@ class GetProviderConfigHandler(BaseQueryHandler[GetProviderConfigQuery, Provider
             raise
 
     def _get_configuration_source(self, config_manager) -> str:
-        """Get source of configuration."""
-        try:
-            if hasattr(config_manager, '_config_manager') and hasattr(config_manager._config_manager, '_config_file'):
-                return "config_file" if config_manager._config_manager._config_file else "environment"
-            return "environment"
-        except Exception:
-            return "unknown"
+        """Get source of configuration using domain service."""
+        sources = config_manager.get_configuration_sources()
+        return sources["primary_source"]
 
 
 @query_handler(ValidateProviderConfigQuery)

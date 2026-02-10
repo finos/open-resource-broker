@@ -229,6 +229,20 @@ class ConfigurationManager:
         """Get current provider override."""
         return self._provider_override
 
+    def get_loaded_config_file(self) -> str | None:
+        """Get the actual config file that was loaded."""
+        # Check standard locations that exist
+        import os
+        # Get current working directory and check relative paths
+        candidates = [
+            "config/config.json",  # Relative to project root
+            "conf/config.json"     # Alternative location
+        ]
+        for path in candidates:
+            if os.path.exists(path):
+                return os.path.abspath(path)
+        return None
+
     def get_provider_type(self) -> str:
         """Get provider type."""
         return self._ensure_provider_manager().get_provider_type()

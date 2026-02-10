@@ -292,3 +292,39 @@ class ConfigurationAdapter(ConfigurationPort):
     def override_provider_instance(self, provider_name: str) -> None:
         """Override the active provider instance."""
         return self._config_manager.override_provider_instance(provider_name)
+
+    def get_configuration_sources(self) -> dict[str, Any]:
+        """Get configuration source information using existing methods."""
+        # Get actual loaded config file
+        actual_config_file = self._config_manager.get_loaded_config_file()
+        
+        # Get active template file from scheduler
+        template_file = self._get_active_template_file()
+        
+        return {
+            "config_file": actual_config_file,
+            "template_file": template_file,
+            "config_dir": self.get_conf_dir(),
+            "work_dir": self.get_work_dir(),
+            "primary_source": "config_file" if actual_config_file else "environment"
+        }
+
+    def _get_active_template_file(self) -> str | None:
+        """Get active template file from scheduler."""
+        try:
+            from infrastructure.di.container import get_container
+            from infrastructure.scheduler.factory import SchedulerStrategyFactory
+            
+            container = get_container()
+            scheduler_factory = container.get(SchedulerStrategyFactory)
+            scheduler_type = self.get_scheduler_strategy()
+            scheduler = scheduler_factory.create_strategy(scheduler_type, container)
+            
+            template_paths = scheduler.get_template_paths()
+            for path in template_paths:
+                import os
+                if os.path.exists(path):
+                    return path
+            return None
+        except Exception:
+            return None
