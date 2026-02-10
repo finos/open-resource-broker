@@ -2,6 +2,9 @@
 
 from typing import TYPE_CHECKING, Any
 
+if TYPE_CHECKING:
+    from domain.services.timestamp_service import TimestampService
+
 from application.base.handlers import BaseQueryHandler
 from application.decorators import query_handler
 from application.dto.system import (
@@ -109,6 +112,7 @@ class GetProviderConfigHandler(BaseQueryHandler[GetProviderConfigQuery, Provider
         logger: LoggingPort,
         container: ContainerPort,
         error_handler: ErrorHandlingPort,
+        timestamp_service: "TimestampService",
     ) -> None:
         """
         Initialize get provider config handler.
@@ -117,7 +121,11 @@ class GetProviderConfigHandler(BaseQueryHandler[GetProviderConfigQuery, Provider
             logger: Logging port for operation logging
             container: Container port for dependency access
             error_handler: Error handling port for exception management
+            timestamp_service: Service for timestamp formatting
         """
+        super().__init__(logger, error_handler)
+        self.container = container
+        self.timestamp_service = timestamp_service
         super().__init__(logger, error_handler)
         self.container = container
 
@@ -150,10 +158,9 @@ class GetProviderConfigHandler(BaseQueryHandler[GetProviderConfigQuery, Provider
                 last_updated = None
                 if config_sources.get("config_file"):
                     import os
-                    from infrastructure.utilities.timestamp_utils import to_iso_timestamp
                     try:
                         mtime = os.path.getmtime(config_sources["config_file"])
-                        last_updated = to_iso_timestamp(mtime)
+                        last_updated = self.timestamp_service.format_for_display(mtime)
                     except (OSError, ValueError):
                         pass
                 
@@ -280,6 +287,7 @@ class GetSystemStatusHandler(BaseQueryHandler[GetSystemStatusQuery, SystemStatus
         logger: LoggingPort,
         container: ContainerPort,
         error_handler: ErrorHandlingPort,
+        timestamp_service: "TimestampService",
     ) -> None:
         """
         Initialize get system status handler.
@@ -288,7 +296,11 @@ class GetSystemStatusHandler(BaseQueryHandler[GetSystemStatusQuery, SystemStatus
             logger: Logging port for operation logging
             container: Container port for dependency access
             error_handler: Error handling port for exception management
+            timestamp_service: Service for timestamp formatting
         """
+        super().__init__(logger, error_handler)
+        self.container = container
+        self.timestamp_service = timestamp_service
         super().__init__(logger, error_handler)
         self.container = container
 
@@ -298,13 +310,12 @@ class GetSystemStatusHandler(BaseQueryHandler[GetSystemStatusQuery, SystemStatus
 
         try:
             import time
-            from infrastructure.utilities.timestamp_utils import now_iso, to_iso_timestamp
 
             # Get basic system information
             system_status = {
                 "status": "operational",
-                "timestamp": now_iso(),
-                "uptime": to_iso_timestamp(time.time()),
+                "timestamp": self.timestamp_service.current_timestamp(),
+                "uptime": self.timestamp_service.format_for_display(time.time()),
                 "components": {},
             }
 

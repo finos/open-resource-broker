@@ -17,6 +17,8 @@ class ListMachinesQuery(BaseQuery):
 
     template_id: Optional[str] = None
     status: Optional[str] = None
+    request_id: Optional[str] = None
+    filter_expressions: list[str] = []  # Raw filter expressions from CLI
     limit: int = 50
     offset: int = 0
 

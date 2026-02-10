@@ -5,7 +5,10 @@ leveraging the Provider Registry for clean CQRS interfaces.
 """
 
 import time
-from typing import Any
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from domain.services.timestamp_service import TimestampService
 
 from application.base.handlers import BaseQueryHandler
 from application.decorators import query_handler
@@ -32,6 +35,7 @@ class GetProviderHealthHandler(BaseQueryHandler[GetProviderHealthQuery, Provider
         self,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
+        timestamp_service: "TimestampService",
     ) -> None:
         """
         Initialize provider health handler.
@@ -39,8 +43,10 @@ class GetProviderHealthHandler(BaseQueryHandler[GetProviderHealthQuery, Provider
         Args:
             logger: Logging port for operation logging
             error_handler: Error handling port for exception management
+            timestamp_service: Service for timestamp formatting
         """
         super().__init__(logger, error_handler)
+        self.timestamp_service = timestamp_service
 
     async def execute_query(self, query: GetProviderHealthQuery) -> dict[str, Any]:
         """Execute provider health query."""
@@ -79,23 +85,21 @@ class GetProviderHealthHandler(BaseQueryHandler[GetProviderHealthQuery, Provider
             # Get health information from registry
             health_status = registry.check_strategy_health(provider_name)
             
-            from infrastructure.utilities.timestamp_utils import now_iso, to_iso_timestamp
-            
             health_info = {
                 "provider_name": provider_name,
                 "status": "active",
                 "health": "healthy" if health_status and health_status.is_healthy else "unhealthy",
-                "last_check": now_iso(),
+                "last_check": self.timestamp_service.current_timestamp(),
                 "message": getattr(health_status, 'message', None) or getattr(health_status, 'error_message', None) or "No health data available",
             }
 
             if health_status:
                 health_info.update({
                     "details": getattr(health_status, 'details', {}),
-                    "timestamp": to_iso_timestamp(getattr(health_status, 'timestamp', time.time())),
+                    "timestamp": self.timestamp_service.format_for_display(getattr(health_status, 'timestamp', time.time())),
                 })
             else:
-                health_info["timestamp"] = now_iso()
+                health_info["timestamp"] = self.timestamp_service.current_timestamp()
 
             self.logger.info("Provider %s health: %s", provider_name, health_info["health"])
             return health_info

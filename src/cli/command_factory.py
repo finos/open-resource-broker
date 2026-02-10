@@ -359,6 +359,7 @@ class CLICommandFactory:
         return ListMachinesQuery(
             filters=filters,
             pagination={"limit": limit, "offset": offset},
+            filter_expressions=kwargs.get("filter_expressions", []),
         )
 
     def create_get_machine_query(
@@ -806,7 +807,8 @@ class CLICommandFactory:
                     template_id=args.get("template_id"),
                     request_id=args.get("request_id"),
                     limit=args.get("limit", 50),
-                    offset=args.get("offset", 0)
+                    offset=args.get("offset", 0),
+                    filter_expressions=args.get("filter", []),
                 )
             elif command_action == "request":
                 # Alias for requests create

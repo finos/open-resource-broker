@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 # Import focused service registration modules
 from infrastructure.di.core_services import register_core_services
+from infrastructure.di.domain_services import register_domain_services
 from infrastructure.di.infrastructure_services import register_infrastructure_services
 from infrastructure.di.provider_services import register_provider_services
 from infrastructure.di.scheduler_services import register_scheduler_services
@@ -72,11 +73,14 @@ def _register_services_lazy(container: "DIContainer") -> "DIContainer":
 
     # 3. Register remaining core services
     register_core_services(container)
+    
+    # 4. Register domain services
+    register_domain_services(container)
 
-    # 2. Register configured storage strategy only
+    # 5. Register configured storage strategy only
     register_storage_services(container)
 
-    # 3. Register configured scheduler strategy only
+    # 6. Register configured scheduler strategy only
     register_scheduler_services(container)
 
     # 4. Register provider services immediately (fix for provider

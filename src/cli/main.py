@@ -57,6 +57,7 @@ def add_machine_actions(subparsers):
     add_global_arguments(machines_list)
     machines_list.add_argument("--status", help="Filter by machine status")
     machines_list.add_argument("--template-id", help="Filter by template ID")
+    machines_list.add_argument("--filter", action="append", help="Generic filter: field=value, field~value, field=~regex (can be used multiple times)")
 
     # Machines show
     machines_show = subparsers.add_parser("show", help="Show machine details")

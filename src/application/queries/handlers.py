@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any, TypeVar
+from typing import Any, TypeVar, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from domain.services.timestamp_service import TimestampService
+    from domain.services.filter_service import FilterService
 
 from application.base.handlers import BaseQueryHandler
 from application.decorators import query_handler
@@ -986,9 +990,11 @@ class GetMachineHandler(BaseQueryHandler[GetMachineQuery, MachineDTO]):
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
+        timestamp_service: "TimestampService",
     ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
+        self.timestamp_service = timestamp_service
 
     async def execute_query(self, query: GetMachineQuery) -> MachineDTO:
         """Execute get machine query."""
@@ -1013,7 +1019,7 @@ class GetMachineHandler(BaseQueryHandler[GetMachineQuery, MachineDTO]):
                     private_dns_name=machine.private_dns_name,
                     public_dns_name=machine.public_dns_name,
                     result=MachineDTO._get_result_status(machine.status.value),
-                    launch_time=to_iso_timestamp(machine.launch_time) if machine.launch_time else None,
+                    launch_time=self.timestamp_service.format_for_display(machine.launch_time),
                     message=machine.status_reason or "",
                     provider_api=machine.provider_api,
                     provider_name=machine.provider_name,
@@ -1044,11 +1050,15 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, list[MachineDTO]])
         error_handler: ErrorHandlingPort,
         container: ContainerPort,
         command_bus: CommandBus,
+        timestamp_service: "TimestampService",
+        filter_service: "FilterService",
     ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
         self.container = container
         self.command_bus = command_bus
+        self.timestamp_service = timestamp_service
+        self.filter_service = filter_service
         
         # Initialize machine sync service like GetRequestHandler does
         from application.services.machine_sync_service import MachineSyncService
@@ -1059,8 +1069,6 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, list[MachineDTO]])
         self.logger.info("Listing machines")
 
         try:
-            from infrastructure.utilities.timestamp_utils import to_iso_timestamp
-            
             with self.uow_factory.create_unit_of_work() as uow:
                 # Get machines based on query filters
                 if query.status:
@@ -1072,6 +1080,12 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, list[MachineDTO]])
                     machines = uow.machines.find_by_request_id(query.request_id)
                 else:
                     machines = uow.machines.get_all()
+
+                # Apply generic filters using domain service
+                if query.filter_expressions:
+                    filters = self.filter_service.parse_filters(query.filter_expressions)
+                    for filter_obj in filters:
+                        machines = [m for m in machines if filter_obj.matches(m)]
 
                 # Convert to DTOs (with sync for running machines)
                 machine_dtos = []
@@ -1100,7 +1114,7 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, list[MachineDTO]])
                         private_dns_name=machine.private_dns_name,
                         public_dns_name=machine.public_dns_name,
                         result=MachineDTO._get_result_status(machine.status.value),
-                        launch_time=to_iso_timestamp(machine.launch_time) if machine.launch_time else None,
+                        launch_time=self.timestamp_service.format_for_display(machine.launch_time),
                         message=machine.status_reason or "",
                         provider_api=machine.provider_api,
                         provider_name=machine.provider_name,

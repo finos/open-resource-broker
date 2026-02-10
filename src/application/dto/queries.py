@@ -77,6 +77,7 @@ class ListMachinesQuery(Query, BaseModel):
     request_id: Optional[str] = None
     status: Optional[str] = None
     active_only: bool = False
+    filter_expressions: list[str] = []  # Generic filters
 
 
 class GetActiveMachineCountQuery(Query, BaseModel):
