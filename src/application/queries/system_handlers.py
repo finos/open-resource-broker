@@ -138,6 +138,14 @@ class GetProviderConfigHandler(BaseQueryHandler[GetProviderConfigQuery, Provider
                 # Get full configuration sources
                 config_sources = config_manager.get_configuration_sources()
                 
+                # Determine default provider
+                active_providers = (
+                    provider_config.get_active_providers()
+                    if hasattr(provider_config, "get_active_providers")
+                    else []
+                )
+                default_provider = active_providers[0].name if active_providers else None
+                
                 return ProviderConfigDTO(
                     provider_mode=(
                         provider_config.get_mode().value
@@ -145,15 +153,10 @@ class GetProviderConfigHandler(BaseQueryHandler[GetProviderConfigQuery, Provider
                         else "legacy"
                     ),
                     active_providers=(
-                        [p.name for p in provider_config.get_active_providers()]
-                        if hasattr(provider_config, "get_active_providers")
-                        else []
+                        [p.name for p in active_providers]
                     ),
-                    provider_count=(
-                        len(provider_config.get_active_providers())
-                        if hasattr(provider_config, "get_active_providers")
-                        else 0
-                    ),
+                    provider_count=len(active_providers),
+                    default_provider=default_provider,
                     configuration_source=config_sources["primary_source"],
                     config_file=config_sources.get("config_file"),
                     template_file=config_sources.get("template_file"),
