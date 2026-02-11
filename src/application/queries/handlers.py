@@ -67,12 +67,11 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
         # Initialize services for SRP compliance
         from application.services.request_query_service import RequestQueryService
         from application.services.request_status_service import RequestStatusService
-        from application.services.machine_sync_service import MachineSyncService
         from application.factories.request_dto_factory import RequestDTOFactory
         
         self._query_service = RequestQueryService(uow_factory, logger)
         self._status_service = RequestStatusService(uow_factory, logger)
-        self._machine_sync_service = MachineSyncService(command_bus, container, logger, provider_registry_service)
+        self._machine_sync_service = container.get(MachineSyncService)
         self._dto_factory = RequestDTOFactory()
 
     async def execute_query(self, query: GetRequestQuery) -> RequestDTO:
@@ -1063,9 +1062,9 @@ class ListMachinesHandler(BaseQueryHandler[MachineListQuery, list[MachineDTO]]):
         self.timestamp_service = timestamp_service
         self.filter_service = filter_service
         
-        # Initialize machine sync service like GetRequestHandler does
+        # Initialize machine sync service via DI
         from application.services.machine_sync_service import MachineSyncService
-        self._machine_sync_service = MachineSyncService(command_bus, container, logger)
+        self._machine_sync_service = container.get(MachineSyncService)
 
     async def execute_query(self, query: MachineListQuery) -> list[MachineDTO]:
         """Execute list machines query."""

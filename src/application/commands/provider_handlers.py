@@ -5,11 +5,9 @@ integrating the existing provider strategy ecosystem with the CQRS architecture.
 """
 
 import time
-from typing import Any, TYPE_CHECKING
+from typing import Any
 
-if TYPE_CHECKING:
-    from application.services.provider_registry_service import ProviderRegistryService
-
+from application.services.provider_registry_service import ProviderRegistryService
 from application.base.handlers import BaseCommandHandler
 from application.decorators import command_handler
 from application.provider.commands import (
@@ -45,7 +43,7 @@ class SelectProviderStrategyHandler(
         logger: LoggingPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
-        provider_registry_service: "ProviderRegistryService",
+        provider_registry_service: ProviderRegistryService,
     ) -> None:
         """Initialize the instance."""
         super().__init__(logger, event_publisher, error_handler)
@@ -70,10 +68,7 @@ class SelectProviderStrategyHandler(
             )
 
             # Get available strategies from registry service
-            # Note: This functionality may need to be added to ProviderRegistryService
-            from providers.registry import get_provider_registry
-            registry = get_provider_registry()
-            available_strategies = registry.get_registered_providers() + registry.get_registered_provider_instances()
+            available_strategies = self._provider_registry_service.get_available_strategies()
 
             if not available_strategies:
                 raise ValueError("No provider strategies available")
@@ -121,7 +116,7 @@ class ExecuteProviderOperationHandler(
         logger: LoggingPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
-        provider_registry_service: "ProviderRegistryService",
+        provider_registry_service: ProviderRegistryService,
     ) -> None:
         super().__init__(logger, event_publisher, error_handler)
         self._container = container
@@ -141,15 +136,11 @@ class ExecuteProviderOperationHandler(
         start_time = time.time()
 
         try:
-            from providers.registry import get_provider_registry
-            
-            registry = get_provider_registry()
-            
             # Use specific strategy if override provided, otherwise use default
             provider_identifier = command.strategy_override or "aws"  # Default fallback
             
-            # Execute operation through registry
-            result = await registry.execute_operation(provider_identifier, operation)
+            # Execute operation through registry service
+            result = await self._provider_registry_service.execute_operation(provider_identifier, operation)
 
             execution_time = (time.time() - start_time) * 1000  # Convert to milliseconds
 
@@ -217,36 +208,15 @@ class RegisterProviderStrategyHandler(
         self.logger.info("Registering provider strategy: %s", command.strategy_name)
 
         try:
-            # Use provider registry to create strategy
-            from providers.registry import get_provider_registry
-
-            registry = get_provider_registry()
-
-            # Create a mock provider config for strategy creation
-            from dataclasses import dataclass
-            from typing import Any
-
-            @dataclass
-            class MockProviderConfig:
-                """Mock provider configuration for testing and strategy creation."""
-
-                type: str
-                name: str
-                config: dict[str, Any]
-
-            provider_config = MockProviderConfig(
-                type=command.provider_type.lower(),
-                name=command.strategy_name,
-                config=command.strategy_config,
+            # Register provider strategy through service
+            success = self._provider_registry_service.register_provider_strategy(
+                command.provider_type.lower(), 
+                command.config
             )
-
-            strategy = registry.get_or_create_strategy(command.provider_type.lower(), provider_config)
-
-            # Register strategy with registry
-            # Note: Provider Registry handles strategy registration automatically
-            # when strategies are created, so no explicit registration needed
+            if not success:
+                raise ValueError(f"Failed to register provider strategy: {command.provider_type}")
             
-            self.logger.info("Strategy created and available through registry: %s", command.strategy_name)
+            self.logger.info("Strategy registered successfully: %s", command.strategy_name)
 
             # Publish registration event
             event = ProviderStrategyRegisteredEvent(
@@ -298,10 +268,8 @@ class UpdateProviderHealthHandler(BaseCommandHandler[UpdateProviderHealthCommand
         self.logger.debug("Updating health for provider: %s", command.provider_name)
 
         try:
-            # Get current health status for comparison using registry
-            from providers.registry import get_provider_registry
-            registry = get_provider_registry()
-            old_status = registry.check_strategy_health(command.provider_name)
+            # Get current health status for comparison using service
+            old_status = self._provider_registry_service.check_strategy_health(command.provider_name)
 
             # Health status updates are handled by the registry automatically
             # when strategies are accessed
