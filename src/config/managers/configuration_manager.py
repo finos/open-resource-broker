@@ -54,6 +54,8 @@ class ConfigurationManager:
         # Scheduler override support
         self._scheduler_override: Optional[str] = None
         self._provider_override: Optional[str] = None
+        self._aws_region_override: Optional[str] = None
+        self._aws_profile_override: Optional[str] = None
 
     @property
     def loader(self) -> ConfigurationLoader:
@@ -224,6 +226,14 @@ class ConfigurationManager:
     def override_provider_instance(self, provider_name: str) -> None:
         """Temporarily override provider instance."""
         self._provider_override = provider_name
+
+    def override_aws_region(self, region: str) -> None:
+        """Temporarily override AWS region."""
+        self._aws_region_override = region
+
+    def override_aws_profile(self, profile: str) -> None:
+        """Temporarily override AWS profile."""
+        self._aws_profile_override = profile
 
     def get_active_provider_override(self) -> Optional[str]:
         """Get current provider override."""

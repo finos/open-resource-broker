@@ -46,12 +46,26 @@ def add_global_arguments(parser):
     - --filter "status=running"             # Running machines/requests
     - --filter "template_id~instant"        # Templates with "instant" in ID
     """
+    # Provider and environment overrides
     parser.add_argument("--provider", help="Override provider instance")
+    parser.add_argument("--region", help="AWS region override")
+    parser.add_argument("--profile", help="AWS profile override")
     parser.add_argument("--scheduler", choices=["default", "hostfactory", "hf"], help="Override scheduler strategy")
+    
+    # Operation control
     parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
+    parser.add_argument("--yes", "-y", action="store_true", help="Assume yes to all prompts")
+    parser.add_argument("--timeout", type=int, help="Operation timeout in seconds")
+    
+    # Output control
     parser.add_argument("--format", choices=["json", "yaml", "table", "list"], default="json", help="Output format")
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
     parser.add_argument("--quiet", action="store_true", help="Suppress output")
+    parser.add_argument("--no-color", action="store_true", help="Disable colored output")
+    
+    # Pagination and filtering
+    parser.add_argument("--limit", type=int, help="Maximum number of results to return")
+    parser.add_argument("--offset", type=int, default=0, help="Number of results to skip")
     parser.add_argument("--filter", action="append", help="Generic filter using snake_case field names: field=value, field~value, field=~regex. Examples: --filter \"machine_types~t3\", --filter \"status=running\". Can be combined with specific filters. Use multiple times for AND logic.")
 
 
@@ -906,6 +920,25 @@ async def main() -> None:
             except Exception as e:
                 logger = get_logger(__name__)
                 logger.warning("Failed to override provider instance: %s", e)
+
+        # Handle global AWS overrides
+        if hasattr(args, "region") and args.region:
+            try:
+                container = get_container()
+                config = container.get(ConfigurationPort)
+                config.override_aws_region(args.region)
+            except Exception as e:
+                logger = get_logger(__name__)
+                logger.warning("Failed to override region: %s", e)
+
+        if hasattr(args, "profile") and args.profile:
+            try:
+                container = get_container()
+                config = container.get(ConfigurationPort)
+                config.override_aws_profile(args.profile)
+            except Exception as e:
+                logger = get_logger(__name__)
+                logger.warning("Failed to override profile: %s", e)
 
         # Skip application initialization for init and templates generate commands only
         if args.resource == "init":

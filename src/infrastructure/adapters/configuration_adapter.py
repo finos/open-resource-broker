@@ -285,11 +285,17 @@ class ConfigurationAdapter(ConfigurationPort):
         """Override provider instance - delegate to ConfigurationManager."""
         self._config_manager.override_provider_instance(provider_name)
 
+    def override_aws_region(self, region: str) -> None:
+        """Override AWS region - delegate to ConfigurationManager."""
+        self._config_manager.override_aws_region(region)
+
+    def override_aws_profile(self, profile: str) -> None:
+        """Override AWS profile - delegate to ConfigurationManager."""
+        self._config_manager.override_aws_profile(profile)
+
     def get_active_provider_override(self) -> str | None:
         """Get current provider override from CLI."""
         return self._config_manager.get_active_provider_override()
-
-    def override_provider_instance(self, provider_name: str) -> None:
         """Override the active provider instance."""
         return self._config_manager.override_provider_instance(provider_name)
 

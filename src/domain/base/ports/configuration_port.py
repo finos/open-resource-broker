@@ -56,6 +56,14 @@ class ConfigurationPort(ABC):
         """Override the active provider instance."""
 
     @abstractmethod
+    def override_aws_region(self, region: str) -> None:
+        """Override the AWS region for this session."""
+
+    @abstractmethod
+    def override_aws_profile(self, profile: str) -> None:
+        """Override the AWS profile for this session."""
+
+    @abstractmethod
     def get_provider_instance_config(self, provider_name: str) -> Any:
         """Get configuration for a specific provider instance."""
 
