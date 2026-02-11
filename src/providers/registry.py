@@ -156,6 +156,7 @@ class ProviderRegistry(BaseRegistry):
 
     def get_strategy_capabilities(self, provider_identifier: str, config: Any = None) -> Optional[Any]:
         """Get capabilities for a provider strategy."""
+        self._ensure_dependencies_initialized()
         try:
             strategy = self.get_or_create_strategy(provider_identifier, config)
             return strategy.get_capabilities() if strategy else None
@@ -166,6 +167,7 @@ class ProviderRegistry(BaseRegistry):
 
     def check_strategy_health(self, provider_identifier: str, config: Any = None) -> Optional[Any]:
         """Check health of a provider strategy."""
+        self._ensure_dependencies_initialized()
         try:
             strategy = self.get_or_create_strategy(provider_identifier, config)
             if not strategy:
