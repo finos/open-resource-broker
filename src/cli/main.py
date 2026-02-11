@@ -1009,7 +1009,7 @@ async def main() -> None:
             result = await handle_init(args)
             sys.exit(result)
 
-        if args.resource == "templates" and args.action == "generate":
+        if args.resource in ["templates", "template"] and args.action == "generate":
             # Templates generate doesn't need existing config (creates templates)
             # But it DOES need scheduler/provider overrides which are now applied above
             from interface.templates_generate_handler import handle_templates_generate

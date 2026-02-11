@@ -1,53 +1,45 @@
 {
   "templates": [
     {
-      "createdAt": "2026-02-08T23:00:52.574626",
+      "createdAt": "2026-02-11T20:01:56.787476",
       "templateId": "EC2Fleet-Instant-OnDemand",
       "maxNumber": 10,
       "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
       "keyName": "",
       "providerApi": "EC2Fleet",
+      "name": "EC2 Fleet Instant On-Demand",
+      "providerType": "aws",
       "securityGroupIds": [
         "sg-0207c8c797fadea6f"
       ],
-      "vmType": "t3.medium",
+      "vmTypes": {
+        "t3.medium": 1
+      },
       "priceType": "ondemand",
       "allocationStrategy": "lowest_price",
       "instanceTags": {
         "Environment": "dev",
         "ManagedBy": "ORB"
       },
-      "attributes": {
-        "type": [
-          "String",
-          "X86_64"
-        ],
-        "ncpus": [
-          "Numeric",
-          "2"
-        ],
-        "ncores": [
-          "Numeric",
-          "2"
-        ],
-        "nram": [
-          "Numeric",
-          "4096"
-        ]
-      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {},
       "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
     },
     {
-      "createdAt": "2026-02-08T23:00:52.574709",
+      "createdAt": "2026-02-11T20:01:56.787567",
       "templateId": "EC2Fleet-Instant-Spot",
       "maxNumber": 10,
       "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
       "keyName": "",
       "providerApi": "EC2Fleet",
+      "name": "EC2 Fleet Instant Spot",
+      "providerType": "aws",
       "securityGroupIds": [
         "sg-0207c8c797fadea6f"
       ],
-      "vmType": "t3.medium",
+      "vmTypes": {
+        "t3.medium": 1
+      },
       "priceType": "spot",
       "maxSpotPrice": 0.05,
       "allocationStrategy": "price_capacity_optimized",
@@ -55,37 +47,25 @@
         "Environment": "dev",
         "ManagedBy": "ORB"
       },
-      "attributes": {
-        "type": [
-          "String",
-          "X86_64"
-        ],
-        "ncpus": [
-          "Numeric",
-          "2"
-        ],
-        "ncores": [
-          "Numeric",
-          "2"
-        ],
-        "nram": [
-          "Numeric",
-          "4096"
-        ]
-      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {},
       "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
     },
     {
-      "createdAt": "2026-02-08T23:00:52.574722",
+      "createdAt": "2026-02-11T20:01:56.787581",
       "templateId": "EC2Fleet-Instant-Mixed",
       "maxNumber": 10,
       "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
       "keyName": "",
       "providerApi": "EC2Fleet",
+      "name": "EC2 Fleet Instant Mixed",
+      "providerType": "aws",
       "securityGroupIds": [
         "sg-0207c8c797fadea6f"
       ],
-      "vmType": "t3.medium",
+      "vmTypes": {
+        "t3.medium": 1
+      },
       "priceType": "heterogeneous",
       "maxSpotPrice": 0.05,
       "allocationStrategy": "diversified",
@@ -93,74 +73,50 @@
         "Environment": "dev",
         "ManagedBy": "ORB"
       },
-      "attributes": {
-        "type": [
-          "String",
-          "X86_64"
-        ],
-        "ncpus": [
-          "Numeric",
-          "2"
-        ],
-        "ncores": [
-          "Numeric",
-          "2"
-        ],
-        "nram": [
-          "Numeric",
-          "4096"
-        ]
-      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {},
       "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
     },
     {
-      "createdAt": "2026-02-08T23:00:52.574728",
+      "createdAt": "2026-02-11T20:01:56.787588",
       "templateId": "EC2Fleet-Request-OnDemand",
       "maxNumber": 15,
       "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
       "keyName": "",
       "providerApi": "EC2Fleet",
+      "name": "EC2 Fleet Request On-Demand",
+      "providerType": "aws",
       "securityGroupIds": [
         "sg-0207c8c797fadea6f"
       ],
-      "vmType": "t3.medium",
+      "vmTypes": {
+        "t3.medium": 1
+      },
       "priceType": "ondemand",
       "allocationStrategy": "lowest_price",
       "instanceTags": {
         "Environment": "test",
         "ManagedBy": "ORB"
       },
-      "attributes": {
-        "type": [
-          "String",
-          "X86_64"
-        ],
-        "ncpus": [
-          "Numeric",
-          "2"
-        ],
-        "ncores": [
-          "Numeric",
-          "2"
-        ],
-        "nram": [
-          "Numeric",
-          "4096"
-        ]
-      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {},
       "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
     },
     {
-      "createdAt": "2026-02-08T23:00:52.574735",
+      "createdAt": "2026-02-11T20:01:56.787596",
       "templateId": "EC2Fleet-Request-Spot",
       "maxNumber": 20,
       "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
       "keyName": "",
       "providerApi": "EC2Fleet",
+      "name": "EC2 Fleet Request Spot",
+      "providerType": "aws",
       "securityGroupIds": [
         "sg-0207c8c797fadea6f"
       ],
-      "vmType": "t3.medium",
+      "vmTypes": {
+        "t3.medium": 1
+      },
       "priceType": "spot",
       "maxSpotPrice": 0.08,
       "allocationStrategy": "capacity_optimized",
@@ -168,37 +124,22 @@
         "Environment": "test",
         "ManagedBy": "ORB"
       },
-      "attributes": {
-        "type": [
-          "String",
-          "X86_64"
-        ],
-        "ncpus": [
-          "Numeric",
-          "2"
-        ],
-        "ncores": [
-          "Numeric",
-          "2"
-        ],
-        "nram": [
-          "Numeric",
-          "4096"
-        ]
-      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {},
       "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
     },
     {
-      "createdAt": "2026-02-08T23:00:52.574740",
+      "createdAt": "2026-02-11T20:01:56.787602",
       "templateId": "EC2Fleet-Request-Mixed",
       "maxNumber": 25,
       "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
       "keyName": "",
       "providerApi": "EC2Fleet",
+      "name": "EC2 Fleet Request Mixed",
+      "providerType": "aws",
       "securityGroupIds": [
         "sg-0207c8c797fadea6f"
       ],
-      "vmType": "t3.medium",
       "vmTypes": {
         "t3.medium": 1,
         "t3.large": 2
@@ -210,74 +151,50 @@
         "Environment": "test",
         "ManagedBy": "ORB"
       },
-      "attributes": {
-        "type": [
-          "String",
-          "X86_64"
-        ],
-        "ncpus": [
-          "Numeric",
-          "2"
-        ],
-        "ncores": [
-          "Numeric",
-          "2"
-        ],
-        "nram": [
-          "Numeric",
-          "4096"
-        ]
-      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {},
       "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
     },
     {
-      "createdAt": "2026-02-08T23:00:52.574745",
+      "createdAt": "2026-02-11T20:01:56.787659",
       "templateId": "EC2Fleet-Maintain-OnDemand",
       "maxNumber": 12,
       "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
       "keyName": "",
       "providerApi": "EC2Fleet",
+      "name": "EC2 Fleet Maintain On-Demand",
+      "providerType": "aws",
       "securityGroupIds": [
         "sg-0207c8c797fadea6f"
       ],
-      "vmType": "t3.medium",
+      "vmTypes": {
+        "t3.medium": 1
+      },
       "priceType": "ondemand",
       "allocationStrategy": "lowest_price",
       "instanceTags": {
         "Environment": "prod",
         "ManagedBy": "ORB"
       },
-      "attributes": {
-        "type": [
-          "String",
-          "X86_64"
-        ],
-        "ncpus": [
-          "Numeric",
-          "2"
-        ],
-        "ncores": [
-          "Numeric",
-          "2"
-        ],
-        "nram": [
-          "Numeric",
-          "4096"
-        ]
-      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {},
       "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
     },
     {
-      "createdAt": "2026-02-08T23:00:52.574753",
+      "createdAt": "2026-02-11T20:01:56.787667",
       "templateId": "EC2Fleet-Maintain-Spot",
       "maxNumber": 30,
       "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
       "keyName": "",
       "providerApi": "EC2Fleet",
+      "name": "EC2 Fleet Maintain Spot",
+      "providerType": "aws",
       "securityGroupIds": [
         "sg-0207c8c797fadea6f"
       ],
-      "vmType": "t3.medium",
+      "vmTypes": {
+        "t3.medium": 1
+      },
       "priceType": "spot",
       "maxSpotPrice": 0.1,
       "allocationStrategy": "price_capacity_optimized",
@@ -285,37 +202,22 @@
         "Environment": "prod",
         "ManagedBy": "ORB"
       },
-      "attributes": {
-        "type": [
-          "String",
-          "X86_64"
-        ],
-        "ncpus": [
-          "Numeric",
-          "2"
-        ],
-        "ncores": [
-          "Numeric",
-          "2"
-        ],
-        "nram": [
-          "Numeric",
-          "4096"
-        ]
-      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {},
       "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
     },
     {
-      "createdAt": "2026-02-08T23:00:52.574758",
+      "createdAt": "2026-02-11T20:01:56.787674",
       "templateId": "EC2Fleet-Maintain-Mixed",
       "maxNumber": 50,
       "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
       "keyName": "",
       "providerApi": "EC2Fleet",
+      "name": "EC2 Fleet Maintain Mixed",
+      "providerType": "aws",
       "securityGroupIds": [
         "sg-0207c8c797fadea6f"
       ],
-      "vmType": "t3.medium",
       "vmTypes": {
         "t3.medium": 1,
         "t3.large": 2,
@@ -328,37 +230,22 @@
         "Environment": "prod",
         "ManagedBy": "ORB"
       },
-      "attributes": {
-        "type": [
-          "String",
-          "X86_64"
-        ],
-        "ncpus": [
-          "Numeric",
-          "2"
-        ],
-        "ncores": [
-          "Numeric",
-          "2"
-        ],
-        "nram": [
-          "Numeric",
-          "4096"
-        ]
-      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {},
       "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
     },
     {
-      "createdAt": "2026-02-08T23:00:52.574769",
+      "createdAt": "2026-02-11T20:01:56.787682",
       "templateId": "SpotFleet-Request-LowestPrice",
       "maxNumber": 20,
       "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
       "keyName": "",
       "providerApi": "SpotFleet",
+      "name": "Spot Fleet Request - Lowest Price",
+      "providerType": "aws",
       "securityGroupIds": [
         "sg-0207c8c797fadea6f"
       ],
-      "vmType": "t3.medium",
       "vmTypes": {
         "t3.medium": 1,
         "t3.large": 2
@@ -370,37 +257,22 @@
         "Environment": "dev",
         "ManagedBy": "ORB"
       },
-      "attributes": {
-        "type": [
-          "String",
-          "X86_64"
-        ],
-        "ncpus": [
-          "Numeric",
-          "2"
-        ],
-        "ncores": [
-          "Numeric",
-          "2"
-        ],
-        "nram": [
-          "Numeric",
-          "4096"
-        ]
-      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {},
       "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
     },
     {
-      "createdAt": "2026-02-08T23:00:52.574774",
+      "createdAt": "2026-02-11T20:01:56.787686",
       "templateId": "SpotFleet-Request-Diversified",
       "maxNumber": 25,
       "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
       "keyName": "",
       "providerApi": "SpotFleet",
+      "name": "Spot Fleet Request - Diversified",
+      "providerType": "aws",
       "securityGroupIds": [
         "sg-0207c8c797fadea6f"
       ],
-      "vmType": "t3.medium",
       "vmTypes": {
         "t3.medium": 1,
         "t3.large": 2
@@ -412,37 +284,22 @@
         "Environment": "dev",
         "ManagedBy": "ORB"
       },
-      "attributes": {
-        "type": [
-          "String",
-          "X86_64"
-        ],
-        "ncpus": [
-          "Numeric",
-          "2"
-        ],
-        "ncores": [
-          "Numeric",
-          "2"
-        ],
-        "nram": [
-          "Numeric",
-          "4096"
-        ]
-      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {},
       "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
     },
     {
-      "createdAt": "2026-02-08T23:00:52.574778",
+      "createdAt": "2026-02-11T20:01:56.787690",
       "templateId": "SpotFleet-Request-CapacityOptimized",
       "maxNumber": 30,
       "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
       "keyName": "",
       "providerApi": "SpotFleet",
+      "name": "Spot Fleet Request - Capacity Optimized",
+      "providerType": "aws",
       "securityGroupIds": [
         "sg-0207c8c797fadea6f"
       ],
-      "vmType": "t3.medium",
       "vmTypes": {
         "t3.medium": 1,
         "t3.large": 2
@@ -454,37 +311,22 @@
         "Environment": "dev",
         "ManagedBy": "ORB"
       },
-      "attributes": {
-        "type": [
-          "String",
-          "X86_64"
-        ],
-        "ncpus": [
-          "Numeric",
-          "2"
-        ],
-        "ncores": [
-          "Numeric",
-          "2"
-        ],
-        "nram": [
-          "Numeric",
-          "4096"
-        ]
-      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {},
       "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
     },
     {
-      "createdAt": "2026-02-08T23:00:52.574782",
+      "createdAt": "2026-02-11T20:01:56.787694",
       "templateId": "SpotFleet-Maintain-LowestPrice",
       "maxNumber": 15,
       "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
       "keyName": "",
       "providerApi": "SpotFleet",
+      "name": "Spot Fleet Maintain - Lowest Price",
+      "providerType": "aws",
       "securityGroupIds": [
         "sg-0207c8c797fadea6f"
       ],
-      "vmType": "t3.medium",
       "vmTypes": {
         "t3.medium": 1,
         "t3.large": 2
@@ -496,37 +338,22 @@
         "Environment": "prod",
         "ManagedBy": "ORB"
       },
-      "attributes": {
-        "type": [
-          "String",
-          "X86_64"
-        ],
-        "ncpus": [
-          "Numeric",
-          "2"
-        ],
-        "ncores": [
-          "Numeric",
-          "2"
-        ],
-        "nram": [
-          "Numeric",
-          "4096"
-        ]
-      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {},
       "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
     },
     {
-      "createdAt": "2026-02-08T23:00:52.574786",
+      "createdAt": "2026-02-11T20:01:56.787697",
       "templateId": "SpotFleet-Maintain-Diversified",
       "maxNumber": 20,
       "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
       "keyName": "",
       "providerApi": "SpotFleet",
+      "name": "Spot Fleet Maintain - Diversified",
+      "providerType": "aws",
       "securityGroupIds": [
         "sg-0207c8c797fadea6f"
       ],
-      "vmType": "t3.medium",
       "vmTypes": {
         "t3.medium": 1,
         "t3.large": 2
@@ -538,37 +365,22 @@
         "Environment": "prod",
         "ManagedBy": "ORB"
       },
-      "attributes": {
-        "type": [
-          "String",
-          "X86_64"
-        ],
-        "ncpus": [
-          "Numeric",
-          "2"
-        ],
-        "ncores": [
-          "Numeric",
-          "2"
-        ],
-        "nram": [
-          "Numeric",
-          "4096"
-        ]
-      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {},
       "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
     },
     {
-      "createdAt": "2026-02-08T23:00:52.574790",
+      "createdAt": "2026-02-11T20:01:56.787701",
       "templateId": "SpotFleet-Maintain-CapacityOptimized",
       "maxNumber": 25,
       "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
       "keyName": "",
       "providerApi": "SpotFleet",
+      "name": "Spot Fleet Maintain - Capacity Optimized",
+      "providerType": "aws",
       "securityGroupIds": [
         "sg-0207c8c797fadea6f"
       ],
-      "vmType": "t3.medium",
       "vmTypes": {
         "t3.medium": 1,
         "t3.large": 2
@@ -580,74 +392,50 @@
         "Environment": "prod",
         "ManagedBy": "ORB"
       },
-      "attributes": {
-        "type": [
-          "String",
-          "X86_64"
-        ],
-        "ncpus": [
-          "Numeric",
-          "2"
-        ],
-        "ncores": [
-          "Numeric",
-          "2"
-        ],
-        "nram": [
-          "Numeric",
-          "4096"
-        ]
-      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {},
       "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
     },
     {
-      "createdAt": "2026-02-08T23:00:52.574796",
+      "createdAt": "2026-02-11T20:01:56.787707",
       "templateId": "ASG-OnDemand",
       "maxNumber": 15,
       "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
       "keyName": "",
       "providerApi": "AutoScalingGroup",
+      "name": "Auto Scaling Group On-Demand",
+      "providerType": "aws",
       "securityGroupIds": [
         "sg-0207c8c797fadea6f"
       ],
-      "vmType": "t3.medium",
+      "vmTypes": {
+        "t3.medium": 1
+      },
       "priceType": "ondemand",
       "allocationStrategy": "lowest_price",
       "instanceTags": {
         "Environment": "prod",
         "ManagedBy": "ORB"
       },
-      "attributes": {
-        "type": [
-          "String",
-          "X86_64"
-        ],
-        "ncpus": [
-          "Numeric",
-          "2"
-        ],
-        "ncores": [
-          "Numeric",
-          "2"
-        ],
-        "nram": [
-          "Numeric",
-          "4096"
-        ]
-      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {},
       "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
     },
     {
-      "createdAt": "2026-02-08T23:00:52.574804",
+      "createdAt": "2026-02-11T20:01:56.787714",
       "templateId": "ASG-Spot",
       "maxNumber": 20,
       "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
       "keyName": "",
       "providerApi": "AutoScalingGroup",
+      "name": "Auto Scaling Group Spot",
+      "providerType": "aws",
       "securityGroupIds": [
         "sg-0207c8c797fadea6f"
       ],
-      "vmType": "t3.medium",
+      "vmTypes": {
+        "t3.medium": 1
+      },
       "priceType": "spot",
       "maxSpotPrice": 0.05,
       "allocationStrategy": "price_capacity_optimized",
@@ -655,37 +443,22 @@
         "Environment": "dev",
         "ManagedBy": "ORB"
       },
-      "attributes": {
-        "type": [
-          "String",
-          "X86_64"
-        ],
-        "ncpus": [
-          "Numeric",
-          "2"
-        ],
-        "ncores": [
-          "Numeric",
-          "2"
-        ],
-        "nram": [
-          "Numeric",
-          "4096"
-        ]
-      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {},
       "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
     },
     {
-      "createdAt": "2026-02-08T23:00:52.574810",
+      "createdAt": "2026-02-11T20:01:56.787719",
       "templateId": "ASG-Mixed",
       "maxNumber": 25,
       "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
       "keyName": "",
       "providerApi": "AutoScalingGroup",
+      "name": "Auto Scaling Group Mixed",
+      "providerType": "aws",
       "securityGroupIds": [
         "sg-0207c8c797fadea6f"
       ],
-      "vmType": "t3.medium",
       "vmTypes": {
         "t3.medium": 1,
         "t3.large": 2
@@ -696,74 +469,50 @@
         "Environment": "prod",
         "ManagedBy": "ORB"
       },
-      "attributes": {
-        "type": [
-          "String",
-          "X86_64"
-        ],
-        "ncpus": [
-          "Numeric",
-          "2"
-        ],
-        "ncores": [
-          "Numeric",
-          "2"
-        ],
-        "nram": [
-          "Numeric",
-          "4096"
-        ]
-      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {},
       "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
     },
     {
-      "createdAt": "2026-02-08T23:00:52.574817",
+      "createdAt": "2026-02-11T20:01:56.787723",
       "templateId": "RunInstances-OnDemand",
       "maxNumber": 5,
       "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
       "keyName": "",
       "providerApi": "RunInstances",
+      "name": "Run Instances On-Demand",
+      "providerType": "aws",
       "securityGroupIds": [
         "sg-0207c8c797fadea6f"
       ],
-      "vmType": "t3.medium",
+      "vmTypes": {
+        "t3.medium": 1
+      },
       "priceType": "ondemand",
       "allocationStrategy": "lowest_price",
       "instanceTags": {
         "Environment": "dev",
         "ManagedBy": "ORB"
       },
-      "attributes": {
-        "type": [
-          "String",
-          "X86_64"
-        ],
-        "ncpus": [
-          "Numeric",
-          "2"
-        ],
-        "ncores": [
-          "Numeric",
-          "2"
-        ],
-        "nram": [
-          "Numeric",
-          "4096"
-        ]
-      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {},
       "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
     },
     {
-      "createdAt": "2026-02-08T23:00:52.574825",
+      "createdAt": "2026-02-11T20:01:56.787728",
       "templateId": "RunInstances-Spot",
       "maxNumber": 10,
       "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
       "keyName": "",
       "providerApi": "RunInstances",
+      "name": "Run Instances Spot",
+      "providerType": "aws",
       "securityGroupIds": [
         "sg-0207c8c797fadea6f"
       ],
-      "vmType": "t3.medium",
+      "vmTypes": {
+        "t3.medium": 1
+      },
       "priceType": "spot",
       "maxSpotPrice": 0.05,
       "allocationStrategy": "price_capacity_optimized",
@@ -771,24 +520,8 @@
         "Environment": "dev",
         "ManagedBy": "ORB"
       },
-      "attributes": {
-        "type": [
-          "String",
-          "X86_64"
-        ],
-        "ncpus": [
-          "Numeric",
-          "2"
-        ],
-        "ncores": [
-          "Numeric",
-          "2"
-        ],
-        "nram": [
-          "Numeric",
-          "4096"
-        ]
-      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {},
       "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
     }
   ]

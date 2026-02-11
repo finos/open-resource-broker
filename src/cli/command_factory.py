@@ -772,9 +772,11 @@ class CLICommandFactory:
                     configuration=input_data
                 )
             elif command_action == "refresh":
-                return self.create_template_utility_command_data("refresh", **args)
+                refresh_args = {k: v for k, v in args.items() if k != 'action'}
+                return self.create_template_utility_command_data("refresh", **refresh_args)
             elif command_action == "generate":
-                return self.create_template_utility_command_data("generate", **args)
+                generate_args = {k: v for k, v in args.items() if k != 'action'}
+                return self.create_template_utility_command_data("generate", **generate_args)
 
         # Request operations
         elif command_group == "requests":
