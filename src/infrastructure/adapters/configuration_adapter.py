@@ -293,6 +293,14 @@ class ConfigurationAdapter(ConfigurationPort):
         """Override AWS profile - delegate to ConfigurationManager."""
         self._config_manager.override_aws_profile(profile)
 
+    def get_effective_aws_region(self, default_region: str = "us-east-1") -> str:
+        """Get effective AWS region - delegate to ConfigurationManager."""
+        return self._config_manager.get_effective_aws_region(default_region)
+
+    def get_effective_aws_profile(self, default_profile: str = "default") -> str:
+        """Get effective AWS profile - delegate to ConfigurationManager."""
+        return self._config_manager.get_effective_aws_profile(default_profile)
+
     def get_active_provider_override(self) -> str | None:
         """Get current provider override from CLI."""
         return self._config_manager.get_active_provider_override()

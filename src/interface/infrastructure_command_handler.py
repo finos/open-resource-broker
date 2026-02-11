@@ -13,9 +13,9 @@ async def handle_infrastructure_discover(args) -> Dict[str, Any]:
         if args.provider:
             providers = [_get_provider_config(args.provider)]
         elif getattr(args, "all_providers", False):
-            providers = _get_active_providers()
+            providers = _get_active_providers_with_overrides()
         else:
-            providers = _get_active_providers()
+            providers = _get_active_providers_with_overrides()
 
         results = []
         for provider in providers:
@@ -40,9 +40,9 @@ async def handle_infrastructure_show(args) -> Dict[str, Any]:
         if args.provider:
             providers = [_get_provider_config(args.provider)]
         elif getattr(args, "all_providers", False):
-            providers = _get_active_providers()
+            providers = _get_active_providers_with_overrides()
         else:
-            providers = _get_active_providers()
+            providers = _get_active_providers_with_overrides()
 
         for provider in providers:
             _show_provider_infrastructure(provider)
@@ -62,7 +62,7 @@ async def handle_infrastructure_validate(args) -> Dict[str, Any]:
         if args.provider:
             providers = [_get_provider_config(args.provider)]
         else:
-            providers = _get_active_providers()
+            providers = _get_active_providers_with_overrides()
 
         results = []
         for provider in providers:
@@ -188,6 +188,42 @@ def _get_active_providers() -> List[Dict[str, Any]]:
         active_providers = [{"name": "default", "type": default_type, "config": {"region": "us-east-1", "profile": "default"}}]
     
     return active_providers
+
+
+def _get_active_providers_with_overrides() -> List[Dict[str, Any]]:
+    """Get active providers with global overrides applied."""
+    providers = _get_active_providers()
+    
+    # Apply global overrides
+    try:
+        from infrastructure.di.container import get_container
+        from domain.base.ports.configuration_port import ConfigurationPort
+        
+        container = get_container()
+        config = container.get(ConfigurationPort)
+        
+        for provider in providers:
+            if provider.get("type") == "aws":
+                provider_config = provider.get("config", {})
+                
+                # Apply region override
+                effective_region = config.get_effective_aws_region(
+                    provider_config.get("region", "us-east-1")
+                )
+                provider_config["region"] = effective_region
+                
+                # Apply profile override
+                effective_profile = config.get_effective_aws_profile(
+                    provider_config.get("profile", "default")
+                )
+                provider_config["profile"] = effective_profile
+                
+                provider["config"] = provider_config
+    except Exception:
+        # Fallback to original providers if override fails
+        pass
+    
+    return providers
 
 
 def _get_provider_config(provider_name: str) -> Dict[str, Any]:

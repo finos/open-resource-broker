@@ -235,6 +235,22 @@ class ConfigurationManager:
         """Temporarily override AWS profile."""
         self._aws_profile_override = profile
 
+    def get_aws_region_override(self) -> Optional[str]:
+        """Get current AWS region override."""
+        return self._aws_region_override
+
+    def get_aws_profile_override(self) -> Optional[str]:
+        """Get current AWS profile override."""
+        return self._aws_profile_override
+
+    def get_effective_aws_region(self, default_region: str = "us-east-1") -> str:
+        """Get effective AWS region (override or default)."""
+        return self._aws_region_override or default_region
+
+    def get_effective_aws_profile(self, default_profile: str = "default") -> str:
+        """Get effective AWS profile (override or default)."""
+        return self._aws_profile_override or default_profile
+
     def get_active_provider_override(self) -> Optional[str]:
         """Get current provider override."""
         return self._provider_override
