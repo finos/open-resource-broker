@@ -263,6 +263,26 @@ def add_provider_actions(subparsers):
     providers_health = subparsers.add_parser("health", help="Check provider health")
     add_global_arguments(providers_health)
 
+    # Providers add
+    providers_add = subparsers.add_parser("add", help="Add new provider")
+    add_global_arguments(providers_add)
+    providers_add.add_argument("--aws-profile", help="AWS profile name")
+    providers_add.add_argument("--aws-region", help="AWS region")
+    providers_add.add_argument("--name", help="Provider instance name")
+    providers_add.add_argument("--discover", action="store_true", help="Discover infrastructure")
+
+    # Providers remove
+    providers_remove = subparsers.add_parser("remove", help="Remove provider")
+    add_global_arguments(providers_remove)
+    providers_remove.add_argument("provider_name", help="Provider instance name to remove")
+
+    # Providers update
+    providers_update = subparsers.add_parser("update", help="Update provider configuration")
+    add_global_arguments(providers_update)
+    providers_update.add_argument("provider_name", help="Provider instance name")
+    providers_update.add_argument("--aws-region", help="Update region")
+    providers_update.add_argument("--aws-profile", help="Update profile")
+
     # Providers select
     providers_select = subparsers.add_parser("select", help="Select provider strategy")
     add_global_arguments(providers_select)
@@ -792,6 +812,23 @@ async def execute_command(args, app, resource_parsers) -> Union[str, tuple[str, 
             result = await handle_infrastructure_validate(args)
         else:
             raise ValueError(f"Unknown infrastructure action: {args.action}")
+    
+    # Handle provider configuration commands directly
+    elif hasattr(args, 'resource') and args.resource == 'providers' and args.action in ['add', 'remove', 'update']:
+        from interface.provider_config_handler import (
+            handle_provider_add,
+            handle_provider_remove,
+            handle_provider_update
+        )
+        
+        if args.action == 'add':
+            result = await handle_provider_add(args)
+        elif args.action == 'remove':
+            result = await handle_provider_remove(args)
+        elif args.action == 'update':
+            result = await handle_provider_update(args)
+        else:
+            raise ValueError(f"Unknown provider config action: {args.action}")
     else:
         # Create command or query from CLI args
         command_or_query = cli_command_factory.create_command_or_query(args)

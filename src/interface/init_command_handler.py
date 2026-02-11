@@ -268,14 +268,35 @@ def _interactive_setup() -> Dict[str, Any]:
         if discover_choice in ['y', 'yes']:
             infrastructure_defaults = _discover_infrastructure(provider_type, region, profile)
         
+        # Create first provider instance
+        first_provider = {
+            "type": provider_type,
+            "profile": profile,
+            "region": region,
+            "infrastructure_defaults": infrastructure_defaults,
+        }
+        
+        providers = [first_provider]
+        
+        # Multi-provider loop
+        print_info("")
+        print_separator(width=60, char="-", color="cyan")
+        while True:
+            print_info("")
+            add_another = input("  Add another provider? (y/N): ").strip().lower()
+            
+            if add_another not in ['y', 'yes']:
+                break
+                
+            additional_provider = _configure_additional_provider()
+            if additional_provider:
+                providers.append(additional_provider)
+        
         print_info("")
 
         return {
             "scheduler_type": scheduler_type,
-            "provider_type": provider_type,
-            "region": region,
-            "profile": profile,
-            "infrastructure_defaults": infrastructure_defaults,
+            "providers": providers,
         }
     except KeyboardInterrupt:
         print_error("\n\nSetup cancelled by user")
@@ -284,6 +305,99 @@ def _interactive_setup() -> Dict[str, Any]:
         print_error("\n\nUnexpected end of input")
         print_info("  Run with --non-interactive for automated setup")
         raise
+
+
+def _configure_additional_provider() -> Optional[Dict[str, Any]]:
+    """Configure an additional provider instance."""
+    try:
+        print_info("")
+        print_info("Additional Provider Configuration")
+        print_separator(width=60, char="-", color="cyan")
+        
+        # Provider type
+        providers = _get_available_providers()
+        for i, provider in enumerate(providers, 1):
+            print_info(f"  ({i}) {provider['display_name']} - {provider['description']}")
+        
+        print_info("")
+        provider_choice = input("  Select provider (1): ").strip() or "1"
+        try:
+            provider_type = providers[int(provider_choice) - 1]["type"]
+        except (ValueError, IndexError):
+            provider_type = providers[0]["type"] if providers else "aws"
+
+        # Provider configuration
+        print_info("")
+        print_info("Provider Configuration")
+        print_separator(width=60, char="-", color="cyan")
+        
+        # Get credential requirements
+        requirements = _get_credential_requirements(provider_type)
+        
+        provider_config = {"type": provider_type}
+        for param, info in requirements.items():
+            if info.get("required"):
+                default_value = "us-east-1" if param == "region" else ""
+                prompt = f"  {info['description']} ({default_value}): " if default_value else f"  {info['description']}: "
+                value = input(prompt).strip() or default_value
+                provider_config[param] = value
+        
+        # Fallback for AWS
+        if provider_type == "aws" and not requirements:
+            region = input("  Region (us-east-1): ").strip() or "us-east-1"
+            provider_config["region"] = region
+        
+        # Get available credential sources
+        credential_sources = _get_available_credential_sources(provider_type)
+        
+        print_info("")
+        print_info("Available credentials:")
+        for i, source in enumerate(credential_sources, 1):
+            print_info(f"  ({i}) {source['description']}")
+        
+        choice = input("  Select credentials (1): ").strip() or "1"
+        try:
+            selected_source = credential_sources[int(choice) - 1]["name"]
+        except (ValueError, IndexError):
+            selected_source = None
+        
+        # Test credentials
+        print_info("")
+        print_info("Testing credentials...")
+        success, error_msg = _test_provider_credentials(provider_type, selected_source, **provider_config)
+        if success:
+            print_success("Credentials verified successfully")
+            if selected_source:
+                provider_config["profile"] = selected_source
+        else:
+            print_error(f"Authentication failed: {error_msg}")
+            return None
+        
+        # Infrastructure discovery
+        print_info("")
+        print_info("Infrastructure Discovery")
+        print_separator(width=60, char="-", color="cyan")
+        discover_choice = input("  Discover infrastructure? (y/N): ").strip().lower()
+        
+        infrastructure_defaults = {}
+        if discover_choice in ['y', 'yes']:
+            region = provider_config.get("region", "us-east-1")
+            profile = provider_config.get("profile", "default")
+            infrastructure_defaults = _discover_infrastructure(provider_type, region, profile)
+        
+        return {
+            "type": provider_type,
+            "profile": provider_config.get("profile", "default"),
+            "region": provider_config.get("region", "us-east-1"),
+            "infrastructure_defaults": infrastructure_defaults,
+        }
+        
+    except KeyboardInterrupt:
+        print_error("\nProvider configuration cancelled")
+        return None
+    except Exception as e:
+        print_error(f"Failed to configure provider: {e}")
+        return None
 
 
 def _get_available_credential_sources(provider_type: str) -> list[dict]:
@@ -367,12 +481,16 @@ def _get_default_config(args) -> Dict[str, Any]:
     providers = _get_available_providers()
     default_provider = providers[0]["type"] if providers else "aws"
     
+    first_provider = {
+        "type": args.provider or default_provider,
+        "profile": args.profile or "default",
+        "region": args.region or "us-east-1",
+        "infrastructure_defaults": {},
+    }
+    
     return {
         "scheduler_type": args.scheduler or "default",
-        "provider_type": args.provider or default_provider,
-        "region": args.region or "us-east-1",
-        "profile": args.profile or "default",
-        "infrastructure_defaults": {},
+        "providers": [first_provider],
     }
 
 
@@ -391,7 +509,7 @@ def _create_directories(config_dir: Path, work_dir: Path, logs_dir: Path):
 
 
 def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
-    """Write configuration file with new provider naming."""
+    """Write configuration file with multiple provider support."""
     from config.installation_detector import get_template_location
 
     try:
@@ -411,46 +529,48 @@ def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
     with open(default_config_file, "w") as f:
         json.dump(full_config, f, indent=2)
 
-    # Generate provider name using provider-aware naming convention
-    provider_config = {"profile": user_config["profile"], "region": user_config["region"]}
-
-    # Use provider strategy to generate name with proper sanitization
-    provider_type = user_config["provider_type"]
-    
-    # Get provider strategy to generate proper name
-    try:
-        from infrastructure.di.container import get_container
-        from providers.factory import ProviderStrategyFactory
+    # Process all providers
+    providers_list = []
+    for provider_data in user_config.get("providers", []):
+        provider_config = {"profile": provider_data["profile"], "region": provider_data["region"]}
+        provider_type = provider_data["type"]
         
-        container = get_container()
-        factory = container.get(ProviderStrategyFactory)
-        
-        temp_config = {"type": provider_type, **provider_config}
-        strategy = factory.create_strategy(provider_type, temp_config)
-        provider_name = strategy.generate_provider_name(provider_config)
-    except Exception:
-        # Fallback to simple name generation
-        import re
-        sanitized_profile = re.sub(r'[^a-zA-Z0-9\-_]', '-', user_config['profile'])
-        provider_name = f"{provider_type}_{sanitized_profile}_{user_config['region']}"
+        # Generate provider name
+        try:
+            from infrastructure.di.container import get_container
+            from providers.factory import ProviderStrategyFactory
+            
+            container = get_container()
+            factory = container.get(ProviderStrategyFactory)
+            
+            temp_config = {"type": provider_type, **provider_config}
+            strategy = factory.create_strategy(provider_type, temp_config)
+            provider_name = strategy.generate_provider_name(provider_config)
+        except Exception:
+            # Fallback to simple name generation
+            import re
+            sanitized_profile = re.sub(r'[^a-zA-Z0-9\-_]', '-', provider_data['profile'])
+            provider_name = f"{provider_type}_{sanitized_profile}_{provider_data['region']}"
 
-    # Create config.json with user overrides only
-    provider_instance = {
-        "name": provider_name,  # NEW NAMING
-        "type": user_config["provider_type"],
-        "enabled": True,
-        "config": provider_config,
-    }
-    
-    # Add template_defaults if infrastructure was discovered
-    infrastructure_defaults = user_config.get("infrastructure_defaults", {})
-    if infrastructure_defaults:
-        provider_instance["template_defaults"] = infrastructure_defaults
+        # Create provider instance
+        provider_instance = {
+            "name": provider_name,
+            "type": provider_type,
+            "enabled": True,
+            "config": provider_config,
+        }
+        
+        # Add template_defaults if infrastructure was discovered
+        infrastructure_defaults = provider_data.get("infrastructure_defaults", {})
+        if infrastructure_defaults:
+            provider_instance["template_defaults"] = infrastructure_defaults
+        
+        providers_list.append(provider_instance)
     
     config = {
         "scheduler": {"type": user_config["scheduler_type"]},
         "provider": {
-            "providers": [provider_instance]
+            "providers": providers_list
         },
     }
 
