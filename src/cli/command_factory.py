@@ -983,11 +983,11 @@ class CLICommandFactory:
         # Infrastructure operations
         elif command_group == "infrastructure" or command_group == "infra":
             if command_action == "discover":
-                return self.create_infrastructure_command_data("discover", **args)
+                return self.create_infrastructure_command_data("discover", **{k: v for k, v in args.items() if k != 'action'})
             elif command_action == "show":
-                return self.create_infrastructure_command_data("show", **args)
+                return self.create_infrastructure_command_data("show", **{k: v for k, v in args.items() if k != 'action'})
             elif command_action == "validate":
-                return self.create_infrastructure_command_data("validate", **args)
+                return self.create_infrastructure_command_data("validate", **{k: v for k, v in args.items() if k != 'action'})
 
         # MCP operations
         elif command_group == "mcp":
