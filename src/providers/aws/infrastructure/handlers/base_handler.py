@@ -556,8 +556,8 @@ class AWSHandler(ABC):
         # The actual AWS API call will validate the AMI ID format
 
         # Validate instance type(s)
-        if not (template.instance_type or template.instance_types):
-            errors["instanceType"] = "Either instance_type or instance_types must be specified"
+        if not template.machine_types:
+            errors["instanceType"] = "machine_types must be specified"
 
         # Validate subnet(s) - subnet_id is a property of subnet_ids, so only
         # check subnet_ids
