@@ -38,15 +38,21 @@ class ProviderRegistryService:
     
     async def execute_operation(self, provider_id: str, operation: Any) -> Any:
         """Execute operation using provider strategy."""
-        strategy = self._registry.get_strategy(provider_id)
+        strategy = self._registry.get_or_create_strategy(provider_id)
+        if strategy is None:
+            raise ValueError(f"No strategy found for provider: {provider_id}")
         return await strategy.execute_operation(operation)
     
     def get_strategy_capabilities(self, provider_id: str) -> Any:
         """Get capabilities of provider strategy."""
-        strategy = self._registry.get_strategy(provider_id)
+        strategy = self._registry.get_or_create_strategy(provider_id)
+        if strategy is None:
+            return None
         return strategy.get_capabilities()
     
     def check_strategy_health(self, provider_id: str) -> Any:
         """Check health of provider strategy."""
-        strategy = self._registry.get_strategy(provider_id)
+        strategy = self._registry.get_or_create_strategy(provider_id)
+        if strategy is None:
+            return None
         return strategy.check_health()
