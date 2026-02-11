@@ -333,12 +333,12 @@ def test_aws_provider_provision_instances(
 ### Parametrized Tests
 
 ```python
-@pytest.mark.parametrize("instance_type", [
+@pytest.mark.parametrize("machine_type", [
     "t2.micro", "t2.small", "t3.medium", "m5.large"
 ])
-def test_instance_type_validation(self, instance_type: str):
+def test_machine_type_validation(self, machine_type: str):
     """Test instance type validation with various types."""
-    instance_type_obj = InstanceType(instance_type)
+    machine_type_obj = MachineType(machine_type)
     assert instance_type_obj.value == instance_type
 ```
 

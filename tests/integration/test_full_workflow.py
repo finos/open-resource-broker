@@ -63,7 +63,7 @@ class TestFullWorkflow:
             "name": "test-template",
             "provider_api": "ec2_fleet",
             "image_id": "ami-12345678",
-            "instance_type": "t2.micro",
+            "machine_types": {"t2.micro": 1},
             "subnet_ids": [mock_ec2_resources["subnet_id"]],
             "security_group_ids": [mock_ec2_resources["security_group_id"]],
         }
@@ -196,7 +196,7 @@ class TestFullWorkflow:
                 "status": "running",
                 "private_ip": "10.0.1.100",
                 "public_ip": "54.123.45.67",
-                "instance_type": "t2.micro",
+                "machine_types": {"t2.micro": 1},
                 "availability_zone": "us-east-1a",
             }
 
@@ -387,7 +387,7 @@ class TestEndToEndScenarios:
                 name="test-template",
                 provider_api="ec2_fleet",
                 image_id="ami-12345678",
-                instance_type=InstanceType("t2.micro"),
+                machine_types={"t2.micro": 1},
                 subnet_ids=[mock_ec2_resources["subnet_id"]],
                 security_group_ids=[mock_ec2_resources["security_group_id"]],
             )
@@ -665,7 +665,7 @@ class TestPerformanceIntegration:
                 name=f"template-{i:04d}",
                 provider_api="ec2_fleet",
                 image_id="ami-12345678",
-                instance_type=InstanceType("t2.micro"),
+                machine_types={"t2.micro": 1},
                 subnet_ids=["subnet-12345678"],
                 security_group_ids=["sg-12345678"],
             )

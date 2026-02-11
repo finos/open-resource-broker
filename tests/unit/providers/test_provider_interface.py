@@ -83,7 +83,7 @@ class TestProviderPort:
         assert provider.initialize(config) is True
 
         # Test create instances
-        template_config = {"image_id": "mock-ami", "instance_type": "mock.small"}
+        template_config = {"image_id": "mock-ami", "machine_types": {"mock.small": 1}}
         instances = provider.create_instances(template_config, 2)
         assert len(instances) == 2
         assert all(isinstance(inst, InstanceId) for inst in instances)
@@ -120,7 +120,7 @@ class TestProviderPort:
         provider.set_response("get_instance_status", custom_status)
 
         # Test configured responses
-        template_config = {"image_id": "test", "instance_type": "test"}
+        template_config = {"image_id": "test", "machine_types": {"test": 1}}
         instances = provider.create_instances(template_config, 2)
         assert instances == custom_instances
 
@@ -136,7 +136,7 @@ class TestProviderPort:
         # Test valid template
         valid_template = {
             "image_id": "ami-12345678",
-            "instance_type": "t2.micro",
+            "machine_types": {"t2.micro": 1},
             "provider_api": "ec2_fleet",
         }
         result = provider.validate_template(valid_template)

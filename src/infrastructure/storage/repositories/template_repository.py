@@ -32,6 +32,25 @@ class TemplateSerializer:
             except Exception as e:
                 self.logger.debug("Could not get defaults service from container: %s", e)
 
+    def _normalize_machine_types(self, data: dict) -> dict[str, int]:
+        """Normalize machine types from various input formats."""
+        # Handle vmType (single type)
+        if "vmType" in data:
+            return {data["vmType"]: 1}
+        
+        # Handle vmTypes (multiple types)
+        if "vmTypes" in data:
+            return data["vmTypes"]
+        
+        # Handle legacy instance_type/instance_types
+        if "instance_type" in data:
+            return {data["instance_type"]: 1}
+        
+        if "instance_types" in data:
+            return data["instance_types"]
+        
+        return {}
+
     @handle_infrastructure_exceptions(context="template_serialization")
     def to_dict(self, template: Template) -> dict[str, Any]:
         """Convert Template aggregate to dictionary with complete field support."""
@@ -41,11 +60,11 @@ class TemplateSerializer:
                 "name": template.name,
                 "description": template.description,
                 "image_id": template.image_id,
-                "instance_type": template.instance_type,
                 "max_instances": template.max_instances,
-                # Instance configuration
-                "instance_types": template.instance_types,
-                "primary_instance_type": template.primary_instance_type,
+                # Machine type configuration
+                "machine_types": template.machine_types,
+                "machine_types_ondemand": template.machine_types_ondemand,
+                "machine_types_priority": template.machine_types_priority,
                 # Network configuration
                 "subnet_ids": template.subnet_ids,
                 "security_group_ids": template.security_group_ids,
@@ -75,10 +94,6 @@ class TemplateSerializer:
                 "provider_type": template.provider_type,
                 "provider_name": template.provider_name,
                 "provider_api": template.provider_api,
-                # Legacy HF fields (for backward compatibility)
-                "vm_type": template.vm_type,
-                "vm_types": template.vm_types,
-                "key_name": template.key_name,
                 # Status and timestamps
                 "is_active": template.is_active,
                 "created_at": (template.created_at.isoformat() if template.created_at else None),
@@ -126,15 +141,6 @@ class TemplateSerializer:
             if not template_id:
                 raise ValueError(f"No template_id found in data: {list(processed_data.keys())}")
 
-            # Normalize instance type mappings across legacy and new schemas
-            normalized_instance_types = (
-                processed_data.get("instance_types")
-                or processed_data.get("vmTypes")
-                or processed_data.get("instanceTypes")
-                or processed_data.get("vm_types")
-                or {}
-            )
-
             # Build template data with complete field support
             template_data = {
                 # Core template fields
@@ -142,13 +148,13 @@ class TemplateSerializer:
                 "name": processed_data.get("name", template_id),
                 "description": processed_data.get("description"),
                 "image_id": processed_data.get("imageId", processed_data.get("image_id")),
-                "instance_type": processed_data.get("vmType", processed_data.get("instance_type")),
                 "max_instances": processed_data.get(
                     "maxNumber", processed_data.get("max_instances", 1)
                 ),
-                # Instance configuration
-                "instance_types": normalized_instance_types,
-                "primary_instance_type": processed_data.get("primary_instance_type"),
+                # Machine type configuration
+                "machine_types": self._normalize_machine_types(data),
+                "machine_types_ondemand": data.get("vmTypesOnDemand", {}),
+                "machine_types_priority": data.get("vmTypesPriority", {}),
                 # Network configuration
                 "subnet_ids": (
                     [processed_data.get("subnetId")]
@@ -184,10 +190,6 @@ class TemplateSerializer:
                 "provider_type": data.get("provider_type"),
                 "provider_name": data.get("provider_name"),
                 "provider_api": data.get("providerApi", data.get("provider_api")),
-                # Legacy HF fields (for backward compatibility)
-                "vm_type": data.get("vmType", data.get("vm_type")),
-                "vm_types": normalized_instance_types,
-                "key_name": data.get("keyName", data.get("key_name")),
                 # Status and timestamps
                 "is_active": data.get("is_active", True),
                 "created_at": created_at,

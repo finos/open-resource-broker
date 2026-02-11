@@ -389,10 +389,8 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             "NewInstancesProtectedFromScaleIn": True,
         }
 
-        # Prefer multi-instance maps (including legacy vm_types) over a single instance_type
-        instance_types_map = getattr(aws_template, "instance_types", None) or getattr(
-            aws_template, "vm_types", {}
-        )
+        # Prefer multi-instance maps over a single instance_type
+        instance_types_map = aws_template.machine_types
 
         # Prefer ABIS/InstanceRequirements payload when present (no explicit types)
         instance_requirements_payload = aws_template.get_instance_requirements_payload()
@@ -959,7 +957,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Auto Scaling Group with on-demand instances only",
                 provider_type="aws",
                 provider_api="AutoScalingGroup",
-                instance_type="t3.medium",
+                machine_types={"t3.medium": 1},
                 max_instances=15,
                 price_type="ondemand",
                 tags={"Environment": "prod", "ManagedBy": "ORB"},
@@ -970,7 +968,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Auto Scaling Group with spot instances only",
                 provider_type="aws",
                 provider_api="AutoScalingGroup",
-                instance_type="t3.medium",
+                machine_types={"t3.medium": 1},
                 max_instances=20,
                 price_type="spot",
                 max_price=0.05,
@@ -982,7 +980,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Auto Scaling Group with mixed on-demand and spot instances",
                 provider_type="aws",
                 provider_api="AutoScalingGroup",
-                instance_types={"t3.medium": 1, "t3.large": 2},
+                machine_types={"t3.medium": 1, "t3.large": 2},
                 max_instances=25,
                 price_type="heterogeneous",
                 percent_on_demand=30,

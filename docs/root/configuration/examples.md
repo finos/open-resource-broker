@@ -33,7 +33,7 @@ The AWS provider supports an optional `context` field for EC2 Fleet, Auto Scalin
   "template_defaults": {
     "context": "c-abc1234567890123",
     "provider_api": "EC2Fleet",
-    "instance_type": "t3.medium"
+    "machine_types": {"t3.medium": 1}
   }
 }
 ```
@@ -244,7 +244,7 @@ The AWS provider supports an optional `context` field for EC2 Fleet, Auto Scalin
           "region": "us-east-1",
           "profile": "dev",
           "max_instances": 10,
-          "instance_types": ["t3.micro", "t3.small"]
+          "machine_types": {"t3.micro": 1, "t3.small": 1}
         }
       }
     ]
@@ -274,7 +274,7 @@ The AWS provider supports an optional `context` field for EC2 Fleet, Auto Scalin
           "region": "us-east-1",
           "profile": "prod",
           "max_instances": 1000,
-          "instance_types": ["m5.large", "m5.xlarge", "c5.large"]
+          "machine_types": {"m5.large": 1, "m5.xlarge": 1, "c5.large": 1}
         },
         "health_check": {
           "enabled": true,
@@ -293,7 +293,7 @@ The AWS provider supports an optional `context` field for EC2 Fleet, Auto Scalin
           "region": "us-west-2",
           "profile": "prod",
           "max_instances": 500,
-          "instance_types": ["m5.large", "m5.xlarge", "c5.large"]
+          "machine_types": {"m5.large": 1, "m5.xlarge": 1, "c5.large": 1}
         },
         "health_check": {
           "enabled": true,
@@ -565,7 +565,7 @@ The scheduler configuration determines how the system interfaces with job schedu
       "template_id_field": "templateId",
       "max_instances_field": "maxNumber",
       "image_id_field": "imageId",
-      "instance_type_field": "vmType"
+      "machine_type_field": "vmType"
     },
     "output_format": {
       "use_camel_case": true,

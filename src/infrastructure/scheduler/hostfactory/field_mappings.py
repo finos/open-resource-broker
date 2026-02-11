@@ -41,8 +41,8 @@ class HostFactoryFieldMappings:
             "subnetIds": "subnet_ids",  # Preserve full list when provided
             "securityGroupIds": "security_group_ids",
             # Instance configuration
-            "vmType": "instance_type",
-            "vmTypes": "instance_types",
+            "vmType": "machine_types",  # Special handling in transformation
+            "vmTypes": "machine_types",
             # Pricing and allocation
             "priceType": "price_type",
             "maxSpotPrice": "max_price",
@@ -57,8 +57,8 @@ class HostFactoryFieldMappings:
         # AWS-specific fields (only mapped when AWS provider is active)
         "aws": {
             # AWS instance type configurations
-            "vmTypesOnDemand": "instance_types_ondemand",
-            "vmTypesPriority": "instance_types_priority",
+            "vmTypesOnDemand": "machine_types_ondemand",
+            "vmTypesPriority": "machine_types_priority",
             "abisInstanceRequirements": "abis_instance_requirements",
             # AWS pricing configurations
             "percentOnDemand": "percent_on_demand",

@@ -453,8 +453,9 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
         }
 
         # Add instance type override if specified (overrides launch template)
-        if aws_template.instance_type:
-            params["InstanceType"] = aws_template.instance_type
+        if aws_template.machine_types:
+            # Use first machine type for RunInstances (single instance type only)
+            params["InstanceType"] = list(aws_template.machine_types.keys())[0]
 
         # Handle networking overrides based on launch template source
         if aws_template.launch_template_id:
@@ -696,7 +697,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 description="On-demand instances using RunInstances API",
                 provider_type="aws",
                 provider_api="RunInstances",
-                instance_type="t3.medium",
+                machine_types={"t3.medium": 1},
                 max_instances=5,
                 price_type="ondemand",
                 tags={"Environment": "dev", "ManagedBy": "ORB"},
@@ -707,7 +708,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 description="Spot instances using RunInstances API",
                 provider_type="aws",
                 provider_api="RunInstances",
-                instance_type="t3.medium",
+                machine_types={"t3.medium": 1},
                 max_instances=10,
                 price_type="spot",
                 max_price=0.05,

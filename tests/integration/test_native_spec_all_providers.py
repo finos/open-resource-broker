@@ -75,7 +75,7 @@ class TestNativeSpecAllProviders:
         template = AWSTemplate(
             template_id="ec2fleet-test",
             image_id="ami-12345",
-            instance_type="t3.micro",
+            machine_types={"t3.micro": 1},
             provider_api=ProviderApi.EC2_FLEET,
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
@@ -126,7 +126,7 @@ class TestNativeSpecAllProviders:
         template = AWSTemplate(
             template_id="spotfleet-test",
             image_id="ami-67890",
-            instance_type="t3.small",
+            machine_types={"t3.small": 1},
             provider_api=ProviderApi.SPOT_FLEET,
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
@@ -188,7 +188,7 @@ class TestNativeSpecAllProviders:
         template = AWSTemplate(
             template_id="asg-test",
             image_id="ami-asg123",
-            instance_type="m5.large",
+            machine_types={"m5.large": 1},
             provider_api=ProviderApi.ASG,
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
@@ -239,7 +239,7 @@ class TestNativeSpecAllProviders:
         template = AWSTemplate(
             template_id="lt-test",
             image_id="ami-lt456",
-            instance_type="t3.medium",
+            machine_types={"t3.medium": 1},
             provider_api=ProviderApi.RUN_INSTANCES,
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
@@ -299,7 +299,7 @@ class TestNativeSpecAllProviders:
         template = AWSTemplate(
             template_id="mixed-test",
             image_id="ami-mixed789",
-            instance_type="c5.xlarge",
+            machine_types={"c5.xlarge": 1},
             provider_api=ProviderApi.EC2_FLEET,
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
@@ -378,7 +378,7 @@ class TestNativeSpecAllProviders:
         template = AWSTemplate(
             template_id="file-test",
             image_id="ami-file123",
-            instance_type="t3.large",
+            machine_types={"t3.large": 1},
             provider_api=ProviderApi.EC2_FLEET,
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
@@ -411,7 +411,7 @@ class TestNativeSpecAllProviders:
         template = AWSTemplate(
             template_id="disabled-test",
             image_id="ami-disabled",
-            instance_type="t3.micro",
+            machine_types={"t3.micro": 1},
             provider_api=ProviderApi.EC2_FLEET,
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
@@ -444,7 +444,7 @@ class TestNativeSpecAllProviders:
         template = AWSTemplate(
             template_id="complex-test",
             image_id="ami-complex",
-            instance_type="t3.micro",
+            machine_types={"t3.micro": 1},
             provider_api=ProviderApi.EC2_FLEET,
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
@@ -506,7 +506,7 @@ class TestNativeSpecAllProviders:
         template_invalid = AWSTemplate(
             template_id="invalid-test",
             image_id="ami-invalid",
-            instance_type="t3.micro",
+            machine_types={"t3.micro": 1},
             provider_api=ProviderApi.EC2_FLEET,
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
@@ -533,7 +533,7 @@ class TestNativeSpecAllProviders:
         template = AWSTemplate(
             template_id="context-test",
             image_id="ami-context",
-            instance_type="t3.micro",
+            machine_types={"t3.micro": 1},
             provider_api=ProviderApi.EC2_FLEET,
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],

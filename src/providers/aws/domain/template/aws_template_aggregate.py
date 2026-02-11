@@ -218,9 +218,7 @@ class AWSTemplate(Template):
     launch_template_id: Optional[str] = None
     launch_template_version: Optional[str] = None
 
-    # AWS-specific instance types and priorities (extends Template.instance_types)
-    instance_types_ondemand: Optional[dict[str, int]] = None
-    instance_types_priority: Optional[dict[str, int]] = None
+    # Note: machine_types_ondemand and machine_types_priority are inherited from base Template
 
     # Native spec fields (flattened, no nesting)
     launch_template_spec: Optional[dict[str, Any]] = None
@@ -347,8 +345,6 @@ class AWSTemplate(Template):
             "pools_count": self.pools_count,
             "launch_template_id": self.launch_template_id,
             "launch_template_version": self.launch_template_version,
-            "instance_types_ondemand": self.instance_types_ondemand,
-            "instance_types_priority": self.instance_types_priority,
         }
 
         # Add AWS-specific allocation strategies
@@ -401,8 +397,6 @@ class AWSTemplate(Template):
             "pools_count": data.get("pools_count"),
             "launch_template_id": data.get("launch_template_id"),
             "launch_template_version": data.get("launch_template_version"),
-            "instance_types_ondemand": data.get("instance_types_ondemand"),
-            "instance_types_priority": data.get("instance_types_priority"),
         }
 
         # Handle optional AWS-specific fields

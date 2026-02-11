@@ -9,7 +9,7 @@
       "max_instances": 1,
       "instance_config": {
         "image_id": "ami-12345678",
-        "instance_type": "t2.micro",
+        "machine_types": {"t2.micro": 1},
         "subnet_id": "subnet-12345678",
         "security_group_ids": ["sg-12345678"],
         "key_name": "test-key"

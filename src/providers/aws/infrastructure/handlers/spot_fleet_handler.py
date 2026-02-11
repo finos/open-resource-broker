@@ -299,20 +299,20 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         ):
             errors.append("percent_on_demand is required for heterogeneous price type")
 
-        # For heterogeneous price type with vm_types_on_demand, validate the
+        # For heterogeneous price type with machine_types_ondemand, validate the
         # configuration
         if (
             hasattr(aws_template, "price_type")
             and aws_template.price_type == "heterogeneous"
-            and hasattr(aws_template, "vm_types_on_demand")
-            and aws_template.vm_types_on_demand
+            and hasattr(aws_template, "machine_types_ondemand")
+            and aws_template.machine_types_ondemand
         ):
-            # Validate that instance_types is also specified
-            if not hasattr(aws_template, "instance_types") or not aws_template.instance_types:
-                errors.append("instance_types must be specified when using instance_types_ondemand")
+            # Validate that machine_types is also specified
+            if not hasattr(aws_template, "machine_types") or not aws_template.machine_types:
+                errors.append("machine_types must be specified when using machine_types_ondemand")
 
-            # Validate that instance_types_ondemand has valid instance types
-            for instance_type, weight in aws_template.instance_types_ondemand.items():
+            # Validate that machine_types_ondemand has valid instance types
+            for instance_type, weight in aws_template.machine_types_ondemand.items():
                 if not isinstance(weight, int) or weight <= 0:
                     errors.append(
                         f"Weight for on-demand instance type {instance_type} must be a positive integer"
@@ -430,9 +430,9 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
         # Instance type overrides (minimal data)
         instance_overrides = []
-        if template.instance_types and template.subnet_ids:
+        if template.machine_types and template.subnet_ids:
             for subnet_id in template.subnet_ids:
-                for instance_type, weight in template.instance_types.items():
+                for instance_type, weight in template.machine_types.items():
                     instance_overrides.append(
                         {
                             "instance_type": instance_type,
@@ -440,16 +440,17 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                             "weighted_capacity": weight,
                         }
                     )
-        elif template.instance_types:
-            for instance_type, weight in template.instance_types.items():
+        elif template.machine_types:
+            for instance_type, weight in template.machine_types.items():
                 instance_overrides.append(
                     {"instance_type": instance_type, "weighted_capacity": weight}
                 )
         else:
             # Single instance type
+            single_type = list(template.machine_types.keys())[0] if template.machine_types else "t3.medium"
             instance_overrides.append(
                 {
-                    "instance_type": template.instance_type,
+                    "instance_type": single_type,
                     "weighted_capacity": 1,
                     "subnet_id": template.subnet_ids[0] if template.subnet_ids else None,
                 }
@@ -627,9 +628,9 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
         else:
             # Add instance type overrides if specified
-            if template.instance_types:
+            if template.machine_types:
                 # For heterogeneous price type with on-demand instances
-                if template.price_type == "heterogeneous" and template.instance_types_ondemand:
+                if template.price_type == "heterogeneous" and template.machine_types_ondemand:
                     # Create spot instance overrides
                     spot_overrides = [
                         {
@@ -639,7 +640,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                             "SpotPrice": (str(template.max_price) if template.max_price else None),
                         }
                         for idx, (instance_type, weight) in enumerate(
-                            template.instance_types.items()
+                            template.machine_types.items()
                         )
                     ]
 
@@ -648,11 +649,11 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                         {
                             "InstanceType": instance_type,
                             "WeightedCapacity": weight,
-                            "Priority": idx + len(template.instance_types) + 1,
+                            "Priority": idx + len(template.machine_types) + 1,
                             # Force this to be on-demand by not specifying SpotPrice
                         }
                         for idx, (instance_type, weight) in enumerate(
-                            template.instance_types_ondemand.items()
+                            template.machine_types_ondemand.items()
                         )
                     ]
 
@@ -677,7 +678,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                             "SpotPrice": (str(template.max_price) if template.max_price else None),
                         }
                         for idx, (instance_type, weight) in enumerate(
-                            template.instance_types.items()
+                            template.machine_types.items()
                         )
                     ]
 
@@ -689,14 +690,14 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 # For heterogeneous price type with on-demand instances
                 if (
                     template.price_type == "heterogeneous"
-                    and template.instance_types_ondemand
-                    and template.instance_types
+                    and template.machine_types_ondemand
+                    and template.machine_types
                 ):
                     # Create spot instance overrides with subnets
                     spot_overrides = []
                     for subnet_id in template.subnet_ids:
                         for idx, (instance_type, weight) in enumerate(
-                            template.instance_types.items()
+                            template.machine_types.items()
                         ):
                             override = {
                                 "SubnetId": subnet_id,
@@ -713,13 +714,13 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     ondemand_overrides = []
                     for subnet_id in template.subnet_ids:
                         for idx, (instance_type, weight) in enumerate(
-                            template.instance_types_ondemand.items()
+                            template.machine_types_ondemand.items()
                         ):
                             override = {
                                 "SubnetId": subnet_id,
                                 "InstanceType": instance_type,
                                 "WeightedCapacity": weight,
-                                "Priority": idx + len(template.instance_types) + 1,
+                                "Priority": idx + len(template.machine_types) + 1,
                                 # No SpotPrice for on-demand instances
                             }
                             ondemand_overrides.append(override)
@@ -736,11 +737,11 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                         f"{len(ondemand_overrides)} on-demand instance overrides"
                     )
                 # If we have both instance types and subnets, create all combinations
-                elif template.instance_types:
+                elif template.machine_types:
                     overrides = []
                     for subnet_id in template.subnet_ids:
                         for idx, (instance_type, weight) in enumerate(
-                            template.instance_types.items()
+                            template.machine_types.items()
                         ):
                             override = {
                                 "SubnetId": subnet_id,
@@ -788,10 +789,12 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             instance_types = []
 
             # Get instance types from template
-            if hasattr(aws_template, "instance_types") and aws_template.instance_types:
-                instance_types = list(aws_template.instance_types.keys())
-            elif hasattr(aws_template, "instance_type") and aws_template.instance_type:
-                instance_types = [aws_template.instance_type]
+            if hasattr(aws_template, "machine_types") and aws_template.machine_types:
+                instance_types = list(aws_template.machine_types.keys())
+            else:
+                # Fallback to single type if machine_types is empty
+                single_type = list(aws_template.machine_types.keys())[0] if aws_template.machine_types else "t3.medium"
+                instance_types = [single_type]
 
             if not instance_types:
                 self._logger.warning("No instance types found for spot price monitoring")
@@ -1216,7 +1219,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Spot Fleet request with lowest price allocation",
                 provider_type="aws",
                 provider_api="SpotFleet",
-                instance_types={"t3.medium": 1, "t3.large": 2},
+                machine_types={"t3.medium": 1, "t3.large": 2},
                 max_instances=20,
                 price_type="spot",
                 allocation_strategy="lowest_price",
@@ -1230,7 +1233,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Spot Fleet request with diversified allocation",
                 provider_type="aws",
                 provider_api="SpotFleet",
-                instance_types={"t3.medium": 1, "t3.large": 2},
+                machine_types={"t3.medium": 1, "t3.large": 2},
                 max_instances=25,
                 price_type="spot",
                 allocation_strategy="diversified",
@@ -1244,7 +1247,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Spot Fleet request with capacity optimized allocation",
                 provider_type="aws",
                 provider_api="SpotFleet",
-                instance_types={"t3.medium": 1, "t3.large": 2},
+                machine_types={"t3.medium": 1, "t3.large": 2},
                 max_instances=30,
                 price_type="spot",
                 allocation_strategy="capacity_optimized",
@@ -1259,7 +1262,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Spot Fleet maintain with lowest price allocation",
                 provider_type="aws",
                 provider_api="SpotFleet",
-                instance_types={"t3.medium": 1, "t3.large": 2},
+                machine_types={"t3.medium": 1, "t3.large": 2},
                 max_instances=15,
                 price_type="spot",
                 allocation_strategy="lowest_price",
@@ -1273,7 +1276,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Spot Fleet maintain with diversified allocation",
                 provider_type="aws",
                 provider_api="SpotFleet",
-                instance_types={"t3.medium": 1, "t3.large": 2},
+                machine_types={"t3.medium": 1, "t3.large": 2},
                 max_instances=20,
                 price_type="spot",
                 allocation_strategy="diversified",
@@ -1287,7 +1290,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Spot Fleet maintain with capacity optimized allocation",
                 provider_type="aws",
                 provider_api="SpotFleet",
-                instance_types={"t3.medium": 1, "t3.large": 2},
+                machine_types={"t3.medium": 1, "t3.large": 2},
                 max_instances=25,
                 price_type="spot",
                 allocation_strategy="capacity_optimized",

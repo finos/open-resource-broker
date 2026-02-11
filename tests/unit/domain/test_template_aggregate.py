@@ -4,43 +4,18 @@ from datetime import datetime, timezone
 
 import pytest
 
-from src.domain.base.value_objects import InstanceType as _InstanceType
 from src.domain.template.exceptions import TemplateNotFoundError, TemplateValidationError
 from src.domain.template.template_aggregate import Template as _Template
 
 
-# Wrapper to allow positional argument for InstanceType
-def InstanceType(value):
-    """Wrapper for InstanceType that accepts positional argument."""
-    return _InstanceType(value=value)
-
-
-# Simple object to wrap string instance_type with .value attribute
-class _InstanceTypeWrapper:
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return self.value
-
-    def __eq__(self, other):
-        if isinstance(other, _InstanceTypeWrapper):
-            return self.value == other.value
-        return self.value == other
-
-
 # Wrapper for Template to handle field name mapping
 class Template(_Template):
-    """Wrapper for Template that handles id -> template_id mapping and InstanceType conversion."""
+    """Wrapper for Template that handles id -> template_id mapping."""
 
     def __init__(self, **data):
         # Map 'id' to 'template_id'
         if "id" in data:
             data["template_id"] = data.pop("id")
-
-        # Convert InstanceType object to string
-        if "instance_type" in data and isinstance(data["instance_type"], _InstanceType):
-            data["instance_type"] = data["instance_type"].value
 
         super().__init__(**data)
 
@@ -48,24 +23,6 @@ class Template(_Template):
     def id(self):
         """Provide 'id' property for backward compatibility."""
         return self.template_id
-
-    def __getattribute__(self, name):
-        """Override to wrap instance_type with .value attribute."""
-        if name == "instance_type":
-            value = super().__getattribute__(name)
-            if value is not None and not isinstance(value, _InstanceTypeWrapper):
-                return _InstanceTypeWrapper(value)
-            return value
-        return super().__getattribute__(name)
-
-    def __setattr__(self, name, value):
-        """Override to handle instance_type assignment."""
-        if name == "instance_type":
-            if isinstance(value, _InstanceType):
-                value = value.value
-            elif isinstance(value, _InstanceTypeWrapper):
-                value = value.value
-        super().__setattr__(name, value)
 
 
 # Try to import optional classes - create mocks if not available
@@ -106,7 +63,7 @@ class TestTemplateAggregate:
             name="test-template",
             provider_api="ec2_fleet",
             image_id="ami-12345678",
-            instance_type="t2.micro",
+            machine_types={"t2.micro": 1},
             subnet_ids=["subnet-12345678"],
             security_group_ids=["sg-12345678"],
             key_name="test-key",
@@ -118,7 +75,7 @@ class TestTemplateAggregate:
         assert template.name == "test-template"
         assert template.provider_api == "ec2_fleet"
         assert template.image_id == "ami-12345678"
-        assert template.instance_type == "t2.micro"
+        assert template.machine_types == {"t2.micro": 1}
         assert template.subnet_ids == ["subnet-12345678"]
         assert template.security_group_ids == ["sg-12345678"]
         assert template.key_name == "test-key"
@@ -133,7 +90,7 @@ class TestTemplateAggregate:
             name="minimal-template",
             provider_api="run_instances",
             image_id="ami-87654321",
-            instance_type=InstanceType("t3.small"),
+            machine_types={"t3.small": 1},
             subnet_ids=["subnet-87654321"],
             security_group_ids=["sg-87654321"],
         )
@@ -155,7 +112,7 @@ class TestTemplateAggregate:
                 name=f"template-{api}",
                 provider_api=api,
                 image_id="ami-12345678",
-                instance_type=InstanceType("t2.micro"),
+                machine_types={"t2.micro": 1},
                 subnet_ids=["subnet-12345678"],
                 security_group_ids=["sg-12345678"],
             )
@@ -169,7 +126,7 @@ class TestTemplateAggregate:
                 name="invalid-template",
                 provider_api="invalid_api",
                 image_id="ami-12345678",
-                instance_type=InstanceType("t2.micro"),
+                machine_types={"t2.micro": 1},
                 subnet_ids=["subnet-12345678"],
                 security_group_ids=["sg-12345678"],
             )
@@ -182,7 +139,7 @@ class TestTemplateAggregate:
                 name="no-subnets-template",
                 provider_api="ec2_fleet",
                 image_id="ami-12345678",
-                instance_type=InstanceType("t2.micro"),
+                machine_types={"t2.micro": 1},
                 subnet_ids=[],  # Empty list should be invalid
                 security_group_ids=["sg-12345678"],
             )
@@ -195,7 +152,7 @@ class TestTemplateAggregate:
                 name="no-sgs-template",
                 provider_api="ec2_fleet",
                 image_id="ami-12345678",
-                instance_type=InstanceType("t2.micro"),
+                machine_types={"t2.micro": 1},
                 subnet_ids=["subnet-12345678"],
                 security_group_ids=[],  # Empty list should be invalid
             )
@@ -211,7 +168,7 @@ class TestTemplateAggregate:
                     name="invalid-ami-template",
                     provider_api="ec2_fleet",
                     image_id=invalid_ami,
-                    instance_type=InstanceType("t2.micro"),
+                    machine_types={"t2.micro": 1},
                     subnet_ids=["subnet-12345678"],
                     security_group_ids=["sg-12345678"],
                 )
@@ -223,7 +180,7 @@ class TestTemplateAggregate:
             name="original-name",
             provider_api="ec2_fleet",
             image_id="ami-12345678",
-            instance_type=InstanceType("t2.micro"),
+            machine_types={"t2.micro": 1},
             subnet_ids=["subnet-12345678"],
             security_group_ids=["sg-12345678"],
         )
@@ -232,9 +189,9 @@ class TestTemplateAggregate:
         template.name = "updated-name"
         assert template.name == "updated-name"
 
-        # Update instance type
-        template.instance_type = InstanceType("t2.small")
-        assert template.instance_type.value == "t2.small"
+        # Update machine types
+        template.machine_types = {"t2.small": 1}
+        assert template.machine_types == {"t2.small": 1}
 
         # Update tags
         template.tags = {"Environment": "production", "Owner": "team"}
@@ -248,7 +205,7 @@ class TestTemplateAggregate:
             name="add-subnet-template",
             provider_api="ec2_fleet",
             image_id="ami-12345678",
-            instance_type=InstanceType("t2.micro"),
+            machine_types={"t2.micro": 1},
             subnet_ids=["subnet-12345678"],
             security_group_ids=["sg-12345678"],
         )
@@ -265,7 +222,7 @@ class TestTemplateAggregate:
             name="add-sg-template",
             provider_api="ec2_fleet",
             image_id="ami-12345678",
-            instance_type=InstanceType("t2.micro"),
+            machine_types={"t2.micro": 1},
             subnet_ids=["subnet-12345678"],
             security_group_ids=["sg-12345678"],
         )
@@ -290,7 +247,7 @@ class TestTemplateAggregate:
                 name="userdata-template",
                 provider_api="ec2_fleet",
                 image_id="ami-12345678",
-                instance_type=InstanceType("t2.micro"),
+                machine_types={"t2.micro": 1},
                 subnet_ids=["subnet-12345678"],
                 security_group_ids=["sg-12345678"],
                 user_data=user_data if user_data else None,
@@ -304,7 +261,7 @@ class TestTemplateAggregate:
             name="tags-template",
             provider_api="ec2_fleet",
             image_id="ami-12345678",
-            instance_type=InstanceType("t2.micro"),
+            machine_types={"t2.micro": 1},
             subnet_ids=["subnet-12345678"],
             security_group_ids=["sg-12345678"],
             tags={"Environment": "test"},
@@ -330,7 +287,7 @@ class TestTemplateAggregate:
             name="template-1",
             provider_api="ec2_fleet",
             image_id="ami-12345678",
-            instance_type=InstanceType("t2.micro"),
+            machine_types={"t2.micro": 1},
             subnet_ids=["subnet-12345678"],
             security_group_ids=["sg-12345678"],
         )
@@ -340,7 +297,7 @@ class TestTemplateAggregate:
             name="template-2",  # Different name
             provider_api="run_instances",  # Different API
             image_id="ami-87654321",  # Different AMI
-            instance_type=InstanceType("t2.small"),  # Different instance type
+            machine_types={"t2.small": 1},  # Different machine type
             subnet_ids=["subnet-87654321"],  # Different subnet
             security_group_ids=["sg-87654321"],  # Different security group
         )
@@ -350,7 +307,7 @@ class TestTemplateAggregate:
             name="template-1",  # Same name as template1
             provider_api="ec2_fleet",
             image_id="ami-12345678",
-            instance_type=InstanceType("t2.micro"),
+            machine_types={"t2.micro": 1},
             subnet_ids=["subnet-12345678"],
             security_group_ids=["sg-12345678"],
         )
@@ -366,7 +323,7 @@ class TestTemplateAggregate:
             name="template-1",
             provider_api="ec2_fleet",
             image_id="ami-12345678",
-            instance_type=InstanceType("t2.micro"),
+            machine_types={"t2.micro": 1},
             subnet_ids=["subnet-12345678"],
             security_group_ids=["sg-12345678"],
         )
@@ -376,7 +333,7 @@ class TestTemplateAggregate:
             name="different-name",
             provider_api="run_instances",
             image_id="ami-87654321",
-            instance_type=InstanceType("t2.small"),
+            machine_types={"t2.small": 1},
             subnet_ids=["subnet-87654321"],
             security_group_ids=["sg-87654321"],
         )
@@ -390,7 +347,7 @@ class TestTemplateAggregate:
             name="test-template",
             provider_api="ec2_fleet",
             image_id="ami-12345678",
-            instance_type=InstanceType("t2.micro"),
+            machine_types={"t2.micro": 1},
             subnet_ids=["subnet-12345678"],
             security_group_ids=["sg-12345678"],
         )
@@ -410,7 +367,7 @@ class TestTemplateAggregate:
             name="test-template",
             provider_api="ec2_fleet",
             image_id="ami-12345678",
-            instance_type=InstanceType("t2.micro"),
+            machine_types={"t2.micro": 1},
             subnet_ids=["subnet-12345678"],
             security_group_ids=["sg-12345678"],
             key_name="test-key",
@@ -427,7 +384,7 @@ class TestTemplateAggregate:
         assert template_dict["name"] == "test-template"
         assert template_dict["provider_api"] == "ec2_fleet"
         assert template_dict["image_id"] == "ami-12345678"
-        assert template_dict["instance_type"] == "t2.micro"
+        assert template_dict["machine_types"] == {"t2.micro": 1}
         assert template_dict["subnet_ids"] == ["subnet-12345678"]
         assert template_dict["security_group_ids"] == ["sg-12345678"]
         assert template_dict["key_name"] == "test-key"
@@ -443,7 +400,7 @@ class TestTemplateAggregate:
             "name": "test-template",
             "provider_api": "ec2_fleet",
             "image_id": "ami-12345678",
-            "instance_type": "t2.micro",
+            "machine_types": {"t2.micro": 1},
             "subnet_ids": ["subnet-12345678"],
             "security_group_ids": ["sg-12345678"],
             "key_name": "test-key",
@@ -459,7 +416,7 @@ class TestTemplateAggregate:
         assert template.name == "test-template"
         assert template.provider_api == "ec2_fleet"
         assert template.image_id == "ami-12345678"
-        assert template.instance_type.value == "t2.micro"
+        assert template.machine_types == {"t2.micro": 1}
         assert template.subnet_ids == ["subnet-12345678"]
         assert template.security_group_ids == ["sg-12345678"]
         assert template.key_name == "test-key"
@@ -474,7 +431,7 @@ class TestTemplateAggregate:
             "name",
             "provider_api",
             "image_id",
-            "instance_type",
+            "machine_types",
             "subnet_ids",
             "security_group_ids",
         ]
@@ -484,7 +441,7 @@ class TestTemplateAggregate:
             "name": "test-template",
             "provider_api": "ec2_fleet",
             "image_id": "ami-12345678",
-            "instance_type": InstanceType("t2.micro"),
+            "machine_types": {"t2.micro": 1},
             "subnet_ids": ["subnet-12345678"],
             "security_group_ids": ["sg-12345678"],
         }
@@ -504,7 +461,7 @@ class TestTemplateAggregate:
             name="multi-template",
             provider_api="ec2_fleet",
             image_id="ami-12345678",
-            instance_type=InstanceType("t2.micro"),
+            machine_types={"t2.micro": 1},
             subnet_ids=["subnet-12345678", "subnet-87654321", "subnet-abcdef12"],
             security_group_ids=["sg-12345678", "sg-87654321", "sg-abcdef12"],
         )

@@ -40,7 +40,7 @@ class TestCleanArchitectureIntegration:
             "aws": Mock(
                 template_defaults={
                     "image_id": "ami-12345678",
-                    "instance_type": "t2.micro",
+                    "machine_types": {"t2.micro": 1},
                     "provider_api": "EC2Fleet",
                     "price_type": "ondemand",
                 },
@@ -60,7 +60,7 @@ class TestCleanArchitectureIntegration:
         aws_provider = Mock()
         aws_provider.name = "aws-primary"
         aws_provider.type = "aws"
-        aws_provider.template_defaults = {"instance_type": "t3.small"}  # Override
+        aws_provider.template_defaults = {"machine_types": {"t3.small": 1}}  # Override
         aws_provider.extensions = {"volume_type": "gp2"}  # Override
 
         provider_config.providers = [aws_provider]
@@ -273,7 +273,7 @@ class TestCleanArchitectureIntegration:
         provider_instance = ProviderInstanceConfig(
             name="aws-test",
             type="aws",
-            template_defaults={"instance_type": "t2.micro"},
+            template_defaults={"machine_types": {"t2.micro": 1}},
             extensions={"volume_type": "gp2"},
         )
 

@@ -197,19 +197,16 @@ class AWSTemplateAdapter(TemplateAdapterPort):
             errors["image_id"] = f"Invalid AMI ID format: {template.image_id}"
 
         # Validate instance type(s)
-        instance_types_map = getattr(template, "instance_types", None)
+        machine_types_map = template.machine_types
         abis = getattr(template, "abis_instance_requirements", None)
-        if not (template.instance_type or instance_types_map or abis):
-            errors["instance_type"] = (
-                "Either instance_type, instance_types, or abis_instance_requirements must be specified"
+        if not (machine_types_map or abis):
+            errors["machine_types"] = (
+                "Either machine_types or abis_instance_requirements must be specified"
             )
-        elif template.instance_type:
-            if not self._is_valid_instance_type(template.instance_type):
-                errors["instance_type"] = f"Invalid instance type: {template.instance_type}"
-        elif instance_types_map:
-            for itype in instance_types_map.keys():
+        elif machine_types_map:
+            for itype in machine_types_map.keys():
                 if not self._is_valid_instance_type(itype):
-                    errors["instance_type"] = f"Invalid instance type in instance_types: {itype}"
+                    errors["machine_types"] = f"Invalid instance type in machine_types: {itype}"
                     break
 
         # Validate subnet IDs
@@ -399,8 +396,8 @@ class AWSTemplateAdapter(TemplateAdapterPort):
         if not template.image_id:
             errors.append("Image ID is required for AWS templates")
 
-        if not (template.instance_type or getattr(template, "instance_types", None)):
-            errors.append("Instance type is required for AWS templates")
+        if not template.machine_types:
+            errors.append("Machine types are required for AWS templates")
 
         if not template.subnet_ids or len(template.subnet_ids) == 0:
             errors.append("At least one subnet ID is required for AWS templates")

@@ -212,7 +212,7 @@ class TestTemplateBusinessRules:
             name="Test Template",
             provider_api="RunInstances",
             image_id="ami-123",
-            instance_type="t2.micro",
+            machine_types={"t2.micro": 1},
         )
 
         # Should not be able to create another template with same ID
@@ -230,7 +230,7 @@ class TestTemplateBusinessRules:
                 name="Test Template",
                 provider_api=api,
                 image_id="ami-123",
-                instance_type="t2.micro",
+                machine_types={"t2.micro": 1},
             )
             assert template.provider_api == api
 
@@ -241,7 +241,7 @@ class TestTemplateBusinessRules:
                 name="Test Template",
                 provider_api="InvalidAPI",
                 image_id="ami-123",
-                instance_type="t2.micro",
+                machine_types={"t2.micro": 1},
             )
 
     def test_image_id_must_be_valid_format(self):
@@ -252,7 +252,7 @@ class TestTemplateBusinessRules:
             name="Test Template",
             provider_api="RunInstances",
             image_id="ami-1234567890abcdef0",
-            instance_type="t2.micro",
+            machine_types={"t2.micro": 1},
         )
         assert template.image_id == "ami-1234567890abcdef0"
 
@@ -263,32 +263,32 @@ class TestTemplateBusinessRules:
                 name="Test Template",
                 provider_api="RunInstances",
                 image_id="invalid-ami-id",
-                instance_type="t2.micro",
+                machine_types={"t2.micro": 1},
             )
 
-    def test_instance_type_must_be_valid(self):
-        """Test that instance type must be valid."""
+    def test_machine_types_must_be_valid(self):
+        """Test that machine types must be valid."""
         valid_types = ["t2.micro", "t2.small", "t3.medium", "m5.large"]
 
-        # Valid instance types
-        for instance_type in valid_types:
+        # Valid machine types
+        for machine_type in valid_types:
             template = Template(
-                template_id=f"test-template-{instance_type}",
+                template_id=f"test-template-{machine_type}",
                 name="Test Template",
                 provider_api="RunInstances",
                 image_id="ami-123",
-                instance_type=instance_type,
+                machine_types={machine_type: 1},
             )
-            assert template.instance_type == instance_type
+            assert machine_type in template.machine_types
 
-        # Invalid instance type
+        # Invalid machine type
         with pytest.raises(TemplateValidationError):
             Template(
                 template_id="test-template",
                 name="Test Template",
                 provider_api="RunInstances",
                 image_id="ami-123",
-                instance_type="invalid.type",
+                machine_types={"invalid.type": 1},
             )
 
     def test_max_number_must_be_positive(self):
@@ -299,7 +299,7 @@ class TestTemplateBusinessRules:
             name="Test Template",
             provider_api="RunInstances",
             image_id="ami-123",
-            instance_type="t2.micro",
+            machine_types={"t2.micro": 1},
             max_number=10,
         )
         assert template.max_number == 10
@@ -311,7 +311,7 @@ class TestTemplateBusinessRules:
                 name="Test Template",
                 provider_api="RunInstances",
                 image_id="ami-123",
-                instance_type="t2.micro",
+                machine_types={"t2.micro": 1},
                 max_number=0,
             )
 
@@ -323,7 +323,7 @@ class TestTemplateBusinessRules:
             name="Test Template",
             provider_api="RunInstances",
             image_id="ami-123",
-            instance_type="t2.micro",
+            machine_types={"t2.micro": 1},
             subnet_ids=["subnet-1234567890abcdef0", "subnet-abcdef1234567890"],
         )
         assert len(template.subnet_ids) == 2
@@ -335,7 +335,7 @@ class TestTemplateBusinessRules:
                 name="Test Template",
                 provider_api="RunInstances",
                 image_id="ami-123",
-                instance_type="t2.micro",
+                machine_types={"t2.micro": 1},
                 subnet_ids=["invalid-subnet-id"],
             )
 
@@ -347,7 +347,7 @@ class TestTemplateBusinessRules:
             name="Test Template",
             provider_api="RunInstances",
             image_id="ami-123",
-            instance_type="t2.micro",
+            machine_types={"t2.micro": 1},
             security_group_ids=["sg-1234567890abcdef0", "sg-abcdef1234567890"],
         )
         assert len(template.security_group_ids) == 2
@@ -359,7 +359,7 @@ class TestTemplateBusinessRules:
                 name="Test Template",
                 provider_api="RunInstances",
                 image_id="ami-123",
-                instance_type="t2.micro",
+                machine_types={"t2.micro": 1},
                 security_group_ids=["invalid-sg-id"],
             )
 
@@ -371,7 +371,7 @@ class TestTemplateBusinessRules:
             name="Spot Template",
             provider_api="SpotFleet",
             image_id="ami-123",
-            instance_type="t2.micro",
+            machine_types={"t2.micro": 1},
             max_spot_price=0.05,  # Required for spot fleet
         )
 
@@ -381,8 +381,8 @@ class TestTemplateBusinessRules:
             name="Fleet Template",
             provider_api="EC2Fleet",
             image_id="ami-123",
-            instance_type="t2.micro",
-            instance_types=["t2.micro", "t2.small", "t3.micro"],  # Mixed types
+            machine_types={"t2.micro": 1},
+            machine_types=["t2.micro", "t2.small", "t3.micro"],  # Mixed types
         )
 
         assert spot_template.provider_api == "SpotFleet"
@@ -476,7 +476,7 @@ class TestMachineBusinessRules:
             request_id="req-123",
             template_id="template-123",
             status=MachineStatus.RUNNING,
-            instance_type="t2.micro",
+            machine_types={"t2.micro": 1},
             hourly_cost=0.0116,
         )
 
@@ -528,11 +528,11 @@ class TestCrossAggregateBusinessRules:
             request_id="req-123",
             template_id="template-123",
             status=MachineStatus.RUNNING,
-            instance_type=template_instance_type,
+            machine_types={"t2.micro": 1},
         )
 
         # Machine instance type should match template
-        assert machine.instance_type == template_instance_type
+        assert machine.machine_types == {"t2.micro": 1}
 
     def test_request_completion_requires_all_machines(self):
         """Test that requests can only be completed when all machines are ready."""

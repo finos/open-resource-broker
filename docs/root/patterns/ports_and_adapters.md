@@ -301,7 +301,7 @@ class AWSTemplateAdapter:
         self._logger.info(f"Validating AWS template configuration")
 
         # AWS-specific validation logic
-        required_fields = ['image_id', 'vm_type', 'subnet_ids']
+        required_fields = ['image_id', 'machine_types', 'subnet_ids']
         for field in required_fields:
             if field not in template_config:
                 self._logger.error(f"Missing required field: {field}")
@@ -365,7 +365,7 @@ class AWSProviderStrategy(ProviderStrategy):
         for instance in response['Instances']:
             machine = Machine(
                 machine_id=instance['InstanceId'],
-                instance_type=instance['InstanceType'],
+                machine_types=instance['InstanceType'],
                 status=instance['State']['Name'],
                 request_id=request.id
             )

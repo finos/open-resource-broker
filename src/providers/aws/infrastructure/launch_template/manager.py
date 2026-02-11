@@ -307,9 +307,8 @@ class AWSLaunchTemplateManager:
             # Basic values
             "image_id": template.image_id,
             "instance_type": (
-                template.instance_type
-                if template.instance_type
-                else next(iter(template.instance_types.keys()))
+                list(template.machine_types.keys())[0] if template.machine_types
+                else "t3.medium"  # fallback
             ),
             "request_id": str(request.request_id),
             "template_id": str(template.template_id),
@@ -450,9 +449,8 @@ class AWSLaunchTemplateManager:
         launch_template_data = {
             "ImageId": image_id,
             "InstanceType": (
-                aws_template.instance_type
-                if aws_template.instance_type
-                else next(iter(aws_template.instance_types.keys()))
+                list(aws_template.machine_types.keys())[0] if aws_template.machine_types
+                else "t3.medium"  # fallback
             ),
             "TagSpecifications": [
                 {

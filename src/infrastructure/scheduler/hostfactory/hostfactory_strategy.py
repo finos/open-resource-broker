@@ -918,3 +918,22 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
     def format_request_for_display(self, request: RequestDTO) -> dict[str, Any]:
         """Format RequestDTO for display using HostFactory field mapper."""
         return request.to_dict()  # Use DTO's to_dict() method
+
+    def _transform_machine_types_input(self, hf_data: dict) -> dict:
+        """Transform HF vmType/vmTypes to internal machine_types."""
+        if "vmType" in hf_data:
+            return {"machine_types": {hf_data["vmType"]: 1}}
+        elif "vmTypes" in hf_data:
+            return {"machine_types": hf_data["vmTypes"]}
+        return {}
+
+    def _transform_machine_types_output(self, internal_data: dict) -> dict:
+        """Transform internal machine_types to HF vmType/vmTypes."""
+        machine_types = internal_data.get("machine_types", {})
+        if not machine_types:
+            return {}
+        
+        if len(machine_types) == 1 and list(machine_types.values())[0] == 1:
+            return {"vmType": list(machine_types.keys())[0]}
+        else:
+            return {"vmTypes": machine_types}

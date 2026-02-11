@@ -68,7 +68,7 @@ class TestPackageNameIntegration:
             template = AWSTemplate(
                 template_id="integration-test",
                 image_id="ami-test",
-                instance_type="t3.micro",
+                machine_types={"t3.micro": 1},
                 provider_api=ProviderApi.EC2_FLEET,
                 subnet_ids=["subnet-test"],
             )

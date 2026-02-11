@@ -109,7 +109,7 @@ class TestEndToEndDryRun:
         mock_template = Template(
             template_id="test-template",
             provider_api="EC2Fleet",
-            vm_type="t2.micro",
+            machine_types={"t2.micro": 1},
             image_id="ami-12345678",
             subnet_ids=["subnet-12345678"],
             security_group_ids=["sg-12345678"],
@@ -262,7 +262,7 @@ class TestEndToEndDryRun:
         template = Template(
             template_id="test-template",
             provider_api="EC2Fleet",
-            vm_type="t2.micro",
+            machine_types={"t2.micro": 1},
             image_id="ami-12345678",
         )
 
@@ -295,7 +295,7 @@ class TestEndToEndDryRun:
         template = Template(
             template_id="test-template",
             provider_api="EC2Fleet",
-            vm_type="t2.micro",
+            machine_types={"t2.micro": 1},
             image_id="ami-12345678",
         )
 

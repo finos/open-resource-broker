@@ -345,7 +345,7 @@ def sample_template() -> Template:
             name="test-template",
             provider_api="ec2_fleet",
             image_id="ami-12345678",
-            instance_type="t2.micro",  # Use string instead of InstanceType object
+            machine_types={"t2.micro": 1},  # Use string instead of InstanceType object
             max_instances=10,  # Add max_instances field
             subnet_ids=["subnet-12345678"],
             security_group_ids=["sg-12345678"],
@@ -384,7 +384,7 @@ def sample_machine() -> Machine:
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType("t2.micro"),
+            machine_types={"t2.micro": 1},
             availability_zone="us-east-1a",
             private_ip="10.0.1.100",
             public_ip="54.123.45.67",
@@ -575,7 +575,7 @@ class TestDataBuilder:
             name=name or "test-template",
             provider_api=provider_api,
             image_id=kwargs.get("image_id", "ami-12345678"),
-            instance_type=InstanceType(kwargs.get("instance_type", "t2.micro")),
+            machine_types=kwargs.get("machine_types", {"t2.micro": 1}),
             subnet_ids=kwargs.get("subnet_ids", ["subnet-12345678"]),
             security_group_ids=kwargs.get("security_group_ids", ["sg-12345678"]),
             key_name=kwargs.get("key_name", "test-key"),
@@ -612,7 +612,7 @@ class TestDataBuilder:
             template_id=kwargs.get("template_id", generate_template_id()),
             request_id=kwargs.get("request_id", generate_request_id()),
             status=kwargs.get("status", "running"),
-            instance_type=InstanceType(kwargs.get("instance_type", "t2.micro")),
+            machine_types=kwargs.get("machine_types", {"t2.micro": 1}),
             availability_zone=kwargs.get("availability_zone", "us-east-1a"),
             private_ip=kwargs.get("private_ip", "10.0.1.100"),
             public_ip=kwargs.get("public_ip", "54.123.45.67"),

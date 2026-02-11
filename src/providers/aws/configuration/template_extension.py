@@ -61,10 +61,10 @@ class AWSTemplateExtensionConfig(BaseModel):
     vm_types: Optional[dict[str, int]] = Field(
         None, description="Map of instance types and weights for spot/heterogeneous"
     )
-    vm_types_on_demand: Optional[dict[str, int]] = Field(
+    machine_types_ondemand: Optional[dict[str, int]] = Field(
         None, description="On-Demand instance types for heterogeneous"
     )
-    vm_types_priority: Optional[dict[str, int]] = Field(
+    machine_types_priority: Optional[dict[str, int]] = Field(
         None, description="Priority settings for instance types"
     )
 

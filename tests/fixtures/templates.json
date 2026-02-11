@@ -4,7 +4,7 @@
       "template_id": "basic-aws-template",
       "provider_type": "aws",
       "image_id": "ami-12345678",
-      "primary_instance_type": "t2.micro",
+      "machine_types": {"t2.micro": 1},
       "network_zones": ["subnet-123456"],
       "security_groups": ["sg-123456"],
       "key_pair_name": "test-keypair",
@@ -27,12 +27,11 @@
       "template_id": "spot-fleet-template",
       "provider_type": "aws",
       "image_id": "ami-87654321",
-      "instance_types": {
+      "machine_types": {
         "t2.micro": 1,
         "t2.small": 2,
         "t3.micro": 1
       },
-      "primary_instance_type": "t2.micro",
       "network_zones": ["subnet-123456", "subnet-789012"],
       "security_groups": ["sg-123456", "sg-789012"],
       "key_pair_name": "spot-keypair",
@@ -68,12 +67,11 @@
       "template_id": "ec2-fleet-template",
       "provider_type": "aws",
       "image_id": "ami-abcdef12",
-      "instance_types": {
+      "machine_types": {
         "t3.small": 2,
         "t3.medium": 1,
         "m5.large": 1
       },
-      "primary_instance_type": "t3.small",
       "network_zones": ["subnet-abc123", "subnet-def456"],
       "security_groups": ["sg-abc123"],
       "key_pair_name": "ec2-fleet-key",
@@ -112,7 +110,7 @@
       "template_id": "asg-template",
       "provider_type": "aws",
       "image_id": "ami-fedcba98",
-      "primary_instance_type": "t2.small",
+      "machine_types": {"t2.small": 1},
       "network_zones": ["subnet-asg123"],
       "security_groups": ["sg-asg123", "sg-common"],
       "key_pair_name": "asg-keypair",
@@ -141,7 +139,7 @@
       "template_id": "run-instances-template",
       "provider_type": "aws",
       "image_id": "ami-123abc45",
-      "primary_instance_type": "t3.micro",
+      "machine_types": {"t3.micro": 1},
       "network_zones": ["subnet-run123"],
       "security_groups": ["sg-run123"],
       "key_pair_name": "run-instances-key",

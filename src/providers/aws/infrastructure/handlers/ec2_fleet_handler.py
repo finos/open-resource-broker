@@ -534,9 +534,9 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
         # Instance overrides computation
         instance_overrides = []
-        if template.instance_types and template.subnet_ids:
+        if template.machine_types and template.subnet_ids:
             for subnet_id in template.subnet_ids:
-                for instance_type, weight in template.instance_types.items():
+                for instance_type, weight in template.machine_types.items():
                     instance_overrides.append(
                         {
                             "instance_type": instance_type,
@@ -544,8 +544,8 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                             "weighted_capacity": weight,
                         }
                     )
-        elif template.instance_types:
-            for instance_type, weight in template.instance_types.items():
+        elif template.machine_types:
+            for instance_type, weight in template.machine_types.items():
                 instance_overrides.append(
                     {"instance_type": instance_type, "weighted_capacity": weight}
                 )
@@ -554,10 +554,10 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         ondemand_overrides = []
         if (
             template.price_type == "heterogeneous"
-            and hasattr(template, "instance_types_ondemand")
-            and template.instance_types_ondemand
+            and hasattr(template, "machine_types_ondemand")
+            and template.machine_types_ondemand
         ):
-            for instance_type, weight in template.instance_types_ondemand.items():
+            for instance_type, weight in template.machine_types_ondemand.items():
                 ondemand_overrides.append(
                     {"instance_type": instance_type, "weighted_capacity": weight}
                 )
@@ -765,17 +765,17 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
         else:
             # Add overrides with weighted capacity if multiple instance types are specified
-            if template.instance_types:
+            if template.machine_types:
                 overrides = []
-                for instance_type, weight in template.instance_types.items():
+                for instance_type, weight in template.machine_types.items():
                     override = {"InstanceType": instance_type, "WeightedCapacity": weight}
                     overrides.append(override)
                 fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
 
                 # Add on-demand instance types for heterogeneous fleets
-                if price_type == "heterogeneous" and template.instance_types_ondemand:
+                if price_type == "heterogeneous" and template.machine_types_ondemand:
                     on_demand_overrides = []
-                    for instance_type, weight in template.instance_types_ondemand.items():
+                    for instance_type, weight in template.machine_types_ondemand.items():
                         override = {
                             "InstanceType": instance_type,
                             "WeightedCapacity": weight,
@@ -793,10 +793,10 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = []
 
                 # If we have both instance types and subnets, create all combinations
-                if template.instance_types:
+                if template.machine_types:
                     overrides = []
                     for subnet_id in template.subnet_ids:
-                        for instance_type, weight in template.instance_types.items():
+                        for instance_type, weight in template.machine_types.items():
                             override = {
                                 "SubnetId": subnet_id,
                                 "InstanceType": instance_type,
@@ -805,11 +805,11 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                             overrides.append(override)
 
                         # Add on-demand instance types for heterogeneous fleets
-                        if price_type == "heterogeneous" and template.instance_types_ondemand:
+                        if price_type == "heterogeneous" and template.machine_types_ondemand:
                             for (
                                 instance_type,
                                 weight,
-                            ) in template.instance_types_ondemand.items():
+                            ) in template.machine_types_ondemand.items():
                                 override = {
                                     "SubnetId": subnet_id,
                                     "InstanceType": instance_type,
@@ -1300,7 +1300,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with instant fulfillment using on-demand instances",
                 provider_type="aws",
                 provider_api="EC2Fleet",
-                instance_type="t3.medium",
+                machine_types={"t3.medium": 1},
                 max_instances=10,
                 price_type="ondemand",
                 tags={"Environment": "dev", "ManagedBy": "ORB"},
@@ -1312,7 +1312,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with instant fulfillment using spot instances",
                 provider_type="aws",
                 provider_api="EC2Fleet",
-                instance_type="t3.medium",
+                machine_types={"t3.medium": 1},
                 max_instances=10,
                 price_type="spot",
                 max_price=0.05,
@@ -1325,7 +1325,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with instant fulfillment using mixed pricing",
                 provider_type="aws",
                 provider_api="EC2Fleet",
-                instance_type="t3.medium",
+                machine_types={"t3.medium": 1},
                 max_instances=10,
                 price_type="heterogeneous",
                 percent_on_demand=30,
@@ -1341,7 +1341,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with request fulfillment using on-demand instances",
                 provider_type="aws",
                 provider_api="EC2Fleet",
-                instance_type="t3.medium",
+                machine_types={"t3.medium": 1},
                 max_instances=15,
                 price_type="ondemand",
                 tags={"Environment": "test", "ManagedBy": "ORB"},
@@ -1353,7 +1353,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with request fulfillment using spot instances",
                 provider_type="aws",
                 provider_api="EC2Fleet",
-                instance_type="t3.medium",
+                machine_types={"t3.medium": 1},
                 max_instances=20,
                 price_type="spot",
                 allocation_strategy="capacity_optimized",
@@ -1367,7 +1367,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with request fulfillment using mixed pricing",
                 provider_type="aws",
                 provider_api="EC2Fleet",
-                instance_types={"t3.medium": 1, "t3.large": 2},
+                machine_types={"t3.medium": 1, "t3.large": 2},
                 max_instances=25,
                 price_type="heterogeneous",
                 percent_on_demand=40,
@@ -1384,7 +1384,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with maintain capacity using on-demand instances",
                 provider_type="aws",
                 provider_api="EC2Fleet",
-                instance_type="t3.medium",
+                machine_types={"t3.medium": 1},
                 max_instances=12,
                 price_type="ondemand",
                 tags={"Environment": "prod", "ManagedBy": "ORB"},
@@ -1396,7 +1396,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with maintain capacity using spot instances",
                 provider_type="aws",
                 provider_api="EC2Fleet",
-                instance_type="t3.medium",
+                machine_types={"t3.medium": 1},
                 max_instances=30,
                 price_type="spot",
                 allocation_strategy="price_capacity_optimized",
@@ -1410,7 +1410,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with maintain capacity using mixed pricing",
                 provider_type="aws",
                 provider_api="EC2Fleet",
-                instance_types={"t3.medium": 1, "t3.large": 2, "t3.xlarge": 3},
+                machine_types={"t3.medium": 1, "t3.large": 2, "t3.xlarge": 3},
                 max_instances=50,
                 price_type="heterogeneous",
                 percent_on_demand=50,

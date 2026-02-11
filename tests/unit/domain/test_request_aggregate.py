@@ -294,7 +294,7 @@ class TestRequestAggregate:
     def test_request_configuration(self):
         """Test request configuration handling."""
         config = {
-            "instance_type": "t2.small",
+            "machine_types": {"t2.small": 1},
             "spot_price": "0.05",
             "user_data": "#!/bin/bash\necho 'custom config'",
         }
@@ -307,7 +307,7 @@ class TestRequestAggregate:
         )
 
         assert request.configuration == config
-        assert request.configuration["instance_type"] == "t2.small"
+        assert request.configuration["machine_types"] == {"t2.small": 1}
         assert request.configuration["spot_price"] == "0.05"
 
     def test_request_tags_operations(self):
@@ -386,7 +386,7 @@ class TestRequestAggregate:
             requester_id="user-123",
             priority=2,
             tags={"Environment": "test"},
-            configuration={"instance_type": "t2.small"},
+            configuration={"machine_types": {"t2.small": 1}},
         )
 
         request_dict = request.model_dump()
@@ -398,7 +398,7 @@ class TestRequestAggregate:
         assert request_dict["status"] == RequestStatus.PENDING.value
         assert request_dict["request_type"] == RequestType.NEW.value
         assert request_dict["tags"] == {"Environment": "test"}
-        assert request_dict["configuration"] == {"instance_type": "t2.small"}
+        assert request_dict["configuration"] == {"machine_types": {"t2.small": 1}}
         assert "id" in request_dict
         assert "created_at" in request_dict
         assert "updated_at" in request_dict
@@ -532,7 +532,7 @@ class TestRequestValueObjects:
     def test_request_configuration_creation(self):
         """Test RequestConfiguration creation."""
         config_dict = {
-            "instance_type": "t2.small",
+            "machine_types": {"t2.small": 1},
             "spot_price": "0.05",
             "user_data": "#!/bin/bash\necho 'test'",
         }

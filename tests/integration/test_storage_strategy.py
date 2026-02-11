@@ -153,7 +153,7 @@ def test_machine_repository_enhancements():
             template_id="test-template",
             request_id="req-123",
             provider_type="aws",
-            instance_type=InstanceType(value="t2.micro"),
+            machine_types={"t2.micro": 1},
             image_id="ami-123456",
             # Additional network fields
             private_ip="10.0.1.100",

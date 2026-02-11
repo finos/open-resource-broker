@@ -61,7 +61,7 @@ class TestMachineAggregate:
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType(value="t2.micro"),
+            machine_types={"t2.micro": 1},
             availability_zone="us-east-1a",
             private_ip="10.0.1.100",
             public_ip="54.123.45.67",
@@ -75,7 +75,7 @@ class TestMachineAggregate:
         assert machine.template_id == "template-001"
         assert machine.request_id == "request-001"
         assert machine.status == "running"
-        assert machine.instance_type.value == "t2.micro"
+        assert machine.machine_types == {"t2.micro": 1}
         assert machine.availability_zone == "us-east-1a"
         assert machine.private_ip == "10.0.1.100"
         assert machine.public_ip == "54.123.45.67"
@@ -92,7 +92,7 @@ class TestMachineAggregate:
             template_id="template-002",
             request_id="request-002",
             status="pending",
-            instance_type=InstanceType(value="t3.small"),
+            machine_types={"t3.small": 1},
             availability_zone="us-west-2b",
         )
 
@@ -101,7 +101,7 @@ class TestMachineAggregate:
         assert machine.template_id == "template-002"
         assert machine.request_id == "request-002"
         assert machine.status == "pending"
-        assert machine.instance_type.value == "t3.small"
+        assert machine.machine_types == {"t3.small": 1}
         assert machine.availability_zone == "us-west-2b"
         assert machine.private_ip is None
         assert machine.public_ip is None
@@ -115,7 +115,7 @@ class TestMachineAggregate:
             template_id="template-001",
             request_id="request-001",
             status="pending",
-            instance_type=InstanceType(value="t2.micro"),
+            machine_types={"t2.micro": 1},
             availability_zone="us-east-1a",
         )
 
@@ -149,7 +149,7 @@ class TestMachineAggregate:
             template_id="template-001",
             request_id="request-001",
             status="launching",
-            instance_type=InstanceType(value="t2.micro"),
+            machine_types={"t2.micro": 1},
             availability_zone="us-east-1a",
         )
 
@@ -169,7 +169,7 @@ class TestMachineAggregate:
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType(value="t2.micro"),
+            machine_types={"t2.micro": 1},
             availability_zone="us-east-1a",
         )
 
@@ -192,7 +192,7 @@ class TestMachineAggregate:
             template_id="template-001",
             request_id="request-001",
             status="terminated",
-            instance_type=InstanceType(value="t2.micro"),
+            machine_types={"t2.micro": 1},
             availability_zone="us-east-1a",
         )
 
@@ -214,7 +214,7 @@ class TestMachineAggregate:
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType(value="t2.micro"),
+            machine_types={"t2.micro": 1},
             availability_zone="us-east-1a",
         )
 
@@ -257,7 +257,7 @@ class TestMachineAggregate:
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType(value="t2.micro"),
+            machine_types={"t2.micro": 1},
             availability_zone="us-east-1a",
             network_configuration=network_config,
         )
@@ -282,7 +282,7 @@ class TestMachineAggregate:
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType(value="t2.micro"),
+            machine_types={"t2.micro": 1},
             availability_zone="us-east-1a",
             running_since=start_time,
         )
@@ -304,7 +304,7 @@ class TestMachineAggregate:
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType(value="t2.micro"),
+            machine_types={"t2.micro": 1},
             availability_zone="us-east-1a",
             hourly_cost=0.0116,  # t2.micro cost per hour
         )
@@ -363,7 +363,7 @@ class TestMachineAggregate:
                 template_id="template-001",
                 request_id="request-001",
                 status="running",
-                instance_type=InstanceType(value="t2.micro"),
+                machine_types={"t2.micro": 1},
                 availability_zone="us-east-1a",
             )
 
@@ -379,7 +379,7 @@ class TestMachineAggregate:
                 template_id="template-001",
                 request_id="request-001",
                 status="running",
-                instance_type=InstanceType(value="t2.micro"),
+                machine_types={"t2.micro": 1},
                 availability_zone="us-east-1a",
                 private_ip=ip,
                 public_ip=ip,
@@ -398,7 +398,7 @@ class TestMachineAggregate:
                     template_id="template-001",
                     request_id="request-001",
                     status="running",
-                    instance_type=InstanceType(value="t2.micro"),
+                    machine_types={"t2.micro": 1},
                     availability_zone="us-east-1a",
                     private_ip=ip,
                 )
@@ -411,7 +411,7 @@ class TestMachineAggregate:
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType(value="t2.micro"),
+            machine_types={"t2.micro": 1},
             availability_zone="us-east-1a",
             tags={"Environment": "test"},
         )
@@ -442,7 +442,7 @@ class TestMachineAggregate:
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType(value="t2.micro"),
+            machine_types={"t2.micro": 1},
             availability_zone="us-east-1a",
         )
 
@@ -462,7 +462,7 @@ class TestMachineAggregate:
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType(value="t2.micro"),
+            machine_types={"t2.micro": 1},
             availability_zone="us-east-1a",
         )
 
@@ -478,7 +478,7 @@ class TestMachineAggregate:
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType(value="t2.micro"),
+            machine_types={"t2.micro": 1},
             availability_zone="us-east-1a",
         )
 
@@ -502,7 +502,7 @@ class TestMachineAggregate:
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType(value="t2.micro"),
+            machine_types={"t2.micro": 1},
             availability_zone="us-east-1a",
             private_ip="10.0.1.100",
             public_ip="54.123.45.67",
@@ -550,7 +550,7 @@ class TestMachineAggregate:
         assert machine.template_id == "template-001"
         assert machine.request_id == "request-001"
         assert machine.status == "running"
-        assert machine.instance_type.value == "t2.micro"
+        assert machine.machine_types == {"t2.micro": 1}
         assert machine.availability_zone == "us-east-1a"
         assert machine.private_ip == "10.0.1.100"
         assert machine.public_ip == "54.123.45.67"
@@ -564,7 +564,7 @@ class TestMachineAggregate:
             template_id="template-001",
             request_id="request-001",
             status="running",
-            instance_type=InstanceType(value="t2.micro"),
+            machine_types={"t2.micro": 1},
             availability_zone="us-east-1a",
         )
 

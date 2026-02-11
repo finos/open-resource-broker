@@ -21,7 +21,6 @@ class Template(BaseModel):
     description: Optional[str] = None
 
     # Instance configuration
-    instance_type: Optional[str] = None
     image_id: Optional[str] = None
     max_instances: int = 1
 
@@ -34,9 +33,10 @@ class Template(BaseModel):
     allocation_strategy: Optional[str] = None  # Will be set based on price_type
     max_price: Optional[float] = None
 
-    # Instance types configuration (extensible for all providers)
-    instance_types: dict[str, int] = Field(default_factory=dict)  # type -> weight
-    primary_instance_type: Optional[str] = None  # for simple cases
+    # Machine types configuration (unified for all providers)
+    machine_types: dict[str, int] = Field(default_factory=dict)
+    machine_types_ondemand: dict[str, int] = Field(default_factory=dict)
+    machine_types_priority: dict[str, int] = Field(default_factory=dict)
 
     # Network configuration (generic concepts)
     network_zones: list[str] = Field(default_factory=list)  # subnets, zones, regions
@@ -147,11 +147,17 @@ class Template(BaseModel):
 
         return self
 
-    # Host Factory standard fields (provider-agnostic interface)
-    vm_type: Optional[str] = None
-    vm_types: dict[str, Any] = Field(default_factory=dict)
-    key_name: Optional[str] = None
-    user_data: Optional[str] = None
+    # Provider configuration (multi-provider support)
+    provider_type: Optional[str] = None
+    provider_name: Optional[str] = None
+    provider_api: Optional[str] = None
+
+    # Timestamps for tracking
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    # Active status flag
+    is_active: bool = True
 
     @property
     def subnet_id(self) -> Optional[str]:

@@ -37,8 +37,14 @@ def add_global_arguments(parser):
     Filtering Strategy:
     - Generic filters: --filter field=value (works on any snake_case field)
     - Specific filters: Command-specific filters like --status, --template-id
-    - Both can be combined: --filter "name~test" --status running
-    - Multiple generic filters use AND logic: --filter "field1=value1" --filter "field2=value2"
+    - Both can be combined: --filter "machine_types~t3" --status running
+    - Multiple generic filters use AND logic: --filter "machine_types~t3" --filter "status=running"
+    
+    Common filter examples:
+    - --filter "machine_types~t3"           # Templates with t3 instance types
+    - --filter "machine_types~medium"       # Templates with medium-sized instances
+    - --filter "status=running"             # Running machines/requests
+    - --filter "template_id~instant"        # Templates with "instant" in ID
     """
     parser.add_argument("--provider", help="Override provider instance")
     parser.add_argument("--scheduler", choices=["default", "hostfactory", "hf"], help="Override scheduler strategy")
@@ -46,7 +52,7 @@ def add_global_arguments(parser):
     parser.add_argument("--format", choices=["json", "yaml", "table", "list"], default="json", help="Output format")
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
     parser.add_argument("--quiet", action="store_true", help="Suppress output")
-    parser.add_argument("--filter", action="append", help="Generic filter using snake_case field names: field=value, field~value, field=~regex. Can be combined with specific filters. Use multiple times for AND logic.")
+    parser.add_argument("--filter", action="append", help="Generic filter using snake_case field names: field=value, field~value, field=~regex. Examples: --filter \"machine_types~t3\", --filter \"status=running\". Can be combined with specific filters. Use multiple times for AND logic.")
 
 
 def add_force_argument(parser):
@@ -352,7 +358,7 @@ def parse_args() -> tuple[argparse.Namespace, dict]:
     # Main parser with global options
     parser = argparse.ArgumentParser(
         prog=os.path.basename(sys.argv[0]),
-        description="Open Resource Broker - Cloud resource management for IBM Spectrum Symphony",
+        description="Open Resource Broker - Cloud resource management for IBM Spectrum Symphony. Use --filter with snake_case field names (e.g., machine_types~t3) for generic filtering.",
         formatter_class=HELP_FORMATTER,
         epilog=f"""
 Examples:
@@ -360,6 +366,7 @@ Examples:
   %(prog)s templates list --provider aws-prod         # Use specific provider
   %(prog)s templates generate --all-providers         # Generate for all providers
   %(prog)s machines request template-id 5             # Request 5 machines
+  %(prog)s machines list --filter "machine_types~t3"  # Filter machines by type
   %(prog)s requests status req-123                    # Check request status
   %(prog)s providers health --provider aws-prod       # Check provider health
 

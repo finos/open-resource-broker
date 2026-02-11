@@ -83,7 +83,7 @@ class TestAdditionalEndToEnd:
         self.aws_template = AWSTemplate(
             template_id="integration-test-template",
             image_id="ami-12345678",
-            primary_instance_type="t2.micro",
+            machine_types={"t2.micro": 1},
             subnet_ids=["subnet-123"],  # Changed from network_zones
             security_group_ids=["sg-123"],  # Changed from security_groups
             key_name="test-key",  # Changed from key_pair_name
@@ -414,7 +414,7 @@ class TestAdditionalEndToEnd:
                 status="pending",
                 private_ip_address=f"10.0.1.{i + 10}",
                 launch_time=int(datetime.now().timestamp()),
-                instance_type="t2.micro",
+                machine_types={"t2.micro": 1},
                 price_type="spot",
             )
             machines.append(machine)
@@ -442,7 +442,7 @@ class TestAdditionalEndToEnd:
             assert hf_output["machineId"] == machine.machine_id
             assert hf_output["result"] == machine.result
             assert hf_output["privateIpAddress"] == machine.private_ip_address
-            assert hf_output["instanceType"] == machine.instance_type
+            assert hf_output["instanceType"] == list(machine.machine_types.keys())[0] if machine.machine_types else None
             assert hf_output["priceType"] == machine.price_type
 
 

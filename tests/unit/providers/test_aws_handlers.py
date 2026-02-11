@@ -38,7 +38,7 @@ class TestContextFieldSupport:
         template = Mock()
         template.context = "c-abc1234567890123"
         template.fleet_type = "instant"
-        template.instance_types = None
+        template.machine_types = {}
         template.subnet_ids = None
         template.tags = None
         template.price_type = "ondemand"
@@ -46,7 +46,7 @@ class TestContextFieldSupport:
         template.max_spot_price = None
         template.percent_on_demand = None
         template.allocation_strategy_on_demand = None
-        template.instance_types_ondemand = None
+        template.machine_types_ondemand = {}
         template.template_id = "test-template"
 
         # Mock request
@@ -107,7 +107,7 @@ class TestContextFieldSupport:
         template.context = "development-testing"
         template.fleet_role = "arn:aws:iam::123456789012:role/aws-service-role/spotfleet.amazonaws.com/AWSServiceRoleForEC2SpotFleet"
         template.fleet_type = "request"  # Use string instead of Mock
-        template.instance_types = None
+        template.machine_types = {}
         template.subnet_ids = None
         template.tags = None
         template.allocation_strategy = None
@@ -115,7 +115,7 @@ class TestContextFieldSupport:
         template.spot_fleet_request_expiry = 30
         template.percent_on_demand = 0  # Fix: Set to numeric value instead of Mock
         template.price_type = "spot"  # Fix: Add missing price_type attribute
-        template.instance_type = "t3.micro"  # Fix: Add missing instance_type
+        template.machine_types = {"t3.micro": 1}  # Fix: Add missing machine_types
         template.template_id = "test-template"  # Fix: Add missing template_id
         template.get_instance_requirements_payload = Mock(return_value=None)
 
@@ -150,9 +150,8 @@ class TestContextFieldSupport:
             "AWSServiceRoleForEC2SpotFleet"
         )
         template.fleet_type = "request"
-        template.instance_types = None
-        template.instance_types_ondemand = None
-        template.instance_type = "t3.micro"
+        template.machine_types_ondemand = {}
+        template.machine_types = {"t3.micro": 1}
         template.subnet_ids = ["subnet-abc123"]
         template.tags = None
         template.allocation_strategy = None
@@ -189,7 +188,7 @@ class TestContextFieldSupport:
         template = Mock()
         template.context = None
         template.fleet_type = "instant"
-        template.instance_types = None
+        template.machine_types = {}
         template.subnet_ids = None
         template.tags = None
         template.price_type = "ondemand"
@@ -197,7 +196,7 @@ class TestContextFieldSupport:
         template.max_spot_price = None
         template.percent_on_demand = None
         template.allocation_strategy_on_demand = None
-        template.instance_types_ondemand = None
+        template.machine_types_ondemand = {}
         template.template_id = "test-template"
 
         # Mock request
@@ -241,8 +240,8 @@ class TestEC2FleetHandler:
             allocation_strategy_on_demand=None,
             percent_on_demand=0,
             max_price=None,
-            instance_types=None,
-            instance_types_ondemand=None,
+            machine_types={},
+            machine_types_ondemand={},
             subnet_ids=None,
             tags=None,
             context=None,
@@ -304,13 +303,12 @@ class TestEC2FleetHandler:
 
         template = Mock()
         template.template_id = "test-template"
-        template.instance_type = "t2.micro"
+        template.machine_types = {"t2.micro": 1}
         template.image_id = "ami-12345678"
         template.subnet_ids = [subnet["Subnet"]["SubnetId"]]
         template.security_group_ids = [sg["GroupId"]]
         template.tags = {}
         template.fleet_type = "maintain"
-        template.instance_types = ["t2.micro"]
         template.key_pair_name = None
         template.user_data = None
 
@@ -349,13 +347,12 @@ class TestEC2FleetHandler:
 
         template = Mock()
         template.template_id = "test-template"
-        template.instance_type = "invalid-instance-type"
+        template.machine_types = {"invalid-instance-type": 1}
         template.image_id = "ami-invalid"
         template.subnet_ids = ["subnet-invalid"]
         template.security_group_ids = ["sg-invalid"]
         template.tags = {}
         template.fleet_type = "maintain"
-        template.instance_types = ["invalid-instance-type"]
         template.key_pair_name = None
         template.user_data = None
 
@@ -1212,9 +1209,8 @@ class TestSpotFleetHandler:
             allocation_strategy_on_demand=None,
             percent_on_demand=0,
             max_price=None,
-            instance_type=None,
-            instance_types={"t3.micro": 1},
-            instance_types_ondemand=None,
+            machine_types={"t3.micro": 1},
+            machine_types_ondemand={},
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
             tags=None,
@@ -1279,7 +1275,7 @@ class TestSpotFleetHandler:
         template.template_id = "test-template"
         template.fleet_role = "arn:aws:iam::123456789012:role/fleet-role"
         template.fleet_type = "request"
-        template.instance_type = "t2.micro"
+        template.machine_types = {"t2.micro": 1}
         template.image_id = "ami-12345678"
         template.subnet_ids = [subnet["Subnet"]["SubnetId"]]
         template.security_group_ids = [sg["GroupId"]]
@@ -1307,7 +1303,7 @@ class TestSpotFleetHandler:
             security_group_ids=["sg-1"],
             price_type="spot",
             percent_on_demand=0,
-            instance_types=None,
+            machine_types={},
             context=None,
             get_instance_requirements_payload=lambda: None,
             allocation_strategy="lowest-price",
@@ -1338,7 +1334,7 @@ class TestSpotFleetHandler:
             security_group_ids=["sg-1"],
             price_type="ondemand",
             percent_on_demand=75,
-            instance_types=None,
+            machine_types={},
             context=None,
             get_instance_requirements_payload=lambda: None,
             allocation_strategy=None,
@@ -1368,7 +1364,7 @@ class TestSpotFleetHandler:
             security_group_ids=["sg-1"],
             price_type="heterogeneous",
             percent_on_demand=50,
-            instance_types={"t3.micro": 1},
+            machine_types={"t3.micro": 1},
             context=None,
             get_instance_requirements_payload=lambda: None,
             allocation_strategy=None,
@@ -1874,7 +1870,7 @@ class TestRunInstancesHandler:
 
         template = Mock()
         template.template_id = "test-template"
-        template.instance_type = "t2.micro"
+        template.machine_types = {"t2.micro": 1}
         template.image_id = "ami-12345678"
         template.key_pair_name = "test-key"
         template.security_group_ids = ["sg-12345678"]
@@ -1917,7 +1913,7 @@ class TestRunInstancesHandler:
 
         template = Mock()
         template.template_id = "test-template"
-        template.instance_type = "x1e.32xlarge"  # Very large instance
+        template.machine_types = {"x1e.32xlarge": 1}  # Very large instance
         template.image_id = "ami-12345678"
         template.key_pair_name = None
         template.security_group_ids = ["sg-12345678"]
@@ -1960,7 +1956,7 @@ class TestRunInstancesHandler:
 
         template = Mock()
         template.template_id = "test-template"
-        template.instance_type = "t2.micro"
+        template.machine_types = {"t2.micro": 1}
         template.image_id = "ami-12345678"
         template.key_pair_name = None
         template.security_group_ids = ["sg-12345678"]
@@ -2273,8 +2269,8 @@ class TestABISOverrides:
             allocation_strategy_on_demand=None,
             max_price=None,
             percent_on_demand=0,
-            instance_types={"m5.large": 1},  # Should be ignored when ABIS is present
-            instance_types_ondemand=None,
+            machine_types={"m5.large": 1},  # Should be ignored when ABIS is present
+            machine_types_ondemand={},
             subnet_ids=subnet_ids,
             tags=None,
             context=None,
@@ -2285,7 +2281,7 @@ class TestABISOverrides:
         )
 
     def test_ec2_fleet_uses_instance_requirements_overrides(self):
-        """EC2 Fleet should ignore instance_types when ABIS is provided."""
+        """EC2 Fleet should ignore machine_types when ABIS is provided."""
         template = self._abis_template()
         request = SimpleNamespace(requested_count=2, request_id="req-abis-1", metadata={})
 
@@ -2305,7 +2301,7 @@ class TestABISOverrides:
         assert all("InstanceType" not in o for o in overrides)
 
     def test_spot_fleet_uses_instance_requirements_overrides(self):
-        """Spot Fleet should ignore instance_types when ABIS is provided."""
+        """Spot Fleet should ignore machine_types when ABIS is provided."""
         template = self._abis_template()
         request = SimpleNamespace(requested_count=2, request_id="req-abis-2", metadata={})
 
@@ -2366,8 +2362,8 @@ class TestMultiInstanceOverrides:
             allocation_strategy_on_demand=None,
             max_price=None,
             percent_on_demand=0,
-            instance_types={"t2.micro": 1, "t2.small": 2, "t2.medium": 4},
-            instance_types_ondemand=None,
+            machine_types={"t2.micro": 1, "t2.small": 2, "t2.medium": 4},
+            machine_types_ondemand={},
             subnet_ids=["subnet-1"],
             tags=None,
             context=None,
@@ -2377,7 +2373,7 @@ class TestMultiInstanceOverrides:
             get_instance_requirements_payload=lambda: None,
         )
 
-    def test_ec2_fleet_overrides_from_instance_types(self):
+    def test_ec2_fleet_overrides_from_machine_types(self):
         template = self._multi_type_template(provider_api="EC2Fleet")
         request = SimpleNamespace(requested_count=3, request_id="req-multi", metadata={})
 
@@ -2392,11 +2388,11 @@ class TestMultiInstanceOverrides:
         )
 
         overrides = config["LaunchTemplateConfigs"][0].get("Overrides", [])
-        assert len(overrides) == len(template.instance_types)
+        assert len(overrides) == len(template.machine_types)
         instance_types = {o["InstanceType"] for o in overrides}
-        assert instance_types == set(template.instance_types.keys())
+        assert instance_types == set(template.machine_types.keys())
 
-    def test_spot_fleet_overrides_from_instance_types(self):
+    def test_spot_fleet_overrides_from_machine_types(self):
         template = self._multi_type_template(
             provider_api="EC2Fleet", fleet_type=AWSFleetType.REQUEST
         )
@@ -2415,11 +2411,11 @@ class TestMultiInstanceOverrides:
         )
 
         overrides = config["LaunchTemplateConfigs"][0].get("Overrides", [])
-        assert len(overrides) == len(template.instance_types)
+        assert len(overrides) == len(template.machine_types)
         instance_types = {o["InstanceType"] for o in overrides}
-        assert instance_types == set(template.instance_types.keys())
+        assert instance_types == set(template.machine_types.keys())
 
-    def test_asg_overrides_from_instance_types(self):
+    def test_asg_overrides_from_machine_types(self):
         template = self._multi_type_template(provider_api="ASG")
         request = SimpleNamespace(requested_count=2, metadata={}, request_id="req-asg")
 
@@ -2435,21 +2431,20 @@ class TestMultiInstanceOverrides:
         )
 
         policy = config.get("MixedInstancesPolicy")
-        assert policy, "MixedInstancesPolicy should be present when instance_types are provided"
+        assert policy, "MixedInstancesPolicy should be present when machine_types are provided"
         overrides = policy["LaunchTemplate"].get("Overrides", [])
-        assert len(overrides) == len(template.instance_types)
+        assert len(overrides) == len(template.machine_types)
         instance_types = {o["InstanceType"] for o in overrides}
-        assert instance_types == set(template.instance_types.keys())
+        assert instance_types == set(template.machine_types.keys())
         # WeightedCapacity should be string per AWS API
         assert all(
             isinstance(o.get("WeightedCapacity"), str) for o in overrides if "WeightedCapacity" in o
         )
 
-    def test_conflicting_instance_type_and_instance_types_raises(self):
+    def test_conflicting_machine_type_and_machine_types_raises(self):
         template = SimpleNamespace(
             image_id="ami-123",
-            instance_type="t2.micro",
-            instance_types={"t2.small": 1},
+            machine_types={"t2.micro": 1, "t2.small": 1},
             subnet_ids=["subnet-1"],
             security_group_ids=["sg-1"],
         )
