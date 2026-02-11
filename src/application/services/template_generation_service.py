@@ -159,7 +159,10 @@ class TemplateGenerationService:
         from infrastructure.di.container import get_container
         container = get_container()
         
-        # Ensure provider type is registered
+        # Ensure provider type is registered via registry
+        from providers.registry import get_provider_registry
+        registry = get_provider_registry()
+        
         if not registry.is_provider_registered(provider_type):
             registry.ensure_provider_type_registered(provider_type)
         

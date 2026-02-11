@@ -48,12 +48,14 @@ def _register_template_services(container: DIContainer):
         from application.services.template_generation_service import (
             TemplateGenerationService,
         )
+        from application.services.provider_registry_service import ProviderRegistryService
         from domain.base.ports.scheduler_port import SchedulerPort
 
         return TemplateGenerationService(
             config_manager=c.get(ConfigurationPort),
             scheduler_strategy=c.get(SchedulerPort),
             logger=c.get(LoggingPort),
+            provider_registry_service=c.get(ProviderRegistryService),
         )
 
     from application.services.template_generation_service import TemplateGenerationService
