@@ -55,7 +55,6 @@ def add_global_arguments(parser):
     # Operation control
     parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
     parser.add_argument("--yes", "-y", action="store_true", help="Assume yes to all prompts")
-    parser.add_argument("--timeout", type=int, help="Operation timeout in seconds")
     
     # Output control
     parser.add_argument("--format", choices=["json", "yaml", "table", "list"], default="json", help="Output format")
