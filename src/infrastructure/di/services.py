@@ -126,6 +126,9 @@ def _register_services_eager(container: "DIContainer") -> "DIContainer":
     # Register core services (uses LoggingPort from port adapters)
     register_core_services(container)
 
+    # Register domain services
+    register_domain_services(container)
+
     # Setup CQRS infrastructure (handlers and buses)
     from infrastructure.di.container import _setup_cqrs_infrastructure
 

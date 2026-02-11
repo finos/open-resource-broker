@@ -1,7 +1,10 @@
 """Service for orchestrating provider provisioning operations."""
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from application.services.provider_registry_service import ProviderRegistryService
 
 from domain.base.ports import ContainerPort, LoggingPort
 from domain.request.aggregate import Request
@@ -24,9 +27,10 @@ class ProvisioningResult:
 class ProvisioningOrchestrationService:
     """Service for orchestrating provider provisioning operations."""
     
-    def __init__(self, container: ContainerPort, logger: LoggingPort):
+    def __init__(self, container: ContainerPort, logger: LoggingPort, provider_registry_service: "ProviderRegistryService"):
         self._container = container
         self._logger = logger
+        self._provider_registry_service = provider_registry_service
     
     async def execute_provisioning(
         self,
@@ -60,9 +64,7 @@ class ProvisioningOrchestrationService:
             provider_instance_config = config_manager.get_provider_instance_config(selection_result.provider_name)
             provider_config = provider_instance_config.config if provider_instance_config else {}
 
-            from providers.registry import get_provider_registry
-            registry = get_provider_registry()
-            result = await registry.execute_operation(selection_result.provider_name, operation, provider_config)
+            result = await self._provider_registry_service.execute_operation(selection_result.provider_name, operation, provider_config)
 
             if result.success:
                 self._logger.info("Provider result.data: %s", result.data)

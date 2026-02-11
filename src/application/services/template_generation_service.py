@@ -1,6 +1,9 @@
 """Template Generation Service - Application Layer."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from application.services.provider_registry_service import ProviderRegistryService
 from pathlib import Path
 
 from domain.base.ports import ConfigurationPort, LoggingPort, SchedulerPort
@@ -24,10 +27,12 @@ class TemplateGenerationService:
         config_manager: ConfigurationPort,
         scheduler_strategy: SchedulerPort,
         logger: LoggingPort,
+        provider_registry_service: "ProviderRegistryService",
     ):
         self._config_manager = config_manager
         self._scheduler_strategy = scheduler_strategy
         self._logger = logger
+        self._provider_registry_service = provider_registry_service
 
     async def generate_templates(self, request: TemplateGenerationRequest) -> TemplateGenerationResult:
         """
@@ -151,10 +156,7 @@ class TemplateGenerationService:
         provider_api: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Generate example templates using provider registry."""
-        from providers.registry import get_provider_registry
         from infrastructure.di.container import get_container
-        
-        registry = get_provider_registry()
         container = get_container()
         
         # Ensure provider type is registered

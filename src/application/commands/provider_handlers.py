@@ -5,7 +5,10 @@ integrating the existing provider strategy ecosystem with the CQRS architecture.
 """
 
 import time
-from typing import Any
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from application.services.provider_registry_service import ProviderRegistryService
 
 from application.base.handlers import BaseCommandHandler
 from application.decorators import command_handler
@@ -42,10 +45,12 @@ class SelectProviderStrategyHandler(
         logger: LoggingPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
+        provider_registry_service: "ProviderRegistryService",
     ) -> None:
         """Initialize the instance."""
         super().__init__(logger, event_publisher, error_handler)
         self._container = container
+        self._provider_registry_service = provider_registry_service
 
     async def validate_command(self, command: SelectProviderStrategyCommand) -> None:
         """Validate select provider strategy command."""
@@ -64,7 +69,8 @@ class SelectProviderStrategyHandler(
                 self.logger,  # Use capability-based selection
             )
 
-            # Get available strategies from registry
+            # Get available strategies from registry service
+            # Note: This functionality may need to be added to ProviderRegistryService
             from providers.registry import get_provider_registry
             registry = get_provider_registry()
             available_strategies = registry.get_registered_providers() + registry.get_registered_provider_instances()
@@ -115,9 +121,11 @@ class ExecuteProviderOperationHandler(
         logger: LoggingPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
+        provider_registry_service: "ProviderRegistryService",
     ) -> None:
         super().__init__(logger, event_publisher, error_handler)
         self._container = container
+        self._provider_registry_service = provider_registry_service
 
     async def validate_command(self, command: ExecuteProviderOperationCommand) -> None:
         """Validate execute provider operation command."""

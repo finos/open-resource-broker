@@ -28,6 +28,11 @@ from domain.base import UnitOfWorkFactory
 # Exception handling through BaseQueryHandler (Clean Architecture compliant)
 from domain.base.exceptions import EntityNotFoundError
 from domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
+
+# Import for type hints
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from application.services.provider_registry_service import ProviderRegistryService
 from domain.template.factory import TemplateFactory, get_default_template_factory
 from infrastructure.di.buses import CommandBus
 from domain.template.template_aggregate import Template
@@ -48,12 +53,14 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
         error_handler: ErrorHandlingPort,
         container: ContainerPort,
         command_bus: CommandBus,
+        provider_registry_service: "ProviderRegistryService",
     ) -> None:
         """Initialize the instance."""
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
         self._container = container
         self.command_bus = command_bus
+        self._provider_registry_service = provider_registry_service
         self._cache_service = self._get_cache_service()
         self.event_publisher = self._get_event_publisher()
         
@@ -65,7 +72,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
         
         self._query_service = RequestQueryService(uow_factory, logger)
         self._status_service = RequestStatusService(uow_factory, logger)
-        self._machine_sync_service = MachineSyncService(command_bus, container, logger)
+        self._machine_sync_service = MachineSyncService(command_bus, container, logger, provider_registry_service)
         self._dto_factory = RequestDTOFactory()
 
     async def execute_query(self, query: GetRequestQuery) -> RequestDTO:
@@ -199,11 +206,9 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             config_port = self._container.get(ConfigurationPort)
             provider_instance_config = config_port.get_provider_instance_config(request.provider_name)
             
-            # Execute operation using Provider Registry
+            # Execute operation using Provider Registry Service
             # Pass the full ProviderInstanceConfig object, not just the nested config dict
-            from providers.registry import get_provider_registry
-            registry = get_provider_registry()
-            result = await registry.execute_operation(request.provider_name, operation, provider_instance_config)
+            result = await self._provider_registry_service.execute_operation(request.provider_name, operation, provider_instance_config)
 
             self.logger.info(
                 "Provider strategy result: success=%s, data_keys=%s",

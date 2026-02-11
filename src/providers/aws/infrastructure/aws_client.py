@@ -203,11 +203,13 @@ class AWSClient:
                 provider_name = self._provider_name
                 self._logger.debug("Using specific provider: %s", provider_name)
             else:
-                # Use provider registry for provider selection
-                from providers.registry import get_provider_registry
-
-                registry = get_provider_registry()
-                selection_result = registry.select_active_provider()
+                # Use provider registry service for provider selection
+                from infrastructure.di.container import get_container
+                container = get_container()
+                from application.services.provider_registry_service import ProviderRegistryService
+                
+                provider_service = container.get(ProviderRegistryService)
+                selection_result = provider_service.select_active_provider()
 
                 self._logger.debug(
                     "Provider selection result: %s, %s",

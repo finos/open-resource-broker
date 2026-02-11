@@ -56,5 +56,9 @@ class ConfigurationPort(ABC):
         """Override the active provider instance."""
 
     @abstractmethod
+    def get_provider_instance_config(self, provider_name: str) -> Any:
+        """Get configuration for a specific provider instance."""
+
+    @abstractmethod
     def get_configuration_sources(self) -> dict[str, Any]:
         """Get configuration source information."""

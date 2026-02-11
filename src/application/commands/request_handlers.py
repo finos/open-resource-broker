@@ -1,6 +1,9 @@
 """Command handlers for request operations."""
 
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from application.services.provider_registry_service import ProviderRegistryService
 
 from application.base.handlers import BaseCommandHandler
 from application.decorators import command_handler
@@ -42,12 +45,14 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
         query_bus: QueryBus,  # QueryBus is required for template lookup
+        provider_registry_service: "ProviderRegistryService",
     ) -> None:
         """Initialize the instance."""
         super().__init__(logger, event_publisher, error_handler)
         self.uow_factory = uow_factory  # Use UoW factory pattern
         self._container = container
         self._query_bus = query_bus
+        self._provider_registry_service = provider_registry_service
         
         # Initialize services
         from application.services.request_creation_service import RequestCreationService
@@ -55,7 +60,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
         from application.services.request_status_management_service import RequestStatusManagementService
         
         self._request_creation_service = RequestCreationService(logger)
-        self._provisioning_service = ProvisioningOrchestrationService(container, logger)
+        self._provisioning_service = ProvisioningOrchestrationService(container, logger, provider_registry_service)
         self._status_service = RequestStatusManagementService(uow_factory, logger)
 
     async def validate_command(self, command: CreateRequestCommand) -> None:
@@ -102,10 +107,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
 
     async def _validate_provider_availability(self) -> None:
         """Validate that providers are available."""
-        from providers.registry import get_provider_registry
         from domain.base.ports.configuration_port import ConfigurationPort
         
-        registry = get_provider_registry()
         config_manager = self._container.get(ConfigurationPort)
         provider_config = config_manager.get_provider_config()
         
@@ -143,10 +146,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
 
     async def _select_and_validate_provider(self, template: Any) -> Any:
         """Select provider and validate template compatibility."""
-        from providers.registry import get_provider_registry
         
-        registry = get_provider_registry()
-        selection_result = registry.select_provider_for_template(template)
+        selection_result = self._provider_registry_service.select_provider_for_template(template)
         
         self.logger.info(
             "Selected provider: %s (%s)",
@@ -481,10 +482,8 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             # Pass the full ProviderInstanceConfig object, not just the config dict
             provider_config = provider_instance_config if provider_instance_config else {}
 
-            # Execute via provider registry
-            from providers.registry import get_provider_registry
-            registry = get_provider_registry()
-            result = await registry.execute_operation(provider_name, operation, provider_config)
+            # Execute via provider registry service
+            result = await self._provider_registry_service.execute_operation(provider_name, operation, provider_config)
 
             if result.success:
                 self.logger.info("Successfully terminated %d instances in resource %s", 
@@ -511,10 +510,12 @@ class PopulateMachineIdsHandler(BaseCommandHandler[PopulateMachineIdsCommand, No
         container: ContainerPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
+        provider_registry_service: "ProviderRegistryService",
     ):
         super().__init__(logger, event_publisher, error_handler)
         self.uow_factory = uow_factory
         self._container = container
+        self._provider_registry_service = provider_registry_service
 
     async def execute_command(self, command: PopulateMachineIdsCommand) -> None:
         """Discover and store machine IDs from provider resources."""
@@ -539,7 +540,6 @@ class PopulateMachineIdsHandler(BaseCommandHandler[PopulateMachineIdsCommand, No
     async def _discover_machine_ids(self, request) -> list[str]:
         """Discover machine IDs from provider resources."""
         try:
-            from providers.registry import get_provider_registry
             from providers.base.strategy import ProviderOperation, ProviderOperationType
             
             if not request.resource_ids:
@@ -550,7 +550,6 @@ class PopulateMachineIdsHandler(BaseCommandHandler[PopulateMachineIdsCommand, No
                 parameters={"resource_ids": request.resource_ids}
             )
             
-            registry = get_provider_registry()
             from domain.base.ports.configuration_port import ConfigurationPort
             config_manager = self._container.get(ConfigurationPort)
             provider_config = config_manager.get_provider_instance_config(request.provider_name)

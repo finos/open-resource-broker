@@ -48,7 +48,7 @@ class BaseRegistry(ABC):
     _instances: dict[str, "BaseRegistry"] = {}
     _lock = threading.Lock()
 
-    def __new__(cls):
+    def __new__(cls, *args, **kwargs):
         """Ensure singleton instance per registry type."""
         registry_name = cls.__name__
         if registry_name not in cls._instances:

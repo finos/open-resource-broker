@@ -13,6 +13,11 @@ from application.machine.commands import (
     ValidateProviderStateCommand,
 )
 from domain.base.ports import ContainerPort, ErrorHandlingPort, EventPublisherPort, LoggingPort
+
+# Import for type hints
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from application.services.provider_registry_service import ProviderRegistryService
 from domain.machine.repository import MachineRepository
 from domain.machine.value_objects import MachineStatus
 from providers.base.strategy import (
@@ -95,10 +100,12 @@ class ConvertMachineStatusCommandHandler(
         logger: LoggingPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
+        provider_registry_service: "ProviderRegistryService",
     ) -> None:
         """Initialize with container for registry access."""
         super().__init__(logger, event_publisher, error_handler)
         self._container = container
+        self._provider_registry_service = provider_registry_service
 
     async def validate_command(self, command: ConvertMachineStatusCommand) -> None:
         """Validate conversion command."""
@@ -110,10 +117,6 @@ class ConvertMachineStatusCommandHandler(
 
     async def execute_command(self, command: ConvertMachineStatusCommand) -> ConvertMachineStatusResponse:
         """Execute status conversion using registry."""
-        from providers.registry import get_provider_registry
-        
-        # Get registry and execute status conversion
-        registry = get_provider_registry()
         
         # Create operation for status conversion
         operation = ProviderOperation(

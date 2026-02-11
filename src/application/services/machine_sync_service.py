@@ -1,6 +1,9 @@
 """Machine sync service for provider integration."""
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from application.services.provider_registry_service import ProviderRegistryService
 
 from domain.base.ports.logging_port import LoggingPort
 from domain.base.ports.container_port import ContainerPort
@@ -17,10 +20,12 @@ class MachineSyncService:
         command_bus: CommandBus,
         container: ContainerPort,
         logger: LoggingPort,
+        provider_registry_service: "ProviderRegistryService",
     ) -> None:
         self.command_bus = command_bus
         self.container = container
         self.logger = logger
+        self._provider_registry_service = provider_registry_service
 
     async def populate_missing_machine_ids(self, request: Request) -> None:
         """Populate missing machine IDs via command."""
@@ -82,10 +87,8 @@ class MachineSyncService:
             config_port = self.container.get(ConfigurationPort)
             provider_instance_config = config_port.get_provider_instance_config(request.provider_name)
             
-            # Execute operation using Provider Registry
-            from providers.registry import get_provider_registry
-            registry = get_provider_registry()
-            result = await registry.execute_operation(
+            # Execute operation using Provider Registry Service
+            result = await self._provider_registry_service.execute_operation(
                 request.provider_name, operation, provider_instance_config.config
             )
 

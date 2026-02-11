@@ -1,6 +1,7 @@
 """Generic template validation service."""
 
 from domain.base.ports.logging_port import LoggingPort
+from domain.services.template_validation_domain_service import TemplateValidationDomainService
 from domain.template.template_aggregate import Template
 from providers.results import ValidationResult
 
@@ -8,7 +9,12 @@ from providers.results import ValidationResult
 class TemplateValidationService:
     """Generic template validation service."""
     
-    def __init__(self, logger: LoggingPort):
+    def __init__(
+        self, 
+        validation_service: TemplateValidationDomainService,
+        logger: LoggingPort
+    ):
+        self._validation_service = validation_service
         self._logger = logger
     
     async def validate_template_requirements(
@@ -17,7 +23,4 @@ class TemplateValidationService:
         provider_instance: str
     ) -> ValidationResult:
         """Validate template against provider capabilities."""
-        from providers.registry import get_provider_registry
-        
-        provider_registry = get_provider_registry()
-        return provider_registry.validate_template_requirements(template, provider_instance)
+        return self._validation_service.validate_template_requirements(template, provider_instance)
