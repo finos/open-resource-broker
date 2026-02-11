@@ -83,18 +83,22 @@ def _register_services_lazy(container: "DIContainer") -> "DIContainer":
     # 6. Register configured scheduler strategy only
     register_scheduler_services(container)
 
-    # 4. Register provider services immediately (fix for provider
+    # 7. Register registry services
+    from infrastructure.di.registry_services import register_registry_services
+    register_registry_services(container)
+
+    # 8. Register provider services immediately (fix for provider
     # context errors)
     register_provider_services(container)
 
-    # 5. Register infrastructure services immediately (needed for template system)
+    # 9. Register infrastructure services immediately (needed for template system)
     register_infrastructure_services(container)
 
-    # 6. Setup CQRS infrastructure immediately (handlers need to be registered before buses are used)
+    # 10. Setup CQRS infrastructure immediately (handlers need to be registered before buses are used)
     from infrastructure.di.container import _setup_cqrs_infrastructure
     _setup_cqrs_infrastructure(container)
 
-    # 7. Register lazy factories for non-essential services
+    # 11. Register lazy factories for non-essential services
     _register_lazy_service_factories(container)
 
     logger.info("Lazy service registration complete")
