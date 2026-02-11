@@ -43,6 +43,7 @@ class GetConfigurationQuery(Query, BaseModel):
     key: str
     default: Optional[Any] = None
     section: Optional[str] = None
+    filter_expressions: list[str] = []
 
 
 class GetConfigurationSectionQuery(Query, BaseModel):

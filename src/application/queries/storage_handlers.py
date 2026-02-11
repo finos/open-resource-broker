@@ -14,6 +14,7 @@ from application.queries.storage import (
 )
 from application.services.storage_registry_service import StorageRegistryService
 from domain.base.ports import LoggingPort, ErrorHandlingPort
+from domain.services.generic_filter_service import GenericFilterService
 
 
 @query_handler(ListStorageStrategiesQuery)
@@ -27,9 +28,11 @@ class ListStorageStrategiesHandler(
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
         storage_service: StorageRegistryService,
+        generic_filter_service: GenericFilterService,
     ):
         super().__init__(logger, error_handler)
         self._storage_service = storage_service
+        self._generic_filter_service = generic_filter_service
 
     async def execute_query(self, query: ListStorageStrategiesQuery) -> StorageStrategyListResponse:
         """
@@ -72,6 +75,12 @@ class ListStorageStrategiesHandler(
                 )
 
             strategies.append(strategy_info)
+
+        # Apply generic filters if provided
+        if query.filter_expressions:
+            strategies = self._generic_filter_service.apply_filters(
+                strategies, query.filter_expressions
+            )
 
         return StorageStrategyListResponse(
             strategies=strategies,

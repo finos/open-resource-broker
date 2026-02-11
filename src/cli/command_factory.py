@@ -159,6 +159,7 @@ class CLICommandFactory:
         provider: Optional[str] = None,
         template_type: Optional[str] = None,
         limit: int = 50,
+        filter_expressions: Optional[List[str]] = None,
         **kwargs: Any,
     ) -> ListTemplatesQuery:
         """Create query to list templates."""
@@ -171,6 +172,7 @@ class CLICommandFactory:
         return ListTemplatesQuery(
             filters=filters,
             pagination={"limit": limit, "offset": kwargs.get("offset", 0)},
+            filter_expressions=filter_expressions or [],
         )
 
     def create_get_template_query(
@@ -284,6 +286,7 @@ class CLICommandFactory:
         template_id: Optional[str] = None,
         limit: int = 50,
         offset: int = 0,
+        filter_expressions: Optional[List[str]] = None,
         **kwargs: Any,
     ) -> ListRequestsQuery:
         """Create query to list requests."""
@@ -292,6 +295,7 @@ class CLICommandFactory:
             template_id=template_id,
             limit=limit,
             offset=offset,
+            filter_expressions=filter_expressions or [],
         )
 
     def create_cancel_request_command(
@@ -325,6 +329,7 @@ class CLICommandFactory:
         status: Optional[str] = None,
         limit: int = 50,
         offset: int = 0,
+        filter_expressions: Optional[List[str]] = None,
         **kwargs: Any,
     ) -> ListReturnRequestsQuery:
         """Create query to list return requests."""
@@ -335,6 +340,7 @@ class CLICommandFactory:
         return ListReturnRequestsQuery(
             filters=filters,
             pagination={"limit": limit, "offset": offset},
+            filter_expressions=filter_expressions or [],
         )
 
     # Machine operations
@@ -448,12 +454,14 @@ class CLICommandFactory:
         self,
         include_current: bool = True,
         include_details: bool = False,
+        filter_expressions: Optional[List[str]] = None,
         **kwargs: Any,
     ) -> ListStorageStrategiesQuery:
         """Create query to list storage strategies."""
         return ListStorageStrategiesQuery(
             include_current=include_current,
             include_details=include_details,
+            filter_expressions=filter_expressions or [],
         )
 
     def create_get_storage_health_query(
@@ -487,12 +495,14 @@ class CLICommandFactory:
         self,
         include_current: bool = True,
         include_details: bool = False,
+        filter_expressions: Optional[List[str]] = None,
         **kwargs: Any,
     ) -> ListSchedulerStrategiesQuery:
         """Create query to list scheduler strategies."""
         return ListSchedulerStrategiesQuery(
             include_current=include_current,
             include_details=include_details,
+            filter_expressions=filter_expressions or [],
         )
 
     def create_get_scheduler_configuration_query(
@@ -533,6 +543,7 @@ class CLICommandFactory:
         include_metrics: bool = False,
         filter_healthy_only: bool = False,
         provider_type: Optional[str] = None,
+        filter_expressions: Optional[List[str]] = None,
         **kwargs: Any,
     ) -> ListAvailableProvidersQuery:
         """Create query to list available providers."""
@@ -542,6 +553,7 @@ class CLICommandFactory:
             include_metrics=include_metrics,
             filter_healthy_only=filter_healthy_only,
             provider_type=provider_type,
+            filter_expressions=filter_expressions or [],
         )
 
     def create_get_provider_capabilities_query(
@@ -712,7 +724,8 @@ class CLICommandFactory:
                 return self.create_list_templates_query(
                     provider=args.get("provider"),
                     template_type=args.get("provider_api"),
-                    limit=args.get("limit", 50)
+                    limit=args.get("limit", 50),
+                    filter_expressions=args.get("filter") or []
                 )
             elif command_action == "show":
                 template_id = args.get("template_id")
@@ -792,7 +805,8 @@ class CLICommandFactory:
                     status=args.get("status"),
                     template_id=args.get("template_id"),
                     limit=args.get("limit", 50),
-                    offset=args.get("offset", 0)
+                    offset=args.get("offset", 0),
+                    filter_expressions=args.get("filter") or []
                 )
             elif command_action == "cancel":
                 request_id = args.get("request_id")
@@ -887,7 +901,8 @@ class CLICommandFactory:
             if command_action == "list":
                 return self.create_list_storage_strategies_query(
                     include_current=True,
-                    include_details=args.get("detailed", False)
+                    include_details=args.get("detailed", False),
+                    filter_expressions=args.get("filter") or []
                 )
             elif command_action == "show":
                 return self.create_get_storage_health_query(
@@ -917,7 +932,8 @@ class CLICommandFactory:
             if command_action == "list":
                 return self.create_list_scheduler_strategies_query(
                     include_current=True,
-                    include_details=args.get("long", False)
+                    include_details=args.get("long", False),
+                    filter_expressions=args.get("filter") or []
                 )
             elif command_action == "show":
                 return self.create_get_scheduler_configuration_query(
@@ -934,7 +950,8 @@ class CLICommandFactory:
                 return self.create_list_available_providers_query(
                     include_health=True,
                     include_capabilities=args.get("detailed", False),
-                    include_metrics=args.get("detailed", False)
+                    include_metrics=args.get("detailed", False),
+                    filter_expressions=args.get("filter") or []
                 )
             elif command_action == "show":
                 provider_name = args.get("provider")

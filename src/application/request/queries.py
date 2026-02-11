@@ -12,6 +12,7 @@ class ListRequestsQuery(BaseQuery):
     template_id: Optional[str] = None
     limit: int = 50
     offset: int = 0
+    filter_expressions: list[str] = []
 
 
 class GetRequestHistoryQuery(BaseQuery):
@@ -26,6 +27,7 @@ class GetActiveRequestsQuery(BaseQuery):
 
     template_id: Optional[str] = None
     limit: int = 100
+    filter_expressions: list[str] = []
 
 
 class GetRequestMetricsQuery(BaseQuery):

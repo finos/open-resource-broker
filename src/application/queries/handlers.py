@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, TypeVar
 
 from domain.services.timestamp_service import TimestampService
-from domain.services.filter_service import FilterService
+from domain.services.generic_filter_service import GenericFilterService
 
 from application.base.handlers import BaseQueryHandler
 from application.decorators import query_handler
@@ -735,9 +735,11 @@ class ListRequestsHandler(BaseQueryHandler[ListRequestsQuery, list[RequestDTO]])
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
+        generic_filter_service: GenericFilterService,
     ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
+        self._generic_filter_service = generic_filter_service
 
     async def execute_query(self, query: ListRequestsQuery) -> list[RequestDTO]:
         """Execute list requests query."""
@@ -777,6 +779,17 @@ class ListRequestsHandler(BaseQueryHandler[ListRequestsQuery, list[RequestDTO]])
                     request_dto = dto_factory.create_from_domain(request, machines)
                     request_dtos.append(request_dto)
 
+                # Apply generic filters if provided
+                if query.filter_expressions:
+                    # Convert RequestDTO objects to dicts for filtering
+                    request_dicts = [dto.model_dump() for dto in request_dtos]
+                    
+                    # Apply filters using GenericFilterService
+                    filtered_dicts = self._generic_filter_service.apply_filters(request_dicts, query.filter_expressions)
+                    
+                    # Convert back to RequestDTO objects
+                    request_dtos = [RequestDTO.model_validate(d) for d in filtered_dicts]
+
                 self.logger.info("Found %s requests (total: %s)", len(request_dtos), total_count)
                 return request_dtos
 
@@ -794,9 +807,11 @@ class ListReturnRequestsHandler(BaseQueryHandler[ListReturnRequestsQuery, list[R
         uow_factory: UnitOfWorkFactory,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
+        generic_filter_service: GenericFilterService,
     ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
+        self._generic_filter_service = generic_filter_service
 
     async def execute_query(self, query: ListReturnRequestsQuery) -> list[RequestDTO]:
         """Execute list return requests query."""
@@ -823,11 +838,93 @@ class ListReturnRequestsHandler(BaseQueryHandler[ListReturnRequestsQuery, list[R
                     )
                     request_dtos.append(request_dto)
 
+                # Apply generic filters if provided
+                if query.filter_expressions:
+                    # Convert RequestDTO objects to dicts for filtering
+                    request_dicts = [dto.model_dump() for dto in request_dtos]
+                    
+                    # Apply filters using GenericFilterService
+                    filtered_dicts = self._generic_filter_service.apply_filters(request_dicts, query.filter_expressions)
+                    
+                    # Convert back to RequestDTO objects
+                    request_dtos = [RequestDTO.model_validate(d) for d in filtered_dicts]
+
                 self.logger.info("Found %s return requests", len(request_dtos))
                 return request_dtos
 
         except Exception as e:
             self.logger.error("Failed to list return requests: %s", e)
+            raise
+
+
+@query_handler(ListActiveRequestsQuery)
+class ListActiveRequestsHandler(BaseQueryHandler[ListActiveRequestsQuery, list[RequestDTO]]):
+    """Handler for listing active requests."""
+
+    def __init__(
+        self,
+        uow_factory: UnitOfWorkFactory,
+        logger: LoggingPort,
+        error_handler: ErrorHandlingPort,
+        generic_filter_service: GenericFilterService,
+    ) -> None:
+        super().__init__(logger, error_handler)
+        self.uow_factory = uow_factory
+        self._generic_filter_service = generic_filter_service
+
+    async def execute_query(self, query: ListActiveRequestsQuery) -> list[RequestDTO]:
+        """Execute list active requests query."""
+        self.logger.info("Listing active requests")
+
+        try:
+            with self.uow_factory.create_unit_of_work() as uow:
+                # Get active requests from repository
+                from domain.request.value_objects import RequestStatus
+                
+                active_statuses = [RequestStatus.PENDING, RequestStatus.RUNNING, RequestStatus.PROVISIONING]
+                requests = uow.requests.find_all()
+                active_requests = [r for r in requests if r.status in active_statuses]
+
+                # Apply template filter if provided
+                if query.template_id:
+                    active_requests = [r for r in active_requests if r.template_id == query.template_id]
+
+                # Apply pagination
+                total_count = len(active_requests)
+                start_idx = 0
+                end_idx = query.limit or 100
+                active_requests = active_requests[start_idx:end_idx]
+
+                # Convert to DTOs
+                request_dtos = []
+                for request in active_requests:
+                    # Query machines for this request if machine_ids exist
+                    machines = []
+                    if request.machine_ids:
+                        machines = uow.machines.find_by_ids(request.machine_ids)
+                    
+                    # Create RequestDTO using factory
+                    from application.factories.request_dto_factory import RequestDTOFactory
+                    dto_factory = RequestDTOFactory()
+                    request_dto = dto_factory.create_from_domain(request, machines)
+                    request_dtos.append(request_dto)
+
+                # Apply generic filters if provided
+                if query.filter_expressions:
+                    # Convert RequestDTO objects to dicts for filtering
+                    request_dicts = [dto.model_dump() for dto in request_dtos]
+                    
+                    # Apply filters using GenericFilterService
+                    filtered_dicts = self._generic_filter_service.apply_filters(request_dicts, query.filter_expressions)
+                    
+                    # Convert back to RequestDTO objects
+                    request_dtos = [RequestDTO.model_validate(d) for d in filtered_dicts]
+
+                self.logger.info("Found %s active requests (total: %s)", len(request_dtos), total_count)
+                return request_dtos
+
+        except Exception as e:
+            self.logger.error("Failed to list active requests: %s", e)
             raise
 
 
@@ -905,9 +1002,11 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[TemplateDTO
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
         container: ContainerPort,
+        generic_filter_service: GenericFilterService,
     ) -> None:
         super().__init__(logger, error_handler)
         self._container = container
+        self._generic_filter_service = generic_filter_service
 
     async def execute_query(self, query: ListTemplatesQuery) -> list[TemplateDTO]:
         """Execute list templates query - returns raw templates for scheduler formatting."""
@@ -923,6 +1022,17 @@ class ListTemplatesHandler(BaseQueryHandler[ListTemplatesQuery, list[TemplateDTO
                 template_dtos = await template_manager.get_templates_by_provider(query.provider_api)
             else:
                 template_dtos = await template_manager.load_templates()
+
+            # Apply generic filters if provided
+            if query.filter_expressions:
+                # Convert TemplateDTO objects to dicts for filtering
+                template_dicts = [dto.model_dump() for dto in template_dtos]
+                
+                # Apply filters using GenericFilterService
+                filtered_dicts = self._generic_filter_service.apply_filters(template_dicts, query.filter_expressions)
+                
+                # Convert back to TemplateDTO objects
+                template_dtos = [TemplateDTO.model_validate(d) for d in filtered_dicts]
 
             self.logger.info("Found %s templates", len(template_dtos))
             return template_dtos
@@ -1053,14 +1163,14 @@ class ListMachinesHandler(BaseQueryHandler[MachineListQuery, list[MachineDTO]]):
         container: ContainerPort,
         command_bus: CommandBus,
         timestamp_service: TimestampService,
-        filter_service: FilterService,
+        generic_filter_service: GenericFilterService,
     ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
         self.container = container
         self.command_bus = command_bus
         self.timestamp_service = timestamp_service
-        self.filter_service = filter_service
+        self._generic_filter_service = generic_filter_service
         
         # Initialize machine sync service via DI
         from application.services.machine_sync_service import MachineSyncService
@@ -1082,12 +1192,6 @@ class ListMachinesHandler(BaseQueryHandler[MachineListQuery, list[MachineDTO]]):
                     machines = uow.machines.find_by_request_id(query.request_id)
                 else:
                     machines = uow.machines.get_all()
-
-                # Apply generic filters using domain service
-                if query.filter_expressions:
-                    filters = self.filter_service.parse_filters(query.filter_expressions)
-                    for filter_obj in filters:
-                        machines = [m for m in machines if filter_obj.matches(m)]
 
                 # Convert to DTOs (with sync for running machines)
                 machine_dtos = []
@@ -1125,6 +1229,11 @@ class ListMachinesHandler(BaseQueryHandler[MachineListQuery, list[MachineDTO]]):
                         metadata=machine.metadata or {},
                     )
                     machine_dtos.append(machine_dto.to_dict())
+
+                # Apply generic filters if provided
+                if query.filter_expressions:
+                    # Apply filters using GenericFilterService (machine_dtos are already dicts)
+                    machine_dtos = self._generic_filter_service.apply_filters(machine_dtos, query.filter_expressions)
 
                 self.logger.info("Found %s machines", len(machine_dtos))
                 return machine_dtos

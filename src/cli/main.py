@@ -31,13 +31,22 @@ except ImportError:
 
 
 def add_global_arguments(parser):
-    """Add arguments that should be available on all commands."""
+    """
+    Add arguments that should be available on all commands.
+    
+    Filtering Strategy:
+    - Generic filters: --filter field=value (works on any snake_case field)
+    - Specific filters: Command-specific filters like --status, --template-id
+    - Both can be combined: --filter "name~test" --status running
+    - Multiple generic filters use AND logic: --filter "field1=value1" --filter "field2=value2"
+    """
     parser.add_argument("--provider", help="Override provider instance")
     parser.add_argument("--scheduler", choices=["default", "hostfactory", "hf"], help="Override scheduler strategy")
     parser.add_argument("--dry-run", action="store_true", help="Preview without executing")
     parser.add_argument("--format", choices=["json", "yaml", "table", "list"], default="json", help="Output format")
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
     parser.add_argument("--quiet", action="store_true", help="Suppress output")
+    parser.add_argument("--filter", action="append", help="Generic filter using snake_case field names: field=value, field~value, field=~regex. Can be combined with specific filters. Use multiple times for AND logic.")
 
 
 def add_force_argument(parser):
@@ -53,11 +62,14 @@ def add_multi_provider_arguments(parser):
 def add_machine_actions(subparsers):
     """Add machine actions to a subparser."""
     # Machines list
-    machines_list = subparsers.add_parser("list", help="List machines")
+    machines_list = subparsers.add_parser(
+        "list", 
+        help="List machines",
+        description="List machines with filtering support. Use specific filters (--status, --template-id) or generic filters (--filter field=value)."
+    )
     add_global_arguments(machines_list)
-    machines_list.add_argument("--status", help="Filter by machine status")
-    machines_list.add_argument("--template-id", help="Filter by template ID")
-    machines_list.add_argument("--filter", action="append", help="Generic filter: field=value, field~value, field=~regex (can be used multiple times)")
+    machines_list.add_argument("--status", help="Filter by machine status (specific filter)")
+    machines_list.add_argument("--template-id", help="Filter by template ID (specific filter)")
     machines_list.add_argument("--timestamp-format", choices=["auto", "unix", "iso"], default="auto", help="Timestamp format: auto (scheduler default), unix (seconds), iso (ISO 8601)")
 
     # Machines show
@@ -112,14 +124,18 @@ def add_machine_actions(subparsers):
 def add_request_actions(subparsers):
     """Add request actions to a subparser."""
     # Requests list
-    requests_list = subparsers.add_parser("list", help="List requests")
+    requests_list = subparsers.add_parser(
+        "list", 
+        help="List requests",
+        description="List requests with filtering support. Use specific filters (--status, --template-id) or generic filters (--filter field=value)."
+    )
     add_global_arguments(requests_list)
     requests_list.add_argument(
         "--status",
         choices=[s.value for s in RequestStatus],
-        help="Filter by request status",
+        help="Filter by request status (specific filter)",
     )
-    requests_list.add_argument("--template-id", help="Filter by template ID")
+    requests_list.add_argument("--template-id", help="Filter by template ID (specific filter)")
 
     # Requests show
     requests_show = subparsers.add_parser("show", help="Show request details")
@@ -210,10 +226,14 @@ def add_infrastructure_actions(subparsers):
 def add_provider_actions(subparsers):
     """Add provider actions to a subparser."""
     # Providers list
-    providers_list = subparsers.add_parser("list", help="List providers")
+    providers_list = subparsers.add_parser(
+        "list", 
+        help="List providers",
+        description="List providers with filtering support. Use specific filters (--detailed) or generic filters (--filter field=value)."
+    )
     add_global_arguments(providers_list)
     providers_list.add_argument(
-        "--detailed", action="store_true", help="Show detailed provider information"
+        "--detailed", action="store_true", help="Show detailed provider information (specific filter)"
     )
 
     # Providers show
@@ -244,9 +264,13 @@ def add_provider_actions(subparsers):
 def add_template_actions(subparsers):
     """Add template actions to a subparser."""
     # Templates list
-    templates_list = subparsers.add_parser("list", help="List templates")
+    templates_list = subparsers.add_parser(
+        "list", 
+        help="List templates",
+        description="List templates with filtering support. Use specific filters (--provider-api) or generic filters (--filter field=value)."
+    )
     add_global_arguments(templates_list)
-    templates_list.add_argument("--provider-api", help="Filter by provider API type")
+    templates_list.add_argument("--provider-api", help="Filter by provider API type (specific filter)")
     templates_list.add_argument(
         "--long", action="store_true", help="Include detailed configuration fields"
     )
@@ -535,7 +559,11 @@ For more information, visit: {DOCS_URL}
     )
 
     # Storage list
-    storage_list = storage_subparsers.add_parser("list", help="List storage strategies")
+    storage_list = storage_subparsers.add_parser(
+        "list", 
+        help="List storage strategies",
+        description="List storage strategies with filtering support using generic filters (--filter field=value)."
+    )
     add_global_arguments(storage_list)
 
     # Storage show
@@ -574,25 +602,23 @@ For more information, visit: {DOCS_URL}
     )
 
     # Scheduler list
-    scheduler_list = scheduler_subparsers.add_parser("list", help="List scheduler strategies")
-    scheduler_list.add_argument(
-        "--format", choices=["json", "yaml", "table", "list"], help="Output format"
+    scheduler_list = scheduler_subparsers.add_parser(
+        "list", 
+        help="List scheduler strategies",
+        description="List scheduler strategies with filtering support using generic filters (--filter field=value)."
     )
+    add_global_arguments(scheduler_list)
     scheduler_list.add_argument("--long", action="store_true", help="Show detailed information")
 
     # Scheduler show
     scheduler_show = scheduler_subparsers.add_parser("show", help="Show scheduler details")
-    scheduler_show.add_argument(
-        "--format", choices=["json", "yaml", "table", "list"], help="Output format"
-    )
-    scheduler_show.add_argument("--scheduler", help="Show specific scheduler strategy details")
+    add_global_arguments(scheduler_show)
+    scheduler_show.add_argument("--strategy", help="Show specific scheduler strategy details")
 
     # Scheduler validate
     scheduler_validate = scheduler_subparsers.add_parser("validate", help="Validate scheduler")
-    scheduler_validate.add_argument(
-        "--format", choices=["json", "yaml", "table", "list"], help="Output format"
-    )
-    scheduler_validate.add_argument("--scheduler", help="Validate specific scheduler strategy")
+    add_global_arguments(scheduler_validate)
+    scheduler_validate.add_argument("--strategy", help="Validate specific scheduler strategy")
 
     # MCP resource
     mcp_parser = subparsers.add_parser("mcp", help="MCP (Model Context Protocol) operations")

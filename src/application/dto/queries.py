@@ -24,6 +24,8 @@ class ListActiveRequestsQuery(Query, BaseModel):
     """Query to list active requests."""
 
     model_config = ConfigDict(frozen=True)
+    
+    filter_expressions: list[str] = []
 
 
 class ListReturnRequestsQuery(Query, BaseModel):
@@ -33,6 +35,7 @@ class ListReturnRequestsQuery(Query, BaseModel):
 
     status: Optional[str] = None
     requester_id: Optional[str] = None
+    filter_expressions: list[str] = []
 
 
 class GetTemplateQuery(Query, BaseModel):
@@ -51,6 +54,7 @@ class ListTemplatesQuery(Query, BaseModel):
     provider_api: Optional[str] = None
     active_only: bool = True
     include_configuration: bool = False
+    filter_expressions: list[str] = []
 
 
 class ValidateTemplateQuery(Query, BaseModel):

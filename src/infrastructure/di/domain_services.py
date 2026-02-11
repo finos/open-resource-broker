@@ -5,6 +5,7 @@ from domain.services.provider_selection_service import ProviderSelectionService
 from domain.services.template_validation_domain_service import TemplateValidationDomainService
 from domain.services.timestamp_service import TimestampService
 from domain.services.filter_service import FilterService
+from domain.services.generic_filter_service import GenericFilterService
 from infrastructure.services.iso_timestamp_service import ISOTimestampService
 from infrastructure.services.machine_filter_service import MachineFilterService
 from domain.base.ports.configuration_port import ConfigurationPort
@@ -42,4 +43,10 @@ def register_domain_services(container: DIContainer) -> None:
     container.register_singleton(
         FilterService,
         lambda c: MachineFilterService()
+    )
+    
+    # Generic filter service
+    container.register_singleton(
+        GenericFilterService,
+        lambda c: GenericFilterService()
     )

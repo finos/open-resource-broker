@@ -9,6 +9,7 @@ from typing import Any
 
 from application.services.provider_registry_service import ProviderRegistryService
 from domain.services.timestamp_service import TimestampService
+from domain.services.generic_filter_service import GenericFilterService
 
 from application.base.handlers import BaseQueryHandler
 from application.decorators import query_handler
@@ -115,6 +116,7 @@ class ListAvailableProvidersHandler(
         config_manager: ConfigurationPort,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
+        generic_filter_service: GenericFilterService,
     ) -> None:
         """
         Initialize list providers handler.
@@ -123,9 +125,11 @@ class ListAvailableProvidersHandler(
             config_manager: Configuration port for getting provider config
             logger: Logging port for operation logging
             error_handler: Error handling port for exception management
+            generic_filter_service: Service for applying generic filters
         """
         super().__init__(logger, error_handler)
         self._config_manager = config_manager
+        self._generic_filter_service = generic_filter_service
 
     async def execute_query(self, query: ListAvailableProvidersQuery) -> dict[str, Any]:
         """Execute list available providers query."""
@@ -161,6 +165,12 @@ class ListAvailableProvidersHandler(
                     "weight": provider_instance.weight,
                     "priority": provider_instance.priority,
                 })
+
+            # Apply generic filters if provided
+            if query.filter_expressions:
+                providers_info = self._generic_filter_service.apply_filters(
+                    providers_info, query.filter_expressions
+                )
 
             return {
                 "providers": providers_info,

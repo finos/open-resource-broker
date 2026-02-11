@@ -16,6 +16,7 @@ from application.queries.scheduler import (
 from application.services.scheduler_registry_service import SchedulerRegistryService
 from domain.base.ports.error_handling_port import ErrorHandlingPort
 from domain.base.ports.logging_port import LoggingPort
+from domain.services.generic_filter_service import GenericFilterService
 
 
 @query_handler(ListSchedulerStrategiesQuery)
@@ -29,9 +30,11 @@ class ListSchedulerStrategiesHandler(
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
         scheduler_service: SchedulerRegistryService,
+        generic_filter_service: GenericFilterService,
     ):
         super().__init__(logger, error_handler)
         self._scheduler_service = scheduler_service
+        self._generic_filter_service = generic_filter_service
 
     async def execute_query(
         self, query: ListSchedulerStrategiesQuery
@@ -77,10 +80,22 @@ class ListSchedulerStrategiesHandler(
             )
             strategies.append(strategy_info)
 
+        # Convert DTO objects to dictionaries for filtering
+        strategies_dict = [strategy.model_dump() for strategy in strategies]
+
+        # Apply generic filters if provided
+        if query.filter_expressions:
+            strategies_dict = self._generic_filter_service.apply_filters(
+                strategies_dict, query.filter_expressions
+            )
+
+        # Convert back to DTO objects
+        filtered_strategies = [SchedulerStrategyDTO(**strategy) for strategy in strategies_dict]
+
         return SchedulerStrategyListResponse(
-            strategies=strategies,
+            strategies=filtered_strategies,
             current_strategy=current_strategy,
-            total_count=len(strategies),
+            total_count=len(filtered_strategies),
         )
 
     def _get_scheduler_description(self, scheduler_type: str) -> str:

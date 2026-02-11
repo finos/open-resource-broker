@@ -25,6 +25,7 @@ class ListAvailableProvidersQuery(BaseQuery):
     include_metrics: bool = False
     filter_healthy_only: bool = False
     provider_type: Optional[str] = None
+    filter_expressions: list[str] = []
 
 
 class GetProviderCapabilitiesQuery(BaseQuery):
