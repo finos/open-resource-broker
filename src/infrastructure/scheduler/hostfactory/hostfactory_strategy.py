@@ -186,9 +186,11 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
     def _get_provider_name(self) -> str:
         """Get the active provider instance name."""
         try:
-            from providers.registry import get_provider_registry
-            provider_registry = get_provider_registry()
-            selection_result = provider_registry.select_active_provider()
+            from infrastructure.di.container import get_container
+            from application.services.provider_registry_service import ProviderRegistryService
+            container = get_container()
+            provider_service = container.get(ProviderRegistryService)
+            selection_result = provider_service.select_active_provider()
             return selection_result.provider_name
         except Exception as e:
             self._logger.warning("Failed to get provider instance name: %s", e)
@@ -201,9 +203,11 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
     def _get_active_provider_type(self) -> str:
         """Get the active provider type from configuration."""
         try:
-            from providers.registry import get_provider_registry
-            provider_registry = get_provider_registry()
-            selection_result = provider_registry.select_active_provider()
+            from infrastructure.di.container import get_container
+            from application.services.provider_registry_service import ProviderRegistryService
+            container = get_container()
+            provider_service = container.get(ProviderRegistryService)
+            selection_result = provider_service.select_active_provider()
             provider_type = selection_result.provider_type
             self._logger.debug("Active provider type: %s", provider_type)
             return provider_type
@@ -474,9 +478,11 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         if not active_provider:
             # Get from provider registry instead of hardcoded default
             try:
-                from providers.registry import get_provider_registry
-                provider_registry = get_provider_registry()
-                selection_result = provider_registry.select_active_provider()
+                from infrastructure.di.container import get_container
+                from application.services.provider_registry_service import ProviderRegistryService
+                container = get_container()
+                provider_service = container.get(ProviderRegistryService)
+                selection_result = provider_service.select_active_provider()
                 active_provider = selection_result.provider_name
             except Exception:
                 active_provider = "aws_default"

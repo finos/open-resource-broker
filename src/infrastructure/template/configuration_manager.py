@@ -207,7 +207,11 @@ class TemplateConfigurationManager:
             from providers.registry import get_provider_registry
 
             registry = get_provider_registry()
-            selection_result = registry.select_active_provider()
+            from infrastructure.di.container import get_container
+            from application.services.provider_registry_service import ProviderRegistryService
+            container = get_container()
+            provider_service = container.get(ProviderRegistryService)
+            selection_result = provider_service.select_active_provider()
             return selection_result.provider_instance
         except Exception as e:
             self.logger.debug("Could not determine provider instance via registry: %s", e)
