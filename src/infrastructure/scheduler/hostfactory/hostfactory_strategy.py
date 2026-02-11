@@ -613,16 +613,12 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         }
 
     def format_templates_for_generation(self, templates: list[dict]) -> list[dict]:
-        """Convert internal templates to HostFactory input format with full business logic."""
+        """Convert internal templates to HostFactory format without applying defaults."""
         processed_templates = []
 
         for template in templates:
-            # Apply the same business logic as loading
-            processed_template = self._map_template_fields(template)
-
-            # Convert back to HostFactory format for file storage
-            hf_template = self.field_mapper.format_for_generation([processed_template])[0]
-
+            # Convert to HostFactory format for file storage WITHOUT applying defaults
+            hf_template = self.field_mapper.format_for_generation([template])[0]
             processed_templates.append(hf_template)
 
         return processed_templates

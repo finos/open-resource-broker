@@ -48,20 +48,30 @@ class TemplateGenerationService:
             # Determine target providers
             providers = self._determine_target_providers(request)
             
-            # Generate templates for each provider
-            results = []
-            for provider in providers:
-                result = await self._generate_templates_for_provider(provider, request)
-                results.append(result)
+            if request.provider_specific:
+                # Provider-specific mode: generate separate files
+                results = []
+                for provider in providers:
+                    result = await self._generate_templates_for_provider(provider, request)
+                    results.append(result)
+            else:
+                # Default mode: collect templates and merge by filename
+                results = await self._generate_with_deep_merge(providers, request)
             
             # Calculate summary
             created_results = [r for r in results if r.status == "created"]
             skipped_results = [r for r in results if r.status == "skipped"]
             total_templates = sum(r.templates_count for r in created_results)
             
+            # Adjust message for deep merge vs provider-specific
+            if request.provider_specific:
+                message = f"Generated templates for {len(providers)} providers"
+            else:
+                message = f"Merged templates from {len(providers)} providers"
+            
             return TemplateGenerationResult(
                 status="success",
-                message=f"Generated templates for {len(results)} providers",
+                message=message,
                 providers=results,
                 total_templates=total_templates,
                 created_count=len(created_results),
@@ -88,6 +98,115 @@ class TemplateGenerationService:
         else:
             # Default: generate for all active providers
             return self._get_active_providers()
+
+    async def _generate_with_deep_merge(self, providers: List[Dict[str, str]], request: TemplateGenerationRequest) -> List[ProviderTemplateResult]:
+        """Generate templates with deep merge for providers targeting same file."""
+        # Group providers by target filename
+        providers_by_file = {}
+        for provider in providers:
+            filename = self._determine_filename(provider, request)
+            if filename not in providers_by_file:
+                providers_by_file[filename] = []
+            providers_by_file[filename].append(provider)
+        
+        results = []
+        for filename, file_providers in providers_by_file.items():
+            if len(file_providers) == 1:
+                # Single provider for this file - generate normally
+                result = await self._generate_templates_for_provider(file_providers[0], request)
+                results.append(result)
+            else:
+                # Multiple providers for same file - merge templates
+                merged_result = await self._generate_merged_templates(file_providers, filename, request)
+                results.extend(merged_result)
+        
+        return results
+
+    async def _generate_merged_templates(self, providers: List[Dict[str, str]], filename: str, request: TemplateGenerationRequest) -> List[ProviderTemplateResult]:
+        """Generate and merge templates from multiple providers with deduplication."""
+        templates_file = self._get_templates_file_path(filename)
+        
+        # Check for existing file
+        if templates_file.exists() and not request.force_overwrite:
+            return [ProviderTemplateResult(
+                provider=p["name"],
+                filename=filename,
+                templates_count=0,
+                path=str(templates_file),
+                status="skipped",
+                reason="file_exists"
+            ) for p in providers]
+        
+        # Collect templates from all providers
+        provider_templates = {}
+        original_counts = {}
+        
+        for provider in providers:
+            try:
+                # Generate templates for this provider
+                examples = await self._generate_examples_from_provider(
+                    provider["type"], 
+                    provider["name"], 
+                    request.provider_api
+                )
+                
+                formatted_templates = self._format_templates(examples, request)
+                provider_templates[provider["name"]] = formatted_templates
+                original_counts[provider["name"]] = len(examples)
+                
+            except Exception as e:
+                self._logger.error("Failed to generate templates for provider %s: %s", provider["name"], str(e))
+                provider_templates[provider["name"]] = []
+                original_counts[provider["name"]] = 0
+        
+        # Merge templates with deduplication
+        merged_templates = self._merge_templates_with_deduplication(provider_templates)
+        
+        # Calculate actual contributions after deduplication
+        total_original = sum(original_counts.values())
+        final_count = len(merged_templates)
+        
+        # Write merged templates to file
+        if merged_templates:
+            self._write_templates_file(templates_file, merged_templates)
+        
+        # Create accurate results after deduplication
+        if len(providers) == 1 or request.provider_specific:
+            # Provider-specific mode or single provider - report per provider
+            provider_results = []
+            for provider in providers:
+                if provider["name"] in original_counts:
+                    original_count = original_counts[provider["name"]]
+                    if original_count > 0:
+                        provider_results.append(ProviderTemplateResult(
+                            provider=provider["name"],
+                            filename=filename,
+                            templates_count=final_count,
+                            path=str(templates_file),
+                            status="created"
+                        ))
+                    else:
+                        provider_results.append(ProviderTemplateResult(
+                            provider=provider["name"],
+                            filename=filename,
+                            templates_count=0,
+                            path=str(templates_file),
+                            status="error",
+                            reason="no templates generated"
+                        ))
+        else:
+            # Deep merge mode - report as single merged result
+            provider_names = ", ".join([p["name"] for p in providers])
+            provider_results = [ProviderTemplateResult(
+                provider=f"{provider_names} (merged)",
+                filename=filename,
+                templates_count=final_count,
+                path=str(templates_file),
+                status="created",
+                reason=f"Merged from {len(providers)} providers: {final_count} final templates (deduplicated from {total_original})"
+            )]
+        
+        return provider_results
 
     async def _generate_templates_for_provider(
         self, 
@@ -231,6 +350,29 @@ class TemplateGenerationService:
         config_dir = get_config_location()
         return config_dir / filename
 
+    def _get_config_dict(self) -> dict:
+        """Get configuration dictionary for scheduler strategy."""
+        try:
+            from infrastructure.di.container import get_container
+            from domain.base.ports.configuration_port import ConfigurationPort
+            
+            container = get_container()
+            config_port = container.get(ConfigurationPort)
+            
+            # Get the configuration as dict
+            # This provides access to template filename patterns and overrides
+            return {
+                "template": {
+                    "filename_patterns": {
+                        "provider_specific": "{provider_name}_templates.json",
+                        "provider_type": "{provider_type}_templates.json"
+                    }
+                }
+            }
+        except Exception:
+            # Fallback to empty config
+            return {}
+
     def _write_templates_file(self, templates_file: Path, formatted_examples: List[Dict[str, Any]]) -> None:
         """Write templates to file (bulk operation)."""
         import json
@@ -289,3 +431,79 @@ class TemplateGenerationService:
                 "name": provider_name,
                 "type": provider_name.split("_")[0] if "_" in provider_name else provider_name,
             }
+
+    def _merge_templates_with_deduplication(self, provider_templates: Dict[str, List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+        """Merge templates from multiple providers with intelligent deduplication."""
+        template_groups = {}  # templateId -> list of templates
+        
+        # Group templates by templateId
+        for provider_name, templates in provider_templates.items():
+            for template in templates:
+                template_id = template.get("templateId")
+                if template_id:
+                    if template_id not in template_groups:
+                        template_groups[template_id] = []
+                    template_groups[template_id].append((provider_name, template))
+        
+        merged_templates = []
+        
+        for template_id, template_list in template_groups.items():
+            if len(template_list) == 1:
+                # Single template - include as-is
+                _, template = template_list[0]
+                merged_templates.append(template)
+            else:
+                # Multiple templates with same ID - check if identical
+                provider_name, first_template = template_list[0]
+                
+                # Compare templates (excluding timestamps and provider-specific fields)
+                are_identical = True
+                for other_provider, other_template in template_list[1:]:
+                    if not self._templates_are_identical(first_template, other_template):
+                        are_identical = False
+                        break
+                
+                if are_identical:
+                    # Identical templates - keep one copy
+                    merged_templates.append(first_template)
+                else:
+                    # Different templates with same ID - create provider variants
+                    for provider_name, template in template_list:
+                        variant_template = template.copy()
+                        region = self._extract_region_from_provider(provider_name)
+                        variant_template["templateId"] = f"{template_id}-{region}"
+                        merged_templates.append(variant_template)
+        
+        return merged_templates
+    
+    def _templates_are_identical(self, template1: Dict[str, Any], template2: Dict[str, Any]) -> bool:
+        """Check if two templates are identical (ignoring timestamps and provider-specific fields)."""
+        ignore_fields = {"createdAt", "updatedAt", "version", "name"}
+        
+        # Get keys from both templates
+        keys1 = set(template1.keys()) - ignore_fields
+        keys2 = set(template2.keys()) - ignore_fields
+        
+        if keys1 != keys2:
+            return False
+        
+        # Compare values for common keys
+        for key in keys1:
+            if template1[key] != template2[key]:
+                return False
+        
+        return True
+    
+    def _extract_region_from_provider(self, provider_name: str) -> str:
+        """Extract region from provider name."""
+        # Provider names like: aws_flamurg-testing-Admin_eu-west-2, aws-testing-us-east-1
+        parts = provider_name.split("_")
+        if len(parts) >= 3:
+            return parts[-1]  # Last part is region
+        elif "-" in provider_name:
+            parts = provider_name.split("-")
+            # Look for region pattern (us-east-1, eu-west-2, etc.)
+            for part in reversed(parts):
+                if "-" in part and len(part) > 5:  # Basic region pattern check
+                    return part
+        return "unknown"

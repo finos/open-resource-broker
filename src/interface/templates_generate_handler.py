@@ -80,7 +80,7 @@ def _print_generation_results(result) -> None:
 
     # Print created results
     if created_providers:
-        print_success(f"Generated templates for {len(created_providers)} providers")
+        print_success(result.message)
         print_info(f"Total templates: {result.total_templates}")
         print_info("")
 

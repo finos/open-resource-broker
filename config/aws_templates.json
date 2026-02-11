@@ -1,17 +1,14 @@
 {
   "templates": [
     {
-      "createdAt": "2026-02-11T20:01:56.787476",
+      "createdAt": "2026-02-12T00:05:30.864029",
       "templateId": "EC2Fleet-Instant-OnDemand",
       "maxNumber": 10,
-      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "keyName": "",
       "providerApi": "EC2Fleet",
       "name": "EC2 Fleet Instant On-Demand",
       "providerType": "aws",
-      "securityGroupIds": [
-        "sg-0207c8c797fadea6f"
-      ],
+      "subnetIds": [],
+      "securityGroupIds": [],
       "vmTypes": {
         "t3.medium": 1
       },
@@ -22,21 +19,17 @@
         "ManagedBy": "ORB"
       },
       "vmTypesOnDemand": {},
-      "vmTypesPriority": {},
-      "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
+      "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-11T20:01:56.787567",
+      "createdAt": "2026-02-12T00:05:30.864137",
       "templateId": "EC2Fleet-Instant-Spot",
       "maxNumber": 10,
-      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "keyName": "",
       "providerApi": "EC2Fleet",
       "name": "EC2 Fleet Instant Spot",
       "providerType": "aws",
-      "securityGroupIds": [
-        "sg-0207c8c797fadea6f"
-      ],
+      "subnetIds": [],
+      "securityGroupIds": [],
       "vmTypes": {
         "t3.medium": 1
       },
@@ -48,21 +41,17 @@
         "ManagedBy": "ORB"
       },
       "vmTypesOnDemand": {},
-      "vmTypesPriority": {},
-      "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
+      "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-11T20:01:56.787581",
+      "createdAt": "2026-02-12T00:05:30.864154",
       "templateId": "EC2Fleet-Instant-Mixed",
       "maxNumber": 10,
-      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "keyName": "",
       "providerApi": "EC2Fleet",
       "name": "EC2 Fleet Instant Mixed",
       "providerType": "aws",
-      "securityGroupIds": [
-        "sg-0207c8c797fadea6f"
-      ],
+      "subnetIds": [],
+      "securityGroupIds": [],
       "vmTypes": {
         "t3.medium": 1
       },
@@ -74,21 +63,17 @@
         "ManagedBy": "ORB"
       },
       "vmTypesOnDemand": {},
-      "vmTypesPriority": {},
-      "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
+      "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-11T20:01:56.787588",
+      "createdAt": "2026-02-12T00:05:30.864162",
       "templateId": "EC2Fleet-Request-OnDemand",
       "maxNumber": 15,
-      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "keyName": "",
       "providerApi": "EC2Fleet",
       "name": "EC2 Fleet Request On-Demand",
       "providerType": "aws",
-      "securityGroupIds": [
-        "sg-0207c8c797fadea6f"
-      ],
+      "subnetIds": [],
+      "securityGroupIds": [],
       "vmTypes": {
         "t3.medium": 1
       },
@@ -99,21 +84,17 @@
         "ManagedBy": "ORB"
       },
       "vmTypesOnDemand": {},
-      "vmTypesPriority": {},
-      "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
+      "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-11T20:01:56.787596",
+      "createdAt": "2026-02-12T00:05:30.864170",
       "templateId": "EC2Fleet-Request-Spot",
       "maxNumber": 20,
-      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "keyName": "",
       "providerApi": "EC2Fleet",
       "name": "EC2 Fleet Request Spot",
       "providerType": "aws",
-      "securityGroupIds": [
-        "sg-0207c8c797fadea6f"
-      ],
+      "subnetIds": [],
+      "securityGroupIds": [],
       "vmTypes": {
         "t3.medium": 1
       },
@@ -125,21 +106,17 @@
         "ManagedBy": "ORB"
       },
       "vmTypesOnDemand": {},
-      "vmTypesPriority": {},
-      "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
+      "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-11T20:01:56.787602",
+      "createdAt": "2026-02-12T00:05:30.864176",
       "templateId": "EC2Fleet-Request-Mixed",
       "maxNumber": 25,
-      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "keyName": "",
       "providerApi": "EC2Fleet",
       "name": "EC2 Fleet Request Mixed",
       "providerType": "aws",
-      "securityGroupIds": [
-        "sg-0207c8c797fadea6f"
-      ],
+      "subnetIds": [],
+      "securityGroupIds": [],
       "vmTypes": {
         "t3.medium": 1,
         "t3.large": 2
@@ -152,21 +129,17 @@
         "ManagedBy": "ORB"
       },
       "vmTypesOnDemand": {},
-      "vmTypesPriority": {},
-      "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
+      "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-11T20:01:56.787659",
+      "createdAt": "2026-02-12T00:05:30.864182",
       "templateId": "EC2Fleet-Maintain-OnDemand",
       "maxNumber": 12,
-      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "keyName": "",
       "providerApi": "EC2Fleet",
       "name": "EC2 Fleet Maintain On-Demand",
       "providerType": "aws",
-      "securityGroupIds": [
-        "sg-0207c8c797fadea6f"
-      ],
+      "subnetIds": [],
+      "securityGroupIds": [],
       "vmTypes": {
         "t3.medium": 1
       },
@@ -177,21 +150,17 @@
         "ManagedBy": "ORB"
       },
       "vmTypesOnDemand": {},
-      "vmTypesPriority": {},
-      "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
+      "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-11T20:01:56.787667",
+      "createdAt": "2026-02-12T00:05:30.864189",
       "templateId": "EC2Fleet-Maintain-Spot",
       "maxNumber": 30,
-      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "keyName": "",
       "providerApi": "EC2Fleet",
       "name": "EC2 Fleet Maintain Spot",
       "providerType": "aws",
-      "securityGroupIds": [
-        "sg-0207c8c797fadea6f"
-      ],
+      "subnetIds": [],
+      "securityGroupIds": [],
       "vmTypes": {
         "t3.medium": 1
       },
@@ -203,21 +172,17 @@
         "ManagedBy": "ORB"
       },
       "vmTypesOnDemand": {},
-      "vmTypesPriority": {},
-      "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
+      "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-11T20:01:56.787674",
+      "createdAt": "2026-02-12T00:05:30.864194",
       "templateId": "EC2Fleet-Maintain-Mixed",
       "maxNumber": 50,
-      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "keyName": "",
       "providerApi": "EC2Fleet",
       "name": "EC2 Fleet Maintain Mixed",
       "providerType": "aws",
-      "securityGroupIds": [
-        "sg-0207c8c797fadea6f"
-      ],
+      "subnetIds": [],
+      "securityGroupIds": [],
       "vmTypes": {
         "t3.medium": 1,
         "t3.large": 2,
@@ -231,21 +196,17 @@
         "ManagedBy": "ORB"
       },
       "vmTypesOnDemand": {},
-      "vmTypesPriority": {},
-      "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
+      "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-11T20:01:56.787682",
+      "createdAt": "2026-02-12T00:05:30.864202",
       "templateId": "SpotFleet-Request-LowestPrice",
       "maxNumber": 20,
-      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "keyName": "",
       "providerApi": "SpotFleet",
       "name": "Spot Fleet Request - Lowest Price",
       "providerType": "aws",
-      "securityGroupIds": [
-        "sg-0207c8c797fadea6f"
-      ],
+      "subnetIds": [],
+      "securityGroupIds": [],
       "vmTypes": {
         "t3.medium": 1,
         "t3.large": 2
@@ -258,21 +219,17 @@
         "ManagedBy": "ORB"
       },
       "vmTypesOnDemand": {},
-      "vmTypesPriority": {},
-      "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
+      "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-11T20:01:56.787686",
+      "createdAt": "2026-02-12T00:05:30.864208",
       "templateId": "SpotFleet-Request-Diversified",
       "maxNumber": 25,
-      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "keyName": "",
       "providerApi": "SpotFleet",
       "name": "Spot Fleet Request - Diversified",
       "providerType": "aws",
-      "securityGroupIds": [
-        "sg-0207c8c797fadea6f"
-      ],
+      "subnetIds": [],
+      "securityGroupIds": [],
       "vmTypes": {
         "t3.medium": 1,
         "t3.large": 2
@@ -285,21 +242,17 @@
         "ManagedBy": "ORB"
       },
       "vmTypesOnDemand": {},
-      "vmTypesPriority": {},
-      "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
+      "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-11T20:01:56.787690",
+      "createdAt": "2026-02-12T00:05:30.864213",
       "templateId": "SpotFleet-Request-CapacityOptimized",
       "maxNumber": 30,
-      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "keyName": "",
       "providerApi": "SpotFleet",
       "name": "Spot Fleet Request - Capacity Optimized",
       "providerType": "aws",
-      "securityGroupIds": [
-        "sg-0207c8c797fadea6f"
-      ],
+      "subnetIds": [],
+      "securityGroupIds": [],
       "vmTypes": {
         "t3.medium": 1,
         "t3.large": 2
@@ -312,21 +265,17 @@
         "ManagedBy": "ORB"
       },
       "vmTypesOnDemand": {},
-      "vmTypesPriority": {},
-      "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
+      "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-11T20:01:56.787694",
+      "createdAt": "2026-02-12T00:05:30.864217",
       "templateId": "SpotFleet-Maintain-LowestPrice",
       "maxNumber": 15,
-      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "keyName": "",
       "providerApi": "SpotFleet",
       "name": "Spot Fleet Maintain - Lowest Price",
       "providerType": "aws",
-      "securityGroupIds": [
-        "sg-0207c8c797fadea6f"
-      ],
+      "subnetIds": [],
+      "securityGroupIds": [],
       "vmTypes": {
         "t3.medium": 1,
         "t3.large": 2
@@ -339,21 +288,17 @@
         "ManagedBy": "ORB"
       },
       "vmTypesOnDemand": {},
-      "vmTypesPriority": {},
-      "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
+      "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-11T20:01:56.787697",
+      "createdAt": "2026-02-12T00:05:30.864226",
       "templateId": "SpotFleet-Maintain-Diversified",
       "maxNumber": 20,
-      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "keyName": "",
       "providerApi": "SpotFleet",
       "name": "Spot Fleet Maintain - Diversified",
       "providerType": "aws",
-      "securityGroupIds": [
-        "sg-0207c8c797fadea6f"
-      ],
+      "subnetIds": [],
+      "securityGroupIds": [],
       "vmTypes": {
         "t3.medium": 1,
         "t3.large": 2
@@ -366,21 +311,17 @@
         "ManagedBy": "ORB"
       },
       "vmTypesOnDemand": {},
-      "vmTypesPriority": {},
-      "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
+      "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-11T20:01:56.787701",
+      "createdAt": "2026-02-12T00:05:30.864231",
       "templateId": "SpotFleet-Maintain-CapacityOptimized",
       "maxNumber": 25,
-      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "keyName": "",
       "providerApi": "SpotFleet",
       "name": "Spot Fleet Maintain - Capacity Optimized",
       "providerType": "aws",
-      "securityGroupIds": [
-        "sg-0207c8c797fadea6f"
-      ],
+      "subnetIds": [],
+      "securityGroupIds": [],
       "vmTypes": {
         "t3.medium": 1,
         "t3.large": 2
@@ -393,21 +334,17 @@
         "ManagedBy": "ORB"
       },
       "vmTypesOnDemand": {},
-      "vmTypesPriority": {},
-      "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
+      "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-11T20:01:56.787707",
+      "createdAt": "2026-02-12T00:05:30.864238",
       "templateId": "ASG-OnDemand",
       "maxNumber": 15,
-      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "keyName": "",
       "providerApi": "AutoScalingGroup",
       "name": "Auto Scaling Group On-Demand",
       "providerType": "aws",
-      "securityGroupIds": [
-        "sg-0207c8c797fadea6f"
-      ],
+      "subnetIds": [],
+      "securityGroupIds": [],
       "vmTypes": {
         "t3.medium": 1
       },
@@ -418,21 +355,17 @@
         "ManagedBy": "ORB"
       },
       "vmTypesOnDemand": {},
-      "vmTypesPriority": {},
-      "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
+      "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-11T20:01:56.787714",
+      "createdAt": "2026-02-12T00:05:30.864248",
       "templateId": "ASG-Spot",
       "maxNumber": 20,
-      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "keyName": "",
       "providerApi": "AutoScalingGroup",
       "name": "Auto Scaling Group Spot",
       "providerType": "aws",
-      "securityGroupIds": [
-        "sg-0207c8c797fadea6f"
-      ],
+      "subnetIds": [],
+      "securityGroupIds": [],
       "vmTypes": {
         "t3.medium": 1
       },
@@ -444,21 +377,17 @@
         "ManagedBy": "ORB"
       },
       "vmTypesOnDemand": {},
-      "vmTypesPriority": {},
-      "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
+      "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-11T20:01:56.787719",
+      "createdAt": "2026-02-12T00:05:30.864254",
       "templateId": "ASG-Mixed",
       "maxNumber": 25,
-      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "keyName": "",
       "providerApi": "AutoScalingGroup",
       "name": "Auto Scaling Group Mixed",
       "providerType": "aws",
-      "securityGroupIds": [
-        "sg-0207c8c797fadea6f"
-      ],
+      "subnetIds": [],
+      "securityGroupIds": [],
       "vmTypes": {
         "t3.medium": 1,
         "t3.large": 2
@@ -470,21 +399,17 @@
         "ManagedBy": "ORB"
       },
       "vmTypesOnDemand": {},
-      "vmTypesPriority": {},
-      "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
+      "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-11T20:01:56.787723",
+      "createdAt": "2026-02-12T00:05:30.864260",
       "templateId": "RunInstances-OnDemand",
       "maxNumber": 5,
-      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "keyName": "",
       "providerApi": "RunInstances",
       "name": "Run Instances On-Demand",
       "providerType": "aws",
-      "securityGroupIds": [
-        "sg-0207c8c797fadea6f"
-      ],
+      "subnetIds": [],
+      "securityGroupIds": [],
       "vmTypes": {
         "t3.medium": 1
       },
@@ -495,21 +420,17 @@
         "ManagedBy": "ORB"
       },
       "vmTypesOnDemand": {},
-      "vmTypesPriority": {},
-      "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
+      "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-11T20:01:56.787728",
+      "createdAt": "2026-02-12T00:05:30.864266",
       "templateId": "RunInstances-Spot",
       "maxNumber": 10,
-      "imageId": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "keyName": "",
       "providerApi": "RunInstances",
       "name": "Run Instances Spot",
       "providerType": "aws",
-      "securityGroupIds": [
-        "sg-0207c8c797fadea6f"
-      ],
+      "subnetIds": [],
+      "securityGroupIds": [],
       "vmTypes": {
         "t3.medium": 1
       },
@@ -521,8 +442,7 @@
         "ManagedBy": "ORB"
       },
       "vmTypesOnDemand": {},
-      "vmTypesPriority": {},
-      "subnetId": "subnet-0b4779042604b3c3c,subnet-0cfcdcb5ecffd8e34,subnet-087ffbe112328f00c"
+      "vmTypesPriority": {}
     }
   ]
 }
