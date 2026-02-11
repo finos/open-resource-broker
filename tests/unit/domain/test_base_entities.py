@@ -127,7 +127,7 @@ class TestValueObjects:
 
     def test_instance_type_creation(self):
         """Test InstanceType value object creation."""
-        instance_type = InstanceType(value="t2.micro")
+        machine_types = {"t2.micro": 1}
         assert str(instance_type) == "t2.micro"
         assert instance_type.value == "t2.micro"
 
@@ -420,7 +420,7 @@ class TestValueObjectStringRepresentation:
 
     def test_instance_type_str(self):
         """Test InstanceType string representation."""
-        instance_type = InstanceType(value="t2.micro")
+        machine_types = {"t2.micro": 1}
         assert str(instance_type) == "t2.micro"
         assert "InstanceType" in repr(instance_type)
         assert "t2.micro" in repr(instance_type)

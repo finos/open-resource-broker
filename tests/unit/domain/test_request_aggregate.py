@@ -414,7 +414,7 @@ class TestRequestAggregate:
             "status": "pending",
             "request_type": "new",
             "tags": {"Environment": "test"},
-            "configuration": {"instance_type": "t2.small"},
+            "configuration": {"machine_types": {"t2.small": 1}},
             "created_at": "2023-01-01T00:00:00Z",
             "updated_at": "2023-01-01T00:00:00Z",
         }
@@ -429,7 +429,7 @@ class TestRequestAggregate:
         assert request.status == RequestStatus.PENDING
         assert request.request_type == RequestType.NEW
         assert request.tags == {"Environment": "test"}
-        assert request.configuration == {"instance_type": "t2.small"}
+        assert request.configuration == {"machine_types": {"t2.small": 1}}
 
     def test_request_domain_events(self):
         """Test request domain events generation."""
@@ -539,7 +539,7 @@ class TestRequestValueObjects:
 
         config = RequestConfiguration(config_dict)
         assert config.value == config_dict
-        assert config["instance_type"] == "t2.small"
+        assert config["machine_types"] == {"t2.small": 1}
         assert config["spot_price"] == "0.05"
         assert config["user_data"] == "#!/bin/bash\necho 'test'"
 

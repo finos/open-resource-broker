@@ -39,7 +39,7 @@ class TestTemplateDefaultsService:
                         **{
                             "template_defaults": {
                                 "image_id": "ami-aws-default",
-                                "instance_type": "t2.micro",
+                                "machine_types": {"t2.micro": 1},
                                 "provider_api": "EC2Fleet",
                                 "price_type": "ondemand",
                                 "security_group_ids": ["sg-aws-default"],
@@ -55,7 +55,7 @@ class TestTemplateDefaultsService:
                             "type": "aws",
                             "template_defaults": {
                                 "provider_api": "SpotFleet",  # Override provider type default
-                                "instance_type": "t3.medium",  # Override provider type default
+                                "machine_types": {"t3.medium": 1},  # Override provider type default
                             },
                         }
                     ),
@@ -109,7 +109,7 @@ class TestTemplateDefaultsService:
         assert result["template_id"] == "test-template"
         assert result["image_id"] == "ami-specific"  # Template value (highest priority)
         assert result["provider_api"] == "EC2Fleet"  # Provider type default
-        assert result["instance_type"] == "t2.micro"  # Provider type default
+        assert result["machine_types"] == {"t2.micro": 1}  # Provider type default
         assert result["security_group_ids"] == ["sg-aws-default"]  # Provider type default
         assert result["price_type"] == "ondemand"  # Global default
 
@@ -188,7 +188,7 @@ class TestTemplateDefaultsService:
         assert result["price_type"] == "ondemand"  # Global default
         assert result["image_id"] == "ami-aws-default"  # Provider type default
         assert result["provider_api"] == "EC2Fleet"  # Provider type default
-        assert result["instance_type"] == "t2.micro"  # Provider type default
+        assert result["machine_types"] == {"t2.micro": 1}  # Provider type default
         assert result["security_group_ids"] == ["sg-aws-default"]  # Provider type default
 
     def test_validate_template_defaults(
@@ -263,7 +263,7 @@ class TestTemplateDefaultsService:
         template_dict = {
             "template_id": "test-template",
             "image_id": None,  # None should not override defaults
-            "instance_type": "t3.large",  # Non-None should override
+            "machine_types": {"t3.large": 1},  # Non-None should override
         }
 
         result = template_defaults_service.resolve_template_defaults(template_dict, "aws-primary")
@@ -271,7 +271,7 @@ class TestTemplateDefaultsService:
         # None value should be replaced by default
         assert result["image_id"] == "ami-aws-default"  # From provider type defaults
         # Non-None value should be preserved
-        assert result["instance_type"] == "t3.large"  # From template
+        assert result["machine_types"] == {"t3.large": 1}  # From template
 
 
 class TestTemplateDefaultsIntegration:

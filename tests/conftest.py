@@ -41,7 +41,7 @@ import boto3
 try:
     from config.manager import ConfigurationManager
     from config.schemas.app_schema import AppConfig
-    from domain.base.value_objects import InstanceId, InstanceType, ResourceId
+    from domain.base.value_objects import InstanceId, ResourceId
     from domain.machine.aggregate import Machine
     from domain.request.aggregate import Request
     from domain.template.template_aggregate import Template

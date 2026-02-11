@@ -40,7 +40,7 @@
   },
   "template": {
     "default_image_id": "ami-12345678",
-    "default_instance_type": "t2.micro",
+    "default_machine_types": {"t2.micro": 1},
     "subnet_ids": ["subnet-12345678"],
     "security_group_ids": ["sg-12345678"]
   }

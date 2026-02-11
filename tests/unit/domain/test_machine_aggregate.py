@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from domain.base.value_objects import InstanceId, InstanceType
+from domain.base.value_objects import InstanceId
 from domain.machine.aggregate import Machine
 from domain.machine.exceptions import (
     InvalidMachineStateError,
@@ -331,7 +331,7 @@ class TestMachineAggregate:
             "template_id",
             "request_id",
             "status",
-            "instance_type",
+            "machine_types",
             "availability_zone",
         ]
 
@@ -341,7 +341,7 @@ class TestMachineAggregate:
             "template_id": "template-001",
             "request_id": "request-001",
             "status": "running",
-            "instance_type": InstanceType(value="t2.micro"),
+            "machine_types": {"t2.micro": 1},
             "availability_zone": "us-east-1a",
         }
 
@@ -452,7 +452,7 @@ class TestMachineAggregate:
             template_id="template-002",  # Different template
             request_id="request-002",  # Different request
             status="stopped",  # Different status
-            instance_type=InstanceType(value="t2.small"),  # Different instance type
+            machine_types={"t2.small": 1},  # Different machine type
             availability_zone="us-west-2a",  # Different AZ
         )
 
@@ -488,7 +488,7 @@ class TestMachineAggregate:
             template_id="template-different",
             request_id="request-different",
             status="stopped",
-            instance_type=InstanceType(value="t2.large"),
+            machine_types={"t2.large": 1},
             availability_zone="us-west-2b",
         )
 
@@ -518,7 +518,7 @@ class TestMachineAggregate:
         assert machine_dict["template_id"] == "template-001"
         assert machine_dict["request_id"] == "request-001"
         assert machine_dict["status"] == "running"
-        assert machine_dict["instance_type"] == "t2.micro"
+        assert machine_dict["machine_types"] == {"t2.micro": 1}
         assert machine_dict["availability_zone"] == "us-east-1a"
         assert machine_dict["private_ip"] == "10.0.1.100"
         assert machine_dict["public_ip"] == "54.123.45.67"
@@ -534,7 +534,7 @@ class TestMachineAggregate:
             "template_id": "template-001",
             "request_id": "request-001",
             "status": "running",
-            "instance_type": "t2.micro",
+            "machine_types": {"t2.micro": 1},
             "availability_zone": "us-east-1a",
             "private_ip": "10.0.1.100",
             "public_ip": "54.123.45.67",

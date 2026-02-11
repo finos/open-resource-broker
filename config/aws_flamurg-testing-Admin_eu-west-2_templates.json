@@ -5,7 +5,7 @@
       "price_type": "ondemand",
       "provider_api": "EC2Fleet",
       "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "instance_type": "t3.medium",
+      "machine_types": {"t3.medium": 1},
       "security_group_ids": [
         "sg-0207c8c797fadea6f"
       ],
@@ -50,7 +50,7 @@
       "price_type": "spot",
       "provider_api": "EC2Fleet",
       "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "instance_type": "t3.medium",
+      "machine_types": {"t3.medium": 1},
       "security_group_ids": [
         "sg-0207c8c797fadea6f"
       ],
@@ -96,7 +96,7 @@
       "price_type": "heterogeneous",
       "provider_api": "EC2Fleet",
       "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "instance_type": "t3.medium",
+      "machine_types": {"t3.medium": 1},
       "security_group_ids": [
         "sg-0207c8c797fadea6f"
       ],
@@ -142,7 +142,7 @@
       "price_type": "ondemand",
       "provider_api": "EC2Fleet",
       "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "instance_type": "t3.medium",
+      "machine_types": {"t3.medium": 1},
       "security_group_ids": [
         "sg-0207c8c797fadea6f"
       ],
@@ -187,7 +187,7 @@
       "price_type": "spot",
       "provider_api": "EC2Fleet",
       "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "instance_type": "t3.medium",
+      "machine_types": {"t3.medium": 1},
       "security_group_ids": [
         "sg-0207c8c797fadea6f"
       ],
@@ -233,7 +233,7 @@
       "price_type": "heterogeneous",
       "provider_api": "EC2Fleet",
       "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "instance_type": "t3.medium",
+      "machine_types": {"t3.medium": 1},
       "security_group_ids": [
         "sg-0207c8c797fadea6f"
       ],
@@ -283,7 +283,7 @@
       "price_type": "ondemand",
       "provider_api": "EC2Fleet",
       "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "instance_type": "t3.medium",
+      "machine_types": {"t3.medium": 1},
       "security_group_ids": [
         "sg-0207c8c797fadea6f"
       ],
@@ -328,7 +328,7 @@
       "price_type": "spot",
       "provider_api": "EC2Fleet",
       "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "instance_type": "t3.medium",
+      "machine_types": {"t3.medium": 1},
       "security_group_ids": [
         "sg-0207c8c797fadea6f"
       ],
@@ -374,7 +374,7 @@
       "price_type": "heterogeneous",
       "provider_api": "EC2Fleet",
       "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "instance_type": "t3.medium",
+      "machine_types": {"t3.medium": 1},
       "security_group_ids": [
         "sg-0207c8c797fadea6f"
       ],
@@ -425,7 +425,7 @@
       "price_type": "spot",
       "provider_api": "SpotFleet",
       "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "instance_type": "t3.medium",
+      "machine_types": {"t3.medium": 1},
       "security_group_ids": [
         "sg-0207c8c797fadea6f"
       ],
@@ -475,7 +475,7 @@
       "price_type": "spot",
       "provider_api": "SpotFleet",
       "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "instance_type": "t3.medium",
+      "machine_types": {"t3.medium": 1},
       "security_group_ids": [
         "sg-0207c8c797fadea6f"
       ],
@@ -525,7 +525,7 @@
       "price_type": "spot",
       "provider_api": "SpotFleet",
       "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "instance_type": "t3.medium",
+      "machine_types": {"t3.medium": 1},
       "security_group_ids": [
         "sg-0207c8c797fadea6f"
       ],
@@ -575,7 +575,7 @@
       "price_type": "spot",
       "provider_api": "SpotFleet",
       "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "instance_type": "t3.medium",
+      "machine_types": {"t3.medium": 1},
       "security_group_ids": [
         "sg-0207c8c797fadea6f"
       ],
@@ -625,7 +625,7 @@
       "price_type": "spot",
       "provider_api": "SpotFleet",
       "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "instance_type": "t3.medium",
+      "machine_types": {"t3.medium": 1},
       "security_group_ids": [
         "sg-0207c8c797fadea6f"
       ],
@@ -675,7 +675,7 @@
       "price_type": "spot",
       "provider_api": "SpotFleet",
       "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "instance_type": "t3.medium",
+      "machine_types": {"t3.medium": 1},
       "security_group_ids": [
         "sg-0207c8c797fadea6f"
       ],
@@ -725,7 +725,7 @@
       "price_type": "ondemand",
       "provider_api": "AutoScalingGroup",
       "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "instance_type": "t3.medium",
+      "machine_types": {"t3.medium": 1},
       "security_group_ids": [
         "sg-0207c8c797fadea6f"
       ],
@@ -770,7 +770,7 @@
       "price_type": "spot",
       "provider_api": "AutoScalingGroup",
       "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "instance_type": "t3.medium",
+      "machine_types": {"t3.medium": 1},
       "security_group_ids": [
         "sg-0207c8c797fadea6f"
       ],
@@ -816,7 +816,7 @@
       "price_type": "heterogeneous",
       "provider_api": "AutoScalingGroup",
       "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "instance_type": "t3.medium",
+      "machine_types": {"t3.medium": 1},
       "security_group_ids": [
         "sg-0207c8c797fadea6f"
       ],
@@ -865,7 +865,7 @@
       "price_type": "ondemand",
       "provider_api": "RunInstances",
       "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
-      "instance_type": "t3.medium",
+      "machine_types": {"t3.medium": 1},
       "security_group_ids": [
         "sg-0207c8c797fadea6f"
       ],
