@@ -721,10 +721,10 @@ class CLICommandFactory:
         # Template operations
         if command_group == "templates":
             if command_action == "list":
-                return self.create_list_templates_query(
-                    provider=args.get("provider"),
-                    template_type=args.get("provider_api"),
-                    limit=args.get("limit", 50),
+                return ListTemplatesQuery(
+                    provider_api=args.get("provider_api"),
+                    active_only=args.get("active_only", True),
+                    include_configuration=args.get("long", False),
                     filter_expressions=args.get("filter") or []
                 )
             elif command_action == "show":
