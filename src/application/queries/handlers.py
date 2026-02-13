@@ -1230,12 +1230,18 @@ class ListMachinesHandler(BaseQueryHandler[MachineListQuery, list[MachineDTO]]):
                     )
                     machine_dtos.append(machine_dto.to_dict())
 
+                # Apply pagination
+                total_count = len(machine_dtos)
+                start_idx = query.offset or 0
+                end_idx = start_idx + (query.limit or 50)
+                machine_dtos = machine_dtos[start_idx:end_idx]
+
                 # Apply generic filters if provided
                 if query.filter_expressions:
                     # Apply filters using GenericFilterService (machine_dtos are already dicts)
                     machine_dtos = self._generic_filter_service.apply_filters(machine_dtos, query.filter_expressions)
 
-                self.logger.info("Found %s machines", len(machine_dtos))
+                self.logger.info("Found %s machines (total: %s)", len(machine_dtos), total_count)
                 return machine_dtos
 
         except Exception as e:

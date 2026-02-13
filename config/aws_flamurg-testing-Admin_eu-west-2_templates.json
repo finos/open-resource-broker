@@ -1,7 +1,7 @@
 {
   "templates": [
     {
-      "createdAt": "2026-02-12T00:04:38.496982",
+      "createdAt": "2026-02-13T12:37:55.766627",
       "templateId": "EC2Fleet-Instant-OnDemand",
       "maxNumber": 10,
       "providerApi": "EC2Fleet",
@@ -22,7 +22,7 @@
       "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-12T00:04:38.497105",
+      "createdAt": "2026-02-13T12:37:55.766730",
       "templateId": "EC2Fleet-Instant-Spot",
       "maxNumber": 10,
       "providerApi": "EC2Fleet",
@@ -44,7 +44,7 @@
       "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-12T00:04:38.497122",
+      "createdAt": "2026-02-13T12:37:55.766742",
       "templateId": "EC2Fleet-Instant-Mixed",
       "maxNumber": 10,
       "providerApi": "EC2Fleet",
@@ -66,7 +66,7 @@
       "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-12T00:04:38.497130",
+      "createdAt": "2026-02-13T12:37:55.766747",
       "templateId": "EC2Fleet-Request-OnDemand",
       "maxNumber": 15,
       "providerApi": "EC2Fleet",
@@ -87,7 +87,7 @@
       "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-12T00:04:38.497139",
+      "createdAt": "2026-02-13T12:37:55.766753",
       "templateId": "EC2Fleet-Request-Spot",
       "maxNumber": 20,
       "providerApi": "EC2Fleet",
@@ -109,7 +109,7 @@
       "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-12T00:04:38.497144",
+      "createdAt": "2026-02-13T12:37:55.766758",
       "templateId": "EC2Fleet-Request-Mixed",
       "maxNumber": 25,
       "providerApi": "EC2Fleet",
@@ -132,7 +132,7 @@
       "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-12T00:04:38.497150",
+      "createdAt": "2026-02-13T12:37:55.766762",
       "templateId": "EC2Fleet-Maintain-OnDemand",
       "maxNumber": 12,
       "providerApi": "EC2Fleet",
@@ -153,7 +153,7 @@
       "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-12T00:04:38.497157",
+      "createdAt": "2026-02-13T12:37:55.766766",
       "templateId": "EC2Fleet-Maintain-Spot",
       "maxNumber": 30,
       "providerApi": "EC2Fleet",
@@ -175,7 +175,7 @@
       "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-12T00:04:38.497162",
+      "createdAt": "2026-02-13T12:37:55.766770",
       "templateId": "EC2Fleet-Maintain-Mixed",
       "maxNumber": 50,
       "providerApi": "EC2Fleet",
@@ -199,7 +199,7 @@
       "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-12T00:04:38.497170",
+      "createdAt": "2026-02-13T12:37:55.766777",
       "templateId": "SpotFleet-Request-LowestPrice",
       "maxNumber": 20,
       "providerApi": "SpotFleet",
@@ -222,7 +222,7 @@
       "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-12T00:04:38.497177",
+      "createdAt": "2026-02-13T12:37:55.766781",
       "templateId": "SpotFleet-Request-Diversified",
       "maxNumber": 25,
       "providerApi": "SpotFleet",
@@ -245,7 +245,7 @@
       "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-12T00:04:38.497184",
+      "createdAt": "2026-02-13T12:37:55.766784",
       "templateId": "SpotFleet-Request-CapacityOptimized",
       "maxNumber": 30,
       "providerApi": "SpotFleet",
@@ -268,7 +268,7 @@
       "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-12T00:04:38.497188",
+      "createdAt": "2026-02-13T12:37:55.766787",
       "templateId": "SpotFleet-Maintain-LowestPrice",
       "maxNumber": 15,
       "providerApi": "SpotFleet",
@@ -291,7 +291,7 @@
       "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-12T00:04:38.497192",
+      "createdAt": "2026-02-13T12:37:55.766790",
       "templateId": "SpotFleet-Maintain-Diversified",
       "maxNumber": 20,
       "providerApi": "SpotFleet",
@@ -314,7 +314,7 @@
       "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-12T00:04:38.497197",
+      "createdAt": "2026-02-13T12:37:55.766793",
       "templateId": "SpotFleet-Maintain-CapacityOptimized",
       "maxNumber": 25,
       "providerApi": "SpotFleet",
@@ -337,7 +337,7 @@
       "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-12T00:04:38.497203",
+      "createdAt": "2026-02-13T12:37:55.766800",
       "templateId": "ASG-OnDemand",
       "maxNumber": 15,
       "providerApi": "AutoScalingGroup",
@@ -358,7 +358,7 @@
       "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-12T00:04:38.497213",
+      "createdAt": "2026-02-13T12:37:55.766808",
       "templateId": "ASG-Spot",
       "maxNumber": 20,
       "providerApi": "AutoScalingGroup",
@@ -380,7 +380,7 @@
       "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-12T00:04:38.497220",
+      "createdAt": "2026-02-13T12:37:55.766853",
       "templateId": "ASG-Mixed",
       "maxNumber": 25,
       "providerApi": "AutoScalingGroup",
@@ -402,7 +402,7 @@
       "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-12T00:04:38.497226",
+      "createdAt": "2026-02-13T12:37:55.766859",
       "templateId": "RunInstances-OnDemand",
       "maxNumber": 5,
       "providerApi": "RunInstances",
@@ -423,7 +423,7 @@
       "vmTypesPriority": {}
     },
     {
-      "createdAt": "2026-02-12T00:04:38.497232",
+      "createdAt": "2026-02-13T12:37:55.766863",
       "templateId": "RunInstances-Spot",
       "maxNumber": 10,
       "providerApi": "RunInstances",

@@ -724,7 +724,6 @@ class CLICommandFactory:
                 return ListTemplatesQuery(
                     provider_api=args.get("provider_api"),
                     active_only=args.get("active_only", True),
-                    include_configuration=args.get("long", False),
                     filter_expressions=args.get("filter") or []
                 )
             elif command_action == "show":
@@ -806,8 +805,8 @@ class CLICommandFactory:
                 return self.create_list_requests_query(
                     status=args.get("status"),
                     template_id=args.get("template_id"),
-                    limit=args.get("limit", 50),
-                    offset=args.get("offset", 0),
+                    limit=args.get("limit") or 50,
+                    offset=args.get("offset") or 0,
                     filter_expressions=args.get("filter") or []
                 )
             elif command_action == "cancel":
@@ -826,8 +825,8 @@ class CLICommandFactory:
                     status=args.get("status"),
                     template_id=args.get("template_id"),
                     request_id=args.get("request_id"),
-                    limit=args.get("limit", 50),
-                    offset=args.get("offset", 0),
+                    limit=args.get("limit") or 50,
+                    offset=args.get("offset") or 0,
                     filter_expressions=args.get("filter") or [],
                     timestamp_format=args.get("timestamp_format"),
                 )
