@@ -53,7 +53,6 @@ class ListTemplatesQuery(Query, BaseModel):
 
     provider_api: Optional[str] = None
     active_only: bool = True
-    include_configuration: bool = False
     filter_expressions: list[str] = []
 
 

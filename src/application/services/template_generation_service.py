@@ -267,6 +267,10 @@ class TemplateGenerationService:
             # Fallback to single default provider
             return [{"name": "aws_default_us-east-1", "type": "aws"}]
 
+    def _get_config_dict(self) -> Dict[str, Any]:
+        """Get template configuration for filename generation."""
+        return self._config_manager.get_template_config()
+
     def _get_provider_config(self, provider_name: str) -> Dict[str, str]:
         """Get configuration for specific provider."""
         try:

@@ -320,9 +320,7 @@ def add_template_actions(subparsers):
     )
     add_global_arguments(templates_list)
     templates_list.add_argument("--provider-api", help="Filter by provider API type (specific filter)")
-    templates_list.add_argument(
-        "--long", action="store_true", help="Include detailed configuration fields"
-    )
+
 
     # Templates show
     templates_show = subparsers.add_parser("show", help="Show template details")
@@ -658,7 +656,7 @@ For more information, visit: {DOCS_URL}
         description="List scheduler strategies with filtering support using generic filters (--filter field=value)."
     )
     add_global_arguments(scheduler_list)
-    scheduler_list.add_argument("--long", action="store_true", help="Show detailed information")
+
 
     # Scheduler show
     scheduler_show = scheduler_subparsers.add_parser("show", help="Show scheduler details")

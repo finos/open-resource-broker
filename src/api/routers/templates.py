@@ -25,7 +25,6 @@ router = APIRouter(prefix="/templates", tags=["Templates"])
 # Module-level dependency variables to avoid B008 warnings
 PROVIDER_API_QUERY = Query(None, description="Filter by provider API")
 FORCE_REFRESH_QUERY = Query(False, description="Force refresh from files")
-INCLUDE_CONFIG_QUERY = Query(False, description="Include full configuration")
 TEMPLATE_DATA_BODY = Body(...)
 
 
@@ -101,7 +100,7 @@ async def list_templates(
 
         # Create and execute query through CQRS bus
         query = ListTemplatesQuery(
-            provider_api=provider_api, active_only=True, include_configuration=False
+            provider_api=provider_api, active_only=True
         )
 
         templates = await query_bus.execute(query)
@@ -137,13 +136,11 @@ async def list_templates(
 @handle_rest_exceptions(endpoint="/api/v1/templates/{template_id}", method="GET")
 async def get_template(
     template_id: str,
-    include_config: bool = INCLUDE_CONFIG_QUERY,
 ) -> JSONResponse:
     """
     Get a specific template by ID.
 
     - **template_id**: Template identifier
-    - **include_config**: Include full template configuration
     """
     try:
         container = get_container()
@@ -395,7 +392,7 @@ async def refresh_templates() -> JSONResponse:
 
         # Force refresh by listing templates - this will trigger cache refresh in
         # the query handler
-        query = ListTemplatesQuery(provider_api=None, active_only=True, include_configuration=False)
+        query = ListTemplatesQuery(provider_api=None, active_only=True)
 
         templates = await query_bus.execute(query)
         template_count = len(templates) if templates else 0
