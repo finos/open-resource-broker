@@ -109,27 +109,26 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
     async def _validate_provider_availability(self) -> None:
         """Validate that providers are available."""
         from domain.base.ports.configuration_port import ConfigurationPort
-        from providers.registry import get_provider_registry
         
         config_manager = self._container.get(ConfigurationPort)
         provider_config = config_manager.get_provider_config()
-        registry = get_provider_registry()
         
         if provider_config:
+            from providers.registry import get_provider_registry
+            registry = get_provider_registry()
             for provider_instance in provider_config.get_active_providers():
                 registry.ensure_provider_instance_registered_from_config(provider_instance)
         
-        available_providers = registry.get_registered_providers()
-        available_instances = registry.get_registered_provider_instances()
+        available_strategies = self._provider_registry_service.get_available_strategies()
         
-        if not available_providers and not available_instances:
+        if not available_strategies:
             error_msg = "No provider strategies available - cannot create machine requests"
             self.logger.error(error_msg)
             raise ValueError(error_msg)
 
         self.logger.debug(
-            "Available provider types: %s, instances: %s",
-            available_providers, available_instances
+            "Available provider strategies: %s",
+            available_strategies
         )
 
     async def _load_template(self, template_id: str) -> Any:

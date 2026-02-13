@@ -679,47 +679,27 @@ For more information, visit: {DOCS_URL}
 
     # MCP tools list
     mcp_tools_list = mcp_tools_sub.add_parser("list", help="List MCP tools")
-    mcp_tools_list.add_argument(
-        "--format",
-        choices=["json", "yaml", "table"],
-        default="table",
-        help="Output format",
-    )
+    add_global_arguments(mcp_tools_list)
     mcp_tools_list.add_argument(
         "--type", choices=["command", "query"], help="Filter tools by handler type"
     )
 
     # MCP tools call
     mcp_tools_call = mcp_tools_sub.add_parser("call", help="Call MCP tool")
+    add_global_arguments(mcp_tools_call)
     mcp_tools_call.add_argument("tool_name", help="Name of tool to call")
     mcp_tools_call.add_argument("--args", help="Tool arguments as JSON string")
     mcp_tools_call.add_argument("--file", help="Tool arguments from JSON file")
-    mcp_tools_call.add_argument(
-        "--format",
-        choices=["json", "yaml", "table"],
-        default="json",
-        help="Output format",
-    )
 
     # MCP tools info
     mcp_tools_info = mcp_tools_sub.add_parser("info", help="Show MCP tool details")
+    add_global_arguments(mcp_tools_info)
     mcp_tools_info.add_argument("tool_name", help="Name of tool to get info for")
-    mcp_tools_info.add_argument(
-        "--format",
-        choices=["json", "yaml", "table"],
-        default="table",
-        help="Output format",
-    )
 
     # MCP validate
     mcp_validate = mcp_subparsers.add_parser("validate", help="Validate MCP")
+    add_global_arguments(mcp_validate)
     mcp_validate.add_argument("--config", help="MCP configuration file to validate")
-    mcp_validate.add_argument(
-        "--format",
-        choices=["json", "yaml", "table"],
-        default="table",
-        help="Output format",
-    )
 
     # MCP serve
     mcp_serve = mcp_subparsers.add_parser("serve", help="Start MCP server")
@@ -739,8 +719,8 @@ For more information, visit: {DOCS_URL}
 
     # Init command
     init_parser = subparsers.add_parser("init", help="Initialize ORB configuration")
+    add_force_argument(init_parser)
     init_parser.add_argument("--non-interactive", action="store_true", help="Non-interactive mode")
-    init_parser.add_argument("--force", action="store_true", help="Force overwrite existing config")
     init_parser.add_argument(
         "--scheduler", choices=["default", "hostfactory"], help="Scheduler type"
     )

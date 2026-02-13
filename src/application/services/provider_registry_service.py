@@ -57,7 +57,7 @@ class ProviderRegistryService:
     
     def register_provider_strategy(self, provider_type: str, config: Any = None) -> bool:
         """Register a provider strategy."""
-        return self._registry.register_provider_type(provider_type)
+        return self._registry.ensure_provider_type_registered(provider_type)
     
     def check_strategy_health(self, provider_id: str) -> Any:
         """Check health of provider strategy."""

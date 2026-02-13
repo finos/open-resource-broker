@@ -159,15 +159,9 @@ class TemplateGenerationService:
         from infrastructure.di.container import get_container
         container = get_container()
         
-        # Ensure provider type is registered via registry
-        from providers.registry import get_provider_registry
-        registry = get_provider_registry()
-        
-        if not registry.is_provider_registered(provider_type):
-            registry.ensure_provider_type_registered(provider_type)
-        
-        if not registry.is_provider_registered(provider_type):
-            error_msg = registry.format_registry_error(provider_type, "provider")
+        # Ensure provider type is registered via service
+        if not self._provider_registry_service.register_provider_strategy(provider_type):
+            error_msg = f"Provider type '{provider_type}' is not available or could not be registered"
             raise ValueError(error_msg)
         
         # For AWS provider, use the existing handler factory
