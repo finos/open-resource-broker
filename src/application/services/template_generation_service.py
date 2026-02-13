@@ -204,8 +204,17 @@ class TemplateGenerationService:
             # Provider-type mode: use specified provider type
             return f"{request.provider_type_filter}_templates.json"
         else:
-            # Generic mode: use provider_type pattern
-            return f"{provider_type}_templates.json"
+            # Generic mode: check for multi-provider scenario
+            active_providers = self._get_active_providers()
+            same_type_providers = [p for p in active_providers if p["type"] == provider_type]
+            
+            if len(same_type_providers) > 1:
+                # Multiple providers of same type: use scheduler strategy for uniqueness
+                config_dict = self._get_config_dict()
+                return self._scheduler_strategy.get_templates_filename(provider_name, provider_type, config_dict)
+            else:
+                # Single provider of this type: use generic type name
+                return f"{provider_type}_templates.json"
 
     def _format_templates(self, examples: List[Dict[str, Any]], request: TemplateGenerationRequest) -> List[Dict[str, Any]]:
         """Format templates using scheduler strategy."""
