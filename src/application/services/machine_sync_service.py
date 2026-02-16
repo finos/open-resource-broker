@@ -89,7 +89,7 @@ class MachineSyncService:
             
             # Execute operation using Provider Registry Service
             result = await self._provider_registry_service.execute_operation(
-                request.provider_name, operation, provider_instance_config.config
+                request.provider_name, operation
             )
 
             if result.success and result.data:
