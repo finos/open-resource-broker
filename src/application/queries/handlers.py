@@ -28,11 +28,12 @@ from domain.base import UnitOfWorkFactory
 # Exception handling through BaseQueryHandler (Clean Architecture compliant)
 from domain.base.exceptions import EntityNotFoundError
 from domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
+from application.services.provider_registry_service import ProviderRegistryService
 
 # Import for type hints
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from application.services.provider_registry_service import ProviderRegistryService
+    pass
 from domain.template.factory import TemplateFactory, get_default_template_factory
 from infrastructure.di.buses import CommandBus
 from domain.template.template_aggregate import Template
@@ -53,7 +54,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
         error_handler: ErrorHandlingPort,
         container: ContainerPort,
         command_bus: CommandBus,
-        provider_registry_service: "ProviderRegistryService",
+        provider_registry_service: ProviderRegistryService,
     ) -> None:
         """Initialize the instance."""
         super().__init__(logger, error_handler)
@@ -67,6 +68,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
         # Initialize services for SRP compliance
         from application.services.request_query_service import RequestQueryService
         from application.services.request_status_service import RequestStatusService
+        from application.services.machine_sync_service import MachineSyncService
         from application.factories.request_dto_factory import RequestDTOFactory
         
         self._query_service = RequestQueryService(uow_factory, logger)
