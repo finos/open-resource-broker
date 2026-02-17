@@ -863,17 +863,27 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
 
         return formatted_machines
 
-    def _map_machine_status_to_result(self, status: str) -> str:
+    def _map_machine_status_to_result(self, status: str, request_type: str = None) -> str:
         """Map machine status to HostFactory result field per hf_docs/input-output.md."""
         # Per docs: "Possible values: 'executing', 'fail', 'succeed'"
-        if status == "running":
-            return "succeed"
-        elif status in ["pending", "launching"]:
-            return "executing"
-        elif status in ["terminated", "failed", "error"]:
-            return "fail"
+        if request_type == "return":
+            # For return requests, terminated is success
+            if status in ["terminated", "stopped"]:
+                return "succeed"
+            elif status in ["pending", "terminating"]:
+                return "executing"
+            else:
+                return "fail"
         else:
-            return "executing"  # Default for unknown states
+            # For acquire requests, running is success
+            if status == "running":
+                return "succeed"
+            elif status in ["pending", "launching"]:
+                return "executing"
+            elif status in ["terminated", "failed", "error"]:
+                return "fail"
+            else:
+                return "executing"  # Default for unknown states
 
     def _map_domain_status_to_hostfactory(self, domain_status: str) -> str:
         """Map domain status to HostFactory status per hf_docs/input-output.md."""

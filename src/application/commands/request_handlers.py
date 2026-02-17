@@ -216,6 +216,19 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         await super().validate_command(command)
         if not command.machine_ids:
             raise ValueError("machine_ids is required and cannot be empty")
+        
+        # Validate machines exist and don't already have return requests
+        with self.uow_factory.create_unit_of_work() as uow:
+            for machine_id in command.machine_ids:
+                machine = uow.machines.get_by_id(machine_id)
+                if not machine:
+                    from domain.base.exceptions import EntityNotFoundError
+                    raise EntityNotFoundError("Machine", machine_id)
+                if machine.return_request_id:
+                    from domain.request.exceptions import RequestValidationError
+                    raise RequestValidationError(
+                        f"Machine {machine_id} already has pending return request: {machine.return_request_id}"
+                    )
 
     async def execute_command(self, command: CreateReturnRequestCommand) -> str:
         """Handle return request creation command."""

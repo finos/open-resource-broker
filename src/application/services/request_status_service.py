@@ -43,16 +43,27 @@ class RequestStatusService:
             failed_count = sum(1 for m in machines_to_check if m.status.value in ["terminated", "failed"])
             total_count = len(machines_to_check)
             
-            # Determine new status
-            if running_count == total_count:
-                return RequestStatus.COMPLETED.value, "All instances running successfully"
-            elif failed_count == total_count:
-                return RequestStatus.FAILED.value, "All instances failed"
-            elif running_count > 0:
-                return RequestStatus.PARTIAL.value, f"{running_count}/{total_count} instances running"
+            # Determine new status based on request type
+            if request.request_type.value == "return":
+                # Return request logic - termination states
+                if failed_count == total_count:
+                    return RequestStatus.COMPLETED.value, "All instances terminated successfully"
+                elif failed_count > 0:
+                    return RequestStatus.PARTIAL.value, f"{failed_count}/{total_count} instances terminated"
+                else:
+                    # All pending/terminating
+                    return RequestStatus.IN_PROGRESS.value, "Instances terminating"
             else:
-                # All pending/starting
-                return RequestStatus.IN_PROGRESS.value, "Instances starting"
+                # Acquisition request logic - running states
+                if running_count == total_count:
+                    return RequestStatus.COMPLETED.value, "All instances running successfully"
+                elif failed_count == total_count:
+                    return RequestStatus.FAILED.value, "All instances failed"
+                elif running_count > 0:
+                    return RequestStatus.PARTIAL.value, f"{running_count}/{total_count} instances running"
+                else:
+                    # All pending/starting
+                    return RequestStatus.IN_PROGRESS.value, "Instances starting"
                 
         except Exception as e:
             self.logger.error(f"Failed to determine status from machines: {e}")
