@@ -81,6 +81,8 @@ class RequestDTO(BaseDTO):
     message: str = ""
     resource_id: Optional[str] = None
     provider_api: Optional[str] = None
+    provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
     launch_template_id: Optional[str] = None
     launch_template_version: Optional[str] = None
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -123,6 +125,8 @@ class RequestDTO(BaseDTO):
             message=request.status_message or "",  # Provide empty string if None
             resource_id=request.resource_ids[0] if request.resource_ids else None,  # First resource ID
             provider_api=request.provider_api,  # Available in domain model
+            provider_name=request.provider_name,  # Available in domain model
+            provider_type=request.provider_type,  # Available in domain model
             launch_template_id=None,  # Not available in current domain model
             launch_template_version=None,  # Not available in current domain model
             metadata=request.metadata,
