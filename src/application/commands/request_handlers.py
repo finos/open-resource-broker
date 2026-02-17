@@ -665,10 +665,10 @@ class CancelRequestHandler(BaseCommandHandler[CancelRequestCommand, None]):
                 raise EntityNotFoundError("Request", command.request_id)
 
             # Cancel request
-            request.cancel(reason=command.reason)
+            cancelled_request = request.cancel(reason=command.reason)
 
             # Save changes and get extracted events
-            events = self._request_repository.save(request)
+            events = self._request_repository.save(cancelled_request)
             # Publish events
             for event in events:
                 self.event_publisher.publish(event)

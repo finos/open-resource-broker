@@ -53,12 +53,12 @@ class RequestSerializer:
         try:
             return {
                 # Core request fields
-                "request_id": str(request.request_id.value),
+                "request_id": str(request.request_id.value) if hasattr(request.request_id, 'value') else str(request.request_id),
                 "template_id": request.template_id,
                 "machine_count": request.requested_count,
                 "desired_capacity": request.desired_capacity,
-                "request_type": request.request_type.value,
-                "status": request.status.value,
+                "request_type": request.request_type.value if hasattr(request.request_type, 'value') else str(request.request_type),
+                "status": request.status.value if hasattr(request.status, 'value') else str(request.status),
                 "status_message": request.status_message,
                 # Provider tracking fields
                 "provider_name": request.provider_name,
@@ -175,7 +175,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
         """Save request using storage strategy and return extracted events."""
         operation_id = str(uuid4())
         start_time = time.time()
-        entity_id = str(request.request_id.value)
+        entity_id = str(request.request_id.value) if hasattr(request.request_id, 'value') else str(request.request_id)
 
         # Publish operation started event
         self._publish_storage_event(
@@ -269,7 +269,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
     def get_by_id(self, request_id: RequestId) -> Optional[Request]:
         """Get request by ID using storage strategy."""
         try:
-            data = self.storage_port.find_by_id(str(request_id.value))
+            data = self.storage_port.find_by_id(str(request_id.value) if hasattr(request_id, 'value') else str(request_id))
             if data:
                 return self.serializer.from_dict(data)
             return None
@@ -298,7 +298,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
     def find_by_status(self, status: RequestStatus) -> list[Request]:
         """Find requests by status."""
         try:
-            criteria = {"status": status.value}
+            criteria = {"status": status.value if hasattr(status, 'value') else str(status)}
             data_list = self.storage_port.find_by_criteria(criteria)
             return [self.serializer.from_dict(data) for data in data_list]
         except Exception as e:
@@ -320,7 +320,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
     def find_by_type(self, request_type: RequestType) -> list[Request]:
         """Find requests by type."""
         try:
-            criteria = {"request_type": request_type.value}
+            criteria = {"request_type": request_type.value if hasattr(request_type, 'value') else str(request_type)}
             data_list = self.storage_port.find_by_criteria(criteria)
             return [self.serializer.from_dict(data) for data in data_list]
         except Exception as e:
@@ -373,7 +373,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
     def delete(self, request_id: RequestId) -> None:
         """Delete request by ID."""
         try:
-            self.storage_port.delete(str(request_id.value))
+            self.storage_port.delete(str(request_id.value) if hasattr(request_id, 'value') else str(request_id))
             self.logger.debug("Deleted request %s", request_id)
         except Exception as e:
             self.logger.error("Failed to delete request %s: %s", request_id, e)
@@ -397,7 +397,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
     def exists(self, request_id: RequestId) -> bool:
         """Check if request exists."""
         try:
-            return self.storage_port.exists(str(request_id.value))
+            return self.storage_port.exists(str(request_id.value) if hasattr(request_id, 'value') else str(request_id))
         except Exception as e:
             self.logger.error("Failed to check if request %s exists: %s", request_id, e)
             raise
