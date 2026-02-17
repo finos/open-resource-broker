@@ -351,6 +351,20 @@ class CLICommandFactory:
         )
 
     # Machine operations
+    def create_list_active_requests_query(
+        self,
+        provider_name: Optional[str] = None,
+        filter_expressions: Optional[List[str]] = None,
+        all_resources: bool = False,
+        **kwargs: Any,
+    ) -> ListActiveRequestsQuery:
+        """Create query to list active requests."""
+        return ListActiveRequestsQuery(
+            provider_name=provider_name,
+            filter_expressions=filter_expressions or [],
+            all_resources=all_resources,
+        )
+
     def create_list_machines_query(
         self,
         status: Optional[str] = None,
@@ -359,6 +373,7 @@ class CLICommandFactory:
         limit: int = 50,
         offset: int = 0,
         provider_name: Optional[str] = None,
+        all_resources: bool = False,
         **kwargs: Any,
     ) -> ListMachinesQuery:
         """Create query to list machines."""
@@ -379,6 +394,7 @@ class CLICommandFactory:
             timestamp_format=kwargs.get("timestamp_format"),
             limit=limit,
             offset=offset,
+            all_resources=all_resources,
         )
 
     def create_get_machine_query(
@@ -851,6 +867,7 @@ class CLICommandFactory:
                     offset=args.get("offset") or 0,
                     filter_expressions=args.get("filter") or [],
                     timestamp_format=args.get("timestamp_format"),
+                    all_resources=args.get("all", False),
                 )
             elif command_action == "request":
                 # Alias for requests create

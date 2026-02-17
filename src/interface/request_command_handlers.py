@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 @handle_interface_exceptions(context="get_request_status", interface_type="cli")
 async def handle_get_request_status(args: "argparse.Namespace") -> dict[str, Any]:
     """
-    Handle get request status operations.
+    Handle get request status operations with --all support.
 
     Args:
         args: Argument namespace with resource/action structure
@@ -26,67 +26,88 @@ async def handle_get_request_status(args: "argparse.Namespace") -> dict[str, Any
     query_bus = container.get(QueryBus)
     scheduler_strategy = container.get(SchedulerPort)
 
-    # Pass raw input data to scheduler strategy (scheduler-agnostic)
-    # First precedence is input data, then arguments
-    if hasattr(args, "input_data") and args.input_data:
-        raw_request_data = args.input_data
-    else:
-        request_ids_from_args = []
-        
-        # Handle request_id that might be a list (from CLI command factory)
-        if hasattr(args, "request_id") and args.request_id:
-            if isinstance(args.request_id, list):
-                request_ids_from_args.extend(args.request_id)
-            else:
-                request_ids_from_args.append(args.request_id)
-        
-        # Merge positional and flag arguments
-        if hasattr(args, "request_ids") and args.request_ids:
-            request_ids_from_args.extend(args.request_ids)
-        if hasattr(args, "flag_request_ids") and args.flag_request_ids:
-            request_ids_from_args.extend(args.flag_request_ids)
-
-        raw_request_data = {
-            "requests": [{"request_id": request_id} for request_id in request_ids_from_args]
-        }
-
-    # Let scheduler strategy parse the raw data (each scheduler handles its own format)
-    parsed_data_list = scheduler_strategy.parse_request_data(raw_request_data)
-
-    # Validate parsed data
-    if not isinstance(parsed_data_list, list) or len(parsed_data_list) == 0:
-        return {"error": "No request ID provided", "message": "Request ID is required"}
-
-    request_dtos = []
-
-    # Extract request IDs from parsed data
-    request_ids = [parsed_data.get("request_id") for parsed_data in parsed_data_list if parsed_data.get("request_id")]
+    # Validation: Prevent --all with specific IDs
+    has_all = getattr(args, "all", False)
+    has_specific_ids = bool(getattr(args, "request_ids", []) or getattr(args, "flag_request_ids", []))
     
-    if not request_ids:
-        return {"error": "No valid request IDs provided", "message": "Request IDs are required"}
-
-    # Use batch query if multiple IDs, individual queries otherwise
-    if len(request_ids) == 1:
-        from application.dto.queries import GetRequestQuery
-        query = GetRequestQuery(request_id=request_ids[0])
-        request_dto = await query_bus.execute(query)
-        if request_dto:
-            request_dtos.append(request_dto)
+    if has_all and has_specific_ids:
+        return {
+            "error": "Cannot use --all with specific request IDs",
+            "message": "Use either --all or specific IDs, not both"
+        }
+    
+    if has_all:
+        # Create query for all active requests
+        from application.dto.queries import ListActiveRequestsQuery
+        
+        query = ListActiveRequestsQuery(all_resources=True)
+        request_dtos = await query_bus.execute(query)
+        
+        # Format response using scheduler strategy
+        return scheduler_strategy.format_request_status_response(request_dtos)
     else:
-        # For multiple IDs, we need to query each individually since there's no batch query yet
-        from application.dto.queries import GetRequestQuery
-        for request_id in request_ids:
-            try:
-                query = GetRequestQuery(request_id=request_id)
-                request_dto = await query_bus.execute(query)
-                if request_dto:
-                    request_dtos.append(request_dto)
-            except Exception:
-                # Continue with other requests if one fails
-                continue
+        # Existing specific ID logic
+        # Pass raw input data to scheduler strategy (scheduler-agnostic)
+        # First precedence is input data, then arguments
+        if hasattr(args, "input_data") and args.input_data:
+            raw_request_data = args.input_data
+        else:
+            request_ids_from_args = []
+            
+            # Handle request_id that might be a list (from CLI command factory)
+            if hasattr(args, "request_id") and args.request_id:
+                if isinstance(args.request_id, list):
+                    request_ids_from_args.extend(args.request_id)
+                else:
+                    request_ids_from_args.append(args.request_id)
+            
+            # Merge positional and flag arguments
+            if hasattr(args, "request_ids") and args.request_ids:
+                request_ids_from_args.extend(args.request_ids)
+            if hasattr(args, "flag_request_ids") and args.flag_request_ids:
+                request_ids_from_args.extend(args.flag_request_ids)
 
-    # Pass domain DTO to scheduler strategy - NO formatting logic here
-    return scheduler_strategy.format_request_status_response(request_dtos)
+            raw_request_data = {
+                "requests": [{"request_id": request_id} for request_id in request_ids_from_args]
+            }
+
+        # Let scheduler strategy parse the raw data (each scheduler handles its own format)
+        parsed_data_list = scheduler_strategy.parse_request_data(raw_request_data)
+
+        # Validate parsed data
+        if not isinstance(parsed_data_list, list) or len(parsed_data_list) == 0:
+            return {"error": "No request ID provided", "message": "Request ID is required"}
+
+        request_dtos = []
+
+        # Extract request IDs from parsed data
+        request_ids = [parsed_data.get("request_id") for parsed_data in parsed_data_list if parsed_data.get("request_id")]
+        
+        if not request_ids:
+            return {"error": "No valid request IDs provided", "message": "Request IDs are required"}
+
+        # Use batch query if multiple IDs, individual queries otherwise
+        if len(request_ids) == 1:
+            from application.dto.queries import GetRequestQuery
+            query = GetRequestQuery(request_id=request_ids[0])
+            request_dto = await query_bus.execute(query)
+            if request_dto:
+                request_dtos.append(request_dto)
+        else:
+            # For multiple IDs, we need to query each individually since there's no batch query yet
+            from application.dto.queries import GetRequestQuery
+            for request_id in request_ids:
+                try:
+                    query = GetRequestQuery(request_id=request_id)
+                    request_dto = await query_bus.execute(query)
+                    if request_dto:
+                        request_dtos.append(request_dto)
+                except Exception:
+                    # Continue with other requests if one fails
+                    continue
+
+        # Pass domain DTO to scheduler strategy - NO formatting logic here
+        return scheduler_strategy.format_request_status_response(request_dtos)
 
 
 @handle_interface_exceptions(context="request_machines", interface_type="cli")
@@ -247,18 +268,17 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> dict[str
     """
     container = get_container()
     command_bus = container.get(CommandBus)
-    # scheduler_strategy = container.get(SchedulerPort)
+    query_bus = container.get(QueryBus)
 
     from application.dto.commands import CreateReturnRequestCommand
 
-    # Handle input data from -f flag (HostFactory compatibility)
+    # Validation: Prevent --all with specific IDs
+    has_all = getattr(args, "all", False)
     machine_ids = []
+    
+    # Handle input data from -f flag (HostFactory compatibility)
     if hasattr(args, "input_data") and args.input_data:
         # Extract machine IDs from JSON input data
-        # There is a discrepency in the documentation of the original HF https://www.ibm.com/docs/en/spectrum-symphony/7.3.2?topic=specification-requestreturnmachines
-        # documented expected format {"name": "(mandatory)(string) Host name of the machine that must be returned"}
-        # but in practice we get the following:
-        # Format: {"machines": [{"name": "192.168.0.1", "machineId": "i-xxx"}, {{"name": "192.168.0.2", "machineId": "i-yyy"}]}
         raw_request_data = args.input_data
         if "machines" in raw_request_data:
             machine_ids = [
@@ -270,6 +290,38 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> dict[str
         # Use positional arguments
         machine_ids = getattr(args, "machine_ids", [])
 
+    has_specific_ids = bool(machine_ids)
+    
+    if has_all and has_specific_ids:
+        return {
+            "error": "Cannot use --all with specific machine IDs",
+            "message": "Use either --all or specific IDs, not both"
+        }
+
+    if has_all:
+        # Safety confirmation for destructive --all operations
+        has_force = getattr(args, "force", False)
+        if not has_force:
+            return {
+                "error": "Destructive operation requires --force flag",
+                "message": "Use --force to confirm returning all machines"
+            }
+        
+        # Get all active machines
+        from application.dto.queries import ListMachinesQuery
+        
+        query = ListMachinesQuery(all_resources=True, active_only=True)
+        machine_dtos = await query_bus.execute(query)
+        
+        # Extract machine IDs from DTOs
+        machine_ids = [machine.machine_id for machine in machine_dtos if hasattr(machine, 'machine_id')]
+        
+        if not machine_ids:
+            return {
+                "error": "No active machines found",
+                "message": "No machines available to return"
+            }
+
     if not machine_ids:
         return {
             "error": "Machine IDs are required",
@@ -280,4 +332,6 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> dict[str
         request_id=getattr(args, "request_id", None),
         machine_ids=machine_ids,
     )
+    
+    result = await command_bus.execute(command)
     return {"result": result, "message": "Return request created successfully"}

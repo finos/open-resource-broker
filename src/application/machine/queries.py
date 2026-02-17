@@ -16,6 +16,7 @@ class GetMachineStatusQuery(BaseQuery):
 class ListMachinesQuery(BaseQuery):
     """Query to list machines with optional filtering."""
 
+    provider_name: Optional[str] = None
     template_id: Optional[str] = None
     status: Optional[str] = None
     request_id: Optional[str] = None
@@ -23,6 +24,7 @@ class ListMachinesQuery(BaseQuery):
     timestamp_format: Optional[str] = None
     limit: int = 50
     offset: int = 0
+    all_resources: bool = False
 
 
 class GetMachineDetailsQuery(BaseQuery):

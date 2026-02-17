@@ -28,6 +28,7 @@ class ListActiveRequestsQuery(Query, BaseModel):
     
     provider_name: Optional[str] = None
     filter_expressions: list[str] = []
+    all_resources: bool = False
 
 
 class ListReturnRequestsQuery(Query, BaseModel):
@@ -88,6 +89,7 @@ class ListMachinesQuery(Query, BaseModel):
     status: Optional[str] = None
     active_only: bool = False
     filter_expressions: list[str] = []  # Generic filters
+    all_resources: bool = False
 
 
 class GetActiveMachineCountQuery(Query, BaseModel):

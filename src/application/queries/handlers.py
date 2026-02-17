@@ -883,22 +883,25 @@ class ListActiveRequestsHandler(BaseQueryHandler[ListActiveRequestsQuery, list[R
 
         try:
             with self.uow_factory.create_unit_of_work() as uow:
-                # Get active requests from repository
-                from domain.request.value_objects import RequestStatus
-                
-                active_statuses = [RequestStatus.PENDING, RequestStatus.RUNNING, RequestStatus.PROVISIONING]
-                requests = uow.requests.find_all()
-                active_requests = [r for r in requests if r.status in active_statuses]
+                if query.all_resources:
+                    # Use repository to get ALL active requests
+                    active_requests = uow.requests.find_active_requests()
+                else:
+                    # Existing filtered logic
+                    from domain.request.value_objects import RequestStatus
+                    
+                    active_statuses = [RequestStatus.PENDING, RequestStatus.RUNNING, RequestStatus.PROVISIONING]
+                    requests = uow.requests.find_all()
+                    active_requests = [r for r in requests if r.status in active_statuses]
 
-                # Apply template filter if provided
-                if query.template_id:
-                    active_requests = [r for r in active_requests if r.template_id == query.template_id]
+                    # Apply template filter if provided
+                    if hasattr(query, 'template_id') and query.template_id:
+                        active_requests = [r for r in active_requests if r.template_id == query.template_id]
 
-                # Apply pagination
-                total_count = len(active_requests)
-                start_idx = 0
-                end_idx = query.limit or 100
-                active_requests = active_requests[start_idx:end_idx]
+                    # Apply pagination
+                    start_idx = 0
+                    end_idx = getattr(query, 'limit', None) or 100
+                    active_requests = active_requests[start_idx:end_idx]
 
                 # Convert to DTOs
                 request_dtos = []
@@ -925,7 +928,7 @@ class ListActiveRequestsHandler(BaseQueryHandler[ListActiveRequestsQuery, list[R
                     # Convert back to RequestDTO objects
                     request_dtos = [RequestDTO.model_validate(d) for d in filtered_dicts]
 
-                self.logger.info("Found %s active requests (total: %s)", len(request_dtos), total_count)
+                self.logger.info("Found %s active requests", len(request_dtos))
                 return request_dtos
 
         except Exception as e:
@@ -1200,16 +1203,20 @@ class ListMachinesHandler(BaseQueryHandler[MachineListQuery, list[MachineDTO]]):
 
         try:
             with self.uow_factory.create_unit_of_work() as uow:
-                # Get machines based on query filters
-                if query.status:
-                    from domain.machine.value_objects import MachineStatus
-
-                    status_enum = MachineStatus(query.status)
-                    machines = uow.machines.find_by_status(status_enum)
-                elif query.request_id:
-                    machines = uow.machines.find_by_request_id(query.request_id)
+                if query.all_resources:
+                    # Use repository to get ALL active machines
+                    machines = uow.machines.find_active_machines()
                 else:
-                    machines = uow.machines.get_all()
+                    # Existing filtered logic
+                    if query.status:
+                        from domain.machine.value_objects import MachineStatus
+
+                        status_enum = MachineStatus(query.status)
+                        machines = uow.machines.find_by_status(status_enum)
+                    elif query.request_id:
+                        machines = uow.machines.find_by_request_id(query.request_id)
+                    else:
+                        machines = uow.machines.get_all()
 
                 # Convert to DTOs (with sync for running machines)
                 machine_dtos = []
@@ -1251,18 +1258,18 @@ class ListMachinesHandler(BaseQueryHandler[MachineListQuery, list[MachineDTO]]):
                     )
                     machine_dtos.append(machine_dto.to_dict())
 
-                # Apply pagination
-                total_count = len(machine_dtos)
-                start_idx = query.offset or 0
-                end_idx = start_idx + (query.limit or 50)
-                machine_dtos = machine_dtos[start_idx:end_idx]
+                # Apply pagination (skip for --all to show everything)
+                if not query.all_resources:
+                    start_idx = query.offset or 0
+                    end_idx = start_idx + (query.limit or 50)
+                    machine_dtos = machine_dtos[start_idx:end_idx]
 
                 # Apply generic filters if provided
                 if query.filter_expressions:
                     # Apply filters using GenericFilterService (machine_dtos are already dicts)
                     machine_dtos = self._generic_filter_service.apply_filters(machine_dtos, query.filter_expressions)
 
-                self.logger.info("Found %s machines (total: %s)", len(machine_dtos), total_count)
+                self.logger.info("Found %s machines", len(machine_dtos))
                 return machine_dtos
 
         except Exception as e:
