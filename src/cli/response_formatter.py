@@ -119,6 +119,8 @@ class CLIResponseFormatter:
         
         if resource == "requests" and action == "status":
             return "request_status"
+        elif resource == "machines" and action == "return":
+            return "requests"  # Return requests should be formatted like requests
         
         # Map resource names to contexts
         resource_context_map = {
@@ -298,6 +300,14 @@ class CLIResponseFormatter:
                 # For request operations (including machine requests), use format_request_response
                 if self._looks_like_single_request(data):
                     return self.scheduler_strategy.format_request_response(data)
+                elif isinstance(data, str) and data.startswith('ret-'):
+                    # Handle return request ID strings
+                    request_data = {
+                        "request_id": data,
+                        "status": "pending",
+                        "message": "Return request created successfully"
+                    }
+                    return self.scheduler_strategy.format_request_response(request_data)
                 elif hasattr(self.scheduler_strategy, 'format_request_for_display'):
                     if isinstance(data, list):
                         return [self.scheduler_strategy.format_request_for_display(item) for item in data]

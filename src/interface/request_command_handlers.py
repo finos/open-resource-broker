@@ -280,6 +280,4 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> dict[str
         request_id=getattr(args, "request_id", None),
         machine_ids=machine_ids,
     )
-    result = await command_bus.execute(command)
-
-    return result
+    return {"result": result, "message": "Return request created successfully"}
