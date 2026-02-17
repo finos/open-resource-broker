@@ -844,6 +844,10 @@ async def execute_command(args, app, resource_parsers) -> Union[str, tuple[str, 
             if hasattr(args, 'resource') and args.resource == 'machines' and args.action == 'status':
                 from interface.machine_command_handlers import handle_get_machine_status
                 result = await handle_get_machine_status(args)
+            # Handle machine return with --all or multiple IDs
+            elif hasattr(args, 'resource') and args.resource == 'machines' and args.action == 'return':
+                from interface.request_command_handlers import handle_request_return_machines
+                result = await handle_request_return_machines(args)
             # Handle request status with multiple IDs
             elif hasattr(args, 'resource') and args.resource == 'requests' and args.action in ['status', 'show']:
                 from interface.request_command_handlers import handle_get_request_status

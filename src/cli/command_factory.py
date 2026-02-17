@@ -824,6 +824,10 @@ class CLICommandFactory:
                     dry_run=args.get("dry_run", False)
                 )
             elif command_action == "status" or command_action == "show":
+                # Check for --all flag first
+                if args.get("all", False):
+                    return None  # Route to interface handler for --all support
+                
                 request_id = args.get("request_id")
                 if not request_id:
                     raise ValueError("request_id is required for status/show command")
@@ -884,6 +888,10 @@ class CLICommandFactory:
                     dry_run=args.get("dry_run", False)
                 )
             elif command_action == "return":
+                # Check for --all flag first
+                if args.get("all", False):
+                    return None  # Route to interface handler for --all support
+                
                 machine_ids = args.get("machine_ids", [])
                 if not machine_ids:
                     raise ValueError("machine_ids are required for return command")
@@ -894,6 +902,10 @@ class CLICommandFactory:
                 )
             elif command_action == "show" or command_action == "status":
                 if command_action == "status":
+                    # Check for --all flag first
+                    if args.get("all", False):
+                        return None  # Route to interface handler for --all support
+                    
                     # Status command expects machine_ids (plural) - handle multiple IDs
                     machine_ids = args.get("machine_ids", [])
                     flag_machine_ids = args.get("flag_machine_ids", [])
