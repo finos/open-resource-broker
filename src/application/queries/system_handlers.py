@@ -2,6 +2,7 @@
 
 from typing import TYPE_CHECKING, Any
 
+from domain.base import UnitOfWorkFactory
 from domain.request.repository import RequestRepository
 from domain.services.timestamp_service import TimestampService
 
@@ -365,6 +366,7 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Provid
         logger: LoggingPort,
         container: ContainerPort,
         error_handler: ErrorHandlingPort,
+        uow_factory: UnitOfWorkFactory,
     ) -> None:
         """
         Initialize get provider metrics handler.
@@ -373,9 +375,11 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Provid
             logger: Logging port for operation logging
             container: Container port for dependency access
             error_handler: Error handling port for exception management
+            uow_factory: Unit of work factory for data access
         """
         super().__init__(logger, error_handler)
         self.container = container
+        self.uow_factory = uow_factory
 
     async def execute_query(self, query: GetProviderMetricsQuery) -> dict[str, Any]:
         """Execute provider metrics query."""
@@ -395,9 +399,9 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Provid
             else:
                 start_time = end_time - timedelta(hours=1)  # Default to 1 hour
 
-            # Get actual metrics from repository
-            request_repository = self.container.get(RequestRepository)
-            request_metrics = request_repository.get_metrics_by_date_range(start_time, end_time)
+            # Get actual metrics from repository using UoW pattern
+            with self.uow_factory.create_unit_of_work() as uow:
+                request_metrics = uow.requests.get_metrics_by_date_range(start_time, end_time)
 
             # Build response with actual data
             metrics = {

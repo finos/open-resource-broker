@@ -351,7 +351,20 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
             filtered_requests = []
 
             for request in all_requests:
-                if start_date <= request.created_at <= end_date:
+                # Handle timezone-aware vs naive datetime comparison
+                request_date = request.created_at
+                
+                # If request date is naive but comparison dates are aware, make request date aware
+                if request_date.tzinfo is None and start_date.tzinfo is not None:
+                    from datetime import timezone
+                    request_date = request_date.replace(tzinfo=timezone.utc)
+                # If request date is aware but comparison dates are naive, make comparison dates aware
+                elif request_date.tzinfo is not None and start_date.tzinfo is None:
+                    from datetime import timezone
+                    start_date = start_date.replace(tzinfo=timezone.utc)
+                    end_date = end_date.replace(tzinfo=timezone.utc)
+                
+                if start_date <= request_date <= end_date:
                     filtered_requests.append(request)
 
             return filtered_requests
@@ -434,7 +447,7 @@ class RequestRepositoryImpl(RequestRepositoryInterface):
         }
         
         for request in requests:
-            if request.status == RequestStatus.COMPLETE:
+            if request.status == RequestStatus.COMPLETED:
                 metrics["completed"] += 1
             elif request.status == RequestStatus.FAILED:
                 metrics["failed"] += 1
