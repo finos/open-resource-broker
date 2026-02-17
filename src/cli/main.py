@@ -315,6 +315,7 @@ def add_provider_actions(subparsers):
     # Providers metrics
     providers_metrics = subparsers.add_parser("metrics", help="Show provider metrics")
     add_global_arguments(providers_metrics)
+    providers_metrics.add_argument("--timeframe", default="1h", help="Metrics timeframe (e.g., 1h, 24h, 7d)")
 
 
 def add_template_actions(subparsers):

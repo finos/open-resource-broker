@@ -999,12 +999,14 @@ class CLICommandFactory:
             elif command_action == "metrics":
                 return self.create_get_provider_metrics_query(
                     provider_name=args.get("provider"),
+                    timeframe=args.get("timeframe", "1h"),
                     detailed=args.get("detailed", False)
                 )
             elif command_action == "select":
                 return self.create_provider_operation_command_data("select", **args)
             elif command_action == "exec":
-                return self.create_provider_operation_command_data("exec", **args)
+                filtered_args = {k: v for k, v in args.items() if k != 'action'}
+                return self.create_provider_operation_command_data("exec", **filtered_args)
 
         # Infrastructure operations
         elif command_group == "infrastructure" or command_group == "infra":
