@@ -1,0 +1,14 @@
+{
+  "template_id": "test-template-unique-789",
+  "image_id": "ami-99999999",
+  "provider_api": "EC2Fleet",
+  "name": "Test Template Unique",
+  "description": "Test template with unique ID",
+  "instance_type": "t3.small",
+  "subnet_ids": ["subnet-999999"],
+  "security_group_ids": ["sg-999999"],
+  "tags": {
+    "Environment": "test",
+    "Purpose": "field-extraction-test"
+  }
+}

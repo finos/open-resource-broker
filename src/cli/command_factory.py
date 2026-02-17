@@ -748,14 +748,14 @@ class CLICommandFactory:
                 # Extract template data from input_data or args
                 input_data = args.get("input_data") or {}
                 return self.create_create_template_command(
-                    template_id=input_data.get("template_id") or args.get("template_id"),
-                    provider_api=input_data.get("provider_api") or args.get("provider_api", "RunInstances"),
-                    image_id=input_data.get("image_id") or args.get("image_id"),
+                    template_id=input_data.get("templateId") or input_data.get("template_id") or args.get("template_id"),
+                    provider_api=input_data.get("providerApi") or input_data.get("provider_api") or args.get("provider_api", "RunInstances"),
+                    image_id=input_data.get("imageId") or input_data.get("image_id") or args.get("image_id"),
                     name=input_data.get("name") or args.get("name"),
                     description=input_data.get("description") or args.get("description"),
-                    instance_type=input_data.get("instance_type") or args.get("instance_type"),
-                    subnet_ids=input_data.get("subnet_ids") or args.get("subnet_ids"),
-                    security_group_ids=input_data.get("security_group_ids") or args.get("security_group_ids"),
+                    instance_type=input_data.get("instanceType") or input_data.get("instance_type") or args.get("instance_type"),
+                    subnet_ids=input_data.get("subnetIds") or input_data.get("subnet_ids") or args.get("subnet_ids"),
+                    security_group_ids=input_data.get("securityGroupIds") or input_data.get("security_group_ids") or args.get("security_group_ids"),
                     tags=input_data.get("tags") or args.get("tags"),
                     configuration=input_data or {}
                 )

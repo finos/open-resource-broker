@@ -1,0 +1,10 @@
+{
+  "templateId": "test-template-1",
+  "name": "Test Template",
+  "imageId": "ami-075f150fc1ca69e71",
+  "instanceType": "t3.micro",
+  "subnetIds": ["subnet-123"],
+  "securityGroupIds": ["sg-456"],
+  "providerApi": "RunInstances",
+  "providerType": "aws"
+}

@@ -203,11 +203,13 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
         query_bus: QueryBus,  # Add QueryBus for template lookup
+        provider_registry_service: "ProviderRegistryService",  # Add missing dependency with type
     ) -> None:
         super().__init__(logger, event_publisher, error_handler)
         self.uow_factory = uow_factory
         self._container = container
         self._query_bus = query_bus
+        self._provider_registry_service = provider_registry_service
 
     async def validate_command(self, command: CreateReturnRequestCommand):
         """Validate create return request command."""

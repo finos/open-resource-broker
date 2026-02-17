@@ -204,31 +204,44 @@ async def handle_create_template(args: argparse.Namespace) -> dict[str, Any]:
                 "dry_run": True,
             }
 
-        # Extract required fields
-        template_id = getattr(args, "template_id", None)
+        # Read template configuration from file
+        if not hasattr(args, 'file') or not args.file:
+            return {"success": False, "error": "Template file is required"}
+
+        try:
+            import json
+            with open(args.file, 'r') as f:
+                template_config = json.load(f)
+        except FileNotFoundError:
+            return {"success": False, "error": f"Template file not found: {args.file}"}
+        except json.JSONDecodeError as e:
+            return {"success": False, "error": f"Invalid JSON in template file: {e}"}
+
+        # Extract required fields from JSON
+        template_id = template_config.get("templateId")
         if not template_id:
-            return {"success": False, "error": "Template ID is required"}
+            return {"success": False, "error": "templateId is required in template file"}
 
-        provider_api = getattr(args, "provider_api", None)
+        provider_api = template_config.get("providerApi")
         if not provider_api:
-            return {"success": False, "error": "Provider API is required"}
+            return {"success": False, "error": "providerApi is required in template file"}
 
-        image_id = getattr(args, "image_id", None)
+        image_id = template_config.get("imageId")
         if not image_id:
-            return {"success": False, "error": "Image ID is required"}
+            return {"success": False, "error": "imageId is required in template file"}
 
-        # Create command with all fields
+        # Create command with fields from JSON file
         command = CreateTemplateCommand(
             template_id=template_id,
-            name=getattr(args, "name", None),
-            description=getattr(args, "description", None),
+            name=template_config.get("name"),
+            description=template_config.get("description"),
             provider_api=provider_api,
-            instance_type=getattr(args, "instance_type", None),
+            instance_type=template_config.get("instanceType"),
             image_id=image_id,
-            subnet_ids=getattr(args, "subnets", []),
-            security_group_ids=getattr(args, "security_groups", []),
-            tags=getattr(args, "tags", {}),
-            configuration=getattr(args, "configuration", {}),
+            subnet_ids=template_config.get("subnetIds", []),
+            security_group_ids=template_config.get("securityGroupIds", []),
+            tags=template_config.get("tags", {}),
+            configuration=template_config,
         )
 
         # Execute command through CQRS bus
