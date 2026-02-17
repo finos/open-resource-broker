@@ -88,6 +88,15 @@ class RequestDTO(BaseDTO):
     metadata: dict[str, Any] = Field(default_factory=dict)
     request_type: str = "acquire"
     long: bool = False  # Flag to indicate whether to include detailed information
+    desired_capacity: int = 1
+    successful_count: int = 0
+    failed_count: int = 0
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    error_details: dict[str, Any] = Field(default_factory=dict)
+    provider_data: dict[str, Any] = Field(default_factory=dict)
+    version: int = 0
+    resource_ids: list[str] = Field(default_factory=list)
 
     @classmethod
     def from_domain(cls, request: Request, long: bool = False, machine_references: Optional[list["MachineReferenceDTO"]] = None) -> "RequestDTO":
@@ -132,6 +141,15 @@ class RequestDTO(BaseDTO):
             metadata=request.metadata,
             request_type=cls.serialize_enum(request.request_type),
             long=long,
+            desired_capacity=request.desired_capacity,
+            successful_count=request.successful_count,
+            failed_count=request.failed_count,
+            started_at=request.started_at,
+            completed_at=request.completed_at,
+            error_details=request.error_details,
+            provider_data=request.provider_data,
+            version=request.version,
+            resource_ids=request.resource_ids,
         )
 
     def to_dict(self, long: Optional[bool] = None) -> dict[str, Any]:
