@@ -59,7 +59,7 @@ class BaseRegistry(ABC):
 
     def __init__(self, mode: RegistryMode = RegistryMode.SINGLE_CHOICE) -> None:
         """
-        Initialize registry with specified mode.
+        Initialize registry with specified mode and dependencies.
 
         Args:
             mode: Registry operation mode (single or multi choice)
@@ -75,31 +75,33 @@ class BaseRegistry(ABC):
         ] = {}  # Instance-based registrations (multi-choice only)
         self._registry_lock = threading.RLock()  # Use RLock for nested locking
 
-        from infrastructure.logging.logger import get_logger
-
-        self.logger = get_logger(__name__)
+        # Initialize dependencies once for ALL registries
+        self._initialize_dependencies()
         self._initialized = True
-        self._dependencies_initialized = False
 
-    def _ensure_dependencies_initialized(self) -> None:
-        """Ensure registry dependencies are initialized (lazy loading)."""
-        if not self._dependencies_initialized:
-            try:
-                from infrastructure.di.container import get_container
-                from domain.base.ports import LoggingPort, ConfigurationPort
-                from monitoring.metrics import MetricsCollector
+    def _initialize_dependencies(self) -> None:
+        """Initialize dependencies once at construction."""
+        try:
+            from infrastructure.di.container import get_container
+            from domain.base.ports import LoggingPort, ConfigurationPort
+            from monitoring.metrics import MetricsCollector
 
-                container = get_container()
-                self._logger_port = container.get(LoggingPort)
-                self._config_port = container.get(ConfigurationPort)
-                self._metrics = container.get(MetricsCollector)
-                self._dependencies_initialized = True
-            except Exception:
-                # Fallback if DI container not available
-                self._logger_port = None
-                self._config_port = None
-                self._metrics = None
-                self._dependencies_initialized = True
+            container = get_container()
+            self._logger_port = container.get(LoggingPort)
+            self._config_port = container.get(ConfigurationPort)
+            self._metrics = container.get(MetricsCollector)
+
+            # Set up logger property for backward compatibility
+            self.logger = self._logger_port
+
+        except Exception as e:
+            # Graceful fallback if DI container not available
+            from infrastructure.logging.logger import get_logger
+
+            self._logger_port = None
+            self._config_port = None
+            self._metrics = None
+            self.logger = get_logger(__name__)
 
     @abstractmethod
     def register(
@@ -277,16 +279,6 @@ class BaseRegistry(ABC):
                 "Failed to create %s for type '%s': %s", factory_name, type_name, str(e)
             )
             return None
-
-    def ensure_types_registered(self, register_function: Callable) -> None:
-        """Ensure types are registered (idempotent operation)."""
-        if not self.get_registered_types():
-            register_function()
-
-    def get_available_types_with_registration(self, register_function: Callable) -> list[str]:
-        """Get available types, ensuring registration first."""
-        self.ensure_types_registered(register_function)
-        return self.get_registered_types()
 
     def ensure_types_registered(self, register_function: Callable) -> None:
         """Ensure types are registered (idempotent operation)."""
