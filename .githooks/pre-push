@@ -1,0 +1,5 @@
+#!/bin/bash
+set -e
+
+# Beads: Prevent pushing stale JSONL
+bd hooks run pre-push "$@"

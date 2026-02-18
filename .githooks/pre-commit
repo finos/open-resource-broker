@@ -1,0 +1,8 @@
+#!/bin/bash
+set -e
+
+# Beads: Flush pending changes to JSONL before commit
+bd hooks run pre-commit
+
+# Project: Run quality checks
+make pre-commit

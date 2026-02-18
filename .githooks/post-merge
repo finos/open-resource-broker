@@ -1,0 +1,5 @@
+#!/bin/bash
+set -e
+
+# Beads: Import updated JSONL after pull/merge
+bd hooks run post-merge

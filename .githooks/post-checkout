@@ -1,0 +1,5 @@
+#!/bin/bash
+set -e
+
+# Beads: Import JSONL after branch checkout
+bd hooks run post-checkout "$@"

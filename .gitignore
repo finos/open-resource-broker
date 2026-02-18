@@ -136,6 +136,10 @@ yarn-error.log*
 *.sqlite3
 *.sqlite
 
+# Beads
+.beads/
+AGENTS.md
+
 # Docker
 .docker/
 docker-compose.override.yml

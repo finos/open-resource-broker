@@ -1,0 +1,5 @@
+#!/bin/bash
+set -e
+
+# Beads: Add agent identity trailers for forensics
+bd hooks run prepare-commit-msg "$@"

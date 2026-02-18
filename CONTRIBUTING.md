@@ -22,6 +22,9 @@ make dev-install-uv
 
 # Or manually with uv
 uv pip install -e ".[dev]"
+
+# Setup git hooks (required for beads integration)
+./dev-tools/scripts/setup-hooks.sh
 ```
 
 ### Traditional Setup
@@ -36,6 +39,9 @@ make dev-install-pip
 
 # Or manually
 pip install -e ".[dev]"
+
+# Setup git hooks (required for beads integration)
+./dev-tools/scripts/setup-hooks.sh
 ```
 
 ### Optional Dependencies
