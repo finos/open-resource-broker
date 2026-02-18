@@ -780,6 +780,24 @@ async def execute_command(args, app, resource_parsers) -> Union[str, tuple[str, 
         from cli.response_formatter import create_cli_formatter
         formatter = create_cli_formatter()
         return formatter.format_response(result, args)
+    
+    if args.resource == "mcp" and args.action == "tools":
+        from interface.mcp_command_handlers import handle_mcp_tools_list, handle_mcp_tools_call, handle_mcp_tools_info
+        
+        tools_action = getattr(args, 'tools_action', None)
+        if tools_action == "list":
+            result = await handle_mcp_tools_list(args)
+        elif tools_action == "call":
+            result = await handle_mcp_tools_call(args)
+        elif tools_action == "info":
+            result = await handle_mcp_tools_info(args)
+        else:
+            raise ValueError(f"Unknown MCP tools action: {tools_action}")
+        
+        # Format using response formatter
+        from cli.response_formatter import create_cli_formatter
+        formatter = create_cli_formatter()
+        return formatter.format_response(result, args)
 
     # Use pure CQRS pattern for all other commands
     from infrastructure.di.container import get_container
