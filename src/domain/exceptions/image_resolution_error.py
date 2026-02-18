@@ -1,9 +1,9 @@
 """Image resolution domain exception."""
 
-from src.domain.base.exceptions import DomainError
+from src.domain.base.exceptions import DomainException
 
 
-class ImageResolutionError(DomainError):
+class ImageResolutionError(DomainException):
     """Raised when image specification cannot be resolved to actual image ID."""
 
     def __init__(self, message: str, image_specification: str = None):

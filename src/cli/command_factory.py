@@ -174,18 +174,12 @@ class CLICommandFactory:
     def create_list_templates_query(
         self,
         provider: Optional[str] = None,
-        template_type: Optional[str] = None,
-        limit: int = 50,
+        provider_api: Optional[str] = None,
+        active_only: bool = True,
         filter_expressions: Optional[List[str]] = None,
         **kwargs: Any,
     ) -> ListTemplatesQuery:
         """Create query to list templates."""
-        filters = {}
-        if provider:
-            filters["provider"] = provider
-        if template_type:
-            filters["template_type"] = template_type
-
         return ListTemplatesQuery(
             provider_name=provider,
             provider_api=provider_api,
@@ -416,10 +410,11 @@ class CLICommandFactory:
     def create_get_machine_query(
         self,
         machine_id: str,
+        provider: Optional[str] = None,
         **kwargs: Any,
     ) -> GetMachineQuery:
         """Create query to get machine details."""
-        return GetMachineQuery(machine_id=machine_id)
+        return GetMachineQuery(machine_id=machine_id, provider_name=provider)
 
     def create_update_machine_status_command(
         self,
@@ -1161,6 +1156,53 @@ class CLICommandFactory:
     ) -> SetConfigurationCommand:
         """Create command to set configuration value."""
         return SetConfigurationCommand(key=key, value=value)
+
+    # Bulk query factory methods
+    def create_get_multiple_requests_query(
+        self,
+        request_ids: List[str],
+        provider_name: Optional[str] = None,
+        lightweight: bool = False,
+        include_machines: bool = True,
+        **kwargs: Any,
+    ) -> "GetMultipleRequestsQuery":
+        """Create query to get multiple requests by IDs."""
+        from application.dto.bulk_queries import GetMultipleRequestsQuery
+
+        return GetMultipleRequestsQuery(
+            request_ids=request_ids,
+            provider_name=provider_name,
+            lightweight=lightweight,
+            include_machines=include_machines,
+        )
+
+    def create_get_multiple_templates_query(
+        self,
+        template_ids: List[str],
+        provider_name: Optional[str] = None,
+        active_only: bool = True,
+        **kwargs: Any,
+    ) -> "GetMultipleTemplatesQuery":
+        """Create query to get multiple templates by IDs."""
+        from application.dto.bulk_queries import GetMultipleTemplatesQuery
+
+        return GetMultipleTemplatesQuery(
+            template_ids=template_ids, provider_name=provider_name, active_only=active_only
+        )
+
+    def create_get_multiple_machines_query(
+        self,
+        machine_ids: List[str],
+        provider_name: Optional[str] = None,
+        include_requests: bool = True,
+        **kwargs: Any,
+    ) -> "GetMultipleMachinesQuery":
+        """Create query to get multiple machines by IDs."""
+        from application.dto.bulk_queries import GetMultipleMachinesQuery
+
+        return GetMultipleMachinesQuery(
+            machine_ids=machine_ids, provider_name=provider_name, include_requests=include_requests
+        )
 
 
 # Global factory instance
