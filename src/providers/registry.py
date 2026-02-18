@@ -6,7 +6,6 @@ import threading
 import importlib
 
 from domain.base.exceptions import ConfigurationError
-from domain.base.ports import LoggingPort
 
 from infrastructure.registry.base_registry import BaseRegistration, BaseRegistry, RegistryMode
 
@@ -666,9 +665,6 @@ def get_provider_registry() -> ProviderRegistry:
         with _registry_lock:
             if _provider_registry_instance is None:
                 # Use basic logger - no DI container dependency
-                from infrastructure.logging.logger import get_logger
-
-                logger = get_logger(__name__)
                 _provider_registry_instance = ProviderRegistry()
 
     return _provider_registry_instance
