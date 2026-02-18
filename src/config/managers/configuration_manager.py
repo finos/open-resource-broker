@@ -40,6 +40,11 @@ class ConfigurationManager:
 
     def __init__(self, config_file: Optional[str] = None) -> None:
         """Initialize configuration manager with lazy loading."""
+        # Use platform dirs for default config file discovery
+        if config_file is None:
+            from config.platform_dirs import get_config_location
+            config_file = str(get_config_location() / "config.json")
+        
         self._config_file = config_file
         self._loader: Optional[ConfigurationLoader] = None
         self._app_config: Optional[AppConfig] = None

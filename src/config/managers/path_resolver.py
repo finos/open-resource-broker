@@ -98,7 +98,7 @@ class ConfigPathResolver:
         self, default_path: Optional[str] = None, config_path: Optional[str] = None
     ) -> str:
         """Get configuration directory path."""
-        default = default_path or "conf"
+        default = default_path or "config"
         return self.resolve_path("conf", default, config_path)
 
     def get_log_dir(
