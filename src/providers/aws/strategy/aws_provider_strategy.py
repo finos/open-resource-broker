@@ -414,6 +414,7 @@ class AWSProviderStrategy(ProviderStrategy):
         # Determine cache directory
         try:
             from infrastructure.di.container import get_container
+
             container = get_container()
             config = container.get("configuration_port")
             cache_dir = os.path.join(config.get_work_dir(), ".cache")

@@ -437,9 +437,7 @@ class TemplateConfigurationManager:
     ) -> dict[str, str]:
         """Resolve images using provider strategy."""
         if not self.provider_registry_service:
-            self.logger.debug(
-                "Provider registry service not available, skipping image resolution"
-            )
+            self.logger.debug("Provider registry service not available, skipping image resolution")
             return {}
 
         try:
@@ -465,9 +463,7 @@ class TemplateConfigurationManager:
                 return {}
 
         except Exception as e:
-            self.logger.warning(
-                "Image resolution failed for provider %s: %s", provider_instance, e
-            )
+            self.logger.warning("Image resolution failed for provider %s: %s", provider_instance, e)
             return {}
 
     def _apply_resolved_images(

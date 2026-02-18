@@ -653,7 +653,11 @@ class ListRequestsHandler(BaseQueryHandler[ListRequestsQuery, list[RequestDTO]])
                 # Apply filters if provided
                 if query.provider_name:
                     # Filter by provider name (check provider_api field)
-                    requests = [r for r in requests if r.provider_api and query.provider_name in r.provider_api]
+                    requests = [
+                        r
+                        for r in requests
+                        if r.provider_api and query.provider_name in r.provider_api
+                    ]
 
                 if query.status:
                     from domain.request.value_objects import RequestStatus
@@ -1138,7 +1142,11 @@ class ListMachinesHandler(BaseQueryHandler[MachineListQuery, list[MachineDTO]]):
 
                 # Apply provider filtering if specified
                 if query.provider_name:
-                    machines = [m for m in machines if m.provider_name and query.provider_name in m.provider_name]
+                    machines = [
+                        m
+                        for m in machines
+                        if m.provider_name and query.provider_name in m.provider_name
+                    ]
 
                 # Convert to DTOs (with sync for running machines)
                 machine_dtos = []

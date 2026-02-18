@@ -312,7 +312,7 @@ class CLICommandFactory:
         """Create query to list requests."""
         # Use provider if provider_name not specified (CLI compatibility)
         effective_provider = provider_name or provider
-        
+
         return ListRequestsQuery(
             status=status,
             template_id=template_id,
@@ -397,7 +397,7 @@ class CLICommandFactory:
         """Create query to list machines."""
         # Use provider if provider_name not specified (CLI compatibility)
         effective_provider = provider_name or provider
-        
+
         return ListMachinesQuery(
             provider_name=effective_provider,
             template_id=template_id,
