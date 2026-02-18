@@ -383,10 +383,6 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 if str(m.machine_id.value) not in seen_ids:
                     updated_machines.append(m)
 
-            # Update ASG metadata if this is an ASG request
-            if request.metadata.get("provider_api") == "ASG":
-                await self._update_asg_metadata_if_needed(request, updated_machines)
-
             return updated_machines, provider_metadata
 
         except Exception as e:
