@@ -154,11 +154,6 @@ def register_json_storage() -> None:
     registry = get_storage_registry()
     logger = get_logger(__name__)
 
-    # Check if already registered (idempotent registration)
-    if hasattr(registry, "is_registered") and registry.is_registered("json"):
-        logger.debug("JSON storage type already registered, skipping")
-        return
-
     try:
         # Factory that accepts config parameter (no closure capture)
         def unit_of_work_factory(config: Any) -> Any:

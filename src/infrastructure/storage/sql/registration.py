@@ -136,11 +136,6 @@ def register_sql_storage() -> None:
     registry = get_storage_registry()
     logger = get_logger(__name__)
 
-    # Check if already registered (idempotent registration)
-    if hasattr(registry, "is_registered") and registry.is_registered("sql"):
-        logger.debug("SQL storage type already registered, skipping")
-        return
-
     try:
         registry.register_storage(
             storage_type="sql",
