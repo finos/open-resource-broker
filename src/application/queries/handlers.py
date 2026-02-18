@@ -171,117 +171,6 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             self.logger.error("Failed to get request: %s", e)
             raise
 
-    async def _fetch_provider_machines(self, request, existing_machines) -> tuple[list, dict]:
-        """
-        Fetch the latest machine list from the provider using Provider Registry.
-
-        Uses machine_ids for return requests when available, prefers resource-based 
-        discovery (DESCRIBE_RESOURCE_INSTANCES) for acquire requests to capture the
-        full membership of the resource (ASG/Fleet). Falls back to GET_INSTANCE_STATUS
-        when only instance IDs are known.
-        """
-        try:
-            from providers.base.strategy import ProviderOperation, ProviderOperationType
-
-            # Use machine_ids for return requests when available
-            if request.request_type.value == "return" and request.machine_ids:
-                operation_type = ProviderOperationType.GET_INSTANCE_STATUS
-                parameters = {
-                    "instance_ids": request.machine_ids,
-                    "template_id": request.template_id,
-                }
-            # Prefer resource-level discovery for acquire requests
-            elif request.resource_ids:
-                operation_type = ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES
-                parameters = {
-                    "resource_ids": request.resource_ids,
-                    "provider_api": request.metadata.get("provider_api", "RunInstances"),
-                    "template_id": request.template_id,
-                }
-            else:
-                # Fallback to instance-level discovery
-                operation_type = ProviderOperationType.GET_INSTANCE_STATUS
-                instance_ids = [m.machine_id.value for m in existing_machines]
-                parameters = {
-                    "instance_ids": instance_ids,
-                    "template_id": request.template_id,
-                }
-
-            operation = ProviderOperation(
-                operation_type=operation_type,
-                parameters=parameters,
-                context={
-                    "correlation_id": str(request.request_id),
-                    "request_id": str(request.request_id),
-                },
-            )
-
-            # Get provider configuration
-            from domain.base.ports.configuration_port import ConfigurationPort
-            config_port = self._container.get(ConfigurationPort)
-            provider_instance_config = config_port.get_provider_instance_config(request.provider_name)
-            
-            # Execute operation using Provider Registry Service
-            # Pass the full ProviderInstanceConfig object, not just the nested config dict
-            result = await self._provider_registry_service.execute_operation(request.provider_name, operation)
-
-            self.logger.info(
-                "Provider strategy result: success=%s, data_keys=%s",
-                result.success,
-                list(result.data.keys()) if result.data else "None",
-            )
-
-            if not result.success:
-                self.logger.warning(
-                    "Failed to discover instances from resources: %s",
-                    result.error_message,
-                )
-                return [], result.metadata or {}
-
-            # Get instance details from result
-            instance_details = result.data.get("instances", []) or result.data.get("machines", [])
-            if hasattr(instance_details, "__await__"):
-                self.logger.debug("Provider returned awaitable instances result, awaiting it")
-                instance_details = await instance_details
-            if not instance_details:
-                self.logger.info("No instances found for request %s", request.request_id)
-                return [], result.metadata or {}
-
-            # Create machine aggregates from instance details
-            machines = []
-            for instance_data in instance_details:
-                self.logger.debug("instance_data: %s", instance_data)
-                machine = self._create_machine_from_aws_data(instance_data, request)
-                machines.append(machine)
-
-            # Batch save machines for efficiency
-            if machines:
-                with self.uow_factory.create_unit_of_work() as uow:
-                    # Save each machine individually
-                    for machine in machines:
-                        uow.machines.save(machine)
-
-                    # Publish events for all machines
-                    for machine in machines:
-                        events = machine.get_domain_events()
-                        for event in events:
-                            self.event_publisher.publish(event)
-                        machine.clear_domain_events()
-
-                self.logger.info(
-                    "Created and saved %s machines for request %s",
-                    len(machines),
-                    request.request_id,
-                )
-
-            return machines, result.metadata or {}
-
-        except Exception as e:
-            self.logger.exception(
-                "Failed to fetch provider machines: %s", e, exc_info=True
-            )
-            return [], {}
-
     def _normalize_provider_entry(self, entry: Any) -> dict[str, Any]:
         """Normalize provider entry (dict or DomainMachine) to a common shape.
 
@@ -504,7 +393,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             self.logger.warning("Failed to update machine status from AWS: %s", e)
             return machines, {}
 
-    async def _update_asg_metadata_if_needed(self, request, machines):
+    # Provider Registry methods removed - use Provider Registry directly instead
         """Update ASG-specific metadata when capacity changes are detected."""
         try:
             from datetime import datetime
@@ -565,9 +454,6 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                     }
                 )
 
-                # Save to database
-                with self.uow_factory.create_unit_of_work() as uow:
-                    uow.requests.save(updated_request)
 
                 action = "Initialized" if first_time_tracking else "Updated"
                 self.logger.info(
