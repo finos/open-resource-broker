@@ -123,11 +123,9 @@ def create_aws_resolver() -> Any:
         AWS template resolver instance
     """
     try:
-        from providers.aws.infrastructure.template.caching_ami_resolver import (
-            CachingAMIResolver,
-        )
-
-        return CachingAMIResolver()
+        # Image resolution now handled by generic service
+        # Return None to indicate no legacy resolver needed
+        return None
     except ImportError:
         # AWS resolver not available, return None
         return None
@@ -450,15 +448,10 @@ def register_aws_services_with_di(container) -> None:
             logger.debug("AWS Machine Adapter registered with DI container")
 
         # Register AWS-specific utility services only
-        from domain.base.ports.template_resolver_port import TemplateResolverPort
         from providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
-        from providers.aws.infrastructure.template.caching_ami_resolver import CachingAMIResolver
 
-        # Register AMI resolver if not already registered
-        if not container.is_registered(CachingAMIResolver):
-            container.register_singleton(CachingAMIResolver)
-            container.register_singleton(TemplateResolverPort, lambda c: c.get(CachingAMIResolver))
-            logger.debug("AWS AMI resolver registered with DI container")
+        # Image resolution now handled by generic service in provider strategy
+        # No need for separate AMI resolver registration
 
         # Register AWS Launch Template Manager if not already registered
         if not container.is_registered(AWSLaunchTemplateManager):

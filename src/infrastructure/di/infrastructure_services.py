@@ -8,9 +8,6 @@ from domain.template.repository import TemplateRepository
 from infrastructure.di.container import DIContainer
 from infrastructure.logging.logger import get_logger
 from infrastructure.template.configuration_manager import TemplateConfigurationManager
-from providers.aws.infrastructure.template.caching_ami_resolver import (
-    CachingAMIResolver,
-)
 
 
 def register_infrastructure_services(container: DIContainer) -> None:
@@ -119,17 +116,10 @@ def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
 
                     # Check if AMI resolution is enabled
                     if aws_extension_config and aws_extension_config.ami_resolution.enabled:
-                        container.register_singleton(CachingAMIResolver)
-                        # Register interface to resolve to concrete implementation
-                        from domain.base.ports.template_resolver_port import (
-                            TemplateResolverPort,
-                        )
-
-                        container.register_singleton(
-                            TemplateResolverPort, lambda c: c.get(CachingAMIResolver)
-                        )
+                        # AMI resolution now handled by generic image resolution service
+                        # No need for separate template resolver registration
                         logger.info(
-                            "AMI resolver registered - AMI resolution enabled in AWS extensions"
+                            "Image resolution enabled in AWS extensions - using generic service"
                         )
                         return
 
@@ -154,12 +144,9 @@ def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
                                     TemplateResolverPort,
                                 )
 
-                                container.register_singleton(
-                                    TemplateResolverPort,
-                                    lambda c: c.get(CachingAMIResolver),
-                                )
+                                # Image resolution now handled by generic service
                                 logger.info(
-                                    "AMI resolver registered - enabled in AWS provider instance: %s",
+                                    "Image resolution enabled in AWS provider instance: %s",
                                     provider.name,
                                 )
                                 return
@@ -170,21 +157,13 @@ def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
                                 e,
                             )
 
-            # Default: register with default AWS extension config
+            # Default: use generic image resolution service
             default_aws_config = TemplateExtensionRegistry.create_extension_config("aws", {})
             if default_aws_config and default_aws_config.ami_resolution.enabled:
-                container.register_singleton(CachingAMIResolver)
-                # Register interface to resolve to concrete implementation
-                from domain.base.ports.template_resolver_port import (
-                    TemplateResolverPort,
-                )
-
-                container.register_singleton(
-                    TemplateResolverPort, lambda c: c.get(CachingAMIResolver)
-                )
-                logger.info("AMI resolver registered with default AWS extension configuration")
+                # Image resolution now handled by generic service
+                logger.info("Image resolution enabled with default AWS extension configuration")
             else:
-                logger.debug("AMI resolution disabled in default AWS configuration")
+                logger.debug("Image resolution disabled in default AWS configuration")
 
         except Exception as e:
             logger.warning("Could not determine AMI resolution configuration: %s", e)
