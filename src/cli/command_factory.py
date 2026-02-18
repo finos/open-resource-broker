@@ -9,6 +9,7 @@ from application.dto.commands import (
     UpdateRequestStatusCommand,
 )
 from application.dto.queries import (
+    GetConfigurationQuery,
     GetMachineQuery,
     GetRequestQuery,
     GetTemplateQuery,
@@ -33,7 +34,7 @@ from application.template.commands import (
     UpdateTemplateCommand,
     ValidateTemplateCommand,
 )
-from application.commands.system import ReloadProviderConfigCommand, TestStorageCommand, MCPValidateCommand
+from application.commands.system import ReloadProviderConfigCommand, TestStorageCommand, MCPValidateCommand, RefreshTemplatesCommand, SetConfigurationCommand
 from application.queries.system import (
     GetSystemStatusQuery,
     GetProviderConfigQuery,
@@ -432,9 +433,8 @@ class CLICommandFactory:
         self,
         provider_name: Optional[str] = None,
         **kwargs: Any,
-    ) -> "RefreshTemplatesCommand":
+    ) -> RefreshTemplatesCommand:
         """Create command to refresh templates."""
-        from application.commands.system import RefreshTemplatesCommand
         return RefreshTemplatesCommand(provider_name=provider_name)
 
     def create_get_system_status_query(
@@ -1128,7 +1128,6 @@ class CLICommandFactory:
         **kwargs: Any,
     ) -> GetConfigurationQuery:
         """Create query to get configuration value."""
-        from application.dto.queries import GetConfigurationQuery
         return GetConfigurationQuery(key=key, default=default)
 
     def create_set_configuration_command(
@@ -1138,7 +1137,6 @@ class CLICommandFactory:
         **kwargs: Any,
     ) -> SetConfigurationCommand:
         """Create command to set configuration value."""
-        from application.commands.system import SetConfigurationCommand
         return SetConfigurationCommand(key=key, value=value)
 
 
