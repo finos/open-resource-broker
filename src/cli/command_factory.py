@@ -303,16 +303,20 @@ class CLICommandFactory:
         offset: int = 0,
         filter_expressions: Optional[List[str]] = None,
         provider_name: Optional[str] = None,
+        provider: Optional[str] = None,  # CLI compatibility
         **kwargs: Any,
     ) -> ListRequestsQuery:
         """Create query to list requests."""
+        # Use provider if provider_name not specified (CLI compatibility)
+        effective_provider = provider_name or provider
+        
         return ListRequestsQuery(
             status=status,
             template_id=template_id,
             limit=limit,
             offset=offset,
             filter_expressions=filter_expressions or [],
-            provider_name=provider_name,
+            provider_name=effective_provider,
         )
 
     def create_cancel_request_command(
@@ -383,20 +387,16 @@ class CLICommandFactory:
         limit: int = 50,
         offset: int = 0,
         provider_name: Optional[str] = None,
+        provider: Optional[str] = None,  # CLI compatibility
         all_resources: bool = False,
         **kwargs: Any,
     ) -> ListMachinesQuery:
         """Create query to list machines."""
-        filters = {}
-        if status:
-            filters["status"] = status
-        if template_id:
-            filters["template_id"] = template_id
-        if request_id:
-            filters["request_id"] = request_id
-
+        # Use provider if provider_name not specified (CLI compatibility)
+        effective_provider = provider_name or provider
+        
         return ListMachinesQuery(
-            provider_name=provider_name,
+            provider_name=effective_provider,
             template_id=template_id,
             status=status,
             request_id=request_id,

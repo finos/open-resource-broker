@@ -364,13 +364,12 @@ class TemplateConfigurationManager:
             resolved_templates.append(resolved_template)
         return resolved_templates
 
-    async def _batch_resolve_amis(
+    async def _batch_resolve_images(
         self, template_dicts: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
-        """Batch resolve AMI IDs from SSM parameters using provider registry."""
+        """Batch resolve image IDs from specifications using provider registry."""
         try:
-            # Check if AMI resolution is enabled
-            if not self._is_ami_resolution_enabled():
+            if not self._is_image_resolution_enabled():
                 return template_dicts
 
             # Group templates by provider instance
@@ -378,29 +377,23 @@ class TemplateConfigurationManager:
 
             resolved_templates = []
             for provider_instance, templates in templates_by_provider.items():
-                # Collect SSM parameters for this provider
-                ssm_parameters = self._extract_ssm_parameters(templates)
+                # Collect image specifications for this provider
+                image_specifications = self._extract_image_specifications(templates)
 
-                if ssm_parameters:
-                    # Use provider registry to execute AMI resolution
-                    resolved_amis = await self._resolve_amis_via_provider(
-                        provider_instance, ssm_parameters
+                if image_specifications:
+                    # Use provider registry to execute image resolution
+                    resolved_images = await self._resolve_images_via_provider(
+                        provider_instance, image_specifications
                     )
-                    # Apply resolved AMIs to templates
-                    templates = self._apply_resolved_amis(templates, resolved_amis)
+                    # Apply resolved images to templates
+                    templates = self._apply_resolved_images(templates, resolved_images)
 
                 resolved_templates.extend(templates)
 
-            self.logger.info(
-                "Batch resolved AMI parameters for %s templates across %s providers",
-                len(template_dicts),
-                len(templates_by_provider),
-            )
             return resolved_templates
-
         except Exception as e:
-            self.logger.error("Batch AMI resolution failed: %s", e)
-            return template_dicts  # Return original on error
+            self.logger.error("Batch image resolution failed: %s", str(e))
+            return template_dicts  # Return original templates on failure
 
     def _group_templates_by_provider(
         self, template_dicts: list[dict[str, Any]]
@@ -414,17 +407,19 @@ class TemplateConfigurationManager:
             templates_by_provider[provider_instance].append(template_dict)
         return templates_by_provider
 
-    def _extract_ssm_parameters(self, templates: list[dict[str, Any]]) -> list[str]:
-        """Extract unique SSM parameters from templates."""
-        ssm_parameters = set()
-        for template_dict in templates:
-            image_id = template_dict.get("image_id") or template_dict.get("imageId")
-            if image_id and image_id.startswith("/aws/service/"):
-                ssm_parameters.add(image_id)
-        return list(ssm_parameters)
+    def _extract_image_specifications(self, templates: list[dict]) -> list[str]:
+        """Extract image specifications from templates."""
+        specifications = []
+        for template in templates:
+            # Look for image specifications in various template fields
+            if "image_id" in template and template["image_id"]:
+                specifications.append(template["image_id"])
+            if "ami_id" in template and template["ami_id"]:  # Legacy support
+                specifications.append(template["ami_id"])
+        return list(set(specifications))  # Remove duplicates
 
-    def _is_ami_resolution_enabled(self) -> bool:
-        """Check if AMI resolution is enabled via configuration."""
+    def _is_image_resolution_enabled(self) -> bool:
+        """Check if image resolution is enabled via configuration."""
         try:
             # Check the AMI resolution config setting
             from providers.aws.configuration.template_extension import AMIResolutionConfig
@@ -433,21 +428,18 @@ class TemplateConfigurationManager:
             return ami_config.enabled
 
         except Exception as e:
-            self.logger.debug("Could not get AMI resolution config: %s", e)
+            self.logger.debug("Could not get image resolution config: %s", e)
             # Default to enabled if config not available
             return True
 
-        except Exception as e:
-            self.logger.debug("Could not determine AMI resolution status: %s", e)
-            # Default to enabled for backward compatibility
-            return True
-
-    async def _resolve_amis_via_provider(
-        self, provider_instance: str, ssm_parameters: list[str]
+    async def _resolve_images_via_provider(
+        self, provider_instance: str, image_specifications: list[str]
     ) -> dict[str, str]:
-        """Resolve AMI parameters using provider registry service."""
+        """Resolve images using provider strategy."""
         if not self.provider_registry_service:
-            self.logger.debug("Provider registry service not available, skipping AMI resolution")
+            self.logger.debug(
+                "Provider registry service not available, skipping image resolution"
+            )
             return {}
 
         try:
@@ -455,7 +447,7 @@ class TemplateConfigurationManager:
 
             operation = ProviderOperation(
                 operation_type=ProviderOperationType.RESOLVE_IMAGE,
-                parameters={"image_specifications": ssm_parameters},
+                parameters={"image_specifications": image_specifications},
             )
 
             result = await self.provider_registry_service.execute_operation(
@@ -463,35 +455,31 @@ class TemplateConfigurationManager:
             )
 
             if result.success and result.data:
-                return result.data.get("resolved_amis", {})
+                return result.data.get("resolved_images", {})
             else:
                 self.logger.warning(
-                    "AMI resolution failed for provider %s: %s",
+                    "Image resolution failed for provider %s: %s",
                     provider_instance,
                     result.error_message,
                 )
                 return {}
 
         except Exception as e:
-            self.logger.warning("AMI resolution failed for provider %s: %s", provider_instance, e)
+            self.logger.warning(
+                "Image resolution failed for provider %s: %s", provider_instance, e
+            )
             return {}
 
-    def _apply_resolved_amis(
-        self, templates: list[dict[str, Any]], resolved_amis: dict[str, str]
-    ) -> list[dict[str, Any]]:
-        """Apply resolved AMI IDs to templates."""
-        resolved_templates = []
-        for template_dict in templates:
-            resolved_template = template_dict.copy()
-
-            image_id = resolved_template.get("image_id") or resolved_template.get("imageId")
-            if image_id and image_id in resolved_amis:
-                resolved_ami = resolved_amis[image_id]
-                resolved_template["image_id"] = resolved_ami
-                if "imageId" in resolved_template:
-                    resolved_template["imageId"] = resolved_ami
-
-            resolved_templates.append(resolved_template)
+    def _apply_resolved_images(
+        self, templates: list[dict], resolved_images: dict[str, str]
+    ) -> list[dict]:
+        """Apply resolved image IDs to templates."""
+        for template in templates:
+            if "image_id" in template and template["image_id"] in resolved_images:
+                template["image_id"] = resolved_images[template["image_id"]]
+            if "ami_id" in template and template["ami_id"] in resolved_images:  # Legacy support
+                template["ami_id"] = resolved_images[template["ami_id"]]
+        return templates
 
         return resolved_templates
 

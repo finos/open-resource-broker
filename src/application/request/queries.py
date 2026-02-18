@@ -8,6 +8,7 @@ from application.dto.base import BaseQuery
 class ListRequestsQuery(BaseQuery):
     """Query to list requests with optional filtering."""
 
+    provider_name: Optional[str] = None
     status: Optional[str] = None
     template_id: Optional[str] = None
     limit: int = 50
