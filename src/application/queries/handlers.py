@@ -1073,6 +1073,7 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
                     "template_id": template_id,
                     "success": False,
                     "valid": False,
+                    "message": f"Failed to load template: {e}",
                     "error": f"Failed to load template: {e}",
                 }
 
@@ -1099,10 +1100,20 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
                     "Template validation passed for %s", template_id or "file-template"
                 )
 
+            success = len(validation_errors) == 0
+            message = (
+                "Template validation passed"
+                if success
+                else f"Template validation failed: {', '.join(validation_errors)}"
+                if validation_errors
+                else "Template validation failed"
+            )
+
             return {
                 "template_id": template_id or template_config.get("template_id", "file-template"),
-                "success": len(validation_errors) == 0,
-                "valid": len(validation_errors) == 0,
+                "success": success,
+                "valid": success,
+                "message": message,
                 "validation_errors": validation_errors,
                 "configuration": template_config,
             }
@@ -1111,11 +1122,13 @@ class ValidateTemplateHandler(BaseQueryHandler[ValidateTemplateQuery, Validation
             self.logger.error(
                 "Template validation failed for %s: %s", template_id or "file-template", e
             )
+            validation_errors = [f"Validation error: {e!s}"]
             return {
                 "template_id": template_id or template_config.get("template_id", "file-template"),
                 "success": False,
                 "valid": False,
-                "validation_errors": [f"Validation error: {e!s}"],
+                "message": f"Template validation failed: {validation_errors[0]}",
+                "validation_errors": validation_errors,
                 "configuration": template_config,
             }
 

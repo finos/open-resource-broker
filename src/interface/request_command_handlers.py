@@ -350,4 +350,30 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> dict[str
     )
 
     result = await command_bus.execute(command)
-    return {"result": result, "message": "Return request created successfully"}
+
+    # Handle both old format (string) and new format (dict) for backward compatibility
+    if isinstance(result, dict):
+        # New detailed format
+        request_id = result.get("request_id")
+        summary = result.get("summary", "")
+        skipped_machines = result.get("skipped_machines", [])
+        processed_machines = result.get("processed_machines", [])
+
+        message = f"Return request created successfully. {summary}"
+
+        # Add details about skipped machines if any
+        if skipped_machines:
+            skipped_details = []
+            for skipped in skipped_machines:
+                skipped_details.append(f"{skipped['machine_id']}: {skipped['reason']}")
+            message += f"\nSkipped machines: {'; '.join(skipped_details)}"
+
+        return {
+            "result": request_id,
+            "message": message,
+            "processed_count": len(processed_machines),
+            "skipped_count": len(skipped_machines),
+        }
+    else:
+        # Old format (string) - maintain backward compatibility
+        return {"result": result, "message": "Return request created successfully"}

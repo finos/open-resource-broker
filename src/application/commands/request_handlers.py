@@ -193,7 +193,7 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
 
 
 @command_handler(CreateReturnRequestCommand)
-class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, str]):
+class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, dict[str, Any]]):
     """Handler for creating return requests."""
 
     def __init__(
@@ -218,24 +218,75 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         if not command.machine_ids:
             raise ValueError("machine_ids is required and cannot be empty")
 
-        # Validate machines exist and don't already have return requests
+        # For single machine operations, maintain strict validation (existing behavior)
+        # For multiple machines (--all operations), filter invalid machines
+        is_single_machine = len(command.machine_ids) == 1
+
+        valid_machine_ids = []
+        skipped_machines = []
+
         with self.uow_factory.create_unit_of_work() as uow:
             for machine_id in command.machine_ids:
                 machine = uow.machines.get_by_id(machine_id)
                 if not machine:
-                    from domain.base.exceptions import EntityNotFoundError
+                    if is_single_machine:
+                        from domain.base.exceptions import EntityNotFoundError
 
-                    raise EntityNotFoundError("Machine", machine_id)
+                        raise EntityNotFoundError("Machine", machine_id)
+                    else:
+                        skipped_machines.append(
+                            {"machine_id": machine_id, "reason": "Machine not found"}
+                        )
+                        continue
+
                 if machine.return_request_id:
-                    from domain.request.exceptions import RequestValidationError
+                    if is_single_machine:
+                        from domain.request.exceptions import RequestValidationError
 
-                    raise RequestValidationError(
-                        f"Machine {machine_id} already has pending return request: {machine.return_request_id}"
-                    )
+                        raise RequestValidationError(
+                            f"Machine {machine_id} already has pending return request: {machine.return_request_id}"
+                        )
+                    else:
+                        skipped_machines.append(
+                            {
+                                "machine_id": machine_id,
+                                "reason": f"Machine already has pending return request: {machine.return_request_id}",
+                            }
+                        )
+                        continue
 
-    async def execute_command(self, command: CreateReturnRequestCommand) -> str:
+                valid_machine_ids.append(machine_id)
+
+        # Update command with only valid machines
+        command.machine_ids = valid_machine_ids
+
+        # Store validation results for reporting
+        self._validation_results = {
+            "valid_machines": valid_machine_ids,
+            "skipped_machines": skipped_machines,
+        }
+
+    async def execute_command(self, command: CreateReturnRequestCommand) -> dict[str, Any]:
         """Handle return request creation command."""
         self.logger.info("Creating return request for machines: %s", command.machine_ids)
+
+        # Get validation results from validate_command
+        validation_results = getattr(
+            self,
+            "_validation_results",
+            {"valid_machines": command.machine_ids, "skipped_machines": []},
+        )
+
+        # If no valid machines remain after filtering, return early with detailed info
+        if not command.machine_ids:
+            return {
+                "status": "completed",
+                "request_id": None,
+                "message": "No valid machines to process",
+                "processed_machines": [],
+                "skipped_machines": validation_results["skipped_machines"],
+                "summary": f"Skipped {len(validation_results['skipped_machines'])} machines, processed 0 machines",
+            }
 
         try:
             from collections import defaultdict
@@ -364,8 +415,18 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                     except Exception as update_error:
                         self.logger.error("Failed to update request status: %s", update_error)
 
-            # Return first request ID for backward compatibility
-            return created_requests[0] if created_requests else None
+            # Return detailed results with backward compatibility
+            processed_count = len(validation_results["valid_machines"])
+            skipped_count = len(validation_results["skipped_machines"])
+
+            return {
+                "status": "completed",
+                "request_id": created_requests[0] if created_requests else None,
+                "message": "Return request processed successfully",
+                "processed_machines": validation_results["valid_machines"],
+                "skipped_machines": validation_results["skipped_machines"],
+                "summary": f"Skipped {skipped_count} machines, processed {processed_count} machines",
+            }
 
         except Exception as e:
             self.logger.error("Failed to create return request: %s", e)
