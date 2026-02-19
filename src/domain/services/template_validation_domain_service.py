@@ -13,6 +13,12 @@ class TemplateValidationDomainService:
     def __init__(self, config: ConfigurationPort, logger: LoggingPort):
         self._config = config
         self._logger = logger
+        self._initialized = False
+
+    def _ensure_initialized(self):
+        """Lazy initialization to avoid circular dependency during DI container setup."""
+        if not self._initialized:
+            self._initialized = True
 
     def validate_template_requirements(
         self,
@@ -21,6 +27,8 @@ class TemplateValidationDomainService:
         validation_level: ValidationLevel = ValidationLevel.STRICT,
     ) -> ValidationResult:
         """Business logic for template validation."""
+        self._ensure_initialized()
+        
         result = ValidationResult(
             is_valid=True,
             errors=[],
@@ -63,6 +71,8 @@ class TemplateValidationDomainService:
 
     def _get_config_based_capabilities(self, provider_instance: str) -> Any:
         """Get capabilities from merged provider configuration."""
+        self._ensure_initialized()
+        
         if not self._config:
             raise ValueError("No configuration manager available")
 

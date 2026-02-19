@@ -15,21 +15,21 @@ from domain.base.ports.logging_port import LoggingPort
 def register_domain_services(container: DIContainer) -> None:
     """Register domain services in the DI container."""
 
-    # Provider selection domain service
-    container.register_singleton(
-        ProviderSelectionService,
-        lambda c: ProviderSelectionService(
-            config=c.get(ConfigurationPort), logger=c.get(LoggingPort)
-        ),
-    )
+    # Provider selection domain service - lazy initialization
+    def create_provider_selection_service(c):
+        config = c.get(ConfigurationPort)
+        logger = c.get(LoggingPort)
+        return ProviderSelectionService(config, logger)
+    
+    container.register_singleton(ProviderSelectionService, create_provider_selection_service)
 
-    # Template validation domain service
-    container.register_singleton(
-        TemplateValidationDomainService,
-        lambda c: TemplateValidationDomainService(
-            config=c.get(ConfigurationPort), logger=c.get(LoggingPort)
-        ),
-    )
+    # Template validation domain service - lazy initialization
+    def create_template_validation_service(c):
+        config = c.get(ConfigurationPort)
+        logger = c.get(LoggingPort)
+        return TemplateValidationDomainService(config, logger)
+    
+    container.register_singleton(TemplateValidationDomainService, create_template_validation_service)
 
     # Timestamp service
     container.register_singleton(TimestampService, lambda c: ISOTimestampService())

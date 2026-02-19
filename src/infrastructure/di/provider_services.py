@@ -24,26 +24,23 @@ def _register_application_services(container: DIContainer) -> None:
     from domain.base.ports.logging_port import LoggingPort
     from providers.registry import get_provider_registry
 
-    # Enhanced provider registry service
-    container.register_singleton(
-        ProviderRegistryService,
-        lambda c: ProviderRegistryService(
-            registry=get_provider_registry(),
-            validation_service=c.get(TemplateValidationDomainService),
-            selection_service=c.get(ProviderSelectionService),
-            logger=c.get(LoggingPort),
-        ),
-    )
+    # Enhanced provider registry service - lazy initialization
+    def create_provider_registry_service(c):
+        registry = get_provider_registry()  # This is safe - no DI dependencies
+        validation_service = c.get(TemplateValidationDomainService)
+        selection_service = c.get(ProviderSelectionService)
+        logger = c.get(LoggingPort)
+        return ProviderRegistryService(registry, validation_service, selection_service, logger)
+    
+    container.register_singleton(ProviderRegistryService, create_provider_registry_service)
 
-    # Machine sync service
-    container.register_singleton(
-        MachineSyncService,
-        lambda c: MachineSyncService(
-            command_bus=c.get(CommandBus),
-            container=c,
-            logger=c.get(LoggingPort),
-        ),
-    )
+    # Machine sync service - lazy initialization
+    def create_machine_sync_service(c):
+        command_bus = c.get(CommandBus)
+        logger = c.get(LoggingPort)
+        return MachineSyncService(command_bus, c, logger)
+    
+    container.register_singleton(MachineSyncService, create_machine_sync_service)
 
 
 def _register_provider_utility_services(container: DIContainer) -> None:

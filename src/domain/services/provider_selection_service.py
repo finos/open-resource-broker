@@ -13,6 +13,12 @@ class ProviderSelectionService:
         self._logger = logger
         self._provider_config = None
         self._active_provider_cache = None
+        self._initialized = False
+
+    def _ensure_initialized(self):
+        """Lazy initialization to avoid circular dependency during DI container setup."""
+        if not self._initialized:
+            self._initialized = True
 
     def select_provider_for_template(self, template: Any) -> Any:
         """
@@ -25,6 +31,8 @@ class ProviderSelectionService:
         4. Auto-selection based on API capabilities (template.provider_api)
         5. Fallback to configuration default
         """
+        self._ensure_initialized()
+        
         if self._logger:
             self._logger.info("Selecting provider for template: %s", template.template_id)
 
@@ -49,6 +57,8 @@ class ProviderSelectionService:
 
     def select_active_provider(self) -> Any:
         """Select active provider instance from configuration."""
+        self._ensure_initialized()
+        
         if self._active_provider_cache is not None:
             return self._active_provider_cache
 
