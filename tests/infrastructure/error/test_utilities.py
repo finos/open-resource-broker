@@ -23,7 +23,7 @@ class TestFormatErrorMessage:
         """Should format simple exception message."""
         error = ValueError("Invalid input")
         result = format_error_message(error)
-        
+
         assert "ValueError: Invalid input" in result
         assert "traceback" not in result.lower()
 
@@ -31,15 +31,15 @@ class TestFormatErrorMessage:
         """Should include traceback when requested."""
         error = ValueError("Invalid input")
         result = format_error_message(error, include_traceback=True)
-        
+
         assert "ValueError: Invalid input" in result
-        assert ("Traceback" in result or "test_formats_with_traceback" in result)
+        assert "Traceback" in result or "test_formats_with_traceback" in result
 
     def test_formats_domain_exception(self):
         """Should format domain exception with error code."""
         error = ValidationError("Invalid field", error_code="INVALID_FIELD")
         result = format_error_message(error)
-        
+
         assert "INVALID_FIELD" in result
         assert "Invalid field" in result
 
@@ -47,7 +47,7 @@ class TestFormatErrorMessage:
         """Should handle exception with None message."""
         error = ValueError(None)
         result = format_error_message(error)
-        
+
         assert "ValueError" in result
 
 
@@ -58,7 +58,7 @@ class TestBuildErrorContext:
         """Should build basic error context."""
         error = ValueError("test error")
         context = build_error_context(error, operation="test_op")
-        
+
         assert context["error_type"] == "ValueError"
         assert context["error_message"] == "test error"
         assert context["operation"] == "test_op"
@@ -68,23 +68,17 @@ class TestBuildErrorContext:
         """Should include additional context from kwargs."""
         error = ValueError("test")
         context = build_error_context(
-            error, 
-            operation="test_op",
-            user_id="123",
-            request_id="req-456"
+            error, operation="test_op", user_id="123", request_id="req-456"
         )
-        
+
         assert context["user_id"] == "123"
         assert context["request_id"] == "req-456"
 
     def test_handles_domain_exception_details(self):
         """Should extract details from domain exceptions."""
-        error = ValidationError(
-            "Invalid field", 
-            details={"field": "email", "value": "invalid"}
-        )
+        error = ValidationError("Invalid field", details={"field": "email", "value": "invalid"})
         context = build_error_context(error, operation="validate")
-        
+
         assert context["error_details"]["field"] == "email"
         assert context["error_details"]["value"] == "invalid"
 
@@ -92,7 +86,7 @@ class TestBuildErrorContext:
         """Should handle exceptions without details attribute."""
         error = ValueError("test")
         context = build_error_context(error, operation="test")
-        
+
         assert "error_details" not in context or context["error_details"] == {}
 
 
@@ -102,7 +96,7 @@ class TestFormatStackTrace:
     def test_formats_current_stack(self):
         """Should format current stack trace."""
         result = format_stack_trace()
-        
+
         assert "test_formats_current_stack" in result
         assert "Current stack trace" in result
 
@@ -112,7 +106,7 @@ class TestFormatStackTrace:
             raise ValueError("test error")
         except ValueError as e:
             result = format_stack_trace(e)
-            
+
             assert "ValueError: test error" in result
             assert "raise ValueError" in result
 
@@ -122,15 +116,15 @@ class TestFormatStackTrace:
             raise ValueError("test")
         except ValueError as e:
             result = format_stack_trace(e, limit=2)
-            lines = result.split('\n')
-            
+            lines = result.split("\n")
+
             # Should have limited number of lines (plus header/footer)
             assert len([l for l in lines if l.strip()]) <= 10
 
     def test_handles_none_exception(self):
         """Should handle None exception gracefully."""
         result = format_stack_trace(None)
-        
+
         assert "Current stack trace" in result
         assert "test_handles_none_exception" in result
 
@@ -142,36 +136,37 @@ class TestGenerateErrorCode:
         """Should generate error code from exception type."""
         error = ValueError("test")
         code = generate_error_code(error)
-        
+
         assert code == "VALUE_ERROR"
 
     def test_generates_from_domain_exception(self):
         """Should use existing error code from domain exception."""
         error = ValidationError("test", error_code="CUSTOM_CODE")
         code = generate_error_code(error)
-        
+
         assert code == "CUSTOM_CODE"
 
     def test_generates_with_prefix(self):
         """Should add prefix when provided."""
         error = ValueError("test")
         code = generate_error_code(error, prefix="API")
-        
+
         assert code == "API_VALUE_ERROR"
 
     def test_handles_nested_exception_names(self):
         """Should handle complex exception class names."""
         error = EntityNotFoundError("test", "test-id")
         code = generate_error_code(error)
-        
+
         assert code == "ENTITY_NOT_FOUND"
 
     def test_generates_fallback_code(self):
         """Should generate fallback for unknown exceptions."""
+
         class CustomError(Exception):
             pass
-        
+
         error = CustomError("test")
         code = generate_error_code(error)
-        
+
         assert code == "CUSTOM_ERROR"

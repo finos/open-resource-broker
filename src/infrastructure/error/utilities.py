@@ -12,40 +12,40 @@ from typing import Any, Optional
 
 def format_error_message(error: Exception, include_traceback: bool = False) -> str:
     """Format error message with optional traceback.
-    
+
     Args:
         error: Exception to format
         include_traceback: Whether to include stack trace
-        
+
     Returns:
         Formatted error message
     """
     error_type = type(error).__name__
     error_msg = str(error) or "No message"
-    
+
     # Include error code for domain exceptions
-    if hasattr(error, 'error_code') and error.error_code:
+    if hasattr(error, "error_code") and error.error_code:
         base_msg = f"{error.error_code}: {error_msg}"
     else:
         base_msg = f"{error_type}: {error_msg}"
-    
+
     if include_traceback:
         tb = traceback.format_exc()
         if tb.strip() == "NoneType: None":
             # No active exception, format current stack instead
             tb = "".join(traceback.format_stack())
         return f"{base_msg}\n\n{tb}"
-    
+
     return base_msg
 
 
 def build_error_context(error: Exception, **kwargs) -> dict[str, Any]:
     """Build error context dictionary.
-    
+
     Args:
         error: Exception to build context for
         **kwargs: Additional context data
-        
+
     Returns:
         Error context dictionary
     """
@@ -53,23 +53,23 @@ def build_error_context(error: Exception, **kwargs) -> dict[str, Any]:
         "error_type": type(error).__name__,
         "error_message": str(error),
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        **kwargs
+        **kwargs,
     }
-    
+
     # Include error details for domain exceptions
-    if hasattr(error, 'details') and error.details:
+    if hasattr(error, "details") and error.details:
         context["error_details"] = error.details
-    
+
     return context
 
 
 def format_stack_trace(error: Optional[Exception] = None, limit: Optional[int] = None) -> str:
     """Format stack trace for debugging.
-    
+
     Args:
         error: Exception to format traceback for, or None for current stack
         limit: Maximum number of stack frames to include
-        
+
     Returns:
         Formatted stack trace
     """
@@ -92,25 +92,26 @@ def format_stack_trace(error: Optional[Exception] = None, limit: Optional[int] =
 
 def generate_error_code(error: Exception, prefix: Optional[str] = None) -> str:
     """Generate consistent error code from exception.
-    
+
     Args:
         error: Exception to generate code for
         prefix: Optional prefix for the error code
-        
+
     Returns:
         Generated error code
     """
     # Use existing error code if available
-    if hasattr(error, 'error_code') and error.error_code:
+    if hasattr(error, "error_code") and error.error_code:
         base_code = error.error_code
     else:
         # Generate from exception type name
         error_type = type(error).__name__
         # Convert CamelCase to UPPER_SNAKE_CASE
         import re
-        base_code = re.sub('([a-z0-9])([A-Z])', r'\1_\2', error_type).upper()
-    
+
+        base_code = re.sub("([a-z0-9])([A-Z])", r"\1_\2", error_type).upper()
+
     if prefix:
         return f"{prefix}_{base_code}"
-    
+
     return base_code
