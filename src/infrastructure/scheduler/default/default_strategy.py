@@ -25,6 +25,8 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
         """Initialize the instance."""
         self._config_manager = None
         self._logger = None
+        # Initialize field mapper
+        self.field_mapper = DefaultFieldMapper()
 
     @property
     def config_manager(self):
@@ -44,9 +46,6 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
             if is_container_ready():
                 self._logger = get_container().get(LoggingPort)
         return self._logger
-
-        # Initialize field mapper
-        self.field_mapper = DefaultFieldMapper()
 
     def get_template_paths(self) -> list[str]:
         """Get template file paths with fallback hierarchy."""

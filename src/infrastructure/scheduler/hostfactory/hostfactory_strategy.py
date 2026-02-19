@@ -25,6 +25,8 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         self._config_manager = None
         self._logger = None
         self._template_defaults_service = None
+        # Initialize field mapper lazily - will be created when first needed
+        self._field_mapper = None
 
     @property
     def config_manager(self):
@@ -53,9 +55,6 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             if is_container_ready():
                 self._template_defaults_service = get_container().get_optional(TemplateDefaultsPort)
         return self._template_defaults_service
-
-        # Initialize field mapper lazily - will be created when first needed
-        self._field_mapper = None
 
     @property
     def field_mapper(self) -> HostFactoryFieldMapper:
