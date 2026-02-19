@@ -210,6 +210,10 @@ class AWSAMIResolver(ImageResolver):
                 if stale_result:
                     return stale_result
 
+            # For unknown aliases, return original reference instead of raising error
+            if self._is_custom_alias(image_reference) and "Unknown AMI alias" in str(e):
+                return image_reference
+
             # No fallback available, re-raise error
             raise ValueError(f"Failed to resolve image reference {image_reference}: {str(e)}")
 

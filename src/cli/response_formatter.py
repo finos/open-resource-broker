@@ -323,8 +323,13 @@ class CLIResponseFormatter:
                             return self.scheduler_strategy.format_request_for_display(data)
 
             elif context == "machines":
+                # Check if this is a machine show command (single machine details)
+                action = getattr(args, "action", None) if args else None
+                if action == "show" and hasattr(self.scheduler_strategy, "format_machine_details_response"):
+                    if isinstance(data, dict) and self._looks_like_machine(data):
+                        return self.scheduler_strategy.format_machine_details_response(data)
                 # Check if this is a machine request creation (single request object)
-                if hasattr(
+                elif hasattr(
                     self.scheduler_strategy, "format_request_response"
                 ) and self._looks_like_single_request(data):
                     return self.scheduler_strategy.format_request_response(data)

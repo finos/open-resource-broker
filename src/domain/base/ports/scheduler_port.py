@@ -62,6 +62,10 @@ class SchedulerPort(ABC):
         """Format MachineDTOs to scheduler response."""
 
     @abstractmethod
+    def format_machine_details_response(self, machine_data: dict) -> dict:
+        """Format machine details for CLI display."""
+
+    @abstractmethod
     def get_storage_base_path(self) -> str:
         """Get storage base path within working directory."""
 
