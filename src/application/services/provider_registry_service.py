@@ -3,6 +3,7 @@
 from typing import Any
 
 from domain.base.ports.logging_port import LoggingPort
+from domain.services.provider_selection_service import ProviderSelectionService
 from domain.services.template_validation_domain_service import TemplateValidationDomainService
 from domain.template.template_aggregate import Template
 from providers.registry import ProviderRegistry
@@ -16,19 +17,21 @@ class ProviderRegistryService:
         self,
         registry: ProviderRegistry,
         validation_service: TemplateValidationDomainService,
+        selection_service: ProviderSelectionService,
         logger: LoggingPort,
     ):
         self._registry = registry
         self._validation_service = validation_service
+        self._selection_service = selection_service
         self._logger = logger
 
     def select_provider_for_template(self, template: Template) -> ProviderSelectionResult:
         """Select provider instance for template requirements."""
-        return self._registry.select_provider_for_template(template)
+        return self._selection_service.select_provider_for_template(template)
 
     def select_active_provider(self) -> ProviderSelectionResult:
         """Select active provider instance from configuration."""
-        return self._registry.select_active_provider()
+        return self._selection_service.select_active_provider()
 
     def validate_template_requirements(
         self, template: Template, provider_instance: str
