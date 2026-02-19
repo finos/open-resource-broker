@@ -206,12 +206,12 @@ class BaseRegistry(ABC):
         with self._registry_lock:
             return list(self._instance_registrations.keys())
 
-    def format_registry_error(self, requested_item: str, registry_type: str) -> str:
-        """Format error message for unregistered registry item.
+    def format_not_registered_error(self, requested_item: str, registry_type: str) -> str:
+        """Format standardized error message for unregistered items.
 
         Args:
             requested_item: The item that was requested
-            registry_type: Type of registry (provider, scheduler, etc.)
+            registry_type: Type of registry (provider, scheduler, storage)
 
         Returns:
             Formatted error message with available options
@@ -231,6 +231,21 @@ class BaseRegistry(ABC):
             parts.append(f"Available {registry_type} instances: {', '.join(available_instances)}")
 
         return ". ".join(parts)
+
+    def format_registry_error(self, requested_item: str, registry_type: str) -> str:
+        """Format error message for unregistered registry item.
+
+        Args:
+            requested_item: The item that was requested
+            registry_type: Type of registry (provider, scheduler, etc.)
+
+        Returns:
+            Formatted error message with available options
+
+        Note:
+            Backward compatibility alias for format_not_registered_error
+        """
+        return self.format_not_registered_error(requested_item, registry_type)
 
     def unregister_type(self, type_name: str) -> bool:
         """Unregister a type."""

@@ -45,6 +45,7 @@ from domain.template.exceptions import (
     TemplateNotFoundError,
     TemplateValidationError,
 )
+from infrastructure.error.exception_type_mapper import ExceptionTypeMapper
 from infrastructure.logging.logger import get_logger
 
 # Import for HTTP error handling delegation
@@ -310,11 +311,14 @@ class ExceptionHandler:
         """Initialize exception handler with optional logger and metrics."""
         self.logger = logger or get_logger(__name__)
         self.metrics = metrics
-        self._handlers: dict[type[Exception], Callable] = {}
+        self._type_mapper = ExceptionTypeMapper()
         self._http_handler: Optional["HTTPErrorResponseHandler"] = None
         self._performance_stats = {"total_handled": 0, "by_type": {}}
         self._lock = threading.Lock()
         self._register_handlers()
+
+        # Backward compatibility: maintain _handlers reference
+        self._handlers = self._type_mapper._handlers
 
     def handle(self, exception: Exception, context: ExceptionContext, **kwargs) -> Exception:
         """
@@ -347,65 +351,53 @@ class ExceptionHandler:
         # Handle with context
         return handler(exception, context, **kwargs)
 
-    @lru_cache(maxsize=128)
     def _get_handler(self, exception_type: type[Exception]) -> Callable:
         """
         Find the most specific handler for this exception type.
 
-        Uses Method Resolution Order (MRO) to find the best match.
-        Cached for performance.
+        Uses ExceptionTypeMapper with Method Resolution Order (MRO) to find the best match.
         """
-        # 1. Check for exact type match first
-        if exception_type in self._handlers:
-            return self._handlers[exception_type]
-
-        # 2. Walk up inheritance hierarchy (MRO)
-        for parent_type in exception_type.__mro__[1:]:  # Skip self
-            if parent_type in self._handlers:
-                return self._handlers[parent_type]
-
-        # 3. Fall back to generic handler
-        return self._handle_generic_exception
+        return self._type_mapper.get_handler(exception_type, self._handle_generic_exception)
 
     def _register_handlers(self) -> None:
-        """Register handlers for different exception types."""
+        """Register handlers for different exception types using ExceptionTypeMapper."""
 
         # DOMAIN EXCEPTIONS - Preserve with rich logging
-        self._handlers[DomainException] = self._preserve_domain_exception
-        self._handlers[ValidationError] = self._preserve_validation_exception
-        self._handlers[EntityNotFoundError] = self._preserve_entity_not_found
-        self._handlers[BusinessRuleViolationError] = self._preserve_business_rule_violation
+        self._type_mapper.register_handler(DomainException, self._preserve_domain_exception)
+        self._type_mapper.register_handler(ValidationError, self._preserve_validation_exception)
+        self._type_mapper.register_handler(EntityNotFoundError, self._preserve_entity_not_found)
+        self._type_mapper.register_handler(BusinessRuleViolationError, self._preserve_business_rule_violation)
 
         # TEMPLATE EXCEPTIONS - Preserve with template context
-        self._handlers[TemplateException] = self._preserve_template_exception
-        self._handlers[TemplateNotFoundError] = self._preserve_template_not_found
-        self._handlers[TemplateValidationError] = self._preserve_template_validation
+        self._type_mapper.register_handler(TemplateException, self._preserve_template_exception)
+        self._type_mapper.register_handler(TemplateNotFoundError, self._preserve_template_not_found)
+        self._type_mapper.register_handler(TemplateValidationError, self._preserve_template_validation)
 
         # MACHINE EXCEPTIONS - Preserve with machine context
-        self._handlers[MachineException] = self._preserve_machine_exception
-        self._handlers[MachineNotFoundError] = self._preserve_machine_not_found
-        self._handlers[MachineValidationError] = self._preserve_machine_validation
+        self._type_mapper.register_handler(MachineException, self._preserve_machine_exception)
+        self._type_mapper.register_handler(MachineNotFoundError, self._preserve_machine_not_found)
+        self._type_mapper.register_handler(MachineValidationError, self._preserve_machine_validation)
 
         # REQUEST EXCEPTIONS - Preserve with request context
-        self._handlers[RequestException] = self._preserve_request_exception
-        self._handlers[RequestNotFoundError] = self._preserve_request_not_found
-        self._handlers[RequestValidationError] = self._preserve_request_validation
+        self._type_mapper.register_handler(RequestException, self._preserve_request_exception)
+        self._type_mapper.register_handler(RequestNotFoundError, self._preserve_request_not_found)
+        self._type_mapper.register_handler(RequestValidationError, self._preserve_request_validation)
 
         # AWS EXCEPTIONS - Handle dynamically
         # AWS exceptions will be handled by the generic provider exception handler
 
         # INFRASTRUCTURE EXCEPTIONS - Preserve with infrastructure context
-        self._handlers[InfrastructureError] = self._preserve_infrastructure_exception
-        self._handlers[ConfigurationError] = self._preserve_configuration_exception
+        self._type_mapper.register_handler(InfrastructureError, self._preserve_infrastructure_exception)
+        self._type_mapper.register_handler(ConfigurationError, self._preserve_configuration_exception)
 
         # PYTHON BUILT-IN EXCEPTIONS - Wrap appropriately
-        self._handlers[json.JSONDecodeError] = self._wrap_json_decode_error
-        self._handlers[ConnectionError] = self._wrap_connection_error
-        self._handlers[FileNotFoundError] = self._wrap_file_not_found_error
-        self._handlers[ValueError] = self._wrap_value_error
-        self._handlers[KeyError] = self._wrap_key_error
-        self._handlers[TypeError] = self._wrap_type_error
-        self._handlers[AttributeError] = self._wrap_attribute_error
+        self._type_mapper.register_handler(json.JSONDecodeError, self._wrap_json_decode_error)
+        self._type_mapper.register_handler(ConnectionError, self._wrap_connection_error)
+        self._type_mapper.register_handler(FileNotFoundError, self._wrap_file_not_found_error)
+        self._type_mapper.register_handler(ValueError, self._wrap_value_error)
+        self._type_mapper.register_handler(KeyError, self._wrap_key_error)
+        self._type_mapper.register_handler(TypeError, self._wrap_type_error)
+        self._type_mapper.register_handler(AttributeError, self._wrap_attribute_error)
 
     # DOMAIN EXCEPTION HANDLERS (PRESERVE)
 
