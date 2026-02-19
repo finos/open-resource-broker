@@ -345,11 +345,8 @@ class CLICommandFactoryOrchestrator:
         # Machine operations
         elif command_group in ["machines", "machine"]:
             if command_action == "list":
-                return self.create_list_machines_query(
-                    provider=args.get("provider"),
-                    status=args.get("status"),
-                    request_id=args.get("request_id"),
-                )
+                # Return None to trigger fallback to scheduler-aware handler
+                return None
             elif command_action == "show":
                 return self.create_get_machine_query(machine_id=args.get("machine_id"))
             elif command_action == "request":

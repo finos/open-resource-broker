@@ -74,3 +74,42 @@ async def handle_get_machine_status(args: "argparse.Namespace") -> dict[str, Any
 
         # Format response using scheduler strategy
         return scheduler_strategy.format_machine_status_response(machine_dtos)
+
+
+@handle_interface_exceptions(context="list_machines", interface_type="cli")
+async def handle_list_machines(args: "argparse.Namespace") -> dict[str, Any]:
+    """
+    Handle list machines operations with scheduler-aware formatting.
+
+    Args:
+        args: Argument namespace with filtering options
+
+    Returns:
+        Machines list formatted for scheduler compatibility
+    """
+    container = get_container()
+    query_bus = container.get(QueryBus)
+    scheduler_strategy = container.get(SchedulerPort)
+
+    from application.dto.queries import ListMachinesQuery
+    from application.dto.responses import MachineDTO
+
+    # Create query with filters from args
+    query = ListMachinesQuery(
+        provider_name=getattr(args, "provider", None),
+        status=getattr(args, "status", None),
+        request_id=getattr(args, "request_id", None) or getattr(args, "template_id", None),
+    )
+
+    # Execute query to get machine dictionaries
+    machine_dicts = await query_bus.execute(query)
+
+    # Convert dictionaries back to MachineDTO objects for scheduler formatting
+    machine_dtos = []
+    for machine_dict in machine_dicts:
+        # Create MachineDTO from dictionary
+        machine_dto = MachineDTO(**machine_dict)
+        machine_dtos.append(machine_dto)
+
+    # Format response using scheduler strategy for proper field mapping
+    return scheduler_strategy.format_machine_status_response(machine_dtos)

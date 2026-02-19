@@ -912,6 +912,13 @@ async def execute_command(args, app, resource_parsers) -> Union[str, tuple[str, 
                 from interface.request_command_handlers import handle_get_request_status
 
                 result = await handle_get_request_status(args)
+            # Handle machines list with scheduler-aware formatting
+            elif (
+                hasattr(args, "resource") and args.resource == "machines" and args.action == "list"
+            ):
+                from interface.machine_command_handlers import handle_list_machines
+
+                result = await handle_list_machines(args)
             else:
                 raise ValueError(f"Unknown command: {args.resource} {args.action}")
         else:
