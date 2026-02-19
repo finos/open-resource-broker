@@ -1,6 +1,6 @@
 """CLI command factory orchestrator for coordinating focused command factories."""
 
-from typing import Any, Union
+from typing import Any
 
 from .template_command_factory import TemplateCommandFactory
 from .request_command_factory import RequestCommandFactory
@@ -452,7 +452,7 @@ class CLICommandFactoryOrchestrator:
                 )
 
         # Infrastructure operations
-        elif command_group == "infrastructure" or command_group == "infra":
+        elif command_group in {"infrastructure", "infra"}:
             if command_action == "discover":
                 return self.create_infrastructure_command_data(
                     "discover", **{k: v for k, v in args.items() if k != "action"}

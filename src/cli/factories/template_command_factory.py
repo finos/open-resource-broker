@@ -2,7 +2,6 @@
 
 from typing import Any, Optional
 
-from application.dto.commands import CreateRequestCommand
 from application.dto.queries import GetTemplateQuery, ListTemplatesQuery
 from application.dto.bulk_queries import GetMultipleTemplatesQuery
 from application.template.commands import (
