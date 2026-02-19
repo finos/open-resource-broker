@@ -366,29 +366,41 @@ class ExceptionHandler:
         self._type_mapper.register_handler(DomainException, self._preserve_domain_exception)
         self._type_mapper.register_handler(ValidationError, self._preserve_validation_exception)
         self._type_mapper.register_handler(EntityNotFoundError, self._preserve_entity_not_found)
-        self._type_mapper.register_handler(BusinessRuleViolationError, self._preserve_business_rule_violation)
+        self._type_mapper.register_handler(
+            BusinessRuleViolationError, self._preserve_business_rule_violation
+        )
 
         # TEMPLATE EXCEPTIONS - Preserve with template context
         self._type_mapper.register_handler(TemplateException, self._preserve_template_exception)
         self._type_mapper.register_handler(TemplateNotFoundError, self._preserve_template_not_found)
-        self._type_mapper.register_handler(TemplateValidationError, self._preserve_template_validation)
+        self._type_mapper.register_handler(
+            TemplateValidationError, self._preserve_template_validation
+        )
 
         # MACHINE EXCEPTIONS - Preserve with machine context
         self._type_mapper.register_handler(MachineException, self._preserve_machine_exception)
         self._type_mapper.register_handler(MachineNotFoundError, self._preserve_machine_not_found)
-        self._type_mapper.register_handler(MachineValidationError, self._preserve_machine_validation)
+        self._type_mapper.register_handler(
+            MachineValidationError, self._preserve_machine_validation
+        )
 
         # REQUEST EXCEPTIONS - Preserve with request context
         self._type_mapper.register_handler(RequestException, self._preserve_request_exception)
         self._type_mapper.register_handler(RequestNotFoundError, self._preserve_request_not_found)
-        self._type_mapper.register_handler(RequestValidationError, self._preserve_request_validation)
+        self._type_mapper.register_handler(
+            RequestValidationError, self._preserve_request_validation
+        )
 
         # AWS EXCEPTIONS - Handle dynamically
         # AWS exceptions will be handled by the generic provider exception handler
 
         # INFRASTRUCTURE EXCEPTIONS - Preserve with infrastructure context
-        self._type_mapper.register_handler(InfrastructureError, self._preserve_infrastructure_exception)
-        self._type_mapper.register_handler(ConfigurationError, self._preserve_configuration_exception)
+        self._type_mapper.register_handler(
+            InfrastructureError, self._preserve_infrastructure_exception
+        )
+        self._type_mapper.register_handler(
+            ConfigurationError, self._preserve_configuration_exception
+        )
 
         # PYTHON BUILT-IN EXCEPTIONS - Wrap appropriately
         self._type_mapper.register_handler(json.JSONDecodeError, self._wrap_json_decode_error)

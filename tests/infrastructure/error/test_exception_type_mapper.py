@@ -12,21 +12,25 @@ from infrastructure.error.exception_type_mapper import ExceptionTypeMapper
 
 class CustomException(Exception):
     """Custom exception for testing."""
+
     pass
 
 
 class ChildException(CustomException):
     """Child exception for testing inheritance."""
+
     pass
 
 
 class GrandchildException(ChildException):
     """Grandchild exception for testing deep inheritance."""
+
     pass
 
 
 class UnrelatedError(Exception):
     """Unrelated exception for testing."""
+
     pass
 
 
@@ -37,34 +41,34 @@ class TestExceptionTypeMapper:
         """Test basic handler registration and retrieval."""
         mapper = ExceptionTypeMapper()
         handler = Mock()
-        
+
         mapper.register_handler(ValueError, handler)
         retrieved_handler = mapper.get_handler(ValueError)
-        
+
         assert retrieved_handler == handler
 
     def test_register_and_get_http_handler(self):
         """Test HTTP handler registration and retrieval."""
         mapper = ExceptionTypeMapper()
         http_handler = Mock()
-        
+
         mapper.register_http_handler(ValueError, http_handler)
         retrieved_handler = mapper.get_http_handler(ValueError)
-        
+
         assert retrieved_handler == http_handler
 
     def test_mro_handler_lookup(self):
         """Test that handler lookup follows Method Resolution Order."""
         mapper = ExceptionTypeMapper()
         parent_handler = Mock()
-        
+
         # Register handler for parent class
         mapper.register_handler(CustomException, parent_handler)
-        
+
         # Child should get parent's handler
         retrieved_handler = mapper.get_handler(ChildException)
         assert retrieved_handler == parent_handler
-        
+
         # Grandchild should also get parent's handler
         retrieved_handler = mapper.get_handler(GrandchildException)
         assert retrieved_handler == parent_handler
@@ -73,10 +77,10 @@ class TestExceptionTypeMapper:
         """Test that HTTP handler lookup follows Method Resolution Order."""
         mapper = ExceptionTypeMapper()
         parent_handler = Mock()
-        
+
         # Register HTTP handler for parent class
         mapper.register_http_handler(CustomException, parent_handler)
-        
+
         # Child should get parent's HTTP handler
         retrieved_handler = mapper.get_http_handler(ChildException)
         assert retrieved_handler == parent_handler
@@ -86,17 +90,17 @@ class TestExceptionTypeMapper:
         mapper = ExceptionTypeMapper()
         parent_handler = Mock()
         child_handler = Mock()
-        
+
         # Register handlers
         mapper.register_handler(CustomException, parent_handler)
         mapper.register_handler(ChildException, child_handler)
-        
+
         # Parent gets parent handler
         assert mapper.get_handler(CustomException) == parent_handler
-        
+
         # Child gets specific handler, not parent
         assert mapper.get_handler(ChildException) == child_handler
-        
+
         # Grandchild gets child handler (most specific)
         assert mapper.get_handler(GrandchildException) == child_handler
 
@@ -104,7 +108,7 @@ class TestExceptionTypeMapper:
         """Test that fallback handler is used when no specific handler found."""
         mapper = ExceptionTypeMapper()
         fallback_handler = Mock()
-        
+
         retrieved_handler = mapper.get_handler(UnrelatedError, fallback_handler)
         assert retrieved_handler == fallback_handler
 
@@ -112,21 +116,21 @@ class TestExceptionTypeMapper:
         """Test that fallback HTTP handler is used when no specific handler found."""
         mapper = ExceptionTypeMapper()
         fallback_handler = Mock()
-        
+
         retrieved_handler = mapper.get_http_handler(UnrelatedError, fallback_handler)
         assert retrieved_handler == fallback_handler
 
     def test_no_handler_raises_error_without_fallback(self):
         """Test that ValueError is raised when no handler found and no fallback."""
         mapper = ExceptionTypeMapper()
-        
+
         with pytest.raises(ValueError, match="No handler found for exception type"):
             mapper.get_handler(UnrelatedError)
 
     def test_no_http_handler_raises_error_without_fallback(self):
         """Test that ValueError is raised when no HTTP handler found and no fallback."""
         mapper = ExceptionTypeMapper()
-        
+
         with pytest.raises(ValueError, match="No HTTP handler found for exception type"):
             mapper.get_http_handler(UnrelatedError)
 
@@ -134,9 +138,9 @@ class TestExceptionTypeMapper:
         """Test has_handler returns True for exact matches."""
         mapper = ExceptionTypeMapper()
         handler = Mock()
-        
+
         mapper.register_handler(ValueError, handler)
-        
+
         assert mapper.has_handler(ValueError) is True
         assert mapper.has_handler(TypeError) is False
 
@@ -144,9 +148,9 @@ class TestExceptionTypeMapper:
         """Test has_handler returns True for inherited handlers."""
         mapper = ExceptionTypeMapper()
         handler = Mock()
-        
+
         mapper.register_handler(CustomException, handler)
-        
+
         assert mapper.has_handler(CustomException) is True
         assert mapper.has_handler(ChildException) is True
         assert mapper.has_handler(GrandchildException) is True
@@ -156,9 +160,9 @@ class TestExceptionTypeMapper:
         """Test has_http_handler returns True for exact matches."""
         mapper = ExceptionTypeMapper()
         handler = Mock()
-        
+
         mapper.register_http_handler(ValueError, handler)
-        
+
         assert mapper.has_http_handler(ValueError) is True
         assert mapper.has_http_handler(TypeError) is False
 
@@ -166,9 +170,9 @@ class TestExceptionTypeMapper:
         """Test has_http_handler returns True for inherited handlers."""
         mapper = ExceptionTypeMapper()
         handler = Mock()
-        
+
         mapper.register_http_handler(CustomException, handler)
-        
+
         assert mapper.has_http_handler(CustomException) is True
         assert mapper.has_http_handler(ChildException) is True
         assert mapper.has_http_handler(GrandchildException) is True
@@ -179,17 +183,17 @@ class TestExceptionTypeMapper:
         mapper = ExceptionTypeMapper()
         handler = Mock()
         http_handler = Mock()
-        
+
         mapper.register_handler(ValueError, handler)
         mapper.register_http_handler(TypeError, http_handler)
-        
+
         # Verify handlers are registered
         assert mapper.has_handler(ValueError) is True
         assert mapper.has_http_handler(TypeError) is True
-        
+
         # Clear handlers
         mapper.clear_handlers()
-        
+
         # Verify handlers are cleared
         assert mapper.has_handler(ValueError) is False
         assert mapper.has_http_handler(TypeError) is False
@@ -197,13 +201,13 @@ class TestExceptionTypeMapper:
     def test_get_registered_types(self):
         """Test that get_registered_types returns all registered types."""
         mapper = ExceptionTypeMapper()
-        
+
         mapper.register_handler(ValueError, Mock())
         mapper.register_handler(TypeError, Mock())
         mapper.register_http_handler(KeyError, Mock())
-        
+
         registered_types = mapper.get_registered_types()
-        
+
         assert ValueError in registered_types
         assert TypeError in registered_types
         assert KeyError in registered_types
@@ -213,13 +217,13 @@ class TestExceptionTypeMapper:
         """Test that handler lookup is cached for performance."""
         mapper = ExceptionTypeMapper()
         handler = Mock()
-        
+
         mapper.register_handler(CustomException, handler)
-        
+
         # First call should cache the result
         result1 = mapper.get_handler(ChildException)
         result2 = mapper.get_handler(ChildException)
-        
+
         # Should return same handler instance (cached)
         assert result1 is result2
         assert result1 == handler
@@ -229,16 +233,16 @@ class TestExceptionTypeMapper:
         mapper = ExceptionTypeMapper()
         handler1 = Mock()
         handler2 = Mock()
-        
+
         # Register and cache a handler
         mapper.register_handler(ValueError, handler1)
         cached_result = mapper.get_handler(ValueError)
         assert cached_result == handler1
-        
+
         # Clear handlers and register new one
         mapper.clear_handlers()
         mapper.register_handler(ValueError, handler2)
-        
+
         # Should get new handler, not cached one
         new_result = mapper.get_handler(ValueError)
         assert new_result == handler2
@@ -249,11 +253,11 @@ class TestExceptionTypeMapper:
         mapper = ExceptionTypeMapper()
         regular_handler = Mock()
         http_handler = Mock()
-        
+
         # Register different handlers for same exception type
         mapper.register_handler(ValueError, regular_handler)
         mapper.register_http_handler(ValueError, http_handler)
-        
+
         # Should get different handlers
         assert mapper.get_handler(ValueError) == regular_handler
         assert mapper.get_http_handler(ValueError) == http_handler
