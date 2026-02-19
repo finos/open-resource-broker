@@ -1,6 +1,5 @@
 """Request-related command handlers for the interface layer."""
 
-import sys
 from typing import TYPE_CHECKING, Any
 
 from domain.base.ports.scheduler_port import SchedulerPort
@@ -116,10 +115,6 @@ async def handle_get_request_status(args: "argparse.Namespace") -> dict[str, Any
                     continue
 
         # Pass domain DTO to scheduler strategy - NO formatting logic here
-        print(
-            f"DEBUG: About to call scheduler_strategy.format_request_status_response, scheduler type: {type(scheduler_strategy).__name__}",
-            file=sys.stderr,
-        )
         return scheduler_strategy.format_request_status_response(request_dtos)
 
 
