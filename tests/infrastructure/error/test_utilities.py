@@ -1,12 +1,5 @@
 """Tests for error handling utilities."""
 
-import json
-import traceback
-from datetime import datetime
-from unittest.mock import Mock
-
-import pytest
-
 from domain.base.exceptions import ValidationError, EntityNotFoundError
 from infrastructure.error.utilities import (
     format_error_message,
@@ -119,7 +112,7 @@ class TestFormatStackTrace:
             lines = result.split("\n")
 
             # Should have limited number of lines (plus header/footer)
-            assert len([l for l in lines if l.strip()]) <= 10
+            assert len([line for line in lines if line.strip()]) <= 10
 
     def test_handles_none_exception(self):
         """Should handle None exception gracefully."""

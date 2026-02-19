@@ -61,7 +61,7 @@ def test_template_generation():
         for i, template in enumerate(example_templates):
             try:
                 template_dict = template.model_dump(exclude_none=True, mode="json")
-                json_str = json.dumps(template_dict, cls=DateTimeEncoder)
+                json.dumps(template_dict, cls=DateTimeEncoder)  # Test serialization but don't store
                 print(f"   ✅ Template {i} JSON serialization works")
             except Exception as e:
                 print(f"   ❌ Template {i} JSON serialization failed: {e}")

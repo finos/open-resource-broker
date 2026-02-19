@@ -252,7 +252,7 @@ class TestAWSAMIResolver:
 
             # Create new resolver and verify cache loaded
             cache_service2 = AMICacheService()
-            resolver2 = AWSAMIResolver(config, cache_service=cache_service2)
+            AWSAMIResolver(config, cache_service=cache_service2)  # Create but don't store
             # Note: In this simplified version, persistent cache loading is limited
             # A full implementation would have proper export/import methods
 

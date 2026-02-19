@@ -116,9 +116,9 @@ class HostFactoryFieldMapper(SchedulerFieldMapper):
         if "machine_types" in mapped:
             machine_types = mapped["machine_types"]
             if machine_types:
-                if len(machine_types) == 1 and list(machine_types.values())[0] == 1:
+                if len(machine_types) == 1 and next(iter(machine_types.values())) == 1:
                     # Single type with weight 1 → vmType
-                    mapped["vmType"] = list(machine_types.keys())[0]
+                    mapped["vmType"] = next(iter(machine_types.keys()))
                 else:
                     # Multiple types or custom weights → vmTypes
                     mapped["vmTypes"] = machine_types

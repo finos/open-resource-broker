@@ -204,7 +204,7 @@ async def _show_resource_help(resource):
     import sys
 
     # Call the CLI with --help for the specific resource
-    subprocess.run([sys.executable, "-m", "run", resource, "--help"])
+    subprocess.run([sys.executable, "-m", "run", resource, "--help"], check=False)
     return {"success": True, "message": f"Showed help for {resource}"}
 
 
@@ -1041,7 +1041,6 @@ async def main() -> None:
                 logger.warning("Failed to override scheduler strategy: %s", e)
 
         # Handle global provider override
-        provider_override_active = False
         if hasattr(args, "provider") and args.provider:
             try:
                 # Use DI container's ConfigurationPort for consistency
@@ -1051,7 +1050,6 @@ async def main() -> None:
                 container = get_container()
                 config = container.get(ConfigurationPort)
                 config.override_provider_instance(args.provider)
-                provider_override_active = True
             except Exception as e:
                 logger = get_logger(__name__)
                 logger.warning("Failed to override provider instance: %s", e)

@@ -11,7 +11,7 @@ def register_all_storage_types() -> None:
     """Register all available storage types."""
     from infrastructure.storage.registry import get_storage_registry
 
-    registry = get_storage_registry()
+    get_storage_registry()
 
     # Register all available storage types
     from infrastructure.storage.json.registration import register_json_storage

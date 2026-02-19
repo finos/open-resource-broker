@@ -178,7 +178,7 @@ class AWSInfrastructureDiscoveryService:
         rule_types = set()
         for rule in ingress_rules:
             from_port = rule.get("FromPort")
-            to_port = rule.get("ToPort")
+            rule.get("ToPort")  # to_port not used but extracted for completeness
             protocol = rule.get("IpProtocol", "unknown")
 
             if protocol == "tcp":
@@ -322,7 +322,7 @@ class AWSInfrastructureDiscoveryService:
         try:
             from cli.console import print_info, print_error, print_success
 
-            config = provider_config.get("config", {})
+            provider_config.get("config", {})  # config extracted but not used
 
             print_info("Discovering infrastructure...")
             discovered = {}
@@ -408,7 +408,7 @@ class AWSInfrastructureDiscoveryService:
         try:
             from cli.console import print_info, print_success, print_error
 
-            config = provider_config.get("config", {})
+            provider_config.get("config", {})  # config extracted but not used
             template_defaults = provider_config.get("template_defaults", {})
 
             if not template_defaults:

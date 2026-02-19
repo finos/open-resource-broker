@@ -450,7 +450,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         else:
             # Single instance type
             single_type = (
-                list(template.machine_types.keys())[0] if template.machine_types else "t3.medium"
+                next(iter(template.machine_types.keys())) if template.machine_types else "t3.medium"
             )
             instance_overrides.append(
                 {
@@ -798,7 +798,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             else:
                 # Fallback to single type if machine_types is empty
                 single_type = (
-                    list(aws_template.machine_types.keys())[0]
+                    next(iter(aws_template.machine_types.keys()))
                     if aws_template.machine_types
                     else "t3.medium"
                 )

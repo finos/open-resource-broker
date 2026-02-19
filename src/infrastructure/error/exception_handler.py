@@ -15,7 +15,6 @@ Follows DDD/SOLID/DRY principles while preserving domain exception semantics.
 import json
 import threading
 from datetime import datetime
-from functools import lru_cache
 from http import HTTPStatus
 from typing import Any, Callable, Optional
 
@@ -312,7 +311,7 @@ class ExceptionHandler:
         self.logger = logger or get_logger(__name__)
         self.metrics = metrics
         self._type_mapper = ExceptionTypeMapper()
-        self._http_handler: Optional["HTTPErrorResponseHandler"] = None
+        self._http_handler: Optional[HTTPErrorResponseHandler] = None
         self._performance_stats = {"total_handled": 0, "by_type": {}}
         self._lock = threading.Lock()
         self._register_handlers()

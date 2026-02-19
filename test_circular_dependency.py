@@ -28,7 +28,7 @@ def test_registry_creation():
     print("✓ Registry created successfully")
 
     # Accessing logger should trigger lazy loading
-    logger = registry.logger
+    _ = registry.logger  # Access logger to trigger lazy loading
     print("✓ Logger accessed successfully")
 
     print("✓ No circular dependency detected")

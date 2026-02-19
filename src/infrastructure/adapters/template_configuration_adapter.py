@@ -62,7 +62,7 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
             # Create a temporary template for validation
             from domain.template.template_aggregate import Template
 
-            temp_template = Template(
+            Template(
                 template_id=template_id or "temp",
                 image_id=image_id or "",
                 instance_type=config.get("instanceType") or config.get("instance_type", ""),

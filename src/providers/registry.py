@@ -519,11 +519,7 @@ class ProviderRegistry(BaseRegistry):
         because it requires access to configuration and provider instances.
         DO NOT move to domain layer - it creates circular dependencies.
         """
-        try:
-            from domain.base.results import ProviderSelectionResult
-        except ImportError:
-            # Fallback if import fails
-            ProviderSelectionResult = dict
+        # Import handled in individual methods where needed
 
         if logger:
             logger.info(
@@ -557,7 +553,7 @@ class ProviderRegistry(BaseRegistry):
             from domain.base.results import ProviderSelectionResult
         except ImportError:
             # Fallback if import fails
-            ProviderSelectionResult = dict
+            pass
 
         if logger:
             logger.debug("Selecting active provider using selection policy")
@@ -599,7 +595,7 @@ class ProviderRegistry(BaseRegistry):
         try:
             from domain.base.results import ProviderSelectionResult
         except ImportError:
-            ProviderSelectionResult = dict
+            pass
 
         provider_instance = self._get_provider_instance_config(provider_name)
         if not provider_instance:
@@ -619,7 +615,7 @@ class ProviderRegistry(BaseRegistry):
         try:
             from domain.base.results import ProviderSelectionResult
         except ImportError:
-            ProviderSelectionResult = dict
+            pass
 
         provider_name = template.provider_name
         provider_instance = self._get_provider_instance_config(provider_name)
@@ -643,7 +639,7 @@ class ProviderRegistry(BaseRegistry):
         try:
             from domain.base.results import ProviderSelectionResult
         except ImportError:
-            ProviderSelectionResult = dict
+            pass
 
         provider_type = template.provider_type
         instances = self._get_enabled_instances_by_type(provider_type)
@@ -672,7 +668,7 @@ class ProviderRegistry(BaseRegistry):
         try:
             from domain.base.results import ProviderSelectionResult
         except ImportError:
-            ProviderSelectionResult = dict
+            pass
 
         provider_api = template.provider_api
         compatible_instances = self._find_compatible_providers(provider_api)
@@ -703,7 +699,7 @@ class ProviderRegistry(BaseRegistry):
         try:
             from domain.base.results import ProviderSelectionResult
         except ImportError:
-            ProviderSelectionResult = dict
+            pass
 
         provider_config = self._get_provider_config()
 

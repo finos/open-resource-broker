@@ -307,7 +307,7 @@ class AWSLaunchTemplateManager:
             # Basic values
             "image_id": template.image_id,
             "instance_type": (
-                list(template.machine_types.keys())[0]
+                next(iter(template.machine_types.keys()))
                 if template.machine_types
                 else "t3.medium"  # fallback
             ),
@@ -450,7 +450,7 @@ class AWSLaunchTemplateManager:
         launch_template_data = {
             "ImageId": image_id,
             "InstanceType": (
-                list(aws_template.machine_types.keys())[0]
+                next(iter(aws_template.machine_types.keys()))
                 if aws_template.machine_types
                 else "t3.medium"  # fallback
             ),

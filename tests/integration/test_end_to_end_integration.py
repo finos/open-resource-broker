@@ -443,7 +443,7 @@ class TestAdditionalEndToEnd:
             assert hf_output["result"] == machine.result
             assert hf_output["privateIpAddress"] == machine.private_ip_address
             assert (
-                hf_output["instanceType"] == list(machine.machine_types.keys())[0]
+                hf_output["instanceType"] == next(iter(machine.machine_types.keys()))
                 if machine.machine_types
                 else None
             )

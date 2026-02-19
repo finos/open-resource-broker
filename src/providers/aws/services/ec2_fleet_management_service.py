@@ -65,14 +65,14 @@ class EC2FleetManagementService:
         }
 
         # Add spot configuration if needed
-        if template.price_type == "spot" or template.price_type == "mixed":
+        if template.price_type in {"spot", "mixed"}:
             if template.max_price:
                 fleet_config["SpotOptions"] = {
                     "MaxTotalPrice": str(template.max_price * request.requested_count)
                 }
 
         # Add on-demand configuration if needed
-        if template.price_type == "ondemand" or template.price_type == "mixed":
+        if template.price_type in {"ondemand", "mixed"}:
             fleet_config["OnDemandOptions"] = {"AllocationStrategy": "lowestPrice"}
 
         return fleet_config

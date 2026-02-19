@@ -8,9 +8,6 @@ from infrastructure.logging.logger import get_logger
 
 if TYPE_CHECKING:
     from infrastructure.di.container import DIContainer
-    from infrastructure.storage.factories.storage_factory_orchestrator import (
-        StorageFactoryOrchestrator,
-    )
 
 
 def register_storage_services(container: "DIContainer") -> None:

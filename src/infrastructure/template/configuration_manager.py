@@ -220,7 +220,7 @@ class TemplateConfigurationManager:
         try:
             from providers.registry import get_provider_registry
 
-            registry = get_provider_registry()
+            get_provider_registry()
             from infrastructure.di.container import get_container
             from application.services.provider_registry_service import ProviderRegistryService
 

@@ -3,7 +3,7 @@
 from typing import Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from application.services.provider_registry_service import ProviderRegistryService
+    pass
 
 from domain.base.ports.logging_port import LoggingPort
 from domain.base.ports.container_port import ContainerPort
@@ -96,9 +96,7 @@ class MachineSyncService:
 
             # Get provider configuration
             config_port = self.container.get(ConfigurationPort)
-            provider_instance_config = config_port.get_provider_instance_config(
-                request.provider_name
-            )
+            config_port.get_provider_instance_config(request.provider_name)
 
             # Execute operation using Provider Registry Service
             result = await self.provider_registry_service.execute_operation(

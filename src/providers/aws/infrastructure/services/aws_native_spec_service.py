@@ -148,7 +148,7 @@ class AWSNativeSpecService:
             "requested_count": request.requested_count,
             "template_id": template.template_id,
             "image_id": template.image_id,
-            "instance_type": list(template.machine_types.keys())[0]
+            "instance_type": next(iter(template.machine_types.keys()))
             if template.machine_types
             else None,
             "package_name": package_info.get("name", "open-resource-broker"),

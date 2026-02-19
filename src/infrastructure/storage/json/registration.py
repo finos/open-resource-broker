@@ -77,7 +77,6 @@ def create_json_unit_of_work(config: Any) -> Any:
     """
     from config.manager import ConfigurationManager
     from config.schemas.storage_schema import StorageConfig
-    from domain.base.ports.scheduler_port import SchedulerPort
     from infrastructure.storage.json.unit_of_work import JSONUnitOfWork
 
     # Handle different config types

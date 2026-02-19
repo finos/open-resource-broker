@@ -442,7 +442,7 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 # Update request with new metadata
                 from domain.request.aggregate import Request
 
-                updated_request = Request.model_validate(
+                Request.model_validate(
                     {
                         **request.model_dump(),
                         "metadata": updated_metadata,

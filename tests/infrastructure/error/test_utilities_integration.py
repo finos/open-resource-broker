@@ -1,7 +1,5 @@
 """Integration tests showing utilities working with ExceptionHandler."""
 
-import pytest
-
 from domain.base.exceptions import ValidationError, EntityNotFoundError
 from infrastructure.error.exception_handler import ExceptionHandler, ExceptionContext
 from infrastructure.error.utilities import (

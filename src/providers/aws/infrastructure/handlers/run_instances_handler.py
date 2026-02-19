@@ -443,7 +443,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
         # Add instance type override if specified (overrides launch template)
         if aws_template.machine_types:
             # Use first machine type for RunInstances (single instance type only)
-            params["InstanceType"] = list(aws_template.machine_types.keys())[0]
+            params["InstanceType"] = next(iter(aws_template.machine_types.keys()))
 
         # Handle networking overrides based on launch template source
         if aws_template.launch_template_id:

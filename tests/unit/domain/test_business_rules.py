@@ -520,7 +520,6 @@ class TestCrossAggregateBusinessRules:
     def test_machine_template_compatibility(self):
         """Test that machines are compatible with their templates."""
         # Machine should match template specifications
-        template_instance_type = "t2.micro"
 
         machine = Machine(
             instance_id="i-123",

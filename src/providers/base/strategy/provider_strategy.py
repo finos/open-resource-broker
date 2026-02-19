@@ -306,6 +306,7 @@ class ProviderStrategy(ABC):
         """
         return {}
 
+    @abstractmethod
     def cleanup(self) -> None:
         """
         Clean up resources used by the strategy.

@@ -111,7 +111,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         Empty collections in infrastructure fields are treated as "unset"
         so provider defaults can apply.
         """
-        INFRASTRUCTURE_FIELDS = {
+        infrastructure_fields = {
             "subnet_ids",
             "security_group_ids",
             "network_zones",
@@ -122,7 +122,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         for key, value in overrides.items():
             if value is not None:
                 # For infrastructure fields, treat empty collections as "unset"
-                if key in INFRASTRUCTURE_FIELDS and self._is_empty_collection(value):
+                if key in infrastructure_fields and self._is_empty_collection(value):
                     continue  # Skip empty collections, keep default
                 result[key] = value
 

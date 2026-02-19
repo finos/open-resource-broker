@@ -36,7 +36,6 @@ def register_port_adapters(container):
     # This was previously in _setup_core_dependencies but got lost during DI cleanup
     # Using consistent Base* naming pattern for abstract classes
     def create_unit_of_work_factory(c):
-        from domain.base import UnitOfWorkFactory as BaseUnitOfWorkFactory
         from infrastructure.utilities.factories.repository_factory import UnitOfWorkFactory
 
         config_manager = c.get(ConfigurationManager)

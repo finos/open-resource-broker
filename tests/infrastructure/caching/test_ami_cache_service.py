@@ -1,6 +1,5 @@
 """Tests for infrastructure AMI cache service."""
 
-import pytest
 import time
 from src.infrastructure.caching.ami_cache_service import AMICacheService
 

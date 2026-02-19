@@ -999,7 +999,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         if not machine_types:
             return {}
 
-        if len(machine_types) == 1 and list(machine_types.values())[0] == 1:
-            return {"vmType": list(machine_types.keys())[0]}
+        if len(machine_types) == 1 and next(iter(machine_types.values())) == 1:
+            return {"vmType": next(iter(machine_types.keys()))}
         else:
             return {"vmTypes": machine_types}

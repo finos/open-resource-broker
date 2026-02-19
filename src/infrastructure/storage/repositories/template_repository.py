@@ -237,7 +237,7 @@ class TemplateRepositoryImpl(TemplateRepositoryInterface):
         try:
             # Increment version
             version = self.version_manager.increment_version(str(template.template_id.value))
-            
+
             # Save the template
             template_data = self.serializer.to_dict(template)
             template_data["version"] = version
@@ -249,7 +249,7 @@ class TemplateRepositoryImpl(TemplateRepositoryInterface):
             # Extract and publish events
             events = template.get_domain_events()
             template.clear_domain_events()
-            
+
             if events:
                 self.event_publisher.publish_events(events)
 
@@ -270,13 +270,13 @@ class TemplateRepositoryImpl(TemplateRepositoryInterface):
         """Get template by ID using storage strategy with caching."""
         try:
             key = str(template_id.value)
-            
+
             # Check cache first
             cached = self.cache.get(key)
             if cached:
                 self.logger.debug("Retrieved template %s from cache", template_id)
                 return cached
-            
+
             # Load from storage
             data = self.storage_strategy.find_by_id(key)
             if data:
@@ -368,10 +368,10 @@ class TemplateRepositoryImpl(TemplateRepositoryInterface):
         try:
             key = str(template_id.value)
             self.storage_strategy.delete(key)
-            
+
             # Remove from cache
             self.cache.remove(key)
-            
+
             self.logger.debug("Deleted template %s", template_id)
         except Exception as e:
             self.logger.error("Failed to delete template %s: %s", template_id, e)

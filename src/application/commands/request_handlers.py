@@ -520,9 +520,8 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             from domain.base.ports.configuration_port import ConfigurationPort
 
             config_manager = self._container.get(ConfigurationPort)
-            provider_instance_config = config_manager.get_provider_instance_config(provider_name)
+            config_manager.get_provider_instance_config(provider_name)
             # Pass the full ProviderInstanceConfig object, not just the config dict
-            provider_config = provider_instance_config if provider_instance_config else {}
 
             # Execute via provider registry service
             result = await self._provider_registry_service.execute_operation(
@@ -602,8 +601,7 @@ class PopulateMachineIdsHandler(BaseCommandHandler[PopulateMachineIdsCommand, No
 
             from domain.base.ports.configuration_port import ConfigurationPort
 
-            config_manager = self._container.get(ConfigurationPort)
-            provider_config = config_manager.get_provider_instance_config(request.provider_name)
+            self._container.get(ConfigurationPort)
 
             result = await self._provider_registry_service.execute_operation(
                 request.provider_name, operation
