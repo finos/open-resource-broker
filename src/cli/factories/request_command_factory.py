@@ -62,7 +62,7 @@ class RequestCommandFactory:
         return ListRequestsQuery(
             provider_name=provider_name,
             status=status,
-            limit=limit,
+            limit=limit if limit is not None else 50,
         )
 
     def create_cancel_request_command(self, request_id: str, **kwargs: Any) -> CancelRequestCommand:

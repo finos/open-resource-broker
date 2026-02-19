@@ -63,20 +63,36 @@ async def handle_list_templates(args: argparse.Namespace) -> dict[str, Any]:
             provider_api = input_data.get("provider_api")
             active_only = input_data.get("active_only", True)
             include_config = input_data.get("include_config", False)
+            include_detailed_fields = input_data.get("include_detailed_fields", False)
         else:
             # Use command line arguments
             provider_api = getattr(args, "provider_api", None)
             active_only = getattr(args, "active_only", True)
             include_config = getattr(args, "include_config", False)
+            include_detailed_fields = getattr(args, "long", False)
 
         # Create and execute query through CQRS bus
         query = ListTemplatesQuery(
             provider_api=provider_api,
             active_only=active_only,
             include_configuration=include_config,
+            include_detailed_fields=include_detailed_fields,
         )
 
         templates = await query_bus.execute(query)
+
+        # Filter template fields based on include_detailed_fields flag
+        if not include_detailed_fields:
+            # Show only core fields when --long is not used
+            core_fields = {"template_id", "name", "description", "provider_api", "max_instances"}
+            filtered_templates = []
+            for template in templates:
+                template_dict = (
+                    template.model_dump() if hasattr(template, "model_dump") else template
+                )
+                filtered_dict = {k: v for k, v in template_dict.items() if k in core_fields}
+                filtered_templates.append(filtered_dict)
+            templates = filtered_templates
 
         # Get scheduler strategy from DI container
         scheduler_strategy = container.get(SchedulerPort)

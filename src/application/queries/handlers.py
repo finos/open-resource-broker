@@ -14,12 +14,12 @@ from application.dto.queries import (
     GetRequestQuery,
     GetTemplateQuery,
     ListActiveRequestsQuery,
+    ListMachinesQuery,
     ListReturnRequestsQuery,
     ListTemplatesQuery,
     ValidateTemplateQuery,
 )
 from application.dto.queries import GetConfigurationQuery
-from application.machine.queries import ListMachinesQuery as MachineListQuery
 from application.request.queries import ListRequestsQuery
 from application.dto.responses import MachineDTO, RequestDTO
 from application.dto.system import ValidationDTO
@@ -1092,8 +1092,8 @@ class GetMachineHandler(BaseQueryHandler[GetMachineQuery, MachineDTO]):
             raise
 
 
-@query_handler(MachineListQuery)
-class ListMachinesHandler(BaseQueryHandler[MachineListQuery, list[MachineDTO]]):
+@query_handler(ListMachinesQuery)
+class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, list[MachineDTO]]):
     """Handler for listing machines."""
 
     def __init__(
@@ -1118,7 +1118,7 @@ class ListMachinesHandler(BaseQueryHandler[MachineListQuery, list[MachineDTO]]):
 
         self._machine_sync_service = container.get(MachineSyncService)
 
-    async def execute_query(self, query: MachineListQuery) -> list[MachineDTO]:
+    async def execute_query(self, query: ListMachinesQuery) -> list[MachineDTO]:
         """Execute list machines query."""
         self.logger.info("Listing machines")
 
