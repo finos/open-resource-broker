@@ -900,11 +900,11 @@ async def execute_command(args, app, resource_parsers) -> Union[str, tuple[str, 
                 from interface.request_command_handlers import handle_request_return_machines
 
                 result = await handle_request_return_machines(args)
-            # Handle request status with multiple IDs
+            # Handle request status with multiple IDs (but not single request show)
             elif (
                 hasattr(args, "resource")
                 and args.resource == "requests"
-                and args.action in ["status", "show"]
+                and args.action == "status"
             ):
                 from interface.request_command_handlers import handle_get_request_status
 
