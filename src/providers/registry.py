@@ -483,7 +483,7 @@ class ProviderRegistry(BaseRegistry):
     # PROVIDER SELECTION LOGIC
     # ============================================================================
     # CRITICAL ARCHITECTURE NOTE:
-    # 
+    #
     # Provider selection logic is implemented in this registry class
     # (infrastructure layer) rather than a separate domain service because:
     #
@@ -502,20 +502,17 @@ class ProviderRegistry(BaseRegistry):
     # ============================================================================
 
     def select_provider_for_template(
-        self,
-        template: Any,
-        provider_name: Optional[str] = None,
-        logger: Optional[Any] = None
+        self, template: Any, provider_name: Optional[str] = None, logger: Optional[Any] = None
     ) -> Any:
         """Select provider instance for template requirements.
-        
+
         Selection hierarchy:
         1. CLI override (--provider flag)
         2. Explicit provider instance (template.provider_name)
         3. Provider type with load balancing (template.provider_type)
         4. Auto-selection based on API capabilities (template.provider_api)
         5. Fallback to configuration default
-        
+
         ARCHITECTURE NOTE: This logic is in the registry (infrastructure layer)
         because it requires access to configuration and provider instances.
         DO NOT move to domain layer - it creates circular dependencies.
@@ -525,24 +522,28 @@ class ProviderRegistry(BaseRegistry):
         except ImportError:
             # Fallback if import fails
             ProviderSelectionResult = dict
-        
+
         if logger:
-            logger.info("Selecting provider for template: %s", getattr(template, 'template_id', 'unknown'))
+            logger.info(
+                "Selecting provider for template: %s", getattr(template, "template_id", "unknown")
+            )
 
         # Strategy 1: CLI override (highest precedence)
         if provider_name or self._get_cli_override():
-            return self._select_by_cli_override(template, provider_name or self._get_cli_override(), logger)
+            return self._select_by_cli_override(
+                template, provider_name or self._get_cli_override(), logger
+            )
 
         # Strategy 2: Explicit provider instance selection
-        if hasattr(template, 'provider_name') and template.provider_name:
+        if hasattr(template, "provider_name") and template.provider_name:
             return self._select_by_explicit_provider(template, logger)
 
         # Strategy 3: Provider type with load balancing
-        if hasattr(template, 'provider_type') and template.provider_type:
+        if hasattr(template, "provider_type") and template.provider_type:
             return self._select_by_provider_type(template, logger)
 
         # Strategy 4: Auto-selection based on API capabilities
-        if hasattr(template, 'provider_api') and template.provider_api:
+        if hasattr(template, "provider_api") and template.provider_api:
             return self._select_by_api_capability(template, logger)
 
         # Strategy 5: Fallback to default
@@ -555,7 +556,7 @@ class ProviderRegistry(BaseRegistry):
         except ImportError:
             # Fallback if import fails
             ProviderSelectionResult = dict
-        
+
         if logger:
             logger.debug("Selecting active provider using selection policy")
 
@@ -589,13 +590,15 @@ class ProviderRegistry(BaseRegistry):
 
         return result
 
-    def _select_by_cli_override(self, template: Any, provider_name: str, logger: Optional[Any]) -> Any:
+    def _select_by_cli_override(
+        self, template: Any, provider_name: str, logger: Optional[Any]
+    ) -> Any:
         """Select CLI-overridden provider with validation."""
         try:
             from domain.base.results import ProviderSelectionResult
         except ImportError:
             ProviderSelectionResult = dict
-        
+
         provider_instance = self._get_provider_instance_config(provider_name)
         if not provider_instance:
             raise ValueError(f"Provider instance '{provider_name}' not found")
@@ -615,7 +618,7 @@ class ProviderRegistry(BaseRegistry):
             from domain.base.results import ProviderSelectionResult
         except ImportError:
             ProviderSelectionResult = dict
-        
+
         provider_name = template.provider_name
         provider_instance = self._get_provider_instance_config(provider_name)
         if not provider_instance:
@@ -639,7 +642,7 @@ class ProviderRegistry(BaseRegistry):
             from domain.base.results import ProviderSelectionResult
         except ImportError:
             ProviderSelectionResult = dict
-        
+
         provider_type = template.provider_type
         instances = self._get_enabled_instances_by_type(provider_type)
         if not instances:
@@ -668,7 +671,7 @@ class ProviderRegistry(BaseRegistry):
             from domain.base.results import ProviderSelectionResult
         except ImportError:
             ProviderSelectionResult = dict
-        
+
         provider_api = template.provider_api
         compatible_instances = self._find_compatible_providers(provider_api)
         if not compatible_instances:
@@ -699,9 +702,9 @@ class ProviderRegistry(BaseRegistry):
             from domain.base.results import ProviderSelectionResult
         except ImportError:
             ProviderSelectionResult = dict
-        
+
         provider_config = self._get_provider_config()
-        
+
         default_provider_type = getattr(provider_config, "default_provider_type", None)
         default_provider_instance = getattr(provider_config, "default_provider_instance", None)
 
@@ -729,12 +732,28 @@ class ProviderRegistry(BaseRegistry):
         return None  # Simplified - CLI override handled at higher level
 
     def _get_provider_config(self) -> Optional[Any]:
-        """Get provider configuration."""
-        return None  # Simplified - will be enhanced later
+        """Get provider configuration via lazy injection."""
+        try:
+            config_port = self._get_config_port()
+            if config_port:
+                return config_port.get_provider_config()
+        except Exception as e:
+            if self._logger:
+                self._logger.debug("Failed to get provider configuration: %s", e)
+        return None
 
     def _get_config_port(self) -> Optional[Any]:
-        """Get configuration port from DI container."""
-        return None  # Simplified to avoid circular dependencies
+        """Get configuration port from DI container using lazy injection."""
+        try:
+            from infrastructure.di.container import get_container
+            from domain.base.ports.configuration_port import ConfigurationPort
+
+            container = get_container()
+            return container.get(ConfigurationPort)
+        except Exception as e:
+            if self._logger:
+                self._logger.debug("Failed to get configuration port: %s", e)
+            return None
 
     def _get_provider_instance_config(self, provider_name: str) -> Optional[Any]:
         """Get provider instance configuration by name."""

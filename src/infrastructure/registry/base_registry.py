@@ -90,18 +90,24 @@ class BaseRegistry(ABC):
             with self._registry_lock:
                 if not self._dependencies_initialized:
                     try:
-                        # Avoid circular dependency by checking if container is available
+                        # Avoid circular dependency by checking if container is available AND ready
                         import sys
 
                         if "infrastructure.di.container" in sys.modules:
-                            from infrastructure.di.container import get_container
-                            from domain.base.ports import LoggingPort, ConfigurationPort
-                            from monitoring.metrics import MetricsCollector
+                            from infrastructure.di.container import (
+                                get_container,
+                                is_container_ready,
+                            )
 
-                            container = get_container()
-                            self._logger_port = container.get(LoggingPort)
-                            self._config_port = container.get(ConfigurationPort)
-                            self._metrics = container.get(MetricsCollector)
+                            # Only try to get dependencies if container is fully ready
+                            if is_container_ready():
+                                from domain.base.ports import LoggingPort, ConfigurationPort
+                                from monitoring.metrics import MetricsCollector
+
+                                container = get_container()
+                                self._logger_port = container.get(LoggingPort)
+                                self._config_port = container.get(ConfigurationPort)
+                                self._metrics = container.get(MetricsCollector)
                     except (ImportError, AttributeError, Exception):
                         # Fallback if DI container not available or circular dependency
                         pass

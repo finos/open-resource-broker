@@ -61,7 +61,9 @@ def register_port_adapters(container):
     def create_template_configuration_manager(c):
         """Create template configuration manager with dependencies."""
         return TemplateConfigurationManager(
-            config_manager=c.get(ConfigurationPort),
+            config_manager=c.get(
+                ConfigurationManager
+            ),  # Use ConfigurationManager directly to break circular dependency
             scheduler_strategy=c.get_optional(SchedulerPort),
             logger=c.get(LoggingPort),
             event_publisher=c.get_optional(EventPublisherPort),
