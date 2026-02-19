@@ -110,6 +110,9 @@ class TemplateConfigurationManager:
             scheduler_strategy, logger, event_publisher
         )
 
+        # Provider selection cache for batch operations
+        self._provider_selection_cache = {}
+
         self.logger.info("Template configuration manager initialized")
 
     async def load_templates(
@@ -216,7 +219,13 @@ class TemplateConfigurationManager:
         if "provider_name" in template_dict:
             return template_dict["provider_name"]
 
-        # 2. Use active provider from configuration with appropriate selection logic
+        # 2. Check cache for templates with same constraints
+        cache_key = (template_dict.get("provider_type"), template_dict.get("provider_api"))
+
+        if cache_key in self._provider_selection_cache:
+            return self._provider_selection_cache[cache_key]
+
+        # 3. Use active provider from configuration (expensive operation)
         try:
             from providers.registry import get_provider_registry
 
@@ -227,7 +236,11 @@ class TemplateConfigurationManager:
             container = get_container()
             provider_service = container.get(ProviderRegistryService)
             selection_result = provider_service.select_active_provider()
-            return selection_result.provider_instance
+            result = selection_result.provider_instance
+
+            # Cache the result
+            self._provider_selection_cache[cache_key] = result
+            return result
         except Exception as e:
             self.logger.debug("Could not determine provider instance via registry: %s", e)
 
@@ -237,18 +250,30 @@ class TemplateConfigurationManager:
                 if provider_config:
                     active_providers = provider_config.get_active_providers()
                     if active_providers:
-                        return active_providers[0].name
+                        result = active_providers[0].name
+                        # Cache the fallback result
+                        self._provider_selection_cache[cache_key] = result
+                        return result
             except Exception as e2:
                 self.logger.debug("Could not determine provider instance via direct access: %s", e2)
 
-        # 3. Fallback to default
-        return "aws"
+        # 4. Fallback to default
+        result = "aws"
+        self._provider_selection_cache[cache_key] = result
+        return result
+
+    def _clear_provider_selection_cache(self):
+        """Clear provider selection cache between batches."""
+        self._provider_selection_cache.clear()
 
     async def _batch_resolve_images(
         self, template_dicts: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
         """Batch resolve image IDs from specifications using provider registry."""
         try:
+            # Clear cache at start of each batch
+            self._clear_provider_selection_cache()
+
             if not self._is_image_resolution_enabled():
                 return template_dicts
 
@@ -275,6 +300,9 @@ class TemplateConfigurationManager:
         except Exception as e:
             self.logger.error("Batch image resolution failed: %s", e)
             return template_dicts
+        finally:
+            # Clear cache at end of batch (cleanup)
+            self._clear_provider_selection_cache()
 
     def _is_image_resolution_enabled(self) -> bool:
         """Check if image resolution is enabled."""
