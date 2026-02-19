@@ -48,9 +48,16 @@ async def handle_get_machine_status(args: "argparse.Namespace") -> dict[str, Any
 
     if has_all:
         from application.dto.queries import ListMachinesQuery
+        from application.machine.dto import MachineDTO
 
         query = ListMachinesQuery(all_resources=True)
-        machine_dtos = await query_bus.execute(query)
+        machine_dicts = await query_bus.execute(query)
+
+        # Convert dictionaries back to MachineDTO objects for scheduler formatting
+        machine_dtos = []
+        for machine_dict in machine_dicts:
+            machine_dto = MachineDTO(**machine_dict)
+            machine_dtos.append(machine_dto)
 
         return scheduler_strategy.format_machine_status_response(machine_dtos)
     else:
