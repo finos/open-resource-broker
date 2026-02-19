@@ -321,10 +321,16 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> dict[str
         query = ListMachinesQuery(all_resources=True, active_only=True)
         machine_dtos = await query_bus.execute(query)
 
-        # Extract machine IDs from DTOs
-        machine_ids = [
-            machine.machine_id for machine in machine_dtos if hasattr(machine, "machine_id")
-        ]
+        # Extract machine IDs from DTOs (handle both dict and object DTOs)
+        machine_ids = []
+        for machine in machine_dtos:
+            if isinstance(machine, dict):
+                machine_id = machine.get("machine_id")
+            else:
+                machine_id = getattr(machine, "machine_id", None)
+
+            if machine_id:
+                machine_ids.append(machine_id)
 
         if not machine_ids:
             return {
