@@ -275,7 +275,7 @@ class CLICommandFactoryOrchestrator:
     def _route_command(self, command_group: str, command_action: str, args: dict):
         """Route command to appropriate factory method."""
         # Template operations
-        if command_group == "templates":
+        if command_group in ["templates", "template"]:
             if command_action == "list":
                 return self.create_list_templates_query(
                     provider_name=args.get("provider"),
@@ -313,7 +313,7 @@ class CLICommandFactoryOrchestrator:
                 return self.create_template_utility_command_data("generate", **args)
 
         # Request operations
-        elif command_group == "requests":
+        elif command_group in ["requests", "request"]:
             if command_action == "create":
                 return self.create_create_request_command(
                     template_id=args.get("template_id"),
@@ -348,7 +348,7 @@ class CLICommandFactoryOrchestrator:
                 )
 
         # Machine operations
-        elif command_group == "machines":
+        elif command_group in ["machines", "machine"]:
             if command_action == "list":
                 return self.create_list_machines_query(
                     provider=args.get("provider"),
@@ -376,7 +376,7 @@ class CLICommandFactoryOrchestrator:
                 return self.create_reload_provider_config_command(config_path=args.get("file"))
 
         # Provider operations
-        elif command_group == "providers":
+        elif command_group in ["providers", "provider"]:
             if command_action == "list":
                 return self.create_list_available_providers_query(
                     include_health=True,
