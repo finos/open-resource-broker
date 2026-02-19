@@ -215,7 +215,7 @@ class AWSAMIResolver(ImageResolver):
                 return image_reference
 
             # No fallback available, re-raise error
-            raise ValueError(f"Failed to resolve image reference {image_reference}: {str(e)}")
+            raise ValueError(f"Failed to resolve image reference {image_reference}: {e!s}")
 
     def supports_reference_format(self, image_reference: str) -> bool:
         """
@@ -326,7 +326,7 @@ class AWSAMIResolver(ImageResolver):
         """Load cache from persistent file."""
         try:
             if os.path.exists(self._cache_file_path):
-                with open(self._cache_file_path, "r") as f:
+                with open(self._cache_file_path) as f:
                     cache_data = json.load(f)
                     # Filter out expired entries
                     current_time = time.time()

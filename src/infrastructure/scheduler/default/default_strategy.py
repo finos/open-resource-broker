@@ -216,21 +216,21 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
     def format_machine_details_response(self, machine_data: dict) -> dict:
         """Format machine details with default fields."""
         return {
-            'id': machine_data.get('id'),
-            'name': machine_data.get('name'),
-            'status': machine_data.get('status'),
-            'provider': 'default',
-            'instance_type': machine_data.get('instance_type'),
-            'region': machine_data.get('region'),
-            'image_id': machine_data.get('image_id'),
-            'private_ip': machine_data.get('private_ip'),
-            'public_ip': machine_data.get('public_ip'),
-            'subnet_id': machine_data.get('subnet_id'),
-            'security_group_ids': machine_data.get('security_group_ids'),
-            'status_reason': machine_data.get('status_reason'),
-            'launch_time': machine_data.get('launch_time'),
-            'termination_time': machine_data.get('termination_time'),
-            'tags': machine_data.get('tags'),
+            "id": machine_data.get("id"),
+            "name": machine_data.get("name"),
+            "status": machine_data.get("status"),
+            "provider": "default",
+            "instance_type": machine_data.get("instance_type"),
+            "region": machine_data.get("region"),
+            "image_id": machine_data.get("image_id"),
+            "private_ip": machine_data.get("private_ip"),
+            "public_ip": machine_data.get("public_ip"),
+            "subnet_id": machine_data.get("subnet_id"),
+            "security_group_ids": machine_data.get("security_group_ids"),
+            "status_reason": machine_data.get("status_reason"),
+            "launch_time": machine_data.get("launch_time"),
+            "termination_time": machine_data.get("termination_time"),
+            "tags": machine_data.get("tags"),
         }
 
     def get_storage_base_path(self) -> str:

@@ -4,7 +4,6 @@ import pytest
 import time
 import tempfile
 import os
-import json
 from unittest.mock import patch, MagicMock
 from src.providers.aws.domain.services.ami_resolver import AWSAMIResolver, AMICache
 
