@@ -121,6 +121,40 @@ git push origin main
 - `feat:` → minor version (1.1.0)  
 - `BREAKING CHANGE:` → major version (2.0.0)
 
+### Commit Message Format
+
+Follow conventional commits format (simplified):
+
+```
+type: description
+
+[optional body with details]
+```
+
+**Types:**
+- `feat:` - New feature or capability
+- `fix:` - Bug fix
+- `docs:` - Documentation changes
+- `refactor:` - Code restructuring without behavior change
+- `test:` - Test additions or fixes
+- `chore:` - Maintenance tasks (dependencies, tooling)
+- `perf:` - Performance improvements
+
+**Rules:**
+- No scope in parentheses (keep simple)
+- No task IDs or internal tracking references
+- Description is lowercase, no period at end
+- Body explains what/why, not how
+- Keep commits focused and atomic
+
+**Examples:**
+```bash
+git commit -m "fix: requests show --all helpful error"
+git commit -m "feat: add LAUNCHING state to machine lifecycle"
+git commit -m "docs: update CLI usage examples"
+git commit -m "refactor: extract validation logic to separate service"
+```
+
 ### Artifact Locations
 
 **Development Artifacts:**
