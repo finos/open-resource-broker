@@ -138,13 +138,11 @@ class StorageRegistry(BaseRegistry):
         try:
             registration = self._get_type_registration(storage_type)
             config = registration.config_factory(data)
-            self.logger.debug("Created config for storage type: %s", storage_type)
             return config
         except ValueError as e:
             raise UnsupportedStorageError(str(e))
         except Exception as e:
             error_msg = f"Failed to create config for storage type '{storage_type}': {e!s}"
-            self.logger.error(error_msg)
             raise ConfigurationError(error_msg)
 
     def create_unit_of_work(self, storage_type: str, config: Any) -> Optional[Any]:

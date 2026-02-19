@@ -61,8 +61,10 @@ class ProviderRegistry(BaseRegistry):
         # Provider is MULTI_CHOICE - multiple provider strategies simultaneously
         super().__init__(mode=RegistryMode.MULTI_CHOICE)
         self._strategy_cache: dict[str, Any] = {}
-        # Use the logger from BaseRegistry
-        self._logger = self.logger
+        # Create logger directly since BaseRegistry no longer provides it
+        from infrastructure.logging.logger import get_logger
+
+        self._logger = get_logger(__name__)
 
     def get_strategy(self, provider_identifier: str) -> Optional[Any]:
         """Get cached strategy instance."""

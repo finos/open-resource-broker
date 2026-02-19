@@ -181,9 +181,8 @@ class BaseRegistry(ABC):
 
         # Use factory if available, otherwise use registration directly
         if self._factory:
-            return self._factory.create_instance(
-                instance_name, **config if isinstance(config, dict) else {}
-            )
+            # For factory, we need to call the constructor with config as first argument
+            return registration.strategy_factory(config)
         else:
             return self._create_strategy_from_registration(registration, config, instance_name)
 
