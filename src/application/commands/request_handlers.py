@@ -219,34 +219,52 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             raise ValueError("machine_ids is required and cannot be empty")
 
         # For single machine operations, maintain strict validation (existing behavior)
-        # For multiple machines (--all operations), filter invalid machines
         is_single_machine = len(command.machine_ids) == 1
 
-        valid_machine_ids = []
-        skipped_machines = []
-
-        with self.uow_factory.create_unit_of_work() as uow:
-            for machine_id in command.machine_ids:
+        if is_single_machine:
+            # Strict validation for single machine (preserve existing behavior)
+            with self.uow_factory.create_unit_of_work() as uow:
+                machine_id = command.machine_ids[0]
                 machine = uow.machines.get_by_id(machine_id)
                 if not machine:
-                    if is_single_machine:
-                        from domain.base.exceptions import EntityNotFoundError
+                    from domain.base.exceptions import EntityNotFoundError
 
-                        raise EntityNotFoundError("Machine", machine_id)
-                    else:
+                    raise EntityNotFoundError("Machine", machine_id)
+
+                if machine.return_request_id:
+                    from domain.request.exceptions import RequestValidationError
+
+                    raise RequestValidationError(
+                        f"Machine {machine_id} already has pending return request: {machine.return_request_id}"
+                    )
+        # For multiple machines, we'll do filtering in execute_command
+
+    async def execute_command(self, command: CreateReturnRequestCommand) -> dict[str, Any]:
+        """Handle return request creation command."""
+        self.logger.info("Creating return request for machines: %s", command.machine_ids)
+
+        # For multiple machine operations, filter out invalid machines
+        is_single_machine = len(command.machine_ids) == 1
+
+        if is_single_machine:
+            # Single machine - validation already handled, proceed normally
+            valid_machine_ids = command.machine_ids
+            skipped_machines = []
+        else:
+            # Multiple machines - filter out invalid ones
+            valid_machine_ids = []
+            skipped_machines = []
+
+            with self.uow_factory.create_unit_of_work() as uow:
+                for machine_id in command.machine_ids:
+                    machine = uow.machines.get_by_id(machine_id)
+                    if not machine:
                         skipped_machines.append(
                             {"machine_id": machine_id, "reason": "Machine not found"}
                         )
                         continue
 
-                if machine.return_request_id:
-                    if is_single_machine:
-                        from domain.request.exceptions import RequestValidationError
-
-                        raise RequestValidationError(
-                            f"Machine {machine_id} already has pending return request: {machine.return_request_id}"
-                        )
-                    else:
+                    if machine.return_request_id:
                         skipped_machines.append(
                             {
                                 "machine_id": machine_id,
@@ -255,30 +273,16 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                         )
                         continue
 
-                valid_machine_ids.append(machine_id)
-
-        # Update command with only valid machines
-        command.machine_ids = valid_machine_ids
+                    valid_machine_ids.append(machine_id)
 
         # Store validation results for reporting
-        self._validation_results = {
+        validation_results = {
             "valid_machines": valid_machine_ids,
             "skipped_machines": skipped_machines,
         }
 
-    async def execute_command(self, command: CreateReturnRequestCommand) -> dict[str, Any]:
-        """Handle return request creation command."""
-        self.logger.info("Creating return request for machines: %s", command.machine_ids)
-
-        # Get validation results from validate_command
-        validation_results = getattr(
-            self,
-            "_validation_results",
-            {"valid_machines": command.machine_ids, "skipped_machines": []},
-        )
-
         # If no valid machines remain after filtering, return early with detailed info
-        if not command.machine_ids:
+        if not valid_machine_ids:
             return {
                 "status": "completed",
                 "request_id": None,
@@ -298,7 +302,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             provider_groups = defaultdict(list)
 
             with self.uow_factory.create_unit_of_work() as uow:
-                for machine_id in command.machine_ids:
+                for machine_id in valid_machine_ids:
                     machine = uow.machines.get_by_id(machine_id)
                     if not machine:
                         raise EntityNotFoundError("Machine", machine_id)
