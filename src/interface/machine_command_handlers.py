@@ -113,3 +113,92 @@ async def handle_list_machines(args: "argparse.Namespace") -> dict[str, Any]:
 
     # Format response using scheduler strategy for proper field mapping
     return scheduler_strategy.format_machine_status_response(machine_dtos)
+
+
+@handle_interface_exceptions(context="stop_machines", interface_type="cli")
+async def handle_stop_machines(args: "argparse.Namespace") -> dict[str, Any]:
+    """
+    Handle stop machines operations.
+
+    Args:
+        args: Argument namespace with machine_ids, all, and force flags
+
+    Returns:
+        Stop operation results
+    """
+    # Validation: --all requires --force
+    has_all = getattr(args, "all", False)
+    has_force = getattr(args, "force", False)
+    machine_ids_from_args = getattr(args, "machine_ids", []) or []
+
+    if has_all and not has_force:
+        return {
+            "error": "Cannot use --all without --force flag",
+            "message": "Use --force with --all to confirm stopping all machines",
+        }
+
+    # Validation: Cannot use both --all and specific IDs
+    if has_all and machine_ids_from_args:
+        return {
+            "error": "Cannot use --all with specific machine IDs",
+            "message": "Use either --all or specific IDs, not both",
+        }
+
+    # Validation: Must specify either --all or specific IDs
+    if not has_all and not machine_ids_from_args:
+        return {
+            "error": "No machines specified",
+            "message": "Specify machine IDs or use --all --force",
+        }
+
+    container = get_container()
+    query_bus = container.get(QueryBus)
+
+    # Get machines to stop
+    if has_all:
+        from application.dto.queries import ListMachinesQuery
+
+        query = ListMachinesQuery(status="running")
+        machine_dtos = await query_bus.execute(query)
+        machine_ids = [machine["machine_id"] for machine in machine_dtos]
+    else:
+        machine_ids = machine_ids_from_args
+
+    if not machine_ids:
+        return {
+            "success": True,
+            "message": "No machines to stop",
+            "stopped_machines": [],
+        }
+
+    # Stop machines using AWS instance manager
+    from providers.aws.managers.aws_instance_manager import AWSInstanceManager
+
+    instance_manager = container.get(AWSInstanceManager)
+    stop_results = instance_manager.stop_instances(machine_ids)
+
+    # Update machine status to "stopping" for successfully stopped machines
+    from application.machine.commands import UpdateMachineStatusCommand
+    from infrastructure.di.buses import CommandBus
+
+    command_bus = container.get(CommandBus)
+
+    stopped_machines = []
+    failed_machines = []
+
+    for machine_id, success in stop_results.items():
+        if success:
+            # Update status to stopping
+            command = UpdateMachineStatusCommand(machine_id=machine_id, status="stopping")
+            await command_bus.execute(command)
+            stopped_machines.append(machine_id)
+        else:
+            failed_machines.append(machine_id)
+
+    return {
+        "success": len(failed_machines) == 0,
+        "message": f"Stopped {len(stopped_machines)} machines"
+        + (f", failed to stop {len(failed_machines)}" if failed_machines else ""),
+        "stopped_machines": stopped_machines,
+        "failed_machines": failed_machines,
+    }
