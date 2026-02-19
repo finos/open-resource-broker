@@ -132,7 +132,9 @@ class RequestSerializer:
                 "provider_type": data.get("provider_type", "aws"),
                 # Resource tracking fields
                 "resource_ids": data.get("resource_ids", []),
-                "machine_ids": data.get("machine_ids", []),
+                "machine_ids": [
+                    mid for mid in (data.get("machine_ids", []) or []) if mid is not None
+                ],
                 # HF output fields
                 "message": data.get("message"),
                 # Results and instances

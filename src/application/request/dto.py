@@ -137,7 +137,7 @@ class RequestDTO(BaseDTO):
             last_status_check=None,  # Not available in current domain model
             first_status_check=None,  # Not available in current domain model
             machine_references=machine_refs,
-            machine_ids=request.machine_ids,
+            machine_ids=[mid for mid in (request.machine_ids or []) if mid is not None],
             message=request.status_message or "",  # Provide empty string if None
             resource_id=request.resource_ids[0]
             if request.resource_ids
