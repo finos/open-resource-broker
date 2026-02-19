@@ -19,7 +19,7 @@ class TestEntity:
     value: int
 
 
-class TestEntitySerializer(BaseEntitySerializer[TestEntity]):
+class TestEntitySerializer(BaseEntitySerializer):
     """Test implementation of EntitySerializer."""
     
     def to_dict(self, entity: TestEntity) -> Dict[str, Any]:

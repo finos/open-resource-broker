@@ -12,7 +12,7 @@ from infrastructure.storage.components.event_publisher import (
 
 
 @dataclass
-class TestEvent:
+class DomainTestEvent:
     """Test event for publisher tests."""
     
     event_type: str
@@ -39,7 +39,7 @@ class TestLoggingEventPublisher:
     def test_publish_single_event(self):
         """Test publishing single event."""
         publisher = LoggingEventPublisher()
-        event = TestEvent("test", "data")
+        event = DomainTestEvent("test", "data")
         
         # Should not raise exception
         publisher.publish_event(event)
@@ -48,8 +48,8 @@ class TestLoggingEventPublisher:
         """Test publishing multiple events."""
         publisher = LoggingEventPublisher()
         events = [
-            TestEvent("test1", "data1"),
-            TestEvent("test2", "data2"),
+            DomainTestEvent("test1", "data1"),
+            DomainTestEvent("test2", "data2"),
         ]
         
         # Should not raise exception
@@ -62,7 +62,7 @@ class TestNoOpEventPublisher:
     def test_publish_event_does_nothing(self):
         """Test that publish_event does nothing."""
         publisher = NoOpEventPublisher()
-        event = TestEvent("test", "data")
+        event = DomainTestEvent("test", "data")
         
         # Should not raise exception
         publisher.publish_event(event)
@@ -71,8 +71,8 @@ class TestNoOpEventPublisher:
         """Test that publish_events does nothing."""
         publisher = NoOpEventPublisher()
         events = [
-            TestEvent("test1", "data1"),
-            TestEvent("test2", "data2"),
+            DomainTestEvent("test1", "data1"),
+            DomainTestEvent("test2", "data2"),
         ]
         
         # Should not raise exception
@@ -91,7 +91,7 @@ class TestInMemoryEventPublisher:
     def test_publish_single_event(self):
         """Test publishing single event."""
         publisher = InMemoryEventPublisher()
-        event = TestEvent("test", "data")
+        event = DomainTestEvent("test", "data")
         
         publisher.publish_event(event)
         
@@ -102,8 +102,8 @@ class TestInMemoryEventPublisher:
         """Test publishing multiple events."""
         publisher = InMemoryEventPublisher()
         events = [
-            TestEvent("test1", "data1"),
-            TestEvent("test2", "data2"),
+            DomainTestEvent("test1", "data1"),
+            DomainTestEvent("test2", "data2"),
         ]
         
         publisher.publish_events(events)
@@ -114,7 +114,7 @@ class TestInMemoryEventPublisher:
     def test_get_published_events(self):
         """Test getting published events."""
         publisher = InMemoryEventPublisher()
-        event = TestEvent("test", "data")
+        event = DomainTestEvent("test", "data")
         
         publisher.publish_event(event)
         result = publisher.get_published_events()
@@ -126,7 +126,7 @@ class TestInMemoryEventPublisher:
     def test_clear_events(self):
         """Test clearing published events."""
         publisher = InMemoryEventPublisher()
-        event = TestEvent("test", "data")
+        event = DomainTestEvent("test", "data")
         
         publisher.publish_event(event)
         publisher.clear_events()
@@ -137,10 +137,10 @@ class TestInMemoryEventPublisher:
     def test_mixed_publish_methods(self):
         """Test mixing single and batch event publishing."""
         publisher = InMemoryEventPublisher()
-        event1 = TestEvent("test1", "data1")
+        event1 = DomainTestEvent("test1", "data1")
         events = [
-            TestEvent("test2", "data2"),
-            TestEvent("test3", "data3"),
+            DomainTestEvent("test2", "data2"),
+            DomainTestEvent("test3", "data3"),
         ]
         
         publisher.publish_event(event1)

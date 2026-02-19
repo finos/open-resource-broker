@@ -38,6 +38,9 @@ def register_storage_services(container: "DIContainer") -> None:
 
     container.register_factory(StorageStrategyFactory, create_factory)
 
+    # Register repository components
+    _register_repository_components(container)
+
     # ALWAYS register JSON storage as it's the default and most critical
     from infrastructure.storage.registry import get_storage_registry
 
@@ -54,6 +57,30 @@ def register_storage_services(container: "DIContainer") -> None:
         # Preload critical storage types only
         _register_critical_storage_types(container, lazy_config.preload_critical)
     # Lazy mode (default): JSON already registered above, other types will register on-demand
+
+
+def _register_repository_components(container: "DIContainer") -> None:
+    """Register repository components for dependency injection."""
+    from infrastructure.storage.components import (
+        InMemoryEventPublisher,
+        LoggingEventPublisher,
+        MemoryEntityCache,
+        MemoryVersionManager,
+        NoOpEntityCache,
+        NoOpEventPublisher,
+        NoOpVersionManager,
+    )
+
+    # Register default implementations
+    container.register_singleton(MemoryEntityCache)
+    container.register_singleton(MemoryVersionManager)
+    container.register_singleton(LoggingEventPublisher)
+
+    # Register no-op implementations for testing/minimal setups
+    container.register_singleton(NoOpEntityCache)
+    container.register_singleton(NoOpVersionManager)
+    container.register_singleton(NoOpEventPublisher)
+    container.register_singleton(InMemoryEventPublisher)
 
 
 def _register_critical_storage_types(container: "DIContainer", critical_types: list[str]) -> None:

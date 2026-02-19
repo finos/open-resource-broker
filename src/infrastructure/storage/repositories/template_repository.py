@@ -9,9 +9,18 @@ from domain.template.value_objects import TemplateId
 from infrastructure.error.decorators import handle_infrastructure_exceptions
 from infrastructure.logging.logger import get_logger
 from infrastructure.storage.base.strategy import BaseStorageStrategy
+from infrastructure.storage.components import (
+    EntityCache,
+    EntitySerializer,
+    EventPublisher,
+    MemoryEntityCache,
+    NoOpEventPublisher,
+    VersionManager,
+    NoOpVersionManager,
+)
 
 
-class TemplateSerializer:
+class TemplateSerializer(EntitySerializer):
     """Handles Template aggregate serialization/deserialization."""
 
     def __init__(self, defaults_service=None) -> None:
@@ -207,27 +216,47 @@ class TemplateSerializer:
 class TemplateRepositoryImpl(TemplateRepositoryInterface):
     """Template repository implementation using storage strategy composition."""
 
-    def __init__(self, storage_strategy: BaseStorageStrategy) -> None:
-        """Initialize repository with storage strategy."""
+    def __init__(
+        self,
+        storage_strategy: BaseStorageStrategy,
+        cache: Optional[EntityCache] = None,
+        event_publisher: Optional[EventPublisher] = None,
+        version_manager: Optional[VersionManager] = None,
+    ) -> None:
+        """Initialize repository with storage strategy and optional components."""
         self.storage_strategy = storage_strategy
         self.serializer = TemplateSerializer()
+        self.cache = cache or MemoryEntityCache()
+        self.event_publisher = event_publisher or NoOpEventPublisher()
+        self.version_manager = version_manager or NoOpVersionManager()
         self.logger = get_logger(__name__)
 
     @handle_infrastructure_exceptions(context="template_save")
     def save(self, template: Template) -> list[Any]:
         """Save template using storage strategy and return extracted events."""
         try:
+            # Increment version
+            version = self.version_manager.increment_version(str(template.template_id.value))
+            
             # Save the template
             template_data = self.serializer.to_dict(template)
+            template_data["version"] = version
             self.storage_strategy.save(str(template.template_id.value), template_data)
 
-            # Extract events from the aggregate
+            # Update cache
+            self.cache.put(str(template.template_id.value), template)
+
+            # Extract and publish events
             events = template.get_domain_events()
             template.clear_domain_events()
+            
+            if events:
+                self.event_publisher.publish_events(events)
 
             self.logger.debug(
-                "Saved template %s and extracted %s events",
+                "Saved template %s (version %d) and extracted %s events",
                 template.template_id,
+                version,
                 len(events),
             )
             return events
@@ -238,11 +267,23 @@ class TemplateRepositoryImpl(TemplateRepositoryInterface):
 
     @handle_infrastructure_exceptions(context="template_retrieval")
     def get_by_id(self, template_id: TemplateId) -> Optional[Template]:
-        """Get template by ID using storage strategy."""
+        """Get template by ID using storage strategy with caching."""
         try:
-            data = self.storage_strategy.find_by_id(str(template_id.value))
+            key = str(template_id.value)
+            
+            # Check cache first
+            cached = self.cache.get(key)
+            if cached:
+                self.logger.debug("Retrieved template %s from cache", template_id)
+                return cached
+            
+            # Load from storage
+            data = self.storage_strategy.find_by_id(key)
             if data:
-                return self.serializer.from_dict(data)
+                template = self.serializer.from_dict(data)
+                # Cache the result
+                self.cache.put(key, template)
+                return template
             return None
         except Exception as e:
             self.logger.error("Failed to get template %s: %s", template_id, e)
@@ -325,7 +366,12 @@ class TemplateRepositoryImpl(TemplateRepositoryInterface):
     def delete(self, template_id: TemplateId) -> None:
         """Delete template by ID."""
         try:
-            self.storage_strategy.delete(str(template_id.value))
+            key = str(template_id.value)
+            self.storage_strategy.delete(key)
+            
+            # Remove from cache
+            self.cache.remove(key)
+            
             self.logger.debug("Deleted template %s", template_id)
         except Exception as e:
             self.logger.error("Failed to delete template %s: %s", template_id, e)

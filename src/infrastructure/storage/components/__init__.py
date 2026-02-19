@@ -19,7 +19,7 @@ from .file_manager import FileManager
 
 # Generic components (truly reusable across storage types)
 from .lock_manager import LockManager, ReaderWriterLock
-from .resource_manager import DataConverter, QueryManager
+from .resource_manager import DataConverter, QueryManager, StorageResourceManager
 from .serialization_manager import JSONSerializer, SerializationManager
 
 # SQL-specific components (clearly prefixed)
@@ -59,13 +59,12 @@ __all__: list[str] = [
     "NoOpVersionManager",
     "QueryManager",
     "ReaderWriterLock",
-    # Base interfaces
-    "ResourceManager",
     # SQL components
     "SQLConnectionManager",
     "SQLQueryBuilder",
     "SQLSerializer",
     "SerializationManager",
+    "StorageResourceManager",
     "TransactionManager",
     "VersionManager",
 ]

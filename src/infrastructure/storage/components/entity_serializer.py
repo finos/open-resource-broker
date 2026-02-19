@@ -1,5 +1,7 @@
 """Entity serialization components for repository operations."""
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import Any, TypeVar
 
@@ -12,15 +14,15 @@ class EntitySerializer(ABC):
     """Base interface for entity serialization."""
 
     @abstractmethod
-    def to_dict(self, entity: T) -> dict[str, Any]:
+    def to_dict(self, entity: Any) -> dict[str, Any]:
         """Convert entity to dictionary."""
 
     @abstractmethod
-    def from_dict(self, data: dict[str, Any]) -> T:
+    def from_dict(self, data: dict[str, Any]) -> Any:
         """Convert dictionary to entity."""
 
 
-class BaseEntitySerializer(EntitySerializer[T]):
+class BaseEntitySerializer(EntitySerializer):
     """Base implementation for entity serialization."""
 
     def __init__(self) -> None:
