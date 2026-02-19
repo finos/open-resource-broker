@@ -65,9 +65,7 @@ class RequestCommandFactory:
             limit=limit,
         )
 
-    def create_cancel_request_command(
-        self, request_id: str, **kwargs: Any
-    ) -> CancelRequestCommand:
+    def create_cancel_request_command(self, request_id: str, **kwargs: Any) -> CancelRequestCommand:
         """Create command to cancel request."""
         return CancelRequestCommand(request_id=request_id)
 

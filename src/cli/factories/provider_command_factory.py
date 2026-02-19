@@ -4,7 +4,7 @@ from typing import Any, Optional
 import json
 
 from application.provider.commands import ExecuteProviderOperationCommand
-from application.queries.system import (
+from application.provider.queries import (
     GetProviderHealthQuery,
     ListAvailableProvidersQuery,
     GetProviderCapabilitiesQuery,

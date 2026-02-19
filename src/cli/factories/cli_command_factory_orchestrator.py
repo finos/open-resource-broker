@@ -266,8 +266,8 @@ class CLICommandFactoryOrchestrator:
             args_dict["request_ids"] = request_ids
 
         # Extract command group and action
-        command_group = getattr(args, "command_group", None)
-        command_action = getattr(args, "command_action", None) or getattr(args, "action", None)
+        command_group = getattr(args, "resource", None)
+        command_action = getattr(args, "action", None)
 
         # Route to appropriate factory based on command group
         return self._route_command(command_group, command_action, args_dict)
@@ -373,9 +373,7 @@ class CLICommandFactoryOrchestrator:
                     include_config=args.get("detailed", False),
                 )
             elif command_action == "reload":
-                return self.create_reload_provider_config_command(
-                    config_path=args.get("file")
-                )
+                return self.create_reload_provider_config_command(config_path=args.get("file"))
 
         # Provider operations
         elif command_group == "providers":
@@ -419,20 +417,19 @@ class CLICommandFactoryOrchestrator:
         elif command_group == "storage":
             if command_action == "list":
                 return self.create_list_storage_strategies_query(
-                    include_health=args.get("health", False),
-                    include_capabilities=args.get("detailed", False),
-                    include_metrics=args.get("detailed", False),
+                    include_current=True,
+                    include_details=args.get("detailed", False),
                     filter_expressions=args.get("filter") or [],
                 )
             elif command_action == "health":
                 return self.create_get_storage_health_query(
-                    storage_name=args.get("storage"), include_details=True
+                    strategy_name=args.get("storage"), detailed=True
                 )
             elif command_action == "metrics":
                 return self.create_get_storage_metrics_query(
-                    storage_name=args.get("storage"),
-                    timeframe=args.get("timeframe", "1h"),
-                    detailed=args.get("detailed", False),
+                    strategy_name=args.get("storage"),
+                    time_range=args.get("timeframe", "1h"),
+                    include_operations=args.get("detailed", False),
                 )
             elif command_action == "test":
                 return self.create_storage_test_command_data(**args)
@@ -441,8 +438,7 @@ class CLICommandFactoryOrchestrator:
         elif command_group == "scheduler":
             if command_action == "list":
                 return self.create_list_scheduler_strategies_query(
-                    include_health=args.get("health", False),
-                    include_capabilities=args.get("detailed", False),
+                    include_current=True,
                     include_details=args.get("long", False),
                     filter_expressions=args.get("filter") or [],
                 )

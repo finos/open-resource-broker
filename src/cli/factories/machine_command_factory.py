@@ -26,9 +26,7 @@ class MachineCommandFactory:
             request_id=request_id,
         )
 
-    def create_get_machine_query(
-        self, machine_id: str, **kwargs: Any
-    ) -> GetMachineQuery:
+    def create_get_machine_query(self, machine_id: str, **kwargs: Any) -> GetMachineQuery:
         """Create query to get machine by ID."""
         return GetMachineQuery(machine_id=machine_id)
 

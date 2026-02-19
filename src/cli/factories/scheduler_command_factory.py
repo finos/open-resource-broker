@@ -2,7 +2,7 @@
 
 from typing import Any, Optional
 
-from application.queries.system import (
+from application.queries.scheduler import (
     ListSchedulerStrategiesQuery,
     GetSchedulerConfigurationQuery,
     ValidateSchedulerConfigurationQuery,
@@ -14,16 +14,14 @@ class SchedulerCommandFactory:
 
     def create_list_scheduler_strategies_query(
         self,
-        include_health: bool = False,
-        include_capabilities: bool = False,
+        include_current: bool = True,
         include_details: bool = False,
         filter_expressions: Optional[list] = None,
         **kwargs: Any,
     ) -> ListSchedulerStrategiesQuery:
         """Create query to list scheduler strategies."""
         return ListSchedulerStrategiesQuery(
-            include_health=include_health,
-            include_capabilities=include_capabilities,
+            include_current=include_current,
             include_details=include_details,
             filter_expressions=filter_expressions or [],
         )

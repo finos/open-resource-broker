@@ -2,7 +2,7 @@
 
 from typing import Any, Optional
 
-from application.queries.system import (
+from application.queries.storage import (
     ListStorageStrategiesQuery,
     GetStorageHealthQuery,
     GetStorageMetricsQuery,
@@ -14,39 +14,37 @@ class StorageCommandFactory:
 
     def create_list_storage_strategies_query(
         self,
-        include_health: bool = False,
-        include_capabilities: bool = False,
-        include_metrics: bool = False,
+        include_current: bool = True,
+        include_details: bool = False,
         filter_expressions: Optional[list] = None,
         **kwargs: Any,
     ) -> ListStorageStrategiesQuery:
         """Create query to list storage strategies."""
         return ListStorageStrategiesQuery(
-            include_health=include_health,
-            include_capabilities=include_capabilities,
-            include_metrics=include_metrics,
+            include_current=include_current,
+            include_details=include_details,
             filter_expressions=filter_expressions or [],
         )
 
     def create_get_storage_health_query(
         self,
-        storage_name: Optional[str] = None,
-        include_details: bool = True,
+        strategy_name: Optional[str] = None,
+        detailed: bool = False,
         **kwargs: Any,
     ) -> GetStorageHealthQuery:
         """Create query to get storage health."""
-        return GetStorageHealthQuery(
-            storage_name=storage_name, include_details=include_details
-        )
+        return GetStorageHealthQuery(strategy_name=strategy_name, detailed=detailed)
 
     def create_get_storage_metrics_query(
         self,
-        storage_name: Optional[str] = None,
-        timeframe: str = "1h",
-        detailed: bool = False,
+        strategy_name: Optional[str] = None,
+        time_range: str = "1h",
+        include_operations: bool = True,
         **kwargs: Any,
     ) -> GetStorageMetricsQuery:
         """Create query to get storage metrics."""
         return GetStorageMetricsQuery(
-            storage_name=storage_name, timeframe=timeframe, detailed=detailed
+            strategy_name=strategy_name,
+            time_range=time_range,
+            include_operations=include_operations,
         )
