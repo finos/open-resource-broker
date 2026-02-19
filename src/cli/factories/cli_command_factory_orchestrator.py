@@ -327,19 +327,8 @@ class CLICommandFactoryOrchestrator:
                     provider=args.get("provider"),
                 )
             elif command_action == "status":
-                if args.get("request_ids"):
-                    return self.create_get_multiple_requests_query(
-                        request_ids=args.get("request_ids"),
-                        provider_name=args.get("provider"),
-                        lightweight=False,
-                        include_machines=True,
-                    )
-                else:
-                    return self.create_get_request_status_query(
-                        request_id=args.get("request_id"),
-                        provider=args.get("provider"),
-                        lightweight=False,
-                    )
+                # Return None to trigger fallback to scheduler-aware handler
+                return None
             elif command_action == "list":
                 return self.create_list_requests_query(
                     provider=args.get("provider"),
