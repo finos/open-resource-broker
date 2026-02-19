@@ -2,6 +2,7 @@
 
 from typing import Any, Optional
 from domain.base.ports import ConfigurationPort, LoggingPort
+from domain.base.results import ProviderSelectionResult
 
 
 class ProviderSelectionService:
@@ -73,8 +74,6 @@ class ProviderSelectionService:
             )
             reason = f"load_balanced_{self._provider_config.selection_policy.lower()}"
 
-        from providers.results import ProviderSelectionResult
-
         result = ProviderSelectionResult(
             provider_type=selected.type,
             provider_name=selected.name,
@@ -98,8 +97,6 @@ class ProviderSelectionService:
         if not provider_instance.enabled:
             raise ValueError(f"Provider instance '{provider_name}' is disabled")
 
-        from providers.results import ProviderSelectionResult
-
         return ProviderSelectionResult(
             provider_type=provider_instance.type,
             provider_name=provider_name,
@@ -118,8 +115,6 @@ class ProviderSelectionService:
 
         if self._logger:
             self._logger.info("Selected explicit provider: %s", provider_name)
-
-        from providers.results import ProviderSelectionResult
 
         return ProviderSelectionResult(
             provider_type=provider_instance.type,
@@ -144,8 +139,6 @@ class ProviderSelectionService:
                 provider_type,
             )
 
-        from providers.results import ProviderSelectionResult
-
         return ProviderSelectionResult(
             provider_type=provider_type,
             provider_name=selected_instance.name,
@@ -169,8 +162,6 @@ class ProviderSelectionService:
                 selected_instance.name,
                 provider_api,
             )
-
-        from providers.results import ProviderSelectionResult
 
         return ProviderSelectionResult(
             provider_type=selected_instance.type,
@@ -203,8 +194,6 @@ class ProviderSelectionService:
 
         if self._logger:
             self._logger.info("Selected default provider: %s", default_provider_instance)
-
-        from providers.results import ProviderSelectionResult
 
         return ProviderSelectionResult(
             provider_type=default_provider_type,

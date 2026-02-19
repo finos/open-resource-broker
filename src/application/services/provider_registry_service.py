@@ -3,11 +3,11 @@
 from typing import Any
 
 from domain.base.ports.logging_port import LoggingPort
+from domain.base.results import ProviderSelectionResult, ValidationResult
 from domain.services.provider_selection_service import ProviderSelectionService
 from domain.services.template_validation_domain_service import TemplateValidationDomainService
 from domain.template.template_aggregate import Template
 from providers.registry import ProviderRegistry
-from providers.results import ProviderSelectionResult, ValidationResult
 
 
 class ProviderRegistryService:

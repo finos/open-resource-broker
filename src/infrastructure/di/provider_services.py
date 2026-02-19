@@ -19,6 +19,7 @@ def _register_application_services(container: DIContainer) -> None:
     from application.services.provider_registry_service import ProviderRegistryService
     from application.services.machine_sync_service import MachineSyncService
     from infrastructure.di.buses import CommandBus
+    from domain.services.provider_selection_service import ProviderSelectionService
     from domain.services.template_validation_domain_service import TemplateValidationDomainService
     from domain.base.ports.logging_port import LoggingPort
     from providers.registry import get_provider_registry
@@ -29,6 +30,7 @@ def _register_application_services(container: DIContainer) -> None:
         lambda c: ProviderRegistryService(
             registry=get_provider_registry(),
             validation_service=c.get(TemplateValidationDomainService),
+            selection_service=c.get(ProviderSelectionService),
             logger=c.get(LoggingPort),
         ),
     )
