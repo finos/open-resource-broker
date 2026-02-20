@@ -7,7 +7,7 @@ handler discovery for zero code duplication.
 """
 
 from contextlib import suppress
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Dict
 
 from bootstrap import Application
 
@@ -190,6 +190,30 @@ class OpenResourceBroker:
 
         return self._discovery.get_method_info(method_name)
 
+    def get_method_parameters(self, method_name: str) -> Optional[Dict[str, str]]:
+        """
+        Get supported parameters for a specific SDK method, including CLI-style aliases.
+
+        Args:
+            method_name: Name of the method to get parameters for
+
+        Returns:
+            Dict mapping parameter names (including CLI aliases) to CQRS parameter names,
+            or None if method not found
+        """
+        if not self._initialized:
+            raise SDKError(
+                "SDK not initialized. Call initialize() or use as async context manager."
+            )
+
+        method_info = self.get_method_info(method_name)
+        if not method_info:
+            return None
+
+        from .parameter_mapping import ParameterMapper
+
+        return ParameterMapper.get_supported_parameters(method_info.original_class)
+
     def get_methods_by_type(self, handler_type: str) -> list[str]:
         """
         Get methods filtered by handler type.
@@ -257,6 +281,46 @@ class OpenResourceBroker:
             "query_methods": len(query_methods),
             "available_methods": list(self._methods.keys()),
         }
+
+    # CLI-equivalent convenience methods
+    async def request_machines(self, template_id: str, count: int, **kwargs) -> Any:
+        """Request machines (CLI-style convenience method).
+
+        Equivalent to: orb machines request <template_id> <count>
+        Maps to: create_request()
+        """
+        if not self._initialized:
+            raise SDKError(
+                "SDK not initialized. Call initialize() or use as async context manager."
+            )
+
+        return await self.create_request(template_id=template_id, machine_count=count, **kwargs)
+
+    async def show_template(self, template_id: str) -> Any:
+        """Show template details (CLI-style convenience method).
+
+        Equivalent to: orb templates show <template_id>
+        Maps to: get_template()
+        """
+        if not self._initialized:
+            raise SDKError(
+                "SDK not initialized. Call initialize() or use as async context manager."
+            )
+
+        return await self.get_template(template_id=template_id)
+
+    async def health_check(self) -> Any:
+        """Check provider health (CLI-style convenience method).
+
+        Equivalent to: orb providers health
+        Maps to: get_provider_health()
+        """
+        if not self._initialized:
+            raise SDKError(
+                "SDK not initialized. Call initialize() or use as async context manager."
+            )
+
+        return await self.get_provider_health()
 
     def __repr__(self) -> str:
         """Return string representation of SDK instance."""

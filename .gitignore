@@ -139,6 +139,8 @@ yarn-error.log*
 # Beads
 .beads/
 AGENTS.md
+.dolt
+.doltcfg
 
 # Docker
 .docker/

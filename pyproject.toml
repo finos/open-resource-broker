@@ -50,11 +50,13 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     "urllib3>=2.6.0", # Security: Fix CVE-2025-66471 and CVE-2025-66418
     "PyJWT>=2.8.0",
-    "cryptography>=41.0.0",
+    "cryptography>=46.0.5", # Security: Fix CVE-2026-26007
+    "filelock>=3.20.1", # Security: Fix CVE-2025-68146 race condition
     "requests>=2.31.0",
     "PyYAML>=6.0.0", # Exported API (lazy-loaded)
     "jsonschema>=4.17.0",
     "fastapi>=0.128.0",
+    "starlette>=0.49.1", # Security: Fix CVE-2025-62727, CVE-2025-54121, CVE-2024-47874
 ]
 
 [project.optional-dependencies]
@@ -151,6 +153,7 @@ ci = [
 
 # Dev Dependencies: Additional dev tools (includes all CI deps)
 dev = [
+    "virtualenv>=20.26.6",  # Security: Fix CVE-2024-53899 command injection
     "pre-commit>=3.5.0,<5.0.0",
     "bump2version>=1.0.1,<2.0.0",
     "python-semantic-release>=10.0.0,<11.0.0",

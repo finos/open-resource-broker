@@ -19,7 +19,7 @@ class TemplateCacheService(ABC):
     """
 
     @abstractmethod
-    def get_or_load(self, loader_func: Callable[[], list[TemplateDTO]]) -> list[TemplateDTO]:
+    async def get_or_load(self, loader_func: Callable[[], list[TemplateDTO]]) -> list[TemplateDTO]:
         """
         Get templates from cache or load using the provided function.
 
@@ -55,10 +55,13 @@ class NoOpTemplateCacheService(TemplateCacheService):
         """
         self._logger = logger
 
-    def get_or_load(self, loader_func: Callable[[], list[TemplateDTO]]) -> list[TemplateDTO]:
+    async def get_or_load(self, loader_func: Callable[[], list[TemplateDTO]]) -> list[TemplateDTO]:
         """Load fresh data, no caching."""
         self._logger.debug("NoOpTemplateCacheService: Loading fresh templates")
-        return loader_func()
+        result = loader_func()
+        if hasattr(result, "__await__"):
+            return await result
+        return result
 
     def get_all(self) -> Optional[list[TemplateDTO]]:
         """Return None as nothing is cached."""
@@ -97,7 +100,7 @@ class TTLTemplateCacheService(TemplateCacheService):
         self._cache_time: Optional[datetime] = None
         self._lock = threading.Lock()
 
-    def get_or_load(self, loader_func: Callable[[], list[TemplateDTO]]) -> list[TemplateDTO]:
+    async def get_or_load(self, loader_func: Callable[[], list[TemplateDTO]]) -> list[TemplateDTO]:
         """
         Get templates from cache or load if expired.
 
@@ -117,10 +120,18 @@ class TTLTemplateCacheService(TemplateCacheService):
             if self._logger:
                 self._logger.debug("TTL cache miss: loading fresh templates")
 
-            self._cached_templates = loader_func()
+        # Load outside the lock to avoid blocking
+        result = loader_func()
+        if hasattr(result, "__await__"):
+            templates = await result
+        else:
+            templates = result
+
+        with self._lock:
+            self._cached_templates = templates
             self._cache_time = datetime.now()
 
-            return self._cached_templates
+        return templates
 
     def invalidate(self) -> None:
         """Invalidate the cache by clearing cached data."""
@@ -198,7 +209,7 @@ class AutoRefreshTemplateCacheService(TTLTemplateCacheService):
         self._refresh_timer: Optional[threading.Timer] = None
         self._loader_func: Optional[Callable[[], list[TemplateDTO]]] = None
 
-    def get_or_load(self, loader_func: Callable[[], list[TemplateDTO]]) -> list[TemplateDTO]:
+    async def get_or_load(self, loader_func: Callable[[], list[TemplateDTO]]) -> list[TemplateDTO]:
         """
         Get templates from cache with auto-refresh capability.
 
@@ -210,7 +221,7 @@ class AutoRefreshTemplateCacheService(TTLTemplateCacheService):
         """
         self._loader_func = loader_func
 
-        templates = super().get_or_load(loader_func)
+        templates = await super().get_or_load(loader_func)
 
         # Schedule refresh if auto-refresh is enabled and cache was loaded
         if self._auto_refresh and self._cache_time:
@@ -228,9 +239,44 @@ class AutoRefreshTemplateCacheService(TTLTemplateCacheService):
             if self._loader_func and self._logger:
                 self._logger.debug("Auto-refreshing template cache")
                 try:
-                    with self._lock:
-                        self._cached_templates = self._loader_func()
-                        self._cache_time = datetime.now()
+                    import asyncio
+
+                    result = self._loader_func()
+                    if hasattr(result, "__await__"):
+                        # Run async function in new event loop for background refresh
+                        try:
+                            loop = asyncio.get_event_loop()
+                            if loop.is_running():
+                                # Create new thread for async operation if loop is running
+                                import threading
+
+                                def async_refresh():
+                                    new_loop = asyncio.new_event_loop()
+                                    asyncio.set_event_loop(new_loop)
+                                    try:
+                                        templates = new_loop.run_until_complete(result)
+                                        with self._lock:
+                                            self._cached_templates = templates
+                                            self._cache_time = datetime.now()
+                                    finally:
+                                        new_loop.close()
+
+                                threading.Thread(target=async_refresh, daemon=True).start()
+                            else:
+                                templates = loop.run_until_complete(result)
+                                with self._lock:
+                                    self._cached_templates = templates
+                                    self._cache_time = datetime.now()
+                        except RuntimeError:
+                            # No event loop, create one
+                            templates = asyncio.run(result)
+                            with self._lock:
+                                self._cached_templates = templates
+                                self._cache_time = datetime.now()
+                    else:
+                        with self._lock:
+                            self._cached_templates = result
+                            self._cache_time = datetime.now()
                 except Exception as e:
                     if self._logger:
                         self._logger.error("Auto-refresh failed: %s", e)

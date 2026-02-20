@@ -32,11 +32,11 @@ async with orb(provider="aws") as sdk:
     templates = await sdk.list_templates(active_only=True)
     print(f"Found {len(templates)} templates")
 
-    # Create machines
+    # Create machines using CLI-style convenience method
     if templates:
-        request = await sdk.create_request(
+        request = await sdk.request_machines(
             template_id=templates[0].template_id,
-            machine_count=5
+            count=5
         )
         print(f"Created request: {request.id}")
 
@@ -44,6 +44,27 @@ async with orb(provider="aws") as sdk:
         status = await sdk.get_request_status(request_id=request.id)
         print(f"Request status: {status}")
 ```
+
+### CLI-Style Convenience Methods
+
+The SDK provides CLI-equivalent convenience methods for common operations:
+
+```python
+async with orb(provider="aws") as sdk:
+    # CLI: orb machines request <template_id> <count>
+    request = await sdk.request_machines("template-id", 5)
+    
+    # CLI: orb templates show <template_id>
+    template = await sdk.show_template("template-id")
+    
+    # CLI: orb providers health
+    health = await sdk.health_check()
+```
+
+These convenience methods map to the underlying CQRS methods:
+- `request_machines(template_id, count)` → `create_request(template_id=template_id, machine_count=count)`
+- `show_template(template_id)` → `get_template(template_id=template_id)`
+- `health_check()` → `get_provider_health()`
 
 ### Manual Initialization
 
@@ -94,6 +115,39 @@ async with orb(config=config) as sdk:
 # Load from JSON file
 async with orb(config_path="config.json") as sdk:
     pass
+```
+
+## CLI vs SDK Equivalents
+
+For users familiar with the CLI, the SDK provides both convenience methods and direct CQRS methods:
+
+| CLI Command | SDK Convenience Method | SDK CQRS Method |
+|-------------|----------------------|-----------------|
+| `orb machines request <template_id> <count>` | `sdk.request_machines(template_id, count)` | `sdk.create_request(template_id=template_id, machine_count=count)` |
+| `orb templates show <template_id>` | `sdk.show_template(template_id)` | `sdk.get_template(template_id=template_id)` |
+| `orb providers health` | `sdk.health_check()` | `sdk.get_provider_health()` |
+| `orb templates list` | N/A | `sdk.list_templates()` |
+| `orb requests status <request_id>` | N/A | `sdk.get_request_status(request_id=request_id)` |
+
+### Example Usage Comparison
+
+```python
+# CLI-style convenience methods (shorter, familiar to CLI users)
+async with orb(provider="aws") as sdk:
+    template = await sdk.show_template("my-template")
+    request = await sdk.request_machines("my-template", 3)
+    health = await sdk.health_check()
+
+# CQRS methods (more explicit, full parameter control)
+async with orb(provider="aws") as sdk:
+    template = await sdk.get_template(template_id="my-template")
+    request = await sdk.create_request(
+        template_id="my-template", 
+        machine_count=3,
+        timeout=1800,
+        priority="high"
+    )
+    health = await sdk.get_provider_health()
 ```
 
 ## Method Discovery
