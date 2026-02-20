@@ -899,6 +899,27 @@ async def execute_command(args, app, resource_parsers) -> Union[str, tuple[str, 
             result = await handle_provider_show(args)
         else:
             raise ValueError(f"Unknown provider config action: {args.action}")
+
+    # Handle system commands directly
+    elif hasattr(args, "resource") and args.resource == "system":
+        if args.action == "serve":
+            from interface.serve_command_handler import handle_serve_api
+
+            result = await handle_serve_api(args)
+        elif args.action == "status":
+            from interface.system_command_handlers import handle_system_status
+
+            result = await handle_system_status(args)
+        elif args.action == "health":
+            from interface.system_command_handlers import handle_system_health
+
+            result = await handle_system_health(args)
+        elif args.action == "metrics":
+            from interface.system_command_handlers import handle_system_metrics
+
+            result = await handle_system_metrics(args)
+        else:
+            raise ValueError(f"Unknown system action: {args.action}")
     else:
         # Validate show commands before creating command/query
         if hasattr(args, "resource") and hasattr(args, "action") and args.action == "show":
