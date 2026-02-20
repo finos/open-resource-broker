@@ -356,7 +356,7 @@ class TestAWSProviderConfigBaseSettings:
             "profile": "ORB_AWS_PROFILE",
             "role_arn": "ORB_AWS_ROLE_ARN",
             "access_key_id": "ORB_AWS_ACCESS_KEY_ID",
-            "secret_access_key": "ORB_AWS_SECRET_ACCESS_KEY",
+            "secret_access_key": "ORB_AWS_SECRET_ACCESS_KEY",  # nosec B105
             "aws_max_retries": "ORB_AWS_AWS_MAX_RETRIES",
             "proxy_host": "ORB_AWS_PROXY_HOST",
             "proxy_port": "ORB_AWS_PROXY_PORT",

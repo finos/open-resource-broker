@@ -364,7 +364,7 @@ class TestCQRSHandlerRegistryEdgeCases:
             self.registry.register_command_handler(None, None)
             self.registry.register_query_handler(None, None)
             self.registry.register_event_handler(None, None)
-        except Exception:
+        except Exception:  # nosec B110
             # It's acceptable for this to raise an exception
             pass
 

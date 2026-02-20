@@ -50,14 +50,14 @@ class TestDependencyInjectionComprehensive:
                     container.register("test_service", Mock())
                     # Should not raise exception
                     assert True
-                except Exception:
+                except Exception:  # nosec B110
                     # Registration might require specific format
                     pass
             elif hasattr(container, "bind"):
                 try:
                     container.bind("test_service", Mock())
                     assert True
-                except Exception:
+                except Exception:  # nosec B110
                     pass
 
         except ImportError:
@@ -147,7 +147,7 @@ class TestDependencyInjectionComprehensive:
                 try:
                     mock_command = Mock()
                     await command_bus.send(mock_command)
-                except Exception:
+                except Exception:  # nosec B110
                     # Send might require registered handlers
                     pass
 
@@ -162,7 +162,7 @@ class TestDependencyInjectionComprehensive:
                     mock_query = Mock()
                     result = await query_bus.send(mock_query)
                     assert result is not None or result is None  # Both are valid
-                except Exception:
+                except Exception:  # nosec B110
                     # Send might require registered handlers
                     pass
 
@@ -289,7 +289,7 @@ class TestPersistenceLayerComprehensive:
                                         else:
                                             # Methods that need parameters
                                             await method(Mock())
-                                    except Exception:
+                                    except Exception:  # nosec B110
                                         # Method might require specific parameters
                                         pass
 

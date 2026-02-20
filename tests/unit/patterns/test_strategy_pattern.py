@@ -273,7 +273,7 @@ class TestStrategyPattern:
                 factory.create_strategy(config)
                 # Some invalid configs might still create strategies
                 # Validation might happen at execution time
-            except Exception:
+            except Exception:  # nosec B110
                 # Expected for invalid configurations
                 pass
 
@@ -305,7 +305,7 @@ class TestStrategyPattern:
                 if hasattr(result, "error_message"):
                     assert result.error_message is not None
 
-            except Exception:
+            except Exception:  # nosec B110
                 # Some strategies might raise exceptions - this is acceptable
                 # as long as they're handled at a higher level
                 pass
@@ -355,7 +355,7 @@ class TestStrategyPattern:
             try:
                 result = strategy.execute(operation)
                 results.append(result)
-            except Exception:
+            except Exception:  # nosec B110
                 # Strategy might not be fully configured
                 pass
 

@@ -247,9 +247,12 @@ class AWSAMIResolver(ImageResolver):
                     # Load failed entries
                     for key in cache_data.get("failed", []):
                         self._cache.mark_failed(key)
-        except Exception:
+        except Exception as e:
             # Ignore errors loading persistent cache
-            pass
+            from infrastructure.logging.logger import get_logger
+
+            logger = get_logger(__name__)
+            logger.debug(f"Failed to load persistent cache: {e}")
 
     def _save_persistent_cache(self) -> None:
         """Save cache to persistent file."""
@@ -264,9 +267,12 @@ class AWSAMIResolver(ImageResolver):
             # In a full implementation, the cache service would provide export/import methods
             with open(self._cache_file_path, "w") as f:
                 json.dump(cache_data, f, indent=2)
-        except Exception:
+        except Exception as e:
             # Ignore errors saving persistent cache
-            pass
+            from infrastructure.logging.logger import get_logger
+
+            logger = get_logger(__name__)
+            logger.debug(f"Failed to save persistent cache: {e}")
 
     def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics."""

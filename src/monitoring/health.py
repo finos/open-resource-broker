@@ -8,6 +8,25 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+# Optional monitoring dependencies
+try:
+    import psutil
+
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    psutil = None
+
+try:
+    from prometheus_client import Counter, Histogram, generate_latest
+
+    PROMETHEUS_AVAILABLE = True
+except ImportError:
+    PROMETHEUS_AVAILABLE = False
+    Counter = None
+    Histogram = None
+    generate_latest = None
+
 from botocore.exceptions import ClientError
 
 from config.managers.configuration_manager import ConfigurationManager
@@ -185,12 +204,13 @@ class HealthCheck:
 
     def _check_system_health(self) -> HealthStatus:
         """Check system health."""
-        try:
-            import psutil
-        except ImportError:
-            raise ImportError(
-                "System monitoring requires: pip install orb-py[monitoring]"
-            ) from None
+        if not PSUTIL_AVAILABLE:
+            return HealthStatus(
+                name="system",
+                status="unknown",
+                details={"available": False, "reason": "psutil not installed"},
+                dependencies=["os"],
+            )
 
         try:
             cpu_percent = psutil.cpu_percent()

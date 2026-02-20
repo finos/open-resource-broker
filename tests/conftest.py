@@ -152,9 +152,9 @@ def setup_test_environment():
         {
             "AWS_DEFAULT_REGION": "us-east-1",
             "AWS_ACCESS_KEY_ID": "testing",
-            "AWS_SECRET_ACCESS_KEY": "testing",
-            "AWS_SECURITY_TOKEN": "testing",
-            "AWS_SESSION_TOKEN": "testing",
+            "AWS_SECRET_ACCESS_KEY": "testing",  # nosec B105
+            "AWS_SECURITY_TOKEN": "testing",  # nosec B105
+            "AWS_SESSION_TOKEN": "testing",  # nosec B105
             "ENVIRONMENT": "testing",
             "LOG_LEVEL": "DEBUG",
             "TESTING": "true",
@@ -201,7 +201,7 @@ def test_config_dict() -> dict[str, Any]:
                         "region": "us-east-1",
                         "profile": "default",
                         "access_key_id": "testing",
-                        "secret_access_key": "testing",
+                        "secret_access_key": "testing",  # nosec B105
                     },
                 }
             ],
@@ -210,7 +210,7 @@ def test_config_dict() -> dict[str, Any]:
             "region": "us-east-1",
             "profile": "default",
             "access_key_id": "testing",
-            "secret_access_key": "testing",
+            "secret_access_key": "testing",  # nosec B105
         },
         "logging": {
             "level": "DEBUG",

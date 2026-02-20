@@ -137,7 +137,7 @@ class TestHostFactoryLifecycle:
 
                     # Should indicate failure
                     assert request_info["status"] == scenario["expected_request_status"]
-                except Exception:
+                except Exception:  # nosec B110
                     # Exception is also acceptable for failure scenarios
                     pass
 

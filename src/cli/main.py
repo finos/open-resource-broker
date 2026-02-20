@@ -217,11 +217,11 @@ def add_request_actions(subparsers):
 
 async def _show_resource_help(resource):
     """Show help for a resource when no action is provided."""
-    import subprocess
+    import subprocess  # nosec B404
     import sys
 
     # Call the CLI with --help for the specific resource
-    subprocess.run([sys.executable, "-m", "run", resource, "--help"], check=False)
+    subprocess.run([sys.executable, "-m", "run", resource, "--help"], check=False)  # nosec B603
     return {"success": True, "message": f"Showed help for {resource}"}
 
 

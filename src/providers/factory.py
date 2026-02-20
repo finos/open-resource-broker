@@ -104,8 +104,8 @@ class ProviderStrategyFactory:
                 "profile": "ORB_AWS_PROFILE",
                 "role_arn": "ORB_AWS_ROLE_ARN",
                 "access_key_id": "ORB_AWS_ACCESS_KEY_ID",
-                "secret_access_key": "ORB_AWS_SECRET_ACCESS_KEY",
-                "session_token": "ORB_AWS_SESSION_TOKEN",
+                "secret_access_key": "ORB_AWS_SECRET_ACCESS_KEY",  # nosec B105
+                "session_token": "ORB_AWS_SESSION_TOKEN",  # nosec B105
                 "endpoint_url": "ORB_AWS_ENDPOINT_URL",
                 "aws_max_retries": "ORB_AWS_AWS_MAX_RETRIES",
                 "aws_read_timeout": "ORB_AWS_AWS_READ_TIMEOUT",

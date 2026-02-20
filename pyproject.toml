@@ -55,8 +55,6 @@ dependencies = [
     "requests>=2.31.0",
     "PyYAML>=6.0.0", # Exported API (lazy-loaded)
     "jsonschema>=4.17.0",
-    "fastapi>=0.128.0",
-    "starlette>=0.49.1", # Security: Fix CVE-2025-62727, CVE-2025-54121, CVE-2024-47874
 ]
 
 [project.optional-dependencies]
@@ -68,7 +66,8 @@ cli = [
 
 # API server (for REST API mode)
 api = [
-    "fastapi>=0.104.0",
+    "fastapi>=0.128.0",
+    "starlette>=0.49.1", # Security: Fix CVE-2025-62727, CVE-2025-54121, CVE-2024-47874
     "uvicorn>=0.24.0",
     "jinja2>=3.1.0",
 ]

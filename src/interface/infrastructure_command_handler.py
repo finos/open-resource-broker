@@ -236,9 +236,12 @@ def _get_active_providers_with_overrides() -> List[Dict[str, Any]]:
                 provider_config["profile"] = effective_profile
 
                 provider["config"] = provider_config
-    except Exception:
+    except Exception as e:
         # Fallback to original providers if override fails
-        pass
+        from infrastructure.logging.logger import get_logger
+
+        logger = get_logger(__name__)
+        logger.debug(f"Failed to override provider config: {e}")
 
     return providers
 

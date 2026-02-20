@@ -110,7 +110,7 @@ async def handle_get_request_status(args: "argparse.Namespace") -> dict[str, Any
                     request_dto = await query_bus.execute(query)
                     if request_dto:
                         request_dtos.append(request_dto)
-                except Exception:
+                except Exception:  # nosec B112
                     # Continue with other requests if one fails
                     continue
 

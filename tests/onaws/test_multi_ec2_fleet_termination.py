@@ -656,7 +656,7 @@ def test_multi_ec2_fleet_termination(setup_multi_ec2_fleet_templates):
                     fleet_type = fleet.get("Type", "unknown")
                     if fleet_type == "maintain":
                         maintain_fleets_remaining.append(fleet_id)
-            except Exception:
+            except Exception:  # nosec B110
                 pass
 
     if final_remaining_fleets:

@@ -13,4 +13,6 @@ echo "Git hooks configured!"
 echo "Hooks will now run from .githooks/ (version controlled)"
 echo ""
 echo "Installed hooks:"
-ls -1 .githooks/ | grep -v README
+for hook in .githooks/*; do
+    [[ "$(basename "$hook")" != "README"* ]] && basename "$hook"
+done

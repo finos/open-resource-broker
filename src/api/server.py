@@ -35,6 +35,22 @@ def create_fastapi_app(server_config):
             "Install with: pip install orb-py[api]"
         )
 
+    logger = get_logger(__name__)
+
+    # Validate and default configuration
+    if server_config is None:
+        logger.warning("No server configuration provided, using defaults")
+        from config.schemas.server_schema import ServerConfig
+
+        server_config = ServerConfig()
+
+    # Validate configuration object
+    if not hasattr(server_config, "docs_enabled"):
+        logger.error("Invalid server configuration: missing docs_enabled")
+        from config.schemas.server_schema import ServerConfig
+
+        server_config = ServerConfig()
+
     from api.documentation import configure_openapi
     from api.middleware import AuthMiddleware, LoggingMiddleware
     from infrastructure.error.exception_handler import get_exception_handler

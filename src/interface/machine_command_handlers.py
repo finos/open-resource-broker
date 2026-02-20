@@ -75,7 +75,7 @@ async def handle_get_machine_status(args: "argparse.Namespace") -> dict[str, Any
                 machine_dto = await query_bus.execute(query)
                 if machine_dto:
                     machine_dtos.append(machine_dto)
-            except Exception:
+            except Exception:  # nosec B112
                 # Continue with other machines if one fails
                 continue
 

@@ -743,7 +743,7 @@ class TestSystemValidation:
             try:
                 factory.clear_cache()  # Should not raise exception
                 validation_checklist["error_handling"] = True
-            except Exception:
+            except Exception:  # nosec B110
                 pass
 
             # Performance

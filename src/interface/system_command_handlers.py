@@ -144,8 +144,11 @@ async def handle_select_provider_strategy(args) -> dict[str, Any]:
         registered_types = registry.get_registered_providers()
         if registered_types:
             default_provider = registered_types[0]
-    except Exception:
-        pass  # Use fallback
+    except Exception as e:
+        from infrastructure.logging.logger import get_logger
+
+        logger = get_logger(__name__)
+        logger.debug(f"Failed to get default provider: {e}")  # Use fallback
 
     provider = getattr(args, "provider", default_provider)
     return {

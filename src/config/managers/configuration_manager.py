@@ -130,6 +130,15 @@ class ConfigurationManager:
 
         return config_instance
 
+    def get_typed_with_defaults(self, config_type: type[T]) -> T:
+        """Get typed configuration with guaranteed defaults."""
+        try:
+            return self.get_typed(config_type)
+        except (ConfigurationError, Exception) as e:
+            logger.warning(f"Configuration loading failed for {config_type.__name__}: {e}")
+            logger.info(f"Using default configuration for {config_type.__name__}")
+            return config_type()  # Use Pydantic defaults
+
     def reload(self) -> None:
         """Reload configuration from sources."""
         try:

@@ -57,7 +57,7 @@ class TestAWSProviderEnvironmentVariables:
             # Test access key authentication
             with patch.dict(
                 os.environ,
-                {"ORB_AWS_ACCESS_KEY_ID": "AKIATEST123", "ORB_AWS_SECRET_ACCESS_KEY": "secret123"},
+                {"ORB_AWS_ACCESS_KEY_ID": "AKIATEST123", "ORB_AWS_SECRET_ACCESS_KEY": "secret123"},  # nosec B105
             ):
                 config = AWSProviderConfig()
                 assert config.access_key_id == "AKIATEST123"
@@ -739,13 +739,13 @@ class TestProviderStrategyPatternsComprehensive:
                             if inspect.iscoroutinefunction(method):
                                 try:
                                     await method(Mock())
-                                except Exception:
+                                except Exception:  # nosec B110
                                     # Method might require specific parameters
                                     pass
                             else:
                                 try:
                                     method(Mock())
-                                except Exception:
+                                except Exception:  # nosec B110
                                     # Method might require specific parameters
                                     pass
 

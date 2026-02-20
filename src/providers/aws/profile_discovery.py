@@ -28,9 +28,12 @@ def get_available_profiles() -> List[Dict[str, str]]:
                         profile_names.add(section[8:])  # Remove "profile " prefix
                     elif section == "default":
                         profile_names.add("default")
-            except Exception:
+            except Exception as e:
                 # Ignore parsing errors and continue
-                pass
+                from infrastructure.logging.logger import get_logger
+
+                logger = get_logger(__name__)
+                logger.debug(f"Failed to parse AWS config file: {e}")
 
     for profile_name in sorted(profile_names):
         profiles.append({"name": profile_name, "description": f"Profile: {profile_name}"})

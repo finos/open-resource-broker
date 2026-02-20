@@ -355,9 +355,12 @@ class CLIResponseFormatter:
                         elif self._looks_like_machine(data):
                             return self.scheduler_strategy.format_machine_for_display(data)
 
-        except Exception:
+        except Exception as e:
             # Fallback to original data if formatting fails
-            pass
+            from infrastructure.logging.logger import get_logger
+
+            logger = get_logger(__name__)
+            logger.debug(f"Failed to format data for display: {e}")
 
         return data
 

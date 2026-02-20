@@ -41,10 +41,22 @@ async def handle_serve_api(args) -> dict[str, Any]:
         from domain.base.ports.configuration_port import ConfigurationPort
         from infrastructure.di.container import get_container
 
-        # Get configuration through DI
+        # Get configuration through DI with fallbacks
         container = get_container()
         config_manager = container.get(ConfigurationPort)
-        server_config = config_manager.get_typed(ServerConfig)
+
+        # Use defensive configuration loading
+        try:
+            server_config = config_manager.get_typed_with_defaults(ServerConfig)
+        except Exception as e:
+            logger.warning(f"Configuration loading failed: {e}")
+            logger.info("Using default server configuration")
+            server_config = ServerConfig()  # Use Pydantic defaults
+
+        # Validate critical configuration
+        if server_config is None:
+            logger.error("Server configuration is None, creating default")
+            server_config = ServerConfig()
 
         # Override with CLI arguments if provided
         if host:

@@ -162,7 +162,7 @@ class TestAPIHandlersComprehensive:
                                             try:
                                                 await method(Mock())
                                                 break
-                                            except Exception:
+                                            except Exception:  # nosec B110
                                                 # Method might require specific arguments
                                                 pass
 

@@ -70,9 +70,12 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
             if generic_path != provider_specific_path:
                 paths.append(generic_path)
 
-        except Exception:
+        except Exception as e:
             # Fallback to default paths if provider info not available
-            pass
+            from infrastructure.logging.logger import get_logger
+
+            logger = get_logger(__name__)
+            logger.debug(f"Failed to get provider info for path resolution: {e}")
 
         # 3. Default fallback paths (always available)
         default_paths = [
