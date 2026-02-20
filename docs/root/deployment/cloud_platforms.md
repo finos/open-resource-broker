@@ -84,28 +84,6 @@ spec:
 }
 ```
 
-## Google Cloud Run
 
-```bash
-# Deploy to Cloud Run
-gcloud run deploy orb-api \
-  --image gcr.io/your-project/orb-api:latest \
-  --platform managed \
-  --region us-central1 \
-  --set-env-vars HF_SERVER_ENABLED=true,HF_AUTH_ENABLED=true \
-  --allow-unauthenticated
-```
-
-## Provider1 Container Instances
-
-```bash
-# Deploy to Provider1 Container Instances
-az container create \
-  --resource-group myResourceGroup \
-  --name orb-api \
-  --image your-registry.com/orb-api:latest \
-  --ports 8000 \
-  --environment-variables HF_SERVER_ENABLED=true HF_AUTH_ENABLED=true
-```
 
 For complete deployment examples and configuration, see the [main deployment guide](readme.md).
