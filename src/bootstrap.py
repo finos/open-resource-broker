@@ -58,9 +58,9 @@ class Application:
             if not self._container:
                 raise RuntimeError("Application not initialized - call initialize() first")
 
-            from config.managers.configuration_manager import ConfigurationManager
+            from domain.base.ports.configuration_port import ConfigurationPort
 
-            self._config_manager = self._container.get(ConfigurationManager)
+            self._config_manager = self._container.get(ConfigurationPort)
 
             # Extract provider type from config
             provider_config = self._config_manager.get("provider", {"type": "mock"})
