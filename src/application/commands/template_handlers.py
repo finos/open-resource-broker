@@ -21,7 +21,7 @@ from domain.template.template_aggregate import Template
 
 
 @command_handler(CreateTemplateCommand)
-class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, TemplateCommandResponse]):
+class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  # type: ignore[type-var]
     """
     Handler for creating templates.
 
@@ -30,6 +30,8 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, TemplateCo
     - Create template aggregate
     - Persist template through repository
     - Publish TemplateCreated domain event
+
+    CQRS Compliance: Returns None. Results stored in command.validation_errors and command.created.
     """
 
     def __init__(
@@ -55,7 +57,7 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, TemplateCo
         if not command.image_id:
             raise ValueError("image_id is required")
 
-    async def execute_command(self, command: CreateTemplateCommand) -> TemplateCommandResponse:
+    async def execute_command(self, command: CreateTemplateCommand) -> None:
         """Create new template with validation and events."""
         self.logger.info("Creating template: %s", command.template_id)
 
@@ -75,9 +77,9 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, TemplateCo
                     command.template_id,
                     validation_errors,
                 )
-                return TemplateCommandResponse(
-                    template_id=command.template_id, validation_errors=validation_errors
-                )
+                command.validation_errors = validation_errors
+                command.created = False
+                return
 
             # Create template aggregate
             template = Template.create(
@@ -106,7 +108,7 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, TemplateCo
 
                 self.logger.info("Template created successfully: %s", command.template_id)
 
-            return TemplateCommandResponse(template_id=command.template_id)
+            command.created = True
 
         except BusinessRuleError as e:
             self.logger.error(
@@ -114,16 +116,15 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, TemplateCo
                 command.template_id,
                 e,
             )
-            return TemplateCommandResponse(
-                template_id=command.template_id, validation_errors=[str(e)]
-            )
+            command.validation_errors = [str(e)]
+            command.created = False
         except Exception as e:
             self.logger.error("Failed to create template %s: %s", command.template_id, e)
             raise
 
 
 @command_handler(UpdateTemplateCommand)
-class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, TemplateCommandResponse]):
+class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, None]):  # type: ignore[type-var]
     """
     Handler for updating templates.
 
@@ -133,6 +134,8 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, TemplateCo
     - Update template aggregate
     - Persist changes through repository
     - Publish TemplateUpdated domain event
+
+    CQRS Compliance: Returns None. Results stored in command.validation_errors and command.updated.
     """
 
     def __init__(
@@ -153,7 +156,7 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, TemplateCo
         if not command.template_id:
             raise ValueError("template_id is required")
 
-    async def execute_command(self, command: UpdateTemplateCommand) -> TemplateCommandResponse:
+    async def execute_command(self, command: UpdateTemplateCommand) -> None:
         """Update existing template with validation and events."""
         self.logger.info("Updating template: %s", command.template_id)
 
@@ -175,10 +178,9 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, TemplateCo
                         command.template_id,
                         validation_errors,
                     )
-                    return TemplateCommandResponse(
-                        template_id=command.template_id,
-                        validation_errors=validation_errors,
-                    )
+                    command.validation_errors = validation_errors
+                    command.updated = False
+                    return
 
             # Update template through repository
             with self._uow_factory.create_unit_of_work() as uow:
@@ -209,7 +211,7 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, TemplateCo
 
                 self.logger.info("Template updated successfully: %s", command.template_id)
 
-            return TemplateCommandResponse(template_id=command.template_id)
+            command.updated = True
 
         except EntityNotFoundError:
             self.logger.error("Template not found for update: %s", command.template_id)
@@ -220,7 +222,7 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, TemplateCo
 
 
 @command_handler(DeleteTemplateCommand)
-class DeleteTemplateHandler(BaseCommandHandler[DeleteTemplateCommand, TemplateCommandResponse]):
+class DeleteTemplateHandler(BaseCommandHandler[DeleteTemplateCommand, None]):  # type: ignore[type-var]
     """
     Handler for deleting templates.
 
@@ -229,6 +231,8 @@ class DeleteTemplateHandler(BaseCommandHandler[DeleteTemplateCommand, TemplateCo
     - Check if template is in use
     - Delete template through repository
     - Publish TemplateDeleted domain event
+
+    CQRS Compliance: Returns None. Results stored in command.deleted.
     """
 
     def __init__(
@@ -249,7 +253,7 @@ class DeleteTemplateHandler(BaseCommandHandler[DeleteTemplateCommand, TemplateCo
         if not command.template_id:
             raise ValueError("template_id is required")
 
-    async def execute_command(self, command: DeleteTemplateCommand) -> TemplateCommandResponse:
+    async def execute_command(self, command: DeleteTemplateCommand) -> None:
         """Delete template with validation and events."""
         self.logger.info("Deleting template: %s", command.template_id)
 
@@ -278,7 +282,7 @@ class DeleteTemplateHandler(BaseCommandHandler[DeleteTemplateCommand, TemplateCo
 
                 self.logger.info("Template deleted successfully: %s", command.template_id)
 
-            return TemplateCommandResponse(template_id=command.template_id)
+            command.deleted = True
 
         except EntityNotFoundError:
             self.logger.error("Template not found for deletion: %s", command.template_id)
@@ -295,7 +299,7 @@ class DeleteTemplateHandler(BaseCommandHandler[DeleteTemplateCommand, TemplateCo
 
 
 @command_handler(ValidateTemplateCommand)
-class ValidateTemplateHandler(BaseCommandHandler[ValidateTemplateCommand, TemplateCommandResponse]):
+class ValidateTemplateHandler(BaseCommandHandler[ValidateTemplateCommand, None]):  # type: ignore[type-var]
     """
     Handler for validating template configurations.
 
@@ -304,6 +308,9 @@ class ValidateTemplateHandler(BaseCommandHandler[ValidateTemplateCommand, Templa
     - Validate provider-specific rules
     - Return detailed validation results
     - Publish TemplateValidated domain event
+
+    CQRS Compliance: Returns None. Results stored in command.validation_errors and command.is_valid.
+    Note: This is a pure query operation and should be moved to queries/ in future refactoring.
     """
 
     def __init__(
@@ -324,7 +331,7 @@ class ValidateTemplateHandler(BaseCommandHandler[ValidateTemplateCommand, Templa
         if not command.configuration:
             raise ValueError("configuration is required")
 
-    async def execute_command(self, command: ValidateTemplateCommand) -> TemplateCommandResponse:
+    async def execute_command(self, command: ValidateTemplateCommand) -> None:
         """Validate template configuration with detailed results."""
         self.logger.info("Validating template configuration: %s", command.template_id)
 
@@ -346,19 +353,17 @@ class ValidateTemplateHandler(BaseCommandHandler[ValidateTemplateCommand, Templa
                     command.template_id,
                     validation_errors,
                 )
+                command.validation_errors = validation_errors
+                command.is_valid = False
             else:
                 self.logger.info("Template validation passed for %s", command.template_id)
+                command.validation_errors = []
+                command.is_valid = True
 
             # Publish validation event (could be useful for monitoring/auditing)
             # This would be handled by the domain event system
 
-            return TemplateCommandResponse(
-                template_id=command.template_id, validation_errors=validation_errors
-            )
-
         except Exception as e:
             self.logger.error("Template validation failed for %s: %s", command.template_id, e)
-            return TemplateCommandResponse(
-                template_id=command.template_id,
-                validation_errors=[f"Validation error: {e!s}"],
-            )
+            command.validation_errors = [f"Validation error: {e!s}"]
+            command.is_valid = False

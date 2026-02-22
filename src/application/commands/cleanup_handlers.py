@@ -19,7 +19,7 @@ from domain.request.repository import RequestRepository
 
 
 @command_handler(CleanupOldRequestsCommand)
-class CleanupOldRequestsHandler(BaseCommandHandler[CleanupOldRequestsCommand, None]):
+class CleanupOldRequestsHandler(BaseCommandHandler[CleanupOldRequestsCommand, None]):  # type: ignore[type-var]
     """Handler for cleaning up old requests using domain commands.
 
     CQRS Compliance: Returns None. Results are stored in command fields.
@@ -104,7 +104,7 @@ class CleanupOldRequestsHandler(BaseCommandHandler[CleanupOldRequestsCommand, No
 
 
 @command_handler(CleanupAllResourcesCommand)
-class CleanupAllResourcesHandler(BaseCommandHandler[CleanupAllResourcesCommand, None]):
+class CleanupAllResourcesHandler(BaseCommandHandler[CleanupAllResourcesCommand, None]):  # type: ignore[type-var]
     """Handler for cleaning up all resources (requests and machines).
 
     CQRS Compliance: Returns None. Results are stored in command fields.

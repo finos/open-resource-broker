@@ -247,8 +247,11 @@ class RegisterProviderStrategyHandler(
 
 
 @command_handler(UpdateProviderHealthCommand)
-class UpdateProviderHealthHandler(BaseCommandHandler[UpdateProviderHealthCommand, dict[str, Any]]):
-    """Handler for updating provider health status."""
+class UpdateProviderHealthHandler(BaseCommandHandler[UpdateProviderHealthCommand, None]):  # type: ignore[type-var]
+    """Handler for updating provider health status.
+
+    CQRS Compliance: Returns None. Results stored in command.result.
+    """
 
     def __init__(
         self,
@@ -268,8 +271,11 @@ class UpdateProviderHealthHandler(BaseCommandHandler[UpdateProviderHealthCommand
         if not command.health_status:
             raise ValueError("health_status is required")
 
-    async def execute_command(self, command: UpdateProviderHealthCommand) -> dict[str, Any]:
-        """Handle provider health status update command."""
+    async def execute_command(self, command: UpdateProviderHealthCommand) -> None:
+        """Handle provider health status update command.
+
+        CQRS Compliance: Returns None. Results stored in command.result.
+        """
         self.logger.debug("Updating health for provider: %s", command.provider_name)
 
         try:
@@ -294,7 +300,8 @@ class UpdateProviderHealthHandler(BaseCommandHandler[UpdateProviderHealthCommand
                 status_change = "healthy" if command.health_status.is_healthy else "unhealthy"
                 self.logger.info("Provider %s is now %s", command.provider_name, status_change)
 
-            return {
+            # Store results in command
+            command.result = {
                 "provider_name": command.provider_name,
                 "health_status": command.health_status.model_dump(),
                 "updated_at": command.timestamp or time.strftime("%Y-%m-%d %H:%M:%S"),

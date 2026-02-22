@@ -24,8 +24,11 @@ from domain.base.ports import (
 
 
 @command_handler(ReloadProviderConfigCommand)
-class ReloadProviderConfigHandler(BaseCommandHandler[ReloadProviderConfigCommand, dict[str, Any]]):
-    """Handler for reloading provider configuration."""
+class ReloadProviderConfigHandler(BaseCommandHandler[ReloadProviderConfigCommand, None]):  # type: ignore[type-var]
+    """Handler for reloading provider configuration.
+
+    CQRS Compliance: Returns None. Results stored in command.result.
+    """
 
     def __init__(
         self,
@@ -42,7 +45,7 @@ class ReloadProviderConfigHandler(BaseCommandHandler[ReloadProviderConfigCommand
         """Validate reload provider config command."""
         await super().validate_command(command)
 
-    async def execute_command(self, command: ReloadProviderConfigCommand) -> dict[str, Any]:
+    async def execute_command(self, command: ReloadProviderConfigCommand) -> None:
         """Execute provider configuration reload command."""
         self.logger.info(
             "Reloading provider configuration from: %s",
@@ -78,7 +81,8 @@ class ReloadProviderConfigHandler(BaseCommandHandler[ReloadProviderConfigCommand
                 provider_mode = "strategy"
                 active_providers = []
 
-            result = {
+            # Store result in command (CQRS compliance)
+            command.result = {
                 "status": "success",
                 "message": "Provider configuration reloaded successfully",
                 "config_path": command.config_path,
@@ -88,11 +92,11 @@ class ReloadProviderConfigHandler(BaseCommandHandler[ReloadProviderConfigCommand
             }
 
             self.logger.info("Provider configuration reload completed successfully")
-            return result
 
         except Exception as e:
             self.logger.error("Provider configuration reload failed: %s", str(e))
-            return {
+            # Store error result in command
+            command.result = {
                 "status": "failed",
                 "error": str(e),
                 "command_id": command.command_id,
@@ -101,8 +105,11 @@ class ReloadProviderConfigHandler(BaseCommandHandler[ReloadProviderConfigCommand
 
 
 @command_handler(RefreshTemplatesCommand)
-class RefreshTemplatesHandler(BaseCommandHandler[RefreshTemplatesCommand, dict[str, Any]]):
-    """Handler for refreshing templates from all sources."""
+class RefreshTemplatesHandler(BaseCommandHandler[RefreshTemplatesCommand, None]):  # type: ignore[type-var]
+    """Handler for refreshing templates from all sources.
+
+    CQRS Compliance: Returns None. Results stored in command.result.
+    """
 
     def __init__(
         self,
@@ -119,7 +126,7 @@ class RefreshTemplatesHandler(BaseCommandHandler[RefreshTemplatesCommand, dict[s
         """Validate refresh templates command."""
         await super().validate_command(command)
 
-    async def execute_command(self, command: RefreshTemplatesCommand) -> dict[str, Any]:
+    async def execute_command(self, command: RefreshTemplatesCommand) -> None:
         """Execute template refresh command."""
         self.logger.info("Refreshing templates from all sources")
 
@@ -131,7 +138,8 @@ class RefreshTemplatesHandler(BaseCommandHandler[RefreshTemplatesCommand, dict[s
             # Refresh templates
             templates = await template_manager.load_templates(command.provider_name)
 
-            result = {
+            # Store result in command (CQRS compliance)
+            command.result = {
                 "status": "success",
                 "message": "Templates refreshed successfully",
                 "template_count": len(templates),
@@ -140,11 +148,11 @@ class RefreshTemplatesHandler(BaseCommandHandler[RefreshTemplatesCommand, dict[s
             }
 
             self.logger.info("Template refresh completed successfully")
-            return result
 
         except Exception as e:
             self.logger.error("Template refresh failed: %s", str(e))
-            return {
+            # Store error result in command
+            command.result = {
                 "status": "failed",
                 "error": str(e),
                 "command_id": command.command_id,
@@ -153,8 +161,11 @@ class RefreshTemplatesHandler(BaseCommandHandler[RefreshTemplatesCommand, dict[s
 
 
 @command_handler(SetConfigurationCommand)
-class SetConfigurationHandler(BaseCommandHandler[SetConfigurationCommand, dict[str, Any]]):
-    """Handler for setting configuration values."""
+class SetConfigurationHandler(BaseCommandHandler[SetConfigurationCommand, None]):  # type: ignore[type-var]
+    """Handler for setting configuration values.
+
+    CQRS Compliance: Returns None. Results stored in command.result.
+    """
 
     def __init__(
         self,
@@ -173,7 +184,7 @@ class SetConfigurationHandler(BaseCommandHandler[SetConfigurationCommand, dict[s
         if not command.key:
             raise ValueError("Configuration key is required")
 
-    async def execute_command(self, command: SetConfigurationCommand) -> dict[str, Any]:
+    async def execute_command(self, command: SetConfigurationCommand) -> None:
         """Execute set configuration command."""
         self.logger.info("Setting configuration: %s = %s", command.key, command.value)
 
@@ -183,7 +194,8 @@ class SetConfigurationHandler(BaseCommandHandler[SetConfigurationCommand, dict[s
             config_manager = self.container.get(ConfigurationPort)
             config_manager.set_configuration_value(command.key, command.value)
 
-            result = {
+            # Store result in command (CQRS compliance)
+            command.result = {
                 "status": "success",
                 "message": f"Configuration '{command.key}' set successfully",
                 "key": command.key,
@@ -192,11 +204,11 @@ class SetConfigurationHandler(BaseCommandHandler[SetConfigurationCommand, dict[s
             }
 
             self.logger.info("Configuration set completed successfully")
-            return result
 
         except Exception as e:
             self.logger.error("Set configuration failed: %s", str(e))
-            return {
+            # Store error result in command
+            command.result = {
                 "status": "failed",
                 "error": str(e),
                 "command_id": command.command_id,
@@ -205,8 +217,12 @@ class SetConfigurationHandler(BaseCommandHandler[SetConfigurationCommand, dict[s
 
 
 @command_handler(TestStorageCommand)
-class TestStorageCommandHandler(BaseCommandHandler[TestStorageCommand, dict[str, Any]]):
-    """Handler for testing storage connectivity and functionality."""
+class TestStorageCommandHandler(BaseCommandHandler[TestStorageCommand, None]):  # type: ignore[type-var]
+    """Handler for testing storage connectivity and functionality.
+
+    CQRS Compliance: Returns None. Results stored in command.result.
+    Note: This is a pure query operation and should be moved to queries/ in future refactoring.
+    """
 
     def __init__(
         self,
@@ -223,7 +239,7 @@ class TestStorageCommandHandler(BaseCommandHandler[TestStorageCommand, dict[str,
         """Validate test storage command."""
         await super().validate_command(command)
 
-    async def execute_command(self, command: TestStorageCommand) -> dict[str, Any]:
+    async def execute_command(self, command: TestStorageCommand) -> None:
         """Execute storage test command."""
         self.logger.info("Testing storage connectivity")
 
@@ -233,7 +249,8 @@ class TestStorageCommandHandler(BaseCommandHandler[TestStorageCommand, dict[str,
             registry = self.container.get(StorageRegistryPort)
             storage_types = registry.get_registered_types()
 
-            result = {
+            # Store result in command (CQRS compliance)
+            command.result = {
                 "status": "success",
                 "message": "Storage test completed successfully",
                 "storage_types": storage_types,
@@ -241,11 +258,11 @@ class TestStorageCommandHandler(BaseCommandHandler[TestStorageCommand, dict[str,
             }
 
             self.logger.info("Storage test completed successfully")
-            return result
 
         except Exception as e:
             self.logger.error("Storage test failed: %s", str(e))
-            return {
+            # Store error result in command
+            command.result = {
                 "status": "failed",
                 "error": str(e),
                 "command_id": command.command_id,
@@ -253,8 +270,12 @@ class TestStorageCommandHandler(BaseCommandHandler[TestStorageCommand, dict[str,
 
 
 @command_handler(MCPValidateCommand)
-class MCPValidateCommandHandler(BaseCommandHandler[MCPValidateCommand, dict[str, Any]]):
-    """Handler for validating MCP server configuration and tools."""
+class MCPValidateCommandHandler(BaseCommandHandler[MCPValidateCommand, None]):  # type: ignore[type-var]
+    """Handler for validating MCP server configuration and tools.
+
+    CQRS Compliance: Returns None. Results stored in command.result.
+    Note: This is a pure query operation and should be moved to queries/ in future refactoring.
+    """
 
     def __init__(
         self,
@@ -271,23 +292,24 @@ class MCPValidateCommandHandler(BaseCommandHandler[MCPValidateCommand, dict[str,
         """Validate MCP validate command."""
         await super().validate_command(command)
 
-    async def execute_command(self, command: MCPValidateCommand) -> dict[str, Any]:
+    async def execute_command(self, command: MCPValidateCommand) -> None:
         """Execute MCP validation command."""
         self.logger.info("Validating MCP server configuration")
 
         try:
-            result = {
+            # Store result in command (CQRS compliance)
+            command.result = {
                 "status": "success",
                 "message": "MCP validation completed successfully",
                 "command_id": command.command_id,
             }
 
             self.logger.info("MCP validation completed successfully")
-            return result
 
         except Exception as e:
             self.logger.error("MCP validation failed: %s", str(e))
-            return {
+            # Store error result in command
+            command.result = {
                 "status": "failed",
                 "error": str(e),
                 "command_id": command.command_id,

@@ -94,7 +94,10 @@ async def handle_test_storage(args) -> dict[str, Any]:
     from application.commands.system import TestStorageCommand
 
     command = TestStorageCommand()
-    result = await command_bus.execute(command)
+    await command_bus.execute(command)
+
+    # CQRS: Result is stored in command.result field
+    result = command.result
 
     return {"test_result": result, "message": "Storage test completed successfully"}
 

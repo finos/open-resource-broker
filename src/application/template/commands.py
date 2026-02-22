@@ -8,7 +8,10 @@ from application.dto.base import BaseCommand, BaseResponse
 
 
 class CreateTemplateCommand(BaseCommand):
-    """Command to create a new template."""
+    """Command to create a new template.
+
+    CQRS: Commands should not return data. Results are stored in mutable fields.
+    """
 
     template_id: str
     name: Optional[str] = None
@@ -21,27 +24,51 @@ class CreateTemplateCommand(BaseCommand):
     tags: dict[str, str] = Field(default_factory=dict)
     configuration: dict[str, Any] = Field(default_factory=dict)
 
+    # Mutable result fields for CQRS compliance
+    validation_errors: Optional[list[str]] = None
+    created: bool = False
+
 
 class UpdateTemplateCommand(BaseCommand):
-    """Command to update an existing template."""
+    """Command to update an existing template.
+
+    CQRS: Commands should not return data. Results are stored in mutable fields.
+    """
 
     template_id: str
     name: Optional[str] = None
     description: Optional[str] = None
     configuration: dict[str, Any] = Field(default_factory=dict)
 
+    # Mutable result fields for CQRS compliance
+    validation_errors: Optional[list[str]] = None
+    updated: bool = False
+
 
 class DeleteTemplateCommand(BaseCommand):
-    """Command to delete a template."""
+    """Command to delete a template.
+
+    CQRS: Commands should not return data. Results are stored in mutable fields.
+    """
 
     template_id: str
+
+    # Mutable result fields for CQRS compliance
+    deleted: bool = False
 
 
 class ValidateTemplateCommand(BaseCommand):
-    """Command to validate a template configuration."""
+    """Command to validate a template configuration.
+
+    CQRS: Commands should not return data. Results are stored in mutable fields.
+    """
 
     template_id: str
     configuration: dict[str, Any]
+
+    # Mutable result fields for CQRS compliance
+    validation_errors: Optional[list[str]] = None
+    is_valid: bool = False
 
 
 class TemplateCommandResponse(BaseResponse):

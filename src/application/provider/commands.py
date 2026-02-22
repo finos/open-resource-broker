@@ -43,12 +43,18 @@ class RegisterProviderStrategyCommand(BaseCommand):
 
 
 class UpdateProviderHealthCommand(BaseCommand):
-    """Command to update provider health status."""
+    """Command to update provider health status.
+
+    CQRS: Commands should not return data. Results are stored in mutable fields.
+    """
 
     provider_name: str
     health_status: ProviderHealthStatus
     source: str = "system"
     timestamp: Optional[str] = None
+
+    # Store results for caller to access after command execution
+    result: Optional[dict[str, Any]] = None
 
 
 class ConfigureProviderStrategyCommand(BaseCommand):
