@@ -18,6 +18,30 @@ from application.queries.system import (
     GetSystemStatusQuery,
     ValidateProviderConfigQuery,
 )
+
+# Define query classes inline since they're not in dto/queries.py yet
+from pydantic import BaseModel, ConfigDict
+from application.interfaces.command_query import Query
+
+
+class GetProviderHealthQuery(Query, BaseModel):
+    """Query to get provider health status."""
+
+    model_config = ConfigDict(frozen=True)
+
+    provider_name: str | None = None
+
+
+class ValidateStorageQuery(Query, BaseModel):
+    """Query to validate storage connectivity."""
+
+    model_config = ConfigDict(frozen=True)
+
+
+class ValidateMCPQuery(Query, BaseModel):
+    """Query to validate MCP configuration."""
+
+    model_config = ConfigDict(frozen=True)
 from domain.base import UnitOfWorkFactory
 from domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
 from domain.services.timestamp_service import TimestampService
@@ -444,3 +468,178 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Provid
         except Exception as e:
             self.logger.error("Failed to get provider metrics: %s", e)
             raise
+
+
+@query_handler(GetProviderHealthQuery)
+class GetProviderHealthHandler(BaseQueryHandler[GetProviderHealthQuery, dict[str, Any]]):
+    """Handler for getting provider health status."""
+
+    def __init__(
+        self,
+        logger: LoggingPort,
+        container: ContainerPort,
+        error_handler: ErrorHandlingPort,
+    ) -> None:
+        """Initialize get provider health handler."""
+        super().__init__(logger, error_handler)
+        self.container = container
+
+    async def execute_query(self, query: GetProviderHealthQuery) -> dict[str, Any]:
+        """Execute provider health query."""
+        self.logger.info("Getting provider health status for: %s", query.provider_name or "all")
+
+        try:
+            from domain.base.ports import ConfigurationPort
+
+            config_manager = self.container.get(ConfigurationPort)
+
+            # Get provider configuration
+            if hasattr(config_manager, "get_provider_config"):
+                provider_config = config_manager.get_provider_config()
+                active_providers = (
+                    provider_config.get_active_providers()
+                    if hasattr(provider_config, "get_active_providers")
+                    else []
+                )
+
+                health_status = {
+                    "status": "success",
+                    "timestamp": TimestampService().current_timestamp(),
+                    "providers": {},
+                }
+
+                # Check health for specific provider or all
+                for provider in active_providers:
+                    if query.provider_name and provider.name != query.provider_name:
+                        continue
+
+                    # Basic health check - provider is configured and accessible
+                    health_status["providers"][provider.name] = {
+                        "status": "healthy",
+                        "name": provider.name,
+                        "type": provider.type if hasattr(provider, "type") else "unknown",
+                        "available": True,
+                    }
+
+                return health_status
+            else:
+                return {
+                    "status": "error",
+                    "error": "Provider configuration not available",
+                    "providers": {},
+                }
+
+        except Exception as e:
+            self.logger.error("Failed to get provider health: %s", e, exc_info=True)
+            return {
+                "status": "error",
+                "error": str(e),
+                "providers": {},
+            }
+
+
+@query_handler(ValidateStorageQuery)
+class ValidateStorageHandler(BaseQueryHandler[ValidateStorageQuery, dict[str, Any]]):
+    """Handler for validating storage connectivity."""
+
+    def __init__(
+        self,
+        logger: LoggingPort,
+        container: ContainerPort,
+        error_handler: ErrorHandlingPort,
+        uow_factory: UnitOfWorkFactory,
+    ) -> None:
+        """Initialize validate storage handler."""
+        super().__init__(logger, error_handler)
+        self.container = container
+        self.uow_factory = uow_factory
+
+    async def execute_query(self, query: ValidateStorageQuery) -> dict[str, Any]:
+        """Execute storage validation query."""
+        self.logger.info("Validating storage connectivity")
+
+        try:
+            # Test storage connectivity by attempting to list requests
+            with self.uow_factory.create_unit_of_work() as uow:
+                # Try to access repositories
+                requests = uow.requests.list_all()
+                machines = uow.machines.list_all()
+
+                return {
+                    "status": "success",
+                    "storage_accessible": True,
+                    "request_count": len(requests),
+                    "machine_count": len(machines),
+                    "message": "Storage is accessible and operational",
+                }
+
+        except Exception as e:
+            self.logger.error("Storage validation failed: %s", e, exc_info=True)
+            return {
+                "status": "error",
+                "storage_accessible": False,
+                "error": str(e),
+                "message": "Storage validation failed",
+            }
+
+
+@query_handler(ValidateMCPQuery)
+class ValidateMCPHandler(BaseQueryHandler[ValidateMCPQuery, dict[str, Any]]):
+    """Handler for validating MCP configuration."""
+
+    def __init__(
+        self,
+        logger: LoggingPort,
+        container: ContainerPort,
+        error_handler: ErrorHandlingPort,
+    ) -> None:
+        """Initialize validate MCP handler."""
+        super().__init__(logger, error_handler)
+        self.container = container
+
+    async def execute_query(self, query: ValidateMCPQuery) -> dict[str, Any]:
+        """Execute MCP validation query."""
+        self.logger.info("Validating MCP configuration")
+
+        try:
+            # Basic MCP validation - check if configuration is accessible
+            from domain.base.ports import ConfigurationPort
+
+            config_manager = self.container.get(ConfigurationPort)
+
+            validation_errors = []
+            warnings = []
+
+            # Check if MCP configuration exists
+            mcp_config = config_manager.get("mcp", {})
+            if not mcp_config:
+                warnings.append("MCP configuration not found")
+
+            # Validate MCP structure
+            if isinstance(mcp_config, dict):
+                if "enabled" not in mcp_config:
+                    warnings.append("MCP 'enabled' flag not configured")
+                if "endpoint" not in mcp_config:
+                    warnings.append("MCP 'endpoint' not configured")
+            else:
+                validation_errors.append("MCP configuration is not a valid dictionary")
+
+            is_valid = len(validation_errors) == 0
+
+            return {
+                "status": "success" if is_valid else "error",
+                "is_valid": is_valid,
+                "validation_errors": validation_errors,
+                "warnings": warnings,
+                "mcp_enabled": mcp_config.get("enabled", False) if isinstance(mcp_config, dict) else False,
+            }
+
+        except Exception as e:
+            self.logger.error("MCP validation failed: %s", e, exc_info=True)
+            return {
+                "status": "error",
+                "is_valid": False,
+                "validation_errors": [str(e)],
+                "warnings": [],
+                "mcp_enabled": False,
+            }

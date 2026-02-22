@@ -21,7 +21,7 @@ from domain.base.events import DomainEvent
 from domain.base.ports import ErrorHandlingPort, EventPublisherPort, LoggingPort
 
 TCommand = TypeVar("TCommand", bound=BaseCommand)
-TResponse = TypeVar("TResponse", bound=BaseResponse)
+TResponse = TypeVar("TResponse")  # Allow None for CQRS compliance
 TQuery = TypeVar("TQuery")
 TResult = TypeVar("TResult")
 
@@ -206,6 +206,9 @@ class BaseCommandHandler(BaseHandler, CommandHandler[TCommand, TResponse]):
 
     Provides command-specific functionality including validation,
     event publishing, and transaction management.
+
+    CQRS Compliance: Commands should return None (void) to maintain
+    command-query separation. Use TResponse = None for proper CQRS commands.
     """
 
     def __init__(

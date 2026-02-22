@@ -12,7 +12,11 @@ from domain.request.value_objects import RequestStatus
 
 
 class CreateRequestCommand(BaseCommand):
-    """Command to create a new request."""
+    """Command to create a new request.
+
+    CQRS: Commands should not return data. After executing this command,
+    use GetRequestQuery with the request_id to retrieve the created request.
+    """
 
     request_id: Optional[str] = None
     template_id: str
@@ -20,13 +24,25 @@ class CreateRequestCommand(BaseCommand):
     timeout: Optional[int] = 3600
     tags: Optional[Dict[str, Any]] = None
 
+    # Store created request_id for caller to use in subsequent query
+    created_request_id: Optional[str] = None
+
 
 class CreateReturnRequestCommand(BaseCommand):
-    """Command to create a return request."""
+    """Command to create a return request.
+
+    CQRS: Commands should not return data. After executing this command,
+    use GetReturnRequestStatusQuery to retrieve the operation results.
+    """
 
     machine_ids: list[str]
     timeout: Optional[int] = 3600
     force_return: Optional[bool] = False
+
+    # Store results for caller to access after command execution
+    created_request_ids: Optional[list[str]] = None
+    processed_machines: Optional[list[str]] = None
+    skipped_machines: Optional[list[dict[str, Any]]] = None
 
 
 class UpdateRequestStatusCommand(Command, BaseModel):
@@ -56,12 +72,18 @@ class SyncRequestCommand(Command, BaseModel):
     request_id: str
 
 
-class CleanupOldRequestsCommand(Command, BaseModel):
-    """Command to clean up old requests."""
+class CleanupOldRequestsCommand(BaseCommand):
+    """Command to clean up old requests.
 
-    model_config = ConfigDict(frozen=True)
+    CQRS: Commands should not return data. Results are stored in mutable fields.
+    """
 
-    age_hours: int = 24
+    older_than_days: int = 1
+    statuses_to_cleanup: Optional[list[str]] = None
+
+    # Store results for caller to access after command execution
+    requests_cleaned: Optional[int] = None
+    request_ids_found: Optional[list[str]] = None
 
 
 class CleanupTerminatedMachinesCommand(Command, BaseModel):
@@ -72,10 +94,19 @@ class CleanupTerminatedMachinesCommand(Command, BaseModel):
     age_hours: int = 24
 
 
-class CleanupAllResourcesCommand(Command, BaseModel):
-    """Command to clean up all resources."""
+class CleanupAllResourcesCommand(BaseCommand):
+    """Command to clean up all resources.
 
-    model_config = ConfigDict(frozen=True)
+    CQRS: Commands should not return data. Results are stored in mutable fields.
+    """
+
+    older_than_days: int = 1
+    include_pending: bool = False
+
+    # Store results for caller to access after command execution
+    requests_cleaned: Optional[int] = None
+    machines_cleaned: Optional[int] = None
+    total_cleaned: Optional[int] = None
 
 
 class CompleteRequestCommand(Command, BaseModel):

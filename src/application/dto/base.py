@@ -79,7 +79,13 @@ class BaseDTO(BaseModel):
 
 
 class BaseCommand(BaseDTO):
-    """Base class for command DTOs."""
+    """Base class for command DTOs.
+
+    CQRS: Commands can store results in mutable fields for callers to access.
+    This allows commands to return void while still providing result data.
+    """
+
+    model_config = ConfigDict(frozen=False)  # Allow mutation for result storage
 
     command_id: Optional[str] = None
     correlation_id: Optional[str] = None

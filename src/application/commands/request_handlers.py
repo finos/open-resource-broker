@@ -29,8 +29,12 @@ from application.ports.query_bus_port import QueryBusPort
 
 
 @command_handler(CreateRequestCommand)
-class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str]):
-    """Handler for creating machine requests."""
+class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]):
+    """Handler for creating machine requests.
+
+    CQRS Compliance: This command handler returns None (void).
+    The created request_id is stored in command.created_request_id for callers to use.
+    """
 
     def __init__(
         self,
@@ -76,8 +80,12 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
         if not command.requested_count or command.requested_count <= 0:
             raise ValueError("requested_count must be positive")
 
-    async def execute_command(self, command: CreateRequestCommand) -> str:
-        """Handle machine request creation by orchestrating services."""
+    async def execute_command(self, command: CreateRequestCommand) -> None:
+        """Handle machine request creation by orchestrating services.
+
+        CQRS Compliance: Returns None. The created request_id is stored in
+        command.created_request_id for callers to use in subsequent queries.
+        """
         self.logger.info("Creating machine request for template: %s", command.template_id)
 
         # Validate provider availability using service
@@ -109,8 +117,10 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
         # Persist and publish events
         await self._persist_and_publish(request)
 
+        # Store request_id in command for caller to use
+        command.created_request_id = str(request.request_id)
+
         self.logger.info("Machine request created successfully: %s", request.request_id)
-        return request
 
     async def _load_template(self, template_id: str) -> Any:
         """Load template using CQRS QueryBus."""
@@ -150,8 +160,12 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, str])
 
 
 @command_handler(CreateReturnRequestCommand)
-class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, dict[str, Any]]):
-    """Handler for creating return requests."""
+class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, None]):
+    """Handler for creating return requests.
+
+    CQRS Compliance: This command handler returns None (void).
+    Results are stored in command fields for callers to access.
+    """
 
     def __init__(
         self,
@@ -205,23 +219,25 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                     )
         # For multiple machines, we'll do filtering in execute_command
 
-    async def execute_command(self, command: CreateReturnRequestCommand) -> dict[str, Any]:
-        """Handle return request creation command."""
+    async def execute_command(self, command: CreateReturnRequestCommand) -> None:
+        """Handle return request creation command.
+
+        CQRS Compliance: Returns None. Results are stored in command fields:
+        - command.created_request_ids: List of created request IDs
+        - command.processed_machines: List of successfully processed machine IDs
+        - command.skipped_machines: List of skipped machines with reasons
+        """
         self.logger.info("Creating return request for machines: %s", command.machine_ids)
 
         # Validate and filter machines
         validation_results = self._validate_and_filter_machines(command.machine_ids)
 
-        # If no valid machines remain after filtering, return early
+        # If no valid machines remain after filtering, store results and return
         if not validation_results["valid_machines"]:
-            return {
-                "status": "completed",
-                "request_id": None,
-                "message": "No valid machines to process",
-                "processed_machines": [],
-                "skipped_machines": validation_results["skipped_machines"],
-                "summary": f"Skipped {len(validation_results['skipped_machines'])} machines, processed 0 machines",
-            }
+            command.created_request_ids = []
+            command.processed_machines = []
+            command.skipped_machines = validation_results["skipped_machines"]
+            return
 
         try:
             from domain.request.aggregate import Request
@@ -255,18 +271,10 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                 # Execute deprovisioning
                 await self._execute_deprovisioning_for_request(machine_ids, request, provider_name)
 
-            # Return detailed results
-            processed_count = len(validation_results["valid_machines"])
-            skipped_count = len(validation_results["skipped_machines"])
-
-            return {
-                "status": "completed",
-                "request_id": created_requests[0] if created_requests else None,
-                "message": "Return request processed successfully",
-                "processed_machines": validation_results["valid_machines"],
-                "skipped_machines": validation_results["skipped_machines"],
-                "summary": f"Skipped {skipped_count} machines, processed {processed_count} machines",
-            }
+            # Store results in command for caller to access
+            command.created_request_ids = created_requests
+            command.processed_machines = validation_results["valid_machines"]
+            command.skipped_machines = validation_results["skipped_machines"]
 
         except Exception as e:
             self.logger.error(

@@ -6,9 +6,9 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from application.dto.responses import MachineDTO
-    from application.request.dto import RequestDTO
-    from infrastructure.template.dtos import TemplateDTO
+    # Use forward references to avoid circular imports
+    # These types should be defined in domain layer or passed as Any
+    pass
 
 
 class SchedulerPort(ABC):
@@ -35,32 +35,32 @@ class SchedulerPort(ABC):
         """Get log level for this scheduler."""
 
     @abstractmethod
-    def parse_template_config(self, raw_data: dict[str, Any]) -> TemplateDTO:
-        """Parse scheduler template config to TemplateDTO."""
+    def parse_template_config(self, raw_data: dict[str, Any]) -> Any:
+        """Parse scheduler template config to template DTO."""
 
     @abstractmethod
     def parse_request_data(self, raw_data: dict[str, Any]) -> dict[str, Any]:
         """Parse scheduler request data to domain-compatible format."""
 
     @abstractmethod
-    def format_templates_response(self, templates: list[TemplateDTO]) -> dict[str, Any]:
-        """Format TemplateDTOs to scheduler response."""
+    def format_templates_response(self, templates: list[Any]) -> dict[str, Any]:
+        """Format template DTOs to scheduler response."""
 
     @abstractmethod
     def format_templates_for_generation(self, templates: list[dict]) -> list[dict]:
         """Convert internal templates to scheduler's expected input format."""
 
     @abstractmethod
-    def format_request_status_response(self, requests: list[RequestDTO]) -> dict[str, Any]:
-        """Format RequestDTOs to scheduler response."""
+    def format_request_status_response(self, requests: list[Any]) -> dict[str, Any]:
+        """Format request DTOs to scheduler response."""
 
     @abstractmethod
     def format_request_response(self, request_data: dict[str, Any]) -> dict[str, Any]:
         """Format request creation response to scheduler format."""
 
     @abstractmethod
-    def format_machine_status_response(self, machines: list[MachineDTO]) -> dict[str, Any]:
-        """Format MachineDTOs to scheduler response."""
+    def format_machine_status_response(self, machines: list[Any]) -> dict[str, Any]:
+        """Format machine DTOs to scheduler response."""
 
     @abstractmethod
     def format_machine_details_response(self, machine_data: dict) -> dict:
@@ -71,15 +71,15 @@ class SchedulerPort(ABC):
         """Get storage base path within working directory."""
 
     @abstractmethod
-    def format_template_for_display(self, template: TemplateDTO) -> dict[str, Any]:
+    def format_template_for_display(self, template: Any) -> dict[str, Any]:
         """Format template for CLI/API display using scheduler-specific field mapping."""
 
     @abstractmethod
-    def format_template_for_provider(self, template: TemplateDTO) -> dict[str, Any]:
+    def format_template_for_provider(self, template: Any) -> dict[str, Any]:
         """Format template for provider operations using scheduler-specific field mapping."""
 
     @abstractmethod
-    def format_request_for_display(self, request: RequestDTO) -> dict[str, Any]:
+    def format_request_for_display(self, request: Any) -> dict[str, Any]:
         """Format request for CLI/API display using scheduler-specific field mapping."""
 
     @abstractmethod

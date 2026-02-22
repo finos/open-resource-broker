@@ -125,3 +125,48 @@ class GetMachineHealthQuery(Query, BaseModel):
     model_config = ConfigDict(frozen=True)
 
     machine_id: str
+
+
+# System Queries for CQRS compliance
+class GetProviderHealthQuery(Query, BaseModel):
+    """Query to get provider health status."""
+
+    model_config = ConfigDict(frozen=True)
+
+    provider_name: Optional[str] = None
+
+
+class ValidateStorageQuery(Query, BaseModel):
+    """Query to validate storage connectivity."""
+
+    model_config = ConfigDict(frozen=True)
+
+
+class ValidateMCPQuery(Query, BaseModel):
+    """Query to validate MCP configuration."""
+
+    model_config = ConfigDict(frozen=True)
+
+
+# Cleanup Queries for CQRS compliance
+class ListCleanableRequestsQuery(Query, BaseModel):
+    """Query to list requests eligible for cleanup."""
+
+    model_config = ConfigDict(frozen=True)
+
+    older_than_days: int
+
+
+class ListCleanableResourcesQuery(Query, BaseModel):
+    """Query to list resources eligible for cleanup."""
+
+    model_config = ConfigDict(frozen=True)
+
+
+# Template Result Queries
+class GetTemplateValidationResultQuery(Query, BaseModel):
+    """Query to get template validation results."""
+
+    model_config = ConfigDict(frozen=True)
+
+    template_id: str

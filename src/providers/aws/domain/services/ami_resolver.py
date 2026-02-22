@@ -164,7 +164,7 @@ class AWSAMIResolver(ImageResolver):
         """
         try:
             import boto3
-            from botocore.exceptions import ClientError
+            from botocore.exceptions import ClientError as BotocoreClientError
 
             ssm_client = boto3.client("ssm")
             response = ssm_client.get_parameter(Name=ssm_path)
@@ -177,12 +177,14 @@ class AWSAMIResolver(ImageResolver):
 
             return ami_id
 
-        except ClientError as e:
-            raise ValueError(f"Failed to resolve SSM parameter {ssm_path}: {e}")
-        except ImportError:
-            raise ValueError("boto3 is required for SSM parameter resolution")
         except Exception as e:
-            raise ValueError(f"Unexpected error resolving SSM parameter {ssm_path}: {e}")
+            # Handle both ClientError and other exceptions
+            if "ClientError" in type(e).__name__:
+                raise ValueError(f"Failed to resolve SSM parameter {ssm_path}: {e}")
+            elif "ImportError" in type(e).__name__:
+                raise ValueError("boto3 is required for SSM parameter resolution")
+            else:
+                raise ValueError(f"Unexpected error resolving SSM parameter {ssm_path}: {e}")
 
     def _is_custom_alias(self, reference: str) -> bool:
         """
@@ -242,17 +244,17 @@ class AWSAMIResolver(ImageResolver):
                     cache_data = json.load(f)
                     # Load cache entries
                     for key, entry in cache_data.get("cache", {}).items():
-                        self._cache.set(key, entry["data"])
+                        if self._cache:
+                            self._cache.set(key, entry["data"])
 
                     # Load failed entries
                     for key in cache_data.get("failed", []):
-                        self._cache.mark_failed(key)
-        except Exception as e:
-            # Ignore errors loading persistent cache
-            from infrastructure.logging.logger import get_logger
-
-            logger = get_logger(__name__)
-            logger.debug(f"Failed to load persistent cache: {e}")
+                        if self._cache:
+                            self._cache.mark_failed(key)
+        except Exception:
+            # Ignore errors loading persistent cache - silently fail
+            # Logging should be injected via constructor if needed
+            pass
 
     def _save_persistent_cache(self) -> None:
         """Save cache to persistent file."""
@@ -267,12 +269,10 @@ class AWSAMIResolver(ImageResolver):
             # In a full implementation, the cache service would provide export/import methods
             with open(self._cache_file_path, "w") as f:
                 json.dump(cache_data, f, indent=2)
-        except Exception as e:
-            # Ignore errors saving persistent cache
-            from infrastructure.logging.logger import get_logger
-
-            logger = get_logger(__name__)
-            logger.debug(f"Failed to save persistent cache: {e}")
+        except Exception:
+            # Ignore errors saving persistent cache - silently fail
+            # Logging should be injected via constructor if needed
+            pass
 
     def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics."""
