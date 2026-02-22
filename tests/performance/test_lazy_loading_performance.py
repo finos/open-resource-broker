@@ -8,11 +8,18 @@ import os
 import time
 from unittest.mock import patch
 
-import psutil
 import pytest
+
+try:
+    import psutil
+    HAS_PSUTIL = True
+except ImportError:
+    HAS_PSUTIL = False
 
 from bootstrap import Application
 from infrastructure.di.container import get_container
+
+pytestmark = pytest.mark.skipif(not HAS_PSUTIL, reason="psutil not installed")
 
 
 class TestLazyLoadingPerformance:

@@ -10,7 +10,12 @@ from unittest.mock import Mock
 import boto3
 import pytest
 from botocore.exceptions import ClientError
-from moto import mock_aws
+
+try:
+    from moto import mock_aws
+    HAS_MOTO = True
+except ImportError:
+    HAS_MOTO = False
 
 from domain.base.ports import LoggingPort
 from monitoring.metrics import MetricsCollector
@@ -18,6 +23,8 @@ from providers.aws.infrastructure.instrumentation.botocore_metrics import (
     BotocoreMetricsHandler,
     RequestContext,
 )
+
+pytestmark = pytest.mark.skipif(not HAS_MOTO, reason="moto not installed")
 
 
 class TestBotocoreMetrics:

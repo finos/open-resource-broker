@@ -17,8 +17,8 @@ from domain.base.ports.logging_port import LoggingPort
 from domain.base.ports.scheduler_port import SchedulerPort
 from infrastructure.template.configuration_manager import TemplateConfigurationManager
 from infrastructure.template.dtos import TemplateDTO
-from infrastructure.template.services.template_persistence_service import (
-    TemplatePersistenceService,
+from infrastructure.template.services.template_storage_service import (
+    TemplateStorageService,
 )
 from infrastructure.template.template_cache_service import (
     NoOpTemplateCacheService,

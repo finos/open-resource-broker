@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
-from application.dto.queries import GetRequestQuery, GetRequestStatusQuery, ListActiveRequestsQuery
+from application.dto.queries import GetRequestQuery, ListActiveRequestsQuery
 from application.request.dto import RequestStatusResponse
 
 # Check if FastAPI is available

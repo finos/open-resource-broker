@@ -5,7 +5,12 @@ from unittest.mock import Mock, patch
 
 import boto3
 import pytest
-from moto import mock_aws
+
+try:
+    from moto import mock_aws
+    HAS_MOTO = True
+except ImportError:
+    HAS_MOTO = False
 
 # Import AWS components
 try:
@@ -25,6 +30,9 @@ try:
 except ImportError as e:
     IMPORTS_AVAILABLE = False
     pytestmark = pytest.mark.skip(f"AWS provider imports not available: {e}")
+
+if not HAS_MOTO and IMPORTS_AVAILABLE:
+    pytestmark = pytest.mark.skip("moto not installed")
 
 
 @pytest.mark.unit
