@@ -1,11 +1,11 @@
-"""Storage events - Repository and storage monitoring."""
+"""Storage events - Repository and storage monitoring (Infrastructure Layer)."""
 
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 from pydantic import Field
 
-from .base_events import (
+from domain.base.events.base_events import (
     ErrorEvent,
     InfrastructureEvent,
     OperationEvent,

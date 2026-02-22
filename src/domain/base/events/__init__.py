@@ -55,22 +55,8 @@ from .provider_events import (
     ProviderResourceStateChangedEvent,
 )
 
-# Storage events (Repository and storage)
-from .storage_events import (  # Repository operations; Storage strategy
-    ConnectionPoolEvent,
-    RepositoryOperationCompletedEvent,
-    RepositoryOperationFailedEvent,
-    RepositoryOperationStartedEvent,
-    SlowQueryDetectedEvent,
-    StorageEvent,
-    StorageHealthCheckEvent,
-    StoragePerformanceEvent,
-    StorageStrategyEvent,
-    StorageStrategyFailoverEvent,
-    StorageStrategySelectedEvent,
-    TransactionCommittedEvent,
-    TransactionStartedEvent,
-)
+# Storage events moved to infrastructure.events.storage_events
+# These are infrastructure monitoring events, not domain events
 
 # System events (Configuration, lifecycle, security, performance)
 from .system_events import (  # System base; Configuration events; Application lifecycle events; Security and audit events; Performance and monitoring events
@@ -98,7 +84,6 @@ __all__: list[str] = [
     "ConfigurationChangedEvent",
     "ConfigurationErrorEvent",
     "ConfigurationLoadedEvent",
-    "ConnectionPoolEvent",
     # Base classes and protocols
     "DomainEvent",
     "ErrorEvent",
@@ -118,9 +103,6 @@ __all__: list[str] = [
     "OperationStartedEvent",
     "PerformanceEvent",
     "PerformanceMetricEvent",
-    # Repository Operation Events
-    "StorageEvent",
-    "StorageStrategyEvent",
     "ProviderConfigurationEvent",
     "ProviderCredentialsEvent",
     "ProviderHealthCheckEvent",
@@ -128,9 +110,6 @@ __all__: list[str] = [
     "ProviderOperationEvent",
     "ProviderRateLimitEvent",
     "ProviderResourceStateChangedEvent",
-    "RepositoryOperationCompletedEvent",
-    "RepositoryOperationFailedEvent",
-    "RepositoryOperationStartedEvent",
     "RequestCompletedEvent",
     "RequestCreatedEvent",
     # Request Events
@@ -145,14 +124,7 @@ __all__: list[str] = [
     "ResourceEvent",
     "ResourceUpdatedEvent",
     "SecurityEvent",
-    "SlowQueryDetectedEvent",
     "StatusChangeEvent",
-    # Storage Strategy Events
-    "StorageEvent",
-    "StorageHealthCheckEvent",
-    "StoragePerformanceEvent",
-    "StorageStrategyFailoverEvent",
-    "StorageStrategySelectedEvent",
     # System Events
     "SystemEvent",
     "TemplateCreatedEvent",
@@ -162,6 +134,4 @@ __all__: list[str] = [
     "TemplateUpdatedEvent",
     "TemplateValidatedEvent",
     "TimedEvent",
-    "TransactionCommittedEvent",
-    "TransactionStartedEvent",
 ]

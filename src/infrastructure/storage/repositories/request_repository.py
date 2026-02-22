@@ -5,8 +5,8 @@ from datetime import datetime
 from typing import Any, Optional
 from uuid import uuid4
 
-from domain.base.events import (
-    DomainEvent,
+from domain.base.events import DomainEvent
+from infrastructure.events import (
     RepositoryOperationCompletedEvent,
     RepositoryOperationFailedEvent,
     RepositoryOperationStartedEvent,
