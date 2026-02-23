@@ -2,7 +2,7 @@
 
 import time
 from functools import wraps
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, Generic, Optional, TypeVar
 
 from domain.base.exceptions import ConcurrencyError
 from infrastructure.logging.logger import get_logger
@@ -11,7 +11,7 @@ T = TypeVar("T")  # Entity type
 R = TypeVar("R")  # Return type
 
 
-class OptimisticConcurrencyControl:
+class OptimisticConcurrencyControl(Generic[T]):
     """Utilities for optimistic concurrency control."""
 
     def __init__(self, max_retries: int = 3, retry_delay: float = 0.1) -> None:
@@ -66,7 +66,7 @@ class OptimisticConcurrencyControl:
 
     def check_version(
         self,
-        entity: T,  # pyright: ignore[reportInvalidTypeVarUse]
+        entity: T,
         entity_id: str,
         version_map: dict[str, int],
         entity_class_name: str,
@@ -89,7 +89,7 @@ class OptimisticConcurrencyControl:
                 f"expected {version_map[entity_id]}, got {getattr(entity, 'version', None)}"
             )
 
-    def increment_version(self, entity: T, entity_id: str, version_map: dict[str, int]) -> None:  # pyright: ignore[reportInvalidTypeVarUse]
+    def increment_version(self, entity: T, entity_id: str, version_map: dict[str, int]) -> None:
         """
         Increment entity version.
 

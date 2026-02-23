@@ -149,7 +149,7 @@ class CommandBus(CommandBusPort):
         self.container = container
         self.logger = logger
 
-    async def execute(self, command: Command) -> Any:  # type: ignore[override]
+    async def execute(self, command: Command) -> Any:
         """
         Execute a command through pure routing with lazy handler discovery.
 
