@@ -816,7 +816,9 @@ def setup_host_factory_mock(request):
     scheduler_type = overrides.get("scheduler", "hostfactory")
     hfm = HostFactoryMock(scheduler=scheduler_type)
 
-    return hfm
+    yield hfm
+
+    processor.cleanup_test_templates(test_name)
 
 
 @pytest.fixture
@@ -862,7 +864,9 @@ def setup_host_factory_mock_with_scenario(request):
     scheduler_type = overrides.get("scheduler", "hostfactory")
     hfm = HostFactoryMock(scheduler=scheduler_type)
 
-    return hfm
+    yield hfm
+
+    processor.cleanup_test_templates(test_name)
 
 
 def _check_request_machines_response_status(status_response):

@@ -2,6 +2,8 @@ import json
 import logging
 import os
 import time
+import uuid
+from pathlib import Path
 from typing import Any, Dict, List
 
 import boto3
@@ -44,12 +46,7 @@ console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(formatter)
 
-file_handler = logging.FileHandler("logs/multi_resource_test.log")
-file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(formatter)
-
 log.addHandler(console_handler)
-log.addHandler(file_handler)
 
 MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC = 180
 
@@ -132,7 +129,15 @@ def categorize_instances_by_resource_type(instance_ids: List[str]) -> Dict[str, 
 def setup_multi_resource_templates():
     """Setup fixture that creates templates for all four AWS resource types."""
     processor = TemplateProcessor()
-    test_name = "test_multi_resource_termination"
+    test_name = f"test_multi_resource_termination_{uuid.uuid4().hex[:8]}"
+
+    logs_dir = Path(__file__).parent.parent.parent / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    log_file = logs_dir / f"{test_name}.log"
+    file_handler = logging.FileHandler(str(log_file))
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    log.addHandler(file_handler)
 
     test_config_dir = processor.run_templates_dir / test_name
     if test_config_dir.exists():
@@ -186,7 +191,11 @@ def setup_multi_resource_templates():
 
     hfm = HostFactoryMock()
 
-    return hfm, template_configs
+    yield hfm, template_configs
+
+    processor.cleanup_test_templates(test_name)
+    log.removeHandler(file_handler)
+    file_handler.close()
 
 
 def provision_resource_capacity(
