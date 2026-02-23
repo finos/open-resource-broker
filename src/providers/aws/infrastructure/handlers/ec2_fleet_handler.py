@@ -26,7 +26,6 @@ Note:
     launches and is suitable for large-scale, complex deployments.
 """
 
-from datetime import datetime
 from typing import Any, Optional
 
 from botocore.exceptions import ClientError
@@ -38,6 +37,7 @@ from domain.template.template_aggregate import Template
 from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from infrastructure.di.container import get_container
 from infrastructure.error.decorators import handle_infrastructure_exceptions
+from providers.aws.infrastructure.tags import build_system_tags, merge_tags
 from infrastructure.resilience import CircuitBreakerOpenError
 from infrastructure.utilities.common.resource_naming import get_resource_prefix
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
@@ -681,25 +681,27 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             "TagSpecifications": [
                 {
                     "ResourceType": "fleet",
-                    "Tags": [
-                        {
-                            "Key": "Name",
-                            "Value": f"{get_resource_prefix('fleet')}{request.request_id}",
-                        },
-                        {"Key": "RequestId", "Value": str(request.request_id)},
-                        {"Key": "TemplateId", "Value": str(template.template_id)},
-                        {"Key": "CreatedBy", "Value": created_by},
-                        {"Key": "CreatedAt", "Value": datetime.utcnow().isoformat()},
-                        {"Key": "ProviderApi", "Value": "EC2Fleet"},
-                    ],
+                    "Tags": merge_tags(
+                        [
+                            {
+                                "Key": "Name",
+                                "Value": f"{get_resource_prefix('fleet')}{request.request_id}",
+                            },
+                            *(
+                                [{"Key": k, "Value": v} for k, v in template.tags.items()]
+                                if template.tags
+                                else []
+                            ),
+                        ],
+                        build_system_tags(
+                            request_id=str(request.request_id),
+                            template_id=str(template.template_id),
+                            provider_api="EC2Fleet",
+                        ),
+                    ),
                 }
             ],
         }
-
-        # Add template tags if any
-        if template.tags:
-            fleet_tags = [{"Key": k, "Value": v} for k, v in template.tags.items()]
-            fleet_config["TagSpecifications"][0]["Tags"].extend(fleet_tags)
 
         # Add fleet type specific configurations
         if template.fleet_type == AWSFleetType.MAINTAIN.value:

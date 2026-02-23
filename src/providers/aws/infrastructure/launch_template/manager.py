@@ -24,6 +24,7 @@ from providers.aws.exceptions.aws_exceptions import (
     InfrastructureError,
 )
 from providers.aws.infrastructure.aws_client import AWSClient
+from providers.aws.infrastructure.tags import build_system_tags, merge_tags
 
 
 @dataclass
@@ -558,19 +559,18 @@ class AWSLaunchTemplateManager:
                 # Intentionally silent fallback for package info retrieval
                 pass
 
-        tags = [
-            {"Key": "Name", "Value": instance_name},
-            {"Key": "RequestId", "Value": str(request.request_id)},
-            {"Key": "TemplateId", "Value": str(aws_template.template_id)},
-            {"Key": "CreatedBy", "Value": created_by},
-        ]
-
-        # Add template tags if any
+        user_tags: list[dict[str, str]] = [{"Key": "Name", "Value": instance_name}]
         if aws_template.tags:
-            template_tags = [{"Key": k, "Value": str(v)} for k, v in aws_template.tags.items()]
-            tags.extend(template_tags)
+            user_tags.extend([{"Key": k, "Value": str(v)} for k, v in aws_template.tags.items()])
 
-        return tags
+        return merge_tags(
+            user_tags,
+            build_system_tags(
+                request_id=str(request.request_id),
+                template_id=str(aws_template.template_id),
+                provider_api="LaunchTemplate",
+            ),
+        )
 
     def _create_launch_template_tags(
         self, aws_template: AWSTemplate, request: Request
@@ -597,12 +597,14 @@ class AWSLaunchTemplateManager:
                 # Intentionally silent fallback for package info retrieval
                 pass
 
-        return [
-            {"Key": "Name", "Value": template_name},
-            {"Key": "RequestId", "Value": str(request.request_id)},
-            {"Key": "TemplateId", "Value": str(aws_template.template_id)},
-            {"Key": "CreatedBy", "Value": created_by},
-        ]
+        return merge_tags(
+            [{"Key": "Name", "Value": template_name}],
+            build_system_tags(
+                request_id=str(request.request_id),
+                template_id=str(aws_template.template_id),
+                provider_api="LaunchTemplate",
+            ),
+        )
 
     def _extract_instance_profile_name(self, instance_profile: str) -> str:
         """

@@ -27,7 +27,6 @@ Note:
     and workloads that require predictable instance provisioning.
 """
 
-from datetime import datetime
 from typing import Any, Optional
 
 from botocore.exceptions import ClientError
@@ -38,6 +37,7 @@ from domain.request.aggregate import Request
 from domain.template.template_aggregate import Template
 from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from infrastructure.error.decorators import handle_infrastructure_exceptions
+from providers.aws.infrastructure.tags import build_system_tags, merge_tags
 from infrastructure.utilities.common.resource_naming import get_resource_prefix
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
@@ -479,24 +479,26 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
         tag_specifications = [
             {
                 "ResourceType": "instance",
-                "Tags": [
-                    {
-                        "Key": "Name",
-                        "Value": f"{get_resource_prefix('instance')}{request.request_id}",
-                    },
-                    {"Key": "RequestId", "Value": str(request.request_id)},
-                    {"Key": "TemplateId", "Value": str(aws_template.template_id)},
-                    {"Key": "CreatedBy", "Value": created_by},
-                    {"Key": "CreatedAt", "Value": datetime.utcnow().isoformat()},
-                    {"Key": "ProviderApi", "Value": "RunInstances"},
-                ],
+                "Tags": merge_tags(
+                    [
+                        {
+                            "Key": "Name",
+                            "Value": f"{get_resource_prefix('instance')}{request.request_id}",
+                        },
+                        *(
+                            [{"Key": k, "Value": v} for k, v in aws_template.tags.items()]
+                            if aws_template.tags
+                            else []
+                        ),
+                    ],
+                    build_system_tags(
+                        request_id=str(request.request_id),
+                        template_id=str(aws_template.template_id),
+                        provider_api="RunInstances",
+                    ),
+                ),
             }
         ]
-
-        # Add template tags if any
-        if aws_template.tags:
-            instance_tags = [{"Key": k, "Value": v} for k, v in aws_template.tags.items()]
-            tag_specifications[0]["Tags"].extend(instance_tags)
 
         params["TagSpecifications"] = tag_specifications
 

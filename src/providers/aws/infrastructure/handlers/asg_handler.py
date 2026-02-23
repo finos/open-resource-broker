@@ -38,6 +38,7 @@ from domain.template.template_aggregate import Template
 from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from infrastructure.error.decorators import handle_infrastructure_exceptions
 from infrastructure.utilities.common.resource_naming import get_resource_prefix
+from providers.aws.infrastructure.tags import build_system_tags, merge_tags
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
@@ -209,38 +210,10 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             created_by = self._get_package_name()
 
             # Prepare standard tags with proper ResourceId and ResourceType
-            tags = [
+            user_tags = [
                 {
                     "Key": "Name",
                     "Value": f"hostfactory-asg-{request_id}",
-                    "PropagateAtLaunch": True,
-                    "ResourceId": asg_name,
-                    "ResourceType": "auto-scaling-group",
-                },
-                {
-                    "Key": "RequestId",
-                    "Value": str(request_id),
-                    "PropagateAtLaunch": True,
-                    "ResourceId": asg_name,
-                    "ResourceType": "auto-scaling-group",
-                },
-                {
-                    "Key": "TemplateId",
-                    "Value": aws_template.template_id,
-                    "PropagateAtLaunch": True,
-                    "ResourceId": asg_name,
-                    "ResourceType": "auto-scaling-group",
-                },
-                {
-                    "Key": "CreatedBy",
-                    "Value": created_by,
-                    "PropagateAtLaunch": True,
-                    "ResourceId": asg_name,
-                    "ResourceType": "auto-scaling-group",
-                },
-                {
-                    "Key": "ProviderApi",
-                    "Value": "ASG",
                     "PropagateAtLaunch": True,
                     "ResourceId": asg_name,
                     "ResourceType": "auto-scaling-group",
@@ -250,7 +223,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             # Add custom tags from template
             if hasattr(aws_template, "tags") and aws_template.tags:
                 for key, value in aws_template.tags.items():
-                    tags.append(
+                    user_tags.append(
                         {
                             "Key": key,
                             "Value": str(value),
@@ -259,6 +232,31 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                             "ResourceType": "auto-scaling-group",
                         }
                     )
+
+            # Build and merge orb: system tags
+            system_tags = build_system_tags(
+                request_id=str(request_id),
+                template_id=str(aws_template.template_id),
+                provider_api="ASG",
+            )
+            merged = merge_tags(
+                [{"Key": t["Key"], "Value": t["Value"]} for t in user_tags],
+                system_tags,
+            )
+            # Re-attach ASG-specific fields to merged tags
+            user_keys = {t["Key"]: t for t in user_tags}
+            tags = []
+            for tag in merged:
+                base = user_keys.get(tag["Key"], {})
+                tags.append(
+                    {
+                        "Key": tag["Key"],
+                        "Value": tag["Value"],
+                        "PropagateAtLaunch": base.get("PropagateAtLaunch", True),
+                        "ResourceId": base.get("ResourceId", asg_name),
+                        "ResourceType": base.get("ResourceType", "auto-scaling-group"),
+                    }
+                )
 
             # Create tags for the ASG
             self._retry_with_backoff(

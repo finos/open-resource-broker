@@ -27,7 +27,6 @@ Note:
 """
 
 import json
-from datetime import datetime
 from typing import Any, Optional
 
 from domain.base.dependency_injection import injectable
@@ -37,6 +36,7 @@ from domain.template.template_aggregate import Template
 from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from infrastructure.error.decorators import handle_infrastructure_exceptions
 from infrastructure.utilities.common.resource_naming import get_resource_prefix
+from providers.aws.infrastructure.tags import build_system_tags, merge_tags
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.domain.template.value_objects import AWSFleetType
 from providers.aws.exceptions.aws_exceptions import (
@@ -563,14 +563,15 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         on_demand_capacity = capacity_distribution["on_demand_count"]
 
         # Common tags for both fleet and instances
-        common_tags = [
-            {"Key": "Name", "Value": f"hf-{request.request_id}"},
-            {"Key": "RequestId", "Value": str(request.request_id)},
-            {"Key": "TemplateId", "Value": str(template.template_id)},
-            {"Key": "CreatedBy", "Value": created_by},
-            {"Key": "CreatedAt", "Value": datetime.utcnow().isoformat()},
-            {"Key": "ProviderApi", "Value": "SpotFleet"},
-        ]
+        user_tags = [{"Key": "Name", "Value": f"hf-{request.request_id}"}]
+        if template.tags:
+            user_tags.extend([{"Key": k, "Value": v} for k, v in template.tags.items()])
+        system_tags = build_system_tags(
+            request_id=str(request.request_id),
+            template_id=str(template.template_id),
+            provider_api="SpotFleet",
+        )
+        common_tags = merge_tags(user_tags, system_tags)
 
         fleet_type_value = (
             template.fleet_type.value  # type: ignore[union-attr]
@@ -599,11 +600,6 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         if price_type in ("ondemand", "heterogeneous") or on_demand_capacity > 0:
             # SpotFleet API: TargetCapacity is total, OnDemandTargetCapacity is on-demand portion
             fleet_config["OnDemandTargetCapacity"] = on_demand_capacity
-
-        # Add template tags if any
-        if template.tags:
-            instance_tags = [{"Key": k, "Value": v} for k, v in template.tags.items()]
-            fleet_config["TagSpecifications"][0]["Tags"].extend(instance_tags)
 
         # Add fleet type specific configurations
         if template.fleet_type == AWSFleetType.MAINTAIN.value:
