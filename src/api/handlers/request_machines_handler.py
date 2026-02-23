@@ -106,11 +106,11 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
             )
 
             # Execute command through CQRS command bus
-            result_request_id = await self._command_bus.execute(cast(Any, command))
+            await self._command_bus.execute(cast(Any, command))
 
-            # Create response
+            # Create response — use the pre-generated request_id since the CQRS command returns None
             response = RequestMachinesResponse(
-                request_id=result_request_id,
+                request_id=request_id,
                 metadata={"correlation_id": context.correlation_id, "submitted_at": time.time()},
             )
 
