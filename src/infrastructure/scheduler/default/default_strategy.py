@@ -90,7 +90,7 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
 
         return paths
 
-    def load_templates_from_path(self, template_path: str) -> list[dict[str, Any]]:
+    def load_templates_from_path(self, template_path: str, provider_override: Any = None) -> list[dict[str, Any]]:
         """Load templates from a specific path."""
         if not os.path.exists(template_path):
             self.logger.debug("Template file not found: %s", template_path)
