@@ -1,11 +1,14 @@
 """Configuration adapter implementing domain ConfigurationPort."""
 
+import logging
 from typing import Any, Optional
 
 from config import NamingConfig, RequestConfig, TemplateConfig
 from config.manager import ConfigurationManager
 from config.schemas.app_schema import AppConfig
 from domain.base.ports import ConfigurationPort
+
+_logger = logging.getLogger(__name__)
 
 
 class ConfigurationAdapter(ConfigurationPort):
@@ -54,8 +57,8 @@ class ConfigurationAdapter(ConfigurationPort):
                     ),
                 },
             }
-        except Exception:
-            # Fallback configuration if config not available
+        except Exception as e:
+            _logger.warning("Failed to load naming config, using defaults: %s", e)
             return {
                 "patterns": {
                     "request_id": r"^(req-|ret-)[a-f0-9\-]{36}$",
@@ -78,8 +81,8 @@ class ConfigurationAdapter(ConfigurationPort):
                 "min_timeout": getattr(request_config, "min_timeout", 30),
                 "max_timeout": getattr(request_config, "max_timeout", 3600),
             }
-        except Exception:
-            # Fallback validation config
+        except Exception as e:
+            _logger.warning("Failed to load validation config, using defaults: %s", e)
             return {
                 "max_machines_per_request": 100,
                 "default_timeout": 300,
@@ -107,7 +110,8 @@ class ConfigurationAdapter(ConfigurationPort):
                 "min_timeout": getattr(request_config, "min_timeout", 30),
                 "max_timeout": getattr(request_config, "max_timeout", 3600),
             }
-        except Exception:
+        except Exception as e:
+            _logger.warning("Failed to load request config, using defaults: %s", e)
             return {
                 "max_machines_per_request": 100,
                 "default_timeout": 300,
@@ -165,8 +169,8 @@ class ConfigurationAdapter(ConfigurationPort):
                     result["aws_metrics"].update(metrics_config["aws_metrics"])
 
             return result
-        except Exception:
-            # Fallback configuration
+        except Exception as e:
+            _logger.warning("Failed to load metrics config, using defaults: %s", e)
             return defaults
 
     def get_storage_config(self) -> dict[str, Any]:
@@ -178,7 +182,8 @@ class ConfigurationAdapter(ConfigurationPort):
                 "path": storage_config.get("path", "data"),
                 "backup_enabled": storage_config.get("backup_enabled", True),
             }
-        except Exception:
+        except Exception as e:
+            _logger.warning("Failed to load storage config, using defaults: %s", e)
             return {"type": "json", "path": "data", "backup_enabled": True}
 
     def get_events_config(self) -> dict[str, Any]:
@@ -190,7 +195,8 @@ class ConfigurationAdapter(ConfigurationPort):
                 "mode": events_config.get("mode", "logging"),
                 "batch_size": events_config.get("batch_size", 10),
             }
-        except Exception:
+        except Exception as e:
+            _logger.warning("Failed to load events config, using defaults: %s", e)
             return {"enabled": True, "mode": "logging", "batch_size": 10}
 
     def get_logging_config(self) -> dict[str, Any]:
@@ -204,7 +210,8 @@ class ConfigurationAdapter(ConfigurationPort):
                 ),
                 "file_enabled": logging_config.get("file_enabled", True),
             }
-        except Exception:
+        except Exception as e:
+            _logger.warning("Failed to load logging config, using defaults: %s", e)
             return {
                 "level": "INFO",
                 "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -256,8 +263,8 @@ class ConfigurationAdapter(ConfigurationPort):
 
             config = self._config_manager.get_typed(NativeSpecConfig)
             return {"enabled": config.enabled, "merge_mode": config.merge_mode}
-        except Exception:
-            # Fallback configuration if config not available
+        except Exception as e:
+            _logger.warning("Failed to load native spec config, using defaults: %s", e)
             return {"enabled": False, "merge_mode": "merge"}
 
     def get_package_info(self) -> dict[str, Any]:
@@ -283,20 +290,20 @@ class ConfigurationAdapter(ConfigurationPort):
         """Override provider instance - delegate to ConfigurationManager."""
         self._config_manager.override_provider_instance(provider_name)
 
-    def override_aws_region(self, region: str) -> None:
-        """Override AWS region - delegate to ConfigurationManager."""
+    def override_provider_region(self, region: str) -> None:
+        """Override provider region - delegate to ConfigurationManager."""
         self._config_manager.override_aws_region(region)
 
-    def override_aws_profile(self, profile: str) -> None:
-        """Override AWS profile - delegate to ConfigurationManager."""
+    def override_provider_profile(self, profile: str) -> None:
+        """Override provider credential profile - delegate to ConfigurationManager."""
         self._config_manager.override_aws_profile(profile)
 
-    def get_effective_aws_region(self, default_region: str = "us-east-1") -> str:
-        """Get effective AWS region - delegate to ConfigurationManager."""
+    def get_effective_region(self, default_region: str = "us-east-1") -> str:
+        """Get effective provider region - delegate to ConfigurationManager."""
         return self._config_manager.get_effective_aws_region(default_region)
 
-    def get_effective_aws_profile(self, default_profile: str = "default") -> str:
-        """Get effective AWS profile - delegate to ConfigurationManager."""
+    def get_effective_profile(self, default_profile: str = "default") -> str:
+        """Get effective provider credential profile - delegate to ConfigurationManager."""
         return self._config_manager.get_effective_aws_profile(default_profile)
 
     def get_active_provider_override(self) -> str | None:
@@ -345,5 +352,6 @@ class ConfigurationAdapter(ConfigurationPort):
                 if os.path.exists(path):
                     return path
             return None
-        except Exception:
+        except Exception as e:
+            _logger.debug("Could not determine active template file: %s", e)
             return None

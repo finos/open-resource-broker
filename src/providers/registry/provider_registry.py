@@ -2,51 +2,13 @@
 
 import importlib
 import threading
-from abc import ABC, abstractmethod
 from typing import Any, Callable, List, Optional
 
 from domain.base.exceptions import ConfigurationError
 from domain.base.results import ProviderSelectionResult
 from infrastructure.registry.base_registry import BaseRegistration, BaseRegistry, RegistryMode
 
-
-class UnsupportedProviderError(Exception):
-    """Exception raised when an unsupported provider type is requested."""
-
-
-class ProviderFactoryInterface(ABC):
-    """Interface for provider factory functions."""
-
-    @abstractmethod
-    def create_strategy(self, config: Any) -> Any:
-        """Create a provider strategy."""
-
-    @abstractmethod
-    def create_config(self, data: dict[str, Any]) -> Any:
-        """Create a provider configuration."""
-
-
-class ProviderRegistration(BaseRegistration):
-    """Provider-specific registration with resolver and validator factories."""
-
-    def __init__(
-        self,
-        type_name: str,
-        strategy_factory: Callable,
-        config_factory: Callable,
-        resolver_factory: Optional[Callable] = None,
-        validator_factory: Optional[Callable] = None,
-    ) -> None:
-        """Initialize the instance."""
-        super().__init__(
-            type_name,
-            strategy_factory,
-            config_factory,
-            resolver_factory=resolver_factory,
-            validator_factory=validator_factory,
-        )
-        self.resolver_factory = resolver_factory
-        self.validator_factory = validator_factory
+from providers.registry.types import ProviderFactoryInterface, ProviderRegistration, UnsupportedProviderError
 
 
 class ProviderRegistry(BaseRegistry):
@@ -203,7 +165,7 @@ class ProviderRegistry(BaseRegistry):
                 self._logger.error("Error registering provider type '%s': %s", provider_type, e, exc_info=True)
             return False
 
-    def ensure_provider_instance_registered_from_config(self, provider_instance) -> bool:
+    def ensure_provider_instance_registered_from_config(self, provider_instance: Any) -> bool:
         """
         Ensure provider instance is registered from config.
         Handles both type and instance registration.
@@ -223,8 +185,6 @@ class ProviderRegistry(BaseRegistry):
             return True
 
         try:
-            import importlib
-
             provider_type = provider_instance.type
 
             if self._logger:
@@ -523,8 +483,6 @@ class ProviderRegistry(BaseRegistry):
         because it requires access to configuration and provider instances.
         DO NOT move to domain layer - it creates circular dependencies.
         """
-        # Import handled in individual methods where needed
-
         if logger:
             logger.info(
                 "Selecting provider for template: %s", getattr(template, "template_id", "unknown")
@@ -845,7 +803,7 @@ class ProviderRegistry(BaseRegistry):
         type_name: str,
         strategy_factory: Callable,
         config_factory: Callable,
-        **additional_factories,
+        **additional_factories: Any,
     ) -> BaseRegistration:
         """Create provider-specific registration."""
         return ProviderRegistration(

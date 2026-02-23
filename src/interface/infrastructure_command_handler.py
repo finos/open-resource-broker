@@ -224,13 +224,13 @@ def _get_active_providers_with_overrides() -> List[Dict[str, Any]]:
                 provider_config = provider.get("config", {})
 
                 # Apply region override
-                effective_region = config.get_effective_aws_region(
+                effective_region = config.get_effective_region(
                     provider_config.get("region", "us-east-1")
                 )
                 provider_config["region"] = effective_region
 
                 # Apply profile override
-                effective_profile = config.get_effective_aws_profile(
+                effective_profile = config.get_effective_profile(
                     provider_config.get("profile", "default")
                 )
                 provider_config["profile"] = effective_profile

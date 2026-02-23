@@ -202,8 +202,8 @@ def _register_lazy_service_factories(container: "DIContainer") -> None:
                 else str(scheduler_config)
             )
             register_active_scheduler_only(scheduler_type)
-        except Exception:
-            # Fallback to default scheduler
+        except Exception as e:
+            logger.warning("Failed to load scheduler config, falling back to default: %s", e)
             register_active_scheduler_only("default")
 
     # Register scheduler on-demand when SchedulerPort is accessed

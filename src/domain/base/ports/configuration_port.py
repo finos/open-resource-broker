@@ -56,20 +56,20 @@ class ConfigurationPort(ABC):
         """Override the active provider instance."""
 
     @abstractmethod
-    def override_aws_region(self, region: str) -> None:
-        """Override the AWS region for this session."""
+    def override_provider_region(self, region: str) -> None:
+        """Override the provider region for this session."""
 
     @abstractmethod
-    def override_aws_profile(self, profile: str) -> None:
-        """Override the AWS profile for this session."""
+    def override_provider_profile(self, profile: str) -> None:
+        """Override the provider credential profile for this session."""
 
     @abstractmethod
-    def get_effective_aws_region(self, default_region: str = "us-east-1") -> str:
-        """Get effective AWS region (override or configured)."""
+    def get_effective_region(self, default_region: str = "us-east-1") -> str:
+        """Get effective provider region (override or configured)."""
 
     @abstractmethod
-    def get_effective_aws_profile(self, default_profile: str = "default") -> str:
-        """Get effective AWS profile (override or configured)."""
+    def get_effective_profile(self, default_profile: str = "default") -> str:
+        """Get effective provider credential profile (override or configured)."""
 
     @abstractmethod
     def get_provider_instance_config(self, provider_name: str) -> Any:
