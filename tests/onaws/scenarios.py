@@ -5,18 +5,57 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 
+def _get_templates_for_resolution() -> List[Dict[str, Any]]:
+    """Get templates for ID resolution using handler classmethods, with filesystem fallback."""
+    try:
+        from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
+        from providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHandler
+        from providers.aws.infrastructure.handlers.run_instances_handler import RunInstancesHandler
+        from providers.aws.infrastructure.handlers.spot_fleet_handler import SpotFleetHandler
+
+        templates = []
+        for handler_class in [EC2FleetHandler, SpotFleetHandler, ASGHandler, RunInstancesHandler]:
+            if hasattr(handler_class, "get_example_templates"):
+                for t in handler_class.get_example_templates():
+                    provider_api = t.provider_api
+                    if hasattr(provider_api, "value"):
+                        provider_api = provider_api.value
+                    fleet_type = (t.metadata or {}).get("fleet_type") or getattr(
+                        t, "fleet_type", None
+                    )
+                    if hasattr(fleet_type, "value"):
+                        fleet_type = fleet_type.value
+                    templates.append(
+                        {
+                            "templateId": t.template_id,
+                            "providerApi": provider_api,
+                            "fleetType": fleet_type,
+                            "priceType": t.price_type,
+                        }
+                    )
+        if templates:
+            return templates
+    except Exception:
+        pass
+
+    # Filesystem fallback
+    templates_path = Path(__file__).parent.parent.parent / "config" / "aws_templates.json"
+    if templates_path.exists():
+        with open(templates_path) as f:
+            return json.load(f).get("templates", [])
+    return []
+
+
 def resolve_template_id(overrides: Dict[str, Any]) -> str:
-    """Resolve a template_id from aws_templates.json matching the scenario overrides.
+    """Resolve a template_id matching the scenario overrides.
 
     Picks the first template whose providerApi and (optionally) fleetType/priceType
     match the scenario.  Falls back progressively to less specific matches.
+    Uses handler classmethods for programmatic resolution; falls back to filesystem.
     """
-    templates_path = Path(__file__).parent.parent.parent / "config" / "aws_templates.json"
-    if not templates_path.exists():
-        return "BASE"  # legacy fallback
-
-    with open(templates_path) as f:
-        templates = json.load(f).get("templates", [])
+    templates = _get_templates_for_resolution()
+    if not templates:
+        return "BASE"
 
     provider_api = overrides.get("providerApi", "")
     fleet_type = overrides.get("fleetType", "")
@@ -377,7 +416,7 @@ def generate_scenarios_from_attributes(
         scenario = base_template.copy()
         scenario.update({"test_name": test_name, "overrides": overrides})
 
-        # Resolve template_id from aws_templates.json if not explicitly set
+        # Resolve template_id from handler classmethods if not explicitly set
         if not scenario.get("template_id"):
             scenario["template_id"] = resolve_template_id(overrides)
 

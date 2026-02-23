@@ -6,9 +6,10 @@ list.  This replaces the old placeholder-based approach and keeps test configs
 aligned with the actual runtime format.
 
 Flow:
-    config/aws_templates.json  ──copy + override──►  run_templates/<test>/aws_templates.json
-    config/config.json         ──merge overrides──►   run_templates/<test>/config.json
-    config/default_config.json ──copy──────────────►  run_templates/<test>/default_config.json
+    AWSHandlerFactory.get_example_templates()  ──programmatic──►  in-memory templates
+    (fallback: config/aws_templates.json)      ──copy + override──►  run_templates/<test>/aws_templates.json
+    config/config.json                         ──merge overrides──►  run_templates/<test>/config.json
+    config/default_config.json                 ──copy──────────────►  run_templates/<test>/default_config.json
 """
 
 import json
@@ -18,6 +19,27 @@ from pathlib import Path
 from typing import Any, Dict
 
 log = logging.getLogger(__name__)
+
+# Snake_case → camelCase mapping for the aws_templates.json file format
+_SNAKE_TO_CAMEL: dict[str, str] = {
+    "template_id": "templateId",
+    "max_instances": "maxNumber",
+    "provider_api": "providerApi",
+    "provider_type": "providerType",
+    "subnet_ids": "subnetIds",
+    "security_group_ids": "securityGroupIds",
+    "machine_types": "vmTypes",
+    "machine_types_ondemand": "vmTypesOnDemand",
+    "machine_types_priority": "vmTypesPriority",
+    "price_type": "priceType",
+    "allocation_strategy": "allocationStrategy",
+    "max_price": "maxSpotPrice",
+    "tags": "instanceTags",
+    "created_at": "createdAt",
+    "name": "name",
+    "fleet_type": "fleetType",
+    "percent_on_demand": "percentOnDemand",
+}
 
 # Fields that can be overridden directly on each template entry
 TEMPLATE_OVERRIDE_KEYS = {
@@ -92,7 +114,15 @@ class TemplateProcessor:
         test_dir.mkdir(parents=True, exist_ok=True)
 
         # 1. Generate aws_templates.json (with overrides applied)
-        templates_data = self._load_json(self._find_templates_source())
+        # Try programmatic generation first; fall back to filesystem copy
+        try:
+            templates_data = self.generate_templates_programmatically()
+            log.debug("Generated templates programmatically from handler classmethods")
+        except Exception as exc:
+            log.warning(
+                "Programmatic template generation failed (%s), falling back to filesystem", exc
+            )
+            templates_data = self._load_json(self._find_templates_source())
         self._apply_template_overrides(templates_data, overrides)
         template_filename = "aws_templates.json"
         self._write_json(test_dir / template_filename, templates_data)
@@ -147,7 +177,13 @@ class TemplateProcessor:
         test_dir.mkdir(parents=True, exist_ok=True)
 
         # Load source templates and config
-        source_templates = self._load_json(self._find_templates_source())
+        try:
+            source_templates = self.generate_templates_programmatically()
+        except Exception as exc:
+            log.warning(
+                "Programmatic template generation failed (%s), falling back to filesystem", exc
+            )
+            source_templates = self._load_json(self._find_templates_source())
         config_data = self._load_json(self.config_source_dir / "config.json")
 
         # Build combined template list: one entry per template_config,
@@ -171,6 +207,86 @@ class TemplateProcessor:
             shutil.copy2(default_config_src, test_dir / "default_config.json")
 
         print(f"Generated combined config with {len(combined)} templates in {test_dir}")
+
+    # ------------------------------------------------------------------
+    # Programmatic template generation
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def generate_templates_programmatically() -> Dict[str, Any]:
+        """Generate templates from handler classmethods without touching the filesystem.
+
+        Calls each AWS handler's get_example_templates() classmethod directly,
+        then converts the resulting Template domain objects to the camelCase
+        aws_templates.json file format.
+
+        Returns:
+            {"templates": [...]} dict in the same format as aws_templates.json
+        """
+        from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
+        from providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHandler
+        from providers.aws.infrastructure.handlers.run_instances_handler import RunInstancesHandler
+        from providers.aws.infrastructure.handlers.spot_fleet_handler import SpotFleetHandler
+
+        all_templates = []
+        for handler_class in [EC2FleetHandler, SpotFleetHandler, ASGHandler, RunInstancesHandler]:
+            if hasattr(handler_class, "get_example_templates"):
+                try:
+                    all_templates.extend(handler_class.get_example_templates())
+                except Exception as exc:
+                    log.warning(
+                        "Failed to get example templates from %s: %s", handler_class.__name__, exc
+                    )
+
+        return {"templates": [TemplateProcessor._template_to_camel(t) for t in all_templates]}
+
+    @staticmethod
+    def _template_to_camel(template: Any) -> Dict[str, Any]:
+        """Convert a Template domain object to the camelCase aws_templates.json format."""
+        raw = template.model_dump()
+        metadata = raw.get("metadata") or {}
+
+        # Pull fleet_type and percent_on_demand out of metadata when not top-level
+        fleet_type = raw.get("fleet_type") or metadata.get("fleet_type")
+        percent_on_demand = raw.get("percent_on_demand") or metadata.get("percent_on_demand")
+
+        # Normalise provider_api: may be a ProviderApi enum or plain string
+        provider_api = raw.get("provider_api")
+        if hasattr(provider_api, "value"):
+            provider_api = provider_api.value
+
+        entry: Dict[str, Any] = {
+            "templateId": raw["template_id"],
+            "name": raw.get("name") or raw["template_id"],
+            "providerApi": provider_api,
+            "providerType": raw.get("provider_type"),
+            "maxNumber": raw.get("max_instances", 1),
+            "subnetIds": raw.get("subnet_ids") or [],
+            "securityGroupIds": raw.get("security_group_ids") or [],
+            "vmTypes": raw.get("machine_types") or {},
+            "vmTypesOnDemand": raw.get("machine_types_ondemand") or {},
+            "vmTypesPriority": raw.get("machine_types_priority") or {},
+            "priceType": raw.get("price_type"),
+            "allocationStrategy": raw.get("allocation_strategy"),
+            "instanceTags": raw.get("tags") or {},
+        }
+
+        # Optional fields — only include when present
+        created_at = raw.get("created_at")
+        if created_at is not None:
+            entry["createdAt"] = str(created_at)
+
+        if raw.get("max_price") is not None:
+            entry["maxSpotPrice"] = raw["max_price"]
+
+        if fleet_type is not None:
+            # fleet_type may be an AWSFleetType enum
+            entry["fleetType"] = fleet_type.value if hasattr(fleet_type, "value") else fleet_type
+
+        if percent_on_demand is not None:
+            entry["percentOnDemand"] = percent_on_demand
+
+        return entry
 
     # ------------------------------------------------------------------
     # Internal helpers
