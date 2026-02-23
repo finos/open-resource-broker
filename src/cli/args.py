@@ -529,5 +529,8 @@ For more information, visit: {DOCS_URL}
     init_parser.add_argument("--region", help="AWS region")
     init_parser.add_argument("--profile", help="AWS profile")
     init_parser.add_argument("--config-dir", help="Custom configuration directory")
+    init_parser.add_argument("--subnet-ids", help="Comma-separated subnet IDs for template_defaults (non-interactive only)")
+    init_parser.add_argument("--security-group-ids", help="Comma-separated security group IDs for template_defaults (non-interactive only)")
+    init_parser.add_argument("--fleet-role", help="Spot Fleet IAM role ARN or name for template_defaults (non-interactive only)")
 
     return parser.parse_args(), resource_parsers

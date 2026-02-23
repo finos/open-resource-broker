@@ -499,11 +499,20 @@ def _get_default_config(args) -> Dict[str, Any]:
     providers = _get_available_providers()
     default_provider = providers[0]["type"] if providers else "aws"
 
+    # Build infrastructure_defaults from CLI flags if provided
+    infrastructure_defaults: Dict[str, Any] = {}
+    if getattr(args, "subnet_ids", None):
+        infrastructure_defaults["subnet_ids"] = [s.strip() for s in args.subnet_ids.split(",")]
+    if getattr(args, "security_group_ids", None):
+        infrastructure_defaults["security_group_ids"] = [s.strip() for s in args.security_group_ids.split(",")]
+    if getattr(args, "fleet_role", None):
+        infrastructure_defaults["fleet_role"] = args.fleet_role
+
     first_provider = {
         "type": args.provider or default_provider,
         "profile": args.profile or "default",
         "region": args.region or "us-east-1",
-        "infrastructure_defaults": {},
+        "infrastructure_defaults": infrastructure_defaults,
     }
 
     return {
