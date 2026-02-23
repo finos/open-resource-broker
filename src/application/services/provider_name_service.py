@@ -2,6 +2,7 @@
 
 from typing import Any, Dict
 
+from infrastructure.utilities.common.string_utils import extract_provider_type
 from providers.registry import ProviderRegistry
 
 
@@ -29,9 +30,4 @@ class ProviderNameService:
 
     def _extract_provider_type(self, provider_name: str) -> str:
         """Extract provider type from provider name."""
-        if "_" in provider_name:
-            return provider_name.split("_")[0]
-        elif "-" in provider_name:
-            return provider_name.split("-")[0]
-        else:
-            return provider_name
+        return extract_provider_type(provider_name)

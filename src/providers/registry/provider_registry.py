@@ -7,6 +7,7 @@ from typing import Any, Callable, List, Optional
 from domain.base.exceptions import ConfigurationError
 from domain.base.results import ProviderSelectionResult
 from infrastructure.registry.base_registry import BaseRegistration, BaseRegistry, RegistryMode
+from infrastructure.utilities.common.string_utils import extract_provider_type
 
 from providers.registry.types import ProviderFactoryInterface, ProviderRegistration, UnsupportedProviderError
 
@@ -55,11 +56,7 @@ class ProviderRegistry(BaseRegistry):
             provider_identifier
         ) and not self.is_provider_registered(provider_identifier):
             # Try to auto-register the provider type
-            provider_type = (
-                provider_identifier.split("_")[0]
-                if "_" in provider_identifier
-                else provider_identifier
-            )
+            provider_type = extract_provider_type(provider_identifier)
             self.ensure_provider_type_registered(provider_type)
 
         # Create new strategy

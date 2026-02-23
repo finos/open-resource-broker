@@ -12,6 +12,7 @@ from application.dto.template_generation_dto import (
     TemplateGenerationResult,
 )
 from domain.base.ports import ConfigurationPort, ContainerPort, LoggingPort, SchedulerPort
+from infrastructure.utilities.common.string_utils import extract_provider_type
 
 
 class TemplateGenerationService:
@@ -296,13 +297,13 @@ class TemplateGenerationService:
             # Provider not found, create from name
             return {
                 "name": provider_name,
-                "type": provider_name.split("_")[0] if "_" in provider_name else provider_name,
+                "type": extract_provider_type(provider_name),
             }
         except Exception:
             # Fallback
             return {
                 "name": provider_name,
-                "type": provider_name.split("_")[0] if "_" in provider_name else provider_name,
+                "type": extract_provider_type(provider_name),
             }
 
     async def _generate_merged_templates_by_type(

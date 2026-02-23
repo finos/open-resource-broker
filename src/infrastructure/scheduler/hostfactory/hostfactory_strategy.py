@@ -15,6 +15,7 @@ from infrastructure.scheduler.hostfactory.field_mapper import HostFactoryFieldMa
 from infrastructure.scheduler.hostfactory.transformations import HostFactoryTransformations
 from infrastructure.template.dtos import TemplateDTO
 from infrastructure.utilities.common.serialization import serialize_enum
+from infrastructure.utilities.common.string_utils import extract_provider_type
 
 
 class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
@@ -516,11 +517,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             except Exception:
                 active_provider = "aws_default"
 
-        provider_type = (
-            active_provider.split("-")[0]
-            if "-" in active_provider
-            else active_provider.split("_")[0]
-        )
+        provider_type = extract_provider_type(active_provider)
 
         # Build config file path
         config_file = f"{provider_type}prov_config.json"

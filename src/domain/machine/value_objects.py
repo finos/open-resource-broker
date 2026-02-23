@@ -3,7 +3,7 @@
 This module provides an integrated interface to all machine value objects organized by category:
 - Machine status (MachineStatus)
 - Machine identifiers and core types (MachineId, MachineType)
-- Machine metadata and configuration (PriceType, MachineConfiguration, MachineEvent, HealthCheck, etc.)
+- Machine metadata and configuration (PriceType, MachineConfiguration, MachineHistoryEvent, HealthCheck, etc.)
 """
 
 from .machine_identifiers import MachineId, MachineType
@@ -12,7 +12,7 @@ from .machine_metadata import (
     HealthCheckResult,
     IPAddressRange,
     MachineConfiguration,
-    MachineEvent,
+    MachineHistoryEvent,
     MachineMetadata,
     PriceType,
     ResourceTag,
@@ -27,7 +27,7 @@ __all__: list[str] = [
     "HealthCheckResult",
     "IPAddressRange",
     "MachineConfiguration",
-    "MachineEvent",
+    "MachineHistoryEvent",
     # Machine identifiers and core types
     "MachineId",
     "MachineMetadata",

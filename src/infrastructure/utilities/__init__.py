@@ -33,6 +33,7 @@ from infrastructure.utilities.common.serialization import (
     serialize_enum,
 )
 from infrastructure.utilities.common.string_utils import (
+    extract_provider_type,
     mask_sensitive_data as sanitize_string,
     to_camel_case as snake_to_camel,
     to_snake_case as camel_to_snake,
@@ -51,6 +52,7 @@ __all__: list[str] = [
     "SQLEngineFactory",
     "UnitOfWorkFactory",
     # String utilities
+    "extract_provider_type",
     "camel_to_snake",
     # String utilities (aliases)
     "camel_to_snake",

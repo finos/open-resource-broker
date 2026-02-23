@@ -122,7 +122,7 @@ class TestDomainBoundaries:
             "MachineType",
             "PriceType",
             "MachineConfiguration",
-            "MachineEvent",
+            "MachineHistoryEvent",
             "HealthCheck",
         ]
 

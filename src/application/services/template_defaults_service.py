@@ -9,6 +9,7 @@ from domain.template.extensions import TemplateExtensionRegistry
 from domain.template.factory import TemplateFactoryPort
 from domain.template.ports.template_defaults_port import TemplateDefaultsPort
 from domain.template.template_aggregate import Template
+from infrastructure.utilities.common.string_utils import extract_provider_type
 
 
 @injectable
@@ -295,10 +296,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
                         return provider.type
 
             # Fallback: extract from name (e.g., 'aws-primary' -> 'aws')
-            if "-" in provider_instance_name:
-                return provider_instance_name.split("-")[0]
-
-            return provider_instance_name
+            return extract_provider_type(provider_instance_name)
 
         except Exception as e:
             self.logger.warning(

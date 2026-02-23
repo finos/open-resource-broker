@@ -105,8 +105,12 @@ class MachineConfiguration(ValueObject):
         )
 
 
-class MachineEvent(ValueObject):
-    """Machine lifecycle event."""
+class MachineHistoryEvent(ValueObject):
+    """Machine lifecycle history record (state transition log entry).
+
+    This is a value object capturing a historical state change, not a domain event.
+    For domain events see domain.base.events.domain_events.MachineEvent.
+    """
 
     timestamp: datetime
     event_type: str
@@ -115,14 +119,14 @@ class MachineEvent(ValueObject):
     details: Optional[dict[str, Any]] = None
 
     @model_validator(mode="after")
-    def validate_event(self) -> MachineEvent:
-        """Validate machine event."""
+    def validate_event(self) -> "MachineHistoryEvent":
+        """Validate machine history event."""
         if not self.event_type:
             raise ValueError("Event type is required")
         return self
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert event to dictionary."""
+        """Convert history event to dictionary."""
         return {
             "timestamp": self.timestamp.isoformat(),
             "eventType": self.event_type,
