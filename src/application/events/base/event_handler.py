@@ -107,7 +107,6 @@ class EventHandler(ABC):
         if self.logger:
             self.logger.debug("Processing event: %s", event.event_type)
 
-    @abstractmethod
     async def _post_process(self, event: DomainEvent) -> None:
         """
         Perform common post-processing logic.
@@ -119,7 +118,7 @@ class EventHandler(ABC):
         Args:
             event: The domain event that was processed
         """
-        # Future: Add metrics collection, audit logging, etc.
+        # Default no-op: subclasses override for metrics, audit logging, etc.
 
     async def _process_with_retry(self, event: DomainEvent):
         """

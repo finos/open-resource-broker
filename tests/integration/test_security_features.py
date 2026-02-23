@@ -622,15 +622,15 @@ class TestInputValidatorIntegration:
     # --- Choice validation ---
 
     def test_valid_choice_passes(self):
-        result = InputValidator.validate_choice("aws", ["aws", "gcp", "azure"])
+        result = InputValidator.validate_choice("aws", ["aws", "provider1", "provider2"])
         assert result == "aws"
 
     def test_invalid_choice_blocked(self):
         with pytest.raises(ValidationError, match="must be one of"):
-            InputValidator.validate_choice("unknown", ["aws", "gcp"])
+            InputValidator.validate_choice("unknown", ["aws", "provider1"])
 
     def test_choice_case_insensitive_by_default(self):
-        result = InputValidator.validate_choice("AWS", ["aws", "gcp"])
+        result = InputValidator.validate_choice("AWS", ["aws", "provider1"])
         assert result == "aws"
 
     # --- Non-string input ---

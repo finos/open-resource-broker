@@ -99,15 +99,26 @@ class QueryBus(QueryBusPort):
             raise
 
     def execute_sync(self, query: TQuery) -> TResult:
-        """Execute query synchronously for sync contexts."""
+        """Execute query synchronously for sync contexts.
+
+        Uses asyncio.run() when no event loop is running. When called from
+        within a running loop (e.g. Jupyter, some test frameworks), raises
+        RuntimeError with a clear message rather than deadlocking.
+        """
         import asyncio
 
         try:
-            return asyncio.run(self.execute(query))
+            loop = asyncio.get_running_loop()
         except RuntimeError:
-            # Event loop already running
-            loop = asyncio.get_event_loop()
-            return loop.run_until_complete(self.execute(query))
+            loop = None
+
+        if loop is not None and loop.is_running():
+            raise RuntimeError(
+                "execute_sync() called from within a running event loop. "
+                "Use 'await execute()' instead, or run from a sync context."
+            )
+
+        return asyncio.run(self.execute(query))
 
     def _trigger_lazy_cqrs_setup(self) -> None:
         """Trigger lazy CQRS infrastructure setup."""

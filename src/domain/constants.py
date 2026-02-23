@@ -26,8 +26,8 @@ PRICE_TYPE_RESERVED = "reserved"
 
 # Provider type constants
 PROVIDER_TYPE_AWS = "aws"
-PROVIDER_TYPE_AZURE = "azure"
-PROVIDER_TYPE_GCP = "gcp"
+PROVIDER_TYPE_PROVIDER1 = "provider1"
+PROVIDER_TYPE_PROVIDER2 = "provider2"
 
 # Template validation constants
 MIN_TEMPLATE_NAME_LENGTH = 1
