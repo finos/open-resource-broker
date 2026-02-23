@@ -1,5 +1,6 @@
 """HostFactory scheduler strategy for field mapping and response formatting."""
 
+import json
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -973,7 +974,10 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             if machine.get("price_type"):
                 formatted_machine["priceType"] = machine["price_type"]
             if machine.get("instance_tags"):
-                formatted_machine["instanceTags"] = machine["instance_tags"]
+                tags = machine["instance_tags"]
+                formatted_machine["instanceTags"] = (
+                    json.dumps(tags) if isinstance(tags, dict) else str(tags)
+                )
 
             formatted_machines.append(formatted_machine)
 
