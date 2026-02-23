@@ -1,0 +1,17 @@
+#!/bin/sh
+# Pre-commit hook dispatcher
+# Calls beads hook + ruff autoformat
+
+# 1. Ruff autoformat: format and re-stage staged Python files
+STAGED_PY=$(git diff --cached --name-only --diff-filter=ACM | grep '\.py$')
+if [ -n "$STAGED_PY" ]; then
+    echo "Running ruff format..."
+    echo "$STAGED_PY" | xargs ruff format
+    echo "$STAGED_PY" | xargs ruff check --fix --silent 2>/dev/null || true
+    echo "$STAGED_PY" | xargs git add
+fi
+
+# 2. Beads hook: flush pending changes to JSONL before commit
+if command -v bd >/dev/null 2>&1; then
+    bd hooks run pre-commit
+fi
