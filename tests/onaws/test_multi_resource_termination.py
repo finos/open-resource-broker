@@ -134,117 +134,55 @@ def setup_multi_resource_templates():
     processor = TemplateProcessor()
     test_name = "test_multi_resource_termination"
 
-    # Clear any existing files from the test directory first
     test_config_dir = processor.run_templates_dir / test_name
     if test_config_dir.exists():
         import shutil
 
         shutil.rmtree(test_config_dir)
-        log.info(f"Cleared existing test directory: {test_config_dir}")
 
-    # Create templates for all four resource types
     template_configs = [
         {
             "template_name": "ASG_Template",
-            "test_dir": f"{test_name}_asg",
             "overrides": {
                 "providerApi": "ASG",
-                "instanceType": "t3.micro",
-                "maxSize": 5,
-                "minSize": 0,
-                "desiredCapacity": 2,
             },
         },
         {
             "template_name": "EC2Fleet_Template",
-            "test_dir": f"{test_name}_ec2fleet",
             "overrides": {
                 "providerApi": "EC2Fleet",
-                "instanceType": "t3.micro",
                 "fleetType": "maintain",
-                "targetCapacity": 2,
                 "allocationStrategy": "lowestPrice",
                 "priceType": "ondemand",
             },
         },
         {
             "template_name": "SpotFleet_Template",
-            "test_dir": f"{test_name}_spotfleet",
             "overrides": {
                 "providerApi": "SpotFleet",
-                "instanceType": "t3.micro",
                 "fleetType": "maintain",
-                "targetCapacity": 2,
                 "allocationStrategy": "lowestPrice",
-                "maxPrice": "0.05",
             },
         },
         {
             "template_name": "RunInstances_Template",
-            "test_dir": f"{test_name}_runinstances",
             "overrides": {
                 "providerApi": "RunInstances",
-                "instanceType": "t3.micro",
-                "minCount": 2,
-                "maxCount": 2,
             },
         },
     ]
 
-    # Generate all templates in separate directories
-    for config in template_configs:
-        processor.generate_test_templates(
-            config["test_dir"],
-            awsprov_base_template="awsprov_templates.base.json",
-            overrides=config["overrides"],
-        )
+    processor.generate_combined_templates(test_name, template_configs)
 
-    # Create a combined config directory that includes all templates
-    combined_config_dir = processor.run_templates_dir / test_name
-    combined_config_dir.mkdir(parents=True, exist_ok=True)
+    # Set environment variables
+    os.environ["HF_PROVIDER_CONFDIR"] = str(test_config_dir)
+    os.environ["HF_PROVIDER_LOGDIR"] = str(test_config_dir / "logs")
+    os.environ["HF_PROVIDER_WORKDIR"] = str(test_config_dir / "work")
+    os.environ["AWS_PROVIDER_LOG_DIR"] = str(test_config_dir / "logs")
+    os.environ["HF_LOGDIR"] = str(test_config_dir / "logs")
 
-    # Copy config files from first template directory (they should be the same)
-    first_template_dir = processor.run_templates_dir / template_configs[0]["test_dir"]
-    import shutil
-
-    shutil.copy2(first_template_dir / "config.json", combined_config_dir / "config.json")
-    shutil.copy2(
-        first_template_dir / "default_config.json", combined_config_dir / "default_config.json"
-    )
-
-    # Combine awsprov_templates.json from all directories
-    combined_templates = {"templates": []}
-
-    for i, config in enumerate(template_configs):
-        template_dir = processor.run_templates_dir / config["test_dir"]
-        awsprov_file = template_dir / "awsprov_templates.json"
-
-        if awsprov_file.exists():
-            with open(awsprov_file) as f:
-                template_data = json.load(f)
-
-            # Update template ID to include our custom name
-            if template_data.get("templates"):
-                template = template_data["templates"][0].copy()
-                template["templateId"] = config["template_name"]
-                combined_templates["templates"].append(template)
-
-    # Write combined templates file
-    with open(combined_config_dir / "awsprov_templates.json", "w") as f:
-        json.dump(combined_templates, f, indent=2)
-
-    log.info(f"Created combined config with {len(combined_templates['templates'])} templates")
-
-    # Set environment variables to use combined config directory
-    os.environ["HF_PROVIDER_CONFDIR"] = str(combined_config_dir)
-    os.environ["HF_PROVIDER_LOGDIR"] = str(combined_config_dir / "logs")
-    os.environ["HF_PROVIDER_WORKDIR"] = str(combined_config_dir / "work")
-    os.environ["AWS_PROVIDER_LOG_DIR"] = str(combined_config_dir / "logs")
-    os.environ["HF_LOGDIR"] = str(combined_config_dir / "logs")
-
-    # Create the log and work directories
-    (combined_config_dir / "logs").mkdir(parents=True, exist_ok=True)
-    (combined_config_dir / "work").mkdir(parents=True, exist_ok=True)
+    (test_config_dir / "logs").mkdir(parents=True, exist_ok=True)
+    (test_config_dir / "work").mkdir(parents=True, exist_ok=True)
 
     hfm = HostFactoryMock()
 

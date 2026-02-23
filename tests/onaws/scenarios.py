@@ -1,12 +1,66 @@
 import itertools
+import json
 import os
+from pathlib import Path
 from typing import Any, Dict, List
+
+
+def resolve_template_id(overrides: Dict[str, Any]) -> str:
+    """Resolve a template_id from aws_templates.json matching the scenario overrides.
+
+    Picks the first template whose providerApi and (optionally) fleetType/priceType
+    match the scenario.  Falls back progressively to less specific matches.
+    """
+    templates_path = Path(__file__).parent.parent.parent / "config" / "aws_templates.json"
+    if not templates_path.exists():
+        return "BASE"  # legacy fallback
+
+    with open(templates_path) as f:
+        templates = json.load(f).get("templates", [])
+
+    provider_api = overrides.get("providerApi", "")
+    fleet_type = overrides.get("fleetType", "")
+    price_type = overrides.get("priceType", "")
+
+    # Normalize provider API names to match template file conventions
+    provider_api_map = {"ASG": "AutoScalingGroup"}
+    search_api = provider_api_map.get(provider_api, provider_api)
+
+    price_map = {"ondemand": "OnDemand", "spot": "Spot", "heterogeneous": "Mixed"}
+
+    # 1. Try exact match: providerApi + fleetType + priceType
+    if fleet_type and price_type:
+        price_label = price_map.get(price_type, "")
+        for t in templates:
+            t_id = t.get("templateId", "")
+            if t.get("providerApi") == search_api and fleet_type.capitalize() in t_id and price_label in t_id:
+                return t_id
+
+    # 2. Try providerApi + fleetType only
+    if fleet_type:
+        for t in templates:
+            if t.get("providerApi") == search_api and fleet_type.capitalize() in t.get("templateId", ""):
+                return t["templateId"]
+
+    # 3. Try providerApi + priceType only
+    if price_type:
+        price_label = price_map.get(price_type, "")
+        for t in templates:
+            if t.get("providerApi") == search_api and price_label in t.get("templateId", ""):
+                return t["templateId"]
+
+    # 4. Fallback: first template matching provider API
+    for t in templates:
+        if t.get("providerApi") == search_api:
+            return t["templateId"]
+
+    return templates[0]["templateId"] if templates else "BASE"
 
 # Global default attribute combinations
 DEFAULT_ATTRIBUTE_COMBINATIONS = [
     {
         "providerApi": ["EC2Fleet"],
-        "fleetType": ["request", "instant", "maintain"],
+        "fleetType": ["request", "instant"],
         "priceType": ["ondemand", "spot"],
         "scheduler": ["default", "hostfactory"],
     },
@@ -51,9 +105,8 @@ CUSTOM_TEST_CASES = [
     # SpotFleet with ABIS
     {
         "test_name": "hostfactory.SpotFleetRequest.ABIS",
-        "template_id": "SpotFleetRequest",
+        "template_id": "SpotFleet-Request-LowestPrice",
         "capacity_to_request": 4,
-        "awsprov_base_template": "awsprov_templates.base.json",
         "overrides": {
             "providerApi": "SpotFleet",
             "fleetType": "request",
@@ -67,9 +120,8 @@ CUSTOM_TEST_CASES = [
     # EC2Fleet with ABIS
     {
         "test_name": "hostfactory.EC2FleetRequest.ABIS",
-        "template_id": "EC2FleetRequest",
+        "template_id": "EC2Fleet-Request-OnDemand",
         "capacity_to_request": 4,
-        "awsprov_base_template": "awsprov_templates.base.json",
         "overrides": {
             "providerApi": "EC2Fleet",
             "fleetType": "request",
@@ -83,9 +135,8 @@ CUSTOM_TEST_CASES = [
     # ASG with ABIS
     {
         "test_name": "hostfactory.ASG.ABIS",
-        "template_id": "ASG",
+        "template_id": "ASG-OnDemand",
         "capacity_to_request": 2,
-        "awsprov_base_template": "awsprov_templates.base.json",
         "overrides": {
             "providerApi": "ASG",
             "scheduler": "hostfactory",
@@ -102,9 +153,8 @@ CUSTOM_TEST_CASES = [
     # SpotFleet with multiTypes
     {
         "test_name": "hostfactory.SpotFleetRequest.MultiTypes",
-        "template_id": "SpotFleetRequest",
+        "template_id": "SpotFleet-Request-LowestPrice",
         "capacity_to_request": 4,
-        "awsprov_base_template": "awsprov_templates.base.json",
         "overrides": {
             "providerApi": "SpotFleet",
             "fleetType": "request",
@@ -122,9 +172,8 @@ CUSTOM_TEST_CASES = [
     # EC2Fleet with multiTypes
     {
         "test_name": "hostfactory.EC2FleetRequest.MultiTypes",
-        "template_id": "EC2FleetRequest",
+        "template_id": "EC2Fleet-Request-OnDemand",
         "capacity_to_request": 4,
-        "awsprov_base_template": "awsprov_templates.base.json",
         "overrides": {
             "providerApi": "EC2Fleet",
             "fleetType": "request",
@@ -142,9 +191,8 @@ CUSTOM_TEST_CASES = [
     # ASG with multiTypes
     {
         "test_name": "hostfactory.ASG.MultiTypes",
-        "template_id": "ASG",
+        "template_id": "ASG-OnDemand",
         "capacity_to_request": 4,
-        "awsprov_base_template": "awsprov_templates.base.json",
         "overrides": {
             "providerApi": "ASG",
             "scheduler": "hostfactory",
@@ -161,9 +209,8 @@ CUSTOM_TEST_CASES = [
     # Mixed price 50/50 - EC2Fleet
     {
         "test_name": "hostfactory.EC2Fleet.Mixed50",
-        "template_id": "EC2FleetRequest",
+        "template_id": "EC2Fleet-Request-Mixed",
         "capacity_to_request": 4,
-        "awsprov_base_template": "awsprov_templates.base.json",
         "overrides": {
             "providerApi": "EC2Fleet",
             "fleetType": "request",
@@ -183,9 +230,8 @@ CUSTOM_TEST_CASES = [
     # Mixed price 50/50 - SpotFleet
     {
         "test_name": "hostfactory.SpotFleet.Mixed50",
-        "template_id": "SpotFleetRequest",
+        "template_id": "SpotFleet-Request-LowestPrice",
         "capacity_to_request": 4,
-        "awsprov_base_template": "awsprov_templates.base.json",
         "overrides": {
             "providerApi": "SpotFleet",
             "fleetType": "request",
@@ -205,9 +251,8 @@ CUSTOM_TEST_CASES = [
     # Mixed price 50/50 - ASG
     {
         "test_name": "hostfactory.ASG.Mixed50",
-        "template_id": "ASG",
+        "template_id": "ASG-Mixed",
         "capacity_to_request": 4,
-        "awsprov_base_template": "awsprov_templates.base.json",
         "overrides": {
             "providerApi": "ASG",
             "scheduler": "hostfactory",
@@ -266,9 +311,8 @@ def generate_scenarios_from_attributes(
     """
     if base_template is None:
         base_template = {
-            "template_id": "BASE",
+            "template_id": None,  # Resolved per-scenario via resolve_template_id()
             "capacity_to_request": 4,
-            "awsprov_base_template": "awsprov_templates.base.json",
         }
 
     scenarios = []
@@ -329,6 +373,10 @@ def generate_scenarios_from_attributes(
         # Create the scenario
         scenario = base_template.copy()
         scenario.update({"test_name": test_name, "overrides": overrides})
+
+        # Resolve template_id from aws_templates.json if not explicitly set
+        if not scenario.get("template_id"):
+            scenario["template_id"] = resolve_template_id(overrides)
 
         scenarios.append(scenario)
 

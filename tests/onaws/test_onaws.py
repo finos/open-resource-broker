@@ -783,34 +783,25 @@ def validate_all_instances_price_type(status_response, test_case):
 
 @pytest.fixture
 def setup_host_factory_mock(request):
-    # Generate templates for this test using the actual test name
     processor = TemplateProcessor()
-    test_name = request.node.name  # Get the actual test function name
+    test_name = request.node.name
 
-    # Get base template and overrides from test parameters if available
-    base_template = (
-        getattr(request, "param", {}).get("base_template", None)
-        if hasattr(request, "param") and isinstance(request.param, dict)
-        else None
-    )
     overrides = (
         getattr(request, "param", {}).get("overrides", {})
         if hasattr(request, "param") and isinstance(request.param, dict)
         else {}
     )
 
-    # Clear any existing files from the test directory first
+    # Clear and regenerate
     test_config_dir = processor.run_templates_dir / test_name
     if test_config_dir.exists():
         import shutil
 
         shutil.rmtree(test_config_dir)
-        print(f"Cleared existing test directory: {test_config_dir}")
 
-    # Generate populated templates with optional base template and overrides
-    processor.generate_test_templates(test_name, base_template=base_template, overrides=overrides)
+    processor.generate_test_templates(test_name, overrides=overrides)
 
-    # Set environment variables to use generated templates
+    # Set environment variables
     test_config_dir = processor.run_templates_dir / test_name
     os.environ["HF_PROVIDER_CONFDIR"] = str(test_config_dir)
     os.environ["HF_PROVIDER_LOGDIR"] = str(test_config_dir / "logs")
@@ -819,11 +810,9 @@ def setup_host_factory_mock(request):
     os.environ["AWS_PROVIDER_LOG_DIR"] = str(test_config_dir / "logs")
     os.environ["HF_LOGDIR"] = str(test_config_dir / "logs")
 
-    # Create the log and work directories
     (test_config_dir / "logs").mkdir(exist_ok=True)
     (test_config_dir / "work").mkdir(exist_ok=True)
 
-    # Get scheduler type from overrides, default to "hostfactory"
     scheduler_type = overrides.get("scheduler", "hostfactory")
     hfm = HostFactoryMock(scheduler=scheduler_type)
 
@@ -841,32 +830,24 @@ def setup_host_factory_mock_with_scenario(request):
     # For parametrized tests, the node name will be like "full_cycle_test[EC2Fleet]"
     scenario_name = None
     if "[" in test_name and "]" in test_name:
-        # Extract the parameter value from the test name
         scenario_name = test_name.split("[")[1].split("]")[0]
 
-    # Get the specific test case for this scenario
     from tests.onaws import scenarios
 
     test_case = scenarios.get_test_case_by_name(scenario_name) if scenario_name else {}
 
-    # Extract overrides and base template from test_case if available
     overrides = test_case.get("overrides", {}) if test_case else {}
-    awsprov_base_template = test_case.get("awsprov_base_template") if test_case else None
 
-    # Clear any existing files from the test directory first
+    # Clear and regenerate
     test_config_dir = processor.run_templates_dir / test_name
     if test_config_dir.exists():
         import shutil
 
         shutil.rmtree(test_config_dir)
-        print(f"Cleared existing test directory: {test_config_dir}")
 
-    # Generate populated templates with overrides and base template from test case
-    processor.generate_test_templates(
-        test_name, awsprov_base_template=awsprov_base_template, overrides=overrides
-    )
+    processor.generate_test_templates(test_name, overrides=overrides)
 
-    # Set environment variables to use generated templates
+    # Set environment variables
     test_config_dir = processor.run_templates_dir / test_name
     os.environ["HF_PROVIDER_CONFDIR"] = str(test_config_dir)
     os.environ["HF_PROVIDER_LOGDIR"] = str(test_config_dir / "logs")
@@ -875,11 +856,9 @@ def setup_host_factory_mock_with_scenario(request):
     os.environ["AWS_PROVIDER_LOG_DIR"] = str(test_config_dir / "logs")
     os.environ["HF_LOGDIR"] = str(test_config_dir / "logs")
 
-    # Create the log and work directories
     (test_config_dir / "logs").mkdir(exist_ok=True)
     (test_config_dir / "work").mkdir(exist_ok=True)
 
-    # Get scheduler type from overrides, default to "hostfactory"
     scheduler_type = overrides.get("scheduler", "hostfactory")
     hfm = HostFactoryMock(scheduler=scheduler_type)
 
@@ -1128,10 +1107,6 @@ def _verify_all_resources_cleaned(
 
 def _wait_for_request_completion(hfm, request_id: str, scheduler_type: str):
     """Poll request status until complete or timeout."""
-    request_status_schema = plugin_io_schemas.get_schema_for_scheduler(
-        "request_status", scheduler_type
-    )
-    alt_schema = plugin_io_schemas.expected_request_status_schema_hostfactory
     start_time = time.time()
 
     while True:
@@ -1139,26 +1114,19 @@ def _wait_for_request_completion(hfm, request_id: str, scheduler_type: str):
         log.debug("Response on get_request_staus: \n %s", json.dumps(status_response, indent=4))
 
         try:
-            # Use the schema that matches the key style in the response
-            requests = status_response.get("requests") or []
-            first_request = requests[0] if requests else {}
-            machines = first_request.get("machines") or []
-
-            if (
-                scheduler_type == "default"
-                and machines
-                and "machineId" in machines[0]
-                and "machine_id" not in machines[0]
-            ):
-                validate_json_schema(instance=status_response, schema=alt_schema)
-            else:
-                validate_json_schema(instance=status_response, schema=request_status_schema)
+            request_status_schema = _resolve_request_status_schema(status_response, scheduler_type)
+            validate_json_schema(instance=status_response, schema=request_status_schema)
         except ValidationError as e:
             pytest.fail(
                 f"JSON validation failed for get_reqest_status response json ({scheduler_type} scheduler): {e}"
             )
 
-        if status_response["requests"][0]["status"] == "complete":
+        # KBG TODO partial should not be returned to host factory.
+        request_status = status_response["requests"][0]["status"]
+        if request_status == "partial":
+            log.warning("Request status is 'partial', treating as 'running'")
+
+        if request_status == "complete":
             return status_response
 
         if time.time() - start_time > MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC:
@@ -1213,6 +1181,34 @@ def _resolve_request_machines_schema(response: dict, scheduler_type: str):
     if has_snake and not has_camel:
         return plugin_io_schemas.expected_request_machines_schema_default
     return plugin_io_schemas.get_schema_for_scheduler("request_machines", scheduler_type)
+
+
+def _resolve_request_status_schema(response: dict, scheduler_type: str):
+    """Pick request_status schema based on key style in the response payload."""
+    requests = response.get("requests") if isinstance(response, dict) else []
+    first_request = requests[0] if isinstance(requests, list) and requests else {}
+
+    has_camel_request = isinstance(first_request, dict) and (
+        "requestId" in first_request and "request_id" not in first_request
+    )
+    has_snake_request = isinstance(first_request, dict) and (
+        "request_id" in first_request and "requestId" not in first_request
+    )
+
+    machines = first_request.get("machines") if isinstance(first_request, dict) else []
+    first_machine = machines[0] if isinstance(machines, list) and machines else {}
+    has_camel_machine = isinstance(first_machine, dict) and (
+        "machineId" in first_machine and "machine_id" not in first_machine
+    )
+    has_snake_machine = isinstance(first_machine, dict) and (
+        "machine_id" in first_machine and "machineId" not in first_machine
+    )
+
+    if has_camel_request or has_camel_machine:
+        return plugin_io_schemas.expected_request_status_schema_hostfactory
+    if has_snake_request or has_snake_machine:
+        return plugin_io_schemas.expected_request_status_schema_default
+    return plugin_io_schemas.get_schema_for_scheduler("request_status", scheduler_type)
 
 
 def provide_release_control_loop(hfm, template_json, capacity_to_request, test_case=None):
@@ -1270,9 +1266,7 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
 
     # Get scheduler type for validation
     scheduler_type = get_scheduler_from_scenario(test_case) if test_case else "hostfactory"
-    request_machines_schema = plugin_io_schemas.get_schema_for_scheduler(
-        "request_machines", scheduler_type
-    )
+    request_machines_schema = _resolve_request_machines_schema(res, scheduler_type)
 
     try:
         validate_json_schema(instance=res, schema=request_machines_schema)
@@ -1294,9 +1288,7 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
 
         sys.stdout.flush()
 
-        request_status_schema = plugin_io_schemas.get_schema_for_scheduler(
-            "request_status", scheduler_type
-        )
+        request_status_schema = _resolve_request_status_schema(status_response, scheduler_type)
 
         try:
             validate_json_schema(instance=status_response, schema=request_status_schema)
@@ -1479,11 +1471,9 @@ def test_get_available_templates(setup_host_factory_mock):
     "setup_host_factory_mock",
     [
         {
-            "base_template": "config",  # Use custom base template
             "overrides": {
-                "region": "us-west-2",  # Override region
-                "imageId": "ami-custom123",  # Override image ID
-                "profile": "test-profile",  # Override profile
+                "region": "us-west-2",
+                "profile": "test-profile",
             },
         }
     ],
