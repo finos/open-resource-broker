@@ -1,11 +1,10 @@
 """Bulk response DTOs for CQRS compliance."""
 
-from typing import List
+from typing import Any, List
 
 from pydantic import BaseModel
 
 from application.dto.responses import MachineDTO, RequestDTO
-from application.ports.template_dto_port import TemplateDTOPort
 
 
 class BulkRequestResponse(BaseModel):
@@ -20,7 +19,7 @@ class BulkRequestResponse(BaseModel):
 class BulkTemplateResponse(BaseModel):
     """Response for bulk template operations."""
 
-    templates: List[TemplateDTOPort]
+    templates: List[Any]
     found_count: int
     not_found_ids: List[str]
     total_requested: int
