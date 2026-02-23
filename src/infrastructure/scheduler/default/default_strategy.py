@@ -288,11 +288,10 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
 
     def format_error_response(self, error: Exception, context: dict[str, Any]) -> dict[str, Any]:
         """Format error response for Default scheduler (console + JSON)."""
-        import sys
         import traceback
 
-        # Print to console
-        print(f"ERROR: {error}", file=sys.stderr)
+        # Log error
+        self.logger.error("Scheduler error: %s", error)
         if context.get("verbose"):
             traceback.print_exc()
 

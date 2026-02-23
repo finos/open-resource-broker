@@ -2,9 +2,16 @@
 
 from typing import Any, Optional
 
+from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from .resource_manager import StorageResourceManager as ResourceManager
+
+_DEFAULT_CONFIG = Config(
+    connect_timeout=10,
+    read_timeout=30,
+    retries={"max_attempts": 3},
+)
 
 
 class DynamoDBClientManager(ResourceManager):
@@ -95,8 +102,8 @@ class DynamoDBClientManager(ResourceManager):
             )
 
             # Create clients
-            self.dynamodb = session.client("dynamodb")
-            self.dynamodb_resource = session.resource("dynamodb")
+            self.dynamodb = session.client("dynamodb", config=_DEFAULT_CONFIG)
+            self.dynamodb_resource = session.resource("dynamodb", config=_DEFAULT_CONFIG)
 
             self.logger.info("Initialized DynamoDB clients for region %s", self.region)
 

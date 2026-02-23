@@ -80,6 +80,9 @@ def create_dynamodb_unit_of_work(config: Any) -> Any:
         DynamoDBUnitOfWork instance with correctly configured AWS client
     """
     from providers.aws.session_factory import AWSSessionFactory
+    from botocore.config import Config
+
+    _BOTO_CONFIG = Config(connect_timeout=10, read_timeout=30, retries={"max_attempts": 3})
 
     from config.manager import ConfigurationManager
     from config.schemas.storage_schema import StorageConfig
@@ -98,7 +101,7 @@ def create_dynamodb_unit_of_work(config: Any) -> Any:
             profile=dynamodb_config.profile if dynamodb_config.profile else None,
             region=dynamodb_config.region,
         )
-        aws_client = session.client("dynamodb")
+        aws_client = session.client("dynamodb", config=_BOTO_CONFIG)
 
         return DynamoDBUnitOfWork(
             aws_client=aws_client,
@@ -118,7 +121,7 @@ def create_dynamodb_unit_of_work(config: Any) -> Any:
         session = AWSSessionFactory.create_session(
             profile=profile if profile else None, region=region
         )
-        aws_client = session.client("dynamodb")
+        aws_client = session.client("dynamodb", config=_BOTO_CONFIG)
 
         return DynamoDBUnitOfWork(
             aws_client=aws_client,

@@ -166,7 +166,8 @@ class AWSAMIResolver(ImageResolver):
             import boto3
             from botocore.exceptions import ClientError as BotocoreClientError
 
-            ssm_client = boto3.client("ssm")
+            from botocore.config import Config
+            ssm_client = boto3.client("ssm", config=Config(connect_timeout=10, read_timeout=30, retries={"max_attempts": 3}))
             response = ssm_client.get_parameter(Name=ssm_path)
             ami_id = str(response["Parameter"]["Value"])
 

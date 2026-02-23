@@ -3,6 +3,14 @@
 from typing import Optional
 
 import boto3
+from botocore.config import Config
+
+# Default timeout config for one-off clients created outside of AWSClient
+_DEFAULT_CONFIG = Config(
+    connect_timeout=10,
+    read_timeout=30,
+    retries={"max_attempts": 3},
+)
 
 
 class AWSSessionFactory:
@@ -39,7 +47,7 @@ class AWSSessionFactory:
         """
         try:
             session = AWSSessionFactory.create_session(profile, region)
-            identity = session.client("sts").get_caller_identity()
+            identity = session.client("sts", config=_DEFAULT_CONFIG).get_caller_identity()
             return {
                 "success": True,
                 "profile": profile,

@@ -61,8 +61,10 @@ class AWSInfrastructureDiscoveryService:
         self._logger = logger
 
         # Create AWS session and clients
+        from botocore.config import Config
+        _config = Config(connect_timeout=10, read_timeout=30, retries={"max_attempts": 3})
         session = boto3.Session(profile_name=profile, region_name=region)
-        self.ec2_client = session.client("ec2")
+        self.ec2_client = session.client("ec2", config=_config)
 
     def discover_vpcs(self) -> list[VPCInfo]:
         """Discover VPCs with name tags and CIDR blocks."""

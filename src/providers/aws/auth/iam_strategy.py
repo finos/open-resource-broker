@@ -12,7 +12,15 @@ from infrastructure.adapters.ports.auth import (
     AuthResult,
     AuthStatus,
 )
+from botocore.config import Config
+
 from providers.aws.session_factory import AWSSessionFactory
+
+_DEFAULT_CONFIG = Config(
+    connect_timeout=10,
+    read_timeout=30,
+    retries={"max_attempts": 3},
+)
 
 
 @injectable
@@ -50,8 +58,8 @@ class IAMAuthStrategy(AuthPort):
         # Initialize AWS session
         try:
             self.session = AWSSessionFactory.create_session(profile, region)
-            self.sts_client = self.session.client("sts")
-            self.iam_client = self.session.client("iam")
+            self.sts_client = self.session.client("sts", config=_DEFAULT_CONFIG)
+            self.iam_client = self.session.client("iam", config=_DEFAULT_CONFIG)
 
         except Exception as e:
             self._logger.error("Failed to initialize AWS session: %s", e)
