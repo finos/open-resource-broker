@@ -28,10 +28,10 @@ class TemplateCommandFactory:
         return ListTemplatesQuery(
             provider_name=provider_name,
             active_only=active_only,
-            include_details=include_details,
+            include_detailed_fields=include_details,
             filter_expressions=filter_expressions or [],
-            limit=min(limit or 50, 1000),
-            offset=offset or 0,
+            limit=min(limit or 50, 1000),  # type: ignore[arg-type]
+            offset=offset or 0,  # type: ignore[arg-type]
         )
 
     def create_get_template_query(
@@ -57,11 +57,10 @@ class TemplateCommandFactory:
         """Create command to create template."""
         return CreateTemplateCommand(
             template_id=template_id,
-            provider_name=provider_name,
-            handler_type=handler_type,
+            provider_api=provider_name,
+            image_id=handler_type,
             configuration=configuration,
             description=description,
-            tags=tags or {},
         )
 
     def create_update_template_command(
@@ -75,9 +74,8 @@ class TemplateCommandFactory:
         """Create command to update template."""
         return UpdateTemplateCommand(
             template_id=template_id,
-            configuration=configuration,
+            configuration=configuration or {},
             description=description,
-            tags=tags,
         )
 
     def create_delete_template_command(

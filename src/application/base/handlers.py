@@ -26,6 +26,31 @@ TQuery = TypeVar("TQuery")
 TResult = TypeVar("TResult")
 
 
+class _NoOpLogger(LoggingPort):
+    """No-op logger used when no logger is provided."""
+
+    def debug(self, message: str, *args: Any, **kwargs: Any) -> None:
+        """No-op debug."""
+
+    def info(self, message: str, *args: Any, **kwargs: Any) -> None:
+        """No-op info."""
+
+    def warning(self, message: str, *args: Any, **kwargs: Any) -> None:
+        """No-op warning."""
+
+    def error(self, message: str, *args: Any, **kwargs: Any) -> None:
+        """No-op error."""
+
+    def critical(self, message: str, *args: Any, **kwargs: Any) -> None:
+        """No-op critical."""
+
+    def exception(self, message: str, *args: Any, **kwargs: Any) -> None:
+        """No-op exception."""
+
+    def log(self, level: int, message: str, *args: Any, **kwargs: Any) -> None:
+        """No-op log."""
+
+
 class BaseHandler(ABC):
     """
     Root base handler with common cross-cutting concerns.
@@ -41,7 +66,7 @@ class BaseHandler(ABC):
         error_handler: Optional[ErrorHandlingPort] = None,
     ) -> None:
         """Initialize base handler with optional logger and error handler."""
-        self.logger = logger
+        self.logger: LoggingPort = logger if logger is not None else _NoOpLogger()
         self.error_handler = error_handler
         self._metrics: dict[str, Any] = {}
 

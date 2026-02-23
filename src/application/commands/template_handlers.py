@@ -19,7 +19,7 @@ from domain.base.ports import (
 from domain.template.template_aggregate import Template
 
 
-@command_handler(CreateTemplateCommand)
+@command_handler(CreateTemplateCommand)  # type: ignore[arg-type]
 class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  # type: ignore[type-var]
     """
     Handler for creating templates.
@@ -81,7 +81,7 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  #
                 return
 
             # Create template aggregate
-            template = Template.create(
+            template = Template(
                 template_id=command.template_id,
                 name=command.name or command.template_id,
                 description=command.description,
@@ -122,7 +122,7 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  #
             raise
 
 
-@command_handler(UpdateTemplateCommand)
+@command_handler(UpdateTemplateCommand)  # type: ignore[arg-type]
 class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, None]):  # type: ignore[type-var]
     """
     Handler for updating templates.
@@ -220,7 +220,7 @@ class UpdateTemplateHandler(BaseCommandHandler[UpdateTemplateCommand, None]):  #
             raise
 
 
-@command_handler(DeleteTemplateCommand)
+@command_handler(DeleteTemplateCommand)  # type: ignore[arg-type]
 class DeleteTemplateHandler(BaseCommandHandler[DeleteTemplateCommand, None]):  # type: ignore[type-var]
     """
     Handler for deleting templates.

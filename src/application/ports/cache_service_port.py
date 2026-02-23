@@ -59,3 +59,14 @@ class CacheServicePort(ABC):
             True if key exists, False otherwise
         """
         ...
+
+    def is_caching_enabled(self) -> bool:
+        """Check if caching is enabled. Override to customize."""
+        return True
+
+    def get_cached_request(self, request_id: str) -> Any:
+        """Get cached request by ID. Synchronous convenience wrapper."""
+        return None
+
+    def cache_request(self, request_id: str, request_dto: Any) -> None:
+        """Cache a request DTO by ID. Synchronous convenience wrapper."""

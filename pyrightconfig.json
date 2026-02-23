@@ -1,0 +1,7 @@
+{
+  "pythonVersion": "3.12",
+  "pythonPlatform": "Darwin",
+  "venvPath": ".",
+  "include": ["src"],
+  "extraPaths": ["src"]
+}

@@ -124,6 +124,11 @@ class UnitOfWork(Protocol):
     def machines(self) -> Any:
         """Get machine repository."""
 
+    @property
+    def templates(self) -> Any:
+        """Get template repository."""
+        raise NotImplementedError("templates repository not available in this UnitOfWork")
+
 
 class UnitOfWorkFactory(ABC):
     """Interface for unit of work factory."""

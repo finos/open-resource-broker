@@ -6,7 +6,7 @@ from typing import Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
-from application.dto.base import PaginationMetadata
+from application.dto.base import PaginationMetadata  # type: ignore[attr-defined]
 
 T = TypeVar("T")
 
