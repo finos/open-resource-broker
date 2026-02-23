@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from domain.base.ports.scheduler_port import SchedulerPort
-from infrastructure.di.buses import CommandBus, QueryBus
+from infrastructure.di.buses import QueryBus
 from infrastructure.di.container import get_container
 from infrastructure.error.decorators import handle_interface_exceptions
 
@@ -89,15 +89,12 @@ async def handle_test_storage(args) -> dict[str, Any]:
         Test results
     """
     container = get_container()
-    command_bus = container.get(CommandBus)
+    query_bus = container.get(QueryBus)
 
-    from application.commands.system import TestStorageCommand
+    from application.dto.queries import ValidateStorageQuery
 
-    command = TestStorageCommand()
-    await command_bus.execute(command)
-
-    # CQRS: Result is stored in command.result field
-    result = command.result
+    query = ValidateStorageQuery()
+    result = await query_bus.execute(query)
 
     return {"test_result": result, "message": "Storage test completed successfully"}
 

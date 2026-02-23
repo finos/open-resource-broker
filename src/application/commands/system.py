@@ -51,31 +51,3 @@ class SetConfigurationCommand(BaseCommand):
     result: Optional[dict[str, Any]] = None
 
     model_config = ConfigDict(frozen=False)
-
-
-class TestStorageCommand(BaseCommand):
-    """Command to test storage connectivity and functionality.
-
-    CQRS: Commands should not return data. Results are stored in mutable fields.
-    Note: This is a pure query operation and should be moved to queries/ in future refactoring.
-    """
-
-    storage_type: Optional[str] = None
-
-    # Mutable result fields for CQRS compliance
-    result: Optional[dict[str, Any]] = None
-
-    model_config = ConfigDict(frozen=False)
-
-
-class MCPValidateCommand(BaseCommand):
-    """Command to validate MCP server configuration and tools.
-
-    CQRS: Commands should not return data. Results are stored in mutable fields.
-    Note: This is a pure query operation and should be moved to queries/ in future refactoring.
-    """
-
-    # Mutable result fields for CQRS compliance
-    result: Optional[dict[str, Any]] = None
-
-    model_config = ConfigDict(frozen=False)

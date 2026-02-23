@@ -4,6 +4,11 @@ from typing import TYPE_CHECKING, Any
 
 from application.base.handlers import BaseQueryHandler
 from application.decorators import query_handler
+from application.dto.queries import (
+    GetProviderHealthQuery,
+    ValidateMCPQuery,
+    ValidateStorageQuery,
+)
 from application.dto.system import (
     ConfigurationSectionResponse,
     ProviderConfigDTO,
@@ -19,29 +24,7 @@ from application.queries.system import (
     ValidateProviderConfigQuery,
 )
 
-# Define query classes inline since they're not in dto/queries.py yet
-from pydantic import BaseModel, ConfigDict
-from application.interfaces.command_query import Query
 
-
-class GetProviderHealthQuery(Query, BaseModel):
-    """Query to get provider health status."""
-
-    model_config = ConfigDict(frozen=True)
-
-    provider_name: str | None = None
-
-
-class ValidateStorageQuery(Query, BaseModel):
-    """Query to validate storage connectivity."""
-
-    model_config = ConfigDict(frozen=True)
-
-
-class ValidateMCPQuery(Query, BaseModel):
-    """Query to validate MCP configuration."""
-
-    model_config = ConfigDict(frozen=True)
 from domain.base import UnitOfWorkFactory
 from domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
 from domain.services.timestamp_service import TimestampService

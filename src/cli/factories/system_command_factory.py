@@ -3,13 +3,15 @@
 from typing import Any, Optional
 
 from application.commands.system import (
-    MCPValidateCommand,
     RefreshTemplatesCommand,
     ReloadProviderConfigCommand,
     SetConfigurationCommand,
-    TestStorageCommand,
 )
-from application.dto.queries import GetConfigurationQuery
+from application.dto.queries import (
+    GetConfigurationQuery,
+    ValidateMCPQuery,
+    ValidateStorageQuery,
+)
 from application.queries.system import (
     GetProviderConfigQuery,
     GetProviderMetricsQuery,
@@ -74,13 +76,13 @@ class SystemCommandFactory:
         """Create query to validate provider configuration."""
         return ValidateProviderConfigQuery(detailed=detailed)
 
-    def create_test_storage_command(self) -> TestStorageCommand:
-        """Create command to test storage."""
-        return TestStorageCommand()
+    def create_test_storage_query(self) -> ValidateStorageQuery:
+        """Create query to test storage."""
+        return ValidateStorageQuery()
 
-    def create_mcp_validate_command(self) -> MCPValidateCommand:
-        """Create command to validate MCP."""
-        return MCPValidateCommand()
+    def create_mcp_validate_query(self) -> ValidateMCPQuery:
+        """Create query to validate MCP."""
+        return ValidateMCPQuery()
 
     def create_get_configuration_query(
         self,

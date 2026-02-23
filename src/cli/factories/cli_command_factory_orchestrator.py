@@ -133,13 +133,13 @@ class CLICommandFactoryOrchestrator:
         """Create query to validate provider configuration."""
         return self._system_factory.create_validate_provider_config_query(**kwargs)
 
-    def create_test_storage_command(self, **kwargs: Any):
-        """Create command to test storage."""
-        return self._system_factory.create_test_storage_command(**kwargs)
+    def create_test_storage_query(self, **kwargs: Any):
+        """Create query to test storage."""
+        return self._system_factory.create_test_storage_query(**kwargs)
 
-    def create_mcp_validate_command(self, **kwargs: Any):
-        """Create command to validate MCP."""
-        return self._system_factory.create_mcp_validate_command(**kwargs)
+    def create_mcp_validate_query(self, **kwargs: Any):
+        """Create query to validate MCP."""
+        return self._system_factory.create_mcp_validate_query(**kwargs)
 
     def create_get_configuration_query(self, **kwargs: Any):
         """Create query to get configuration value."""
@@ -490,7 +490,7 @@ class CLICommandFactoryOrchestrator:
                 }
                 return self.create_mcp_tools_command_data(tools_action, **filtered_args)
             elif command_action == "validate":
-                return self.create_mcp_validate_command()
+                return self.create_mcp_validate_query()
 
         # Init command
         elif command_group == "init":

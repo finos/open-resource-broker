@@ -4,9 +4,11 @@ from typing import Any
 
 from application.base.handlers import BaseCommandHandler
 from application.commands.system import (
+    MCPValidateCommand,
     RefreshTemplatesCommand,
     ReloadProviderConfigCommand,
     SetConfigurationCommand,
+    TestStorageCommand,
 )
 from application.decorators import command_handler
 from domain.base.ports import (
@@ -214,3 +216,101 @@ class SetConfigurationHandler(BaseCommandHandler[SetConfigurationCommand, None])
             }
 
 
+@command_handler(TestStorageCommand)
+class TestStorageCommandHandler(BaseCommandHandler[TestStorageCommand, None]):  # type: ignore[type-var]
+    """Handler for testing storage connectivity and functionality.
+
+    CQRS Compliance: Returns None. Results stored in command.result.
+    Note: This is a pure query operation and should be moved to queries/ in future refactoring.
+    """
+
+    def __init__(
+        self,
+        logger: LoggingPort,
+        container: ContainerPort,
+        event_publisher: EventPublisherPort,
+        error_handler: ErrorHandlingPort,
+    ) -> None:
+        """Initialize test storage handler."""
+        super().__init__(logger, event_publisher, error_handler)
+        self.container = container
+
+    async def validate_command(self, command: TestStorageCommand) -> None:
+        """Validate test storage command."""
+        await super().validate_command(command)
+
+    async def execute_command(self, command: TestStorageCommand) -> None:
+        """Execute storage test command."""
+        self.logger.info("Testing storage connectivity")
+
+        try:
+            from application.ports.storage_registry_port import StorageRegistryPort
+
+            registry = self.container.get(StorageRegistryPort)
+            storage_types = registry.get_registered_types()
+
+            # Store result in command (CQRS compliance)
+            command.result = {
+                "status": "success",
+                "message": "Storage test completed successfully",
+                "storage_types": storage_types,
+                "command_id": command.command_id,
+            }
+
+            self.logger.info("Storage test completed successfully")
+
+        except Exception as e:
+            self.logger.error("Storage test failed: %s", str(e))
+            # Store error result in command
+            command.result = {
+                "status": "failed",
+                "error": str(e),
+                "command_id": command.command_id,
+            }
+
+
+@command_handler(MCPValidateCommand)
+class MCPValidateCommandHandler(BaseCommandHandler[MCPValidateCommand, None]):  # type: ignore[type-var]
+    """Handler for validating MCP server configuration and tools.
+
+    CQRS Compliance: Returns None. Results stored in command.result.
+    Note: This is a pure query operation and should be moved to queries/ in future refactoring.
+    """
+
+    def __init__(
+        self,
+        logger: LoggingPort,
+        container: ContainerPort,
+        event_publisher: EventPublisherPort,
+        error_handler: ErrorHandlingPort,
+    ) -> None:
+        """Initialize MCP validate handler."""
+        super().__init__(logger, event_publisher, error_handler)
+        self.container = container
+
+    async def validate_command(self, command: MCPValidateCommand) -> None:
+        """Validate MCP validate command."""
+        await super().validate_command(command)
+
+    async def execute_command(self, command: MCPValidateCommand) -> None:
+        """Execute MCP validation command."""
+        self.logger.info("Validating MCP server configuration")
+
+        try:
+            # Store result in command (CQRS compliance)
+            command.result = {
+                "status": "success",
+                "message": "MCP validation completed successfully",
+                "command_id": command.command_id,
+            }
+
+            self.logger.info("MCP validation completed successfully")
+
+        except Exception as e:
+            self.logger.error("MCP validation failed: %s", str(e))
+            # Store error result in command
+            command.result = {
+                "status": "failed",
+                "error": str(e),
+                "command_id": command.command_id,
+            }
