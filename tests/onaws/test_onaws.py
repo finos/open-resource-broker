@@ -560,7 +560,7 @@ def validate_subnet_id(instance_details, template, instance_id):
         log.error(f"Instance {instance_id}: Could not retrieve subnet ID from AWS")
         return False
 
-    if actual_subnet == expected_subnet:
+    if actual_subnet == expected_subnet or actual_subnet in expected_subnet.split(","):
         log.info(
             f"Instance {instance_id}: Subnet ID validation PASSED - Expected: {expected_subnet}, Actual: {actual_subnet}"
         )
