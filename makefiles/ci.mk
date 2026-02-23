@@ -20,6 +20,10 @@ ci-quality-mypy:  ## Run mypy type checking
 	@echo "Running mypy type check..."
 	$(call run-tool,mypy,.)
 
+ci-quality-pyright:  ## Run pyright type checking
+	@echo "Running pyright type check..."
+	$(call run-tool,pyright,src/)
+
 # Composite target (for local convenience)
 ci-quality: ci-quality-ruff ci-quality-mypy  ## Run all enforced code quality checks
 

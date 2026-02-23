@@ -284,6 +284,16 @@ ignore = [
     "PLC0414", # Import alias does not rename - acceptable pattern
 ]
 
+[tool.ruff.lint.pep8-naming]
+# Treat Pydantic decorators as classmethod-like so N805 ("first arg should be self")
+# does not fire on @field_validator / @model_validator(mode="before"/"after") methods.
+classmethod-decorators = [
+    "classmethod",
+    "pydantic.field_validator",
+    "pydantic.model_validator",
+    "validator",          # pydantic v1 compat
+]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["PLC0415"]  # Allow conditional imports in tests for optional dependencies
 
@@ -296,6 +306,21 @@ line-ending = "auto"
 [tool.ruff.lint.isort]
 known-first-party = ["orb", "application", "domain", "infrastructure", "interface", "api", "monitoring"]
 combine-as-imports = true
+
+[tool.pyright]
+pythonVersion = "3.9"
+pythonPlatform = "Linux"
+include = ["src"]
+exclude = ["tests", ".venv", "build", "dist"]
+typeCheckingMode = "basic"
+reportMissingImports = true
+reportMissingTypeStubs = false
+reportUnusedImports = true
+reportUnusedVariable = true
+reportPrivateUsage = false
+useLibraryCodeForTypes = true
+venvPath = "."
+venv = ".venv"
 
 [tool.mypy]
 python_version = "3.14"

@@ -19,14 +19,17 @@ from infrastructure.storage.components import (
     NoOpVersionManager,
     VersionManager,
 )
+from infrastructure.storage.components.entity_serializer import BaseEntitySerializer
+from infrastructure.storage.components.generic_serializer import GenericEntitySerializer
 
 
-class TemplateSerializer(EntitySerializer):
+class TemplateSerializer(BaseEntitySerializer):
     """Handles Template aggregate serialization/deserialization."""
 
     def __init__(self, defaults_service=None) -> None:
         """Initialize the instance."""
-        self.logger = get_logger(__name__)
+        super().__init__()
+        self._dt = GenericEntitySerializer(Template, "Template", "template_id")
         self.defaults_service = defaults_service
 
         if not self.defaults_service:
@@ -83,8 +86,8 @@ class TemplateSerializer(EntitySerializer):
                 "provider_name": template.provider_name,
                 "provider_api": template.provider_api,
                 "is_active": template.is_active,
-                "created_at": (template.created_at.isoformat() if template.created_at else None),
-                "updated_at": (template.updated_at.isoformat() if template.updated_at else None),
+                "created_at": self._dt.serialize_datetime(template.created_at),
+                "updated_at": self._dt.serialize_datetime(template.updated_at),
                 "schema_version": "2.0.0",
             }
         except Exception as e:
@@ -109,16 +112,8 @@ class TemplateSerializer(EntitySerializer):
                     processed_data = data
 
             now = datetime.now()
-            created_at = (
-                datetime.fromisoformat(processed_data["created_at"])
-                if processed_data.get("created_at")
-                else now
-            )
-            updated_at = (
-                datetime.fromisoformat(processed_data["updated_at"])
-                if processed_data.get("updated_at")
-                else now
-            )
+            created_at = self._dt.deserialize_datetime(processed_data.get("created_at")) or now
+            updated_at = self._dt.deserialize_datetime(processed_data.get("updated_at")) or now
 
             template_id = processed_data.get("templateId", processed_data.get("template_id"))
             if not template_id:

@@ -48,6 +48,9 @@ format-fix: dev-install  # CRITICAL: Used by ci.yml
 lint-optional: dev-install
 	@$(MAKE) lint optional
 
+typecheck: dev-install  ## Run pyright type checking (alias for ci-quality-pyright)
+	@$(MAKE) ci-quality-pyright
+
 pre-commit: ; @$(MAKE) validate
 hadolint-check: ; @$(MAKE) hadolint
 

@@ -8,7 +8,7 @@ This module coordinates the registration of all services across different layers
 - Server services (FastAPI, REST API handlers)
 """
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from infrastructure.di.container import DIContainer
@@ -24,9 +24,7 @@ from infrastructure.di.storage_services import register_storage_services
 
 
 def register_all_services(container: "DIContainer") -> "DIContainer":
-    """
-    Register all services in the dependency injection container.
-    Includes lazy loading support for improved startup performance.
+    """Register all services in the dependency injection container.
 
     Args:
         container: Container instance (required)
@@ -34,11 +32,64 @@ def register_all_services(container: "DIContainer") -> "DIContainer":
     Returns:
         Configured container
     """
-    # Check if lazy loading is enabled
     if container.is_lazy_loading_enabled():
         return _register_services_lazy(container)
     else:
         return _register_services_eager(container)
+
+
+def setup_cqrs_infrastructure(container: "DIContainer") -> None:
+    """Set up CQRS infrastructure: handler discovery and buses."""
+    from infrastructure.logging.logger import get_logger
+
+    logger = get_logger(__name__)
+
+    try:
+        from domain.base.ports.logging_port import LoggingPort
+        from infrastructure.di.buses import BusFactory, CommandBus, QueryBus
+        from infrastructure.di.handler_discovery import create_handler_discovery_service
+
+        logger.info("Setting up CQRS infrastructure")
+
+        if container.is_lazy_loading_enabled():
+            logger.info("Ensuring infrastructure services are available for CQRS setup")
+            _ensure_infrastructure_services(container)
+
+        discovery_service = create_handler_discovery_service(container)
+        discovery_service.discover_and_register_handlers()
+
+        try:
+            from application.decorators import get_handler_registry_stats
+
+            stats = get_handler_registry_stats()
+            logger.info("Handler discovery results: %s", stats)
+        except ImportError:
+            logger.debug("Handler registry stats not available")
+
+        logging_port = container.get(LoggingPort)
+        query_bus, command_bus = BusFactory.create_buses(container, logging_port)
+        container.register_instance(QueryBus, query_bus)
+        container.register_instance(CommandBus, command_bus)
+
+        logger.info("CQRS infrastructure setup complete")
+
+    except ImportError as e:
+        logger.debug("CQRS infrastructure not available: %s", e)
+    except Exception as e:
+        logger.warning("Failed to setup CQRS infrastructure: %s", e, exc_info=True)
+
+
+def _ensure_infrastructure_services(container: "DIContainer") -> None:
+    """Ensure infrastructure services are registered before CQRS setup."""
+    from infrastructure.logging.logger import get_logger
+
+    logger = get_logger(__name__)
+
+    try:
+        register_infrastructure_services(container)
+        logger.debug("Infrastructure services ensured for CQRS setup")
+    except Exception as e:
+        logger.warning("Failed to ensure infrastructure services: %s", e, exc_info=True)
 
 
 def _register_services_lazy(container: "DIContainer") -> "DIContainer":
@@ -46,10 +97,9 @@ def _register_services_lazy(container: "DIContainer") -> "DIContainer":
     from infrastructure.logging.logger import get_logger
 
     logger = get_logger(__name__)
-
     logger.info("Registering services with lazy loading enabled")
 
-    # 0. ALWAYS register all types first (required for any registry operations)
+    # 0. Register all types first (required for any registry operations)
     from infrastructure.scheduler.registration import register_all_scheduler_types
     from infrastructure.storage.registration import register_all_storage_types
     from providers.registration import register_all_provider_types
@@ -61,10 +111,7 @@ def _register_services_lazy(container: "DIContainer") -> "DIContainer":
     # 1. Register ConfigurationManager FIRST (port adapters depend on it)
     from config.managers.configuration_manager import ConfigurationManager
 
-    def create_configuration_manager(c):
-        return ConfigurationManager()  # Uses default config discovery
-
-    container.register_singleton(ConfigurationManager, create_configuration_manager)
+    container.register_singleton(ConfigurationManager, lambda c: ConfigurationManager())
 
     # 2. Register port adapters (now ConfigurationManager is available)
     from infrastructure.di.port_registrations import register_port_adapters
@@ -88,17 +135,14 @@ def _register_services_lazy(container: "DIContainer") -> "DIContainer":
 
     register_registry_services(container)
 
-    # 8. Register provider services immediately (fix for provider
-    # context errors)
+    # 8. Register provider services immediately (fix for provider context errors)
     register_provider_services(container)
 
     # 9. Register infrastructure services immediately (needed for template system)
     register_infrastructure_services(container)
 
-    # 10. Setup CQRS infrastructure immediately (handlers need to be registered before buses are used)
-    from infrastructure.di.container import _setup_cqrs_infrastructure
-
-    _setup_cqrs_infrastructure(container)
+    # 10. Setup CQRS infrastructure (handlers must be registered before buses are used)
+    setup_cqrs_infrastructure(container)
 
     # 11. Register lazy factories for non-essential services
     _register_lazy_service_factories(container)
@@ -112,10 +156,8 @@ def _register_services_eager(container: "DIContainer") -> "DIContainer":
     from infrastructure.logging.logger import get_logger
 
     logger = get_logger(__name__)
-
     logger.info("Registering services with eager loading (fallback mode)")
 
-    # Use standardized registration functions
     from infrastructure.scheduler.registration import register_all_scheduler_types
     from infrastructure.storage.registration import register_all_storage_types
     from providers.registration import register_all_provider_types
@@ -124,73 +166,29 @@ def _register_services_eager(container: "DIContainer") -> "DIContainer":
     register_all_storage_types()
     register_all_provider_types()
 
-    # Register port adapters FIRST (provides LoggingPort, ConfigurationPort, etc.)
     from infrastructure.di.port_registrations import register_port_adapters
 
     register_port_adapters(container)
-
-    # Register core services (uses LoggingPort from port adapters)
     register_core_services(container)
-
-    # Register domain services
     register_domain_services(container)
-
-    # Setup CQRS infrastructure (handlers and buses)
-    from infrastructure.di.container import _setup_cqrs_infrastructure
-
-    _setup_cqrs_infrastructure(container)
-
-    # Register provider services (needed by infrastructure services)
+    setup_cqrs_infrastructure(container)
     register_provider_services(container)
-
-    # Register infrastructure services
     register_infrastructure_services(container)
-
-    # Register server services (conditionally based on config)
     register_server_services(container)
 
     return container
 
 
 def _register_lazy_service_factories(container: "DIContainer") -> None:
-    """Register lazy factories for services that can be loaded on-demand."""
+    """Register on-demand factories for services that can be deferred."""
     from infrastructure.logging.logger import get_logger
 
     logger = get_logger(__name__)
 
-    # Register CQRS infrastructure as lazy - triggered by QueryBus or CommandBus access
-    # NOTE: CQRS is now registered immediately in lazy mode, so this is not needed
-    # def setup_cqrs_lazy(c) -> None:
-    #     """Setup CQRS infrastructure lazily when needed."""
-    #     from infrastructure.di.container import _setup_cqrs_infrastructure
-    #     _setup_cqrs_infrastructure(c)
-
-    # from infrastructure.di.buses import CommandBus, QueryBus
-    # container.register_on_demand(QueryBus, setup_cqrs_lazy)
-    # container.register_on_demand(CommandBus, setup_cqrs_lazy)
-
-    # Provider services are now registered immediately in lazy mode
-    # No need for lazy provider registration
-
-    # Register infrastructure services as lazy - triggered by first
-    # infrastructure service access
-    def register_infrastructure_lazy(c) -> None:
-        """Register infrastructure services lazily when first accessed."""
-        register_infrastructure_services(c)
-        # CQRS is now registered immediately in lazy mode, no need to check
-
-    # Register infrastructure services on-demand when needed
-    # Use a placeholder type for infrastructure services
-    container.register_on_demand(
-        type("InfrastructureServices", (), {}), register_infrastructure_lazy
-    )
-
-    # Register scheduler services as lazy
-    def register_scheduler_lazy(c) -> None:
-        """Register scheduler services lazily when needed."""
+    # Scheduler services on-demand when SchedulerPort is first accessed
+    def register_scheduler_lazy(c: "DIContainer") -> None:
         from infrastructure.scheduler.registration import register_active_scheduler_only
 
-        # Get scheduler type from config if available
         try:
             from config.managers.configuration_manager import ConfigurationManager
 
@@ -206,93 +204,8 @@ def _register_lazy_service_factories(container: "DIContainer") -> None:
             logger.warning("Failed to load scheduler config, falling back to default: %s", e)
             register_active_scheduler_only("default")
 
-    # Register scheduler on-demand when SchedulerPort is accessed
     from domain.base.ports.scheduler_port import SchedulerPort
 
     container.register_on_demand(SchedulerPort, register_scheduler_lazy)
 
-    # Register server services as lazy
-    def register_server_lazy(c) -> None:
-        """Register server services lazily when needed."""
-        register_server_services(c)
-
-    # Use a placeholder type for server services
-    container.register_on_demand(type("ServerServices", (), {}), register_server_lazy)
-
     logger.debug("Lazy service factories registered")
-
-
-def create_handler(handler_class, config: Optional[dict[str, Any]] = None) -> Any:
-    """
-    Create an API handler with dependencies.
-
-    Args:
-        handler_class: Handler class to create
-        config: Optional configuration
-
-    Returns:
-        Created handler instance
-    """
-    # Ensure services are registered
-    container = register_all_services()  # type: ignore[call-arg]
-
-    # Register handler class if not already registered
-    if handler_class not in container._factories:  # type: ignore[attr-defined]
-        # Get logger
-        from infrastructure.logging.logger import get_logger
-
-        logger = get_logger(__name__)
-
-        # Register handler class directly if it uses @injectable
-        try:
-            from infrastructure.di.decorators import is_injectable
-
-            if is_injectable(handler_class):
-                logger.info("Registering injectable handler class %s", handler_class.__name__)
-                container.register_singleton(handler_class)  # type: ignore[call-arg]
-            else:
-                # Legacy handler registration
-                logger.info("Registering legacy handler class %s", handler_class.__name__)
-
-                def handler_factory(c):
-                    """Factory for legacy handler instances."""
-                    # Get CQRS buses directly from container
-                    from infrastructure.di.buses import CommandBus, QueryBus
-                    from monitoring.metrics import MetricsCollector
-
-                    query_bus = c.get(QueryBus)
-                    command_bus = c.get(CommandBus)
-
-                    # Get metrics collector from container if available
-                    metrics = c.get_optional(MetricsCollector)
-
-                    # Create handler with CQRS dependencies
-                    return handler_class(query_bus, command_bus, metrics)
-
-                container.register_factory(handler_class, handler_factory)
-        except ImportError:
-            # Fallback to CQRS registration if decorator module not available
-            logger.info(
-                "Fallback CQRS registration for handler class %s",
-                handler_class.__name__,
-            )
-
-            def handler_factory(c):
-                """Fallback factory for CQRS handler instances."""
-                # Get CQRS buses directly from container
-                from infrastructure.di.buses import CommandBus, QueryBus
-                from monitoring.metrics import MetricsCollector
-
-                query_bus = c.get(QueryBus)
-                command_bus = c.get(CommandBus)
-
-                # Get metrics collector from container if available
-                metrics = c.get_optional(MetricsCollector)
-
-                # Create handler with CQRS dependencies
-                return handler_class(query_bus, command_bus, metrics)
-
-            container.register_factory(handler_class, handler_factory)
-
-    # Get handler from container
-    return container.get(handler_class)

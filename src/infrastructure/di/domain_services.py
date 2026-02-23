@@ -13,7 +13,6 @@ from domain.services.filter_service import FilterService
 from domain.services.generic_filter_service import GenericFilterService
 from domain.services.template_validation_domain_service import TemplateValidationDomainService
 from domain.services.timestamp_service import TimestampService
-from infrastructure.di.buses import QueryBus
 from infrastructure.di.container import DIContainer
 from infrastructure.services.iso_timestamp_service import ISOTimestampService
 from infrastructure.services.machine_filter_service import MachineFilterService
@@ -55,6 +54,8 @@ def register_domain_services(container: DIContainer) -> None:
 
     # Deprovisioning orchestrator (SRP refactoring)
     def create_deprovisioning_orchestrator(c):
+        from infrastructure.di.buses import QueryBus
+
         return DeprovisioningOrchestrator(
             uow_factory=c.get(UnitOfWorkFactory),
             logger=c.get(LoggingPort),

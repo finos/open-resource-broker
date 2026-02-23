@@ -26,43 +26,11 @@ from infrastructure.di.exceptions import (
     DependencyResolutionError,
     UnregisteredDependencyError,
 )
+from infrastructure.di.lazy_config import LazyLoadingConfig
 from infrastructure.logging.logger import get_logger
 
 T = TypeVar("T")
 logger = get_logger(__name__)
-
-
-class LazyLoadingConfig:
-    """Configuration for lazy loading behavior."""
-
-    def __init__(self, config_dict: Optional[dict[str, Any]] = None) -> None:
-        """Initialize lazy loading configuration with provided settings."""
-        if config_dict is None:
-            config_dict = {}
-
-        self.enabled = config_dict.get("enabled", True)
-        self.cache_instances = config_dict.get("cache_instances", True)
-        self.discovery_mode = config_dict.get("discovery_mode", "lazy")
-        self.connection_mode = config_dict.get("connection_mode", "lazy")
-        self.preload_critical = config_dict.get("preload_critical", [])
-
-    @classmethod
-    def from_config_manager(cls, container=None) -> "LazyLoadingConfig":
-        """Create lazy loading config from configuration manager."""
-        if container is None:
-            # Fallback during bootstrap - use safe defaults
-            return cls()
-
-        try:
-            from config.managers.configuration_manager import ConfigurationManager
-
-            config_manager = container.get(ConfigurationManager)
-
-            performance_config = config_manager.get("performance", {})
-            lazy_config = performance_config.get("lazy_loading", {})
-            return cls(lazy_config)
-        except Exception:
-            return cls()
 
 
 @contextmanager
@@ -289,12 +257,6 @@ class DIContainer(DIContainerPort, CQRSHandlerRegistrationPort, ContainerPort):
                 logger.debug("Auto-registered injectable class %s", cls.__name__)
                 return
 
-    def _create_and_cache(self, cls: type[T]) -> T:
-        """Create an instance and cache it if caching is enabled."""
-        # This method is called by the get() method
-        # For now, delegate to the dependency resolver
-        return self._dependency_resolver.resolve(cls)
-
     def is_lazy_loading_enabled(self) -> bool:
         """Check if lazy loading is enabled."""
         return self._lazy_config.enabled
@@ -355,69 +317,6 @@ def _create_configured_container() -> DIContainer:
     return container
 
 
-def _setup_cqrs_infrastructure(container: DIContainer) -> None:
-    """Set up CQRS infrastructure: handler discovery and buses."""
-    try:
-        from domain.base.ports.logging_port import LoggingPort
-        from infrastructure.di.buses import BusFactory
-        from infrastructure.di.handler_discovery import create_handler_discovery_service
-
-        logger.info("Setting up CQRS infrastructure")
-
-        # Ensure infrastructure services are registered first (for lazy loading)
-        if container.is_lazy_loading_enabled():
-            logger.info("Ensuring infrastructure services are available for CQRS setup")
-            _ensure_infrastructure_services(container)
-
-        # Discover and register all handlers
-        logger.info("Creating handler discovery service")
-        discovery_service = create_handler_discovery_service(container)
-
-        logger.info("Starting handler discovery")
-        discovery_service.discover_and_register_handlers()
-
-        # Check registration results
-        try:
-            from application.decorators import get_handler_registry_stats
-
-            stats = get_handler_registry_stats()
-            logger.info("Handler discovery results: %s", stats)
-        except ImportError:
-            logger.debug("Handler registry stats not available")
-
-        # Create and register buses
-        logger.info("Creating CQRS buses")
-        logging_port = container.get(LoggingPort)
-        query_bus, command_bus = BusFactory.create_buses(container, logging_port)
-
-        # Register buses as singletons
-        from infrastructure.di.buses import CommandBus, QueryBus
-
-        container.register_instance(QueryBus, query_bus)
-        container.register_instance(CommandBus, command_bus)
-
-        logger.info("CQRS infrastructure setup complete")
-
-    except ImportError as e:
-        # Fallback if CQRS infrastructure is not available
-        logger.debug("CQRS infrastructure not available: %s", e)
-    except Exception as e:
-        logger.warning("Failed to setup CQRS infrastructure: %s", e, exc_info=True)
-
-
-def _ensure_infrastructure_services(container: DIContainer) -> None:
-    """Ensure infrastructure services are registered for CQRS setup."""
-    try:
-        from infrastructure.di.infrastructure_services import (
-            register_infrastructure_services,
-        )
-
-        logger.debug("Registering infrastructure services for CQRS setup")
-        register_infrastructure_services(container)
-    except Exception as e:
-        logger.warning("Failed to ensure infrastructure services: %s", e, exc_info=True)
-
-
 def reset_container() -> None:
     """Reset the global container instance."""
     global _container_instance
@@ -429,7 +328,6 @@ def reset_container() -> None:
 
 __all__: list[str] = [
     "DIContainer",
-    "_setup_cqrs_infrastructure",
     "get_container",
     "reset_container",
     "timed_operation",

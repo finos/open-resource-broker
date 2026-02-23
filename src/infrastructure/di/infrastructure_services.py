@@ -6,7 +6,6 @@ from domain.machine.repository import MachineRepository
 from domain.request.repository import RequestRepository
 from domain.template.repository import TemplateRepository
 from infrastructure.di.container import DIContainer
-from infrastructure.logging.logger import get_logger
 from infrastructure.template.configuration_manager import TemplateConfigurationManager
 
 
@@ -88,91 +87,12 @@ def _register_template_services(container: DIContainer):
 
 
 def _register_ami_resolver_if_enabled(container: DIContainer) -> None:
-    """Register AMI resolver if enabled in AWS provider extensions."""
-    try:
-        from domain.base.ports.configuration_port import ConfigurationPort
-        from domain.template.extensions import TemplateExtensionRegistry
+    """Register AMI resolver when implemented.
 
-        config_manager = container.get(ConfigurationPort)
-        logger = get_logger(__name__)
-
-        # Check if AWS extensions are registered
-        if not TemplateExtensionRegistry.has_extension("aws"):
-            logger.debug("AWS extensions not registered, skipping AMI resolver registration")
-            return
-
-        # Try to get AWS provider configuration
-        try:
-            provider_config = config_manager.get_provider_config()
-
-            # Look for AWS provider defaults
-            if (
-                provider_config is not None
-                and hasattr(provider_config, "provider_defaults")
-                and "aws" in provider_config.provider_defaults
-            ):
-                aws_defaults = provider_config.provider_defaults["aws"]
-                if hasattr(aws_defaults, "extensions"):
-                    # Create AWS extension config from provider defaults using registry
-                    aws_extension_config = TemplateExtensionRegistry.create_extension_config(
-                        "aws", aws_defaults.extensions or {}
-                    )
-
-                    # Check if AMI resolution is enabled
-                    if aws_extension_config and hasattr(aws_extension_config, "ami_resolution") and aws_extension_config.ami_resolution.enabled:  # type: ignore[attr-defined]
-                        logger.info(
-                            "Image resolution enabled in AWS extensions - using generic service"
-                        )
-                        return
-
-            # Fallback: check if any AWS provider instances have AMI resolution enabled
-            if provider_config is not None and hasattr(provider_config, "providers"):
-                for provider in provider_config.providers:
-                    if provider.type == "aws" and hasattr(provider, "extensions"):
-                        try:
-                            instance_extension_config = (
-                                TemplateExtensionRegistry.create_extension_config(
-                                    "aws", provider.extensions or {}
-                                )
-                            )
-                            if (
-                                instance_extension_config
-                                and hasattr(instance_extension_config, "ami_resolution")
-                                and instance_extension_config.ami_resolution.enabled  # type: ignore[attr-defined]
-                            ):
-                                logger.info(
-                                    "Image resolution enabled in AWS provider instance: %s",
-                                    provider.name,
-                                )
-                                return
-                        except Exception as e:
-                            logger.debug(
-                                "Could not parse extensions for provider %s: %s",
-                                provider.name,
-                                e,
-                            )
-
-            # Default: use generic image resolution service
-            default_aws_config = TemplateExtensionRegistry.create_extension_config("aws", {})
-            if default_aws_config and hasattr(default_aws_config, "ami_resolution") and default_aws_config.ami_resolution.enabled:  # type: ignore[attr-defined]
-                logger.info("Image resolution enabled with default AWS extension configuration")
-            else:
-                logger.debug("Image resolution disabled in default AWS configuration")
-
-        except Exception as e:
-            logger.warning("Could not determine AMI resolution configuration: %s", e, exc_info=True)
-            # Register with default configuration as fallback
-            # TODO: CachingAMIResolver not implemented yet
-            # container.register_singleton(CachingAMIResolver)
-            # Register interface to resolve to concrete implementation
-            # from domain.base.ports.template_resolver_port import TemplateResolverPort
-
-            # container.register_singleton(TemplateResolverPort, lambda c: c.get(CachingAMIResolver))
-            logger.info("AMI resolver registration skipped - not implemented yet")
-
-    except Exception as e:
-        logger = get_logger(__name__)
-        logger.error("Failed to register AMI resolver: %s", e, exc_info=True)
+    TODO: CachingAMIResolver is not yet implemented. When ready, check
+    TemplateExtensionRegistry for AWS AMI resolution config and register
+    the resolver against TemplateResolverPort.
+    """
 
 
 def _register_repository_services(container: DIContainer) -> None:

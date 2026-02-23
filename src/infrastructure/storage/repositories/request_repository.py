@@ -19,14 +19,22 @@ from domain.request.value_objects import RequestId, RequestStatus, RequestType
 from infrastructure.error.decorators import handle_infrastructure_exceptions
 from infrastructure.logging.logger import get_logger
 from infrastructure.storage.base.repository_mixin import StorageRepositoryMixin
+from infrastructure.storage.components.entity_serializer import BaseEntitySerializer
+from infrastructure.storage.components.generic_serializer import GenericEntitySerializer
 
 
-class RequestSerializer:
+def _id_str(value_obj: Any) -> str:
+    """Extract string from a value object or plain string."""
+    return str(value_obj.value) if hasattr(value_obj, "value") else str(value_obj)
+
+
+class RequestSerializer(BaseEntitySerializer):
     """Handles Request aggregate serialization/deserialization."""
 
     def __init__(self) -> None:
         """Initialize the instance."""
-        self.logger = get_logger(__name__)
+        super().__init__()
+        self._dt = GenericEntitySerializer(Request, "Request", "request_id")
 
     def _parse_request_id(self, request_id_data: Any) -> RequestId:
         """Parse RequestId from various formats."""
@@ -50,23 +58,18 @@ class RequestSerializer:
             # Fallback to string conversion
             return RequestId(value=str(request_id_data))
 
-    def to_dict(self, request: Request) -> dict[str, Any]:
+    def to_dict(self, entity: Any) -> dict[str, Any]:
         """Convert Request aggregate to dictionary with additional fields."""
+        request: Request = entity
         try:
             return {
                 # Core request fields
-                "request_id": str(request.request_id.value)
-                if hasattr(request.request_id, "value")
-                else str(request.request_id),
+                "request_id": _id_str(request.request_id),
                 "template_id": request.template_id,
                 "machine_count": request.requested_count,
                 "desired_capacity": request.desired_capacity,
-                "request_type": request.request_type.value
-                if hasattr(request.request_type, "value")
-                else str(request.request_type),
-                "status": request.status.value
-                if hasattr(request.status, "value")
-                else str(request.status),
+                "request_type": _id_str(request.request_type),
+                "status": _id_str(request.status),
                 "status_message": request.status_message,
                 # Provider tracking fields
                 "provider_name": request.provider_name,
@@ -86,10 +89,8 @@ class RequestSerializer:
                 "provider_data": request.provider_data or {},
                 # Timestamps
                 "created_at": request.created_at.isoformat(),  # type: ignore[union-attr]
-                "started_at": (request.started_at.isoformat() if request.started_at else None),
-                "completed_at": (
-                    request.completed_at.isoformat() if request.completed_at else None
-                ),
+                "started_at": self._dt.serialize_datetime(request.started_at),
+                "completed_at": self._dt.serialize_datetime(request.completed_at),
                 # Versioning
                 "version": request.version,
                 # Legacy fields for backward compatibility
@@ -106,14 +107,10 @@ class RequestSerializer:
     def from_dict(self, data: dict[str, Any]) -> Request:
         """Convert dictionary to Request aggregate with additional field support."""
         try:
-            # Parse datetime fields
+            # Parse datetime fields using shared helper
             created_at = datetime.fromisoformat(data["created_at"])
-            started_at = (
-                datetime.fromisoformat(data["started_at"]) if data.get("started_at") else None
-            )
-            completed_at = (
-                datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else None
-            )
+            started_at = self._dt.deserialize_datetime(data.get("started_at"))
+            completed_at = self._dt.deserialize_datetime(data.get("completed_at"))
 
             # Build request data with additional fields
             request_data = {
@@ -187,11 +184,7 @@ class RequestRepositoryImpl(StorageRepositoryMixin, RequestRepositoryInterface):
         """Save request using storage strategy and return extracted events."""
         operation_id = str(uuid4())
         start_time = time.time()
-        entity_id = (
-            str(request.request_id.value)
-            if hasattr(request.request_id, "value")
-            else str(request.request_id)
-        )
+        entity_id = _id_str(request.request_id)
 
         self._publish_storage_event(
             RepositoryOperationStartedEvent(
@@ -278,8 +271,7 @@ class RequestRepositoryImpl(StorageRepositoryMixin, RequestRepositoryInterface):
     def get_by_id(self, request_id: RequestId) -> Optional[Request]:
         """Get request by ID using storage strategy."""
         try:
-            key = str(request_id.value) if hasattr(request_id, "value") else str(request_id)
-            return self._load_by_id(key)  # type: ignore[return-value]
+            return self._load_by_id(_id_str(request_id))  # type: ignore[return-value]
         except Exception as e:
             self.logger.error("Failed to get request %s: %s", request_id, e)
             raise
@@ -304,8 +296,7 @@ class RequestRepositoryImpl(StorageRepositoryMixin, RequestRepositoryInterface):
     def find_by_status(self, status: RequestStatus) -> list[Request]:
         """Find requests by status."""
         try:
-            criteria = {"status": status.value if hasattr(status, "value") else str(status)}
-            return self._load_by_criteria(criteria)  # type: ignore[return-value]
+            return self._load_by_criteria({"status": _id_str(status)})  # type: ignore[return-value]
         except Exception as e:
             self.logger.error("Failed to find requests by status %s: %s", status, e)
             raise
@@ -323,12 +314,7 @@ class RequestRepositoryImpl(StorageRepositoryMixin, RequestRepositoryInterface):
     def find_by_type(self, request_type: RequestType) -> list[Request]:
         """Find requests by type."""
         try:
-            criteria = {
-                "request_type": request_type.value
-                if hasattr(request_type, "value")
-                else str(request_type)
-            }
-            return self._load_by_criteria(criteria)  # type: ignore[return-value]
+            return self._load_by_criteria({"request_type": _id_str(request_type)})  # type: ignore[return-value]
         except Exception as e:
             self.logger.error("Failed to find requests by type %s: %s", request_type, e)
             raise
@@ -388,9 +374,7 @@ class RequestRepositoryImpl(StorageRepositoryMixin, RequestRepositoryInterface):
     def delete(self, request_id: RequestId) -> None:
         """Delete request by ID."""
         try:
-            self._delete_by_id(
-                str(request_id.value) if hasattr(request_id, "value") else str(request_id)
-            )
+            self._delete_by_id(_id_str(request_id))
             self.logger.debug("Deleted request %s", request_id)
         except Exception as e:
             self.logger.error("Failed to delete request %s: %s", request_id, e)
@@ -414,9 +398,7 @@ class RequestRepositoryImpl(StorageRepositoryMixin, RequestRepositoryInterface):
     def exists(self, request_id: RequestId) -> bool:
         """Check if request exists."""
         try:
-            return self._check_exists(
-                str(request_id.value) if hasattr(request_id, "value") else str(request_id)
-            )
+            return self._check_exists(_id_str(request_id))
         except Exception as e:
             self.logger.error("Failed to check if request %s exists: %s", request_id, e)
             raise

@@ -123,10 +123,10 @@ class QueryBus(QueryBusPort):
     def _trigger_lazy_cqrs_setup(self) -> None:
         """Trigger lazy CQRS infrastructure setup."""
         try:
-            from infrastructure.di.container import _setup_cqrs_infrastructure
+            from infrastructure.di.services import setup_cqrs_infrastructure
 
             self.logger.info("Triggering lazy CQRS infrastructure setup")
-            _setup_cqrs_infrastructure(self.container)
+            setup_cqrs_infrastructure(self.container)
         except Exception as e:
             self.logger.error("Failed to trigger lazy CQRS setup: %s", e)
 
@@ -205,10 +205,10 @@ class CommandBus(CommandBusPort):
     def _trigger_lazy_cqrs_setup(self) -> None:
         """Trigger lazy CQRS infrastructure setup."""
         try:
-            from infrastructure.di.container import _setup_cqrs_infrastructure
+            from infrastructure.di.services import setup_cqrs_infrastructure
 
             self.logger.info("Triggering lazy CQRS infrastructure setup")
-            _setup_cqrs_infrastructure(self.container)
+            setup_cqrs_infrastructure(self.container)
         except Exception as e:
             self.logger.error("Failed to trigger lazy CQRS setup: %s", e)
 
