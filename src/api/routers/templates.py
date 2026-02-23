@@ -223,13 +223,7 @@ async def create_template(template_data: TemplateCreateRequest) -> JSONResponse:
             configuration=template_dict,
         )
 
-        response = await command_bus.execute(cast(Any, command))
-
-        if response and response.validation_errors:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Template validation failed: {', '.join(response.validation_errors)}",
-            )
+        await command_bus.execute(cast(Any, command))
 
         return JSONResponse(
             status_code=201,
@@ -277,13 +271,7 @@ async def update_template(template_id: str, template_data: TemplateUpdateRequest
             configuration=template_dict,
         )
 
-        response = await command_bus.execute(cast(Any, command))
-
-        if response and response.validation_errors:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Template validation failed: {', '.join(response.validation_errors)}",
-            )
+        await command_bus.execute(cast(Any, command))
 
         return JSONResponse(
             status_code=200,
@@ -317,13 +305,7 @@ async def delete_template(template_id: str) -> JSONResponse:
 
         # Create command and execute through CQRS bus
         command = DeleteTemplateCommand(template_id=template_id)
-        response = await command_bus.execute(cast(Any, command))
-
-        if response and response.validation_errors:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Template deletion failed: {', '.join(response.validation_errors)}",
-            )
+        await command_bus.execute(cast(Any, command))
 
         return JSONResponse(
             status_code=200,
