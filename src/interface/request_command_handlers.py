@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 @handle_interface_exceptions(context="get_request_status", interface_type="cli")
 async def handle_get_request_status(
     args: "argparse.Namespace",
-) -> Union[dict[str, Any], tuple[dict[str, Any], int]]:
+) -> Union[dict[str, Any], tuple[dict[str, Any], int], list[Any]]:
     """
     Handle get request status operations with --all support.
 
