@@ -1022,23 +1022,38 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 )
 
             # Process each EC2 Fleet group separately
+            fleet_errors: list[tuple[Optional[str], Exception]] = []
             for fleet_id, fleet_data in fleet_instance_groups.items():
-                if fleet_id is not None:
-                    # Handle EC2 Fleet instances using dedicated method (primary case)
-                    self._release_hosts_for_single_ec2_fleet(
-                        fleet_id, fleet_data["instance_ids"], fleet_data["fleet_details"]
+                try:
+                    if fleet_id is not None:
+                        # Handle EC2 Fleet instances using dedicated method (primary case)
+                        self._release_hosts_for_single_ec2_fleet(
+                            fleet_id, fleet_data["instance_ids"], fleet_data["fleet_details"]
+                        )
+                    else:
+                        # Handle non-EC2 Fleet instances (fallback case)
+                        instance_ids = fleet_data["instance_ids"]
+                        if instance_ids:
+                            self._logger.info(
+                                f"Terminating {len(instance_ids)} non-EC2 Fleet instances"
+                            )
+                            self.aws_ops.terminate_instances_with_fallback(
+                                instance_ids, self._request_adapter, "non-EC2 Fleet instances"
+                            )
+                            self._logger.info(
+                                "Terminated non-EC2 Fleet instances: %s", instance_ids
+                            )
+                except Exception as e:
+                    self._logger.error(
+                        "Failed to release fleet %s: %s", fleet_id, e, exc_info=True
                     )
-                else:
-                    # Handle non-EC2 Fleet instances (fallback case)
-                    instance_ids = fleet_data["instance_ids"]
-                    if instance_ids:
-                        self._logger.info(
-                            f"Terminating {len(instance_ids)} non-EC2 Fleet instances"
-                        )
-                        self.aws_ops.terminate_instances_with_fallback(
-                            instance_ids, self._request_adapter, "non-EC2 Fleet instances"
-                        )
-                        self._logger.info("Terminated non-EC2 Fleet instances: %s", instance_ids)
+                    fleet_errors.append((fleet_id, e))
+
+            if fleet_errors:
+                failed_ids = [str(fid) for fid, _ in fleet_errors]
+                raise AWSInfrastructureError(
+                    f"Failed to release {len(fleet_errors)} fleet(s): {', '.join(failed_ids)}"
+                )
 
         except ClientError as e:
             error = self._convert_client_error(e)
@@ -1263,29 +1278,36 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     "Terminated EC2 Fleet %s instances: %s", fleet_id, fleet_instance_ids
                 )
 
-                # If capacity has reached zero for maintain fleets, delete the fleet
+                # If capacity has reached zero for maintain fleets, delete the fleet.
+                # Instances were already explicitly terminated above, so do NOT terminate again.
                 if fleet_type == "maintain" and new_capacity == 0:
                     self._logger.info("EC2 Fleet %s capacity is zero, deleting fleet", fleet_id)
-                    self._delete_ec2_fleet(fleet_id)
+                    self._delete_ec2_fleet(fleet_id, terminate_instances=False)
             else:
-                # If no specific instances provided, delete entire fleet
-                self._delete_ec2_fleet(fleet_id)
+                # If no specific instances provided, delete entire fleet and let AWS terminate them.
+                self._delete_ec2_fleet(fleet_id, terminate_instances=True)
 
         except Exception as e:
             self._logger.error("Failed to terminate EC2 fleet %s: %s", fleet_id, e)
             raise
 
-    def _delete_ec2_fleet(self, fleet_id: str) -> None:
-        """Delete an EC2 Fleet when it's no longer needed."""
-        try:
-            self._logger.info(f"Deleting EC2 Fleet {fleet_id}")
+    def _delete_ec2_fleet(self, fleet_id: str, terminate_instances: bool = True) -> None:
+        """Delete an EC2 Fleet when it's no longer needed.
 
-            # Delete the fleet with termination of instances
+        Args:
+            fleet_id: The EC2 Fleet ID to delete.
+            terminate_instances: Whether to terminate instances via the fleet delete call.
+                Set to False when instances have already been explicitly terminated to
+                avoid double termination.
+        """
+        try:
+            self._logger.info(f"Deleting EC2 Fleet {fleet_id} (terminate_instances={terminate_instances})")
+
             self._retry_with_backoff(
                 self.aws_client.ec2_client.delete_fleets,
                 operation_type="critical",
                 FleetIds=[fleet_id],
-                TerminateInstances=True,
+                TerminateInstances=terminate_instances,
             )
 
             self._logger.info(f"Successfully deleted EC2 Fleet {fleet_id}")

@@ -730,17 +730,11 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             self._logger.warning(
                 f"ASG details missing for {asg_name}, terminating instances without ASG operations"
             )
-            self._logger.warning(
-                f"ASG details missing for {asg_name}, terminating instances without ASG operations"
-            )
             # Still terminate the instances even if ASG details are missing
             self.aws_ops.terminate_instances_with_fallback(
                 asg_instance_ids,
                 self._request_adapter,
                 f"ASG {asg_name} instances (no ASG details)",
-            )
-            self._logger.info(
-                "Terminated ASG %s instances without ASG operations: %s", asg_name, asg_instance_ids
             )
             self._logger.info(
                 "Terminated ASG %s instances without ASG operations: %s", asg_name, asg_instance_ids
@@ -754,7 +748,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 operation_type="critical",
                 AutoScalingGroupName=asg_name,
                 InstanceIds=chunk,
-                ShouldDecrementDesiredCapacity=True,
+                ShouldDecrementDesiredCapacity=False,
             )
             self._logger.debug("Detached chunk from ASG %s: %s", asg_name, chunk)
         self._logger.info("Detached instances from ASG %s: %s", asg_name, asg_instance_ids)

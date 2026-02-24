@@ -957,23 +957,38 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 )
 
             # Process each Spot Fleet group separately
+            fleet_errors: list[tuple[Optional[str], Exception]] = []
             for fleet_id, fleet_data in fleet_instance_groups.items():
-                if fleet_id is not None:
-                    # Handle Spot Fleet instances using dedicated method (primary case)
-                    self._release_hosts_for_single_spot_fleet(
-                        fleet_id, fleet_data["instance_ids"], fleet_data["fleet_details"]
+                try:
+                    if fleet_id is not None:
+                        # Handle Spot Fleet instances using dedicated method (primary case)
+                        self._release_hosts_for_single_spot_fleet(
+                            fleet_id, fleet_data["instance_ids"], fleet_data["fleet_details"]
+                        )
+                    else:
+                        # Handle non-Spot Fleet instances (fallback case)
+                        instance_ids = fleet_data["instance_ids"]
+                        if instance_ids:
+                            self._logger.info(
+                                f"Terminating {len(instance_ids)} non-Spot Fleet instances"
+                            )
+                            self.aws_ops.terminate_instances_with_fallback(
+                                instance_ids, self._request_adapter, "non-Spot Fleet instances"
+                            )
+                            self._logger.info(
+                                "Terminated non-Spot Fleet instances: %s", instance_ids
+                            )
+                except Exception as e:
+                    self._logger.error(
+                        "Failed to release fleet %s: %s", fleet_id, e, exc_info=True
                     )
-                else:
-                    # Handle non-Spot Fleet instances (fallback case)
-                    instance_ids = fleet_data["instance_ids"]
-                    if instance_ids:
-                        self._logger.info(
-                            f"Terminating {len(instance_ids)} non-Spot Fleet instances"
-                        )
-                        self.aws_ops.terminate_instances_with_fallback(
-                            instance_ids, self._request_adapter, "non-Spot Fleet instances"
-                        )
-                        self._logger.info("Terminated non-Spot Fleet instances: %s", instance_ids)
+                    fleet_errors.append((fleet_id, e))
+
+            if fleet_errors:
+                failed_ids = [str(fid) for fid, _ in fleet_errors]
+                raise AWSInfrastructureError(
+                    f"Failed to release {len(fleet_errors)} fleet(s): {', '.join(failed_ids)}"
+                )
 
         except Exception as e:
             self._logger.error("Failed to release Spot Fleet hosts: %s", str(e))
@@ -1192,7 +1207,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                         self.aws_client.ec2_client.cancel_spot_fleet_requests,
                         operation_type="critical",
                         SpotFleetRequestIds=[fleet_id],
-                        TerminateInstances=True,
+                        TerminateInstances=False,
                     )
             else:
                 # If no specific instances provided, cancel entire spot fleet
