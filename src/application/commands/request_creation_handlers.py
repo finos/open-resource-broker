@@ -225,9 +225,9 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         """
         self.logger.info("Creating return request for machines: %s", command.machine_ids)
 
-        # Cancel stuck return requests if force_return is set
+        # Cancel any existing pending return requests if --force is set
         if command.force_return:
-            self._cancel_stuck_return_requests(command.machine_ids)
+            self._cancel_pending_return_requests(command.machine_ids)
 
         # Validate and filter machines
         validation_results = self._validate_and_filter_machines(command.machine_ids, force_return=command.force_return or False)
@@ -325,7 +325,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
 
         return {"valid_machines": valid_machine_ids, "skipped_machines": skipped_machines}
 
-    def _cancel_stuck_return_requests(self, machine_ids: list[str]) -> None:
+    def _cancel_pending_return_requests(self, machine_ids: list[str]) -> None:
         """Cancel any pending return requests for the given machines and clear their return_request_id."""
         with self.uow_factory.create_unit_of_work() as uow:
             for machine_id in machine_ids:
@@ -339,7 +339,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                 stuck_request = uow.requests.get_by_id(RequestId(value=stuck_request_id))
                 if stuck_request:
                     try:
-                        cancelled = stuck_request.cancel("Force re-return requested")
+                        cancelled = stuck_request.cancel("Superseded by new return request")
                         uow.requests.save(cancelled)
                         self.logger.info(
                             "Cancelled stuck return request %s for machine %s",
