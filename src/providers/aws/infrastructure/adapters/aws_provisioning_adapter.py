@@ -157,6 +157,9 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         # Get the appropriate handler for the template
         handler = self._get_handler_for_template(template)
 
+        # Resolve SSM parameter paths to real AMI IDs before calling the handler
+        template = self._resolve_template_image(template)
+
         try:
             # Acquire hosts using the handler
             result = handler.acquire_hosts(request, template)  # type: ignore[arg-type]
@@ -185,6 +188,49 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         except Exception as e:
             self._logger.error("Error during resource provisioning: %s", str(e))
             raise InfrastructureError(f"Failed to provision resources: {e!s}")
+
+    def _resolve_template_image(self, template: Template) -> Template:
+        """Resolve SSM parameter paths in template.image_id to real AMI IDs."""
+        image_id = template.image_id
+        if not image_id:
+            return template
+
+        try:
+            import os
+
+            from providers.aws.infrastructure.caching.aws_image_cache import AWSImageCache
+            from providers.aws.infrastructure.services.aws_image_resolution_service import (
+                AWSImageResolutionService,
+            )
+
+            try:
+                from infrastructure.di.container import get_container
+
+                container = get_container()
+                config = container.get("configuration_port")  # type: ignore[call-overload]
+                cache_dir = os.path.join(config.get_work_dir(), ".cache")
+            except Exception:
+                cache_dir = os.path.join(os.getcwd(), ".cache")
+
+            cache = AWSImageCache(
+                provider_name="aws",
+                cache_dir=cache_dir,
+                ttl_seconds=3600,
+            )
+            service = AWSImageResolutionService(
+                aws_client=self._aws_client,
+                cache=cache,
+                logger=self._logger,
+            )
+
+            if service.is_resolution_needed(image_id):
+                resolved = service.resolve_image_id(image_id)
+                self._logger.info("Resolved image_id %s -> %s", image_id, resolved)
+                return template.update_image_id(resolved)
+        except Exception as e:
+            self._logger.warning("Failed to resolve image_id '%s': %s", image_id, e)
+
+        return template
 
     # KBG TODO: this function is not used.
     def check_resources_status(self, request: Request) -> list[dict[str, Any]]:
