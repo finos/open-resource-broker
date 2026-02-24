@@ -89,7 +89,7 @@ def write_request_json_to_a_tmp_file(data: dict[str, Any]) -> str:
         raise
 
 
-def run_bash_script(script_path: str, argument: str, timeout: int = 300) -> dict[str, Any]:
+def run_bash_script(script_path: str, argument: str, timeout: int = 300, extra_args: list[str] | None = None) -> dict[str, Any]:
     """
     Run a bash script with timeout and error handling.
 
@@ -97,13 +97,15 @@ def run_bash_script(script_path: str, argument: str, timeout: int = 300) -> dict
         script_path: Path to the script to run
         argument: Argument to pass to the script
         timeout: Timeout in seconds
+        extra_args: Additional arguments to pass to the script
 
     Returns:
         Dict containing stdout, stderr, and return code
     """
     try:
+        cmd = ["/bin/bash", script_path, "-f", argument] + (extra_args or [])
         result = subprocess.run(
-            ["/bin/bash", script_path, "-f", argument],
+            cmd,
             check=False,
             capture_output=True,
             text=True,
@@ -339,7 +341,7 @@ class HostFactoryMock:
 
             return {"error": "Invalid response format", "message": str(e)}
 
-    def request_return_machines(self, machine_names: list[str]) -> dict[str, Any]:
+    def request_return_machines(self, machine_names: list[str], force: bool = False) -> dict[str, Any]:
         """Request machines to be returned."""
         if self.scheduler == "default":
             mn_list = [{"machine_id": machine_name} for machine_name in machine_names]
@@ -350,7 +352,8 @@ class HostFactoryMock:
 
         request_file_name = write_request_json_to_a_tmp_file(request)
 
-        res = run_bash_script(self.request_return_machines_script, request_file_name)
+        extra_args = ["--force"] if force else []
+        res = run_bash_script(self.request_return_machines_script, request_file_name, extra_args=extra_args)
         log.debug(f"response: {res}")
 
         if res["return_code"] != 0:
@@ -487,6 +490,12 @@ def parse_arguments():
         help="Invokes getReturnRequests specify a list of machine names as input",
     )
 
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force cancel existing return request and re-issue (use with --requestReturnMachines)",
+    )
+
     return parser.parse_args()
 
 
@@ -518,7 +527,7 @@ if __name__ == "__main__":
             log.info(json.dumps(res, indent=4))
 
         if FLAGS.requestReturnMachines:
-            res = hfm.request_return_machines(FLAGS.requestReturnMachines)
+            res = hfm.request_return_machines(FLAGS.requestReturnMachines, force=FLAGS.force)
             log.info(json.dumps(res, indent=4))
 
         if FLAGS.getReturnRequests:
