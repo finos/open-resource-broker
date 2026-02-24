@@ -206,11 +206,13 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                     raise EntityNotFoundError("Machine", machine_id)
 
                 if machine.return_request_id:
-                    from domain.request.exceptions import RequestValidationError
+                    if not command.force_return:
+                        from domain.request.exceptions import RequestValidationError
 
-                    raise RequestValidationError(
-                        f"Machine {machine_id} already has pending return request: {machine.return_request_id}"
-                    )
+                        raise RequestValidationError(
+                            f"Machine {machine_id} already has pending return request: {machine.return_request_id}"
+                        )
+                    # force_return=True — fall through, cancel handled in execute_command
         # For multiple machines, we'll do filtering in execute_command
 
     async def execute_command(self, command: CreateReturnRequestCommand) -> None:
@@ -223,8 +225,12 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         """
         self.logger.info("Creating return request for machines: %s", command.machine_ids)
 
+        # Cancel stuck return requests if force_return is set
+        if command.force_return:
+            self._cancel_stuck_return_requests(command.machine_ids)
+
         # Validate and filter machines
-        validation_results = self._validate_and_filter_machines(command.machine_ids)
+        validation_results = self._validate_and_filter_machines(command.machine_ids, force_return=command.force_return or False)
 
         # If no valid machines remain after filtering, store results and return
         if not validation_results["valid_machines"]:
@@ -283,7 +289,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             )
             raise
 
-    def _validate_and_filter_machines(self, machine_ids: list[str]) -> dict[str, Any]:
+    def _validate_and_filter_machines(self, machine_ids: list[str], force_return: bool = False) -> dict[str, Any]:
         """Validate and filter machines for return request."""
         is_single_machine = len(machine_ids) == 1
 
@@ -305,17 +311,49 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                     continue
 
                 if machine.return_request_id:
-                    skipped_machines.append(
-                        {
-                            "machine_id": machine_id,
-                            "reason": f"Machine already has pending return request: {machine.return_request_id}",
-                        }
-                    )
-                    continue
+                    if not force_return:
+                        skipped_machines.append(
+                            {
+                                "machine_id": machine_id,
+                                "reason": f"Machine already has pending return request: {machine.return_request_id}",
+                            }
+                        )
+                        continue
+                    # force_return=True — include, cancel handled in execute_command
 
                 valid_machine_ids.append(machine_id)
 
         return {"valid_machines": valid_machine_ids, "skipped_machines": skipped_machines}
+
+    def _cancel_stuck_return_requests(self, machine_ids: list[str]) -> None:
+        """Cancel any pending return requests for the given machines and clear their return_request_id."""
+        with self.uow_factory.create_unit_of_work() as uow:
+            for machine_id in machine_ids:
+                machine = uow.machines.get_by_id(machine_id)
+                if not machine or not machine.return_request_id:
+                    continue
+
+                stuck_request_id = machine.return_request_id
+                from domain.request.value_objects import RequestId
+
+                stuck_request = uow.requests.get_by_id(RequestId(value=stuck_request_id))
+                if stuck_request:
+                    try:
+                        cancelled = stuck_request.cancel("Force re-return requested")
+                        uow.requests.save(cancelled)
+                        self.logger.info(
+                            "Cancelled stuck return request %s for machine %s",
+                            stuck_request_id,
+                            machine_id,
+                        )
+                    except Exception as e:
+                        self.logger.warning(
+                            "Could not cancel stuck return request %s: %s", stuck_request_id, e
+                        )
+
+                # Clear return_request_id so new request can claim the machine
+                cleared_machine = machine.model_copy(update={"return_request_id": None})
+                uow.machines.save(cleared_machine)
 
     def _persist_return_request(self, request: Any, machine_ids: list[str]) -> None:
         """Persist return request and update machine records."""

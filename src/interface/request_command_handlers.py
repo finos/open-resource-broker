@@ -364,6 +364,7 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> dict[str
 
     command = CreateReturnRequestCommand(
         machine_ids=machine_ids,
+        force_return=getattr(args, "force", False),
     )
 
     # Execute command — CQRS commands return None; read results from command fields
