@@ -716,6 +716,8 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
                 hf_request["providerName"] = req_dict["provider_name"]
             if req_dict.get("provider_type"):
                 hf_request["providerType"] = req_dict["provider_type"]
+            if req_dict.get("provider_api"):
+                hf_request["providerApi"] = req_dict["provider_api"]
 
             formatted_requests.append(hf_request)
 
