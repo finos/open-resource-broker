@@ -954,8 +954,7 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, TemplateDTOPort]):
                 raise EntityNotFoundError("Template", query.template_id)
 
             # Convert TemplateDTO to Template domain object
-            config = dict(template_dto.configuration or {})
-            template_data = dict(config)
+            template_data = template_dto.model_dump()
             template_data.setdefault("template_id", template_dto.template_id)
             template_data.setdefault("name", template_dto.name or template_dto.template_id)
             template_data.setdefault("provider_api", template_dto.provider_api or "aws")
