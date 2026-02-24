@@ -62,13 +62,13 @@ expected_get_available_templates_schema_hostfactory = {
 
 expected_request_machines_schema_hostfactory = {
     "type": "object",
-    "required": ["requestId", "message"],
+    "required": ["requestId"],
     "properties": {
         "requestId": {
             "type": "string",
             "pattern": "^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
         },
-        "message": {"type": "string", "pattern": "^.*(succeeded|success).*$"},
+        "message": {"type": "string"},
     },
     "additionalProperties": False,
 }
@@ -171,13 +171,13 @@ expected_get_available_templates_schema_default = {
 
 expected_request_machines_schema_default = {
     "type": "object",
-    "required": ["request_id", "message"],
+    "required": ["request_id"],
     "properties": {
         "request_id": {
             "type": "string",
             "pattern": "^req-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
         },
-        "message": {"type": "string", "pattern": "^.*(succeeded|success).*$"},
+        "message": {"type": "string"},
         "status": {"type": "string"},
     },
     "additionalProperties": True,

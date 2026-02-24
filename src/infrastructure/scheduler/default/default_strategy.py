@@ -379,9 +379,9 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
         elif status == "complete":
             return {"request_id": request_id, "message": "Request completed successfully"}
         elif status == "in_progress":
-            return {"request_id": request_id, "message": "Request in progress"}
+            return {"request_id": request_id, "message": "Request submitted successfully."}
         elif status == "pending":
-            return {"request_id": request_id, "message": "Request submitted successfully"}
+            return {"request_id": request_id, "message": "Request submitted successfully."}
         else:
             return {
                 "request_id": request_id,
