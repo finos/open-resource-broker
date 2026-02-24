@@ -92,8 +92,8 @@ if [ "$USE_LOCAL_DEV" = "true" ] || [ "$USE_LOCAL_DEV" = "1" ]; then
                 global_args+=("$arg")
                 ;;
             -*)
-                # Other flags
-                global_args+=("$arg")
+                # Unknown flags — treat as command-level args (e.g. --force, --all)
+                command_args+=("$arg")
                 ;;
             *)
                 # Non-flag arguments go to command
