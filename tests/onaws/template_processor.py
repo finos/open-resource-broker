@@ -20,27 +20,6 @@ from typing import Any, Dict
 
 log = logging.getLogger(__name__)
 
-# Snake_case → camelCase mapping for the aws_templates.json file format
-_SNAKE_TO_CAMEL: dict[str, str] = {
-    "template_id": "templateId",
-    "max_instances": "maxNumber",
-    "provider_api": "providerApi",
-    "provider_type": "providerType",
-    "subnet_ids": "subnetIds",
-    "security_group_ids": "securityGroupIds",
-    "machine_types": "vmTypes",
-    "machine_types_ondemand": "vmTypesOnDemand",
-    "machine_types_priority": "vmTypesPriority",
-    "price_type": "priceType",
-    "allocation_strategy": "allocationStrategy",
-    "max_price": "maxSpotPrice",
-    "tags": "instanceTags",
-    "created_at": "createdAt",
-    "name": "name",
-    "fleet_type": "fleetType",
-    "percent_on_demand": "percentOnDemand",
-}
-
 # Fields that can be overridden directly on each template entry
 TEMPLATE_OVERRIDE_KEYS = {
     "providerApi",
@@ -117,7 +96,7 @@ class TemplateProcessor:
         # 1. Generate aws_templates.json (with overrides applied)
         # Try programmatic generation first; fall back to filesystem copy
         try:
-            templates_data = self.generate_templates_programmatically()
+            templates_data = self.generate_templates_programmatically(scheduler_type)
             log.debug("Generated templates programmatically from handler classmethods")
         except Exception as exc:
             log.warning(
@@ -179,7 +158,7 @@ class TemplateProcessor:
 
         # Load source templates and config
         try:
-            source_templates = self.generate_templates_programmatically()
+            source_templates = self.generate_templates_programmatically("hostfactory")
         except Exception as exc:
             log.warning(
                 "Programmatic template generation failed (%s), falling back to filesystem", exc
@@ -214,16 +193,20 @@ class TemplateProcessor:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def generate_templates_programmatically() -> Dict[str, Any]:
+    def generate_templates_programmatically(scheduler_type: str = "hostfactory") -> Dict[str, Any]:
         """Generate templates from handler classmethods without touching the filesystem.
 
         Calls each AWS handler's get_example_templates() classmethod directly,
-        then converts the resulting Template domain objects to the camelCase
-        aws_templates.json file format.
+        then converts the resulting Template domain objects to the format expected
+        by the given scheduler type using the production format_templates_for_generation.
 
         Returns:
-            {"templates": [...]} dict in the same format as aws_templates.json
+            {"templates": [...]} dict in the format expected by the scheduler
         """
+        import sys
+
+        sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+
         from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
         from providers.aws.infrastructure.handlers.ec2_fleet_handler import EC2FleetHandler
         from providers.aws.infrastructure.handlers.run_instances_handler import RunInstancesHandler
@@ -239,55 +222,29 @@ class TemplateProcessor:
                         "Failed to get example templates from %s: %s", handler_class.__name__, exc
                     )
 
-        return {"templates": [TemplateProcessor._template_to_camel(t) for t in all_templates]}
+        # Use production format_templates_for_generation per scheduler type
+        # so the file format always matches what the scheduler expects
+        raw_dicts = [t.model_dump(mode="json") for t in all_templates]
+        formatted = TemplateProcessor._format_templates_for_scheduler(raw_dicts, scheduler_type)
+        return {"templates": formatted}
 
     @staticmethod
-    def _template_to_camel(template: Any) -> Dict[str, Any]:
-        """Convert a Template domain object to the camelCase aws_templates.json format."""
-        raw = template.model_dump()
-        metadata = raw.get("metadata") or {}
+    def _format_templates_for_scheduler(
+        template_dicts: list[Dict[str, Any]], scheduler_type: str
+    ) -> list[Dict[str, Any]]:
+        """Format template dicts using the production scheduler strategy's format_templates_for_generation."""
+        if scheduler_type == "hostfactory":
+            from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+                HostFactorySchedulerStrategy,
+            )
 
-        # Pull fleet_type and percent_on_demand out of metadata when not top-level
-        fleet_type = raw.get("fleet_type") or metadata.get("fleet_type")
-        percent_on_demand = raw.get("percent_on_demand") or metadata.get("percent_on_demand")
+            strategy = HostFactorySchedulerStrategy()
+            return strategy.format_templates_for_generation(template_dicts)
+        else:
+            from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 
-        # Normalise provider_api: may be a ProviderApi enum or plain string
-        provider_api = raw.get("provider_api")
-        if hasattr(provider_api, "value"):
-            provider_api = provider_api.value
-
-        entry: Dict[str, Any] = {
-            "templateId": raw["template_id"],
-            "name": raw.get("name") or raw["template_id"],
-            "providerApi": provider_api,
-            "providerType": raw.get("provider_type"),
-            "maxNumber": raw.get("max_instances", 1),
-            "subnetIds": raw.get("subnet_ids") or [],
-            "securityGroupIds": raw.get("security_group_ids") or [],
-            "vmTypes": raw.get("machine_types") or {},
-            "vmTypesOnDemand": raw.get("machine_types_ondemand") or {},
-            "vmTypesPriority": raw.get("machine_types_priority") or {},
-            "priceType": raw.get("price_type"),
-            "allocationStrategy": raw.get("allocation_strategy"),
-            "instanceTags": raw.get("tags") or {},
-        }
-
-        # Optional fields — only include when present
-        created_at = raw.get("created_at")
-        if created_at is not None:
-            entry["createdAt"] = str(created_at)
-
-        if raw.get("max_price") is not None:
-            entry["maxSpotPrice"] = raw["max_price"]
-
-        if fleet_type is not None:
-            # fleet_type may be an AWSFleetType enum
-            entry["fleetType"] = fleet_type.value if hasattr(fleet_type, "value") else fleet_type
-
-        if percent_on_demand is not None:
-            entry["percentOnDemand"] = percent_on_demand
-
-        return entry
+            strategy = DefaultSchedulerStrategy()
+            return strategy.format_templates_for_generation(template_dicts)
 
     # ------------------------------------------------------------------
     # Internal helpers

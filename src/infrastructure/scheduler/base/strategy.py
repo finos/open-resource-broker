@@ -131,6 +131,77 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
         """Return the path to the scheduler's scripts directory, or None if not applicable."""
         ...
 
+    @abstractmethod
+    def _get_provider_name(self) -> str:
+        """Get the active provider instance name."""
+        ...
+
+    @abstractmethod
+    def _get_active_provider_type(self) -> str:
+        """Get the active provider type."""
+        ...
+
+    def get_template_paths(self) -> list[str]:
+        """Get template file paths with fallback hierarchy."""
+        paths = []
+
+        try:
+            provider_name = self._get_provider_name()
+            provider_type = self._get_active_provider_type()
+
+            provider_specific_filename = self.get_templates_filename(provider_name, provider_type)
+            provider_specific_path = self.config_manager.resolve_file(
+                "template", provider_specific_filename
+            )
+            paths.append(provider_specific_path)
+
+            generic_filename = f"{provider_type}_templates.json"
+            generic_path = self.config_manager.resolve_file("template", generic_filename)
+
+            if generic_path != provider_specific_path:
+                paths.append(generic_path)
+
+        except Exception as e:
+            from infrastructure.logging.logger import get_logger
+
+            logger = get_logger(__name__)
+            logger.debug(f"Failed to get provider info for path resolution: {e}")
+
+        default_paths = [
+            self.config_manager.resolve_file("template", "aws_templates.json"),
+            self.config_manager.resolve_file("template", "templates.json"),
+        ]
+
+        for default_path in default_paths:
+            if default_path not in paths:
+                paths.append(default_path)
+
+        return paths
+
+    def get_templates_filename(
+        self, provider_name: str, provider_type: str, config: dict | None = None
+    ) -> str:
+        """Get templates filename with config override support."""
+        if config:
+            template_config = config.get("template", {})
+            patterns = template_config.get("filename_patterns", {})
+
+            if pattern := patterns.get(self._templates_filename_pattern_key()):
+                return pattern.format(provider_name=provider_name, provider_type=provider_type)
+
+            if config_filename := template_config.get("templates_filename"):
+                return config_filename
+
+        return self._templates_filename_fallback(provider_name, provider_type)
+
+    def _templates_filename_pattern_key(self) -> str:
+        """Pattern key to look up in config filename_patterns. Override per strategy."""
+        return "provider_type"
+
+    def _templates_filename_fallback(self, provider_name: str, provider_type: str) -> str:
+        """Fallback filename when no config is present. Override per strategy."""
+        return f"{provider_type}_templates.json"
+
     def format_template_for_display(self, template: TemplateDTO) -> dict[str, Any]:
         """Default implementation - clean to_dict without scheduler-specific formatting."""
         return template.to_dict()

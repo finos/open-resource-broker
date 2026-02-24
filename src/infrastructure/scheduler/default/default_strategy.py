@@ -46,54 +46,21 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
 
             if is_container_ready():
                 self._logger = get_container().get(LoggingPort)
+            else:
+                from infrastructure.logging.logger import get_logger
+
+                return get_logger(__name__)  # fallback, don't cache — pick up DI logger once ready
         return self._logger
 
     def get_scripts_directory(self) -> Path | None:
         """Default strategy has no scripts directory."""
         return None
 
-    def get_template_paths(self) -> list[str]:
-        """Get template file paths with fallback hierarchy."""
-        paths = []
+    def _templates_filename_pattern_key(self) -> str:
+        return "provider_type"
 
-        try:
-            # 1. Provider-specific file (highest priority) - only if provider info available
-            provider_name = self._get_provider_name()
-            provider_type = self._get_active_provider_type()
-
-            provider_specific_filename = self.get_templates_filename(provider_name, provider_type)
-            provider_specific_path = self.config_manager.resolve_file(
-                "template", provider_specific_filename
-            )
-            paths.append(provider_specific_path)
-
-            # 2. Generic provider-type file (fallback)
-            generic_filename = f"{provider_type}_templates.json"
-            generic_path = self.config_manager.resolve_file("template", generic_filename)
-
-            # Avoid duplicates
-            if generic_path != provider_specific_path:
-                paths.append(generic_path)
-
-        except Exception as e:
-            # Fallback to default paths if provider info not available
-            from infrastructure.logging.logger import get_logger
-
-            logger = get_logger(__name__)
-            logger.debug(f"Failed to get provider info for path resolution: {e}")
-
-        # 3. Default fallback paths (always available)
-        default_paths = [
-            self.config_manager.resolve_file("template", "aws_templates.json"),
-            self.config_manager.resolve_file("template", "templates.json"),
-        ]
-
-        # Add default paths if not already included
-        for default_path in default_paths:
-            if default_path not in paths:
-                paths.append(default_path)
-
-        return paths
+    def _templates_filename_fallback(self, provider_name: str, provider_type: str) -> str:
+        return f"{provider_type}_templates.json"
 
     def load_templates_from_path(
         self, template_path: str, provider_override: Any = None
@@ -282,25 +249,6 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
 
         workdir = self.get_working_directory()
         return os.path.join(workdir, "data")
-
-    def get_templates_filename(
-        self, provider_name: str, provider_type: str, config: dict | None = None
-    ) -> str:
-        """Get templates filename with config override support."""
-        if config:
-            template_config = config.get("template", {})
-            patterns = template_config.get("filename_patterns", {})
-
-            # Use generic pattern for default scheduler
-            if pattern := patterns.get("generic"):
-                return pattern.format(provider_name=provider_name, provider_type=provider_type)
-
-            # Check for explicit filename override
-            if config_filename := template_config.get("templates_filename"):
-                return config_filename
-
-        # Hardcoded fallback for backward compatibility
-        return "templates.json"
 
     def should_log_to_console(self) -> bool:
         """Check if logs should be written to console for Default scheduler.

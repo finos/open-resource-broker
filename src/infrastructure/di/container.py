@@ -324,6 +324,7 @@ def reset_container() -> None:
         if _container_instance:
             _container_instance.clear()
         _container_instance = None
+        _container_ready.clear()  # add this line
 
 
 __all__: list[str] = [
