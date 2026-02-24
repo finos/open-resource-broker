@@ -241,6 +241,38 @@ class AWSInstanceOperationService:
                         for reservation in inst_response.get("Reservations", []):
                             all_instances.extend(reservation.get("Instances", []))
 
+            elif provider_api == "SpotFleet":
+                # Get instance IDs from spot fleet request
+                for resource_id in resource_ids:
+                    response = self._aws_client.ec2_client.describe_spot_fleet_instances(
+                        SpotFleetRequestId=resource_id
+                    )
+                    instance_ids = [
+                        inst["InstanceId"] for inst in response.get("ActiveInstances", [])
+                    ]
+                    if instance_ids:
+                        inst_response = self._aws_client.ec2_client.describe_instances(
+                            InstanceIds=instance_ids
+                        )
+                        for reservation in inst_response.get("Reservations", []):
+                            all_instances.extend(reservation.get("Instances", []))
+
+            elif provider_api == "ASG":
+                # Get instance IDs from auto scaling group
+                for resource_id in resource_ids:
+                    response = self._aws_client.autoscaling_client.describe_auto_scaling_instances()
+                    instance_ids = [
+                        entry["InstanceId"]
+                        for entry in response.get("AutoScalingInstances", [])
+                        if entry.get("AutoScalingGroupName") == resource_id
+                    ]
+                    if instance_ids:
+                        inst_response = self._aws_client.ec2_client.describe_instances(
+                            InstanceIds=instance_ids
+                        )
+                        for reservation in inst_response.get("Reservations", []):
+                            all_instances.extend(reservation.get("Instances", []))
+
             else:
                 # Fallback: try reservation-id filter
                 for resource_id in resource_ids:
