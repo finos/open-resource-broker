@@ -1169,33 +1169,17 @@ def _wait_for_request_completion(hfm, request_id: str, scheduler_type: str):
 
 
 def _wait_for_return_completion(hfm, machine_ids: list[str], return_request_id: str):
-    """Poll return request until complete using return_request_id."""
+    """Poll return request status until complete using getRequestStatus."""
     start_time = time.time()
     while True:
-        status_response = hfm.get_return_requests([return_request_id])
+        status_response = hfm.get_request_status(return_request_id)
         log.debug(json.dumps(status_response, indent=4))
 
-        requests = status_response.get("requests") or []
-        matching_req = None
-        for req in requests:
-            if isinstance(req, dict):
-                rid = req.get("requestId") or req.get("request_id")
-                if return_request_id and rid and rid != return_request_id:
-                    continue
-                matching_req = req
-                break
-            # Sometimes the API returns just request IDs as strings; accept them when unambiguous
-            elif isinstance(req, str):
-                if not return_request_id or req == return_request_id:
-                    matching_req = {"request_id": req, "status": status_response.get("status")}
-                    break
-        if not matching_req and requests:
-            first = requests[0]
-            matching_req = (
-                first if isinstance(first, dict) else {"request_id": first, "status": None}
-            )
-
-        if matching_req and matching_req.get("status") == "complete":
+        request_status = status_response["requests"][0]["status"]
+        terminal_statuses = {"complete", "complete_with_error", "failed", "cancelled", "timeout"}
+        if request_status in terminal_statuses:
+            if request_status != "complete":
+                pytest.fail(f"Return request ended with non-success status: {request_status}")
             return status_response
 
         if time.time() - start_time > MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC:
