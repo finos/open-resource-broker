@@ -48,7 +48,7 @@ async def handle_get_request_status(
         request_dtos = await query_bus.execute(query)
 
         # Format response using scheduler strategy
-        return request_dtos
+        return scheduler_strategy.format_request_status_response(request_dtos)
     else:
         # Existing specific ID logic
         # Pass raw input data to scheduler strategy (scheduler-agnostic)
@@ -120,8 +120,8 @@ async def handle_get_request_status(
                     # Continue with other requests if one fails
                     continue
 
-        # Return raw DTOs - formatting is handled by the CLI response formatter
-        return request_dtos
+        # Format response using scheduler strategy
+        return scheduler_strategy.format_request_status_response(request_dtos)
 
 
 @handle_interface_exceptions(context="request_machines", interface_type="cli")
