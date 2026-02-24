@@ -119,7 +119,7 @@ class ConfigPathResolver:
         self, default_path: Optional[str] = None, config_path: Optional[str] = None
     ) -> str:
         """Get cache directory path."""
-        default = default_path or "cache"
+        default = default_path or os.path.join("work", ".cache")
         return self.resolve_path("cache", default, config_path)
 
     def get_snapshots_dir(

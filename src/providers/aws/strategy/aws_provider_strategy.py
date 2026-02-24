@@ -427,23 +427,17 @@ class AWSProviderStrategy(ProviderStrategy):
 
     def _create_image_resolution_service(self):
         """Create AWS image resolution service with provider-specific context."""
-        import os
-
         from src.providers.aws.infrastructure.caching.aws_image_cache import AWSImageCache
         from src.providers.aws.infrastructure.services.aws_image_resolution_service import (
             AWSImageResolutionService,
         )
 
         # Determine cache directory
-        try:
-            from infrastructure.di.container import get_container
+        from infrastructure.di.container import get_container
 
-            container = get_container()
-            config = container.get("configuration_port")  # type: ignore[call-overload]
-            cache_dir = os.path.join(config.get_work_dir(), ".cache")
-        except Exception:
-            # Fallback to current directory
-            cache_dir = os.path.join(os.getcwd(), ".cache")
+        container = get_container()
+        config = container.get("configuration_port")  # type: ignore[call-overload]
+        cache_dir = config.get_cache_dir()
 
         cache = AWSImageCache(
             provider_name=getattr(self, "provider_name", "aws"),

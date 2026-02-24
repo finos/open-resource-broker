@@ -204,16 +204,11 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
                 AWSImageResolutionService,
             )
 
-            import os
-
             from infrastructure.di.container import get_container
 
-            try:
-                container = get_container()
-                config = container.get("configuration_port")  # type: ignore[call-overload]
-                cache_dir = os.path.join(config.get_work_dir(), ".cache")
-            except Exception:
-                cache_dir = os.path.join(os.getcwd(), ".cache")
+            container = get_container()
+            config = container.get("configuration_port")  # type: ignore[call-overload]
+            cache_dir = config.get_cache_dir()
 
             cache = AWSImageCache(
                 provider_name="aws",
