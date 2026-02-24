@@ -89,15 +89,9 @@ class TestRefactoredTemplateSystem:
             template_id="test-template-1",
             name="Test Template 1",
             provider_api="EC2Fleet",
-            configuration={
-                "template_id": "test-template-1",
-                "name": "Test Template 1",
-                "provider_api": "EC2Fleet",
-                "image_id": "ami-12345678",
-                "vm_type": "t3.micro",
-                "subnet_ids": ["subnet-12345"],
-                "max_instances": 10,
-            },
+            image_id="ami-12345678",
+            subnet_ids=["subnet-12345"],
+            max_instances=10,
         )
 
     def test_cache_service_factory(self, mock_logger):
@@ -392,7 +386,6 @@ class TestRefactoredSystemPerformance:
                     template_id="perf-test",
                     name="Performance Test",
                     provider_api="EC2Fleet",
-                    configuration={"template_id": "perf-test"},
                 )
             ]
 

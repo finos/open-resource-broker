@@ -605,24 +605,17 @@ class TemplateConfigurationManager:
             result["is_valid"] = False
             result["errors"].append("Provider API is required")
 
-        # Check configuration structure
-        if not template.configuration:
-            result["warnings"].append("Template has no configuration data")
-        else:
-            # Validate essential configuration fields
-            config = template.configuration
+        # Validate essential configuration fields directly from DTO
+        if not template.image_id:
+            result["errors"].append("Image ID is required in configuration")
+            result["is_valid"] = False
 
-            if not config.get("image_id") and not config.get("imageId"):
-                result["errors"].append("Image ID is required in configuration")
-                result["is_valid"] = False
-
-            max_instances = config.get("max_instances") or config.get("maxNumber", 0)
-            if max_instances <= 0:
-                result["warnings"].append("Max instances should be greater than 0")
-            elif max_instances > 1000:
-                result["warnings"].append(
-                    "Max instances is very high (>1000), consider if this is intentional"
-                )
+        if template.max_instances <= 0:
+            result["warnings"].append("Max instances should be greater than 0")
+        elif template.max_instances > 1000:
+            result["warnings"].append(
+                "Max instances is very high (>1000), consider if this is intentional"
+            )
 
         self.logger.debug("Basic validation completed for template %s", template.template_id)
 
@@ -639,7 +632,6 @@ class TemplateConfigurationManager:
                 template_id=template.template_id,
                 name=template.name,
                 provider_api=template.provider_api,
-                configuration=template.configuration,
             )
 
             # Use provider registry for validation

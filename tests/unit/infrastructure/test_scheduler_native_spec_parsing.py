@@ -101,8 +101,8 @@ class TestSchedulerNativeSpecParsing:
 
         assert template.template_id == "test-template"
         # TemplateDTO does not have launch_template_spec/provider_api_spec as top-level fields.
-        # They are absent from configuration dict when not provided.
-        config = template.configuration
+        # They are absent from model_dump when not provided.
+        config = template.model_dump()
         assert config.get("launch_template_spec") is None
         assert config.get("launch_template_spec_file") is None
         assert config.get("provider_api_spec") is None

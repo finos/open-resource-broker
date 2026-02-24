@@ -77,7 +77,6 @@ class TemplateDTO(BaseDTO):
     is_active: bool = True
 
     # Legacy fields
-    configuration: dict[str, Any] = Field(default_factory=dict)
     version: Optional[str] = None
 
     def __post_init__(self) -> None:
@@ -140,11 +139,6 @@ class TemplateDTO(BaseDTO):
             # Active status
             is_active=getattr(template, "is_active", True),
             # Legacy fields
-            configuration=getattr(
-                template,
-                "configuration",
-                template.__dict__ if hasattr(template, "__dict__") else {},
-            ),
             version=getattr(template, "version", None),
         )
 

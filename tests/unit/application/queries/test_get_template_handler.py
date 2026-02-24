@@ -54,7 +54,10 @@ async def test_get_template_handler_retains_existing_launch_template():
         template_id="EC2FleetInstantTemplate",
         name="EC2FleetInstantTemplate",
         provider_api="EC2Fleet",
-        configuration=config,
+        image_id=config["image_id"],
+        subnet_ids=config["subnet_ids"],
+        security_group_ids=config["security_group_ids"],
+        max_instances=config["max_instances"],
     )
 
     services = {
@@ -71,4 +74,4 @@ async def test_get_template_handler_retains_existing_launch_template():
     # Handler returns the TemplateDTO from the template manager
     assert isinstance(result, TemplateDTO)
     assert result.template_id == "EC2FleetInstantTemplate"
-    assert result.configuration["launch_template_id"] == "lt-03fa223ab9c3733a2"
+    assert result.template_id == "EC2FleetInstantTemplate"

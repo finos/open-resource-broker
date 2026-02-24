@@ -16,7 +16,6 @@ def _dto_to_template(dto: TemplateDTO) -> Template:
         template_id=dto.template_id,
         name=dto.name,
         provider_api=dto.provider_api,
-        configuration=dto.configuration,
     )
 
 

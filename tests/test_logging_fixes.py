@@ -390,7 +390,7 @@ class TestLoggingFixes:
 
             # Verify DTO was created correctly
             assert dto.template_id == "test-template"
-            assert dto.configuration["imageId"] == "ami-12345"
+            assert dto.image_id == "ami-12345"
 
             # Verify no additional AMI resolution was attempted
             # (since _resolve_ami_if_enabled should not be called)

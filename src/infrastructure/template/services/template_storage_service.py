@@ -69,15 +69,16 @@ class TemplateStorageService:
             existing_templates = await self._load_templates_from_file(target_file)
 
             # Update or add the template
+            template_dict = template.model_dump(exclude_none=False)
             template_found = False
             for i, existing_template in enumerate(existing_templates):
                 if existing_template.get("template_id") == template.template_id:
-                    existing_templates[i] = template.configuration
+                    existing_templates[i] = template_dict
                     template_found = True
                     break
 
             if not template_found:
-                existing_templates.append(template.configuration)
+                existing_templates.append(template_dict)
 
             # Write back to file using scheduler strategy format
             await self._write_templates_to_file(target_file, existing_templates)
@@ -90,7 +91,7 @@ class TemplateStorageService:
                         aggregate_type="template",
                         template_id=template.template_id,
                         template_name=template.name or template.template_id,
-                        changes=template.configuration,
+                        changes=template_dict,
                         version=getattr(template, "version", 1),
                     )
                 else:
@@ -100,7 +101,7 @@ class TemplateStorageService:
                         template_id=template.template_id,
                         template_name=template.name or template.template_id,
                         template_type=template.provider_api or "",
-                        configuration=template.configuration,
+                        configuration=template_dict,
                     )
                 self.event_publisher.publish(event)
                 self.logger.debug("Published domain event for template %s", template.template_id)
