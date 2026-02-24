@@ -1132,7 +1132,10 @@ def _wait_for_request_completion(hfm, request_id: str, scheduler_type: str):
         if request_status == "partial":
             log.warning("Request status is 'partial', treating as 'running'")
 
-        if request_status == "complete":
+        terminal_statuses = {"complete", "complete_with_error", "failed", "cancelled", "timeout"}
+        if request_status in terminal_statuses:
+            if request_status != "complete":
+                pytest.fail(f"Request ended with non-success status: {request_status}")
             return status_response
 
         if time.time() - start_time > MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC:
@@ -1313,10 +1316,14 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
 
         if time.time() - start_time > MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC:
             break
-        if (
-            status_response.get("requests")
-            and status_response["requests"][0]["status"] == "complete"
-        ):
+
+        request_status = (
+            status_response.get("requests", [{}])[0].get("status", "")
+            if status_response.get("requests")
+            else ""
+        )
+        terminal_statuses = {"complete", "complete_with_error", "failed", "cancelled", "timeout"}
+        if request_status in terminal_statuses:
             break
 
         time.sleep(5)
