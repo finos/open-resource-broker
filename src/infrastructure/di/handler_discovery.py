@@ -72,8 +72,7 @@ class HandlerDiscoveryService:
     def _resolve_cache_path(self, config_manager) -> str:
         """Resolve cache file path using configuration system."""
         try:
-            work_dir = config_manager.get_work_dir()
-            cache_dir = os.path.join(work_dir, ".cache")
+            cache_dir = config_manager.get_cache_dir()
             os.makedirs(cache_dir, exist_ok=True)
             return os.path.join(cache_dir, "handler_discovery.json")
         except Exception:
@@ -82,11 +81,11 @@ class HandlerDiscoveryService:
     def _resolve_cache_path_fallback(self) -> str:
         """Fallback cache path resolution."""
         try:
-            scheduler = cast(Any, self.container).get("scheduler_strategy")
-            workdir = scheduler.get_working_directory()
+            from domain.base.ports.configuration_port import ConfigurationPort
+            config = cast(Any, self.container).get(ConfigurationPort)
+            cache_dir = config.get_cache_dir()
         except Exception:
-            workdir = os.getcwd()
-        cache_dir = os.path.join(workdir, ".cache")
+            cache_dir = os.path.join(os.getcwd(), ".cache")
         os.makedirs(cache_dir, exist_ok=True)
         return os.path.join(cache_dir, "handler_discovery.json")
 

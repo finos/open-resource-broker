@@ -32,7 +32,7 @@ class ConfigPathResolver:
             path = config_path
         # Use base config path if available
         elif self._base_config_path:
-            base_dir = os.path.dirname(self._base_config_path)
+            base_dir = os.path.dirname(os.path.dirname(self._base_config_path))
             path = os.path.join(base_dir, default_path)
         else:
             path = default_path
