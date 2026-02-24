@@ -40,7 +40,7 @@ class SchedulerPort(ABC):
         """Parse scheduler template config to template DTO."""
 
     @abstractmethod
-    def parse_request_data(self, raw_data: dict[str, Any]) -> dict[str, Any]:
+    def parse_request_data(self, raw_data: dict[str, Any]) -> dict[str, Any] | list[dict[str, Any]]:
         """Parse scheduler request data to domain-compatible format."""
 
     @abstractmethod

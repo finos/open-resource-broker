@@ -163,7 +163,8 @@ async def handle_request_machines(
         }
 
     # Let scheduler strategy parse the raw data (each scheduler handles its own format)
-    parsed_data = scheduler_strategy.parse_request_data(raw_request_data)
+    parsed_result = scheduler_strategy.parse_request_data(raw_request_data)
+    parsed_data: dict[str, Any] = parsed_result if isinstance(parsed_result, dict) else {}
     template_id = parsed_data.get("template_id")
     machine_count = parsed_data.get("requested_count", 1)
 

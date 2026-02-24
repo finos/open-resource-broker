@@ -186,7 +186,7 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
             # Provide helpful error message for debugging
             raise ValueError(f"Failed to create Template from data: {e}. Data: {raw_data}")
 
-    def parse_request_data(self, raw_data: dict[str, Any]) -> dict[str, Any]:
+    def parse_request_data(self, raw_data: dict[str, Any]) -> dict[str, Any] | list[dict[str, Any]]:
         """
         Parse request data using native domain format - no conversion needed.
 
@@ -195,9 +195,10 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
 
         # Request Status
         if "requests" in raw_data:
-            return {
-                "requests": [{"request_id": req.get("request_id")} for req in raw_data["requests"]]
-            }
+            return [
+                {"request_id": req.get("request_id") or req.get("requestId")}
+                for req in raw_data["requests"]
+            ]
 
         # Request Machines - handle nested format (both snake_case and HF camelCase):
         # {"template": {"template_id": ..., "machine_count": ...}}
