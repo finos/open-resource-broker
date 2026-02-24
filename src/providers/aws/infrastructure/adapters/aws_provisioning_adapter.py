@@ -159,9 +159,13 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         # Resolve SSM parameter paths to real AMI IDs before calling the handler
         template = self._resolve_template_image(template)
 
+        # Convert domain Template to AWSTemplate so handlers can access AWS-specific fields
+        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+        aws_template = AWSTemplate.model_validate(template.model_dump())
+
         try:
             # Acquire hosts using the handler
-            result = handler.acquire_hosts(request, template)  # type: ignore[arg-type]
+            result = handler.acquire_hosts(request, aws_template)  # type: ignore[arg-type]
 
             # Handle both string (legacy) and dict (new) return types
             if isinstance(result, dict):
