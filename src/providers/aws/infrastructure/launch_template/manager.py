@@ -422,7 +422,7 @@ class AWSLaunchTemplateManager:
         Returns:
             Dictionary containing launch template data
         """
-        # Template should already contain resolved AMI ID from boundary resolution
+        # AMI ID is resolved by AWSProvisioningAdapter._resolve_template_image() before this point
         image_id = aws_template.image_id
         if not image_id:
             error_msg = f"Template {aws_template.template_id} has no image_id specified"
