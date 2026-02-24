@@ -8,7 +8,7 @@
       "Overrides": [
         {% for override in instance_overrides %}
         {
-          "InstanceType": "{{ override.instance_type }}"{% if override.subnet_id %},
+          {% if override.instance_requirements %}"InstanceRequirements": {{ override.instance_requirements | tojson }}{% else %}"InstanceType": "{{ override.instance_type }}"{% endif %}{% if override.subnet_id %},
           "SubnetId": "{{ override.subnet_id }}"{% endif %}{% if override.weighted_capacity %},
           "WeightedCapacity": {{ override.weighted_capacity }}{% endif %}
         }{% if not loop.last %},{% endif %}

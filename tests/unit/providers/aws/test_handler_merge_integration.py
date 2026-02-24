@@ -15,27 +15,21 @@ class TestHandlerMergeIntegration:
         template.tags = {}
         template.template_id = "test-template"
         template.instance_types = []
-        template.machine_types = {}
-        template.machine_types_ondemand = {}
         template.subnet_ids = []
         template.image_id = "ami-123"
         template.security_group_ids = []
         template.price_type = "ondemand"
         template.percent_on_demand = None
-        template.allocation_strategy = None
-        template.allocation_strategy_on_demand = None
-        template.max_price = None
-        template.fleet_type = Mock()
-        template.fleet_type.value = "request"
-        template.abis_instance_requirements = None
-        template.context = None
+        template.machine_types = {}
+        template.machine_types_ondemand = {}
+        template.get_instance_requirements_payload.return_value = None
         return template
 
     def _create_mock_request(self):
         """Create properly mocked request."""
         request = Mock()
         request.request_id = "req-123"
-        request.requested_count = 5
+        request.requested_count = 10
         return request
 
     def test_ec2fleet_handler_uses_merge_method(self):

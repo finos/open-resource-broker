@@ -38,7 +38,6 @@ from domain.template.template_aggregate import Template
 from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from infrastructure.error.decorators import handle_infrastructure_exceptions
 from infrastructure.utilities.common.resource_naming import get_resource_prefix
-from providers.aws.infrastructure.tags import build_system_tags, merge_tags
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
@@ -60,7 +59,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         logger: LoggingPort,
         aws_ops: AWSOperations,
         launch_template_manager: AWSLaunchTemplateManager,
-        request_adapter: Optional[RequestAdapterPort] = None,
+        request_adapter: RequestAdapterPort = None,
         machine_adapter: Optional[AWSMachineAdapter] = None,
     ) -> None:
         """
@@ -115,23 +114,24 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         """
         try:
             asg_name = self.aws_ops.execute_with_standard_error_handling(
-                operation=lambda: self._create_asg_with_response(request, aws_template),
+                operation=lambda: self._create_asg_internal(request, aws_template),
                 operation_name="create Auto Scaling Group",
                 context="ASG",
             )
 
-            instances = []
-
             return {
                 "success": True,
                 "resource_ids": [asg_name],
-                "instance_ids": [],  # ASG doesn't return instance IDs immediately
-                "instances": instances,
+                "instances": [],  # ASG instances come later
                 "provider_data": {"resource_type": "asg"},
             }
         except Exception as e:
-            self._logger.error("ASG creation failed: %s", e)
-            return {"success": False, "resource_ids": [], "instances": [], "error_message": str(e)}
+            return {
+                "success": False,
+                "resource_ids": [],
+                "instances": [],
+                "error_message": str(e),
+            }
 
     def _validate_asg_prerequisites(self, template: AWSTemplate) -> None:
         """Validate ASG-specific prerequisites."""
@@ -152,7 +152,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             detailed_message = f"ASG template validation failed - {'; '.join(error_details)}"
             raise AWSInfrastructureError(detailed_message, errors)
 
-    def _create_asg_with_response(self, request: Request, aws_template: AWSTemplate) -> str:
+    def _create_asg_internal(self, request: Request, aws_template: AWSTemplate) -> str:
         """Create ASG with pure business logic."""
         # Validate ASG specific prerequisites
         self._validate_asg_prerequisites(aws_template)
@@ -164,7 +164,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
         # Store launch template info in request (if request has this method)
         if hasattr(request, "set_launch_template_info"):
-            request.set_launch_template_info(  # type: ignore[attr-defined]
+            request.set_launch_template_info(
                 launch_template_result.template_id, launch_template_result.version
             )
 
@@ -193,14 +193,12 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         self._tag_asg(asg_name, aws_template, str(request.request_id))
 
         # Enable instance protection if specified
-        if getattr(aws_template, "instance_protection", None):
-            if hasattr(self, "_enable_instance_protection"):
-                self._enable_instance_protection(asg_name)  # type: ignore[attr-defined]
+        if hasattr(aws_template, "instance_protection") and aws_template.instance_protection:
+            self._enable_instance_protection(asg_name)
 
         # Set instance lifecycle hooks if needed
-        if getattr(aws_template, "lifecycle_hooks", None):
-            if hasattr(self, "_set_lifecycle_hooks"):
-                self._set_lifecycle_hooks(asg_name, aws_template.lifecycle_hooks)  # type: ignore[attr-defined]
+        if hasattr(aws_template, "lifecycle_hooks") and aws_template.lifecycle_hooks:
+            self._set_lifecycle_hooks(asg_name, aws_template.lifecycle_hooks)
 
         return asg_name
 
@@ -210,10 +208,38 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             created_by = self._get_package_name()
 
             # Prepare standard tags with proper ResourceId and ResourceType
-            user_tags = [
+            tags = [
                 {
                     "Key": "Name",
                     "Value": f"hostfactory-asg-{request_id}",
+                    "PropagateAtLaunch": True,
+                    "ResourceId": asg_name,
+                    "ResourceType": "auto-scaling-group",
+                },
+                {
+                    "Key": "RequestId",
+                    "Value": str(request_id),
+                    "PropagateAtLaunch": True,
+                    "ResourceId": asg_name,
+                    "ResourceType": "auto-scaling-group",
+                },
+                {
+                    "Key": "TemplateId",
+                    "Value": aws_template.template_id,
+                    "PropagateAtLaunch": True,
+                    "ResourceId": asg_name,
+                    "ResourceType": "auto-scaling-group",
+                },
+                {
+                    "Key": "CreatedBy",
+                    "Value": created_by,
+                    "PropagateAtLaunch": True,
+                    "ResourceId": asg_name,
+                    "ResourceType": "auto-scaling-group",
+                },
+                {
+                    "Key": "ProviderApi",
+                    "Value": "ASG",
                     "PropagateAtLaunch": True,
                     "ResourceId": asg_name,
                     "ResourceType": "auto-scaling-group",
@@ -223,7 +249,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             # Add custom tags from template
             if hasattr(aws_template, "tags") and aws_template.tags:
                 for key, value in aws_template.tags.items():
-                    user_tags.append(
+                    tags.append(
                         {
                             "Key": key,
                             "Value": str(value),
@@ -232,31 +258,6 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                             "ResourceType": "auto-scaling-group",
                         }
                     )
-
-            # Build and merge orb: system tags
-            system_tags = build_system_tags(
-                request_id=str(request_id),
-                template_id=str(aws_template.template_id),
-                provider_api="ASG",
-            )
-            merged = merge_tags(
-                [{"Key": t["Key"], "Value": t["Value"]} for t in user_tags],
-                system_tags,
-            )
-            # Re-attach ASG-specific fields to merged tags
-            user_keys = {t["Key"]: t for t in user_tags}
-            tags = []
-            for tag in merged:
-                base = user_keys.get(tag["Key"], {})
-                tags.append(
-                    {
-                        "Key": tag["Key"],
-                        "Value": tag["Value"],
-                        "PropagateAtLaunch": base.get("PropagateAtLaunch", True),
-                        "ResourceId": base.get("ResourceId", asg_name),
-                        "ResourceType": base.get("ResourceType", "auto-scaling-group"),
-                    }
-                )
 
             # Create tags for the ASG
             self._retry_with_backoff(
@@ -301,6 +302,15 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
     ) -> dict[str, Any]:
         """Prepare ASG-specific context."""
 
+        # Capacity split for heterogeneous pricing
+        percent_on_demand = template.percent_on_demand or 0
+        on_demand_count = int(request.requested_count * percent_on_demand / 100)
+        spot_count = request.requested_count - on_demand_count
+
+        # ABIS instance requirements
+        abis_instance_requirements = template.get_instance_requirements_payload()
+        has_abis = bool(abis_instance_requirements)
+
         return {
             # ASG-specific values
             "asg_name": f"{get_resource_prefix('asg')}{request.request_id}",
@@ -317,8 +327,17 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             ),
             # ASG-specific flags
             "has_context": hasattr(template, "context") and bool(template.context),
-            "has_instance_protection": bool(getattr(template, "instance_protection", False)),
-            "has_lifecycle_hooks": bool(getattr(template, "lifecycle_hooks", None)),
+            "has_instance_protection": hasattr(template, "instance_protection")
+            and template.instance_protection,
+            "has_lifecycle_hooks": hasattr(template, "lifecycle_hooks")
+            and bool(template.lifecycle_hooks),
+            # ABIS / InstanceRequirements
+            "abis_instance_requirements": abis_instance_requirements,
+            "has_abis": has_abis,
+            # Capacity split
+            "percent_on_demand": percent_on_demand,
+            "on_demand_count": on_demand_count,
+            "spot_count": spot_count,
         }
 
     def _create_asg_config(
@@ -387,8 +406,10 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             "NewInstancesProtectedFromScaleIn": True,
         }
 
-        # Prefer multi-instance maps over a single instance_type
-        instance_types_map = aws_template.machine_types
+        # Prefer multi-instance maps (including legacy vm_types) over a single instance_type
+        instance_types_map = getattr(aws_template, "instance_types", None) or getattr(
+            aws_template, "vm_types", {}
+        )
 
         # Prefer ABIS/InstanceRequirements payload when present (no explicit types)
         instance_requirements_payload = aws_template.get_instance_requirements_payload()
@@ -448,13 +469,13 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 }
 
             ondemand_pct = int(percent_on_demand) if percent_on_demand is not None else 0
-            asg_config["MixedInstancesPolicy"]["InstancesDistribution"] = {  # type: ignore[index]
+            asg_config["MixedInstancesPolicy"]["InstancesDistribution"] = {
                 "OnDemandBaseCapacity": 0,
                 "OnDemandPercentageAboveBaseCapacity": ondemand_pct,
             }
 
             if getattr(aws_template, "allocation_strategy", None):
-                asg_config["MixedInstancesPolicy"]["InstancesDistribution"][  # type: ignore[index]
+                asg_config["MixedInstancesPolicy"]["InstancesDistribution"][
                     "SpotAllocationStrategy"
                 ] = aws_template.get_asg_allocation_strategy()
 
@@ -484,8 +505,8 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             )
         )
 
-        instance_ids: list[str] = [
-            entry.get("InstanceId", "")
+        instance_ids = [
+            entry.get("InstanceId")
             for entry in asg_instances
             if entry.get("AutoScalingGroupName") == asg_name and entry.get("InstanceId")
         ]
@@ -651,7 +672,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     exc,
                 )
 
-    def release_hosts(  # type: ignore[override]
+    def release_hosts(
         self,
         machine_ids: list[str],
         resource_mapping: Optional[dict[str, tuple[Optional[str], int]]] = None,
@@ -730,11 +751,17 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             self._logger.warning(
                 f"ASG details missing for {asg_name}, terminating instances without ASG operations"
             )
+            self._logger.warning(
+                f"ASG details missing for {asg_name}, terminating instances without ASG operations"
+            )
             # Still terminate the instances even if ASG details are missing
             self.aws_ops.terminate_instances_with_fallback(
                 asg_instance_ids,
                 self._request_adapter,
                 f"ASG {asg_name} instances (no ASG details)",
+            )
+            self._logger.info(
+                "Terminated ASG %s instances without ASG operations: %s", asg_name, asg_instance_ids
             )
             self._logger.info(
                 "Terminated ASG %s instances without ASG operations: %s", asg_name, asg_instance_ids
@@ -748,7 +775,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 operation_type="critical",
                 AutoScalingGroupName=asg_name,
                 InstanceIds=chunk,
-                ShouldDecrementDesiredCapacity=False,
+                ShouldDecrementDesiredCapacity=True,
             )
             self._logger.debug("Detached chunk from ASG %s: %s", asg_name, chunk)
         self._logger.info("Detached instances from ASG %s: %s", asg_name, asg_instance_ids)
@@ -907,6 +934,12 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
     def _grouping_label(self) -> str:
         return "ASG"
 
+    @staticmethod
+    def _chunk_list(items: list[str], chunk_size: int):
+        """Yield successive chunk-sized lists from items."""
+        for index in range(0, len(items), chunk_size):
+            yield items[index : index + chunk_size]
+
     def check_hosts_status(self, request: Request) -> list[dict[str, Any]]:
         """Check the status of instances across all ASGs in the request."""
         try:
@@ -942,10 +975,12 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 name="Auto Scaling Group On-Demand",
                 description="Auto Scaling Group with on-demand instances only",
                 provider_type="aws",
-                provider_api="ASG",
-                machine_types={"t3.medium": 1},
+                provider_api="AutoScalingGroup",
+                instance_type="t3.medium",
                 max_instances=15,
                 price_type="ondemand",
+                subnet_ids=["subnet-xxxxx"],
+                security_group_ids=["sg-xxxxx"],
                 tags={"Environment": "prod", "ManagedBy": "ORB"},
             ),
             Template(
@@ -953,11 +988,13 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 name="Auto Scaling Group Spot",
                 description="Auto Scaling Group with spot instances only",
                 provider_type="aws",
-                provider_api="ASG",
-                machine_types={"t3.medium": 1},
+                provider_api="AutoScalingGroup",
+                instance_type="t3.medium",
                 max_instances=20,
                 price_type="spot",
                 max_price=0.05,
+                subnet_ids=["subnet-xxxxx"],
+                security_group_ids=["sg-xxxxx"],
                 tags={"Environment": "dev", "ManagedBy": "ORB"},
             ),
             Template(
@@ -965,12 +1002,14 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 name="Auto Scaling Group Mixed",
                 description="Auto Scaling Group with mixed on-demand and spot instances",
                 provider_type="aws",
-                provider_api="ASG",
-                machine_types={"t3.medium": 1, "t3.large": 2},
+                provider_api="AutoScalingGroup",
+                instance_types={"t3.medium": 1, "t3.large": 2},
                 max_instances=25,
                 price_type="heterogeneous",
                 percent_on_demand=30,
                 allocation_strategy="lowest_price",
+                subnet_ids=["subnet-xxxxx", "subnet-yyyyy"],
+                security_group_ids=["sg-xxxxx"],
                 tags={"Environment": "prod", "ManagedBy": "ORB"},
             ),
         ]

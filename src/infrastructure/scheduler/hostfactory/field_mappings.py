@@ -10,63 +10,39 @@ class HostFactoryFieldMappings:
     MAPPINGS = {
         # Generic fields (work with any provider)
         "generic": {
-            # Request fields
-            "requestId": "request_id",
-            "requestType": "request_type",
-            "returnRequestId": "return_request_id",
-            "requestedCount": "requested_count",
-            "createdAt": "created_at",
             # Core template fields
             "templateId": "template_id",
             "maxNumber": "max_instances",
             "imageId": "image_id",
             "keyName": "key_name",
             "fleetType": "fleet_type",
-            "providerApi": "provider_api",  # Provider API type
-            # Machine fields
-            "machineId": "machine_id",
-            "name": "name",
-            "status": "status",
-            "result": "result",
-            "message": "message",
-            "launchTime": "launch_time",
-            "privateIp": "private_ip",
-            "publicIp": "public_ip",
-            "privateDnsName": "private_dns_name",
-            "publicDnsName": "public_dns_name",
-            "resourceId": "resource_id",
-            "providerName": "provider_name",
-            "providerType": "provider_type",
             # Network configuration
             "subnetId": "subnet_ids",  # Will be converted to list
             "subnetIds": "subnet_ids",  # Preserve full list when provided
             "securityGroupIds": "security_group_ids",
             # Instance configuration
-            "vmType": "machine_types",  # Special handling in transformation
-            "vmTypes": "machine_types",
+            "vmType": "instance_type",
+            "vmTypes": "instance_types",
             # Pricing and allocation
             "priceType": "price_type",
             "maxSpotPrice": "max_price",
             "allocationStrategy": "allocation_strategy",
             # Storage configuration
-            "rootDeviceVolumeSize": "root_volume_size",
+            "rootDeviceVolumeSize": "root_device_volume_size",
             "volumeType": "volume_type",
             "iops": "iops",
             # Tags and metadata
             "instanceTags": "tags",  # Will be parsed from string format
-            # HF-native pass-through fields (identity mapping - same name in/out)
-            "pgrpName": "pgrpName",
-            "onDemandCapacity": "onDemandCapacity",
         },
         # AWS-specific fields (only mapped when AWS provider is active)
         "aws": {
             # AWS instance type configurations
-            "vmTypesOnDemand": "machine_types_ondemand",
-            "vmTypesPriority": "machine_types_priority",
+            "vmTypesOnDemand": "instance_types_ondemand",
+            "vmTypesPriority": "instance_types_priority",
             "abisInstanceRequirements": "abis_instance_requirements",
             # AWS pricing configurations
             "percentOnDemand": "percent_on_demand",
-            "allocationStrategyOnDemand": "allocation_strategy_ondemand",
+            "allocationStrategyOnDemand": "allocation_strategy_on_demand",
             # AWS fleet configurations
             "fleetRole": "fleet_role",
             "spotFleetRequestExpiry": "spot_fleet_request_expiry",

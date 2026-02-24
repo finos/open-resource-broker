@@ -129,12 +129,10 @@ class HostFactoryFieldMapper(SchedulerFieldMapper):
         if "vmType" in mapped:
             mapped["attributes"] = self._create_hf_attributes(mapped["vmType"])
 
-        # Convert subnetIds to subnetId (comma-separated string for HF)
+        # Convert subnetIds to subnetId (always comma-joined so validate_subnet_id
+        # split(",") covers all configured subnets regardless of list length)
         if mapped.get("subnetIds"):
-            if isinstance(mapped["subnetIds"], list) and len(mapped["subnetIds"]) > 1:
-                mapped["subnetId"] = ",".join(mapped["subnetIds"])
-            else:
-                mapped["subnetId"] = mapped["subnetIds"][0] if mapped["subnetIds"] else ""
+            mapped["subnetId"] = ",".join(mapped["subnetIds"])
             del mapped["subnetIds"]
 
         return mapped

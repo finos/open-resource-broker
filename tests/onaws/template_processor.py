@@ -91,40 +91,6 @@ def _normalize_key(key: str, target_fmt: str) -> str:
     return _SNAKE_TO_CAMEL.get(key, key)
 
 
-def _resolve_fleet_role(config_data: dict, profile: str | None = None) -> str | None:
-    """Return fleet_role from config template_defaults, or construct via STS fallback.
-
-    Resolution order:
-    1. First provider in config.json that has template_defaults.fleet_role
-    2. STS GetCallerIdentity to construct the service-linked role ARN
-    3. None — caller skips injection silently
-    """
-    providers = config_data.get("provider", {}).get("providers", [])
-
-    for p in providers:
-        role = p.get("template_defaults", {}).get("fleet_role")
-        if role:
-            return role
-
-    resolved_profile = profile
-    if not resolved_profile:
-        for p in providers:
-            resolved_profile = p.get("config", {}).get("profile")
-            if resolved_profile:
-                break
-
-    try:
-        import boto3
-        session = boto3.Session(profile_name=resolved_profile)
-        sts = session.client("sts")
-        account_id = sts.get_caller_identity()["Account"]
-        return (
-            f"arn:aws:iam::{account_id}:role/aws-service-role"
-            f"/spotfleet.amazonaws.com/AWSServiceRoleForEC2SpotFleet"
-        )
-    except Exception:
-        return None
-
 
 class TemplateProcessor:
     """Generates per-test config directories from the real project config files."""
@@ -260,19 +226,6 @@ class TemplateProcessor:
                     entry[k] = v
             combined.append(entry)
 
-        try:
-            config_data_raw = json.loads((self.config_source_dir / "config.json").read_text())
-            fleet_role = _resolve_fleet_role(config_data_raw)
-            if fleet_role:
-                for tmpl in combined:
-                    fmt = _detect_template_format(tmpl)
-                    api_key = "providerApi" if fmt == "camel" else "provider_api"
-                    role_key = "fleetRole" if fmt == "camel" else "fleet_role"
-                    if tmpl.get(api_key) == "SpotFleet" and not tmpl.get(role_key):
-                        tmpl[role_key] = fleet_role
-        except Exception:
-            pass  # fleet_role not configured — SpotFleet tests will need it via overrides
-
         config_dir = test_dir / "config"
         config_dir.mkdir(parents=True, exist_ok=True)
         self._write_json(config_dir / "aws_templates.json", {"scheduler_type": scheduler_type, "templates": combined})
@@ -318,19 +271,6 @@ class TemplateProcessor:
         # Load via production path — preserves image_id, subnet_ids, etc.
         raw_dicts = strategy.load_templates_from_path(str(templates_file))
         formatted = strategy.format_templates_for_generation(raw_dicts)
-
-        try:
-            config_data = json.loads((config_dir / "config.json").read_text())
-            fleet_role = _resolve_fleet_role(config_data)
-            if fleet_role:
-                for tmpl in formatted:
-                    fmt = _detect_template_format(tmpl)
-                    api_key = "providerApi" if fmt == "camel" else "provider_api"
-                    role_key = "fleetRole" if fmt == "camel" else "fleet_role"
-                    if tmpl.get(api_key) == "SpotFleet" and not tmpl.get(role_key):
-                        tmpl[role_key] = fleet_role
-        except Exception:
-            pass
 
         return {"scheduler_type": scheduler_type, "templates": formatted}
 

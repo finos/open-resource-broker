@@ -26,6 +26,7 @@ Note:
     launches and is suitable for large-scale, complex deployments.
 """
 
+from datetime import datetime
 from typing import Any, Optional
 
 from botocore.exceptions import ClientError
@@ -37,7 +38,6 @@ from domain.template.template_aggregate import Template
 from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from infrastructure.di.container import get_container
 from infrastructure.error.decorators import handle_infrastructure_exceptions
-from providers.aws.infrastructure.tags import build_system_tags, merge_tags
 from infrastructure.resilience import CircuitBreakerOpenError
 from infrastructure.utilities.common.resource_naming import get_resource_prefix
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
@@ -68,7 +68,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         logger: LoggingPort,
         aws_ops: AWSOperations,
         launch_template_manager: AWSLaunchTemplateManager,
-        request_adapter: Optional[RequestAdapterPort] = None,
+        request_adapter: RequestAdapterPort = None,
         machine_adapter: Optional[AWSMachineAdapter] = None,
     ) -> None:
         """
@@ -120,64 +120,78 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         Returns structured result with resource IDs and instance data.
         """
         try:
-            response = self.aws_ops.execute_with_standard_error_handling(
-                operation=lambda: self._create_fleet_with_response(request, aws_template),
+            fleet_id = self.aws_ops.execute_with_standard_error_handling(
+                operation=lambda: self._create_fleet_internal(request, aws_template),
                 operation_name="create EC2 fleet",
                 context="EC2Fleet",
             )
 
-            fleet_id = response["FleetId"]
-
-            instance_ids = self._extract_instance_ids(response, self._extract_instant_instance_ids)
-
-            # Create instances using existing machine adapter
-            instances = []
-            if instance_ids and self._machine_adapter:
-                # Get full instance data from AWS for proper machine creation
+            # Get instance details based on fleet type
+            instances: list[dict[str, Any]] = []
+            instance_details: list[dict[str, Any]] = []
+            fleet_type = aws_template.fleet_type
+            if not isinstance(fleet_type, AWSFleetType):
                 try:
-                    instance_details = self._get_instance_details(
+                    fleet_type = AWSFleetType(str(fleet_type))
+                except Exception:
+                    fleet_type = None
+
+            if fleet_type is AWSFleetType.INSTANT:
+                # For instant fleets, instance IDs are in metadata
+                instance_ids = request.metadata.get("instance_ids", [])
+                if instance_ids:
+                    instances = self._get_instance_details(
                         instance_ids,
                         request_id=str(request.request_id),
                         resource_id=fleet_id,
                         provider_api="EC2Fleet",
                     )
-                    for instance_data in instance_details:
-                        try:
-                            instances.append(
-                                self._machine_adapter.create_machine_from_aws_instance(
-                                    instance_data, str(request.request_id), "EC2Fleet", fleet_id
-                                )
-                            )
-                        except Exception as e:
-                            # If adapter fails with partial data, skip machine creation
-                            # Machines will be populated later via status query
-                            self._logger.debug("Skipping machine creation with partial data: %s", e)
-                except Exception as e:
-                    self._logger.warning(
-                        "Failed to get instance details for fleet %s: %s", fleet_id, e
+
+                    # Collect detailed instance information for enhanced monitoring
+                    for instance in instances:
+                        instance_detail = {
+                            "instance_id": instance.get("instance_id"),
+                            "instance_type": instance.get("instance_type"),
+                            "availability_zone": instance.get("availability_zone"),
+                            "launch_time": instance.get("launch_time"),
+                            "state": instance.get("state"),
+                            "private_ip": instance.get("private_ip_address"),
+                            "public_ip": instance.get("public_ip_address"),
+                            "fleet_id": fleet_id,
+                            "fleet_type": aws_template.fleet_type,
+                        }
+                        instance_details.append(instance_detail)
+
+                    # Log detailed instance information for monitoring
+                    self._logger.info(
+                        "EC2Fleet instance details collected",
+                        extra={
+                            "fleet_id": fleet_id,
+                            "instance_count": len(instance_details),
+                            "instance_details": instance_details,
+                        },
                     )
-                    # Continue without instances, they'll be populated later via status query
 
             return {
                 "success": True,
                 "resource_ids": [fleet_id],
-                "instance_ids": instance_ids,  # Store instance IDs for tracking
                 "instances": instances,
                 "provider_data": {
                     "resource_type": "ec2_fleet",
-                    "fleet_type": str(aws_template.fleet_type),
-                    "fleet_id": fleet_id,
-                    "instance_ids": instance_ids,
+                    "fleet_type": aws_template.fleet_type,
+                    "fleet_errors": request.metadata.get("fleet_errors", []),
                 },
             }
         except Exception as e:
-            self._logger.error("EC2Fleet creation failed: %s", e)
-            return {"success": False, "resource_ids": [], "instances": [], "error_message": str(e)}
+            return {
+                "success": False,
+                "resource_ids": [],
+                "instances": [],
+                "error_message": str(e),
+            }
 
-    def _create_fleet_with_response(
-        self, request: Request, aws_template: AWSTemplate
-    ) -> dict[str, Any]:
-        """Create EC2 Fleet and return full AWS response."""
+    def _create_fleet_internal(self, request: Request, aws_template: AWSTemplate) -> str:
+        """Create EC2 Fleet with pure business logic."""
         # Validate prerequisites
         self._validate_prerequisites(aws_template)
         # Validate fleet type
@@ -209,7 +223,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
         # Store launch template info in request (if request has this method)
         if hasattr(request, "set_launch_template_info"):
-            request.set_launch_template_info(  # type: ignore[attr-defined]
+            request.set_launch_template_info(
                 launch_template_result.template_id, launch_template_result.version
             )
 
@@ -237,6 +251,8 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         fleet_id = response["FleetId"]
         self._logger.info("Successfully created EC2 Fleet: %s", fleet_id)
 
+        instance_ids = self._extract_instant_instance_ids(response)
+
         # Check for errors in response (especially for instant fleets)
         errors = self._extract_fleet_errors(response)
         if errors:
@@ -244,8 +260,6 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 f"{error.get('error_code', 'Unknown')}: {error.get('error_message', 'No message')}"
                 for error in errors
             )
-
-            instance_ids = self._extract_instant_instance_ids(response)
             self._record_fleet_error_details(
                 request=request,
                 fleet_id=fleet_id,
@@ -277,7 +291,18 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         if aws_template.fleet_type in ["maintain", "request"]:
             self._tag_fleet_instances_if_needed(fleet_id, request, aws_template)
 
-        return response
+        # For instant fleets, store instance IDs or warn if nothing was returned
+        if fleet_type == AWSFleetType.INSTANT:
+            if instance_ids:
+                request.metadata["instance_ids"] = instance_ids
+                self._logger.debug("Stored instance IDs in request metadata: %s", instance_ids)
+            else:
+                self._logger.warning(
+                    "No instance IDs found in instant fleet response (no errors reported). Response: %s",
+                    response,
+                )
+
+        return fleet_id
 
     def _extract_instant_instance_ids(self, response: dict[str, Any]) -> list[str]:
         """Extract instance IDs from an instant fleet response."""
@@ -288,7 +313,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         return instance_ids
 
     def _extract_fleet_errors(self, response: dict[str, Any]) -> list[dict[str, Any]]:
-        """Normalize EC2 Fleet error payloads for logging and storage."""
+        """Normalize EC2 Fleet error payloads for logging and persistence."""
         errors = response.get("Errors") or []
         if isinstance(errors, dict):
             errors = [errors]
@@ -331,22 +356,16 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         instance_ids: list[str],
     ) -> None:
         """Persist fleet error context in the request for downstream status handling."""
-        # Store AWS-specific data in provider_data
-        request.provider_data.update(
-            {
-                "fleet_id": fleet_id,
-                "fleet_errors": errors,
-                "instance_ids": instance_ids,
-            }
-        )
-
-        # Keep operational metadata in metadata
         if not hasattr(request, "metadata") or request.metadata is None:
             request.metadata = {}
 
         response_metadata = response.get("ResponseMetadata")
+        request.metadata["fleet_id"] = fleet_id
+        request.metadata["fleet_errors"] = errors
         if response_metadata:
             request.metadata["fleet_response_metadata"] = response_metadata
+        if instance_ids:
+            request.metadata["instance_ids"] = instance_ids
 
         error_details = dict(getattr(request, "error_details", {}) or {})
         error_details["ec2_fleet"] = {
@@ -365,7 +384,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         aws_template: Optional[AWSTemplate] = None,
     ) -> list[dict[str, Any]]:
         """Format AWS instance details to standard structure."""
-        # Use domain field instead of metadata, with template fallback
+        metadata = getattr(request, "metadata", {}) or {}
         if aws_template and aws_template.provider_api is not None:
             provider_api_value = (
                 aws_template.provider_api.value
@@ -373,7 +392,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 else str(aws_template.provider_api)
             )
         else:
-            provider_api_value = request.provider_api or "EC2Fleet"
+            provider_api_value = metadata.get("provider_api", "EC2Fleet")
 
         if self._machine_adapter:
             try:
@@ -428,9 +447,9 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
         # Instance overrides computation
         instance_overrides = []
-        if template.machine_types and template.subnet_ids:
+        if template.instance_types and template.subnet_ids:
             for subnet_id in template.subnet_ids:
-                for instance_type, weight in template.machine_types.items():
+                for instance_type, weight in template.instance_types.items():
                     instance_overrides.append(
                         {
                             "instance_type": instance_type,
@@ -438,8 +457,8 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                             "weighted_capacity": weight,
                         }
                     )
-        elif template.machine_types:
-            for instance_type, weight in template.machine_types.items():
+        elif template.instance_types:
+            for instance_type, weight in template.instance_types.items():
                 instance_overrides.append(
                     {"instance_type": instance_type, "weighted_capacity": weight}
                 )
@@ -448,17 +467,48 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         ondemand_overrides = []
         if (
             template.price_type == "heterogeneous"
-            and hasattr(template, "machine_types_ondemand")
-            and template.machine_types_ondemand
+            and hasattr(template, "instance_types_ondemand")
+            and template.instance_types_ondemand
         ):
-            for instance_type, weight in template.machine_types_ondemand.items():
+            for instance_type, weight in template.instance_types_ondemand.items():
                 ondemand_overrides.append(
                     {"instance_type": instance_type, "weighted_capacity": weight}
                 )
 
+        # Capacity split for heterogeneous pricing
+        percent_on_demand = template.percent_on_demand or 0
+        on_demand_count = int(request.requested_count * percent_on_demand / 100)
+        spot_count = request.requested_count - on_demand_count
+
+        # ABIS instance requirements
+        abis_instance_requirements = template.get_instance_requirements_payload()
+        has_abis = bool(abis_instance_requirements)
+
+        # When ABIS is set, add per-subnet InstanceRequirements overrides
+        if has_abis and not instance_overrides:
+            if template.subnet_ids:
+                for subnet_id in template.subnet_ids:
+                    instance_overrides.append(
+                        {
+                            "instance_type": None,
+                            "subnet_id": subnet_id,
+                            "weighted_capacity": None,
+                            "instance_requirements": abis_instance_requirements,
+                        }
+                    )
+            else:
+                instance_overrides.append(
+                    {
+                        "instance_type": None,
+                        "subnet_id": None,
+                        "weighted_capacity": None,
+                        "instance_requirements": abis_instance_requirements,
+                    }
+                )
+
         return {
             # Fleet-specific values
-            "fleet_type": template.fleet_type.value if template.fleet_type else "request",
+            "fleet_type": template.fleet_type.value,
             "fleet_name": f"{get_resource_prefix('fleet')}{request.request_id}",
             # Computed overrides
             "instance_overrides": instance_overrides,
@@ -469,6 +519,14 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             "replace_unhealthy": template.fleet_type == AWSFleetType.MAINTAIN.value,
             "has_spot_options": bool(template.allocation_strategy or template.max_price),
             "has_ondemand_options": bool(template.allocation_strategy_on_demand),
+            "is_heterogeneous": template.price_type == "heterogeneous",
+            # ABIS / InstanceRequirements
+            "abis_instance_requirements": abis_instance_requirements,
+            "has_abis": has_abis,
+            # Capacity split
+            "percent_on_demand": percent_on_demand,
+            "on_demand_count": on_demand_count,
+            "spot_count": spot_count,
             # Configuration values
             "allocation_strategy": (
                 self._get_allocation_strategy(template.allocation_strategy)
@@ -476,9 +534,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 else None
             ),
             "allocation_strategy_on_demand": (
-                self._get_allocation_strategy_on_demand(
-                    template.allocation_strategy_on_demand.value
-                )
+                self._get_allocation_strategy_on_demand(template.allocation_strategy_on_demand)
                 if template.allocation_strategy_on_demand
                 else None
             ),
@@ -562,34 +618,30 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             ],
             "TargetCapacitySpecification": {"TotalTargetCapacity": request.requested_count},
             "Type": template.fleet_type.value
-            if template.fleet_type and hasattr(template.fleet_type, "value")
-            else str(template.fleet_type)
-            if template.fleet_type
-            else "request",
+            if hasattr(template.fleet_type, "value")
+            else str(template.fleet_type),
             "TagSpecifications": [
                 {
                     "ResourceType": "fleet",
-                    "Tags": merge_tags(
-                        [
-                            {
-                                "Key": "Name",
-                                "Value": f"{get_resource_prefix('fleet')}{request.request_id}",
-                            },
-                            *(
-                                [{"Key": k, "Value": v} for k, v in template.tags.items()]
-                                if template.tags
-                                else []
-                            ),
-                        ],
-                        build_system_tags(
-                            request_id=str(request.request_id),
-                            template_id=str(template.template_id),
-                            provider_api="EC2Fleet",
-                        ),
-                    ),
+                    "Tags": [
+                        {
+                            "Key": "Name",
+                            "Value": f"{get_resource_prefix('fleet')}{request.request_id}",
+                        },
+                        {"Key": "RequestId", "Value": str(request.request_id)},
+                        {"Key": "TemplateId", "Value": str(template.template_id)},
+                        {"Key": "CreatedBy", "Value": created_by},
+                        {"Key": "CreatedAt", "Value": datetime.utcnow().isoformat()},
+                        {"Key": "ProviderApi", "Value": "EC2Fleet"},
+                    ],
                 }
             ],
         }
+
+        # Add template tags if any
+        if template.tags:
+            fleet_tags = [{"Key": k, "Value": v} for k, v in template.tags.items()]
+            fleet_config["TagSpecifications"][0]["Tags"].extend(fleet_tags)
 
         # Add fleet type specific configurations
         if template.fleet_type == AWSFleetType.MAINTAIN.value:
@@ -638,9 +690,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             if template.allocation_strategy_on_demand:
                 fleet_config["OnDemandOptions"] = {
                     "AllocationStrategy": self._get_allocation_strategy_on_demand(
-                        template.allocation_strategy_on_demand.value
-                        if hasattr(template.allocation_strategy_on_demand, "value")
-                        else str(template.allocation_strategy_on_demand)
+                        template.allocation_strategy_on_demand
                     )
                 }
 
@@ -667,17 +717,17 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
         else:
             # Add overrides with weighted capacity if multiple instance types are specified
-            if template.machine_types:
+            if template.instance_types:
                 overrides = []
-                for instance_type, weight in template.machine_types.items():
+                for instance_type, weight in template.instance_types.items():
                     override = {"InstanceType": instance_type, "WeightedCapacity": weight}
                     overrides.append(override)
                 fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
 
                 # Add on-demand instance types for heterogeneous fleets
-                if price_type == "heterogeneous" and template.machine_types_ondemand:
+                if price_type == "heterogeneous" and template.instance_types_ondemand:
                     on_demand_overrides = []
-                    for instance_type, weight in template.machine_types_ondemand.items():
+                    for instance_type, weight in template.instance_types_ondemand.items():
                         override = {
                             "InstanceType": instance_type,
                             "WeightedCapacity": weight,
@@ -695,10 +745,10 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = []
 
                 # If we have both instance types and subnets, create all combinations
-                if template.machine_types:
+                if template.instance_types:
                     overrides = []
                     for subnet_id in template.subnet_ids:
-                        for instance_type, weight in template.machine_types.items():
+                        for instance_type, weight in template.instance_types.items():
                             override = {
                                 "SubnetId": subnet_id,
                                 "InstanceType": instance_type,
@@ -707,11 +757,11 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                             overrides.append(override)
 
                         # Add on-demand instance types for heterogeneous fleets
-                        if price_type == "heterogeneous" and template.machine_types_ondemand:
+                        if price_type == "heterogeneous" and template.instance_types_ondemand:
                             for (
                                 instance_type,
                                 weight,
-                            ) in template.machine_types_ondemand.items():
+                            ) in template.instance_types_ondemand.items():
                                 override = {
                                     "SubnetId": subnet_id,
                                     "InstanceType": instance_type,
@@ -758,17 +808,18 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
             fleet_id = request.resource_ids[0]  # Use first resource ID as fleet ID
 
-            # Get fleet_type from provider_data (AWS-specific data)
-            fleet_type_value = request.provider_data.get("fleet_type")
+            # Get fleet_type from request metadata (simpler approach like other handlers)
+            # The fleet_type should be available in the request metadata from when the fleet was created
+            fleet_type_value = request.metadata.get("fleet_type")
 
-            # If not in provider_data, derive it from the DescribeFleets response (preferred), else default
+            # If not in metadata, derive it from the DescribeFleets response (preferred), else default
             fleet_type = None
             if fleet_type_value:
                 try:
                     fleet_type = AWSFleetType(fleet_type_value.lower())
                 except Exception:
                     self._logger.warning(
-                        "Invalid fleet_type '%s' in provider_data for request %s; will derive from AWS response",
+                        "Invalid fleet_type '%s' in metadata for request %s; will derive from AWS response",
                         fleet_type_value,
                         request.request_id,
                     )
@@ -815,12 +866,12 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             # Get instance IDs based on fleet type
             instance_ids = []
             if fleet_type == AWSFleetType.INSTANT:
-                # Instant fleets do not support DescribeFleetInstances. Use provider_data or the DescribeFleets response.
-                provider_instance_ids = request.provider_data.get("instance_ids", [])
-                if provider_instance_ids:
-                    instance_ids = provider_instance_ids
+                # Instant fleets do not support DescribeFleetInstances. Use metadata or the DescribeFleets response.
+                metadata_instance_ids = request.metadata.get("instance_ids", [])
+                if metadata_instance_ids:
+                    instance_ids = metadata_instance_ids
                     self._logger.debug(
-                        "Instant fleet %s using instance_ids from provider_data: %s",
+                        "Instant fleet %s using instance_ids from metadata: %s",
                         fleet_id,
                         instance_ids,
                     )
@@ -871,7 +922,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             self._logger.error("Unexpected error checking EC2 Fleet status: %s", str(e))
             raise AWSInfrastructureError(f"Failed to check EC2 Fleet status: {e!s}")
 
-    def release_hosts(  # type: ignore[override]
+    def release_hosts(
         self,
         machine_ids: list[str],
         resource_mapping: Optional[dict[str, tuple[Optional[str], int]]] = None,
@@ -910,38 +961,23 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 )
 
             # Process each EC2 Fleet group separately
-            fleet_errors: list[tuple[Optional[str], Exception]] = []
             for fleet_id, fleet_data in fleet_instance_groups.items():
-                try:
-                    if fleet_id is not None:
-                        # Handle EC2 Fleet instances using dedicated method (primary case)
-                        self._release_hosts_for_single_ec2_fleet(
-                            fleet_id, fleet_data["instance_ids"], fleet_data["fleet_details"]
-                        )
-                    else:
-                        # Handle non-EC2 Fleet instances (fallback case)
-                        instance_ids = fleet_data["instance_ids"]
-                        if instance_ids:
-                            self._logger.info(
-                                f"Terminating {len(instance_ids)} non-EC2 Fleet instances"
-                            )
-                            self.aws_ops.terminate_instances_with_fallback(
-                                instance_ids, self._request_adapter, "non-EC2 Fleet instances"
-                            )
-                            self._logger.info(
-                                "Terminated non-EC2 Fleet instances: %s", instance_ids
-                            )
-                except Exception as e:
-                    self._logger.error(
-                        "Failed to release fleet %s: %s", fleet_id, e, exc_info=True
+                if fleet_id is not None:
+                    # Handle EC2 Fleet instances using dedicated method (primary case)
+                    self._release_hosts_for_single_ec2_fleet(
+                        fleet_id, fleet_data["instance_ids"], fleet_data["fleet_details"]
                     )
-                    fleet_errors.append((fleet_id, e))
-
-            if fleet_errors:
-                failed_ids = [str(fid) for fid, _ in fleet_errors]
-                raise AWSInfrastructureError(
-                    f"Failed to release {len(fleet_errors)} fleet(s): {', '.join(failed_ids)}"
-                )
+                else:
+                    # Handle non-EC2 Fleet instances (fallback case)
+                    instance_ids = fleet_data["instance_ids"]
+                    if instance_ids:
+                        self._logger.info(
+                            f"Terminating {len(instance_ids)} non-EC2 Fleet instances"
+                        )
+                        self.aws_ops.terminate_instances_with_fallback(
+                            instance_ids, self._request_adapter, "non-EC2 Fleet instances"
+                        )
+                        self._logger.info("Terminated non-EC2 Fleet instances: %s", instance_ids)
 
         except ClientError as e:
             error = self._convert_client_error(e)
@@ -1134,7 +1170,6 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 fleet_details = fleet_list[0]
 
             fleet_type = fleet_details.get("Type", "maintain")
-            new_capacity = 0
 
             if fleet_instance_ids:
                 if fleet_type == "maintain":
@@ -1166,36 +1201,29 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     "Terminated EC2 Fleet %s instances: %s", fleet_id, fleet_instance_ids
                 )
 
-                # If capacity has reached zero for maintain fleets, delete the fleet.
-                # Instances were already explicitly terminated above, so do NOT terminate again.
+                # If capacity has reached zero for maintain fleets, delete the fleet
                 if fleet_type == "maintain" and new_capacity == 0:
                     self._logger.info("EC2 Fleet %s capacity is zero, deleting fleet", fleet_id)
-                    self._delete_ec2_fleet(fleet_id, terminate_instances=False)
+                    self._delete_ec2_fleet(fleet_id)
             else:
-                # If no specific instances provided, delete entire fleet and let AWS terminate them.
-                self._delete_ec2_fleet(fleet_id, terminate_instances=True)
+                # If no specific instances provided, delete entire fleet
+                self._delete_ec2_fleet(fleet_id)
 
         except Exception as e:
             self._logger.error("Failed to terminate EC2 fleet %s: %s", fleet_id, e)
             raise
 
-    def _delete_ec2_fleet(self, fleet_id: str, terminate_instances: bool = True) -> None:
-        """Delete an EC2 Fleet when it's no longer needed.
-
-        Args:
-            fleet_id: The EC2 Fleet ID to delete.
-            terminate_instances: Whether to terminate instances via the fleet delete call.
-                Set to False when instances have already been explicitly terminated to
-                avoid double termination.
-        """
+    def _delete_ec2_fleet(self, fleet_id: str) -> None:
+        """Delete an EC2 Fleet when it's no longer needed."""
         try:
-            self._logger.info(f"Deleting EC2 Fleet {fleet_id} (terminate_instances={terminate_instances})")
+            self._logger.info(f"Deleting EC2 Fleet {fleet_id}")
 
+            # Delete the fleet with termination of instances
             self._retry_with_backoff(
                 self.aws_client.ec2_client.delete_fleets,
                 operation_type="critical",
                 FleetIds=[fleet_id],
-                TerminateInstances=terminate_instances,
+                TerminateInstances=True,
             )
 
             self._logger.info(f"Successfully deleted EC2 Fleet {fleet_id}")
@@ -1225,9 +1253,11 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with instant fulfillment using on-demand instances",
                 provider_type="aws",
                 provider_api="EC2Fleet",
-                machine_types={"t3.medium": 1},
+                instance_type="t3.medium",
                 max_instances=10,
                 price_type="ondemand",
+                subnet_ids=["subnet-xxxxx"],
+                security_group_ids=["sg-xxxxx"],
                 tags={"Environment": "dev", "ManagedBy": "ORB"},
                 metadata={"fleet_type": "instant"},
             ),
@@ -1237,10 +1267,12 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with instant fulfillment using spot instances",
                 provider_type="aws",
                 provider_api="EC2Fleet",
-                machine_types={"t3.medium": 1},
+                instance_type="t3.medium",
                 max_instances=10,
                 price_type="spot",
                 max_price=0.05,
+                subnet_ids=["subnet-xxxxx"],
+                security_group_ids=["sg-xxxxx"],
                 tags={"Environment": "dev", "ManagedBy": "ORB"},
                 metadata={"fleet_type": "instant"},
             ),
@@ -1250,12 +1282,14 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with instant fulfillment using mixed pricing",
                 provider_type="aws",
                 provider_api="EC2Fleet",
-                machine_types={"t3.medium": 1},
+                instance_type="t3.medium",
                 max_instances=10,
                 price_type="heterogeneous",
                 percent_on_demand=30,
                 allocation_strategy="diversified",
                 max_price=0.05,
+                subnet_ids=["subnet-xxxxx"],
+                security_group_ids=["sg-xxxxx"],
                 tags={"Environment": "dev", "ManagedBy": "ORB"},
                 metadata={"fleet_type": "instant", "percent_on_demand": 30},
             ),
@@ -1266,9 +1300,11 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with request fulfillment using on-demand instances",
                 provider_type="aws",
                 provider_api="EC2Fleet",
-                machine_types={"t3.medium": 1},
+                instance_type="t3.medium",
                 max_instances=15,
                 price_type="ondemand",
+                subnet_ids=["subnet-xxxxx"],
+                security_group_ids=["sg-xxxxx"],
                 tags={"Environment": "test", "ManagedBy": "ORB"},
                 metadata={"fleet_type": "request"},
             ),
@@ -1278,11 +1314,13 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with request fulfillment using spot instances",
                 provider_type="aws",
                 provider_api="EC2Fleet",
-                machine_types={"t3.medium": 1},
+                instance_type="t3.medium",
                 max_instances=20,
                 price_type="spot",
                 allocation_strategy="capacity_optimized",
                 max_price=0.08,
+                subnet_ids=["subnet-xxxxx"],
+                security_group_ids=["sg-xxxxx"],
                 tags={"Environment": "test", "ManagedBy": "ORB"},
                 metadata={"fleet_type": "request"},
             ),
@@ -1292,13 +1330,15 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with request fulfillment using mixed pricing",
                 provider_type="aws",
                 provider_api="EC2Fleet",
-                machine_types={"t3.medium": 1, "t3.large": 2},
+                instance_types={"t3.medium": 1, "t3.large": 2},
                 max_instances=25,
                 price_type="heterogeneous",
                 percent_on_demand=40,
                 allocation_strategy="diversified",
                 allocation_strategy_on_demand="lowest_price",
                 max_price=0.08,
+                subnet_ids=["subnet-xxxxx", "subnet-yyyyy"],
+                security_group_ids=["sg-xxxxx"],
                 tags={"Environment": "test", "ManagedBy": "ORB"},
                 metadata={"fleet_type": "request", "percent_on_demand": 40},
             ),
@@ -1309,9 +1349,11 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with maintain capacity using on-demand instances",
                 provider_type="aws",
                 provider_api="EC2Fleet",
-                machine_types={"t3.medium": 1},
+                instance_type="t3.medium",
                 max_instances=12,
                 price_type="ondemand",
+                subnet_ids=["subnet-xxxxx"],
+                security_group_ids=["sg-xxxxx"],
                 tags={"Environment": "prod", "ManagedBy": "ORB"},
                 metadata={"fleet_type": "maintain"},
             ),
@@ -1321,11 +1363,13 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with maintain capacity using spot instances",
                 provider_type="aws",
                 provider_api="EC2Fleet",
-                machine_types={"t3.medium": 1},
+                instance_type="t3.medium",
                 max_instances=30,
                 price_type="spot",
                 allocation_strategy="price_capacity_optimized",
                 max_price=0.10,
+                subnet_ids=["subnet-xxxxx"],
+                security_group_ids=["sg-xxxxx"],
                 tags={"Environment": "prod", "ManagedBy": "ORB"},
                 metadata={"fleet_type": "maintain"},
             ),
@@ -1335,13 +1379,15 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="EC2 Fleet with maintain capacity using mixed pricing",
                 provider_type="aws",
                 provider_api="EC2Fleet",
-                machine_types={"t3.medium": 1, "t3.large": 2, "t3.xlarge": 3},
+                instance_types={"t3.medium": 1, "t3.large": 2, "t3.xlarge": 3},
                 max_instances=50,
                 price_type="heterogeneous",
                 percent_on_demand=50,
                 allocation_strategy="capacity_optimized",
                 allocation_strategy_on_demand="prioritized",
                 max_price=0.12,
+                subnet_ids=["subnet-xxxxx", "subnet-yyyyy", "subnet-zzzzz"],
+                security_group_ids=["sg-xxxxx"],
                 tags={"Environment": "prod", "ManagedBy": "ORB"},
                 metadata={"fleet_type": "maintain", "percent_on_demand": 50},
             ),

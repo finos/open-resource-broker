@@ -89,7 +89,7 @@ def write_request_json_to_a_tmp_file(data: dict[str, Any]) -> str:
         raise
 
 
-def run_bash_script(script_path: str, argument: str, timeout: int = 300, extra_args: list[str] | None = None) -> dict[str, Any]:
+def run_bash_script(script_path: str, argument: str, timeout: int = 300) -> dict[str, Any]:
     """
     Run a bash script with timeout and error handling.
 
@@ -97,15 +97,13 @@ def run_bash_script(script_path: str, argument: str, timeout: int = 300, extra_a
         script_path: Path to the script to run
         argument: Argument to pass to the script
         timeout: Timeout in seconds
-        extra_args: Additional arguments to pass to the script
 
     Returns:
         Dict containing stdout, stderr, and return code
     """
     try:
-        cmd = ["/bin/bash", script_path, "-f", argument] + (extra_args or [])
         result = subprocess.run(
-            cmd,
+            ["/bin/bash", script_path, "-f", argument],
             check=False,
             capture_output=True,
             text=True,
@@ -144,8 +142,6 @@ class HostFactoryMock:
         # TARGET="IBM_SYMPHONY"
         target = "AWS_PLUGIN"
 
-        hf_scripts_location = Path("./src/infrastructure/scheduler/hostfactory/scripts/")
-
         if target == "IBM_SYMPHONY":
             os.environ["HF_PROVIDER_CONFDIR"] = (
                 "/opt/ibm/spectrumcomputing/hostfactory/conf/providers/awsinst"
@@ -163,58 +159,17 @@ class HostFactoryMock:
             # os.environ["AWS_PROVIDER_LOG_DIR"] = "./logs"
             os.environ["LOG_DESTINATION"] = "file"
 
-            hf_scripts_location = Path("./src/infrastructure/scheduler/hostfactory/scripts/")
+            hf_scripts_location = Path("./scripts/")
 
-        if scheduler != "default":
-            self.get_available_templates_script = os.path.join(
-                hf_scripts_location, "getAvailableTemplates.sh"
-            )
-            self.request_machines_script = os.path.join(hf_scripts_location, "requestMachines.sh")
-            self.get_request_status_script = os.path.join(
-                hf_scripts_location, "getRequestStatus.sh"
-            )
-            self.request_return_machines_script = os.path.join(
-                hf_scripts_location, "requestReturnMachines.sh"
-            )
-            self.get_return_requests_script = os.path.join(
-                hf_scripts_location, "getReturnRequests.sh"
-            )
-
-    def _run_orb_command(
-        self, subcommand: str, request_file: str, extra_args: list[str] | None = None, timeout: int = 300
-    ) -> dict[str, Any]:
-        """Run orb CLI command directly (used for default scheduler).
-
-        Args:
-            subcommand: orb subcommand, e.g. "templates list" or "machines request"
-            request_file: Path to the JSON input file passed via -f
-            extra_args: Additional arguments appended after the subcommand
-            timeout: Timeout in seconds
-
-        Returns:
-            Dict containing stdout, stderr, and return_code
-        """
-        cmd = ["orb", "-f", request_file] + subcommand.split() + (extra_args or [])
-        log.debug(f"Running orb command: {cmd}")
-        try:
-            result = subprocess.run(
-                cmd,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-            return {
-                "stdout": result.stdout,
-                "stderr": result.stderr,
-                "return_code": result.returncode,
-            }
-        except subprocess.TimeoutExpired:
-            log.error(f"orb command timed out after {timeout} seconds")
-            return {"stdout": "", "stderr": f"Timeout after {timeout} seconds", "return_code": -1}
-        except Exception as e:
-            log.error(f"Unexpected error running orb command: {e}")
-            return {"stdout": "", "stderr": str(e), "return_code": -1}
+        self.get_available_templates_script = os.path.join(
+            hf_scripts_location, "getAvailableTemplates.sh"
+        )
+        self.request_machines_script = os.path.join(hf_scripts_location, "requestMachines.sh")
+        self.get_request_status_script = os.path.join(hf_scripts_location, "getRequestStatus.sh")
+        self.request_return_machines_script = os.path.join(
+            hf_scripts_location, "requestReturnMachines.sh"
+        )
+        self.get_return_requests_script = os.path.join(hf_scripts_location, "getReturnRequests.sh")
 
     def get_available_templates(self) -> dict[str, Any]:
         """Get available templates."""
@@ -223,10 +178,7 @@ class HostFactoryMock:
 
         request_file_name = write_request_json_to_a_tmp_file(request)
 
-        if self.scheduler == "default":
-            res = self._run_orb_command("templates list", request_file_name)
-        else:
-            res = run_bash_script(self.get_available_templates_script, request_file_name)
+        res = run_bash_script(self.get_available_templates_script, request_file_name)
         log.debug(f"response: {res}")
 
         if res["return_code"] != 0:
@@ -234,43 +186,16 @@ class HostFactoryMock:
             return {"error": "Failed to get templates", "message": res["stderr"]}
 
         try:
-            # Extract the JSON part from stdout
             stdout = res["stdout"]
-            # Find the JSON part (starts with '{' and ends with '}')
             json_start = stdout.find("{")
-            json_end = stdout.rfind("}") + 1
-
-            if json_start >= 0 and json_end > json_start:
-                json_str = stdout[json_start:json_end]
-                # Fix common JSON formatting issues
-                json_str = json_str.replace(']\n  "', '],\n  "')
-
-                result = json.loads(json_str)
-                log.info(f"response: {json.dumps(result, indent=4)}")
-                return result
-            else:
+            if json_start == -1:
                 log.error("Could not find JSON in response")
-                return {
-                    "error": "Invalid response format",
-                    "message": "Could not find JSON in response",
-                }
+                return {"error": "Invalid response format", "message": "Could not find JSON in response"}
+            result, _ = json.JSONDecoder().raw_decode(stdout, json_start)
+            log.info(f"response: {json.dumps(result, indent=4)}")
+            return result
         except json.JSONDecodeError as e:
             log.error(f"Error parsing template response: {e}")
-            # Try to fix the JSON manually
-            stdout = res["stdout"]
-            json_start = stdout.find("{")
-            json_end = stdout.rfind("}") + 1
-            if json_start >= 0 and json_end > json_start:
-                json_str = stdout[json_start:json_end]
-                # Add missing comma after templates array
-                json_str = json_str.replace(']\n  "', '],\n  "')
-                try:
-                    result = json.loads(json_str)
-                    log.info(f"Fixed JSON response: {json.dumps(result, indent=4)}")
-                    return result
-                except json.JSONDecodeError:
-                    pass
-
             return {"error": "Invalid response format", "message": str(e)}
 
     def request_machines(self, template_name: str, machine_count: int) -> dict[str, Any]:
@@ -283,10 +208,7 @@ class HostFactoryMock:
 
         request_file_name = write_request_json_to_a_tmp_file(request)
 
-        if self.scheduler == "default":
-            res = self._run_orb_command("machines request", request_file_name)
-        else:
-            res = run_bash_script(self.request_machines_script, request_file_name)
+        res = run_bash_script(self.request_machines_script, request_file_name)
         log.debug(f"response: {res}")
 
         if res["return_code"] != 0:
@@ -294,43 +216,16 @@ class HostFactoryMock:
             return {"error": "Failed to request machines", "message": res["stderr"]}
 
         try:
-            # Extract the JSON part from stdout
             stdout = res["stdout"]
-            # Find the JSON part (starts with '{' and ends with '}')
             json_start = stdout.find("{")
-            json_end = stdout.rfind("}") + 1
-
-            if json_start >= 0 and json_end > json_start:
-                json_str = stdout[json_start:json_end]
-                # Fix common JSON formatting issues
-                json_str = json_str.replace(']\n  "', '],\n  "')
-
-                result = json.loads(json_str)
-                log.info(f"response: {json.dumps(result, indent=4)}")
-                return result
-            else:
+            if json_start == -1:
                 log.error("Could not find JSON in response")
-                return {
-                    "error": "Invalid response format",
-                    "message": "Could not find JSON in response",
-                }
+                return {"error": "Invalid response format", "message": "Could not find JSON in response"}
+            result, _ = json.JSONDecoder().raw_decode(stdout, json_start)
+            log.info(f"response: {json.dumps(result, indent=4)}")
+            return result
         except json.JSONDecodeError as e:
             log.error(f"Error parsing request response: {e}")
-            # Try to fix the JSON manually
-            stdout = res["stdout"]
-            json_start = stdout.find("{")
-            json_end = stdout.rfind("}") + 1
-            if json_start >= 0 and json_end > json_start:
-                json_str = stdout[json_start:json_end]
-                # Add missing comma after templates array
-                json_str = json_str.replace(']\n  "', '],\n  "')
-                try:
-                    result = json.loads(json_str)
-                    log.info(f"Fixed JSON response: {json.dumps(result, indent=4)}")
-                    return result
-                except json.JSONDecodeError:
-                    pass
-
             return {"error": "Invalid response format", "message": str(e)}
 
     def get_request_status(self, request_id: str) -> dict[str, Any]:
@@ -343,10 +238,7 @@ class HostFactoryMock:
 
         request_file_name = write_request_json_to_a_tmp_file(request)
 
-        if self.scheduler == "default":
-            res = self._run_orb_command("requests status", request_file_name)
-        else:
-            res = run_bash_script(self.get_request_status_script, request_file_name)
+        res = run_bash_script(self.get_request_status_script, request_file_name)
         log.debug(f"response: {res}")
 
         if res["return_code"] != 0:
@@ -354,46 +246,19 @@ class HostFactoryMock:
             return {"error": "Failed to get request status", "message": res["stderr"]}
 
         try:
-            # Extract the JSON part from stdout
             stdout = res["stdout"]
-            # Find the JSON part (starts with '{' and ends with '}')
             json_start = stdout.find("{")
-            json_end = stdout.rfind("}") + 1
-
-            if json_start >= 0 and json_end > json_start:
-                json_str = stdout[json_start:json_end]
-                # Fix common JSON formatting issues
-                json_str = json_str.replace(']\n  "', '],\n  "')
-
-                result = json.loads(json_str)
-                log.info(f"response: {json.dumps(result, indent=4)}")
-                return result
-            else:
+            if json_start == -1:
                 log.error("Could not find JSON in response")
-                return {
-                    "error": "Invalid response format",
-                    "message": "Could not find JSON in response",
-                }
+                return {"error": "Invalid response format", "message": "Could not find JSON in response"}
+            result, _ = json.JSONDecoder().raw_decode(stdout, json_start)
+            log.info(f"response: {json.dumps(result, indent=4)}")
+            return result
         except json.JSONDecodeError as e:
             log.error(f"Error parsing status response: {e}")
-            # Try to fix the JSON manually
-            stdout = res["stdout"]
-            json_start = stdout.find("{")
-            json_end = stdout.rfind("}") + 1
-            if json_start >= 0 and json_end > json_start:
-                json_str = stdout[json_start:json_end]
-                # Add missing comma after templates array
-                json_str = json_str.replace(']\n  "', '],\n  "')
-                try:
-                    result = json.loads(json_str)
-                    log.info(f"Fixed JSON response: {json.dumps(result, indent=4)}")
-                    return result
-                except json.JSONDecodeError:
-                    pass
-
             return {"error": "Invalid response format", "message": str(e)}
 
-    def request_return_machines(self, machine_names: list[str], force: bool = False) -> dict[str, Any]:
+    def request_return_machines(self, machine_names: list[str]) -> dict[str, Any]:
         """Request machines to be returned."""
         if self.scheduler == "default":
             mn_list = [{"machine_id": machine_name} for machine_name in machine_names]
@@ -404,11 +269,7 @@ class HostFactoryMock:
 
         request_file_name = write_request_json_to_a_tmp_file(request)
 
-        extra_args = ["--force"] if force else []
-        if self.scheduler == "default":
-            res = self._run_orb_command("machines return", request_file_name, extra_args=extra_args)
-        else:
-            res = run_bash_script(self.request_return_machines_script, request_file_name, extra_args=extra_args)
+        res = run_bash_script(self.request_return_machines_script, request_file_name)
         log.debug(f"response: {res}")
 
         if res["return_code"] != 0:
@@ -416,43 +277,16 @@ class HostFactoryMock:
             return {"error": "Failed to return machines", "message": res["stderr"]}
 
         try:
-            # Extract the JSON part from stdout
             stdout = res["stdout"]
-            # Find the JSON part (starts with '{' and ends with '}')
             json_start = stdout.find("{")
-            json_end = stdout.rfind("}") + 1
-
-            if json_start >= 0 and json_end > json_start:
-                json_str = stdout[json_start:json_end]
-                # Fix common JSON formatting issues
-                json_str = json_str.replace(']\n  "', '],\n  "')
-
-                result = json.loads(json_str)
-                log.info(f"response: {json.dumps(result, indent=4)}")
-                return result
-            else:
+            if json_start == -1:
                 log.error("Could not find JSON in response")
-                return {
-                    "error": "Invalid response format",
-                    "message": "Could not find JSON in response",
-                }
+                return {"error": "Invalid response format", "message": "Could not find JSON in response"}
+            result, _ = json.JSONDecoder().raw_decode(stdout, json_start)
+            log.info(f"response: {json.dumps(result, indent=4)}")
+            return result
         except json.JSONDecodeError as e:
             log.error(f"Error parsing return response: {e}")
-            # Try to fix the JSON manually
-            stdout = res["stdout"]
-            json_start = stdout.find("{")
-            json_end = stdout.rfind("}") + 1
-            if json_start >= 0 and json_end > json_start:
-                json_str = stdout[json_start:json_end]
-                # Add missing comma after templates array
-                json_str = json_str.replace(']\n  "', '],\n  "')
-                try:
-                    result = json.loads(json_str)
-                    log.info(f"Fixed JSON response: {json.dumps(result, indent=4)}")
-                    return result
-                except json.JSONDecodeError:
-                    pass
-
             return {"error": "Invalid response format", "message": str(e)}
 
     def get_return_requests(self, machine_names: list[str]) -> dict[str, Any]:
@@ -463,10 +297,7 @@ class HostFactoryMock:
 
         request_file_name = write_request_json_to_a_tmp_file(request)
 
-        if self.scheduler == "default":
-            res = self._run_orb_command("requests list", request_file_name)
-        else:
-            res = run_bash_script(self.get_return_requests_script, request_file_name)
+        res = run_bash_script(self.get_return_requests_script, request_file_name)
         log.debug(f"response: {res}")
 
         if res["return_code"] != 0:
@@ -474,43 +305,16 @@ class HostFactoryMock:
             return {"error": "Failed to get return requests", "message": res["stderr"]}
 
         try:
-            # Extract the JSON part from stdout
             stdout = res["stdout"]
-            # Find the JSON part (starts with '{' and ends with '}')
             json_start = stdout.find("{")
-            json_end = stdout.rfind("}") + 1
-
-            if json_start >= 0 and json_end > json_start:
-                json_str = stdout[json_start:json_end]
-                # Fix common JSON formatting issues
-                json_str = json_str.replace(']\n  "', '],\n  "')
-
-                result = json.loads(json_str)
-                log.info(f"response: {json.dumps(result, indent=4)}")
-                return result
-            else:
+            if json_start == -1:
                 log.error("Could not find JSON in response")
-                return {
-                    "error": "Invalid response format",
-                    "message": "Could not find JSON in response",
-                }
+                return {"error": "Invalid response format", "message": "Could not find JSON in response"}
+            result, _ = json.JSONDecoder().raw_decode(stdout, json_start)
+            log.info(f"response: {json.dumps(result, indent=4)}")
+            return result
         except json.JSONDecodeError as e:
             log.error(f"Error parsing return requests response: {e}")
-            # Try to fix the JSON manually
-            stdout = res["stdout"]
-            json_start = stdout.find("{")
-            json_end = stdout.rfind("}") + 1
-            if json_start >= 0 and json_end > json_start:
-                json_str = stdout[json_start:json_end]
-                # Add missing comma after templates array
-                json_str = json_str.replace(']\n  "', '],\n  "')
-                try:
-                    result = json.loads(json_str)
-                    log.info(f"Fixed JSON response: {json.dumps(result, indent=4)}")
-                    return result
-                except json.JSONDecodeError:
-                    pass
-
             return {"error": "Invalid response format", "message": str(e)}
 
 
@@ -548,12 +352,6 @@ def parse_arguments():
         help="Invokes getReturnRequests specify a list of machine names as input",
     )
 
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Force cancel existing return request and re-issue (use with --requestReturnMachines)",
-    )
-
     return parser.parse_args()
 
 
@@ -585,7 +383,7 @@ if __name__ == "__main__":
             log.info(json.dumps(res, indent=4))
 
         if FLAGS.requestReturnMachines:
-            res = hfm.request_return_machines(FLAGS.requestReturnMachines, force=FLAGS.force)
+            res = hfm.request_return_machines(FLAGS.requestReturnMachines)
             log.info(json.dumps(res, indent=4))
 
         if FLAGS.getReturnRequests:

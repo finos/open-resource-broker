@@ -1,9 +1,25 @@
 {
   "AutoScalingGroupName": "{{ asg_name }}",
-  "LaunchTemplate": {
+  {% if has_abis or spot_count > 0 %}"MixedInstancesPolicy": {
+    "LaunchTemplate": {
+      "LaunchTemplateSpecification": {
+        "LaunchTemplateId": "{{ launch_template_id }}",
+        "Version": "{{ launch_template_version }}"
+      }{% if has_abis %},
+      "Overrides": [
+        {
+          "InstanceRequirements": {{ abis_instance_requirements | tojson }}
+        }
+      ]{% endif %}
+    }{% if spot_count > 0 %},
+    "InstancesDistribution": {
+      "OnDemandBaseCapacity": 0,
+      "OnDemandPercentageAboveBaseCapacity": {{ percent_on_demand }}
+    }{% endif %}
+  }{% else %}"LaunchTemplate": {
     "LaunchTemplateId": "{{ launch_template_id }}",
     "Version": "{{ launch_template_version }}"
-  },
+  }{% endif %},
   "MinSize": {{ min_size }},
   "MaxSize": {{ max_size }},
   "DesiredCapacity": {{ desired_capacity }},

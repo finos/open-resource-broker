@@ -274,6 +274,11 @@ class CLIResponseFormatter:
             if context == "request_status" and hasattr(
                 self.scheduler_strategy, "format_request_status_response"
             ):
+                # If data is already a formatted response dict (e.g. {"requests": [...]}),
+                # return it as-is — calling format_request_status_response again would
+                # attempt .to_dict() on plain dicts and crash.
+                if isinstance(data, dict) and "requests" in data:
+                    return data
                 # Handler returns raw DTOs (list) or a single DTO
                 if isinstance(data, list):
                     return self.scheduler_strategy.format_request_status_response(data)
