@@ -26,15 +26,29 @@ os.environ.setdefault("AWS_PROVIDER_LOG_DIR", "./logss")
 os.environ["LOG_DESTINATION"] = "file"
 
 
-_boto_session = boto3.session.Session()
-_ec2_region = (
-    os.environ.get("AWS_REGION")
-    or os.environ.get("AWS_DEFAULT_REGION")
-    or _boto_session.region_name
-    or "eu-west-1"
-)
-ec2_client = _boto_session.client("ec2", region_name=_ec2_region)
-asg_client = _boto_session.client("autoscaling", region_name=_ec2_region)
+def _get_boto_clients():
+    """Get boto3 clients using credentials from ORB_CONFIG_DIR config if available."""
+    profile = None
+    region = None
+
+    config_dir = os.environ.get("ORB_CONFIG_DIR")
+    if config_dir:
+        try:
+            config_path = os.path.join(config_dir, "config.json")
+            with open(config_path) as f:
+                config = json.load(f)
+            providers = config.get("provider", {}).get("providers", [])
+            if providers:
+                provider_config = providers[0].get("config", {})
+                profile = provider_config.get("profile")
+                region = provider_config.get("region")
+        except Exception:
+            pass  # Fall back to defaults
+
+    region = region or os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "eu-west-1"
+
+    session = boto3.session.Session(profile_name=profile, region_name=region)
+    return session.client("ec2", region_name=region), session.client("autoscaling", region_name=region)
 
 
 log = logging.getLogger("awsome_test")
@@ -81,6 +95,7 @@ def get_instance_state(instance_id):
     Returns:
         dict: Contains existence status and state if instance exists
     """
+    ec2_client, _ = _get_boto_clients()
     try:
         response = ec2_client.describe_instances(InstanceIds=[instance_id])
 
@@ -111,7 +126,7 @@ def get_instances_states(instance_ids, client=None):
         return []
 
     if client is None:
-        client = ec2_client
+        client, _ = _get_boto_clients()
 
     states_by_id = {instance_id: None for instance_id in instance_ids}
     chunk_size = 1000  # as per AWS documentation
@@ -154,6 +169,7 @@ def get_instance_details(instance_id):
     Returns:
         dict: Instance details including volume, subnet, and other attributes
     """
+    ec2_client, _ = _get_boto_clients()
     try:
         response = ec2_client.describe_instances(InstanceIds=[instance_id])
         instance = response["Reservations"][0]["Instances"][0]
@@ -213,6 +229,7 @@ def get_parent_resource_from_instance(instance_id: str) -> tuple[Optional[str], 
         Tuple of (resource_id, resource_type) where resource_type is one of:
         'ec2_fleet', 'spot_fleet', 'asg', or None if not found
     """
+    ec2_client, _ = _get_boto_clients()
     try:
         desc = ec2_client.describe_instances(InstanceIds=[instance_id])
         tags = desc["Reservations"][0]["Instances"][0].get("Tags", [])
@@ -243,6 +260,7 @@ def verify_abis_enabled_for_instance(instance_id):
     Given an instance ID, trace back to the parent resource (Fleet or ASG) and
     assert that InstanceRequirements/ABIS are present in the resource config.
     """
+    ec2_client, asg_client = _get_boto_clients()
     resource_id, resource_type = get_parent_resource_from_instance(instance_id)
 
     if not resource_id or not resource_type:
@@ -316,6 +334,7 @@ def _extract_request_id(response: dict) -> str:
 
 def _get_resource_id_from_instance(instance_id: str, provider_api: str) -> Optional[str]:
     """Discover backing fleet/ASG identifier for a given instance using tags."""
+    ec2_client, _ = _get_boto_clients()
     try:
         desc = ec2_client.describe_instances(InstanceIds=[instance_id])
         tags = desc["Reservations"][0]["Instances"][0].get("Tags", [])
@@ -347,6 +366,7 @@ def _get_resource_id_from_instance(instance_id: str, provider_api: str) -> Optio
 
 def _get_capacity(provider_api: str, resource_id: str) -> int:
     """Return target/desired capacity for fleet or ASG."""
+    ec2_client, asg_client = _get_boto_clients()
     resource_id = resource_id or ""
     # Prefer detecting by ID shape to avoid mismatched API calls
     if resource_id.startswith("fleet-"):
@@ -396,6 +416,7 @@ def _wait_for_fleet_stable(resource_id: str, timeout: int = 300) -> None:
         log.warning("Unknown fleet type for %s, skipping stability check", resource_id)
         return
 
+    ec2_client, _ = _get_boto_clients()
     while True:
         try:
             if fleet_type == "SpotFleet":
@@ -910,6 +931,7 @@ def _force_terminate_asg_instances(asg_name: str) -> None:
     Args:
         asg_name: Name of the Auto Scaling Group to terminate
     """
+    _, asg_client = _get_boto_clients()
     try:
         log.info("Force terminating ASG: %s", asg_name)
 
@@ -998,6 +1020,7 @@ def _cleanup_asg_resources(machine_ids: list[str], provider_api: str) -> None:
         )
         # Fallback: try to terminate instances directly
         try:
+            ec2_client, _ = _get_boto_clients()
             ec2_client.terminate_instances(InstanceIds=machine_ids)
             log.info("Initiated direct termination of instances: %s", machine_ids)
         except Exception as e:
@@ -1067,6 +1090,7 @@ def _verify_all_resources_cleaned(
     resource_cleaned = True
     if resource_id and provider_api:
         try:
+            _, asg_client = _get_boto_clients()
             if provider_api == "ASG" or "asg" in provider_api.lower():
                 try:
                     response = asg_client.describe_auto_scaling_groups(
