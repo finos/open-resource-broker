@@ -70,6 +70,11 @@ def setup_cqrs_infrastructure(container: "DIContainer") -> None:
         query_bus, command_bus = BusFactory.create_buses(container, logging_port)
         container.register_instance(QueryBus, query_bus)
         container.register_instance(CommandBus, command_bus)
+        from application.ports.command_bus_port import CommandBusPort
+        from application.ports.query_bus_port import QueryBusPort
+
+        container.register_instance(QueryBusPort, query_bus)
+        container.register_instance(CommandBusPort, command_bus)
 
         logger.info("CQRS infrastructure setup complete")
 
