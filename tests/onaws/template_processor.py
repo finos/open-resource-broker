@@ -144,6 +144,7 @@ class TemplateProcessor:
         self,
         test_name: str,
         template_configs: list[dict],
+        scheduler_type: str = "hostfactory",
     ) -> None:
         """Generate a config directory with multiple custom templates combined.
 
@@ -153,13 +154,14 @@ class TemplateProcessor:
         Args:
             test_name: Directory name under run_templates/
             template_configs: List of dicts with 'template_name' and 'overrides' keys.
+            scheduler_type: Scheduler type - "hostfactory" (camelCase) or "default" (snake_case).
         """
         test_dir = self.run_templates_dir / test_name
         test_dir.mkdir(parents=True, exist_ok=True)
 
         # Load source templates and config
         try:
-            source_templates = self.generate_templates_programmatically("hostfactory")
+            source_templates = self.generate_templates_programmatically(scheduler_type)
         except Exception as exc:
             log.warning(
                 "Programmatic template generation failed (%s), falling back to filesystem", exc
@@ -169,11 +171,13 @@ class TemplateProcessor:
 
         # Build combined template list: one entry per template_config,
         # cloned from the first source template with overrides applied
+        # Key name depends on scheduler wire format: camelCase for HF, snake_case for default
+        template_id_key = "templateId" if scheduler_type == "hostfactory" else "template_id"
         base_entry = source_templates.get("templates", [{}])[0]
         combined = []
         for tc in template_configs:
             entry = dict(base_entry)
-            entry["templateId"] = tc["template_name"]
+            entry[template_id_key] = tc["template_name"]
             for k, v in tc.get("overrides", {}).items():
                 if k in TEMPLATE_OVERRIDE_KEYS:
                     entry[k] = v

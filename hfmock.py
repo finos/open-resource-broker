@@ -144,6 +144,8 @@ class HostFactoryMock:
         # TARGET="IBM_SYMPHONY"
         target = "AWS_PLUGIN"
 
+        hf_scripts_location = Path("./src/infrastructure/scheduler/hostfactory/scripts/")
+
         if target == "IBM_SYMPHONY":
             os.environ["HF_PROVIDER_CONFDIR"] = (
                 "/opt/ibm/spectrumcomputing/hostfactory/conf/providers/awsinst"
@@ -163,15 +165,56 @@ class HostFactoryMock:
 
             hf_scripts_location = Path("./src/infrastructure/scheduler/hostfactory/scripts/")
 
-        self.get_available_templates_script = os.path.join(
-            hf_scripts_location, "getAvailableTemplates.sh"
-        )
-        self.request_machines_script = os.path.join(hf_scripts_location, "requestMachines.sh")
-        self.get_request_status_script = os.path.join(hf_scripts_location, "getRequestStatus.sh")
-        self.request_return_machines_script = os.path.join(
-            hf_scripts_location, "requestReturnMachines.sh"
-        )
-        self.get_return_requests_script = os.path.join(hf_scripts_location, "getReturnRequests.sh")
+        if scheduler != "default":
+            self.get_available_templates_script = os.path.join(
+                hf_scripts_location, "getAvailableTemplates.sh"
+            )
+            self.request_machines_script = os.path.join(hf_scripts_location, "requestMachines.sh")
+            self.get_request_status_script = os.path.join(
+                hf_scripts_location, "getRequestStatus.sh"
+            )
+            self.request_return_machines_script = os.path.join(
+                hf_scripts_location, "requestReturnMachines.sh"
+            )
+            self.get_return_requests_script = os.path.join(
+                hf_scripts_location, "getReturnRequests.sh"
+            )
+
+    def _run_orb_command(
+        self, subcommand: str, request_file: str, extra_args: list[str] | None = None, timeout: int = 300
+    ) -> dict[str, Any]:
+        """Run orb CLI command directly (used for default scheduler).
+
+        Args:
+            subcommand: orb subcommand, e.g. "templates list" or "machines request"
+            request_file: Path to the JSON input file passed via -f
+            extra_args: Additional arguments appended after the subcommand
+            timeout: Timeout in seconds
+
+        Returns:
+            Dict containing stdout, stderr, and return_code
+        """
+        cmd = ["orb", "-f", request_file] + subcommand.split() + (extra_args or [])
+        log.debug(f"Running orb command: {cmd}")
+        try:
+            result = subprocess.run(
+                cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            return {
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "return_code": result.returncode,
+            }
+        except subprocess.TimeoutExpired:
+            log.error(f"orb command timed out after {timeout} seconds")
+            return {"stdout": "", "stderr": f"Timeout after {timeout} seconds", "return_code": -1}
+        except Exception as e:
+            log.error(f"Unexpected error running orb command: {e}")
+            return {"stdout": "", "stderr": str(e), "return_code": -1}
 
     def get_available_templates(self) -> dict[str, Any]:
         """Get available templates."""
@@ -180,7 +223,10 @@ class HostFactoryMock:
 
         request_file_name = write_request_json_to_a_tmp_file(request)
 
-        res = run_bash_script(self.get_available_templates_script, request_file_name)
+        if self.scheduler == "default":
+            res = self._run_orb_command("templates list", request_file_name)
+        else:
+            res = run_bash_script(self.get_available_templates_script, request_file_name)
         log.debug(f"response: {res}")
 
         if res["return_code"] != 0:
@@ -237,7 +283,10 @@ class HostFactoryMock:
 
         request_file_name = write_request_json_to_a_tmp_file(request)
 
-        res = run_bash_script(self.request_machines_script, request_file_name)
+        if self.scheduler == "default":
+            res = self._run_orb_command("machines request", request_file_name)
+        else:
+            res = run_bash_script(self.request_machines_script, request_file_name)
         log.debug(f"response: {res}")
 
         if res["return_code"] != 0:
@@ -294,7 +343,10 @@ class HostFactoryMock:
 
         request_file_name = write_request_json_to_a_tmp_file(request)
 
-        res = run_bash_script(self.get_request_status_script, request_file_name)
+        if self.scheduler == "default":
+            res = self._run_orb_command("requests status", request_file_name)
+        else:
+            res = run_bash_script(self.get_request_status_script, request_file_name)
         log.debug(f"response: {res}")
 
         if res["return_code"] != 0:
@@ -353,7 +405,10 @@ class HostFactoryMock:
         request_file_name = write_request_json_to_a_tmp_file(request)
 
         extra_args = ["--force"] if force else []
-        res = run_bash_script(self.request_return_machines_script, request_file_name, extra_args=extra_args)
+        if self.scheduler == "default":
+            res = self._run_orb_command("machines return", request_file_name, extra_args=extra_args)
+        else:
+            res = run_bash_script(self.request_return_machines_script, request_file_name, extra_args=extra_args)
         log.debug(f"response: {res}")
 
         if res["return_code"] != 0:
@@ -408,7 +463,10 @@ class HostFactoryMock:
 
         request_file_name = write_request_json_to_a_tmp_file(request)
 
-        res = run_bash_script(self.get_return_requests_script, request_file_name)
+        if self.scheduler == "default":
+            res = self._run_orb_command("requests list", request_file_name)
+        else:
+            res = run_bash_script(self.get_return_requests_script, request_file_name)
         log.debug(f"response: {res}")
 
         if res["return_code"] != 0:
