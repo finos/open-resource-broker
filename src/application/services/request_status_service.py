@@ -43,6 +43,9 @@ class RequestStatusService:
             failed_count = sum(
                 1 for m in machines_to_check if m.status.value in ["terminated", "failed"]
             )
+            pending_count = sum(
+                1 for m in machines_to_check if m.status.value in ["pending", "starting"]
+            )
             total_count = len(machines_to_check)
 
             # Determine new status based on request type
@@ -73,7 +76,11 @@ class RequestStatusService:
                 return RequestStatus.COMPLETED.value, "All instances running successfully"
             elif failed_count == total_count:
                 return RequestStatus.FAILED.value, "All instances failed"
+            elif pending_count > 0:
+                # Still have pending/starting instances — keep polling
+                return RequestStatus.IN_PROGRESS.value, f"{running_count}/{total_count} instances running, waiting for {pending_count} more"
             elif running_count > 0:
+                # All instances terminal, mix of running and failed
                 return (
                     RequestStatus.PARTIAL.value,
                     f"{running_count}/{total_count} instances running",
