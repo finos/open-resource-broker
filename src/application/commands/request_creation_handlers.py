@@ -405,7 +405,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             await self._update_request_to_failed(request, [str(e)])
 
     def _update_machines_to_pending(self, machine_ids: list[str]) -> None:
-        """Update machine statuses to pending (termination in progress)."""
+        """Update machine statuses to shutting-down (termination in progress)."""
         with self.uow_factory.create_unit_of_work() as uow:
             for machine_id in machine_ids:
                 machine = uow.machines.get_by_id(machine_id)
@@ -413,7 +413,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                     from domain.machine.machine_status import MachineStatus
 
                     updated_machine = machine.update_status(
-                        MachineStatus.PENDING, "Termination in progress"
+                        MachineStatus.SHUTTING_DOWN, "Termination in progress"
                     )
                     uow.machines.save(updated_machine)
 

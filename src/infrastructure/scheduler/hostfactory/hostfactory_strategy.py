@@ -953,10 +953,10 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         """Map machine status to HostFactory result field per hf_docs/input-output.md."""
         # Per docs: "Possible values: 'executing', 'fail', 'succeed'"
         if request_type == "return":
-            # For return requests, terminated is success
+            # For return requests: terminated/stopped = success, in-flight = executing
             if status in ["terminated", "stopped"]:
                 return "succeed"
-            elif status in ["pending", "terminating"]:
+            elif status in ["shutting-down", "stopping", "pending", "terminating"]:
                 return "executing"
             else:
                 return "fail"

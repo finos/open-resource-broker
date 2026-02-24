@@ -114,6 +114,7 @@ class MachineSyncService:
 
                 # Convert raw AWS instances to domain machines using machine adapter
                 domain_machines = []
+                returned_ids = set()
                 for aws_instance_data in instances:
                     try:
                         processed_data = machine_adapter.create_machine_from_aws_instance(
@@ -122,11 +123,28 @@ class MachineSyncService:
                             request.provider_api or "RunInstances",
                             request.resource_ids[0] if request.resource_ids else "",
                         )
-
                         machine = self._create_machine_from_processed_data(processed_data, request)
                         domain_machines.append(machine)
+                        returned_ids.add(processed_data["instance_id"])
                     except Exception as e:
                         self.logger.warning(f"Failed to create machine from AWS data: {e}")
+
+                # For return requests: instances missing from AWS response have been
+                # terminated and purged (~1hr window). Treat them as terminated.
+                if request.request_type.value == "return":
+                    queried_ids = set(parameters.get("instance_ids", []))
+                    missing_ids = queried_ids - returned_ids
+                    for missing_id in missing_ids:
+                        self.logger.info(
+                            f"Instance {missing_id} not found in AWS — treating as terminated"
+                        )
+                        existing = next(
+                            (m for m in db_machines if m.machine_id.value == missing_id), None
+                        )
+                        if existing:
+                            domain_machines.append(
+                                self._create_terminated_machine(existing)
+                            )
 
                 return domain_machines, result.metadata or {}
             else:
@@ -175,6 +193,15 @@ class MachineSyncService:
             security_group_ids=processed_data.get("security_group_ids", []),
             metadata=processed_data.get("metadata", {}),
         )
+
+    def _create_terminated_machine(self, existing: Machine) -> Machine:
+        """Return a copy of an existing DB machine with status set to TERMINATED."""
+        from domain.machine.machine_status import MachineStatus
+
+        machine_data = existing.model_dump()
+        machine_data["status"] = MachineStatus.TERMINATED
+        machine_data["version"] = existing.version + 1
+        return Machine.model_validate(machine_data)
 
     async def sync_machines_with_provider(
         self, request: Request, db_machines: list[Machine], provider_machines: list[Machine]
