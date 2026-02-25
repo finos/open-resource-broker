@@ -51,7 +51,7 @@
         {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}
         {%- endfor %}
       ]
-    }{% if fleet_type == "instant" %},
+    },
     {
       "ResourceType": "instance",
       "Tags": [
@@ -63,6 +63,6 @@
         {"Key": "{{ tag.key }}", "Value": "{{ tag.value }}"}
         {%- endfor %}
       ]
-    }{% endif %}
+    }
   ]
 }

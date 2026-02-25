@@ -64,6 +64,8 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
         request_adapter: RequestAdapterPort = None,  # type: ignore[assignment]
         machine_adapter: Optional[AWSMachineAdapter] = None,
         error_handler: ErrorHandlingPort = None,  # type: ignore[assignment]
+        aws_native_spec_service=None,
+        config_port=None,
     ) -> None:
         """
         Initialize RunInstances handler with integrated dependencies.
@@ -85,31 +87,9 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             request_adapter,
             machine_adapter,
             error_handler,
+            aws_native_spec_service=aws_native_spec_service,
+            config_port=config_port,
         )
-
-        # Get AWS native spec service from container
-        from infrastructure.di.container import get_container
-
-        container = get_container()
-        try:
-            from providers.aws.infrastructure.services.aws_native_spec_service import (
-                AWSNativeSpecService,
-            )
-
-            self.aws_native_spec_service = container.get(AWSNativeSpecService)
-            # Get config port for package info
-            from domain.base.ports.configuration_port import ConfigurationPort
-
-            self.config_port = container.get(ConfigurationPort)
-
-            if self._machine_adapter is None:
-                from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
-
-                self._machine_adapter = container.get(AWSMachineAdapter)
-        except Exception:
-            # Service not available, native specs disabled
-            self.aws_native_spec_service = None
-            self.config_port = None
 
     @handle_infrastructure_exceptions(context="run_instances_creation")
     def acquire_hosts(self, request: Request, aws_template: AWSTemplate) -> dict[str, Any]:
@@ -172,12 +152,6 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
         launch_template_result = self.launch_template_manager.create_or_update_launch_template(
             aws_template, request
         )
-
-        # Store launch template info in request (if request has this method)
-        if hasattr(request, "set_launch_template_info"):
-            request.set_launch_template_info(  # type: ignore[attr-defined]
-                launch_template_result.template_id, launch_template_result.version
-            )
 
         # Create RunInstances parameters
         run_params = self._create_run_instances_params(
@@ -292,15 +266,6 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 else None
             ),
         }
-
-    def _get_default_capacity_type(self, price_type: str) -> str:
-        """Get default target capacity type based on price type."""
-        if price_type == "spot":
-            return "spot"
-        elif price_type == "ondemand":
-            return "on-demand"
-        else:  # heterogeneous or None
-            return "on-demand"
 
     def _get_spot_instance_type(self, allocation_strategy: str) -> str:
         """Convert allocation strategy to spot instance type for RunInstances."""
@@ -597,6 +562,8 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             resource_mapping: Dict mapping instance_id to (resource_id or None, desired_capacity)
         """
         try:
+            if resource_mapping:
+                self._logger.debug('resource_mapping provided to release_hosts but not used by RunInstances handler')
             if not machine_ids:
                 self._logger.warning("No instance IDs provided for RunInstances termination")
                 return
@@ -619,27 +586,31 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
     def get_example_templates(cls) -> list[Template]:
         """Get example templates for RunInstances handler."""
         return [
-            Template(
+            AWSTemplate(
                 template_id="RunInstances-OnDemand",
                 name="Run Instances On-Demand",
                 description="On-demand instances using RunInstances API",
-                provider_type="aws",
                 provider_api="RunInstances",
                 machine_types={"t3.medium": 1},
+                image_id="ami-12345678",
                 max_instances=5,
                 price_type="ondemand",
+                subnet_ids=["subnet-12345678"],
+                security_group_ids=["sg-12345678"],
                 tags={"Environment": "dev", "ManagedBy": "ORB"},
             ),
-            Template(
+            AWSTemplate(
                 template_id="RunInstances-Spot",
                 name="Run Instances Spot",
                 description="Spot instances using RunInstances API",
-                provider_type="aws",
                 provider_api="RunInstances",
                 machine_types={"t3.medium": 1},
+                image_id="ami-12345678",
                 max_instances=10,
                 price_type="spot",
                 max_price=0.05,
+                subnet_ids=["subnet-12345678"],
+                security_group_ids=["sg-12345678"],
                 tags={"Environment": "dev", "ManagedBy": "ORB"},
             ),
         ]

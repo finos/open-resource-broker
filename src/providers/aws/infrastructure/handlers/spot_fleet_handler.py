@@ -42,7 +42,6 @@ from providers.aws.domain.template.value_objects import AWSFleetType
 from providers.aws.exceptions.aws_exceptions import (
     AWSInfrastructureError,
     AWSValidationError,
-    IAMError,
 )
 from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from providers.aws.infrastructure.aws_client import AWSClient
@@ -67,6 +66,8 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         launch_template_manager: AWSLaunchTemplateManager,
         request_adapter: RequestAdapterPort = None,  # type: ignore[assignment]
         machine_adapter: Optional[AWSMachineAdapter] = None,
+        aws_native_spec_service=None,
+        config_port=None,
     ) -> None:
         """
         Initialize the Spot Fleet handler.
@@ -86,31 +87,9 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             launch_template_manager,
             request_adapter,
             machine_adapter,
+            aws_native_spec_service=aws_native_spec_service,
+            config_port=config_port,
         )
-
-        # Get AWS native spec service from container
-        from infrastructure.di.container import get_container
-
-        container = get_container()
-        try:
-            from providers.aws.infrastructure.services.aws_native_spec_service import (
-                AWSNativeSpecService,
-            )
-
-            self.aws_native_spec_service = container.get(AWSNativeSpecService)
-            # Get config port for package info
-            from domain.base.ports.configuration_port import ConfigurationPort
-
-            self.config_port = container.get(ConfigurationPort)
-
-            if self._machine_adapter is None:
-                from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
-
-                self._machine_adapter = container.get(AWSMachineAdapter)
-        except Exception:
-            # Service not available, native specs disabled
-            self.aws_native_spec_service = None
-            self.config_port = None
 
     @handle_infrastructure_exceptions(context="spot_fleet_creation")
     def acquire_hosts(self, request: Request, aws_template: AWSTemplate) -> dict[str, Any]:
@@ -179,9 +158,6 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
         fleet_id = response["SpotFleetRequestId"]
         self._logger.info("Successfully created Spot Fleet request: %s", fleet_id)
-
-        # Apply post-creation tagging for spot fleet instances as fallback
-        self._tag_spot_fleet_instances_if_needed(fleet_id, request, aws_template)  # type: ignore[attr-defined]
 
         return response
 
@@ -312,43 +288,6 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             return True
         return False
 
-    def _check_iam_permissions(self, role_arn: str) -> None:
-        """
-        Check if current credentials have necessary IAM permissions.
-
-        Args:
-            role_arn: The role ARN to validate permissions for
-
-        Raises:
-            IAMError: If permissions are insufficient
-        """
-        try:
-            # Get current identity
-            identity = self.aws_client.sts_client.get_caller_identity()
-
-            # Check permissions - create IAM client directly from session
-            iam_client = self.aws_client.session.client("iam", config=self.aws_client.boto_config)
-            response = iam_client.simulate_principal_policy(
-                PolicySourceArn=identity["Arn"],
-                ActionNames=[
-                    "ec2:RequestSpotFleet",
-                    "ec2:ModifySpotFleetRequest",
-                    "ec2:CancelSpotFleetRequests",
-                    "ec2:DescribeSpotFleetRequests",
-                    "ec2:DescribeSpotFleetInstances",
-                    "iam:PassRole",
-                ],
-                ResourceArns=[role_arn],
-            )
-
-            # Check evaluation results
-            for result in response["EvaluationResults"]:
-                if result["EvalDecision"] != "allowed":
-                    raise IAMError(f"Missing permission: {result['EvalActionName']}")
-
-        except Exception as e:
-            raise IAMError(f"Failed to validate IAM permissions: {e!s}")
-
     def _prepare_template_context(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
         """Prepare context with all computed values for template rendering."""
 
@@ -424,7 +363,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             "has_overrides": len(instance_overrides) > 1,
             # Fleet configuration
             "fleet_role": template.fleet_role,
-            "allocation_strategy": template.allocation_strategy or "lowestPrice",
+            "allocation_strategy": template.get_spot_fleet_allocation_strategy(),
             "instance_interruption_behavior": getattr(
                 template, "instance_interruption_behavior", "terminate"
             ),
@@ -492,8 +431,6 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         # Handle fleet role - convert EC2Fleet role to SpotFleet role if needed
         fleet_role = template.fleet_role
 
-        self._logger.debug(f"KBG template {template}")
-
         # If using EC2Fleet service role, convert to SpotFleet service role
         if fleet_role and "ec2fleet.amazonaws.com/AWSServiceRoleForEC2Fleet" in fleet_role:
             account_id = self.aws_client.sts_client.get_caller_identity()["Account"]
@@ -546,7 +483,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             "IamFleetRole": fleet_role,
             "AllocationStrategy": self._get_allocation_strategy(template.allocation_strategy or ""),
             "Type": fleet_type_value,
-            "TagSpecifications": [{"ResourceType": "spot-fleet-request", "Tags": common_tags}],
+            "TagSpecifications": [{"ResourceType": "spot-fleet-request", "Tags": common_tags}, {"ResourceType": "instance", "Tags": common_tags}],
         }
 
         # Configure based on price type
@@ -582,136 +519,16 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
             fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
         else:
-            # Add instance type overrides if specified
-            if template.machine_types:
-                # For heterogeneous price type with on-demand instances
-                if template.price_type == "heterogeneous" and template.machine_types_ondemand:
-                    # Create spot instance overrides
-                    spot_overrides = [
-                        {
-                            "InstanceType": instance_type,
-                            "WeightedCapacity": weight,
-                            "Priority": idx + 1,
-                            "SpotPrice": (str(template.max_price) if template.max_price else None),
-                        }
-                        for idx, (instance_type, weight) in enumerate(
-                            template.machine_types.items()
-                        )
-                    ]
-
-                    # Create on-demand instance overrides
-                    ondemand_overrides = [
-                        {
-                            "InstanceType": instance_type,
-                            "WeightedCapacity": weight,
-                            "Priority": idx + len(template.machine_types) + 1,
-                            # Force this to be on-demand by not specifying SpotPrice
-                        }
-                        for idx, (instance_type, weight) in enumerate(
-                            template.machine_types_ondemand.items()
-                        )
-                    ]
-
-                    # Combine both types of overrides
-                    fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = (
-                        spot_overrides + ondemand_overrides
-                    )
-
-                    # Log the combined overrides
-                    self._logger.debug(
-                        "Created combined overrides for heterogeneous fleet: "
-                        f"{len(spot_overrides)} spot instance types, "
-                        f"{len(ondemand_overrides)} on-demand instance types"
-                    )
-                else:
-                    # Standard spot instance overrides
-                    fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = [
-                        {
-                            "InstanceType": instance_type,
-                            "WeightedCapacity": weight,
-                            "Priority": idx + 1,
-                            "SpotPrice": (str(template.max_price) if template.max_price else None),
-                        }
-                        for idx, (instance_type, weight) in enumerate(
-                            template.machine_types.items()
-                        )
-                    ]
-
-            # Add subnet configuration
-            if template.subnet_ids:
-                if "Overrides" not in fleet_config["LaunchTemplateConfigs"][0]:
-                    fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = []
-
-                # For heterogeneous price type with on-demand instances
-                if (
-                    template.price_type == "heterogeneous"
-                    and template.machine_types_ondemand
-                    and template.machine_types
-                ):
-                    # Create spot instance overrides with subnets
-                    spot_overrides = []
-                    for subnet_id in template.subnet_ids:
-                        for idx, (instance_type, weight) in enumerate(
-                            template.machine_types.items()
-                        ):
-                            override = {
-                                "SubnetId": subnet_id,
-                                "InstanceType": instance_type,
-                                "WeightedCapacity": weight,
-                                "Priority": idx + 1,
-                                "SpotPrice": (
-                                    str(template.max_price) if template.max_price else None
-                                ),
-                            }
-                            spot_overrides.append(override)
-
-                    # Create on-demand instance overrides with subnets
-                    ondemand_overrides = []
-                    for subnet_id in template.subnet_ids:
-                        for idx, (instance_type, weight) in enumerate(
-                            template.machine_types_ondemand.items()
-                        ):
-                            override = {
-                                "SubnetId": subnet_id,
-                                "InstanceType": instance_type,
-                                "WeightedCapacity": weight,
-                                "Priority": idx + len(template.machine_types) + 1,
-                                # No SpotPrice for on-demand instances
-                            }
-                            ondemand_overrides.append(override)
-
-                    # Combine both types of overrides
-                    fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = (
-                        spot_overrides + ondemand_overrides
-                    )
-
-                    # Log the combined overrides
-                    self._logger.debug(
-                        "Created combined overrides with subnets for heterogeneous fleet: "
-                        f"{len(spot_overrides)} spot instance overrides, "
-                        f"{len(ondemand_overrides)} on-demand instance overrides"
-                    )
-                # If we have both instance types and subnets, create all combinations
-                elif template.machine_types:
-                    overrides = []
-                    for subnet_id in template.subnet_ids:
-                        for idx, (instance_type, weight) in enumerate(
-                            template.machine_types.items()
-                        ):
-                            override = {
-                                "SubnetId": subnet_id,
-                                "InstanceType": instance_type,
-                                "WeightedCapacity": weight,
-                                "Priority": idx + 1,
-                            }
-                            if template.max_price:
-                                override["SpotPrice"] = str(template.max_price)
-                            overrides.append(override)
-                    fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
-                else:
-                    fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = [
-                        {"SubnetId": subnet_id} for subnet_id in template.subnet_ids
-                    ]
+            from providers.aws.infrastructure.handlers.fleet_override_builder import build_spot_fleet_overrides
+            overrides = build_spot_fleet_overrides(
+                template.machine_types,
+                template.machine_types_ondemand,
+                template.subnet_ids,
+                template.max_price,
+                template.price_type == "heterogeneous",
+            )
+            if overrides:
+                fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
 
         # Add Context field if specified
         if template.context:
@@ -736,47 +553,6 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         }
 
         return strategy_map.get(strategy, "lowestPrice")
-
-    def _monitor_spot_prices(self, aws_template: AWSTemplate) -> dict[str, float]:
-        """Monitor current spot prices in specified regions/AZs."""
-        try:
-            prices = {}
-            instance_types = []
-
-            # Get instance types from template
-            if hasattr(aws_template, "machine_types") and aws_template.machine_types:
-                instance_types = list(aws_template.machine_types.keys())
-            else:
-                # Fallback to single type if machine_types is empty
-                single_type = (
-                    next(iter(aws_template.machine_types.keys()))
-                    if aws_template.machine_types
-                    else "t3.medium"
-                )
-                instance_types = [single_type]
-
-            if not instance_types:
-                self._logger.warning("No instance types found for spot price monitoring")
-                return {}
-
-            price_history = self._retry_with_backoff(
-                lambda: self._paginate(
-                    self.aws_client.ec2_client.describe_spot_price_history,
-                    "SpotPriceHistory",
-                    InstanceTypes=instance_types,
-                    ProductDescriptions=["Linux/UNIX"],
-                )
-            )
-
-            for price in price_history:
-                key = f"{price['InstanceType']}-{price['AvailabilityZone']}"
-                prices[key] = float(price["SpotPrice"])
-
-            return prices
-
-        except Exception as e:
-            self._logger.warning("Failed to monitor spot prices: %s", str(e))
-            return {}
 
     def check_hosts_status(self, request: Request) -> list[dict[str, Any]]:
         """Check the status of instances across all spot fleets in the request."""
@@ -945,6 +721,8 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     f"Failed to release {len(fleet_errors)} fleet(s): {', '.join(failed_ids)}"
                 )
 
+        except AWSInfrastructureError:
+            raise
         except Exception as e:
             self._logger.error("Failed to release Spot Fleet hosts: %s", str(e))
             raise AWSInfrastructureError(f"Failed to release Spot Fleet hosts: {e!s}")
@@ -1189,89 +967,101 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         """Get example templates for SpotFleet handler."""
         return [
             # Request fleet type examples
-            Template(
+            AWSTemplate(
                 template_id="SpotFleet-Request-LowestPrice",
                 name="Spot Fleet Request - Lowest Price",
                 description="Spot Fleet request with lowest price allocation",
-                provider_type="aws",
                 provider_api="SpotFleet",
                 machine_types={"t3.medium": 1, "t3.large": 2},
+                image_id="ami-12345678",
                 max_instances=20,
                 price_type="spot",
-                allocation_strategy="lowest_price",
+                allocation_strategy="lowestPrice",
                 fleet_type="request",
                 max_price=0.05,
+                subnet_ids=["subnet-12345678"],
+                security_group_ids=["sg-12345678"],
                 tags={"Environment": "dev", "ManagedBy": "ORB"},
             ),
-            Template(
+            AWSTemplate(
                 template_id="SpotFleet-Request-Diversified",
                 name="Spot Fleet Request - Diversified",
                 description="Spot Fleet request with diversified allocation",
-                provider_type="aws",
                 provider_api="SpotFleet",
                 machine_types={"t3.medium": 1, "t3.large": 2},
+                image_id="ami-12345678",
                 max_instances=25,
                 price_type="spot",
                 allocation_strategy="diversified",
                 fleet_type="request",
                 max_price=0.06,
+                subnet_ids=["subnet-12345678"],
+                security_group_ids=["sg-12345678"],
                 tags={"Environment": "dev", "ManagedBy": "ORB"},
             ),
-            Template(
+            AWSTemplate(
                 template_id="SpotFleet-Request-CapacityOptimized",
                 name="Spot Fleet Request - Capacity Optimized",
                 description="Spot Fleet request with capacity optimized allocation",
-                provider_type="aws",
                 provider_api="SpotFleet",
                 machine_types={"t3.medium": 1, "t3.large": 2},
+                image_id="ami-12345678",
                 max_instances=30,
                 price_type="spot",
-                allocation_strategy="capacity_optimized",
+                allocation_strategy="capacityOptimized",
                 fleet_type="request",
                 max_price=0.07,
+                subnet_ids=["subnet-12345678"],
+                security_group_ids=["sg-12345678"],
                 tags={"Environment": "dev", "ManagedBy": "ORB"},
             ),
             # Maintain fleet type examples
-            Template(
+            AWSTemplate(
                 template_id="SpotFleet-Maintain-LowestPrice",
                 name="Spot Fleet Maintain - Lowest Price",
                 description="Spot Fleet maintain with lowest price allocation",
-                provider_type="aws",
                 provider_api="SpotFleet",
                 machine_types={"t3.medium": 1, "t3.large": 2},
+                image_id="ami-12345678",
                 max_instances=15,
                 price_type="spot",
-                allocation_strategy="lowest_price",
+                allocation_strategy="lowestPrice",
                 fleet_type="maintain",
                 max_price=0.04,
+                subnet_ids=["subnet-12345678"],
+                security_group_ids=["sg-12345678"],
                 tags={"Environment": "prod", "ManagedBy": "ORB"},
             ),
-            Template(
+            AWSTemplate(
                 template_id="SpotFleet-Maintain-Diversified",
                 name="Spot Fleet Maintain - Diversified",
                 description="Spot Fleet maintain with diversified allocation",
-                provider_type="aws",
                 provider_api="SpotFleet",
                 machine_types={"t3.medium": 1, "t3.large": 2},
+                image_id="ami-12345678",
                 max_instances=20,
                 price_type="spot",
                 allocation_strategy="diversified",
                 fleet_type="maintain",
                 max_price=0.05,
+                subnet_ids=["subnet-12345678"],
+                security_group_ids=["sg-12345678"],
                 tags={"Environment": "prod", "ManagedBy": "ORB"},
             ),
-            Template(
+            AWSTemplate(
                 template_id="SpotFleet-Maintain-CapacityOptimized",
                 name="Spot Fleet Maintain - Capacity Optimized",
                 description="Spot Fleet maintain with capacity optimized allocation",
-                provider_type="aws",
                 provider_api="SpotFleet",
                 machine_types={"t3.medium": 1, "t3.large": 2},
+                image_id="ami-12345678",
                 max_instances=25,
                 price_type="spot",
-                allocation_strategy="capacity_optimized",
+                allocation_strategy="capacityOptimized",
                 fleet_type="maintain",
                 max_price=0.06,
+                subnet_ids=["subnet-12345678"],
+                security_group_ids=["sg-12345678"],
                 tags={"Environment": "prod", "ManagedBy": "ORB"},
             ),
         ]

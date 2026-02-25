@@ -66,6 +66,8 @@ class AWSHandler(ABC):
         request_adapter=None,
         machine_adapter=None,
         error_handler: Optional[ErrorHandlingPort] = None,
+        aws_native_spec_service: Optional[Any] = None,
+        config_port: Optional[Any] = None,
     ) -> None:
         """
         Initialize AWS handler with standardized dependencies.
@@ -84,6 +86,8 @@ class AWSHandler(ABC):
         self.launch_template_manager = launch_template_manager
         self._machine_adapter = machine_adapter
         self.error_handler = error_handler
+        self.aws_native_spec_service = aws_native_spec_service
+        self.config_port = config_port
         self.max_retries = 3
         self.base_delay = 1  # seconds
         self.max_delay = 10  # seconds
@@ -620,3 +624,12 @@ class AWSHandler(ABC):
     def get_handler_type(self) -> str:
         """Get handler type from class name."""
         return self.__class__.__name__.replace("Handler", "").lower()
+
+    def _get_default_capacity_type(self, price_type: str) -> str:
+        """Get default target capacity type based on price type."""
+        if price_type == "spot":
+            return "spot"
+        elif price_type == "ondemand":
+            return "on-demand"
+        else:  # heterogeneous or None
+            return "on-demand"

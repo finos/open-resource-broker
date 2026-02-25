@@ -3,7 +3,6 @@
 from datetime import datetime
 from typing import Any
 
-from domain.request.aggregate import Request
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
 
@@ -110,25 +109,3 @@ class BaseContextMixin:
             "has_monitoring": hasattr(template, "monitoring_enabled")
             and template.monitoring_enabled is not None,
         }
-
-    def _apply_post_creation_tagging(
-        self, resource_id: str, request: Request, template: AWSTemplate
-    ):
-        """Apply base tags after resource creation using AWSOperations."""
-        if hasattr(self, "aws_operations") and self.aws_operations:  # type: ignore[attr-defined]
-            self.aws_operations.apply_base_tags_to_resource(resource_id, request, template)  # type: ignore[attr-defined]
-
-    def _tag_fleet_instances_if_needed(
-        self, fleet_id: str, request: Request, template: AWSTemplate
-    ):
-        """Tag fleet instances based on provider_api using AWSOperations."""
-        if hasattr(self, "aws_operations") and self.aws_operations:  # type: ignore[attr-defined]
-            if hasattr(template, "provider_api") and template.provider_api:
-                provider_api_str = (
-                    template.provider_api.value
-                    if hasattr(template.provider_api, "value")
-                    else str(template.provider_api)
-                )
-                self.aws_operations.discover_and_tag_fleet_instances(  # type: ignore[attr-defined]
-                    fleet_id, request, template, provider_api_str
-                )

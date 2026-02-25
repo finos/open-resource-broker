@@ -468,7 +468,7 @@ def register_aws_services_with_di(container) -> None:
                     config_port=c.get(ConfigurationPort),
                 )
 
-            container.register_factory(AWSNativeSpecService, create_aws_native_spec_service)
+            container.register_singleton(AWSNativeSpecService, create_aws_native_spec_service)
             logger.debug("AWS Native Spec Service registered with DI container")
 
         logger.debug("AWS utility services registered with DI container")

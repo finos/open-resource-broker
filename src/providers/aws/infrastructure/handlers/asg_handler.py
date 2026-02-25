@@ -61,6 +61,8 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         launch_template_manager: AWSLaunchTemplateManager,
         request_adapter: RequestAdapterPort = None,
         machine_adapter: Optional[AWSMachineAdapter] = None,
+        aws_native_spec_service=None,
+        config_port=None,
     ) -> None:
         """
         Initialize the ASG handler with integrated dependencies.
@@ -80,31 +82,9 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             launch_template_manager,
             request_adapter,
             machine_adapter,
+            aws_native_spec_service=aws_native_spec_service,
+            config_port=config_port,
         )
-
-        # Get AWS native spec service from container
-        from infrastructure.di.container import get_container
-
-        container = get_container()
-        try:
-            from providers.aws.infrastructure.services.aws_native_spec_service import (
-                AWSNativeSpecService,
-            )
-
-            self.aws_native_spec_service = container.get(AWSNativeSpecService)
-            # Get config port for package info
-            from domain.base.ports.configuration_port import ConfigurationPort
-
-            self.config_port = container.get(ConfigurationPort)
-
-            if self._machine_adapter is None:
-                from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
-
-                self._machine_adapter = container.get(AWSMachineAdapter)
-        except Exception:
-            # Service not available, native specs disabled
-            self.aws_native_spec_service = None
-            self.config_port = None
 
     @handle_infrastructure_exceptions(context="asg_creation")
     def acquire_hosts(self, request: Request, aws_template: AWSTemplate) -> dict[str, Any]:
@@ -162,14 +142,9 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             aws_template, request
         )
 
-        # Store launch template info in request (if request has this method)
-        if hasattr(request, "set_launch_template_info"):
-            request.set_launch_template_info(
-                launch_template_result.template_id, launch_template_result.version
-            )
 
         # Generate ASG name
-        asg_name = f"hf-{request.request_id}"
+        asg_name = f"{get_resource_prefix('asg')}{request.request_id}"
 
         # Create ASG configuration
         asg_config = self._create_asg_config(
@@ -302,10 +277,10 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
     ) -> dict[str, Any]:
         """Prepare ASG-specific context."""
 
-        # Capacity split for heterogeneous pricing
+        capacity = self._calculate_capacity_distribution(template, request.requested_count)
+        on_demand_count = capacity['on_demand_count']
+        spot_count = capacity['spot_count']
         percent_on_demand = template.percent_on_demand or 0
-        on_demand_count = int(request.requested_count * percent_on_demand / 100)
-        spot_count = request.requested_count - on_demand_count
 
         # ABIS instance requirements
         abis_instance_requirements = template.get_instance_requirements_payload()
@@ -502,25 +477,20 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
     @handle_infrastructure_exceptions(context="asg_termination")
     def _get_asg_instances(self, asg_name: str) -> list[dict[str, Any]]:
-        """Get instances for a specific ASG using DescribeAutoScalingInstances pagination."""
-        # Collect all membership entries across pages
-        asg_instances = self._retry_with_backoff(
-            lambda: self._paginate(
-                self.aws_client.autoscaling_client.describe_auto_scaling_instances,
-                "AutoScalingInstances",
-            )
+        """Get instances for a specific ASG."""
+        response = self._retry_with_backoff(
+            self.aws_client.autoscaling_client.describe_auto_scaling_groups,
+            operation_type='standard',
+            AutoScalingGroupNames=[asg_name],
         )
-
-        instance_ids = [
-            entry.get("InstanceId")
-            for entry in asg_instances
-            if entry.get("AutoScalingGroupName") == asg_name and entry.get("InstanceId")
-        ]
-
-        if not instance_ids:
-            self._logger.warning("ASG %s not found or has no instances", asg_name)
+        groups = response.get('AutoScalingGroups', [])
+        if not groups:
+            self._logger.warning('ASG %s not found', asg_name)
             return []
-
+        instance_ids = [inst['InstanceId'] for inst in groups[0].get('Instances', []) if inst.get('InstanceId')]
+        if not instance_ids:
+            self._logger.warning('No instances found in ASG %s', asg_name)
+            return []
         return self._get_instance_details(instance_ids)
 
     def _format_instance_data(
@@ -786,18 +756,19 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             self._logger.debug("Detached chunk from ASG %s: %s", asg_name, chunk)
         self._logger.info("Detached instances from ASG %s: %s", asg_name, asg_instance_ids)
 
-        # Then reduce desired capacity
-        current_capacity = asg_details["DesiredCapacity"]
-        new_capacity = max(0, current_capacity - len(asg_instance_ids))
+        # detach_instances with ShouldDecrementDesiredCapacity=True already decremented
+        # the live DesiredCapacity counter in AWS. Only update MinSize if it would now
+        # exceed the post-detach capacity.
+        new_capacity = max(0, asg_details["DesiredCapacity"] - len(asg_instance_ids))
 
-        self._retry_with_backoff(
-            self.aws_client.autoscaling_client.update_auto_scaling_group,
-            operation_type="critical",
-            AutoScalingGroupName=asg_name,
-            DesiredCapacity=new_capacity,
-            MinSize=min(new_capacity, asg_details["MinSize"]),
-        )
-        self._logger.info("Reduced ASG %s capacity to %s", asg_name, new_capacity)
+        if asg_details["MinSize"] > new_capacity:
+            self._retry_with_backoff(
+                self.aws_client.autoscaling_client.update_auto_scaling_group,
+                operation_type="critical",
+                AutoScalingGroupName=asg_name,
+                MinSize=new_capacity,
+            )
+            self._logger.info("Reduced ASG %s MinSize to %s", asg_name, new_capacity)
 
         # Use consolidated AWS operations utility for instance termination
         self.aws_ops.terminate_instances_with_fallback(
@@ -976,46 +947,46 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
     def get_example_templates(cls) -> list[Template]:
         """Get example templates for ASG handler."""
         return [
-            Template(
+            AWSTemplate(
                 template_id="ASG-OnDemand",
                 name="Auto Scaling Group On-Demand",
                 description="Auto Scaling Group with on-demand instances only",
-                provider_type="aws",
                 provider_api="AutoScalingGroup",
                 instance_type="t3.medium",
+                image_id="ami-12345678",
                 max_instances=15,
                 price_type="ondemand",
-                subnet_ids=["subnet-xxxxx"],
-                security_group_ids=["sg-xxxxx"],
+                subnet_ids=["subnet-12345678"],
+                security_group_ids=["sg-12345678"],
                 tags={"Environment": "prod", "ManagedBy": "ORB"},
             ),
-            Template(
+            AWSTemplate(
                 template_id="ASG-Spot",
                 name="Auto Scaling Group Spot",
                 description="Auto Scaling Group with spot instances only",
-                provider_type="aws",
                 provider_api="AutoScalingGroup",
                 instance_type="t3.medium",
+                image_id="ami-12345678",
                 max_instances=20,
                 price_type="spot",
                 max_price=0.05,
-                subnet_ids=["subnet-xxxxx"],
-                security_group_ids=["sg-xxxxx"],
+                subnet_ids=["subnet-12345678"],
+                security_group_ids=["sg-12345678"],
                 tags={"Environment": "dev", "ManagedBy": "ORB"},
             ),
-            Template(
+            AWSTemplate(
                 template_id="ASG-Mixed",
                 name="Auto Scaling Group Mixed",
                 description="Auto Scaling Group with mixed on-demand and spot instances",
-                provider_type="aws",
                 provider_api="AutoScalingGroup",
                 machine_types={"t3.medium": 1, "t3.large": 2},
+                image_id="ami-12345678",
                 max_instances=25,
                 price_type="heterogeneous",
                 percent_on_demand=30,
-                allocation_strategy="lowest_price",
-                subnet_ids=["subnet-xxxxx", "subnet-yyyyy"],
-                security_group_ids=["sg-xxxxx"],
+                allocation_strategy="lowestPrice",
+                subnet_ids=["subnet-12345678", "subnet-87654321"],
+                security_group_ids=["sg-12345678"],
                 tags={"Environment": "prod", "ManagedBy": "ORB"},
             ),
         ]
