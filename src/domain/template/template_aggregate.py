@@ -166,7 +166,7 @@ class Template(BaseModel):
 
     def update_image_id(self, new_image_id: str) -> "Template":
         """Update the image ID and return a new template instance."""
-        fields = self.model_dump()
+        fields = self.model_dump(mode="json")
         fields["image_id"] = new_image_id
         fields["updated_at"] = datetime.now()
         return self.__class__.model_validate(fields)

@@ -1439,7 +1439,7 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
                 graceful_completed = True
                 break
 
-            status_response = hfm.get_return_requests(return_request_id)
+            status_response = hfm.get_request_status(return_request_id)
             log.debug(json.dumps(status_response, indent=4))
             if status_response.get("error"):
                 pytest.fail(

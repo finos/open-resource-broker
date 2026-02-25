@@ -259,8 +259,6 @@ class TemplateProcessor:
 
         sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-        strategy = TemplateProcessor._make_strategy(scheduler_type)
-
         # Find the real generated templates file in config/
         config_dir = Path(__file__).parent.parent.parent / "config"
         templates_file = config_dir / "aws_templates.json"
@@ -270,9 +268,15 @@ class TemplateProcessor:
                 "Run 'orb templates generate' first."
             )
 
-        # Load via production path — preserves image_id, subnet_ids, etc.
-        raw_dicts = strategy.load_templates_from_path(str(templates_file))
-        formatted = strategy.format_templates_for_generation(raw_dicts)
+        # The source file is always in hostfactory camelCase format.
+        # Load via HostFactorySchedulerStrategy so camelCase→snake_case mapping is applied,
+        # preserving image_id, subnet_ids, security_group_ids etc.
+        # Then format via the target strategy for the correct wire format.
+        hf_strategy = TemplateProcessor._make_strategy("hostfactory")
+        raw_dicts = hf_strategy.load_templates_from_path(str(templates_file))
+
+        target_strategy = TemplateProcessor._make_strategy(scheduler_type)
+        formatted = target_strategy.format_templates_for_generation(raw_dicts)
 
         return {"scheduler_type": scheduler_type, "templates": formatted}
 

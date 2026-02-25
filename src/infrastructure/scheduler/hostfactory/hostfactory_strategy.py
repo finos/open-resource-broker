@@ -942,6 +942,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "partial": "complete_with_error",
             "failed": "complete_with_error",
             "cancelled": "complete_with_error",
+            "timeout": "complete_with_error",
         }
 
         return status_mapping.get(domain_status.lower(), "running")

@@ -455,13 +455,16 @@ class AWSLaunchTemplateManager:
 
         # Add optional configurations
         if aws_template.subnet_id:
-            launch_template_data["NetworkInterfaces"] = [
-                {
-                    "DeviceIndex": 0,
-                    "SubnetId": aws_template.subnet_id,
-                    "AssociatePublicIpAddress": True,
-                }
-            ]
+            network_interface: dict[str, Any] = {
+                "DeviceIndex": 0,
+                "SubnetId": aws_template.subnet_id,
+                "AssociatePublicIpAddress": True,
+            }
+            if aws_template.security_group_ids:
+                network_interface["Groups"] = aws_template.security_group_ids
+            launch_template_data["NetworkInterfaces"] = [network_interface]
+        elif aws_template.security_group_ids:
+            launch_template_data["SecurityGroupIds"] = aws_template.security_group_ids
 
         if aws_template.key_name:
             launch_template_data["KeyName"] = aws_template.key_name

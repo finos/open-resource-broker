@@ -473,3 +473,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
                 update_error,
                 exc_info=True,
             )
+            # Ensure the request reaches a terminal status so callers don't poll forever
+            await self._update_request_to_failed(
+                request, [f"Failed to mark completed: {update_error}"]
+            )
