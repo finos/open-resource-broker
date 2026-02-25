@@ -398,11 +398,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         if any("InstanceRequirements" in o for o in overrides):
             return  # already present — respect it
 
-        if any("InstanceType" in o for o in overrides):
-            # ABIS takes precedence — replace InstanceType overrides with InstanceRequirements
-            lt["Overrides"] = [{"InstanceRequirements": instance_requirements}]
-            return
-
+        # ABIS takes precedence — replace any InstanceType overrides with InstanceRequirements
         lt["Overrides"] = [{"InstanceRequirements": instance_requirements}]
 
         lt_spec = lt.setdefault("LaunchTemplateSpecification", {})

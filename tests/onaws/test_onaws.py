@@ -846,7 +846,7 @@ def setup_host_factory_mock(request, monkeypatch):
     # Set environment variables
     test_config_dir = processor.run_templates_dir / test_name
     monkeypatch.setenv("ORB_CONFIG_DIR", str(test_config_dir / "config"))
-    monkeypatch.setenv("HF_PROVIDER_CONFDIR", str(test_config_dir))
+    monkeypatch.setenv("HF_PROVIDER_CONFDIR", str(test_config_dir / "config"))
     monkeypatch.setenv("HF_PROVIDER_LOGDIR", str(test_config_dir / "logs"))
     monkeypatch.setenv("HF_PROVIDER_WORKDIR", str(test_config_dir / "work"))
     monkeypatch.setenv("DEFAULT_PROVIDER_WORKDIR", str(test_config_dir / "work"))
@@ -895,7 +895,7 @@ def setup_host_factory_mock_with_scenario(request, monkeypatch):
     # Set environment variables
     test_config_dir = processor.run_templates_dir / test_name
     monkeypatch.setenv("ORB_CONFIG_DIR", str(test_config_dir / "config"))
-    monkeypatch.setenv("HF_PROVIDER_CONFDIR", str(test_config_dir))
+    monkeypatch.setenv("HF_PROVIDER_CONFDIR", str(test_config_dir / "config"))
     monkeypatch.setenv("HF_PROVIDER_LOGDIR", str(test_config_dir / "logs"))
     monkeypatch.setenv("HF_PROVIDER_WORKDIR", str(test_config_dir / "work"))
     monkeypatch.setenv("DEFAULT_PROVIDER_WORKDIR", str(test_config_dir / "work"))
