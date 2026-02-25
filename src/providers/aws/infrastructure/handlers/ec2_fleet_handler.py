@@ -474,6 +474,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             "needs_overrides": bool(instance_overrides or ondemand_overrides),
             # Fleet-specific flags
             "is_maintain_fleet": template.fleet_type == AWSFleetType.MAINTAIN,
+            "is_instant_fleet": template.fleet_type == AWSFleetType.INSTANT,
             "replace_unhealthy": template.fleet_type == AWSFleetType.MAINTAIN,
             "has_spot_options": bool(template.allocation_strategy or template.max_price),
             "has_ondemand_options": bool(template.allocation_strategy_on_demand),
@@ -585,8 +586,11 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             fleet_tags.extend([{"Key": k, "Value": v} for k, v in template.tags.items()])
         fleet_config["TagSpecifications"] = [
             {"ResourceType": "fleet", "Tags": fleet_tags},
-            {"ResourceType": "instance", "Tags": fleet_tags},
         ]
+        if template.fleet_type == AWSFleetType.INSTANT:
+            fleet_config["TagSpecifications"].append(
+                {"ResourceType": "instance", "Tags": fleet_tags}
+            )
 
         # Add fleet type specific configurations
         if template.fleet_type == AWSFleetType.MAINTAIN:

@@ -358,6 +358,9 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     "Using native provider API spec with merge for ASG template %s",
                     aws_template.template_id,
                 )
+                self._ensure_abis_in_native_spec(
+                    native_spec, aws_template, launch_template_id, launch_template_version
+                )
                 return native_spec
 
             # Use template-driven approach with native spec service
@@ -366,6 +369,53 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         # Fallback to legacy logic when native spec service is not available
         return self._create_asg_config_legacy(
             asg_name, aws_template, request, launch_template_id, launch_template_version
+        )
+
+    def _ensure_abis_in_native_spec(
+        self,
+        native_spec: dict[str, Any],
+        aws_template: AWSTemplate,
+        launch_template_id: str,
+        launch_template_version: str,
+    ) -> None:
+        """Ensure ABIS InstanceRequirements are present in native spec MixedInstancesPolicy."""
+        instance_requirements = aws_template.get_instance_requirements_payload()
+        if not instance_requirements:
+            return
+
+        if "MixedInstancesPolicy" not in native_spec:
+            native_spec["MixedInstancesPolicy"] = {}
+
+        mip = native_spec["MixedInstancesPolicy"]
+
+        if "LaunchTemplate" not in mip:
+            mip["LaunchTemplate"] = {}
+
+        lt = mip["LaunchTemplate"]
+
+        overrides = lt.get("Overrides", [])
+        if any("InstanceRequirements" in o for o in overrides):
+            return  # already present — respect it
+
+        if any("InstanceType" in o for o in overrides):
+            self._logger.warning(
+                "Native spec for template %s has explicit InstanceType overrides; "
+                "skipping ABIS InstanceRequirements injection",
+                aws_template.template_id,
+            )
+            return
+
+        lt["Overrides"] = [{"InstanceRequirements": instance_requirements}]
+
+        lt_spec = lt.setdefault("LaunchTemplateSpecification", {})
+        lt_spec.setdefault("LaunchTemplateId", launch_template_id)
+        lt_spec.setdefault("Version", launch_template_version)
+
+        native_spec.pop("LaunchTemplate", None)
+
+        self._logger.info(
+            "Injected ABIS InstanceRequirements into native spec for template %s",
+            aws_template.template_id,
         )
 
     def _create_asg_config_legacy(

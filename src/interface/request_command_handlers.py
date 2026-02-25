@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING, Any, Union
 
 from domain.base.ports.scheduler_port import SchedulerPort
+from domain.request.exceptions import RequestNotFoundError
 from infrastructure.di.buses import CommandBus, QueryBus
 from infrastructure.di.container import get_container
 from infrastructure.error.decorators import handle_interface_exceptions
@@ -107,10 +108,21 @@ async def handle_get_request_status(
                 request_dto = await query_bus.execute(query)
                 if request_dto:
                     request_dtos.append(request_dto)
+            except RequestNotFoundError:
+                from datetime import datetime
+
+                from application.request.dto import RequestDTO
+
+                request_dtos.append(
+                    RequestDTO(
+                        request_id=str(request_ids[0]),
+                        status="pending",
+                        requested_count=0,
+                        created_at=datetime.utcnow(),
+                    )
+                )
             except Exception:
-                # Return empty requests list rather than propagating — callers
-                # poll this endpoint and must always receive {"requests": [...]}
-                pass
+                raise
         else:
             # For multiple IDs, we need to query each individually since there's no batch query yet
             from application.dto.queries import GetRequestQuery
@@ -121,9 +133,21 @@ async def handle_get_request_status(
                     request_dto = await query_bus.execute(query)
                     if request_dto:
                         request_dtos.append(request_dto)
+                except RequestNotFoundError:
+                    from datetime import datetime
+
+                    from application.request.dto import RequestDTO
+
+                    request_dtos.append(
+                        RequestDTO(
+                            request_id=str(request_id),
+                            status="pending",
+                            requested_count=0,
+                            created_at=datetime.utcnow(),
+                        )
+                    )
                 except Exception:
-                    # Continue with other requests if one fails
-                    continue
+                    raise
 
         # Format response using scheduler strategy
         return scheduler_strategy.format_request_status_response(request_dtos)
@@ -222,7 +246,7 @@ async def handle_request_machines(
         resource_ids = getattr(request_dto, "resource_ids", []) if request_dto else []
 
         # Create response data with resource ID information
-        status = request_dto.status if request_dto else "unknown"
+        status = request_dto.status if request_dto else "pending"
         error_msg = None
         if request_dto and hasattr(request_dto, "metadata"):
             if isinstance(request_dto.metadata, dict):
@@ -241,7 +265,7 @@ async def handle_request_machines(
         # Return success response using scheduler strategy formatting
         if scheduler_strategy:
             response = scheduler_strategy.format_request_response(request_data)
-            status = request_dto.status if request_dto else "unknown"
+            status = request_dto.status if request_dto else "pending"
             exit_code = scheduler_strategy.get_exit_code_for_status(status)
             return response, exit_code
         else:
