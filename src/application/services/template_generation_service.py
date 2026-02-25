@@ -113,9 +113,6 @@ class TemplateGenerationService:
                 provider_type, provider_name, request.provider_api
             )
 
-            # Determine output filename
-            filename = self._determine_filename(provider, request)
-
             # Format templates using scheduler strategy
             formatted_examples = self._format_templates(examples, request)
 
@@ -208,10 +205,10 @@ class TemplateGenerationService:
 
         if request.provider_specific:
             # Provider-specific mode: use provider name pattern
-            config_dict = self._get_config_dict()
             return self._scheduler_strategy.get_templates_filename(
                 provider_name,
-                config_dict,  # type: ignore[call-arg]
+                provider_type,
+                config=self._get_config_dict(),
             )
         elif request.provider_type_filter:
             # Provider-type mode: use specified provider type

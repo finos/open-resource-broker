@@ -92,7 +92,7 @@ class SchedulerPort(ABC):
         """Get directory path for the given file type."""
 
     @abstractmethod
-    def get_templates_filename(self, provider_name: str, provider_type: str) -> str:
+    def get_templates_filename(self, provider_name: str, provider_type: str, config: dict | None = None) -> str:
         """Get templates filename for the given provider."""
 
     @abstractmethod

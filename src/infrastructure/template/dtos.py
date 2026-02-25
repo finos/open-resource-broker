@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from application.dto.base import BaseDTO
 
@@ -84,14 +84,16 @@ class TemplateDTO(BaseDTO):
     percent_on_demand: Optional[int] = None
     abis_instance_requirements: Optional[dict[str, Any]] = None
 
-    def __post_init__(self) -> None:
-        """Validate required fields."""
-        if not self.template_id:
-            raise ValueError("template_id is required")
-        if not self.name:
-            raise ValueError("name is required")
-        if not self.provider_api:
-            raise ValueError("provider_api is required")
+    @model_validator(mode="before")
+    @classmethod
+    def _set_defaults(cls, data: Any) -> Any:
+        """Set default values for optional fields derived from other fields."""
+        if isinstance(data, dict):
+            if not data.get("name"):
+                data["name"] = data.get("template_id")
+            if not data.get("provider_api"):
+                data["provider_api"] = "aws"
+        return data
 
     @classmethod
     def from_domain(cls, template) -> "TemplateDTO":

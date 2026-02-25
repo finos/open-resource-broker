@@ -13,7 +13,7 @@ PROVIDER_API_ALIASES: dict[str, str] = {
 }
 
 if TYPE_CHECKING:
-    pass
+    from domain.template.ports.template_defaults_port import TemplateDefaultsPort
 
 from application.dto.responses import MachineDTO
 from application.request.dto import RequestDTO
@@ -29,11 +29,14 @@ from infrastructure.utilities.common.string_utils import extract_provider_type
 class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
     """HostFactory scheduler strategy for field mapping and response formatting."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        template_defaults_service: "TemplateDefaultsPort | None" = None,
+    ) -> None:
         """Initialize the instance."""
         self._config_manager = None
         self._logger = None
-        self._template_defaults_service = None
+        self._template_defaults_service = template_defaults_service
         # Initialize field mapper lazily - will be created when first needed
         self._field_mapper = None
 
@@ -58,16 +61,6 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
 
                 return get_logger(__name__)  # fallback, don't cache — pick up DI logger once ready
         return self._logger
-
-    @property
-    def template_defaults_service(self):
-        if self._template_defaults_service is None:
-            from domain.template.ports.template_defaults_port import TemplateDefaultsPort
-            from infrastructure.di.container import get_container, is_container_ready
-
-            if is_container_ready():
-                self._template_defaults_service = get_container().get_optional(TemplateDefaultsPort)
-        return self._template_defaults_service
 
     @property
     def field_mapper(self) -> HostFactoryFieldMapper:
@@ -154,20 +147,17 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
 
         # Business logic - Apply template defaults
         target_provider = provider_override or self._get_provider_name()
-        if self.template_defaults_service:
-            mapped["provider_api"] = self.template_defaults_service.resolve_provider_api_default(
+        if self._template_defaults_service:
+            mapped["provider_api"] = self._template_defaults_service.resolve_provider_api_default(
                 template
             )
             mapped["provider_api"] = PROVIDER_API_ALIASES.get(
                 mapped["provider_api"], mapped["provider_api"]
             )
-            # Apply all template defaults using the service
-            mapped = self.template_defaults_service.resolve_template_defaults(
-                mapped, target_provider
-            )
         else:
             raw_api = template.get("providerApi", template.get("provider_api", "EC2Fleet"))
             mapped["provider_api"] = PROVIDER_API_ALIASES.get(raw_api, raw_api)
+        mapped = self._apply_template_defaults(mapped, target_provider)
 
         if "template_id" in mapped:
             mapped["name"] = template.get("name", mapped["template_id"])
@@ -249,19 +239,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
 
     def format_request_response(self, request_data: Any) -> dict[str, Any]:
         """Format request creation response to HostFactory format."""
-        # Allow both dicts and Pydantic-style objects
-        if hasattr(request_data, "model_dump"):
-            request_dict = request_data.model_dump()
-        elif hasattr(request_data, "to_dict"):
-            request_dict = request_data.to_dict()
-        elif isinstance(request_data, dict):
-            request_dict = request_data
-        else:
-            # Fallback: try to coerce to dict
-            try:
-                request_dict = dict(request_data)
-            except Exception:
-                request_dict = {}
+        request_dict = self._coerce_to_dict(request_data)
 
         if "requests" in request_dict:
             return {
@@ -270,20 +248,8 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
                 "message": request_dict.get("message", "Status retrieved successfully"),
             }
 
-        # Prefer snake_case in API responses
-        request_id = request_dict.get("request_id", request_dict.get("requestId"))
-
-        # Handle UUID objects and nested value objects
-        if isinstance(request_id, dict) and "value" in request_id:
-            request_id = str(request_id["value"])
-        elif (
-            request_id is not None
-            and not isinstance(request_id, dict)
-            and hasattr(request_id, "value")
-        ):
-            request_id = str(request_id.value)
-        elif request_id:
-            request_id = str(request_id)
+        raw_id = request_dict.get("request_id", request_dict.get("requestId"))
+        request_id = self._unwrap_request_id(raw_id)
 
         # Check request status to provide appropriate message
         status = request_dict.get("status", "pending")

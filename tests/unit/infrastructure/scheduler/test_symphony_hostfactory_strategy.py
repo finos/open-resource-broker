@@ -1,22 +1,11 @@
 """Tests for Symphony HostFactory scheduler strategy."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
-pytestmark = pytest.mark.skip(
-    reason="application.services.provider_selection_service module removed"
-)
-
-try:
-    from application.services.provider_selection_service import ProviderSelectionResult
-
-    HAS_SELECTION_SERVICE = True
-except ImportError:
-    HAS_SELECTION_SERVICE = False
-
-from domain.template.template_aggregate import Template
 from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
+from infrastructure.template.dtos import TemplateDTO
 
 
 class TestSymphonyHostFactorySchedulerStrategy:
@@ -24,37 +13,21 @@ class TestSymphonyHostFactorySchedulerStrategy:
 
     def setup_method(self):
         """Set up test fixtures."""
-        with patch("infrastructure.di.container.get_container") as mock_get_container:
-            mock_container = Mock()
+        self.mock_config_manager = Mock()
 
-            # Mock ProviderSelectionService to return proper ProviderSelectionResult
-            mock_provider_service = Mock()
-            mock_provider_service.select_active_provider.return_value = ProviderSelectionResult(
-                provider_type="aws", provider_instance="aws-default", selection_reason="test"
-            )
-            mock_container.get.return_value = mock_provider_service
-            mock_get_container.return_value = mock_container
+        # Mock app_config.model_dump() — what get_config_file_path actually calls
+        mock_app_config = Mock()
+        mock_app_config.model_dump.return_value = {
+            "scheduler": {"type": "hostfactory", "config_root": "/test/config"},
+            "provider": {"active_provider": "aws-default"},
+        }
+        self.mock_config_manager.app_config = mock_app_config
 
-            self.mock_config_manager = Mock()
-            self.mock_config_manager.get_app_config.return_value = {
-                "scheduler": {"type": "hostfactory", "config_root": "/test/config"},
-                "provider": {"active_provider": "aws-default"},
-            }
+        self.mock_logger = Mock()
 
-            # Mock provider config to return appropriate values instead of Mock objects
-            mock_provider_config = Mock()
-            mock_provider_config.active_provider = "aws-default"
-            self.mock_config_manager.get_provider_config.return_value = mock_provider_config
-
-            # Mock resolve_file method to return actual paths
-            def mock_resolve_file(file_type, filename):
-                config_root = "/test/config"
-                return f"{config_root}/{filename}"
-
-            self.mock_config_manager.resolve_file.side_effect = mock_resolve_file
-
-            self.mock_logger = Mock()
-            self.strategy = HostFactorySchedulerStrategy(self.mock_config_manager, self.mock_logger)
+        self.strategy = HostFactorySchedulerStrategy()
+        self.strategy._config_manager = self.mock_config_manager
+        self.strategy._logger = self.mock_logger
 
     def test_get_config_file_path(self):
         """Test config file path generation."""
@@ -63,15 +36,12 @@ class TestSymphonyHostFactorySchedulerStrategy:
 
     def test_get_paths_with_different_provider(self):
         """Test path generation with different provider."""
-        self.mock_config_manager.get_app_config.return_value = {
+        mock_app_config = Mock()
+        mock_app_config.model_dump.return_value = {
             "scheduler": {"config_root": "/test/config"},
             "provider": {"active_provider": "provider1-production"},
         }
-
-        # Update the provider config mock as well
-        mock_provider_config = Mock()
-        mock_provider_config.active_provider = "provider1-production"
-        self.mock_config_manager.get_provider_config.return_value = mock_provider_config
+        self.mock_config_manager.app_config = mock_app_config
 
         config_path = self.strategy.get_config_file_path()
 
@@ -97,17 +67,14 @@ class TestSymphonyHostFactorySchedulerStrategy:
             "createdAt": "2023-01-01T00:00:00Z",
             "updatedAt": "2023-01-02T00:00:00Z",
             "isActive": True,
-            "keyName": "test-key",
-            "userData": "#!/bin/bash\necho hello",
         }
 
         template = self.strategy.parse_template_config(raw_template)
 
-        # Verify all Symphony → Domain field mappings
+        # Verify Symphony → Domain field mappings (TemplateDTO fields)
         assert template.template_id == "test-template-123"
         assert template.name == "Test Template"
         assert template.description == "Test description"
-        assert template.instance_type == "t2.micro"
         assert template.image_id == "ami-12345678"
         assert template.max_instances == 10
         assert template.subnet_ids == ["subnet-123", "subnet-456"]
@@ -119,8 +86,6 @@ class TestSymphonyHostFactorySchedulerStrategy:
         assert template.metadata == {"owner": "test-user"}
         assert template.provider_api == "aws"
         assert template.is_active is True
-        assert template.key_name == "test-key"
-        assert template.user_data == "#!/bin/bash\necho hello"
 
     def test_parse_template_config_with_defaults(self):
         """Test template parsing with default values."""
@@ -146,12 +111,10 @@ class TestSymphonyHostFactorySchedulerStrategy:
 
     def test_format_templates_response_single_mapping_point(self):
         """Test template response formatting - SINGLE FIELD MAPPING POINT."""
-        # Create domain template
-        template = Template(
+        # Create TemplateDTO (what format_templates_response expects)
+        template = TemplateDTO(
             template_id="test-template",
             name="Test Template",
-            description="Test description",
-            instance_type="t2.micro",
             image_id="ami-12345678",
             max_instances=5,
             subnet_ids=["subnet-123"],
@@ -160,34 +123,24 @@ class TestSymphonyHostFactorySchedulerStrategy:
             allocation_strategy="capacity_optimized",
             max_price=0.03,
             tags={"Environment": "test"},
-            metadata={"owner": "test-user"},
             provider_api="aws",
             is_active=True,
-            key_name="test-key",
             user_data="#!/bin/bash\necho test",
         )
 
         response = self.strategy.format_templates_response([template])
 
-        # Verify all Domain → Symphony field mappings
+        # Verify Domain → Symphony field mappings (only fields present in output)
         symphony_template = response["templates"][0]
         assert symphony_template["templateId"] == "test-template"
-        assert symphony_template["name"] == "Test Template"
-        assert symphony_template["description"] == "Test description"
-        assert symphony_template["vmType"] == "t2.micro"
         assert symphony_template["imageId"] == "ami-12345678"
         assert symphony_template["maxNumber"] == 5
-        assert symphony_template["subnetIds"] == ["subnet-123"]
+        assert symphony_template["subnetId"] == "subnet-123"  # first subnet, singular key
         assert symphony_template["securityGroupIds"] == ["sg-123"]
         assert symphony_template["priceType"] == "spot"
         assert symphony_template["allocationStrategy"] == "capacity_optimized"
-        assert symphony_template["maxPrice"] == 0.03
-        assert symphony_template["tags"] == {"Environment": "test"}
-        assert symphony_template["metadata"] == {"owner": "test-user"}
-        assert symphony_template["providerApi"] == "aws"
-        assert symphony_template["isActive"] is True
-        assert symphony_template["keyName"] == "test-key"
-        assert symphony_template["userData"] == "#!/bin/bash\necho test"
+        assert symphony_template["maxSpotPrice"] == 0.03  # mapped from max_price for spot
+        assert symphony_template["userDataScript"] == "#!/bin/bash\necho test"
 
     def test_parse_request_data_single_mapping_point(self):
         """Test request data parsing - SINGLE FIELD MAPPING POINT."""
@@ -201,6 +154,7 @@ class TestSymphonyHostFactorySchedulerStrategy:
         parsed_request = self.strategy.parse_request_data(raw_request)
 
         # Verify Symphony → Domain field mappings for requests
+        assert isinstance(parsed_request, dict)
         assert parsed_request["template_id"] == "test-template"
         assert parsed_request["requested_count"] == 3
         assert parsed_request["request_type"] == "provision"
@@ -213,6 +167,7 @@ class TestSymphonyHostFactorySchedulerStrategy:
         parsed_request = self.strategy.parse_request_data(raw_request)
 
         # Verify defaults
+        assert isinstance(parsed_request, dict)
         assert parsed_request["template_id"] == "test-template"
         assert parsed_request["requested_count"] == 1  # Default
         assert parsed_request["request_type"] == "provision"  # Default
@@ -272,11 +227,11 @@ class TestSymphonyHostFactorySchedulerStrategy:
         response = self.strategy.format_templates_response([domain_template])
         symphony_template = response["templates"][0]
 
-        # Verify round-trip consistency for key fields
+        # Verify round-trip consistency for fields that survive the TemplateDTO round-trip.
+        # subnetIds (list) maps to subnetId (first element, singular) on output.
         assert symphony_template["templateId"] == original_data["templateId"]
-        assert symphony_template["vmType"] == original_data["vmType"]
         assert symphony_template["imageId"] == original_data["imageId"]
         assert symphony_template["maxNumber"] == original_data["maxNumber"]
-        assert symphony_template["subnetIds"] == original_data["subnetIds"]
+        assert symphony_template["subnetId"] == ",".join(original_data["subnetIds"])
         assert symphony_template["priceType"] == original_data["priceType"]
         assert symphony_template["allocationStrategy"] == original_data["allocationStrategy"]

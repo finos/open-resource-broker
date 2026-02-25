@@ -23,13 +23,17 @@ def create_symphony_hostfactory_strategy(config: Any) -> "SchedulerPort":
     Returns:
         SchedulerPort: Symphony HostFactory scheduler strategy instance
     """
+    from domain.template.ports.template_defaults_port import TemplateDefaultsPort
+    from infrastructure.di.container import get_container, is_container_ready
     from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
         HostFactorySchedulerStrategy,
     )
 
-    # Don't try to get container during registration - causes circular dependency
-    # Dependencies will be injected later via lazy properties
-    return HostFactorySchedulerStrategy()
+    template_defaults_service = None
+    if is_container_ready():
+        template_defaults_service = get_container().get_optional(TemplateDefaultsPort)
+
+    return HostFactorySchedulerStrategy(template_defaults_service=template_defaults_service)
 
 
 def create_hostfactory_config(data: dict[str, Any]) -> Any:
@@ -70,11 +74,15 @@ def create_default_strategy(config: Any) -> "SchedulerPort":
     Returns:
         SchedulerPort: Default scheduler strategy instance
     """
+    from domain.template.ports.template_defaults_port import TemplateDefaultsPort
+    from infrastructure.di.container import get_container, is_container_ready
     from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 
-    # Don't try to get container during registration - causes circular dependency
-    # Dependencies will be injected later via lazy properties
-    return DefaultSchedulerStrategy()
+    template_defaults_service = None
+    if is_container_ready():
+        template_defaults_service = get_container().get_optional(TemplateDefaultsPort)
+
+    return DefaultSchedulerStrategy(template_defaults_service=template_defaults_service)
 
 
 def create_default_config(data: dict[str, Any]) -> Any:

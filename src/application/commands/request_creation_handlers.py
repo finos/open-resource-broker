@@ -98,9 +98,16 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
             command, template, selection_result
         )
 
+        # Store request_id in command immediately so caller always has it
+        command.created_request_id = str(request.request_id)
+
+        # Persist with initial status so get_request_status works even if provisioning throws
+        await self._persist_and_publish(request)
+
         # Handle dry-run fast path
         if request.metadata.get("dry_run", False):
             request = self._handle_dry_run(request)
+            await self._persist_and_publish(request)
         else:
             # Execute provisioning and update status
             provisioning_result = await self._provisioning_service.execute_provisioning(
@@ -109,12 +116,8 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
             request = await self._status_service.update_request_from_provisioning(
                 request, provisioning_result
             )
-
-        # Persist and publish events
-        await self._persist_and_publish(request)
-
-        # Store request_id in command for caller to use
-        command.created_request_id = str(request.request_id)
+            # Persist final status
+            await self._persist_and_publish(request)
 
         self.logger.info("Machine request created successfully: %s", request.request_id)
 
@@ -394,6 +397,7 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             # Update request status based on result
             if provisioning_result.get("success", False):
                 self._update_machines_to_pending(machine_ids)
+                await self._update_request_to_completed(request)
                 self.logger.info("Termination initiated for request %s", request.request_id)
             else:
                 await self._update_request_to_failed(request, provisioning_result.get("errors", []))
@@ -444,6 +448,28 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
         except Exception as update_error:
             self.logger.error(
                 "Failed to update request status: %s",
+                update_error,
+                exc_info=True,
+            )
+
+    async def _update_request_to_completed(self, request: Any) -> None:
+        """Update return request status to completed and persist."""
+        try:
+            from application.dto.commands import UpdateRequestStatusCommand
+            from application.ports.command_bus_port import CommandBusPort
+            from domain.request.request_types import RequestStatus
+
+            update_command = UpdateRequestStatusCommand(
+                request_id=str(request.request_id),
+                status=RequestStatus.COMPLETED,
+                message="Return request completed: termination initiated",
+            )
+            command_bus = self._container.get(CommandBusPort)
+            await command_bus.execute(update_command)
+            self.logger.info("Updated request %s status to completed", request.request_id)
+        except Exception as update_error:
+            self.logger.error(
+                "Failed to update request status to completed: %s",
                 update_error,
                 exc_info=True,
             )

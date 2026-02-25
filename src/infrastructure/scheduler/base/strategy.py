@@ -12,6 +12,7 @@ from application.request.dto import RequestDTO
 
 # Import from Application layer (correct Clean Architecture)
 from domain.base.ports.scheduler_port import SchedulerPort
+from domain.template.ports.template_defaults_port import TemplateDefaultsPort
 from infrastructure.template.dtos import TemplateDTO
 
 
@@ -24,43 +25,29 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
     Inherits from SchedulerPort which defines all the required abstract methods.
     """
 
-    def __init__(self, config_manager: Any, logger: Any) -> None:
-        """Initialize base scheduler strategy.
+    _template_defaults_service: TemplateDefaultsPort | None = None
 
-        Args:
-            config_manager: Configuration manager instance
-            logger: Logger instance for this strategy
-        """
-        self.config_manager = config_manager
-        self.logger = logger
+    @property
+    @abstractmethod
+    def config_manager(self) -> Any:
+        """Configuration manager instance. Provided by each concrete subclass."""
+        ...
 
-    # Maps internal domain statuses to IBM HF spec statuses
-    _STATUS_MAP = {
-        "pending": "running",
-        "in_progress": "running",
-        "complete": "complete",
-        "completed": "complete",
-        "failed": "complete_with_error",
-        "partial": "complete_with_error",
-        "cancelled": "complete_with_error",
-        "timeout": "complete_with_error",
-    }
+    def _apply_template_defaults(self, template_dict: dict, provider_name: str) -> dict:
+        """Apply template defaults via the template defaults service if available."""
+        if self._template_defaults_service is None:
+            return template_dict
+        return self._template_defaults_service.resolve_template_defaults(template_dict, provider_name)
 
     def format_request_status_response(self, requests: list[RequestDTO]) -> dict[str, Any]:
-        """
-        Format RequestDTOs to native domain response format.
+        """Format RequestDTOs to domain-native response format.
 
-        Uses the RequestDTO's to_dict() method to serialize to native format.
-        Maps internal domain statuses to IBM HF spec statuses before returning.
+        Passes status strings through unchanged (domain values).
+        Protocol-specific strategies (e.g. HostFactory) override this method
+        to apply their own status vocabulary.
         """
-        request_dicts = []
-        for request in requests:
-            d = request.to_dict()
-            if "status" in d:
-                d["status"] = self._STATUS_MAP.get(d["status"], d["status"])
-            request_dicts.append(d)
         return {
-            "requests": request_dicts,
+            "requests": [request.to_dict() for request in requests],
             "message": "Request status retrieved successfully",
             "count": len(requests),
         }
@@ -232,3 +219,28 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
     def format_request_for_display(self, request: RequestDTO) -> dict[str, Any]:
         """Default implementation - clean to_dict without scheduler-specific formatting."""
         return request.to_dict()
+
+    @staticmethod
+    def _unwrap_request_id(value: Any) -> str | None:
+        """Unwrap a request_id that may be a plain value, a dict with 'value', or an object with .value."""
+        if value is None:
+            return None
+        if isinstance(value, dict) and "value" in value:
+            return str(value["value"])
+        if not isinstance(value, (str, int, float, bool, dict)) and hasattr(value, "value"):
+            return str(value.value)
+        return str(value)
+
+    @staticmethod
+    def _coerce_to_dict(request_data: Any) -> dict[str, Any]:
+        """Coerce request_data to a plain dict regardless of its type."""
+        if hasattr(request_data, "model_dump"):
+            return request_data.model_dump()
+        if hasattr(request_data, "to_dict"):
+            return request_data.to_dict()
+        if isinstance(request_data, dict):
+            return request_data
+        try:
+            return dict(request_data)
+        except Exception:
+            return {}

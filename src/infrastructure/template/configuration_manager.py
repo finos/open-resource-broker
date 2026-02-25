@@ -201,22 +201,13 @@ class TemplateConfigurationManager:
         if not template_id:
             raise ValueError("Template missing required template_id field")
 
-        # Apply hierarchical defaults if service is available
-        template_with_defaults = template_dict
-        if self.template_defaults_service:
-            # Determine provider instance for defaults
-            provider_instance = self._determine_provider_instance(template_dict)
-            template_with_defaults = self.template_defaults_service.resolve_template_defaults(
-                template_dict, provider_instance
-            )
-            self.logger.debug("Applied defaults to template %s", template_id)
-
         # AMI resolution is already done in _batch_resolve_images, no need to do it again
+        # Template defaults are applied by the scheduler strategy before this point.
 
         # Create domain Template object from dict with defaults
         # Use factory so provider-specific subclasses (e.g. AWSTemplate) are constructed,
         # preserving fields that base Template silently drops (extra="ignore").
-        template_domain = self.template_factory.create_template(template_with_defaults)
+        template_domain = self.template_factory.create_template(template_dict)
 
         # Convert domain → DTO using existing method
         return TemplateDTO.from_domain(template_domain)
