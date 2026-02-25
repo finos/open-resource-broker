@@ -536,6 +536,12 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                         "LaunchTemplateId": launch_template_id,
                         "Version": launch_template_version,
                     }
+                    if template.abis_instance_requirements:
+                        overrides = native_spec["LaunchTemplateConfigs"][0].get("Overrides", [])
+                        if not any("InstanceRequirements" in o for o in overrides):
+                            native_spec["LaunchTemplateConfigs"][0]["Overrides"] = [
+                                {"InstanceRequirements": template.get_instance_requirements_payload()}
+                            ]
                 self._logger.info(
                     "Using native provider API spec with merge for template %s",
                     template.template_id,

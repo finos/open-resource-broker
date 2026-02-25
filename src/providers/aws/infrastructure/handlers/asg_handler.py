@@ -399,11 +399,8 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             return  # already present — respect it
 
         if any("InstanceType" in o for o in overrides):
-            self._logger.warning(
-                "Native spec for template %s has explicit InstanceType overrides; "
-                "skipping ABIS InstanceRequirements injection",
-                aws_template.template_id,
-            )
+            # ABIS takes precedence — replace InstanceType overrides with InstanceRequirements
+            lt["Overrides"] = [{"InstanceRequirements": instance_requirements}]
             return
 
         lt["Overrides"] = [{"InstanceRequirements": instance_requirements}]

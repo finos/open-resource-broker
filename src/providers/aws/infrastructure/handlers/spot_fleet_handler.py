@@ -354,6 +354,9 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 }
             )
 
+        abis_instance_requirements = template.get_instance_requirements_payload()
+        has_abis = bool(abis_instance_requirements)
+
         return {
             # Fleet-specific values
             "fleet_name": f"{self.config_port.get_resource_prefix('spot_fleet')}{request.request_id}",
@@ -375,6 +378,9 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 else "0.10"
             ),
             "has_spot_price": hasattr(template, "max_price") and template.max_price is not None,
+            # ABIS / InstanceRequirements
+            "abis_instance_requirements": abis_instance_requirements,
+            "has_abis": has_abis,
         }
 
     def _create_spot_fleet_config(
@@ -406,6 +412,13 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                             spec["LaunchTemplate"] = {}
                         spec["LaunchTemplate"]["LaunchTemplateId"] = launch_template_id
                         spec["LaunchTemplate"]["Version"] = launch_template_version
+                if template.abis_instance_requirements:
+                    if "LaunchTemplateConfigs" in native_spec:
+                        overrides = native_spec["LaunchTemplateConfigs"][0].get("Overrides", [])
+                        if not any("InstanceRequirements" in o for o in overrides):
+                            native_spec["LaunchTemplateConfigs"][0]["Overrides"] = [
+                                {"InstanceRequirements": template.get_instance_requirements_payload()}
+                            ]
                 self._logger.info(
                     "Using native provider API spec with merge for SpotFleet template %s",
                     template.template_id,
@@ -413,7 +426,15 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 return native_spec
 
             # Use template-driven approach with native spec service
-            return self.aws_native_spec_service.render_default_spec("spotfleet", context)
+            default_spec = self.aws_native_spec_service.render_default_spec("spotfleet", context)
+            if template.abis_instance_requirements:
+                if "LaunchTemplateConfigs" in default_spec:
+                    overrides = default_spec["LaunchTemplateConfigs"][0].get("Overrides", [])
+                    if not any("InstanceRequirements" in o for o in overrides):
+                        default_spec["LaunchTemplateConfigs"][0]["Overrides"] = [
+                            {"InstanceRequirements": template.get_instance_requirements_payload()}
+                        ]
+            return default_spec
 
         # Fallback to legacy logic when native spec service is not available
         return self._create_spot_fleet_config_legacy(

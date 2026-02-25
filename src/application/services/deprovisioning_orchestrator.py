@@ -165,6 +165,10 @@ class DeprovisioningOrchestrator:
                     "template_id": template_id,
                     "provider_api": provider_api,
                     "resource_id": resource_id,
+                    "resource_mapping": {
+                        iid: (resource_id, len(instance_ids))
+                        for iid in instance_ids
+                    },
                 },
                 context={
                     "correlation_id": str(request.request_id),

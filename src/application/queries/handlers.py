@@ -102,50 +102,16 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
             from application.dto.commands import SyncRequestCommand
             from application.ports.command_bus_port import CommandBusPort
 
-            command_bus = self._container.get(CommandBusPort)
-            sync_command = SyncRequestCommand(request_id=query.request_id)
-            await command_bus.execute(sync_command)
-
-            # Re-query after sync to get updated state
-            request = await self._query_service.get_request(query.request_id)
-            machine_objects = await self._query_service.get_machines_for_request(request)
-
-            # Create RequestDTO using factory
-            request_dto = self._dto_factory.create_from_domain(request, machine_objects)
-
-            # Cache result if caching is enabled
-            if self._cache_service and self._cache_service.is_caching_enabled():
-                self._cache_service.cache_request(query.request_id, request_dto)
-
-            self.logger.info("Retrieved request: %s", query.request_id)
-            return request_dto
-
-        except EntityNotFoundError:
-            self.logger.error("Request not found: %s", query.request_id)
-            raise
-        except Exception as e:
-            self.logger.error("Failed to get request: %s", e)
-            raise
-
-        try:
-            # Check cache first if enabled
-            if self._cache_service and self._cache_service.is_caching_enabled():
-                cached_result = self._cache_service.get_cached_request(query.request_id)
-                if cached_result:
-                    self.logger.info("Cache hit for request: %s", query.request_id)
-                    return cached_result
-
-            # Get request from storage using query service
-            request = await self._query_service.get_request(query.request_id)
-
-            # Lightweight mode: return basic request data without machine fetching or provider sync
-            if query.lightweight:
-                request_dto = self._dto_factory.create_from_domain(request, [])
-                self.logger.info("Retrieved lightweight request: %s", query.request_id)
-                return request_dto
-
-            # Trigger population command if needed (no direct writes in query)
-            await self._machine_sync_service.populate_missing_machine_ids(request)
+            try:
+                command_bus = self._container.get(CommandBusPort)
+                sync_command = SyncRequestCommand(request_id=query.request_id)
+                await command_bus.execute(sync_command)
+            except Exception as sync_err:
+                self.logger.warning(
+                    "Sync failed for request %s, returning stored state: %s",
+                    query.request_id,
+                    sync_err,
+                )
 
             # Re-query after sync to get updated state
             request = await self._query_service.get_request(query.request_id)
