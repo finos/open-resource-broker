@@ -650,30 +650,21 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         resource_id: str,
         request: Request,
     ) -> list[dict[str, Any]]:
-        """Format Spot Fleet instance details to standard structure."""
+        """Format Spot Fleet instance details to standard structure.
+
+        instance_details is already snake_case from _get_instance_details.
+        Just stamp handler-specific context fields.
+        """
         metadata = getattr(request, "metadata", {}) or {}
         provider_api_value = metadata.get("provider_api", "SpotFleet")
 
-        if self._machine_adapter:
-            try:
-                return [
-                    self._machine_adapter.create_machine_from_aws_instance(
-                        inst,
-                        request_id=str(request.request_id),
-                        provider_api=provider_api_value,
-                        resource_id=resource_id,
-                    )
-                    for inst in instance_details
-                ]
-            except Exception as exc:
-                self._logger.error("Failed to normalize instances with machine adapter: %s", exc)
-                raise AWSInfrastructureError(
-                    "Failed to normalize instance data with AWS machine adapter"
-                ) from exc
-
-        return [
-            self._build_fallback_machine_payload(inst, resource_id) for inst in instance_details
-        ]
+        result = []
+        for inst in instance_details:
+            stamped = dict(inst)
+            stamped.setdefault("resource_id", resource_id)
+            stamped.setdefault("provider_api", provider_api_value)
+            result.append(stamped)
+        return result
 
     def release_hosts(  # type: ignore[override]
         self,

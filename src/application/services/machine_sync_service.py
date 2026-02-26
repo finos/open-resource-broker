@@ -107,27 +107,24 @@ class MachineSyncService:
                 instances = result.data.get("instances", [])
                 self.logger.debug(f"Provider returned {len(instances)} instances")
 
-                # Get machine adapter from container (proper DI)
-                from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
-
-                machine_adapter = self.container.get(AWSMachineAdapter)
-
-                # Convert raw AWS instances to domain machines using machine adapter
+                # instances are already snake_case domain dicts from check_hosts_status
+                # via _get_instance_details → machine_adapter (PascalCase→snake_case conversion
+                # happens once in the infrastructure layer). No re-conversion needed here.
                 domain_machines = []
                 returned_ids = set()
-                for aws_instance_data in instances:
+                for instance_data in instances:
                     try:
-                        processed_data = machine_adapter.create_machine_from_aws_instance(
-                            aws_instance_data,
-                            str(request.request_id),
-                            request.provider_api or "RunInstances",
-                            request.resource_ids[0] if request.resource_ids else "",
-                        )
+                        processed_data = {
+                            **instance_data,
+                            "request_id": str(request.request_id),
+                            "provider_api": request.provider_api or "RunInstances",
+                            "resource_id": request.resource_ids[0] if request.resource_ids else "",
+                        }
                         machine = self._create_machine_from_processed_data(processed_data, request)
                         domain_machines.append(machine)
                         returned_ids.add(processed_data["instance_id"])
                     except Exception as e:
-                        self.logger.warning(f"Failed to create machine from AWS data: {e}")
+                        self.logger.warning(f"Failed to create machine from instance data: {e}")
 
                 # For return requests: instances missing from AWS response have been
                 # terminated and purged (~1hr window). Treat them as terminated.

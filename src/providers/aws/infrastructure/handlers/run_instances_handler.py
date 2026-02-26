@@ -193,8 +193,11 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
         request: Request,
         aws_template: Optional[AWSTemplate] = None,
     ) -> list[dict[str, Any]]:
-        """Format AWS instance details to standard structure."""
-        # Use domain field instead of metadata, with template fallback
+        """Format AWS instance details to standard structure.
+
+        instance_details is already snake_case from _get_instance_details.
+        Just stamp handler-specific context fields.
+        """
         if aws_template and aws_template.provider_api is not None:
             provider_api_value = (
                 aws_template.provider_api.value
@@ -204,26 +207,13 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
         else:
             provider_api_value = request.provider_api or "RunInstances"
 
-        if self._machine_adapter:
-            try:
-                return [
-                    self._machine_adapter.create_machine_from_aws_instance(
-                        inst,
-                        request_id=str(request.request_id),
-                        provider_api=provider_api_value,
-                        resource_id=resource_id,
-                    )
-                    for inst in instance_details
-                ]
-            except Exception as exc:
-                self._logger.error("Failed to normalize instances with machine adapter: %s", exc)
-                raise AWSInfrastructureError(
-                    "Failed to normalize instance data with AWS machine adapter"
-                ) from exc
-
-        return [
-            self._build_fallback_machine_payload(inst, resource_id) for inst in instance_details
-        ]
+        result = []
+        for inst in instance_details:
+            stamped = dict(inst)
+            stamped.setdefault("resource_id", resource_id)
+            stamped.setdefault("provider_api", provider_api_value)
+            result.append(stamped)
+        return result
 
     def _prepare_template_context(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
         """Prepare context with all computed values for template rendering."""

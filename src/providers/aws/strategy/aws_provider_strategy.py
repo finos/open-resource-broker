@@ -358,12 +358,82 @@ class AWSProviderStrategy(ProviderStrategy):
                 self._aws_provisioning_port_resolver = None
         return self._aws_provisioning_port
 
-    # Legacy methods that need to be kept for compatibility
     async def _handle_describe_resource_instances(
         self, operation: ProviderOperation
     ) -> ProviderResult:
-        """Handle resource-to-instance discovery operation."""
-        return await self._get_instance_service().describe_resource_instances(operation)
+        """Handle resource-to-instance discovery using the appropriate AWS handler.
+
+        Each handler (EC2Fleet, SpotFleet, ASG, RunInstances) has fleet-type-aware
+        logic for discovering instances from resource IDs. This delegates to the
+        correct handler's check_hosts_status method rather than using a generic
+        service that lacks per-handler context.
+        """
+        try:
+            resource_ids = operation.parameters.get("resource_ids", [])
+            provider_api = operation.parameters.get("provider_api", "RunInstances")
+            provider_api_value = (
+                provider_api.value if hasattr(provider_api, "value") else provider_api
+            )
+
+            if not resource_ids:
+                return ProviderResult.error_result(
+                    "Resource IDs are required for instance discovery",
+                    "MISSING_RESOURCE_IDS",
+                )
+
+            handler = self.get_handler(provider_api_value)
+            if not handler:
+                handler = self.get_handler("RunInstances")
+                if not handler:
+                    return ProviderResult.error_result(
+                        f"No handler available for provider_api: {provider_api}",
+                        "HANDLER_NOT_FOUND",
+                    )
+                self._logger.warning(
+                    "Handler for %s not found, using RunInstances fallback", provider_api
+                )
+
+            from domain.request.aggregate import Request
+            from domain.request.value_objects import RequestType
+
+            request_id = operation.parameters.get("request_id") or (
+                operation.context.get("request_id") if operation.context else None
+            )
+
+            request = Request.create_new_request(
+                request_type=RequestType.ACQUIRE,
+                template_id=operation.parameters.get("template_id", "unknown"),
+                machine_count=1,
+                provider_type="aws",
+                provider_name="aws-default",
+                request_id=request_id,
+            )
+            request.resource_ids = resource_ids
+
+            instance_details = handler.check_hosts_status(request)
+
+            if not instance_details:
+                self._logger.info("No instances found for resources: %s", resource_ids)
+                return ProviderResult.success_result(
+                    {"instances": []},
+                    {"operation": "describe_resource_instances", "resource_ids": resource_ids},
+                )
+
+            return ProviderResult.success_result(
+                data={"instances": instance_details},
+                metadata={
+                    "operation": "describe_resource_instances",
+                    "resource_ids": resource_ids,
+                    "provider_api": provider_api_value,
+                    "instance_count": len(instance_details),
+                },
+            )
+
+        except Exception as e:
+            return ProviderResult.error_result(
+                f"Failed to describe resource instances: {e!s}",
+                "DESCRIBE_RESOURCE_INSTANCES_ERROR",
+            )
 
     # Infrastructure discovery methods (delegated to service)
     def discover_infrastructure(self, provider_config: dict[str, Any]) -> dict[str, Any]:
