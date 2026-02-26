@@ -268,7 +268,7 @@ class AWSInstanceOperationService:
                     instance_ids = [
                         inst["InstanceId"]
                         for inst in asg_groups[0].get("Instances", [])
-                        if inst.get("InstanceId")
+                        if inst.get("InstanceId") and inst.get("LifecycleState") == "InService"
                     ]
                     if instance_ids:
                         inst_response = self._aws_client.ec2_client.describe_instances(

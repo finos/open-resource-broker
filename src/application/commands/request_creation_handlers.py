@@ -379,11 +379,37 @@ class CreateReturnRequestHandler(BaseCommandHandler[CreateReturnRequestCommand, 
             for event in events or []:
                 self.event_publisher.publish(event)  # type: ignore[union-attr]
 
+    async def _update_request_to_in_progress(self, request: Any) -> None:
+        """Update return request status to in_progress."""
+        try:
+            from application.dto.commands import UpdateRequestStatusCommand
+            from application.ports.command_bus_port import CommandBusPort
+            from domain.request.request_types import RequestStatus
+
+            update_command = UpdateRequestStatusCommand(
+                request_id=str(request.request_id),
+                status=RequestStatus.IN_PROGRESS,
+                message="Return request processing started",
+            )
+            command_bus = self._container.get(CommandBusPort)
+            await command_bus.execute(update_command)
+            self.logger.info("Updated request %s status to in_progress", request.request_id)
+        except Exception as update_error:
+            self.logger.error(
+                "Failed to update request status to in_progress: %s",
+                update_error,
+                exc_info=True,
+            )
+
     async def _execute_deprovisioning_for_request(
         self, machine_ids: list[str], request: Any, provider_name: str
     ) -> None:
         """Execute deprovisioning and update request status."""
         try:
+            # Transition to IN_PROGRESS before executing deprovisioning so that
+            # subsequent status updates (COMPLETED or FAILED) are valid transitions.
+            await self._update_request_to_in_progress(request)
+
             # Group machines by resource context
             resource_groups = self._machine_grouping_service.group_by_resource(machine_ids)
 
