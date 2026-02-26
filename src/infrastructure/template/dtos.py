@@ -81,6 +81,7 @@ class TemplateDTO(BaseDTO):
 
     # AWS-specific fields
     fleet_role: Optional[str] = None
+    fleet_type: Optional[str] = None
     percent_on_demand: Optional[int] = None
     abis_instance_requirements: Optional[dict[str, Any]] = None
 
@@ -98,6 +99,9 @@ class TemplateDTO(BaseDTO):
     @classmethod
     def from_domain(cls, template) -> "TemplateDTO":
         """Convert domain template to DTO."""
+        _fleet_type = getattr(template, "fleet_type", None)
+        _fleet_type_str: Optional[str] = str(_fleet_type.value) if _fleet_type is not None and hasattr(_fleet_type, "value") else (_fleet_type if _fleet_type is None else str(_fleet_type))
+        _abis = getattr(template, "abis_instance_requirements", None)
         return cls(
             # Core fields
             template_id=template.template_id,
@@ -149,12 +153,9 @@ class TemplateDTO(BaseDTO):
             version=getattr(template, "version", None),
             # AWS-specific fields
             fleet_role=getattr(template, "fleet_role", None),
+            fleet_type=_fleet_type_str,
             percent_on_demand=getattr(template, "percent_on_demand", None),
-            abis_instance_requirements=(
-                getattr(template, "abis_instance_requirements", None).to_aws_dict()
-                if getattr(template, "abis_instance_requirements", None) is not None
-                else None
-            ),
+            abis_instance_requirements=_abis.to_aws_dict() if _abis is not None else None,
         )
 
 
