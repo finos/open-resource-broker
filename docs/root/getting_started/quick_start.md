@@ -6,6 +6,7 @@ Get up and running with the Open Resource Broker in minutes.
 
 - Python 3.10 or higher
 - AWS credentials configured (`~/.aws/credentials` or an IAM instance profile)
+- IAM permissions for EC2, EC2Fleet, SpotFleet, and Auto Scaling — see the [README](../../../README.md#required-iam-permissions) for the full policy
 
 ## Installation
 
@@ -74,16 +75,16 @@ orb templates list --format table
 
 ## Step 4: Request machines
 
-Request machines using a template ID from the list above:
+Copy a template ID from the output of `orb templates list`, then request machines:
 
 ```bash
-orb machines request aws-ec2fleet-basic 3
+orb machines request <template-id> 3
 ```
 
 Or using flags:
 
 ```bash
-orb machines request --template-id aws-ec2fleet-basic --count 3
+orb machines request --template-id <template-id> --count 3
 ```
 
 The command returns a request ID. Use `--wait` to block until machines are ready:
