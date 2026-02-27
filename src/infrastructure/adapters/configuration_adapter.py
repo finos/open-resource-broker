@@ -322,6 +322,29 @@ class ConfigurationAdapter(ConfigurationPort):
         except Exception:
             return ""
 
+    def get_cleanup_config(self) -> dict[str, Any]:
+        """Get cleanup configuration."""
+        try:
+            cleanup = self._config_manager.app_config.cleanup
+            return {
+                "enabled": cleanup.enabled,
+                "delete_launch_template": cleanup.delete_launch_template,
+                "dry_run": cleanup.dry_run,
+                "resources": {
+                    "asg": cleanup.resources.asg,
+                    "ec2_fleet": cleanup.resources.ec2_fleet,
+                    "spot_fleet": cleanup.resources.spot_fleet,
+                },
+            }
+        except Exception as e:
+            _logger.warning("Failed to load cleanup config, using defaults: %s", e)
+            return {
+                "enabled": True,
+                "delete_launch_template": True,
+                "dry_run": False,
+                "resources": {"asg": True, "ec2_fleet": True, "spot_fleet": True},
+            }
+
     def get_active_provider_override(self) -> str | None:
         """Get current provider override from CLI."""
         return self._config_manager.get_active_provider_override()

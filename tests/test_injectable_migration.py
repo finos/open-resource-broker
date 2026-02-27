@@ -148,6 +148,15 @@ class MockConfigurationPort(ConfigurationPort):
         """Get resource prefix for a given resource type."""
         return ""
 
+    def get_cleanup_config(self) -> dict[str, Any]:
+        """Get cleanup configuration."""
+        return {
+            "enabled": True,
+            "delete_launch_template": True,
+            "dry_run": False,
+            "resources": {"asg": True, "ec2_fleet": True, "spot_fleet": True},
+        }
+
     def get_native_spec_config(self) -> dict[str, Any]:
         """Get native spec configuration."""
         return self._config.get("native_spec", {})

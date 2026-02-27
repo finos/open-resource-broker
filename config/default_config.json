@@ -393,5 +393,15 @@
       "asg": "",
       "tag": ""
     }
+  },
+  "cleanup": {
+    "enabled": true,
+    "delete_launch_template": true,
+    "dry_run": false,
+    "resources": {
+      "asg": true,
+      "ec2_fleet": true,
+      "spot_fleet": true
+    }
   }
 }

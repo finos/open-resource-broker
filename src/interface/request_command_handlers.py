@@ -298,22 +298,31 @@ async def handle_get_return_requests(args: "argparse.Namespace") -> dict[str, An
         args: Argument namespace with resource/action structure
 
     Returns:
-        Return requests list
+        Return requests list in scheduler format
     """
     container = get_container()
     query_bus = container.get(QueryBus)
-    container.get(SchedulerPort)
+    scheduler_strategy = container.get(SchedulerPort)
 
     from application.dto.queries import ListReturnRequestsQuery
 
-    query = ListReturnRequestsQuery()
-    requests = await query_bus.execute(query)
+    # Extract machine name filter from JSON input if provided
+    machine_names: list[str] = []
+    if hasattr(args, "input_data") and args.input_data:
+        raw = args.input_data
+        if "machines" in raw:
+            machine_names = [
+                name
+                for m in raw["machines"]
+                if isinstance(m, dict)
+                for name in [m.get("name") or m.get("machineId") or m.get("machine_id")]
+                if name is not None
+            ]
 
-    return {
-        "requests": requests,
-        "count": len(requests),
-        "message": "Return requests retrieved successfully",
-    }
+    query = ListReturnRequestsQuery(machine_names=machine_names)
+    request_dtos = await query_bus.execute(query)
+
+    return scheduler_strategy.format_request_status_response(request_dtos)
 
 
 @handle_interface_exceptions(context="request_return_machines", interface_type="cli")

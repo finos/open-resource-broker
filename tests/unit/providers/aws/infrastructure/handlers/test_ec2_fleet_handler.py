@@ -200,3 +200,47 @@ class TestEC2FleetHandlerCheckHostsStatus:
             result = handler.check_hosts_status(request)
 
         assert result == []
+
+
+class TestEC2FleetHandlerNameTag:
+    def test_fleet_config_instance_tag_uses_config_prefix(self):
+        """Instance Name tag in EC2Fleet config uses config_port prefix for all fleet types."""
+        from providers.aws.domain.template.aws_template_aggregate import AWSFleetType
+
+        aws_client = MagicMock()
+        logger = MagicMock()
+        aws_ops = MagicMock()
+        launch_template_manager = MagicMock()
+        config_port = MagicMock()
+        config_port.get_resource_prefix.side_effect = lambda rt: "pfx-" if rt == "fleet" else "inst-"
+
+        handler = EC2FleetHandler(
+            aws_client, logger, aws_ops, launch_template_manager, config_port=config_port
+        )
+
+        template = MagicMock()
+        template.fleet_type = AWSFleetType.MAINTAIN
+        template.tags = {}
+        template.price_type = "ondemand"
+        template.allocation_strategy = None
+        template.max_price = None
+        template.machine_types = {"m5.large": 1}
+        template.subnet_ids = ["subnet-abc"]
+        template.template_id = "tmpl-ec2"
+        template.percent_on_demand = None
+        template.context = None
+
+        request = MagicMock()
+        request.request_id = "req-ec2-001"
+        request.requested_count = 2
+
+        fleet_config = handler._create_fleet_config(template, request, "lt-xyz", "$Default")
+
+        instance_ts = next(
+            (ts for ts in fleet_config.get("TagSpecifications", []) if ts["ResourceType"] == "instance"),
+            None,
+        )
+        assert instance_ts is not None, "No instance TagSpecification found"
+        name_tag = next((t for t in instance_ts["Tags"] if t["Key"] == "Name"), None)
+        assert name_tag is not None, "No Name tag in instance TagSpecification"
+        assert "req-ec2-001" in name_tag["Value"]

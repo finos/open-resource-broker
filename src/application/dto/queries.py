@@ -40,6 +40,7 @@ class ListReturnRequestsQuery(Query, BaseModel):
     provider_name: Optional[str] = None
     status: Optional[str] = None
     requester_id: Optional[str] = None
+    machine_names: list[str] = []
     filter_expressions: list[str] = []
     limit: Optional[int] = 50  # Default: 50, Max: 1000
     offset: Optional[int] = 0

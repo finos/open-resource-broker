@@ -435,7 +435,11 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 )
 
             # Get detailed instance information using instance IDs
-            instance_details = self._get_instance_details(instance_ids)
+            instance_details = self._get_instance_details(
+                instance_ids,
+                request_id=str(request.request_id),
+                resource_id=resource_id,
+            )
 
             return self._format_instance_data(instance_details, resource_id, request, None)
 
@@ -463,7 +467,11 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                         )
 
                     if instance_ids:
-                        detailed_instances = self._get_instance_details(instance_ids)
+                        detailed_instances = self._get_instance_details(
+                            instance_ids,
+                            request_id=str(request.request_id),
+                            resource_id=resource_id,
+                        )
                         formatted = self._format_instance_data(
                             detailed_instances, resource_id, request, None
                         )
@@ -524,7 +532,11 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 if not instance_ids:
                     continue
 
-                detailed_instances = self._get_instance_details(instance_ids)
+                detailed_instances = self._get_instance_details(
+                    instance_ids,
+                    request_id=str(request.request_id),
+                    resource_id=reservation_id,
+                )
                 formatted_instances.extend(
                     self._format_instance_data(detailed_instances, reservation_id, request, None)
                 )

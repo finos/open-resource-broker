@@ -551,14 +551,14 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 template.subnet_ids,
                 template.max_price,
                 template.price_type == "heterogeneous",
-                machine_types_priority=template.machine_types_priority or None,
+                machine_types_priority=getattr(template, "machine_types_priority", None) or None,
             )
             if overrides:
                 fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
 
         # Set ValidUntil when spot_fleet_request_expiry is configured
         expiry_minutes = getattr(template, "spot_fleet_request_expiry", None)
-        if expiry_minutes is not None:
+        if expiry_minutes is not None and isinstance(expiry_minutes, (int, float)):
             from datetime import datetime, timezone, timedelta
 
             valid_until = datetime.now(timezone.utc) + timedelta(minutes=int(expiry_minutes))

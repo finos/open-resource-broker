@@ -309,6 +309,9 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             else:
                 return {"requests": [], "message": "Request not found."}
 
+        elif operation == "requestReturnMachines":
+            return self.format_request_response(data)
+
         else:
             raise ValueError(f"Unsupported HostFactory operation: {operation}")
 

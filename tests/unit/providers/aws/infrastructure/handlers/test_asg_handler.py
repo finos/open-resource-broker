@@ -168,7 +168,7 @@ class TestASGHandlerCheckHostsStatus:
         ids_a = ["i-a1", "i-a2"]
         ids_b = ["i-b1"]
 
-        def get_asg_instances_side_effect(asg_name):
+        def get_asg_instances_side_effect(asg_name, **kwargs):
             if asg_name == "asg-A":
                 return _formatted_instances(ids_a, "asg-A")
             return _formatted_instances(ids_b, "asg-B")
@@ -202,3 +202,67 @@ class TestASGHandlerCheckHostsStatus:
 
         assert len(result) == 1
         assert result[0]["instance_id"] == "i-strict-active"
+
+
+class TestASGHandlerNameTag:
+    def test_tag_asg_uses_config_prefix(self):
+        """Name tag on ASG uses config_port prefix, not a hardcoded string."""
+        handler = _make_handler()
+        config_port = MagicMock()
+        config_port.get_resource_prefix.return_value = "myteam-"
+        handler.config_port = config_port
+
+        aws_template = MagicMock()
+        aws_template.template_id = "tmpl-1"
+        aws_template.tags = {}
+        handler.aws_client.autoscaling_client.create_or_update_tags = MagicMock()
+
+        with patch.object(handler, "_retry_with_backoff") as mock_retry:
+            handler._tag_asg("myteam-req-abc", aws_template, "req-abc")
+
+        mock_retry.assert_called_once()
+        call_kwargs = mock_retry.call_args[1]
+        tags = call_kwargs["Tags"]
+        name_tag = next(t for t in tags if t["Key"] == "Name")
+        assert name_tag["Value"] == "myteam-req-abc"
+        assert "hostfactory" not in name_tag["Value"]
+
+    def test_tag_asg_empty_prefix(self):
+        """Name tag with empty prefix is just the request_id."""
+        handler = _make_handler()
+        config_port = MagicMock()
+        config_port.get_resource_prefix.return_value = ""
+        handler.config_port = config_port
+
+        aws_template = MagicMock()
+        aws_template.template_id = "tmpl-2"
+        aws_template.tags = {}
+
+        with patch.object(handler, "_retry_with_backoff") as mock_retry:
+            handler._tag_asg("req-xyz", aws_template, "req-xyz")
+
+        call_kwargs = mock_retry.call_args[1]
+        tags = call_kwargs["Tags"]
+        name_tag = next(t for t in tags if t["Key"] == "Name")
+        assert name_tag["Value"] == "req-xyz"
+
+    def test_get_asg_instances_passes_context_to_get_instance_details(self):
+        """_get_asg_instances passes request_id and resource_id to _get_instance_details."""
+        handler = _make_handler()
+        handler.aws_client.autoscaling_client.describe_auto_scaling_groups = MagicMock(
+            return_value={
+                "AutoScalingGroups": [
+                    {"Instances": [{"InstanceId": "i-ctx1"}]}
+                ]
+            }
+        )
+
+        with patch.object(handler, "_retry_with_backoff", side_effect=lambda fn, **kw: fn(**{k: v for k, v in kw.items() if k != "operation_type"})):
+            with patch.object(handler, "_get_instance_details", return_value=[]) as mock_details:
+                handler._get_asg_instances("asg-ctx", request_id="req-ctx", resource_id="asg-ctx")
+
+        mock_details.assert_called_once_with(
+            ["i-ctx1"],
+            request_id="req-ctx",
+            resource_id="asg-ctx",
+        )

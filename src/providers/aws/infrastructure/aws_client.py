@@ -57,7 +57,7 @@ class AWSClient:
         self._logger.debug("AWS client region determined: %s", self.region_name)
 
         aws_provider_config = self._get_selected_aws_provider_config()
-        max_attempts = int(aws_provider_config.aws_max_retries) if aws_provider_config else 3
+        max_attempts = int(aws_provider_config.request_retry_attempts) + 1 if aws_provider_config else 1
         connect_timeout = int(aws_provider_config.aws_connect_timeout) if aws_provider_config else 5
         read_timeout = int(aws_provider_config.aws_read_timeout) if aws_provider_config else 10
 

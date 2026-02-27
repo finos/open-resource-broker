@@ -681,7 +681,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 template.machine_types_ondemand,
                 template.subnet_ids,
                 price_type == "heterogeneous",
-                machine_types_priority=template.machine_types_priority or None,
+                machine_types_priority=getattr(template, "machine_types_priority", None) or None,
             )
             if overrides:
                 fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides

@@ -287,6 +287,22 @@ class ListReturnRequestsHandler(BaseQueryHandler[ListReturnRequestsQuery, list[R
                     )
                     request_dtos.append(request_dto)
 
+                # Filter by machine names if provided
+                if query.machine_names:
+                    machine_name_set = set(query.machine_names)
+                    filtered = []
+                    for dto in request_dtos:
+                        dto_dict = dto.model_dump()
+                        machines = dto_dict.get("machines") or dto_dict.get("machine_references") or []
+                        names = {
+                            m.get("name") or m.get("machine_id") or m.get("instance_id")
+                            for m in machines
+                            if isinstance(m, dict)
+                        }
+                        if names & machine_name_set:
+                            filtered.append(dto)
+                    request_dtos = filtered
+
                 # Apply generic filters if provided
                 if query.filter_expressions:
                     # Convert RequestDTO objects to dicts for filtering

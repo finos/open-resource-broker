@@ -237,3 +237,52 @@ class TestRunInstancesHandlerCheckHostsStatus:
 
         assert len(result) == 1
         assert result[0]["instance_id"] == "i-fb1"
+
+
+class TestRunInstancesHandlerMachineAdapterContext:
+    def test_check_hosts_status_passes_context_to_get_instance_details(self):
+        """check_hosts_status passes request_id and resource_id to _get_instance_details."""
+        handler = _make_handler()
+        instance_ids = ["i-ctx1", "i-ctx2"]
+        resource_id = "r-ctx-res"
+        request = _make_request(
+            resource_ids=[resource_id],
+            provider_data={"instance_ids": instance_ids, "reservation_id": resource_id},
+        )
+
+        with patch.object(handler, "_get_instance_details", return_value=[]) as mock_details:
+            with patch.object(handler, "_format_instance_data", return_value=[]):
+                handler.check_hosts_status(request)
+
+        mock_details.assert_called_once_with(
+            instance_ids,
+            request_id=str(request.request_id),
+            resource_id=resource_id,
+        )
+
+    def test_find_instances_by_resource_ids_passes_context(self):
+        """_find_instances_by_resource_ids passes request_id and resource_id to _get_instance_details."""
+        handler = _make_handler()
+        resource_id = "r-find-res"
+        request = _make_request(resource_ids=[resource_id])
+
+        handler.aws_client.ec2_client.describe_instances = MagicMock(
+            return_value={
+                "Reservations": [
+                    {
+                        "ReservationId": resource_id,
+                        "Instances": [{"InstanceId": "i-find1"}],
+                    }
+                ]
+            }
+        )
+
+        with patch.object(handler, "_get_instance_details", return_value=[]) as mock_details:
+            with patch.object(handler, "_format_instance_data", return_value=[]):
+                handler._find_instances_by_resource_ids(request, [resource_id])
+
+        mock_details.assert_called_once_with(
+            ["i-find1"],
+            request_id=str(request.request_id),
+            resource_id=resource_id,
+        )

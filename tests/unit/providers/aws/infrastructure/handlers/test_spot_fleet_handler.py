@@ -215,3 +215,62 @@ class TestSpotFleetHandlerCheckHostsStatus:
 
         assert len(result) == 1
         assert result[0]["instance_id"] == "i-spot-strict-active"
+
+
+class TestSpotFleetHandlerNameTag:
+    def test_fleet_config_name_tag_uses_config_prefix(self):
+        """Name tag in SpotFleet config uses config_port prefix, not hardcoded 'hf-'."""
+        aws_client = MagicMock()
+        aws_client.sts_client.get_caller_identity.return_value = {"Account": "123456789012"}
+        logger = MagicMock()
+        aws_ops = MagicMock()
+        launch_template_manager = MagicMock()
+        config_port = MagicMock()
+        config_port.get_resource_prefix.return_value = "myorg-"
+
+        handler = SpotFleetHandler(
+            aws_client, logger, aws_ops, launch_template_manager, config_port=config_port
+        )
+
+        template = MagicMock()
+        template.fleet_type = MagicMock()
+        template.fleet_type.value = "request"
+        template.tags = {}
+        template.price_type = "spot"
+        template.allocation_strategy = None
+        template.max_price = None
+        template.machine_types = {"m5.large": 1}
+        template.machine_types_ondemand = None
+        template.machine_types_priority = None
+        template.subnet_ids = ["subnet-abc"]
+        template.context = None
+        template.template_id = "tmpl-sf-001"
+        template.fleet_role = "arn:aws:iam::123456789012:role/SpotFleetRole"
+        template.get_instance_requirements_payload = MagicMock(return_value=None)
+
+        request = MagicMock()
+        request.request_id = "req-sf-001"
+        request.requested_count = 2
+
+        with patch.object(
+            handler,
+            "_calculate_capacity_distribution",
+            return_value={"target_capacity": 2, "on_demand_count": 0},
+        ):
+            with patch(
+                "providers.aws.infrastructure.handlers.fleet_override_builder.build_spot_fleet_overrides",
+                return_value=[],
+            ):
+                fleet_config = handler._create_spot_fleet_config_legacy(
+                    template, request, "lt-abc", "$Default"
+                )
+
+        all_tags = []
+        for ts in fleet_config.get("TagSpecifications", []):
+            all_tags.extend(ts.get("Tags", []))
+
+        name_tags = [t for t in all_tags if t["Key"] == "Name"]
+        assert name_tags, "No Name tag found in TagSpecifications"
+        for name_tag in name_tags:
+            assert name_tag["Value"] == "myorg-req-sf-001"
+            assert "hf-" not in name_tag["Value"]

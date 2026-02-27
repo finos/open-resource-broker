@@ -6,6 +6,7 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .app_config_settings import CoreAppSettings
+from .cleanup_schema import CleanupConfig
 from .common_schema import (
     DatabaseConfig,
     EventsConfig,
@@ -43,6 +44,7 @@ class AppConfig(BaseModel):
     performance: PerformanceConfig = Field(default_factory=lambda: PerformanceConfig())  # type: ignore[call-arg]
     server: ServerConfig = Field(default_factory=lambda: ServerConfig())  # type: ignore[call-arg]
     native_spec: NativeSpecConfig = Field(default_factory=lambda: NativeSpecConfig())  # type: ignore[call-arg]
+    cleanup: CleanupConfig = Field(default_factory=lambda: CleanupConfig())  # type: ignore[call-arg]
     environment: str = Field("development", description="Environment")
     debug: bool = Field(False, description="Debug mode")
     request_timeout: int = Field(300, description="Request timeout in seconds")
