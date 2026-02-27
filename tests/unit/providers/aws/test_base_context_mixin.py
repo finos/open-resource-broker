@@ -188,6 +188,7 @@ class TestBaseContextMixin:
     def test_prepare_standard_flags(self):
         """Test standard flag preparation."""
         # Add optional attributes
+        self.template.machine_types = {"t3.medium": 1, "t3.large": 2}
         self.template.key_name = "my-key"
         self.template.user_data = "#!/bin/bash"
         self.template.instance_profile = "my-profile"

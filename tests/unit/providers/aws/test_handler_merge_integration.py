@@ -40,7 +40,8 @@ class TestHandlerMergeIntegration:
         mock_launch_template_manager = Mock()
 
         handler = EC2FleetHandler(
-            mock_aws_client, mock_logger, mock_aws_ops, mock_launch_template_manager
+            mock_aws_client, mock_logger, mock_aws_ops, mock_launch_template_manager,
+            config_port=Mock()
         )
 
         mock_native_service = Mock()
@@ -78,7 +79,8 @@ class TestHandlerMergeIntegration:
         mock_launch_template_manager = Mock()
 
         handler = SpotFleetHandler(
-            mock_aws_client, mock_logger, mock_aws_ops, mock_launch_template_manager
+            mock_aws_client, mock_logger, mock_aws_ops, mock_launch_template_manager,
+            config_port=Mock()
         )
 
         mock_native_service = Mock()
@@ -107,7 +109,8 @@ class TestHandlerMergeIntegration:
         mock_launch_template_manager = Mock()
 
         handler = EC2FleetHandler(
-            mock_aws_client, mock_logger, mock_aws_ops, mock_launch_template_manager
+            mock_aws_client, mock_logger, mock_aws_ops, mock_launch_template_manager,
+            config_port=Mock()
         )
 
         mock_native_service = Mock()
@@ -135,7 +138,8 @@ class TestHandlerMergeIntegration:
         mock_launch_template_manager = Mock()
 
         handler = EC2FleetHandler(
-            mock_aws_client, mock_logger, mock_aws_ops, mock_launch_template_manager
+            mock_aws_client, mock_logger, mock_aws_ops, mock_launch_template_manager,
+            config_port=Mock()
         )
         handler.aws_native_spec_service = None
 
