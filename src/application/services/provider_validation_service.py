@@ -78,19 +78,4 @@ class ProviderValidationService:
             selection_result.selection_reason,
         )
 
-        # Validation is temporarily skipped for testing
-        # TODO: Re-enable validation once provider capabilities are stable
-        # validation_result = self._provider_selection_port.validate_template_requirements(
-        #     template, selection_result.provider_name
-        # )
-        #
-        # if not validation_result.is_valid:
-        #     error_msg = f"Template incompatible with provider {selection_result.provider_name}: {'; '.join(validation_result.errors)}"
-        #     self.logger.error(error_msg)
-        #     raise ValueError(error_msg)
-        #
-        # self.logger.info("Template validation passed: %s", validation_result.supported_features)
-
-        self.logger.info("Skipping template validation for testing")
-
         return selection_result

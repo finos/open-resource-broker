@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     pass
 from application.ports.command_bus_port import CommandBusPort
 from application.ports.template_dto_port import TemplateDTOPort
+from infrastructure.template.dtos import TemplateDTO  # noqa: PLC0415 — infrastructure DTO used at application boundary
 from domain.template.factory import TemplateFactory, get_default_template_factory
 from domain.template.template_aggregate import Template
 
@@ -529,8 +530,6 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, TemplateDTOPort]):
             # subnet_ids) applied by template_defaults_service are reflected in the
             # returned value.  Falling back to the original template_dto would silently
             # drop any field that was None in the raw DTO but filled in by defaults.
-            from infrastructure.template.dtos import TemplateDTO
-
             return TemplateDTO.from_domain(resolved_template)  # type: ignore[return-value]
 
         except EntityNotFoundError:

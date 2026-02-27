@@ -467,7 +467,6 @@ class ProviderRegistry(BaseRegistry):
     # - No circular dependencies (infrastructure is outermost layer)
     #
     # DO NOT MOVE THIS TO DOMAIN LAYER
-    # See: .kiro/backlog/cli-hanging-circular-dependency.md
     # ============================================================================
 
     def select_provider_for_template(

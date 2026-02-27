@@ -9,7 +9,7 @@ from domain.template.extensions import TemplateExtensionRegistry
 from domain.template.factory import TemplateFactoryPort
 from domain.template.ports.template_defaults_port import TemplateDefaultsPort
 from domain.template.template_aggregate import Template
-from infrastructure.utilities.common.string_utils import extract_provider_type
+from domain.base.utils import extract_provider_type
 
 
 @injectable

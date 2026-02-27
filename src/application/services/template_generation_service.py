@@ -12,7 +12,7 @@ from application.dto.template_generation_dto import (
     TemplateGenerationResult,
 )
 from domain.base.ports import ConfigurationPort, ContainerPort, LoggingPort, SchedulerPort
-from infrastructure.utilities.common.string_utils import extract_provider_type
+from domain.base.utils import extract_provider_type
 
 
 class TemplateGenerationService:
@@ -159,7 +159,6 @@ class TemplateGenerationService:
         self, provider_type: str, provider_name: str, provider_api: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Generate example templates using provider registry."""
-        # Use injected container instead of get_container()
 
         # Ensure provider type is registered via service
         if not self._provider_registry_service.register_provider_strategy(provider_type):

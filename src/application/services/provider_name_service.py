@@ -2,7 +2,7 @@
 
 from typing import Any, Dict
 
-from infrastructure.utilities.common.string_utils import extract_provider_type
+from domain.base.utils import extract_provider_type
 from providers.registry import ProviderRegistry
 
 
