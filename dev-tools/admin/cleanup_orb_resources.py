@@ -63,7 +63,11 @@ def _get_tag(tags: list[dict[str, str]], key: str) -> str:
 def _find_asgs(asg_client) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     paginator = asg_client.get_paginator("describe_auto_scaling_groups")
-    filters = [{"Name": ORB_TAG_KEY, "Values": [ORB_TAG_VALUE]}]
+    # ASG API uses tag-key / tag-value filter format, not tag:<key>
+    filters = [
+        {"Name": "tag-key", "Values": [ORB_TAG_KEY]},
+        {"Name": "tag-value", "Values": [ORB_TAG_VALUE]},
+    ]
     for page in paginator.paginate(Filters=filters):
         results.extend(page.get("AutoScalingGroups", []))
     return results
