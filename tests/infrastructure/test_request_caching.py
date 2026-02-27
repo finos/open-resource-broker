@@ -37,7 +37,7 @@ class TestRequestCacheService:
         mock_request_caching = Mock()
         mock_request_caching.enabled = True
         mock_request_caching.ttl_seconds = 300
-        mock_caching.request_status_caching = mock_request_caching
+        mock_caching.request_status = mock_request_caching
         mock_performance.caching = mock_caching
         mock_app_config.performance = mock_performance
 
@@ -66,8 +66,8 @@ class TestRequestCacheService:
         mock_app_config = Mock()
         mock_app_config.performance = Mock()
         mock_app_config.performance.caching = Mock()
-        mock_app_config.performance.caching.request_status_caching = Mock()
-        mock_app_config.performance.caching.request_status_caching.enabled = False
+        mock_app_config.performance.caching.request_status = Mock()
+        mock_app_config.performance.caching.request_status.enabled = False
         config_manager.app_config = mock_app_config
 
         cache_service = RequestCacheService(
@@ -88,7 +88,7 @@ class TestRequestCacheService:
         mock_caching = Mock()
         mock_request_caching = Mock()
         mock_request_caching.enabled = False
-        mock_caching.request_status_caching = mock_request_caching
+        mock_caching.request_status = mock_request_caching
         mock_performance.caching = mock_caching
         mock_app_config.performance = mock_performance
         config_manager.app_config = mock_app_config
@@ -112,7 +112,7 @@ class TestRequestCacheService:
         mock_caching = Mock()
         mock_request_caching = Mock()
         mock_request_caching.enabled = False
-        mock_caching.request_status_caching = mock_request_caching
+        mock_caching.request_status = mock_request_caching
         mock_performance.caching = mock_caching
         mock_app_config.performance = mock_performance
         config_manager.app_config = mock_app_config
@@ -197,7 +197,7 @@ class TestRequestCacheIntegration:
         mock_request_caching = Mock()
         mock_request_caching.enabled = True
         mock_request_caching.ttl_seconds = 600
-        mock_caching.request_status_caching = mock_request_caching
+        mock_caching.request_status = mock_request_caching
         mock_performance.caching = mock_caching
         mock_app_config.performance = mock_performance
         mock_config_manager.app_config = mock_app_config
