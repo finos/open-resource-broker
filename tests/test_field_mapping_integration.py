@@ -41,13 +41,13 @@ class TestFieldMappingIntegration:
         assert "templateId" in mappings
         assert mappings["templateId"] == "template_id"
         assert "vmType" in mappings
-        assert mappings["vmType"] == "machine_types"
+        assert mappings["vmType"] == "instance_type"
         assert "vmTypes" in mappings
-        assert mappings["vmTypes"] == "machine_types"
+        assert mappings["vmTypes"] == "instance_types"
 
         # Verify AWS-specific mappings are present
         assert "vmTypesOnDemand" in mappings
-        assert mappings["vmTypesOnDemand"] == "machine_types_ondemand"
+        assert mappings["vmTypesOnDemand"] == "instance_types_ondemand"
         assert "percentOnDemand" in mappings
         assert mappings["percentOnDemand"] == "percent_on_demand"
         assert "fleetRole" in mappings
@@ -70,9 +70,9 @@ class TestFieldMappingIntegration:
         assert tags_dict == expected_tags
 
         # Test instance type consistency
-        mapped_data = {"machine_types": {"t2.micro": 1, "t2.small": 2}}
+        mapped_data = {"instance_types": {"t2.micro": 1, "t2.small": 2}}
         result = HostFactoryTransformations.ensure_instance_type_consistency(mapped_data)
-        assert next(iter(result["machine_types"].keys())) == "t2.micro"  # First from machine_types
+        assert next(iter(result["instance_types"].keys())) == "t2.micro"  # First from instance_types
 
     def test_scheduler_field_mapping_ondemand(self):
         """Test scheduler field mapping for OnDemand template."""
@@ -100,7 +100,7 @@ class TestFieldMappingIntegration:
         assert mapped["max_instances"] == 5
         assert mapped["image_id"] == "ami-12345678"
         assert mapped["subnet_ids"] == ["subnet-abcd1234"]  # Transformed to list
-        assert mapped["machine_types"] == {"t2.micro": 1}
+        assert mapped["instance_type"] == "t2.micro"
         assert mapped["security_group_ids"] == ["sg-12345678"]
         assert mapped["price_type"] == "ondemand"
         assert mapped["key_name"] == "my-key"
@@ -132,7 +132,7 @@ class TestFieldMappingIntegration:
         assert mapped["max_instances"] == 10
         assert mapped["image_id"] == "ami-87654321"
         assert mapped["subnet_ids"] == ["subnet-1111", "subnet-2222"]
-        assert mapped["machine_types"] == {"t2.medium": 1, "t3.medium": 2}
+        assert mapped["instance_types"] == {"t2.medium": 1, "t3.medium": 2}
         assert mapped["price_type"] == "spot"
         assert mapped["max_price"] == "0.05"
         assert mapped["allocation_strategy"] == "diversified"
@@ -163,14 +163,14 @@ class TestFieldMappingIntegration:
 
         # Verify core mappings
         assert mapped["template_id"] == "Hetero-Template"
-        assert mapped["machine_types"] == {"t2.medium": 1, "t3.large": 2}
+        assert mapped["instance_types"] == {"t2.medium": 1, "t3.large": 2}
         assert mapped["price_type"] == "heterogeneous"
 
         # Verify AWS-specific heterogeneous mappings
-        assert mapped["machine_types_ondemand"] == {"t2.medium": 1}
+        assert mapped["instance_types_ondemand"] == {"t2.medium": 1}
         assert mapped["percent_on_demand"] == 30
         assert mapped["allocation_strategy"] == "capacityOptimized"
-        assert mapped["allocation_strategy_ondemand"] == "prioritized"
+        assert mapped["allocation_strategy_on_demand"] == "prioritized"
         assert mapped["fleet_role"] == "AWSServiceRoleForEC2SpotFleet"
         assert mapped["spot_fleet_request_expiry"] == 60
         assert mapped["pools_count"] == 2
