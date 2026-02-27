@@ -180,6 +180,7 @@ class RequestConfig(BaseModel):
     """Request configuration."""
 
     max_machines_per_request: int = Field(100, description="Maximum number of machines per request")
+    default_grace_period: int = Field(300, description="Default grace period in seconds for return requests")
 
     @field_validator("max_machines_per_request")
     @classmethod

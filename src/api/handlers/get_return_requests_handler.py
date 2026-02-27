@@ -355,7 +355,7 @@ class GetReturnRequestsRESTHandler(BaseAPIHandler[dict[str, Any], ReturnRequestR
         container = get_container()
         config_manager = container.get(ConfigurationManager)
         config = config_manager.get_typed(RequestConfig)
-        default_grace_period = getattr(config, "default_grace_period", 0)
+        default_grace_period = config.default_grace_period
 
         # Check if machine is spot instance
         if hasattr(request, "machines") and any(
