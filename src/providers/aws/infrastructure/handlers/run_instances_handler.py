@@ -186,34 +186,15 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
 
         return response
 
-    def _format_instance_data(
-        self,
-        instance_details: list[dict[str, Any]],
-        resource_id: str,
-        request: Request,
-        aws_template: Optional[AWSTemplate] = None,
-    ) -> list[dict[str, Any]]:
-        """Format AWS instance details to standard structure.
-
-        instance_details is already snake_case from _get_instance_details.
-        Just stamp handler-specific context fields.
-        """
+    def _resolve_provider_api(self, request: Request, aws_template: Optional[AWSTemplate] = None) -> str:
+        """Resolve the provider_api value to stamp onto instance data."""
         if aws_template and aws_template.provider_api is not None:
-            provider_api_value = (
+            return (
                 aws_template.provider_api.value
                 if hasattr(aws_template.provider_api, "value")
                 else str(aws_template.provider_api)
             )
-        else:
-            provider_api_value = request.provider_api or "RunInstances"
-
-        result = []
-        for inst in instance_details:
-            stamped = dict(inst)
-            stamped.setdefault("resource_id", resource_id)
-            stamped.setdefault("provider_api", provider_api_value)
-            result.append(stamped)
-        return result
+        return request.provider_api or "RunInstances"
 
     def _prepare_template_context(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
         """Prepare context with all computed values for template rendering."""
@@ -441,7 +422,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 resource_id=resource_id,
             )
 
-            return self._format_instance_data(instance_details, resource_id, request, None)
+            return self._format_instance_data(instance_details, resource_id, self._resolve_provider_api(request))
 
         except Exception as e:
             self._logger.error("Unexpected error checking RunInstances status: %s", str(e))
@@ -473,7 +454,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                             resource_id=resource_id,
                         )
                         formatted = self._format_instance_data(
-                            detailed_instances, resource_id, request, None
+                            detailed_instances, resource_id, self._resolve_provider_api(request)
                         )
                         all_instances.extend(formatted)
 
@@ -538,7 +519,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                     resource_id=reservation_id,
                 )
                 formatted_instances.extend(
-                    self._format_instance_data(detailed_instances, reservation_id, request, None)
+                    self._format_instance_data(detailed_instances, reservation_id, self._resolve_provider_api(request))
                 )
 
             return formatted_instances

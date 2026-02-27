@@ -227,3 +227,9 @@ class FleetGroupingMixin:
     def _grouping_label(self) -> str:
         """Human-readable label for grouping operations."""
         return "fleet"
+
+    @staticmethod
+    def _chunk_list(items: list[str], chunk_size: int):
+        """Yield successive chunk-sized lists from items."""
+        for index in range(0, len(items), chunk_size):
+            yield items[index : index + chunk_size]

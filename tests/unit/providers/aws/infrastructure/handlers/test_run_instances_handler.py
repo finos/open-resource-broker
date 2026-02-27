@@ -71,7 +71,7 @@ class TestRunInstancesHandlerCheckHostsStatus:
             with patch.object(
                 handler,
                 "_format_instance_data",
-                side_effect=lambda insts, rid, req, tmpl=None: insts,
+                side_effect=lambda insts, rid, api_val: insts,
             ):
                 result = handler.check_hosts_status(request)
 
@@ -96,7 +96,7 @@ class TestRunInstancesHandlerCheckHostsStatus:
             with patch.object(
                 handler,
                 "_format_instance_data",
-                side_effect=lambda insts, rid, req, tmpl=None: insts,
+                side_effect=lambda insts, rid, api_val: insts,
             ):
                 result = handler.check_hosts_status(request)
 
@@ -146,7 +146,7 @@ class TestRunInstancesHandlerCheckHostsStatus:
             with patch.object(
                 handler,
                 "_format_instance_data",
-                side_effect=lambda insts, rid, req, tmpl=None: insts,
+                side_effect=lambda insts, rid, api_val: insts,
             ):
                 result = handler.check_hosts_status(request)
 
@@ -169,7 +169,7 @@ class TestRunInstancesHandlerCheckHostsStatus:
             with patch.object(
                 handler,
                 "_format_instance_data",
-                side_effect=lambda insts, rid, req, tmpl=None: insts,
+                side_effect=lambda insts, rid, api_val: insts,
             ):
                 result = handler.check_hosts_status(request)
 
@@ -192,7 +192,7 @@ class TestRunInstancesHandlerCheckHostsStatus:
             with patch.object(
                 handler,
                 "_format_instance_data",
-                side_effect=lambda insts, rid, req, tmpl=None: insts,
+                side_effect=lambda insts, rid, api_val: insts,
             ):
                 result = handler.check_hosts_status(request)
 
@@ -214,7 +214,7 @@ class TestRunInstancesHandlerCheckHostsStatus:
             with patch.object(
                 handler,
                 "_format_instance_data",
-                side_effect=lambda insts, rid, req, tmpl=None: insts,
+                side_effect=lambda insts, rid, api_val: insts,
             ):
                 result = handler.check_hosts_status(request)
 

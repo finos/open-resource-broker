@@ -208,7 +208,7 @@ class TestEC2FleetHandlerTags:
     def _call_legacy(self, handler, fleet_type=AWSFleetType.MAINTAIN):
         template = _make_template(fleet_type=fleet_type)
         request = _make_request()
-        return handler._create_fleet_config_legacy(template, request, "lt-123", "1")
+        return handler._fleet_config_builder._build_legacy(template, request, "lt-123", "1")
 
     def test_fleet_tags_use_orb_keys(self):
         handler = self._make_handler()
@@ -272,7 +272,7 @@ class TestSpotFleetHandlerTags:
     def _call_legacy(self, handler):
         template = _make_template(fleet_type=AWSFleetType.MAINTAIN)
         request = _make_request()
-        return handler._create_spot_fleet_config_legacy(template, request, "lt-123", "1")
+        return handler._config_builder._build_legacy(template, request, "lt-123", "1")
 
     def test_spot_fleet_request_tags_use_orb_keys(self):
         handler = self._make_handler()

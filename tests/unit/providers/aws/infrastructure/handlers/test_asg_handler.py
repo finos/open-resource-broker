@@ -64,7 +64,7 @@ class TestASGHandlerCheckHostsStatus:
             return_value=_formatted_instances(instance_ids, "asg-111"),
         ):
             with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, req: insts
+                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
             ):
                 result = handler.check_hosts_status(request)
 
@@ -84,7 +84,7 @@ class TestASGHandlerCheckHostsStatus:
             handler, "_get_asg_instances", return_value=_formatted_instances(all_ids, "asg-222")
         ):
             with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, req: insts
+                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
             ):
                 result = handler.check_hosts_status(request)
 
@@ -135,7 +135,7 @@ class TestASGHandlerCheckHostsStatus:
             return_value=_formatted_instances(instance_ids, "asg-cnt"),
         ):
             with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, req: insts
+                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
             ):
                 result = handler.check_hosts_status(request)
 
@@ -153,7 +153,7 @@ class TestASGHandlerCheckHostsStatus:
             return_value=_formatted_instances(instance_ids, "asg-ids"),
         ):
             with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, req: insts
+                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
             ):
                 result = handler.check_hosts_status(request)
 
@@ -175,7 +175,7 @@ class TestASGHandlerCheckHostsStatus:
 
         with patch.object(handler, "_get_asg_instances", side_effect=get_asg_instances_side_effect):
             with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, req: insts
+                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
             ):
                 result = handler.check_hosts_status(request)
 
@@ -196,7 +196,7 @@ class TestASGHandlerCheckHostsStatus:
             return_value=_formatted_instances(active_ids, "asg-strict"),
         ):
             with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, req: insts
+                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
             ):
                 result = handler.check_hosts_status(request)
 

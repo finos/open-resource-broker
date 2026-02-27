@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from infrastructure.interfaces.provider import BaseProviderConfig
+from providers.aws.domain.template.value_objects import ProviderApi
 
 
 class HandlerCapabilityConfig(BaseModel):
@@ -21,7 +22,16 @@ class HandlerCapabilityConfig(BaseModel):
 class HandlerDefaultsConfig(BaseModel):
     """Handler defaults configuration."""
 
-    default_handler: str = Field("ec2_fleet", description="Default handler to use")
+    default_handler: str = Field("EC2Fleet", description="Default handler to use")
+
+    @field_validator("default_handler")
+    @classmethod
+    def validate_default_handler(cls, v: str) -> str:
+        """Reject values that are not valid ProviderApi registry keys."""
+        if ProviderApi(v) is None:
+            valid = [m.value for m in ProviderApi]
+            raise ValueError(f"default_handler {v!r} is not a valid ProviderApi value; expected one of {valid}")
+        return v
 
 
 class LaunchTemplateConfiguration(BaseModel):

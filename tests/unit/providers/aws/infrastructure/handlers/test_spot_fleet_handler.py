@@ -64,7 +64,7 @@ class TestSpotFleetHandlerCheckHostsStatus:
             return_value=_formatted_instances(instance_ids, "sfr-111"),
         ):
             with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, req: insts
+                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
             ):
                 result = handler.check_hosts_status(request)
 
@@ -84,7 +84,7 @@ class TestSpotFleetHandlerCheckHostsStatus:
             return_value=_formatted_instances(active_ids, "sfr-222"),
         ):
             with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, req: insts
+                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
             ):
                 result = handler.check_hosts_status(request)
 
@@ -137,7 +137,7 @@ class TestSpotFleetHandlerCheckHostsStatus:
             return_value=_formatted_instances(instance_ids, "sfr-cnt"),
         ):
             with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, req: insts
+                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
             ):
                 result = handler.check_hosts_status(request)
 
@@ -155,7 +155,7 @@ class TestSpotFleetHandlerCheckHostsStatus:
             return_value=_formatted_instances(instance_ids, "sfr-ids"),
         ):
             with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, req: insts
+                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
             ):
                 result = handler.check_hosts_status(request)
 
@@ -189,7 +189,7 @@ class TestSpotFleetHandlerCheckHostsStatus:
             handler, "_get_spot_fleet_instances", side_effect=get_instances_side_effect
         ):
             with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, req: insts
+                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
             ):
                 result = handler.check_hosts_status(request)
 
@@ -209,7 +209,7 @@ class TestSpotFleetHandlerCheckHostsStatus:
             return_value=_formatted_instances(active_ids, "sfr-strict"),
         ):
             with patch.object(
-                handler, "_format_instance_data", side_effect=lambda insts, rid, req: insts
+                handler, "_format_instance_data", side_effect=lambda insts, rid, api_val: insts
             ):
                 result = handler.check_hosts_status(request)
 
@@ -253,7 +253,7 @@ class TestSpotFleetHandlerNameTag:
         request.requested_count = 2
 
         with patch.object(
-            handler,
+            handler._config_builder,
             "_calculate_capacity_distribution",
             return_value={"target_capacity": 2, "on_demand_count": 0},
         ):
@@ -261,7 +261,7 @@ class TestSpotFleetHandlerNameTag:
                 "providers.aws.infrastructure.handlers.fleet_override_builder.build_spot_fleet_overrides",
                 return_value=[],
             ):
-                fleet_config = handler._create_spot_fleet_config_legacy(
+                fleet_config = handler._config_builder._build_legacy(
                     template, request, "lt-abc", "$Default"
                 )
 

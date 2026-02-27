@@ -157,6 +157,25 @@ class AWSHandler(ABC):
         """Extract instance IDs from API response if available."""
         return extractor(api_response)
 
+    def _format_instance_data(
+        self,
+        instance_details: list[dict[str, Any]],
+        resource_id: str,
+        provider_api_value: str,
+    ) -> list[dict[str, Any]]:
+        """Stamp resource_id and provider_api onto each instance dict.
+
+        instance_details is already in snake_case domain format from _get_instance_details.
+        Subclasses resolve provider_api_value via _resolve_provider_api and pass it here.
+        """
+        result = []
+        for inst in instance_details:
+            stamped = dict(inst)
+            stamped.setdefault("resource_id", resource_id)
+            stamped.setdefault("provider_api", provider_api_value)
+            result.append(stamped)
+        return result
+
     @abstractmethod
     def release_hosts(self, request: Request) -> None:
         """

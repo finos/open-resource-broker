@@ -42,6 +42,7 @@ from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from providers.aws.infrastructure.tags import build_system_tags, merge_tags
 from providers.aws.infrastructure.aws_client import AWSClient
+from providers.aws.infrastructure.handlers.asg.config_builder import ASGConfigBuilder
 from providers.aws.infrastructure.handlers.base_context_mixin import BaseContextMixin
 from providers.aws.infrastructure.handlers.base_handler import AWSHandler
 from providers.aws.infrastructure.handlers.fleet_grouping_mixin import FleetGroupingMixin
@@ -85,6 +86,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             aws_native_spec_service=aws_native_spec_service,
             config_port=config_port,
         )
+        self._config_builder = ASGConfigBuilder(aws_native_spec_service, config_port, logger)
 
     @handle_infrastructure_exceptions(context="asg_creation")
     def acquire_hosts(self, request: Request, aws_template: AWSTemplate) -> dict[str, Any]:
@@ -147,12 +149,12 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         asg_name = f"{self.config_port.get_resource_prefix('asg')}{request.request_id}"
 
         # Create ASG configuration
-        asg_config = self._create_asg_config(
+        asg_config = self._config_builder.build(
             asg_name=asg_name,
-            aws_template=aws_template,
+            template=aws_template,
             request=request,
-            launch_template_id=launch_template_result.template_id,
-            launch_template_version=launch_template_result.version,
+            lt_id=launch_template_result.template_id,
+            lt_version=launch_template_result.version,
         )
 
         # Create the ASG with circuit breaker for critical operation
@@ -221,289 +223,6 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         except Exception as e:
             self._logger.warning("Failed to tag ASG %s: %s", asg_name, e)
 
-    def _prepare_template_context(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
-        """Prepare context with all computed values for template rendering."""
-
-        # Start with base context
-        context = self._prepare_base_context(
-            template,
-            str(request.request_id),
-            request.requested_count,
-        )
-
-        # Add capacity distribution (for consistency, even if not all used)
-        context.update(self._calculate_capacity_distribution(template, request.requested_count))
-
-        # Add standard flags
-        context.update(self._prepare_standard_flags(template))
-
-        # Add standard tags
-        tag_context = self._prepare_standard_tags(template, str(request.request_id))
-        context.update(tag_context)
-
-        # Add ASG-specific context
-        context.update(self._prepare_asg_specific_context(template, request))
-
-        return context
-
-    def _prepare_asg_specific_context(
-        self, template: AWSTemplate, request: Request
-    ) -> dict[str, Any]:
-        """Prepare ASG-specific context."""
-
-        capacity = self._calculate_capacity_distribution(template, request.requested_count)
-        on_demand_count = capacity["on_demand_count"]
-        spot_count = capacity["spot_count"]
-        percent_on_demand = template.percent_on_demand or 0
-
-        # ABIS instance requirements
-        abis_instance_requirements = template.get_instance_requirements_payload()
-        has_abis = bool(abis_instance_requirements)
-
-        # Explicit machine type overrides (used when no ABIS and no spot)
-        machine_types_map = template.machine_types or {}
-        has_machine_types = bool(machine_types_map) and not has_abis
-        machine_types_overrides = [
-            {"instance_type": itype, "weighted_capacity": str(weight) if weight else None}
-            for itype, weight in machine_types_map.items()
-        ] if has_machine_types else []
-
-        return {
-            # ASG-specific values
-            "asg_name": f"{self.config_port.get_resource_prefix('asg')}{request.request_id}",  # type: ignore[union-attr]
-            "min_size": 0,
-            "max_size": request.requested_count * 2,  # Allow buffer
-            # Configuration values
-            "default_cooldown": 300,
-            "health_check_type": "EC2",
-            "health_check_grace_period": 300,
-            "vpc_zone_identifier": ",".join(template.subnet_ids) if template.subnet_ids else None,
-            "new_instances_protected_from_scale_in": True,
-            "context": (
-                template.context if hasattr(template, "context") and template.context else None
-            ),
-            # ASG-specific flags
-            "has_context": hasattr(template, "context") and bool(template.context),
-            "has_instance_protection": bool(getattr(template, "instance_protection", None)),
-            "has_lifecycle_hooks": bool(getattr(template, "lifecycle_hooks", None)),
-            # ABIS / InstanceRequirements
-            "abis_instance_requirements": abis_instance_requirements,
-            "has_abis": has_abis,
-            # Explicit machine type overrides (on-demand multi-type, no ABIS)
-            "has_machine_types": has_machine_types,
-            "machine_types_overrides": machine_types_overrides,
-            # Capacity split
-            "percent_on_demand": percent_on_demand,
-            "on_demand_count": on_demand_count,
-            "spot_count": spot_count,
-        }
-
-    def _create_asg_config(
-        self,
-        asg_name: str,
-        aws_template: AWSTemplate,
-        request: Request,
-        launch_template_id: str,
-        launch_template_version: str,
-    ) -> dict[str, Any]:
-        """Create Auto Scaling Group configuration with native spec support."""
-        # Try native spec processing with merge support
-        if self.aws_native_spec_service:
-            context = self._prepare_template_context(aws_template, request)
-            context.update(
-                {
-                    "launch_template_id": launch_template_id,
-                    "launch_template_version": launch_template_version,
-                    "asg_name": asg_name,
-                    "new_instances_protected_from_scale_in": True,
-                }
-            )
-
-            native_spec = self.aws_native_spec_service.process_provider_api_spec_with_merge(
-                aws_template, request, "asg", context
-            )
-            if native_spec:
-                # When MixedInstancesPolicy is present, LaunchTemplate must live inside it —
-                # AWS rejects a top-level LaunchTemplate alongside MixedInstancesPolicy.
-                if "MixedInstancesPolicy" in native_spec:
-                    mip = native_spec["MixedInstancesPolicy"]
-                    lt_spec = mip.setdefault("LaunchTemplate", {}).setdefault(
-                        "LaunchTemplateSpecification", {}
-                    )
-                    lt_spec.setdefault("LaunchTemplateId", launch_template_id)
-                    lt_spec.setdefault("Version", launch_template_version)
-                    native_spec.pop("LaunchTemplate", None)
-                else:
-                    if "LaunchTemplate" not in native_spec:
-                        native_spec["LaunchTemplate"] = {}
-                    native_spec["LaunchTemplate"]["LaunchTemplateId"] = launch_template_id
-                    native_spec["LaunchTemplate"]["Version"] = launch_template_version
-                native_spec["AutoScalingGroupName"] = asg_name
-                native_spec.setdefault("NewInstancesProtectedFromScaleIn", True)
-                self._logger.info(
-                    "Using native provider API spec with merge for ASG template %s",
-                    aws_template.template_id,
-                )
-                self._ensure_abis_in_native_spec(
-                    native_spec, aws_template, launch_template_id, launch_template_version
-                )
-                return native_spec
-
-            # Use template-driven approach with native spec service
-            return self.aws_native_spec_service.render_default_spec("asg", context)
-
-        # Fallback to legacy logic when native spec service is not available
-        return self._create_asg_config_legacy(
-            asg_name, aws_template, request, launch_template_id, launch_template_version
-        )
-
-    def _ensure_abis_in_native_spec(
-        self,
-        native_spec: dict[str, Any],
-        aws_template: AWSTemplate,
-        launch_template_id: str,
-        launch_template_version: str,
-    ) -> None:
-        """Ensure ABIS InstanceRequirements are present in native spec MixedInstancesPolicy."""
-        instance_requirements = aws_template.get_instance_requirements_payload()
-        if not instance_requirements:
-            return
-
-        if "MixedInstancesPolicy" not in native_spec:
-            native_spec["MixedInstancesPolicy"] = {}
-
-        mip = native_spec["MixedInstancesPolicy"]
-
-        if "LaunchTemplate" not in mip:
-            mip["LaunchTemplate"] = {}
-
-        lt = mip["LaunchTemplate"]
-
-        overrides = lt.get("Overrides", [])
-        if any("InstanceRequirements" in o for o in overrides):
-            return  # already present — respect it
-
-        # ABIS takes precedence — replace any InstanceType overrides with InstanceRequirements
-        lt["Overrides"] = [{"InstanceRequirements": instance_requirements}]
-
-        lt_spec = lt.setdefault("LaunchTemplateSpecification", {})
-        lt_spec.setdefault("LaunchTemplateId", launch_template_id)
-        lt_spec.setdefault("Version", launch_template_version)
-
-        native_spec.pop("LaunchTemplate", None)
-
-        self._logger.info(
-            "Injected ABIS InstanceRequirements into native spec for template %s",
-            aws_template.template_id,
-        )
-
-    def _create_asg_config_legacy(
-        self,
-        asg_name: str,
-        aws_template: AWSTemplate,
-        request: Request,
-        launch_template_id: str,
-        launch_template_version: str,
-    ) -> dict[str, Any]:
-        """Create Auto Scaling Group configuration using legacy logic."""
-        asg_config: dict[str, Any] = {
-            "AutoScalingGroupName": asg_name,
-            "MinSize": 0,
-            "MaxSize": request.requested_count * 2,  # Allow some buffer
-            "DesiredCapacity": request.requested_count,
-            "DefaultCooldown": 300,
-            "HealthCheckType": "EC2",
-            "HealthCheckGracePeriod": 300,
-            "NewInstancesProtectedFromScaleIn": True,
-        }
-
-        # Prefer multi-instance maps over a single instance_type
-        instance_types_map = aws_template.machine_types or {}
-
-        # Prefer ABIS/InstanceRequirements payload when present (no explicit types)
-        instance_requirements_payload = aws_template.get_instance_requirements_payload()
-        if instance_requirements_payload:
-            asg_config["MixedInstancesPolicy"] = {
-                "LaunchTemplate": {
-                    "LaunchTemplateSpecification": {
-                        "LaunchTemplateId": launch_template_id,
-                        "Version": launch_template_version,
-                    },
-                    "Overrides": [{"InstanceRequirements": instance_requirements_payload}],
-                }
-            }
-        # Otherwise, emit explicit instance type overrides when we have a type map
-        elif instance_types_map:
-            overrides = []
-            for itype, weight in instance_types_map.items():
-                override = {"InstanceType": itype}
-                if weight:
-                    override["WeightedCapacity"] = str(weight)
-                overrides.append(override)
-
-            asg_config["MixedInstancesPolicy"] = {
-                "LaunchTemplate": {
-                    "LaunchTemplateSpecification": {
-                        "LaunchTemplateId": launch_template_id,
-                        "Version": launch_template_version,
-                    },
-                    "Overrides": overrides,
-                }
-            }
-        else:
-            # Fallback: single instance type (or none) uses plain launch template
-            asg_config["LaunchTemplate"] = {
-                "LaunchTemplateId": launch_template_id,
-                "Version": launch_template_version,
-            }
-
-        # Add spot/on-demand distribution when spot pricing or mixed capacity requested
-        price_type = getattr(aws_template, "price_type", "ondemand") or "ondemand"
-        percent_on_demand = getattr(aws_template, "percent_on_demand", None)
-        needs_spot_distribution = percent_on_demand is not None or price_type in (
-            "spot",
-            "heterogeneous",
-        )
-
-        if needs_spot_distribution:
-            # Ensure MixedInstancesPolicy exists so we can attach distribution
-            if "MixedInstancesPolicy" not in asg_config:
-                asg_config["MixedInstancesPolicy"] = {
-                    "LaunchTemplate": {
-                        "LaunchTemplateSpecification": {
-                            "LaunchTemplateId": launch_template_id,
-                            "Version": launch_template_version,
-                        }
-                    }
-                }
-
-            ondemand_pct = int(percent_on_demand) if percent_on_demand is not None else 0
-            instances_distribution: dict[str, Any] = {
-                "OnDemandBaseCapacity": 0,
-                "OnDemandPercentageAboveBaseCapacity": ondemand_pct,
-            }
-            asg_config["MixedInstancesPolicy"]["InstancesDistribution"] = instances_distribution
-
-            if getattr(aws_template, "allocation_strategy", None):
-                instances_distribution[
-                    "SpotAllocationStrategy"
-                ] = aws_template.get_asg_allocation_strategy()
-
-            # When MixedInstancesPolicy is present, AWS requires launch settings to live there.
-            # Remove top-level LaunchTemplate to avoid API validation errors.
-            if "LaunchTemplate" in asg_config:
-                asg_config.pop("LaunchTemplate", None)
-
-        # Add subnet configuration
-        if aws_template.subnet_ids:
-            asg_config["VPCZoneIdentifier"] = ",".join(aws_template.subnet_ids)
-
-        # Add Context field if specified
-        if aws_template.context:
-            asg_config["Context"] = aws_template.context
-
-        return asg_config
-
     @handle_infrastructure_exceptions(context="asg_termination")
     def _get_asg_instances(
         self,
@@ -533,27 +252,10 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             resource_id=resource_id or asg_name,
         )
 
-    def _format_instance_data(
-        self,
-        instance_details: list[dict[str, Any]],
-        resource_id: str,
-        request: Request,
-    ) -> list[dict[str, Any]]:
-        """Format ASG instance details to standard structure.
-
-        instance_details is already snake_case from _get_instance_details.
-        Just stamp handler-specific context fields.
-        """
+    def _resolve_provider_api(self, request: Request, aws_template: Optional[AWSTemplate] = None) -> str:
+        """Resolve the provider_api value to stamp onto instance data."""
         metadata = getattr(request, "metadata", {}) or {}
-        provider_api_value = metadata.get("provider_api", "ASG")
-
-        result = []
-        for inst in instance_details:
-            stamped = dict(inst)
-            stamped.setdefault("resource_id", resource_id)
-            stamped.setdefault("provider_api", provider_api_value)
-            result.append(stamped)
-        return result
+        return metadata.get("provider_api", "ASG")
 
     @staticmethod
     def detect_asg_instances(aws_client, instance_ids: list[str]) -> dict[str, list[str]]:
@@ -596,12 +298,6 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
         except Exception:
             return {}
-
-    @staticmethod
-    def _chunk_list(items: list[str], chunk_size: int):
-        """Yield successive chunk-sized lists from items."""
-        for index in range(0, len(items), chunk_size):
-            yield items[index : index + chunk_size]
 
     def reduce_capacity_for_instance_ids(self, instance_ids: list[str]) -> None:
         """Reduce ASG capacity ahead of instance termination to avoid replacements."""
@@ -975,7 +671,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     )
                     if asg_instances:
                         formatted_instances = self._format_instance_data(
-                            asg_instances, asg_name, request
+                            asg_instances, asg_name, self._resolve_provider_api(request)
                         )
                         all_instances.extend(formatted_instances)
                 except Exception as e:
