@@ -8,10 +8,7 @@ from typing import TYPE_CHECKING
 
 from application.commands.machine_handlers import (
     CleanupMachineResourcesHandler,
-    ConvertBatchMachineStatusCommandHandler,
-    ConvertMachineStatusCommandHandler,
     UpdateMachineStatusHandler,
-    ValidateProviderStateCommandHandler,
 )
 from domain.base.ports.logging_port import LoggingPort
 from infrastructure.di.buses import CommandBus
@@ -101,25 +98,7 @@ def register_command_handlers_with_bus(container: "DIContainer") -> None:
         # Register machine command handlers
         from application.machine.commands import (
             CleanupMachineResourcesCommand,
-            ConvertBatchMachineStatusCommand,
-            ConvertMachineStatusCommand,
             UpdateMachineStatusCommand,
-            ValidateProviderStateCommand,
-        )
-
-        command_bus.register(
-            ConvertMachineStatusCommand,
-            container.get(ConvertMachineStatusCommandHandler),
-        )
-
-        command_bus.register(
-            ConvertBatchMachineStatusCommand,
-            container.get(ConvertBatchMachineStatusCommandHandler),
-        )
-
-        command_bus.register(
-            ValidateProviderStateCommand,
-            container.get(ValidateProviderStateCommandHandler),
         )
 
         command_bus.register(UpdateMachineStatusCommand, container.get(UpdateMachineStatusHandler))

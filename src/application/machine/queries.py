@@ -40,3 +40,24 @@ class GetMachineHealthQuery(BaseQuery):
 
     machine_ids: list[str]
     check_connectivity: bool = True
+
+
+class ConvertMachineStatusQuery(BaseQuery):
+    """Query to convert a provider-specific state string to a domain MachineStatus."""
+
+    provider_state: str
+    provider_type: str
+
+
+class ConvertBatchMachineStatusQuery(BaseQuery):
+    """Query to convert multiple provider state strings to domain MachineStatus values."""
+
+    # Each entry: {'state': str, 'provider_type': str}
+    provider_states: list[dict[str, str]]
+
+
+class ValidateProviderStateQuery(BaseQuery):
+    """Query to check whether a provider state string maps to a known domain status."""
+
+    provider_state: str
+    provider_type: str

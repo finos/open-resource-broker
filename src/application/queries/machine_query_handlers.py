@@ -2,9 +2,19 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from application.services.provider_registry_service import ProviderRegistryService
+
 from application.base.handlers import BaseQueryHandler
 from application.decorators import query_handler
 from application.dto.queries import GetMachineQuery, ListMachinesQuery
+from application.machine.queries import (
+    ConvertBatchMachineStatusQuery,
+    ConvertMachineStatusQuery,
+    ValidateProviderStateQuery,
+)
 from application.dto.responses import MachineDTO
 from application.ports.command_bus_port import CommandBusPort
 from domain.base import UnitOfWorkFactory
@@ -207,3 +217,114 @@ class ListMachinesHandler(BaseQueryHandler[ListMachinesQuery, list[MachineDTO]])
         except Exception as e:
             self.logger.error("Failed to list machines: %s", e)
             raise
+
+
+@query_handler(ConvertMachineStatusQuery)  # type: ignore[arg-type]
+class ConvertMachineStatusQueryHandler(BaseQueryHandler[ConvertMachineStatusQuery, dict[str, str]]):
+    """Query handler that converts a provider-specific state to a domain MachineStatus."""
+
+    def __init__(
+        self,
+        container: ContainerPort,
+        logger: LoggingPort,
+        error_handler: ErrorHandlingPort,
+        provider_registry_service: "ProviderRegistryService",
+    ) -> None:
+        super().__init__(logger, error_handler)
+        self._container = container
+        self._provider_registry_service = provider_registry_service
+
+    async def execute_query(self, query: ConvertMachineStatusQuery) -> dict[str, str]:
+        """Return the domain status for the given provider state."""
+        from providers.base.strategy import ProviderOperation, ProviderOperationType
+
+        operation = ProviderOperation(
+            operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
+            parameters={"provider_state": query.provider_state, "convert_only": True},
+        )
+        result = await self._provider_registry_service.execute_operation(query.provider_type, operation)
+        from domain.machine.value_objects import MachineStatus
+
+        status: MachineStatus = (
+            result.data.get("status", MachineStatus.UNKNOWN) if result.success else MachineStatus.UNKNOWN
+        )
+        return {
+            "status": status.value if hasattr(status, "value") else str(status),
+            "original_state": query.provider_state,
+            "provider_type": query.provider_type,
+        }
+
+
+@query_handler(ConvertBatchMachineStatusQuery)  # type: ignore[arg-type]
+class ConvertBatchMachineStatusQueryHandler(BaseQueryHandler[ConvertBatchMachineStatusQuery, dict]):
+    """Query handler that converts multiple provider states to domain MachineStatus values."""
+
+    def __init__(
+        self,
+        container: ContainerPort,
+        logger: LoggingPort,
+        error_handler: ErrorHandlingPort,
+        provider_registry_service: "ProviderRegistryService",
+    ) -> None:
+        super().__init__(logger, error_handler)
+        self._container = container
+        self._provider_registry_service = provider_registry_service
+
+    async def execute_query(self, query: ConvertBatchMachineStatusQuery) -> dict:
+        """Return domain statuses for all provider states in the batch."""
+        from providers.base.strategy import ProviderOperation, ProviderOperationType
+        from domain.machine.value_objects import MachineStatus
+
+        statuses = []
+        for state_info in query.provider_states:
+            operation = ProviderOperation(
+                operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
+                parameters={"provider_state": state_info["state"], "convert_only": True},
+            )
+            result = await self._provider_registry_service.execute_operation(
+                state_info["provider_type"], operation
+            )
+            status: MachineStatus = (
+                result.data.get("status", MachineStatus.UNKNOWN) if result.success else MachineStatus.UNKNOWN
+            )
+            statuses.append(status.value if hasattr(status, "value") else str(status))
+        return {"statuses": statuses, "count": len(statuses)}
+
+
+@query_handler(ValidateProviderStateQuery)  # type: ignore[arg-type]
+class ValidateProviderStateQueryHandler(BaseQueryHandler[ValidateProviderStateQuery, dict]):
+    """Query handler that validates whether a provider state maps to a known domain status."""
+
+    def __init__(
+        self,
+        container: ContainerPort,
+        logger: LoggingPort,
+        error_handler: ErrorHandlingPort,
+        provider_registry_service: "ProviderRegistryService",
+    ) -> None:
+        super().__init__(logger, error_handler)
+        self._container = container
+        self._provider_registry_service = provider_registry_service
+
+    async def execute_query(self, query: ValidateProviderStateQuery) -> dict:
+        """Return whether the provider state is valid."""
+        from providers.base.strategy import ProviderOperation, ProviderOperationType
+        from domain.machine.value_objects import MachineStatus
+
+        try:
+            operation = ProviderOperation(
+                operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
+                parameters={"provider_state": query.provider_state, "convert_only": True},
+            )
+            result = await self._provider_registry_service.execute_operation(query.provider_type, operation)
+            status: MachineStatus = (
+                result.data.get("status", MachineStatus.UNKNOWN) if result.success else MachineStatus.UNKNOWN
+            )
+            is_valid = result.success and status != MachineStatus.UNKNOWN
+        except Exception:
+            is_valid = False
+        return {
+            "is_valid": is_valid,
+            "provider_state": query.provider_state,
+            "provider_type": query.provider_type,
+        }

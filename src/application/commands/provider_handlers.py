@@ -1,8 +1,4 @@
-"""Provider Strategy Command Handlers - CQRS handlers for provider strategy commands.
-
-This module implements command handlers for provider strategy operations,
-integrating the existing provider strategy ecosystem with the CQRS architecture.
-"""
+"""Provider Strategy Command Handlers - CQRS handlers for provider strategy commands."""
 
 import time
 from typing import Any
@@ -25,17 +21,18 @@ from domain.base.events.provider_events import (
 )
 from domain.base.ports import ContainerPort, ErrorHandlingPort, EventPublisherPort, LoggingPort
 from providers.base.strategy import (
-    ProviderResult,
+    ProviderOperation,
     SelectionPolicy,
     SelectorFactory,
 )
 
 
 @command_handler(SelectProviderStrategyCommand)  # type: ignore[arg-type]
-class SelectProviderStrategyHandler(
-    BaseCommandHandler[SelectProviderStrategyCommand, dict[str, Any]]
-):
-    """Handler for selecting optimal provider strategy."""
+class SelectProviderStrategyHandler(BaseCommandHandler[SelectProviderStrategyCommand, None]):
+    """Handler for selecting optimal provider strategy.
+
+    CQRS Compliance: Returns None. Result stored in command.result.
+    """
 
     def __init__(
         self,
@@ -56,48 +53,30 @@ class SelectProviderStrategyHandler(
         if not command.operation_type:
             raise ValueError("operation_type is required")
 
-    async def execute_command(self, command: SelectProviderStrategyCommand) -> dict[str, Any]:
-        """Handle provider strategy selection command."""
+    async def execute_command(self, command: SelectProviderStrategyCommand) -> None:
+        """Handle provider strategy selection. Result stored in command.result."""
         self.logger.info("Selecting provider strategy for operation: %s", command.operation_type)
-
         try:
-            # Use existing provider context to select strategy
-            selector = SelectorFactory.create_selector(
-                SelectionPolicy.CAPABILITY_BASED,
-                self.logger,  # Use capability-based selection
-            )
-
-            # Get available strategies from registry service
+            selector = SelectorFactory.create_selector(SelectionPolicy.CAPABILITY_BASED, self.logger)
             available_strategies = self._provider_registry_service.get_available_strategies()
-
             if not available_strategies:
                 raise ValueError("No provider strategies available")
 
-            # Select optimal strategy based on criteria
-            from providers.base.strategy import ProviderOperation, SelectionCriteria
+            from providers.base.strategy import SelectionCriteria
 
-            operation = ProviderOperation(
-                operation_type=command.operation_type,
-                parameters={},
-            )
+            operation = ProviderOperation(operation_type=command.operation_type, parameters={})
             criteria = SelectionCriteria()
-            # available_strategies may be a list; build dict for selector
             strategies_dict: dict[str, Any] = (
                 available_strategies
                 if isinstance(available_strategies, dict)
                 else {str(i): s for i, s in enumerate(available_strategies)}
             )
             selection_result = selector.select_strategy(
-                strategies_dict,
-                {},
-                operation,
-                criteria,  # type: ignore[arg-type]
+                strategies_dict, {}, operation, criteria  # type: ignore[arg-type]
             )
-
             if not selection_result.selected_strategy:
                 raise ValueError("No suitable provider strategy found")
 
-            # Publish strategy selection event
             event = ProviderStrategySelectedEvent(
                 strategy_name=str(selection_result.selected_strategy),
                 operation_type=str(command.operation_type),
@@ -110,23 +89,22 @@ class SelectProviderStrategyHandler(
                 self.event_publisher.publish(event)
 
             self.logger.info("Selected strategy: %s", selection_result.selected_strategy)
-
-            return {
+            command.result = {
                 "selected_strategy": str(selection_result.selected_strategy),
                 "selection_reason": selection_result.selection_reason,
                 "alternatives": [str(s) for s in (selection_result.alternatives or [])],
             }
-
         except Exception as e:
             self.logger.error("Failed to select provider strategy: %s", str(e))
             raise
 
 
 @command_handler(ExecuteProviderOperationCommand)  # type: ignore[arg-type]
-class ExecuteProviderOperationHandler(
-    BaseCommandHandler[ExecuteProviderOperationCommand, ProviderResult]
-):
-    """Handler for executing provider operations through strategy pattern."""
+class ExecuteProviderOperationHandler(BaseCommandHandler[ExecuteProviderOperationCommand, None]):
+    """Handler for executing provider operations.
+
+    CQRS Compliance: Returns None. Result stored in command.result.
+    """
 
     def __init__(
         self,
@@ -146,25 +124,17 @@ class ExecuteProviderOperationHandler(
         if not command.operation:
             raise ValueError("operation is required")
 
-    async def execute_command(self, command: ExecuteProviderOperationCommand) -> ProviderResult:
-        """Handle provider operation execution command."""
+    async def execute_command(self, command: ExecuteProviderOperationCommand) -> None:
+        """Handle provider operation execution. Result stored in command.result."""
         operation = command.operation
         self.logger.info("Executing provider operation: %s", operation.operation_type)
-
         start_time = time.time()
-
         try:
-            # Use specific strategy if override provided, otherwise use default
-            provider_identifier = command.strategy_override or "aws"  # Default fallback
-
-            # Execute operation through registry service
+            provider_identifier = command.strategy_override or "aws"
             result = await self._provider_registry_service.execute_operation(
                 provider_identifier, operation
             )
-
-            execution_time = (time.time() - start_time) * 1000  # Convert to milliseconds
-
-            # Publish operation execution event
+            execution_time = (time.time() - start_time) * 1000
             event = ProviderOperationExecutedEvent(
                 operation_type=operation.operation_type,
                 strategy_name=provider_identifier,
@@ -176,19 +146,18 @@ class ExecuteProviderOperationHandler(
             )
             if self.event_publisher:
                 self.event_publisher.publish(event)
-
             if result.success:
                 self.logger.info("Operation completed successfully in %.2fms", execution_time)
             else:
                 self.logger.error("Operation failed: %s", result.error_message)
-
-            return result
-
+            command.result = {
+                "success": result.success,
+                "data": result.data,
+                "error_message": result.error_message,
+            }
         except Exception as e:
             execution_time = (time.time() - start_time) * 1000
             self.logger.error("Failed to execute provider operation: %s", str(e))
-
-            # Publish failure event
             event = ProviderOperationExecutedEvent(
                 operation_type=operation.operation_type,
                 strategy_name=command.strategy_override or "unknown",
@@ -200,16 +169,15 @@ class ExecuteProviderOperationHandler(
             )
             if self.event_publisher:
                 self.event_publisher.publish(event)
-
-            # Return error result instead of raising
-            return ProviderResult.error_result(error_message=str(e), error_code="EXECUTION_FAILED")
+            command.result = {"success": False, "data": None, "error_message": str(e)}
 
 
 @command_handler(RegisterProviderStrategyCommand)  # type: ignore[arg-type]
-class RegisterProviderStrategyHandler(
-    BaseCommandHandler[RegisterProviderStrategyCommand, dict[str, Any]]
-):
-    """Handler for registering new provider strategies."""
+class RegisterProviderStrategyHandler(BaseCommandHandler[RegisterProviderStrategyCommand, None]):
+    """Handler for registering new provider strategies.
+
+    CQRS Compliance: Returns None. Result stored in command.result.
+    """
 
     def __init__(
         self,
@@ -231,21 +199,16 @@ class RegisterProviderStrategyHandler(
         if not command.provider_type:
             raise ValueError("provider_type is required")
 
-    async def execute_command(self, command: RegisterProviderStrategyCommand) -> dict[str, Any]:
-        """Handle provider strategy registration command."""
+    async def execute_command(self, command: RegisterProviderStrategyCommand) -> None:
+        """Handle provider strategy registration. Result stored in command.result."""
         self.logger.info("Registering provider strategy: %s", command.strategy_name)
-
         try:
-            # Register provider strategy through service
             success = self._provider_registry_service.register_provider_strategy(
                 command.provider_type.lower(), command.strategy_config
             )
             if not success:
                 raise ValueError(f"Failed to register provider strategy: {command.provider_type}")
-
             self.logger.info("Strategy registered successfully: %s", command.strategy_name)
-
-            # Publish registration event
             event = ProviderStrategyRegisteredEvent(
                 strategy_name=command.strategy_name,
                 provider_type=command.provider_type,
@@ -256,16 +219,12 @@ class RegisterProviderStrategyHandler(
             )
             if self.event_publisher:
                 self.event_publisher.publish(event)
-
-            self.logger.info("Successfully registered strategy: %s", command.strategy_name)
-
-            return {
+            command.result = {
                 "strategy_name": command.strategy_name,
                 "provider_type": command.provider_type,
                 "status": "registered",
                 "capabilities": command.capabilities or {},
             }
-
         except Exception as e:
             self.logger.error("Failed to register provider strategy: %s", str(e))
             raise
@@ -275,7 +234,7 @@ class RegisterProviderStrategyHandler(
 class UpdateProviderHealthHandler(BaseCommandHandler[UpdateProviderHealthCommand, None]):
     """Handler for updating provider health status.
 
-    CQRS Compliance: Returns None. Results stored in command.result.
+    CQRS Compliance: Returns None. Result stored in command.result.
     """
 
     def __init__(
@@ -299,20 +258,12 @@ class UpdateProviderHealthHandler(BaseCommandHandler[UpdateProviderHealthCommand
             raise ValueError("health_status is required")
 
     async def execute_command(self, command: UpdateProviderHealthCommand) -> None:
-        """Handle provider health status update command.
-
-        CQRS Compliance: Returns None. Results stored in command.result.
-        """
+        """Handle provider health update. Result stored in command.result."""
         self.logger.debug("Updating health for provider: %s", command.provider_name)
-
         try:
-            # Get current health status for comparison using service
-            old_status = self._provider_registry_service.check_strategy_health(
-                command.provider_name
-            )
-
-            # Publish health change event if status changed
-            if old_status is None or old_status.is_healthy != command.health_status.is_healthy:
+            old_status = self._provider_registry_service.check_strategy_health(command.provider_name)
+            new_is_healthy = command.health_status.is_healthy if hasattr(command.health_status, "is_healthy") else False
+            if old_status is None or old_status.is_healthy != new_is_healthy:
                 event = ProviderHealthChangedEvent(
                     provider_name=command.provider_name,
                     old_status=str(old_status) if old_status is not None else None,
@@ -323,27 +274,28 @@ class UpdateProviderHealthHandler(BaseCommandHandler[UpdateProviderHealthCommand
                 )
                 if self.event_publisher:
                     self.event_publisher.publish(event)
-
-                status_change = "healthy" if command.health_status.is_healthy else "unhealthy"
-                self.logger.info("Provider %s is now %s", command.provider_name, status_change)
-
-            # Store results in command
+                is_healthy = new_is_healthy
+                self.logger.info(
+                    "Provider %s is now %s",
+                    command.provider_name,
+                    "healthy" if is_healthy else "unhealthy",
+                )
             command.result = {
                 "provider_name": command.provider_name,
-                "health_status": command.health_status.model_dump(),
+                "health_status": command.health_status.model_dump() if hasattr(command.health_status, "model_dump") else str(command.health_status),
                 "updated_at": command.timestamp or time.strftime("%Y-%m-%d %H:%M:%S"),
             }
-
         except Exception as e:
             self.logger.error("Failed to update provider health: %s", str(e))
             raise
 
 
 @command_handler(ConfigureProviderStrategyCommand)  # type: ignore[arg-type]
-class ConfigureProviderStrategyHandler(
-    BaseCommandHandler[ConfigureProviderStrategyCommand, dict[str, Any]]
-):
-    """Handler for configuring provider strategy policies."""
+class ConfigureProviderStrategyHandler(BaseCommandHandler[ConfigureProviderStrategyCommand, None]):
+    """Handler for configuring provider strategy policies.
+
+    CQRS Compliance: Returns None. Result stored in command.result.
+    """
 
     def __init__(
         self,
@@ -358,14 +310,11 @@ class ConfigureProviderStrategyHandler(
     async def validate_command(self, command: ConfigureProviderStrategyCommand) -> None:
         """Validate configure provider strategy command."""
         await super().validate_command(command)
-        # Configuration commands can have optional parameters, so minimal validation
 
-    async def execute_command(self, command: ConfigureProviderStrategyCommand) -> dict[str, Any]:
-        """Handle provider strategy configuration command."""
+    async def execute_command(self, command: ConfigureProviderStrategyCommand) -> None:
+        """Handle provider strategy configuration. Result stored in command.result."""
         self.logger.info("Configuring provider strategy policies")
-
         try:
-            # Update provider context configuration
             config_updates = {
                 "default_selection_policy": command.default_selection_policy,
                 "selection_criteria": command.selection_criteria,
@@ -373,21 +322,12 @@ class ConfigureProviderStrategyHandler(
                 "health_check_interval": command.health_check_interval,
                 "circuit_breaker_config": command.circuit_breaker_config or {},
             }
-
-            # Configuration updates are handled at the provider level
-            # Registry pattern doesn't require global configuration updates
-            self.logger.info(
-                "Provider strategy configuration noted (registry pattern handles per-provider config)"
-            )
-
             self.logger.info("Provider strategy configuration updated successfully")
-
-            return {
+            command.result = {
                 "status": "configured",
                 "configuration": config_updates,
                 "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             }
-
         except Exception as e:
             self.logger.error("Failed to configure provider strategy: %s", str(e))
             raise

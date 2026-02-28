@@ -22,6 +22,9 @@ class SelectProviderStrategyCommand(BaseCommand):
     selection_criteria: SelectionCriteria
     context: Optional[dict[str, Any]] = None
 
+    # Result stored here after execution (CQRS: execute_command returns None)
+    result: Optional[dict[str, Any]] = None
+
 
 class ExecuteProviderOperationCommand(BaseCommand):
     """Command to execute a provider operation through strategy pattern."""
@@ -30,6 +33,9 @@ class ExecuteProviderOperationCommand(BaseCommand):
     strategy_override: Optional[str] = None
     retry_count: int = 0
     timeout_seconds: Optional[int] = None
+
+    # Result stored here after execution (CQRS: execute_command returns None)
+    result: Optional[dict[str, Any]] = None
 
 
 class RegisterProviderStrategyCommand(BaseCommand):
@@ -40,6 +46,9 @@ class RegisterProviderStrategyCommand(BaseCommand):
     strategy_config: dict[str, Any]
     capabilities: Optional[dict[str, Any]] = None
     priority: int = 0
+
+    # Result stored here after execution (CQRS: execute_command returns None)
+    result: Optional[dict[str, Any]] = None
 
 
 class UpdateProviderHealthCommand(BaseCommand):
@@ -65,3 +74,6 @@ class ConfigureProviderStrategyCommand(BaseCommand):
     fallback_strategies: Optional[list[str]] = None
     health_check_interval: int = 300  # 5 minutes default
     circuit_breaker_config: Optional[dict[str, Any]] = None
+
+    # Result stored here after execution (CQRS: execute_command returns None)
+    result: Optional[dict[str, Any]] = None
