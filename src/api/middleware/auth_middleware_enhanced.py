@@ -4,6 +4,7 @@ import os
 from typing import Optional
 
 from fastapi import HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from infrastructure.adapters.ports.auth import (
@@ -222,21 +223,21 @@ class EnhancedAuthMiddleware(BaseHTTPMiddleware):
         )
 
         # Return generic error messages to prevent information disclosure
-        if auth_result.status == AuthStatus.EXPIRED:
-            raise HTTPException(
+        if auth_result.status == AuthStatus.INSUFFICIENT_PERMISSIONS:
+            return JSONResponse(
+                status_code=status.HTTP_403_FORBIDDEN,
+                content={"detail": "Access denied"},
+            )
+        elif auth_result.status == AuthStatus.EXPIRED:
+            return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication expired",
+                content={"detail": "Authentication expired"},
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        elif auth_result.status == AuthStatus.INSUFFICIENT_PERMISSIONS:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Access denied",
-            )
         else:
-            raise HTTPException(
+            return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication failed",
+                content={"detail": "Invalid credentials"},
                 headers={"WWW-Authenticate": "Bearer"},
             )
 

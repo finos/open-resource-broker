@@ -23,6 +23,9 @@ def create_symphony_hostfactory_strategy(config: Any) -> "SchedulerPort":
     Returns:
         SchedulerPort: Symphony HostFactory scheduler strategy instance
     """
+    from application.services.provider_registry_service import ProviderRegistryService
+    from domain.base.ports.configuration_port import ConfigurationPort
+    from domain.base.ports.logging_port import LoggingPort
     from domain.template.ports.template_defaults_port import TemplateDefaultsPort
     from infrastructure.di.container import get_container, is_container_ready
     from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
@@ -30,10 +33,23 @@ def create_symphony_hostfactory_strategy(config: Any) -> "SchedulerPort":
     )
 
     template_defaults_service = None
-    if is_container_ready():
-        template_defaults_service = get_container().get_optional(TemplateDefaultsPort)
+    config_port = None
+    logger = None
+    provider_registry_service = None
 
-    return HostFactorySchedulerStrategy(template_defaults_service=template_defaults_service)
+    if is_container_ready():
+        container = get_container()
+        template_defaults_service = container.get_optional(TemplateDefaultsPort)
+        config_port = container.get_optional(ConfigurationPort)
+        logger = container.get_optional(LoggingPort)
+        provider_registry_service = container.get_optional(ProviderRegistryService)
+
+    return HostFactorySchedulerStrategy(
+        template_defaults_service=template_defaults_service,
+        config_port=config_port,
+        logger=logger,
+        provider_registry_service=provider_registry_service,
+    )
 
 
 def create_hostfactory_config(data: dict[str, Any]) -> Any:
@@ -74,15 +90,31 @@ def create_default_strategy(config: Any) -> "SchedulerPort":
     Returns:
         SchedulerPort: Default scheduler strategy instance
     """
+    from application.services.provider_registry_service import ProviderRegistryService
+    from domain.base.ports.configuration_port import ConfigurationPort
+    from domain.base.ports.logging_port import LoggingPort
     from domain.template.ports.template_defaults_port import TemplateDefaultsPort
     from infrastructure.di.container import get_container, is_container_ready
     from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 
     template_defaults_service = None
-    if is_container_ready():
-        template_defaults_service = get_container().get_optional(TemplateDefaultsPort)
+    config_port = None
+    logger = None
+    provider_registry_service = None
 
-    return DefaultSchedulerStrategy(template_defaults_service=template_defaults_service)
+    if is_container_ready():
+        container = get_container()
+        template_defaults_service = container.get_optional(TemplateDefaultsPort)
+        config_port = container.get_optional(ConfigurationPort)
+        logger = container.get_optional(LoggingPort)
+        provider_registry_service = container.get_optional(ProviderRegistryService)
+
+    return DefaultSchedulerStrategy(
+        template_defaults_service=template_defaults_service,
+        config_port=config_port,
+        logger=logger,
+        provider_registry_service=provider_registry_service,
+    )
 
 
 def create_default_config(data: dict[str, Any]) -> Any:

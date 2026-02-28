@@ -27,11 +27,17 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
     def __init__(
         self,
         template_defaults_service: "TemplateDefaultsPort | None" = None,
+        config_port: "Any | None" = None,
+        logger: "Any | None" = None,
+        provider_registry_service: "Any | None" = None,
     ) -> None:
         """Initialize the instance."""
-        self._config_manager = None
-        self._logger = None
         self._template_defaults_service = template_defaults_service
+        self._init_base(
+            config_port=config_port,
+            logger=logger,
+            provider_registry_service=provider_registry_service,
+        )
         # Initialize field mapper
         self.field_mapper = DefaultFieldMapper()
 

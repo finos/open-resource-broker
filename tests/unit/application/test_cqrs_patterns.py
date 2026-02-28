@@ -663,7 +663,7 @@ class TestQueryHandlerImplementation:
         from unittest.mock import MagicMock, Mock
 
         from application.dto.queries import GetRequestQuery
-        from application.queries.handlers import GetRequestHandler
+        from application.queries.request_query_handlers import GetRequestHandler
 
         # Mock dependencies
         mock_uow_factory = Mock()
@@ -715,16 +715,25 @@ class TestQueryHandlerImplementation:
         """Test that query handlers support data projections with real GetRequestStatusQueryHandler."""
         from unittest.mock import MagicMock, Mock
 
-        from application.dto.queries import GetRequestStatusQuery
-        from application.queries.handlers import GetRequestStatusQueryHandler
+        from application.dto.queries import GetRequestQuery
+        from application.queries.request_query_handlers import GetRequestHandler
 
-        # Mock dependencies (no container needed for this handler)
+        # Mock dependencies
         mock_uow_factory = Mock()
         mock_logger = Mock()
         mock_error_handler = Mock()
+        mock_container = MagicMock()
+        mock_command_bus = Mock()
+        mock_provider_registry = Mock()
+        mock_container.get.return_value = Mock()
 
-        handler = GetRequestStatusQueryHandler(
-            uow_factory=mock_uow_factory, logger=mock_logger, error_handler=mock_error_handler
+        handler = GetRequestHandler(
+            uow_factory=mock_uow_factory,
+            logger=mock_logger,
+            error_handler=mock_error_handler,
+            container=mock_container,
+            command_bus=mock_command_bus,
+            provider_registry_service=mock_provider_registry,
         )
 
         # Mock UoW and repository with proper context manager
@@ -745,17 +754,14 @@ class TestQueryHandlerImplementation:
         mock_request.get_domain_events.return_value = []  # This makes it a domain entity
         mock_request_repo.find_by_id.return_value = mock_request
 
-        GetRequestStatusQuery(request_id="test-request")
+        GetRequestQuery(request_id="test-request")
 
         try:
             # This handler is async, so we test the interface exists
             assert hasattr(handler, "handle"), "Handler should have handle method"
             assert hasattr(handler, "execute_query"), "Handler should have execute_query method"
-            # The handler returns a string (status projection), not full entity
-            # This tests the CQRS projection pattern
         except Exception:
             # If it fails due to missing dependencies, that's expected in unit test
-            # The important thing is the handler exists and has the handle method
             assert hasattr(handler, "handle"), "Handler should have handle method"
 
 

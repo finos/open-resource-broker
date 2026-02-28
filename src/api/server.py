@@ -71,7 +71,7 @@ def create_fastapi_app(server_config: Any) -> Any:
         server_config = ServerConfig()  # type: ignore[call-arg]
 
     from api.documentation import configure_openapi
-    from api.middleware import AuthMiddleware, LoggingMiddleware
+    from api.middleware import EnhancedAuthMiddleware, LoggingMiddleware
     from infrastructure.error.exception_handler import get_exception_handler
 
     # Create FastAPI app with configuration
@@ -109,7 +109,7 @@ def create_fastapi_app(server_config: Any) -> Any:
     if server_config.auth.enabled:
         auth_strategy = _create_auth_strategy(server_config.auth)
         if auth_strategy:
-            app.add_middleware(AuthMiddleware, auth_port=auth_strategy, require_auth=True)
+            app.add_middleware(EnhancedAuthMiddleware, auth_port=auth_strategy, require_auth=True)
             logger.info(
                 "Authentication middleware enabled with strategy: %s",
                 auth_strategy.get_strategy_name(),

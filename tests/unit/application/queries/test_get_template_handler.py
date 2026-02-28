@@ -4,7 +4,7 @@ from unittest.mock import Mock
 import pytest
 
 from application.dto.queries import GetTemplateQuery
-from application.queries.handlers import GetTemplateHandler
+from application.queries.template_query_handlers import GetTemplateHandler
 from domain.base.ports.container_port import ContainerPort
 from domain.base.ports.template_configuration_port import TemplateConfigurationPort
 from domain.template.factory import TemplateFactory

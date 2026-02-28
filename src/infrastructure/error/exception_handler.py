@@ -83,7 +83,6 @@ class ErrorCategory:
 
     # Legacy compatibility
     NOT_FOUND = "not_found_error"
-    BUSINESS_RULE = "business_rule_error"
     INFRASTRUCTURE = "infrastructure_error"
     EXTERNAL_SERVICE = "external_service_error"
     UNAUTHORIZED = "unauthorized_error"

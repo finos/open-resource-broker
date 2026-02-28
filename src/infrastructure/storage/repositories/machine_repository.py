@@ -2,7 +2,6 @@
 
 from typing import Any, Optional
 
-from domain.base.ports.storage_port import StoragePort
 from domain.machine.aggregate import Machine
 from domain.machine.machine_identifiers import MachineId
 from domain.machine.repository import MachineRepository as MachineRepositoryInterface
@@ -10,6 +9,7 @@ from domain.machine.value_objects import MachineStatus
 from infrastructure.error.decorators import handle_infrastructure_exceptions
 from infrastructure.logging.logger import get_logger
 from infrastructure.storage.base.repository_mixin import StorageRepositoryMixin
+from infrastructure.storage.base.strategy import BaseStorageStrategy
 from infrastructure.storage.components.entity_serializer import BaseEntitySerializer
 from infrastructure.storage.components.generic_serializer import GenericEntitySerializer
 
@@ -133,12 +133,12 @@ class MachineSerializer(BaseEntitySerializer):
 class MachineRepositoryImpl(StorageRepositoryMixin, MachineRepositoryInterface):
     """Single machine repository implementation using storage strategy composition."""
 
-    def __init__(self, storage_port: StoragePort) -> None:
-        """Initialize repository with storage port."""
-        if hasattr(storage_port, "entity_type"):
-            storage_port.entity_type = "machines"  # type: ignore[attr-defined]
+    def __init__(self, storage_strategy: BaseStorageStrategy) -> None:
+        """Initialize repository with storage strategy."""
+        if hasattr(storage_strategy, "entity_type"):
+            storage_strategy.entity_type = "machines"  # type: ignore[attr-defined]
 
-        self.storage_port = storage_port
+        self.storage_strategy = storage_strategy
         self.serializer = MachineSerializer()
         self.logger = get_logger(__name__)
 
@@ -147,7 +147,7 @@ class MachineRepositoryImpl(StorageRepositoryMixin, MachineRepositoryInterface):
         """Save machine using storage strategy and return extracted events."""
         try:
             machine_data = self.serializer.to_dict(machine)
-            self.storage_port.save(str(machine.machine_id.value), machine_data)  # type: ignore[call-arg]
+            self.storage_strategy.save(str(machine.machine_id.value), machine_data)  # type: ignore[call-arg]
 
             events = machine.get_domain_events()
             machine.clear_domain_events()
@@ -178,12 +178,12 @@ class MachineRepositoryImpl(StorageRepositoryMixin, MachineRepositoryInterface):
                 entity_batch[entity_id] = self.serializer.to_dict(machine)
                 events.extend(machine.get_domain_events())
 
-            if hasattr(self.storage_port, "save_batch"):
-                self.storage_port.save_batch(entity_batch)  # type: ignore[attr-defined]
+            if hasattr(self.storage_strategy, "save_batch"):
+                self.storage_strategy.save_batch(entity_batch)  # type: ignore[attr-defined]
             else:
-                # Fallback for storage ports without batch support.
+                # Fallback for storage strategies without batch support.
                 for entity_id, machine_data in entity_batch.items():
-                    self.storage_port.save(entity_id, machine_data)  # type: ignore[call-arg]
+                    self.storage_strategy.save(entity_id, machine_data)  # type: ignore[call-arg]
 
             # Clear domain events only after a successful storage call.
             for machine in machines:

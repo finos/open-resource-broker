@@ -6,7 +6,7 @@ ensuring consistent interface implementation across different scheduler types.
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from application.request.dto import RequestDTO
 
@@ -14,6 +14,11 @@ from application.request.dto import RequestDTO
 from domain.base.ports.scheduler_port import SchedulerPort
 from domain.template.ports.template_defaults_port import TemplateDefaultsPort
 from infrastructure.template.dtos import TemplateDTO
+
+if TYPE_CHECKING:
+    from application.services.provider_registry_service import ProviderRegistryService
+    from domain.base.ports.configuration_port import ConfigurationPort
+    from domain.base.ports.logging_port import LoggingPort
 
 
 class BaseSchedulerStrategy(SchedulerPort, ABC):
@@ -27,55 +32,44 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
 
     _template_defaults_service: TemplateDefaultsPort | None = None
 
+    def _init_base(
+        self,
+        config_port: "ConfigurationPort | None" = None,
+        logger: "LoggingPort | None" = None,
+        provider_registry_service: "ProviderRegistryService | None" = None,
+    ) -> None:
+        """Initialise base dependencies. Call from subclass __init__."""
+        self._config_manager = config_port
+        self._logger = logger
+        self._provider_registry_service = provider_registry_service
+
     @property
     def config_manager(self) -> Any:
-        """Configuration manager instance, resolved lazily from the DI container."""
-        if self._config_manager is None:
-            from domain.base.ports.configuration_port import ConfigurationPort
-            from infrastructure.di.container import get_container, is_container_ready
-
-            if is_container_ready():
-                self._config_manager = get_container().get(ConfigurationPort)
+        """Configuration manager instance."""
         return self._config_manager
 
     @property
     def logger(self) -> Any:
-        """Logger instance, resolved lazily from the DI container."""
+        """Logger instance, with fallback to module logger when not injected."""
         if self._logger is None:
-            from domain.base.ports.logging_port import LoggingPort
-            from infrastructure.di.container import get_container, is_container_ready
+            from infrastructure.logging.logger import get_logger
 
-            if is_container_ready():
-                self._logger = get_container().get(LoggingPort)
-            else:
-                from infrastructure.logging.logger import get_logger
-
-                return get_logger(__name__)  # fallback, don't cache — pick up DI logger once ready
+            return get_logger(__name__)
         return self._logger
 
     def _get_provider_name(self) -> str:
-        """Get the active provider instance name via proper DI."""
+        """Get the active provider instance name."""
         try:
-            from application.services.provider_registry_service import ProviderRegistryService
-            from infrastructure.di.container import get_container
-
-            container = get_container()
-            provider_service = container.get(ProviderRegistryService)
-            selection_result = provider_service.select_active_provider()
+            selection_result = self._provider_registry_service.select_active_provider()
             return selection_result.provider_name
         except Exception as e:
             self.logger.warning("Failed to get provider instance name: %s", e)
             return "default"
 
     def _get_active_provider_type(self) -> str:
-        """Get the active provider type via proper DI."""
+        """Get the active provider type."""
         try:
-            from application.services.provider_registry_service import ProviderRegistryService
-            from infrastructure.di.container import get_container
-
-            container = get_container()
-            provider_service = container.get(ProviderRegistryService)
-            selection_result = provider_service.select_active_provider()
+            selection_result = self._provider_registry_service.select_active_provider()
             provider_type = selection_result.provider_type
             self.logger.debug("Active provider type: %s", provider_type)
             return provider_type

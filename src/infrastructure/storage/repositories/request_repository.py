@@ -6,7 +6,6 @@ from typing import Any, Optional
 from uuid import uuid4
 
 from domain.base.events import DomainEvent
-from domain.base.ports.storage_port import StoragePort
 from domain.request.aggregate import Request
 from domain.request.repository import RequestRepository as RequestRepositoryInterface
 from domain.request.value_objects import RequestId, RequestStatus, RequestType
@@ -19,6 +18,7 @@ from infrastructure.events import (
 )
 from infrastructure.logging.logger import get_logger
 from infrastructure.storage.base.repository_mixin import StorageRepositoryMixin
+from infrastructure.storage.base.strategy import BaseStorageStrategy
 from infrastructure.storage.components.entity_serializer import BaseEntitySerializer
 from infrastructure.storage.components.generic_serializer import GenericEntitySerializer
 
@@ -163,9 +163,9 @@ class RequestSerializer(BaseEntitySerializer):
 class RequestRepositoryImpl(StorageRepositoryMixin, RequestRepositoryInterface):
     """Single request repository implementation using storage strategy composition."""
 
-    def __init__(self, storage_port: StoragePort, event_publisher=None) -> None:
-        """Initialize repository with storage port and optional event publisher."""
-        self.storage_port = storage_port
+    def __init__(self, storage_strategy: BaseStorageStrategy, event_publisher=None) -> None:
+        """Initialize repository with storage strategy and optional event publisher."""
+        self.storage_strategy = storage_strategy
         self.serializer = RequestSerializer()
         self.logger = get_logger(__name__)
         self.event_publisher = event_publisher
@@ -193,14 +193,14 @@ class RequestRepositoryImpl(StorageRepositoryMixin, RequestRepositoryInterface):
                 operation_id=operation_id,
                 entity_type="Request",
                 entity_id=entity_id,
-                storage_strategy=self.storage_port.__class__.__name__,
+                storage_strategy=self.storage_strategy.__class__.__name__,
                 operation_type="save",
             )
         )
 
         try:
             request_data = self.serializer.to_dict(request)
-            self.storage_port.save(entity_id, request_data)  # type: ignore[call-arg]
+            self.storage_strategy.save(entity_id, request_data)  # type: ignore[call-arg]
 
             duration_ms = (time.time() - start_time) * 1000
 
@@ -214,7 +214,7 @@ class RequestRepositoryImpl(StorageRepositoryMixin, RequestRepositoryInterface):
                     operation_id=operation_id,
                     entity_type="Request",
                     entity_id=entity_id,
-                    storage_strategy=self.storage_port.__class__.__name__,
+                    storage_strategy=self.storage_strategy.__class__.__name__,
                     operation_type="save",
                     duration_ms=duration_ms,
                     success=True,
@@ -230,7 +230,7 @@ class RequestRepositoryImpl(StorageRepositoryMixin, RequestRepositoryInterface):
                         operation_id=operation_id,
                         entity_type="Request",
                         entity_id=entity_id,
-                        storage_strategy=self.storage_port.__class__.__name__,
+                        storage_strategy=self.storage_strategy.__class__.__name__,
                         operation_type="save",
                         duration_ms=duration_ms,
                         threshold_ms=self.slow_query_threshold_ms,
@@ -255,7 +255,7 @@ class RequestRepositoryImpl(StorageRepositoryMixin, RequestRepositoryInterface):
                     operation_id=operation_id,
                     entity_type="Request",
                     entity_id=entity_id,
-                    storage_strategy=self.storage_port.__class__.__name__,
+                    storage_strategy=self.storage_strategy.__class__.__name__,
                     operation_type="save",
                     error_message=str(e),
                     error_code=type(e).__name__,

@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import Any, Optional, cast
+from typing import Optional
 
 from infrastructure.logging.logger import get_logger
 from infrastructure.storage.base.unit_of_work import BaseUnitOfWork
@@ -112,8 +112,8 @@ class JSONUnitOfWork(BaseUnitOfWork):
     def _begin_transaction(self) -> None:
         """Begin transaction on all storage strategies."""
         try:
-            cast(Any, self.machine_repository.storage_port).begin_transaction()
-            cast(Any, self.request_repository.storage_port).begin_transaction()
+            self.machine_repository.storage_strategy.begin_transaction()
+            self.request_repository.storage_strategy.begin_transaction()
             self.template_repository.storage_strategy.begin_transaction()
             self.logger.debug("Transaction begun on all repositories")
         except Exception as e:
@@ -123,8 +123,8 @@ class JSONUnitOfWork(BaseUnitOfWork):
     def _commit_transaction(self) -> None:
         """Commit transaction on all storage strategies."""
         try:
-            cast(Any, self.machine_repository.storage_port).commit_transaction()
-            cast(Any, self.request_repository.storage_port).commit_transaction()
+            self.machine_repository.storage_strategy.commit_transaction()
+            self.request_repository.storage_strategy.commit_transaction()
             self.template_repository.storage_strategy.commit_transaction()
             self.logger.debug("Transaction committed on all repositories")
         except Exception as e:
@@ -134,8 +134,8 @@ class JSONUnitOfWork(BaseUnitOfWork):
     def _rollback_transaction(self) -> None:
         """Rollback transaction on all storage strategies."""
         try:
-            cast(Any, self.machine_repository.storage_port).rollback_transaction()
-            cast(Any, self.request_repository.storage_port).rollback_transaction()
+            self.machine_repository.storage_strategy.rollback_transaction()
+            self.request_repository.storage_strategy.rollback_transaction()
             self.template_repository.storage_strategy.rollback_transaction()
             self.logger.debug("Transaction rolled back on all repositories")
         except Exception as e:

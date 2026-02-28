@@ -30,11 +30,17 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
     def __init__(
         self,
         template_defaults_service: "TemplateDefaultsPort | None" = None,
+        config_port: Any = None,
+        logger: Any = None,
+        provider_registry_service: Any = None,
     ) -> None:
         """Initialize the instance."""
-        self._config_manager = None
-        self._logger = None
         self._template_defaults_service = template_defaults_service
+        self._init_base(
+            config_port=config_port,
+            logger=logger,
+            provider_registry_service=provider_registry_service,
+        )
         # Initialize field mapper lazily - will be created when first needed
         self._field_mapper = None
 
@@ -380,19 +386,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
 
         # Get provider type from active provider
         provider_config = config.get("provider", {})
-        active_provider = provider_config.get("active_provider")
-        if not active_provider:
-            # Get from provider registry instead of hardcoded default
-            try:
-                from application.services.provider_registry_service import ProviderRegistryService
-                from infrastructure.di.container import get_container
-
-                container = get_container()
-                provider_service = container.get(ProviderRegistryService)
-                selection_result = provider_service.select_active_provider()
-                active_provider = selection_result.provider_name
-            except Exception:
-                active_provider = "aws_default"
+        active_provider = provider_config.get("active_provider") or self._get_provider_name()
 
         provider_type = extract_provider_type(active_provider)
 

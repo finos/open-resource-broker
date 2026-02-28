@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from application.base.handlers import BaseQueryHandler
 from application.decorators import query_handler
 from application.dto.queries import (
@@ -19,14 +17,10 @@ from domain.base.exceptions import EntityNotFoundError
 from domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
 from domain.services.generic_filter_service import GenericFilterService
 
-if TYPE_CHECKING:
-    pass
-from application.ports.command_bus_port import CommandBusPort
-
 
 @query_handler(GetRequestQuery)
 class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
-    """Handler for getting request details with machine status checking."""
+    """Handler for getting request details."""
 
     def __init__(
         self,
@@ -34,30 +28,26 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
         container: ContainerPort,
-        command_bus: CommandBusPort,
         provider_registry_service: ProviderRegistryService,
     ) -> None:
         """Initialize the instance."""
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
         self._container = container
-        self.command_bus = command_bus
         self._provider_registry_service = provider_registry_service
         self._cache_service = self._get_cache_service()
         self.event_publisher = self._get_event_publisher()
 
         from application.factories.request_dto_factory import RequestDTOFactory
-        from application.services.machine_sync_service import MachineSyncService
         from application.services.request_query_service import RequestQueryService
         from application.services.request_status_service import RequestStatusService
 
         self._query_service = RequestQueryService(uow_factory, logger)
         self._status_service = RequestStatusService(uow_factory, logger)
-        self._machine_sync_service = container.get(MachineSyncService)
         self._dto_factory = RequestDTOFactory()
 
     async def execute_query(self, query: GetRequestQuery) -> RequestDTO:
-        """Execute get request query with command-driven sync."""
+        """Execute get request query."""
         self.logger.info("Getting request details for: %s", query.request_id)
 
         try:
@@ -74,21 +64,6 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 self.logger.info("Retrieved lightweight request: %s", query.request_id)
                 return request_dto
 
-            await self._machine_sync_service.populate_missing_machine_ids(request)
-
-            from application.dto.commands import SyncRequestCommand
-
-            try:
-                sync_command = SyncRequestCommand(request_id=query.request_id)
-                await self.command_bus.execute(sync_command)
-            except Exception as sync_err:
-                self.logger.warning(
-                    "Sync failed for request %s, returning stored state: %s",
-                    query.request_id,
-                    sync_err,
-                )
-
-            request = await self._query_service.get_request(query.request_id)
             machine_objects = await self._query_service.get_machines_for_request(request)
             request_dto = self._dto_factory.create_from_domain(request, machine_objects)
 
@@ -292,14 +267,10 @@ class ListActiveRequestsHandler(BaseQueryHandler[ListActiveRequestsQuery, list[R
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
         generic_filter_service: GenericFilterService,
-        container: ContainerPort,
-        command_bus: CommandBusPort,
     ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
         self._generic_filter_service = generic_filter_service
-        self._container = container
-        self.command_bus = command_bus
 
     async def execute_query(self, query: ListActiveRequestsQuery) -> list[RequestDTO]:
         """Execute list active requests query."""
@@ -318,43 +289,6 @@ class ListActiveRequestsHandler(BaseQueryHandler[ListActiveRequestsQuery, list[R
 
                     if hasattr(query, "template_id") and query.template_id:  # type: ignore[union-attr]
                         requests = [r for r in requests if r.template_id == query.template_id]  # type: ignore[union-attr]
-
-                total_count = len(requests)
-                limit = min(query.limit or 50, 1000)  # type: ignore[union-attr]
-                offset = query.offset or 0  # type: ignore[union-attr]
-                requests = requests[offset : offset + limit]
-
-                from application.dto.commands import SyncRequestCommand
-                from application.services.machine_sync_service import MachineSyncService
-
-                machine_sync_service = self._container.get(MachineSyncService)
-
-                for request in requests:
-                    try:
-                        await machine_sync_service.populate_missing_machine_ids(request)
-                        sync_command = SyncRequestCommand(request_id=str(request.request_id.value))
-                        await self.command_bus.execute(sync_command)
-                    except Exception as e:
-                        self.logger.warning(
-                            "Failed to sync request %s: %s", request.request_id.value, e
-                        )
-
-            with self.uow_factory.create_unit_of_work() as uow:
-                if query.all_resources:
-                    requests = uow.requests.find_all()
-                else:
-                    from domain.request.value_objects import RequestStatus
-
-                    active_statuses = [RequestStatus.PENDING, RequestStatus.IN_PROGRESS]
-                    all_requests = uow.requests.find_all()
-                    requests = [r for r in all_requests if r.status in active_statuses]
-
-                    if hasattr(query, "template_id") and query.template_id:  # type: ignore[union-attr]
-                        requests = [r for r in requests if r.template_id == query.template_id]  # type: ignore[union-attr]
-
-                    start_idx = 0
-                    end_idx = getattr(query, "limit", None) or 100
-                    requests = requests[start_idx:end_idx]
 
                 total_count = len(requests)
                 limit = min(query.limit or 50, 1000)  # type: ignore[union-attr]

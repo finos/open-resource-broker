@@ -411,7 +411,7 @@ class TestCQRSMigrationValidation:
         """Test that query handlers exist."""
         # Check if query handlers exist
         try:
-            from application.queries.handlers import GetTemplateHandler
+            from application.queries.template_query_handlers import GetTemplateHandler
 
             assert GetTemplateHandler is not None
         except ImportError:

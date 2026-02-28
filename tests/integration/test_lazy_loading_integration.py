@@ -10,7 +10,7 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 
-from application.queries.handlers import ListTemplatesQuery
+from application.dto.queries import ListTemplatesQuery
 from bootstrap import Application
 from infrastructure.di.container import get_container
 

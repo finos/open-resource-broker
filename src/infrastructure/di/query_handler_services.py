@@ -77,7 +77,7 @@ def register_query_handlers_with_bus(container: DIContainer) -> None:
                 ListTemplatesQuery,
                 ValidateTemplateQuery,
             )
-            from application.queries.handlers import (
+            from application.queries.template_query_handlers import (
                 GetTemplateHandler,
                 ListTemplatesHandler,
                 ValidateTemplateHandler,
@@ -97,7 +97,7 @@ def register_query_handlers_with_bus(container: DIContainer) -> None:
                 ListActiveRequestsQuery,
                 ListReturnRequestsQuery,
             )
-            from application.queries.handlers import (
+            from application.queries.request_query_handlers import (
                 GetRequestHandler,
                 ListActiveRequestsHandler,
                 ListReturnRequestsHandler,
@@ -113,7 +113,7 @@ def register_query_handlers_with_bus(container: DIContainer) -> None:
         # Register machine query handlers
         try:
             from application.dto.queries import GetMachineQuery, ListMachinesQuery
-            from application.queries.handlers import (
+            from application.queries.machine_query_handlers import (
                 GetMachineHandler,
                 ListMachinesHandler,
             )
