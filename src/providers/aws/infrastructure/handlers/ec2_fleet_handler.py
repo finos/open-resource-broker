@@ -49,6 +49,7 @@ from providers.aws.infrastructure.aws_client import AWSClient
 from providers.aws.infrastructure.handlers.base_context_mixin import BaseContextMixin
 from providers.aws.infrastructure.handlers.base_handler import AWSHandler
 from providers.aws.infrastructure.handlers.ec2_fleet.config_builder import EC2FleetConfigBuilder
+from providers.aws.infrastructure.handlers.ec2_fleet.release_manager import EC2FleetReleaseManager
 from providers.aws.infrastructure.handlers.fleet_grouping_mixin import FleetGroupingMixin
 from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
@@ -71,6 +72,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         aws_native_spec_service=None,
         config_port=None,
         fleet_config_builder: Optional[EC2FleetConfigBuilder] = None,
+        fleet_release_manager: Optional[EC2FleetReleaseManager] = None,
     ) -> None:
         """
         Initialize the EC2 Fleet handler.
@@ -86,6 +88,8 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             config_port: Optional configuration port
             fleet_config_builder: Optional pre-built config builder; constructed from
                 aws_native_spec_service and config_port when not provided
+            fleet_release_manager: Optional pre-built release manager; constructed from
+                handler dependencies when not provided
         """
         super().__init__(
             aws_client,
@@ -101,6 +105,17 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             native_spec_service=aws_native_spec_service,
             config_port=config_port,
             logger=logger,
+        )
+        self._fleet_release_manager = fleet_release_manager or EC2FleetReleaseManager(
+            aws_client=aws_client,
+            aws_ops=aws_ops,
+            request_adapter=request_adapter,
+            config_port=config_port,
+            logger=logger,
+            retry_fn=self._retry_with_backoff,
+            paginate_fn=self._paginate,
+            collect_with_next_token_fn=self._collect_with_next_token,
+            delete_orb_launch_template_fn=self._delete_orb_launch_template,
         )
 
     @handle_infrastructure_exceptions(context="ec2_fleet_creation")
@@ -677,171 +692,14 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         return "EC2 Fleet"
 
     def _find_ec2_fleet_for_instance(self, instance_id: str) -> Optional[str]:
-        """
-        Find the EC2 Fleet ID for a specific instance by querying active fleets.
-
-        Args:
-            instance_id: EC2 instance ID
-
-        Returns:
-            EC2 Fleet ID if found, None otherwise
-        """
-        try:
-            # Get all active EC2 fleets
-            response = self._retry_with_backoff(
-                lambda: self._paginate(
-                    self.aws_client.ec2_client.describe_fleets,
-                    "Fleets",
-                    FleetStates=["active", "modifying"],
-                ),
-                operation_type="read_only",
-            )
-
-            # Check each fleet for the instance
-            for fleet in response:
-                fleet_id = fleet.get("FleetId")
-                if not fleet_id:
-                    continue
-
-                try:
-                    # Get instances for this fleet
-                    fleet_instances = self._retry_with_backoff(
-                        lambda fid=fleet_id: self._collect_with_next_token(
-                            self.aws_client.ec2_client.describe_fleet_instances,
-                            "ActiveInstances",
-                            FleetId=fid,
-                        )
-                    )
-
-                    # Check if our instance is in this fleet
-                    for instance in fleet_instances:
-                        if instance.get("InstanceId") == instance_id:
-                            return fleet_id
-
-                except Exception as e:
-                    self._logger.debug(
-                        f"Failed to check fleet {fleet_id} for instance {instance_id}: {e}"
-                    )
-                    continue
-
-        except Exception as e:
-            self._logger.debug(f"Failed to find EC2 Fleet for instance {instance_id}: {e}")
-
-        return None
+        """Find the EC2 Fleet ID for a specific instance by querying active fleets."""
+        return self._fleet_release_manager.find_fleet_for_instance(instance_id)
 
     def _release_hosts_for_single_ec2_fleet(
         self, fleet_id: str, fleet_instance_ids: list[str], fleet_details: dict
     ) -> None:
-        """Release hosts for a single EC2 Fleet with proper fleet management."""
-        self._logger.info(
-            f"Processing EC2 Fleet {fleet_id} with {len(fleet_instance_ids)} instances"
-        )
-
-        try:
-            # Get fleet configuration with pagination and retry
-            if not fleet_details:
-                fleet_list = self._retry_with_backoff(
-                    lambda: self._paginate(
-                        self.aws_client.ec2_client.describe_fleets,
-                        "Fleets",
-                        FleetIds=[fleet_id],
-                    ),
-                    operation_type="read_only",
-                )
-
-                if not fleet_list:
-                    self._logger.warning(
-                        f"EC2 Fleet {fleet_id} not found, terminating instances directly"
-                    )
-                    self.aws_ops.terminate_instances_with_fallback(
-                        fleet_instance_ids, self._request_adapter, f"EC2Fleet-{fleet_id} instances"
-                    )
-                    return
-
-                fleet_details = fleet_list[0]
-
-            fleet_type = fleet_details.get("Type", "maintain")
-
-            if fleet_instance_ids:
-                if fleet_type == "maintain":
-                    # For maintain fleets, reduce target capacity first to prevent replacements
-                    current_capacity = fleet_details["TargetCapacitySpecification"][
-                        "TotalTargetCapacity"
-                    ]
-                    new_capacity = max(0, current_capacity - len(fleet_instance_ids))
-
-                    self._logger.info(
-                        "Reducing maintain fleet %s capacity from %s to %s before terminating instances",
-                        fleet_id,
-                        current_capacity,
-                        new_capacity,
-                    )
-
-                    self._retry_with_backoff(
-                        self.aws_client.ec2_client.modify_fleet,
-                        operation_type="critical",
-                        FleetId=fleet_id,
-                        TargetCapacitySpecification={"TotalTargetCapacity": new_capacity},
-                    )
-
-                # Terminate specific instances using existing utility
-                self.aws_ops.terminate_instances_with_fallback(
-                    fleet_instance_ids, self._request_adapter, f"EC2Fleet-{fleet_id} instances"
-                )
-                self._logger.info(
-                    "Terminated EC2 Fleet %s instances: %s", fleet_id, fleet_instance_ids
-                )
-
-                # If capacity has reached zero for maintain fleets, delete the fleet
-                if fleet_type == "maintain" and new_capacity == 0:
-                    self._logger.info("EC2 Fleet %s capacity is zero, deleting fleet", fleet_id)
-                    self._delete_ec2_fleet(fleet_id)
-                    cleanup: dict = {}
-                    if self.config_port is not None:
-                        try:
-                            cleanup = self.config_port.get_cleanup_config()
-                        except Exception:
-                            pass
-                    if cleanup.get("enabled", True) and cleanup.get("resources", {}).get(
-                        "ec2_fleet", True
-                    ):
-                        tags = {
-                            t["Key"]: t["Value"]
-                            for t in fleet_details.get("Tags", [])
-                        }
-                        request_id = tags.get("orb:request-id", "")
-                        if request_id:
-                            self._delete_orb_launch_template(request_id)
-            else:
-                # If no specific instances provided, delete entire fleet
-                self._delete_ec2_fleet(fleet_id)
-
-        except Exception as e:
-            self._logger.error("Failed to terminate EC2 fleet %s: %s", fleet_id, e)
-            raise
-
-    def _delete_ec2_fleet(self, fleet_id: str) -> None:
-        """Delete an EC2 Fleet when it's no longer needed."""
-        try:
-            self._logger.info(f"Deleting EC2 Fleet {fleet_id}")
-
-            # Delete the fleet with termination of instances
-            self._retry_with_backoff(
-                self.aws_client.ec2_client.delete_fleets,
-                operation_type="critical",
-                FleetIds=[fleet_id],
-                TerminateInstances=True,
-            )
-
-            self._logger.info(f"Successfully deleted EC2 Fleet {fleet_id}")
-
-        except Exception as e:
-            # Log the error but don't fail the entire operation
-            # Fleet deletion is cleanup - the main termination should still succeed
-            self._logger.warning(f"Failed to delete EC2 Fleet {fleet_id}: {e}")
-            self._logger.warning(
-                "EC2 Fleet deletion failed, but instance termination completed successfully"
-            )
+        """Release hosts for a single EC2 Fleet, delegating to EC2FleetReleaseManager."""
+        self._fleet_release_manager.release(fleet_id, fleet_instance_ids, fleet_details)
 
     @classmethod
     def get_example_templates(cls) -> list[Template]:

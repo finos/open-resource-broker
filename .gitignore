@@ -103,6 +103,9 @@ venv.bak/
 *.sublime-project
 .kiro/
 .claude/
+.gemini/
+.conductor/
+.codex/
 
 # Testing
 .coverage
@@ -254,3 +257,4 @@ visualise/res/
 # Generated files - always regenerated from templates
 # pyproject.toml is now tracked - selective templating only
 .cache/
+.ruff_cache/

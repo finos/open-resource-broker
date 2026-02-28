@@ -42,6 +42,7 @@ from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from providers.aws.infrastructure.tags import build_system_tags, merge_tags
 from providers.aws.infrastructure.aws_client import AWSClient
+from providers.aws.infrastructure.handlers.asg.capacity_manager import ASGCapacityManager
 from providers.aws.infrastructure.handlers.asg.config_builder import ASGConfigBuilder
 from providers.aws.infrastructure.handlers.base_context_mixin import BaseContextMixin
 from providers.aws.infrastructure.handlers.base_handler import AWSHandler
@@ -87,6 +88,33 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             config_port=config_port,
         )
         self._config_builder = ASGConfigBuilder(aws_native_spec_service, config_port, logger)
+        self._capacity_manager = ASGCapacityManager(
+            aws_client=aws_client,
+            aws_ops=aws_ops,
+            request_adapter=request_adapter,
+            config_port=config_port,
+            logger=logger,
+            retry_with_backoff=self._retry_with_backoff,
+            chunk_list=self._chunk_list,
+        )
+        self._capacity_manager.set_delete_asg_fn(lambda name: self._delete_asg(name))
+        self._capacity_manager.set_delete_launch_template_fn(
+            lambda rid: self._delete_orb_launch_template(rid)
+        )
+
+    def _delete_asg(self, asg_name: str) -> None:
+        """Delete an Auto Scaling Group when it's no longer needed."""
+        try:
+            self._logger.info("Deleting ASG %s", asg_name)
+            self._retry_with_backoff(
+                self.aws_client.autoscaling_client.delete_auto_scaling_group,
+                operation_type="critical",
+                AutoScalingGroupName=asg_name,
+                ForceDelete=True,
+            )
+            self._logger.info("Successfully deleted ASG %s", asg_name)
+        except Exception as e:
+            self._logger.warning("Failed to delete ASG %s: %s", asg_name, e)
 
     @handle_infrastructure_exceptions(context="asg_creation")
     def acquire_hosts(self, request: Request, aws_template: AWSTemplate) -> dict[str, Any]:
@@ -301,79 +329,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
 
     def reduce_capacity_for_instance_ids(self, instance_ids: list[str]) -> None:
         """Reduce ASG capacity ahead of instance termination to avoid replacements."""
-        if not instance_ids:
-            return
-
-        instance_group_map: dict[str, list[str]] = {}
-
-        try:
-            for chunk in self._chunk_list(instance_ids, 50):
-                response = self._retry_with_backoff(
-                    self.aws_client.autoscaling_client.describe_auto_scaling_instances,
-                    operation_type="read_only",
-                    InstanceIds=chunk,
-                )
-
-                for entry in response.get("AutoScalingInstances", []):
-                    group_name = entry.get("AutoScalingGroupName")
-                    instance_id = entry.get("InstanceId")
-                    if group_name and instance_id:
-                        instance_group_map.setdefault(group_name, []).append(instance_id)
-        except Exception as exc:
-            self._logger.warning("Failed to map instances to ASGs for capacity reduction: %s", exc)
-            return
-
-        if not instance_group_map:
-            return
-
-        for group_name, instances in instance_group_map.items():
-            try:
-                group_response = self._retry_with_backoff(
-                    self.aws_client.autoscaling_client.describe_auto_scaling_groups,
-                    operation_type="read_only",
-                    AutoScalingGroupNames=[group_name],
-                )
-            except Exception as exc:
-                self._logger.warning(
-                    "Failed to describe ASG %s while reducing capacity: %s", group_name, exc
-                )
-                continue
-
-            groups = group_response.get("AutoScalingGroups", [])
-            if not groups:
-                continue
-
-            asg = groups[0]
-            current_desired = asg.get("DesiredCapacity", 0) or 0
-            current_min = asg.get("MinSize", 0) or 0
-
-            new_desired = max(0, current_desired - len(instances))
-            new_min = min(current_min, new_desired)
-
-            if current_desired == new_desired and current_min == new_min:
-                continue
-
-            try:
-                self._retry_with_backoff(
-                    self.aws_client.autoscaling_client.update_auto_scaling_group,
-                    operation_type="critical",
-                    AutoScalingGroupName=group_name,
-                    DesiredCapacity=new_desired,
-                    MinSize=new_min,
-                )
-                self._logger.info(
-                    "Reduced ASG %s capacity from %s to %s before terminating %s instances",
-                    group_name,
-                    current_desired,
-                    new_desired,
-                    len(instances),
-                )
-            except Exception as exc:
-                self._logger.warning(
-                    "Failed to update ASG %s capacity prior to termination: %s",
-                    group_name,
-                    exc,
-                )
+        self._capacity_manager.reduce_capacity(instance_ids)
 
     def release_hosts(
         self,
@@ -447,103 +403,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         self, asg_name: str, asg_instance_ids: list[str], asg_details: dict
     ) -> None:
         """Release hosts for a single ASG with proper capacity management."""
-        self._logger.info(f"Processing ASG {asg_name} with {len(asg_instance_ids)} instances")
-
-        # If ASG details are missing, still terminate the instances but skip ASG-specific operations
-        if not asg_details:
-            self._logger.warning(
-                f"ASG details missing for {asg_name}, terminating instances without ASG operations"
-            )
-            self._logger.warning(
-                f"ASG details missing for {asg_name}, terminating instances without ASG operations"
-            )
-            # Still terminate the instances even if ASG details are missing
-            self.aws_ops.terminate_instances_with_fallback(
-                asg_instance_ids,
-                self._request_adapter,
-                f"ASG {asg_name} instances (no ASG details)",
-            )
-            self._logger.info(
-                "Terminated ASG %s instances without ASG operations: %s", asg_name, asg_instance_ids
-            )
-            self._logger.info(
-                "Terminated ASG %s instances without ASG operations: %s", asg_name, asg_instance_ids
-            )
-            return
-
-        # Detach instances from ASG first (API limit: 50 instance IDs per call, use 20 for safety)
-        for chunk in self._chunk_list(asg_instance_ids, 20):
-            self._retry_with_backoff(
-                self.aws_client.autoscaling_client.detach_instances,
-                operation_type="critical",
-                AutoScalingGroupName=asg_name,
-                InstanceIds=chunk,
-                ShouldDecrementDesiredCapacity=True,
-            )
-            self._logger.debug("Detached chunk from ASG %s: %s", asg_name, chunk)
-        self._logger.info("Detached instances from ASG %s: %s", asg_name, asg_instance_ids)
-
-        # detach_instances with ShouldDecrementDesiredCapacity=True already decremented
-        # the live DesiredCapacity counter in AWS. Only update MinSize if it would now
-        # exceed the post-detach capacity.
-        new_capacity = max(0, asg_details["DesiredCapacity"] - len(asg_instance_ids))
-
-        if asg_details["MinSize"] > new_capacity:
-            self._retry_with_backoff(
-                self.aws_client.autoscaling_client.update_auto_scaling_group,
-                operation_type="critical",
-                AutoScalingGroupName=asg_name,
-                MinSize=new_capacity,
-            )
-            self._logger.info("Reduced ASG %s MinSize to %s", asg_name, new_capacity)
-
-        # Use consolidated AWS operations utility for instance termination
-        self.aws_ops.terminate_instances_with_fallback(
-            asg_instance_ids, self._request_adapter, f"ASG {asg_name} instances"
-        )
-        self._logger.info("Terminated ASG %s instances: %s", asg_name, asg_instance_ids)
-
-        # If desired capacity has reached zero, delete the ASG and its launch template
-        if new_capacity == 0:
-            self._logger.info("ASG %s capacity is zero, deleting ASG", asg_name)
-            self._delete_asg(asg_name)
-            cleanup: dict = {}
-            if self.config_port is not None:
-                try:
-                    cleanup = self.config_port.get_cleanup_config()
-                except Exception:
-                    pass
-            if cleanup.get("enabled", True) and cleanup.get("resources", {}).get("asg", True):
-                prefix = self.config_port.get_resource_prefix("asg") if self.config_port else ""
-                request_id = (
-                    asg_name[len(prefix):]
-                    if prefix and asg_name.startswith(prefix)
-                    else asg_name
-                )
-                self._delete_orb_launch_template(request_id)
-
-    def _delete_asg(self, asg_name: str) -> None:
-        """Delete an Auto Scaling Group when it's no longer needed."""
-        try:
-            self._logger.info(f"Deleting ASG {asg_name}")
-
-            # Delete the ASG with force delete to handle any remaining instances
-            self._retry_with_backoff(
-                self.aws_client.autoscaling_client.delete_auto_scaling_group,
-                operation_type="critical",
-                AutoScalingGroupName=asg_name,
-                ForceDelete=True,
-            )
-
-            self._logger.info(f"Successfully deleted ASG {asg_name}")
-
-        except Exception as e:
-            # Log the error but don't fail the entire operation
-            # ASG deletion is cleanup - the main termination should still succeed
-            self._logger.warning(f"Failed to delete ASG {asg_name}: {e}")
-            self._logger.warning(
-                "ASG deletion failed, but instance termination completed successfully"
-            )
+        self._capacity_manager.release_instances(asg_name, asg_instance_ids, asg_details)
 
     def _group_instances_by_asg_from_mapping(
         self, resource_mapping: dict[str, tuple[Optional[str], int]]

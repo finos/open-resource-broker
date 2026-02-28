@@ -13,6 +13,9 @@ from domain.base.ports.configuration_port import ConfigurationPort
 from domain.request.aggregate import Request
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.domain.template.value_objects import AWSFleetType
+from providers.aws.infrastructure.handlers.fleet_override_builder import (
+    map_spot_fleet_allocation_strategy,
+)
 from providers.aws.infrastructure.tags import build_system_tags, merge_tags
 
 
@@ -92,20 +95,6 @@ class SpotFleetConfigBuilder:
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
-
-    def _get_allocation_strategy(self, strategy: str) -> str:
-        """Map a Symphony allocation strategy name to the Spot Fleet API value."""
-        if not strategy:
-            return "lowestPrice"
-
-        strategy_map = {
-            "capacityOptimized": "capacityOptimized",
-            "capacityOptimizedPrioritized": "capacityOptimizedPrioritized",
-            "diversified": "diversified",
-            "lowestPrice": "lowestPrice",
-            "priceCapacityOptimized": "priceCapacityOptimized",
-        }
-        return strategy_map.get(strategy, "lowestPrice")
 
     def _calculate_capacity_distribution(
         self, template: AWSTemplate, requested_count: int
@@ -266,7 +255,7 @@ class SpotFleetConfigBuilder:
             ],
             "TargetCapacity": target_capacity,
             "IamFleetRole": fleet_role,
-            "AllocationStrategy": self._get_allocation_strategy(
+            "AllocationStrategy": map_spot_fleet_allocation_strategy(
                 template.allocation_strategy or ""
             ),
             "Type": fleet_type_value,

@@ -57,7 +57,7 @@ class TestHandlerMergeIntegration:
             "TargetCapacitySpecification": {"TotalTargetCapacity": 10},
             "Type": "maintain",
         }
-        handler.aws_native_spec_service = mock_native_service
+        handler._fleet_config_builder._native_spec_service = mock_native_service
 
         template = self._create_mock_template()
         request = self._create_mock_request()
@@ -85,16 +85,19 @@ class TestHandlerMergeIntegration:
 
         mock_native_service = Mock()
         mock_native_service.process_provider_api_spec_with_merge.return_value = {
-            "LaunchSpecifications": [{"LaunchTemplate": {}}],
+            "LaunchSpecifications": [{"LaunchTemplate": {
+                "LaunchTemplateId": "lt-123",
+                "Version": "1",
+            }}],
             "TargetCapacity": 5,
             "AllocationStrategy": "diversified",
         }
-        handler.aws_native_spec_service = mock_native_service
+        handler._config_builder._native_spec_service = mock_native_service
 
         template = self._create_mock_template()
         request = self._create_mock_request()
 
-        result = handler._create_spot_fleet_config(template, request, "lt-123", "1")
+        result = handler._config_builder.build(template, request, "lt-123", "1")
 
         mock_native_service.process_provider_api_spec_with_merge.assert_called_once()
         for spec in result["LaunchSpecifications"]:
@@ -119,7 +122,7 @@ class TestHandlerMergeIntegration:
             "LaunchTemplateConfigs": [{"LaunchTemplateSpecification": {}}],
             "Type": "maintain",
         }
-        handler.aws_native_spec_service = mock_native_service
+        handler._fleet_config_builder._native_spec_service = mock_native_service
 
         template = self._create_mock_template()
         request = self._create_mock_request()
@@ -141,12 +144,12 @@ class TestHandlerMergeIntegration:
             mock_aws_client, mock_logger, mock_aws_ops, mock_launch_template_manager,
             config_port=Mock()
         )
-        handler.aws_native_spec_service = None
+        handler._fleet_config_builder._native_spec_service = None
 
         template = self._create_mock_template()
         request = self._create_mock_request()
 
-        with patch.object(handler, "_create_fleet_config_legacy") as mock_legacy:
+        with patch.object(handler._fleet_config_builder, "_build_legacy") as mock_legacy:
             mock_legacy.return_value = {"Type": "legacy"}
 
             result = handler._create_fleet_config(template, request, "lt-123", "1")

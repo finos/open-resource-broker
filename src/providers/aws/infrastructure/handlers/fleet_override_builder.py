@@ -1,5 +1,47 @@
 from typing import Any
 
+# ---------------------------------------------------------------------------
+# Allocation strategy mapping functions
+# ---------------------------------------------------------------------------
+
+_EC2_FLEET_SPOT_STRATEGY_MAP: dict[str, str] = {
+    "capacityOptimized": "capacity-optimized",
+    "capacityOptimizedPrioritized": "capacity-optimized-prioritized",
+    "diversified": "diversified",
+    "lowestPrice": "lowest-price",
+    "priceCapacityOptimized": "price-capacity-optimized",
+}
+
+_EC2_FLEET_ONDEMAND_STRATEGY_MAP: dict[str, str] = {
+    "lowestPrice": "lowest-price",
+    "prioritized": "prioritized",
+}
+
+_SPOT_FLEET_STRATEGY_MAP: dict[str, str] = {
+    "capacityOptimized": "capacityOptimized",
+    "capacityOptimizedPrioritized": "capacityOptimizedPrioritized",
+    "diversified": "diversified",
+    "lowestPrice": "lowestPrice",
+    "priceCapacityOptimized": "priceCapacityOptimized",
+}
+
+
+def map_ec2_fleet_allocation_strategy(strategy: str) -> str:
+    """Map a Symphony spot allocation strategy name to the EC2 Fleet API value (hyphenated)."""
+    return _EC2_FLEET_SPOT_STRATEGY_MAP.get(strategy, "lowest-price")
+
+
+def map_ec2_fleet_ondemand_strategy(strategy: str) -> str:
+    """Map a Symphony on-demand allocation strategy name to the EC2 Fleet API value."""
+    return _EC2_FLEET_ONDEMAND_STRATEGY_MAP.get(strategy, "lowest-price")
+
+
+def map_spot_fleet_allocation_strategy(strategy: str) -> str:
+    """Map a Symphony allocation strategy name to the Spot Fleet API value (camelCase)."""
+    if not strategy:
+        return "lowestPrice"
+    return _SPOT_FLEET_STRATEGY_MAP.get(strategy, "lowestPrice")
+
 
 def build_ec2_fleet_overrides(
     machine_types: dict[str, Any] | None,

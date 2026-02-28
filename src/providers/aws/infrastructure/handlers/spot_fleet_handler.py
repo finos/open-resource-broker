@@ -26,7 +26,6 @@ Note:
     that can benefit from significant cost savings through Spot pricing.
 """
 
-import json
 from typing import Any, Optional
 
 from domain.base.dependency_injection import injectable
@@ -36,7 +35,6 @@ from domain.template.template_aggregate import Template
 from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from infrastructure.error.decorators import handle_infrastructure_exceptions
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from providers.aws.domain.template.value_objects import AWSFleetType
 from providers.aws.exceptions.aws_exceptions import (
     AWSInfrastructureError,
     AWSValidationError,
@@ -47,11 +45,11 @@ from providers.aws.infrastructure.handlers.base_context_mixin import BaseContext
 from providers.aws.infrastructure.handlers.base_handler import AWSHandler
 from providers.aws.infrastructure.handlers.fleet_grouping_mixin import FleetGroupingMixin
 from providers.aws.infrastructure.handlers.spot_fleet.config_builder import SpotFleetConfigBuilder
+from providers.aws.infrastructure.handlers.spot_fleet.release_manager import SpotFleetReleaseManager
 from providers.aws.infrastructure.handlers.spot_fleet.validator import SpotFleetValidator
 from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
 )
-from providers.aws.infrastructure.tags import build_system_tags, merge_tags
 from providers.aws.utilities.aws_operations import AWSOperations
 
 
@@ -71,6 +69,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         config_port=None,
         spot_fleet_validator: Optional[SpotFleetValidator] = None,
         config_builder: Optional[SpotFleetConfigBuilder] = None,
+        release_manager: Optional[SpotFleetReleaseManager] = None,
     ) -> None:
         """
         Initialize the Spot Fleet handler.
@@ -101,6 +100,9 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         self._spot_fleet_validator = spot_fleet_validator or SpotFleetValidator(aws_client, logger)
         self._config_builder = config_builder or SpotFleetConfigBuilder(
             aws_native_spec_service, config_port, logger
+        )
+        self._release_manager = release_manager or SpotFleetReleaseManager(
+            aws_client, aws_ops, request_adapter, config_port, logger
         )
 
     @handle_infrastructure_exceptions(context="spot_fleet_creation")
@@ -458,159 +460,14 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         return "Spot Fleet"
 
     def _find_spot_fleet_for_instance(self, instance_id: str) -> Optional[str]:
-        """
-        Find the Spot Fleet request ID for a specific instance by querying active fleets.
-
-        Args:
-            instance_id: EC2 instance ID
-
-        Returns:
-            Spot Fleet request ID if found, None otherwise
-        """
-        try:
-            # Get all active spot fleet requests
-            response = self._retry_with_backoff(
-                lambda: self._paginate(
-                    self.aws_client.ec2_client.describe_spot_fleet_requests,
-                    "SpotFleetRequestConfigs",
-                    SpotFleetRequestStates=["active", "modifying"],
-                ),
-                operation_type="read_only",
-            )
-
-            # Check each fleet for the instance
-            for fleet in response:
-                fleet_id = fleet.get("SpotFleetRequestId")
-                if not fleet_id:
-                    continue
-
-                try:
-                    # Get instances for this fleet
-                    fleet_instances = self._retry_with_backoff(
-                        lambda fid=fleet_id: self._paginate(
-                            self.aws_client.ec2_client.describe_spot_fleet_instances,
-                            "ActiveInstances",
-                            SpotFleetRequestId=fid,
-                        )
-                    )
-
-                    # Check if our instance is in this fleet
-                    for instance in fleet_instances:
-                        if instance.get("InstanceId") == instance_id:
-                            return fleet_id
-
-                except Exception as e:
-                    self._logger.debug(
-                        f"Failed to check fleet {fleet_id} for instance {instance_id}: {e}"
-                    )
-                    continue
-
-        except Exception as e:
-            self._logger.debug(f"Failed to find Spot Fleet for instance {instance_id}: {e}")
-
-        return None
+        """Find the Spot Fleet request ID for a specific instance."""
+        return self._release_manager.find_fleet_for_instance(instance_id)
 
     def _release_hosts_for_single_spot_fleet(
         self, fleet_id: str, fleet_instance_ids: list[str], fleet_details: dict
     ) -> None:
-        """Release hosts for a single Spot Fleet with proper fleet management."""
-        self._logger.info(
-            f"Processing Spot Fleet {fleet_id} with {len(fleet_instance_ids)} instances"
-        )
-
-        try:
-            if not fleet_details:
-                fleet_response = self._retry_with_backoff(
-                    self.aws_client.ec2_client.describe_spot_fleet_requests,
-                    operation_type="read_only",
-                    SpotFleetRequestIds=[fleet_id],
-                )
-                fleet_configs = fleet_response.get("SpotFleetRequestConfigs", [])
-                fleet_details = fleet_configs[0] if fleet_configs else {}
-
-            fleet_config = fleet_details.get("SpotFleetRequestConfig", {}) if fleet_details else {}
-            fleet_type = str(fleet_config.get("Type", "maintain")).lower()
-            target_capacity = int(
-                fleet_config.get("TargetCapacity", len(fleet_instance_ids or [])) or 0
-            )
-            on_demand_capacity = int(fleet_config.get("OnDemandTargetCapacity", 0) or 0)
-            new_target_capacity = None
-
-            if fleet_instance_ids:
-                if fleet_type == AWSFleetType.MAINTAIN:
-                    new_target_capacity = max(0, target_capacity - len(fleet_instance_ids))
-                    new_on_demand_capacity = min(on_demand_capacity, new_target_capacity)
-
-                    self._logger.info(
-                        "Reducing maintain Spot Fleet %s capacity from %s to %s before terminating instances",
-                        fleet_id,
-                        target_capacity,
-                        new_target_capacity,
-                    )
-
-                    self._retry_with_backoff(
-                        self.aws_client.ec2_client.modify_spot_fleet_request,
-                        operation_type="critical",
-                        SpotFleetRequestId=fleet_id,
-                        TargetCapacity=new_target_capacity,
-                        OnDemandTargetCapacity=new_on_demand_capacity,
-                    )
-
-                # Terminate specific instances using existing utility
-                self.aws_ops.terminate_instances_with_fallback(
-                    fleet_instance_ids, self._request_adapter, f"SpotFleet-{fleet_id} instances"
-                )
-                self._logger.info(
-                    "Terminated Spot Fleet %s instances: %s", fleet_id, fleet_instance_ids
-                )
-
-                if fleet_type == AWSFleetType.MAINTAIN and new_target_capacity == 0:
-                    self._logger.info(
-                        "Maintain Spot Fleet %s capacity is zero, cancelling fleet", fleet_id
-                    )
-                    self._retry_with_backoff(
-                        self.aws_client.ec2_client.cancel_spot_fleet_requests,
-                        operation_type="critical",
-                        SpotFleetRequestIds=[fleet_id],
-                        TerminateInstances=False,
-                    )
-                    cleanup: dict = {}
-                    if self.config_port is not None:
-                        try:
-                            cleanup = self.config_port.get_cleanup_config()
-                        except Exception:
-                            pass
-                    if cleanup.get("enabled", True) and cleanup.get("resources", {}).get(
-                        "spot_fleet", True
-                    ):
-                        fleet_config = fleet_details.get("SpotFleetRequestConfig", {})
-                        tags = {
-                            t["Key"]: t["Value"]
-                            for t in fleet_config.get("TagSpecifications", [{}])[0].get("Tags", [])
-                            if isinstance(t, dict)
-                        } if fleet_config.get("TagSpecifications") else {}
-                        # Fall back to top-level Tags if present
-                        if not tags:
-                            tags = {
-                                t["Key"]: t["Value"]
-                                for t in fleet_details.get("Tags", [])
-                            }
-                        request_id = tags.get("orb:request-id", "")
-                        if request_id:
-                            self._delete_orb_launch_template(request_id)
-            else:
-                # If no specific instances provided, cancel entire spot fleet
-                self._retry_with_backoff(
-                    self.aws_client.ec2_client.cancel_spot_fleet_requests,
-                    operation_type="critical",
-                    SpotFleetRequestIds=[fleet_id],
-                    TerminateInstances=True,
-                )
-                self._logger.info("Cancelled entire Spot Fleet: %s", fleet_id)
-
-        except Exception as e:
-            self._logger.error("Failed to terminate spot fleet %s: %s", fleet_id, e)
-            raise
+        """Release hosts for a single Spot Fleet."""
+        self._release_manager.release(fleet_id, fleet_instance_ids, fleet_details)
 
     @classmethod
     def get_example_templates(cls) -> list[Template]:

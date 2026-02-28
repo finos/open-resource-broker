@@ -281,7 +281,6 @@ def test_base_class_inheritance():
                 "_retry_with_backoff",
                 "_convert_client_error",
                 "_validate_prerequisites",
-                "get_metrics",
             ]
             for method_name in base_methods:
                 if not hasattr(handler_class, method_name):
@@ -424,36 +423,17 @@ def test_performance_metrics():
 
         print("   Checking performance metrics support...")
 
-        # Check that base handler has metrics methods
-        metrics_methods = [
+        # Confirm removed metrics methods are no longer present on AWSHandler
+        removed_methods = [
             "get_metrics",
             "_record_success_metrics",
             "_record_failure_metrics",
         ]
 
-        for method_name in metrics_methods:
-            if not hasattr(AWSHandler, method_name):
-                print(f"   FAIL: AWSHandler: Missing metrics method '{method_name}'")
+        for method_name in removed_methods:
+            if hasattr(AWSHandler, method_name):
+                print(f"   FAIL: AWSHandler.{method_name} should have been removed")
                 return False
-
-        # Test metrics functionality
-        mock_aws_client = Mock()
-        mock_logger = Mock()
-        mock_aws_ops = Mock()
-        mock_launch_template_manager = Mock()
-
-        handler = SpotFleetHandler(
-            aws_client=mock_aws_client,
-            logger=mock_logger,
-            aws_ops=mock_aws_ops,
-            launch_template_manager=mock_launch_template_manager,
-        )
-
-        # Test get_metrics returns a dict
-        metrics = handler.get_metrics()
-        if not isinstance(metrics, dict):
-            print(f"   FAIL: get_metrics should return a dict, got {type(metrics)}")
-            return False
 
         print("   PASS: Performance metrics are properly supported")
         return True

@@ -660,8 +660,8 @@ class TestEC2FleetHandler:
 
         # Mock the AWS operations for termination
         aws_ops.terminate_instances_with_fallback = Mock()
-        # Mock _retry_with_backoff to avoid moto's unimplemented modify_fleet
-        handler._retry_with_backoff = Mock(return_value={})
+        # Mock _retry on the release manager to avoid moto's unimplemented modify_fleet
+        handler._fleet_release_manager._retry = Mock(return_value={})
 
         # Create resource mapping indicating these instances belong to the EC2 Fleet
         resource_mapping = {
@@ -1805,7 +1805,7 @@ class TestSpotFleetHandler:
             request_adapter=Mock(),
         )
 
-        handler._retry_with_backoff = lambda func, **kwargs: func(
+        handler._release_manager._retry = lambda func, **kwargs: func(
             **{k: v for k, v in kwargs.items() if k != "operation_type"}
         )
 

@@ -11,6 +11,10 @@ from domain.base.ports.configuration_port import ConfigurationPort
 from domain.request.aggregate import Request
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.domain.template.value_objects import AWSFleetType
+from providers.aws.infrastructure.handlers.fleet_override_builder import (
+    map_ec2_fleet_allocation_strategy,
+    map_ec2_fleet_ondemand_strategy,
+)
 from providers.aws.infrastructure.tags import build_system_tags, merge_tags
 
 
@@ -149,7 +153,7 @@ class EC2FleetConfigBuilder:
             fleet_config["TargetCapacitySpecification"]["DefaultTargetCapacityType"] = "spot"
             if template.allocation_strategy:
                 fleet_config["SpotOptions"] = {
-                    "AllocationStrategy": self._get_allocation_strategy(template.allocation_strategy)
+                    "AllocationStrategy": map_ec2_fleet_allocation_strategy(template.allocation_strategy)
                 }
             if template.max_price is not None:
                 if "SpotOptions" not in fleet_config:
@@ -166,11 +170,11 @@ class EC2FleetConfigBuilder:
 
             if template.allocation_strategy:
                 fleet_config["SpotOptions"] = {
-                    "AllocationStrategy": self._get_allocation_strategy(template.allocation_strategy)
+                    "AllocationStrategy": map_ec2_fleet_allocation_strategy(template.allocation_strategy)
                 }
             if template.allocation_strategy_on_demand:
                 fleet_config["OnDemandOptions"] = {
-                    "AllocationStrategy": self._get_allocation_strategy_on_demand(
+                    "AllocationStrategy": map_ec2_fleet_ondemand_strategy(
                         template.allocation_strategy_on_demand.value
                         if hasattr(template.allocation_strategy_on_demand, "value")
                         else str(template.allocation_strategy_on_demand)
@@ -302,12 +306,12 @@ class EC2FleetConfigBuilder:
             "on_demand_count": on_demand_count,
             "spot_count": spot_count,
             "allocation_strategy": (
-                self._get_allocation_strategy(template.allocation_strategy)
+                map_ec2_fleet_allocation_strategy(template.allocation_strategy)
                 if template.allocation_strategy
                 else None
             ),
             "allocation_strategy_on_demand": (
-                self._get_allocation_strategy_on_demand(
+                map_ec2_fleet_ondemand_strategy(
                     template.allocation_strategy_on_demand.value
                     if hasattr(template.allocation_strategy_on_demand, "value")
                     else str(template.allocation_strategy_on_demand)
@@ -319,18 +323,4 @@ class EC2FleetConfigBuilder:
             "default_capacity_type": default_capacity_type,
         }
 
-    def _get_allocation_strategy(self, strategy: str) -> str:
-        """Map a Symphony spot allocation strategy name to the EC2 Fleet API value."""
-        strategy_map = {
-            "capacityOptimized": "capacity-optimized",
-            "capacityOptimizedPrioritized": "capacity-optimized-prioritized",
-            "diversified": "diversified",
-            "lowestPrice": "lowest-price",
-            "priceCapacityOptimized": "price-capacity-optimized",
-        }
-        return strategy_map.get(strategy, "lowest-price")
 
-    def _get_allocation_strategy_on_demand(self, strategy: str) -> str:
-        """Map a Symphony on-demand allocation strategy name to the EC2 Fleet API value."""
-        strategy_map = {"lowestPrice": "lowest-price", "prioritized": "prioritized"}
-        return strategy_map.get(strategy, "lowest-price")

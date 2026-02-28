@@ -92,7 +92,6 @@ class AWSHandler(ABC):
         self.max_retries = 3
         self.base_delay = 1  # seconds
         self.max_delay = 10  # seconds
-        self._metrics: dict[str, Any] = {}
 
         # Setup required dependencies
         self._setup_aws_operations(aws_ops)
@@ -594,51 +593,6 @@ class AWSHandler(ABC):
 
             detailed_message = f"Template validation failed - {'; '.join(error_details)}"
             raise AWSValidationError(detailed_message, errors)
-
-    # Performance monitoring methods
-    def _record_success_metrics(self, request_type: str, duration: float) -> None:
-        """Record success metrics for monitoring."""
-        key = f"aws_{request_type}"
-        if key not in self._metrics:
-            self._metrics[key] = {
-                "success_count": 0,
-                "failure_count": 0,
-                "total_duration": 0.0,
-                "avg_duration": 0.0,
-            }
-
-        metrics = self._metrics[key]
-        metrics["success_count"] += 1
-        metrics["total_duration"] += duration
-        total_count = metrics["success_count"] + metrics["failure_count"]
-        metrics["avg_duration"] = (
-            metrics["total_duration"] / total_count if total_count > 0 else 0.0
-        )
-
-    def _record_failure_metrics(self, request_type: str, duration: float, error: Exception) -> None:
-        """Record failure metrics for monitoring."""
-        key = f"aws_{request_type}"
-        if key not in self._metrics:
-            self._metrics[key] = {
-                "success_count": 0,
-                "failure_count": 0,
-                "total_duration": 0.0,
-                "avg_duration": 0.0,
-                "last_error": None,
-            }
-
-        metrics = self._metrics[key]
-        metrics["failure_count"] += 1
-        metrics["total_duration"] += duration
-        metrics["last_error"] = str(error)
-        total_count = metrics["success_count"] + metrics["failure_count"]
-        metrics["avg_duration"] = (
-            metrics["total_duration"] / total_count if total_count > 0 else 0.0
-        )
-
-    def get_metrics(self) -> dict[str, Any]:
-        """Get handler performance metrics."""
-        return self._metrics.copy()
 
     # Utility methods for AWS operations (keeping existing functionality)
     def get_handler_type(self) -> str:
