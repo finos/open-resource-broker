@@ -70,9 +70,7 @@ class ASGCapacityManager:
                     if group_name and instance_id:
                         instance_group_map.setdefault(group_name, []).append(instance_id)
         except Exception as exc:
-            self._logger.warning(
-                "Failed to map instances to ASGs for capacity reduction: %s", exc
-            )
+            self._logger.warning("Failed to map instances to ASGs for capacity reduction: %s", exc)
             return
 
         if not instance_group_map:

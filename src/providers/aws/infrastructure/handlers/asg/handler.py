@@ -43,8 +43,8 @@ from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdap
 from providers.aws.infrastructure.aws_client import AWSClient
 from providers.aws.infrastructure.handlers.asg.capacity_manager import ASGCapacityManager
 from providers.aws.infrastructure.handlers.asg.config_builder import ASGConfigBuilder
-from providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
 from providers.aws.infrastructure.handlers.base_handler import AWSHandler
+from providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
 from providers.aws.infrastructure.handlers.shared.fleet_grouping_mixin import FleetGroupingMixin
 from providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
 from providers.aws.utilities.aws_operations import AWSOperations
@@ -117,7 +117,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         if self.config_port is not None:
             prefix = self.config_port.get_resource_prefix("asg")
             request_id = (
-                asg_name[len(prefix):] if prefix and asg_name.startswith(prefix) else asg_name
+                asg_name[len(prefix) :] if prefix and asg_name.startswith(prefix) else asg_name
             )
         else:
             request_id = asg_name
@@ -276,7 +276,9 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             resource_id=resource_id or asg_name,
         )
 
-    def _resolve_provider_api(self, request: Request, aws_template: Optional[AWSTemplate] = None) -> str:
+    def _resolve_provider_api(
+        self, request: Request, aws_template: Optional[AWSTemplate] = None
+    ) -> str:
         """Resolve the provider_api value to stamp onto instance data."""
         metadata = getattr(request, "metadata", {}) or {}
         return metadata.get("provider_api", "ASG")

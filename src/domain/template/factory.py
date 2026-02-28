@@ -81,7 +81,6 @@ class TemplateFactory(BaseTemplateFactory):
             if self._logger:
                 self._logger.warning("AWS template class not available for registration")
 
-
     def register_provider_template_class(self, provider_type: str, template_class: type) -> None:
         """Register a provider-specific template class.
 

@@ -280,7 +280,9 @@ class AWSProviderStrategy(ProviderStrategy):
                 config_port = None
                 if self._logger:
                     self._logger.warning("ConfigurationPort not available for handler factory")
-            return AWSHandlerFactory(aws_client=self.aws_client, logger=self._logger, config=config_port)
+            return AWSHandlerFactory(
+                aws_client=self.aws_client, logger=self._logger, config=config_port
+            )
         return None
 
     def get_handler(self, handler_type: str) -> Optional[Any]:
@@ -505,14 +507,14 @@ class AWSProviderStrategy(ProviderStrategy):
 
     def _create_image_resolution_service(self):
         """Create AWS image resolution service with provider-specific context."""
+        from domain.base.ports.configuration_port import ConfigurationPort
+
+        # Determine cache directory
+        from infrastructure.di.container import get_container
         from providers.aws.infrastructure.caching.aws_image_cache import AWSImageCache
         from providers.aws.infrastructure.services.aws_image_resolution_service import (
             AWSImageResolutionService,
         )
-
-        # Determine cache directory
-        from infrastructure.di.container import get_container
-        from domain.base.ports.configuration_port import ConfigurationPort
 
         container = get_container()
         config = container.get(ConfigurationPort)

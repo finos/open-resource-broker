@@ -1,7 +1,5 @@
 """Tests for the flat CLI command registry."""
 
-import pytest
-
 
 def test_system_reload_resolves_to_handler():
     from cli.registry import build_registry, lookup

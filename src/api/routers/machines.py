@@ -52,6 +52,7 @@ class ReturnMachinesRequest(BaseModel):
     "/request",
     summary="Request Machines",
     description="Request new machines from a template",
+    status_code=202,
 )
 @handle_rest_exceptions(endpoint="/api/v1/machines/request", method="POST")
 async def request_machines(
@@ -86,7 +87,7 @@ async def request_machines(
     else:
         response_content = result
 
-    return JSONResponse(content=response_content)
+    return JSONResponse(content=response_content, status_code=202)
 
 
 @router.post("/return", summary="Return Machines", description="Return machines to the provider")

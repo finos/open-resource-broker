@@ -9,8 +9,8 @@ from typing import Any, Optional
 
 from domain.base.ports import LoggingPort
 from domain.base.ports.configuration_port import ConfigurationPort
-from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from domain.request.aggregate import Request
+from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.infrastructure.handlers.shared.base_config_builder import BaseConfigBuilder
 
 
@@ -200,9 +200,9 @@ class ASGConfigBuilder(BaseConfigBuilder):
             asg_config["MixedInstancesPolicy"]["InstancesDistribution"] = instances_distribution
 
             if getattr(template, "allocation_strategy", None):
-                instances_distribution[
-                    "SpotAllocationStrategy"
-                ] = template.get_asg_allocation_strategy()
+                instances_distribution["SpotAllocationStrategy"] = (
+                    template.get_asg_allocation_strategy()
+                )
 
             if "LaunchTemplate" in asg_config:
                 asg_config.pop("LaunchTemplate", None)
@@ -258,9 +258,7 @@ class ASGConfigBuilder(BaseConfigBuilder):
             "default_cooldown": 300,
             "health_check_type": "EC2",
             "health_check_grace_period": 300,
-            "vpc_zone_identifier": (
-                ",".join(template.subnet_ids) if template.subnet_ids else None
-            ),
+            "vpc_zone_identifier": (",".join(template.subnet_ids) if template.subnet_ids else None),
             "new_instances_protected_from_scale_in": True,
             "context": (
                 template.context if hasattr(template, "context") and template.context else None

@@ -373,7 +373,9 @@ class TestIntegrationWithMoto:
 
 
 @pytest.mark.integration
-@pytest.mark.skip(reason="config.metrics_config and monitoring.aws_metrics modules not yet implemented")
+@pytest.mark.skip(
+    reason="config.metrics_config and monitoring.aws_metrics modules not yet implemented"
+)
 class TestAWSMetricsIntegration:
     """Integration tests for AWS metrics with real components."""
 

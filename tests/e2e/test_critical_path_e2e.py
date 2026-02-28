@@ -98,7 +98,7 @@ class TestRequestLifecycle:
         finally:
             app.dependency_overrides.clear()
 
-        assert response.status_code == 200
+        assert response.status_code == 202
         data = response.json()
         assert data["requestId"] == "req-acquire-abc123"
 
@@ -205,7 +205,7 @@ class TestRequestLifecycle:
             )
         finally:
             app.dependency_overrides.clear()
-        assert create_resp.status_code == 200
+        assert create_resp.status_code == 202
 
         # Step 2: poll status - pending
         mock_status_handler = AsyncMock()
@@ -530,7 +530,7 @@ class TestMachineLifecycle:
             )
         finally:
             app.dependency_overrides.clear()
-        assert provision_resp.status_code == 200
+        assert provision_resp.status_code == 202
 
         # Check status
         mock_status_handler = AsyncMock()
@@ -577,7 +577,7 @@ class TestMachineLifecycle:
             )
         finally:
             app.dependency_overrides.clear()
-        assert provision_resp.status_code == 200
+        assert provision_resp.status_code == 202
 
         # Step 2: terminate via return
         mock_return_result = {

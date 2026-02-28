@@ -71,9 +71,7 @@ class EC2FleetReleaseManager:
             fleet_details: Pre-fetched DescribeFleets entry for this fleet,
                 or an empty dict to trigger a fresh lookup.
         """
-        self._logger.info(
-            "Processing EC2 Fleet %s with %d instances", fleet_id, len(instance_ids)
-        )
+        self._logger.info("Processing EC2 Fleet %s with %d instances", fleet_id, len(instance_ids))
 
         try:
             if not fleet_details:
@@ -128,14 +126,10 @@ class EC2FleetReleaseManager:
                     self._request_adapter,
                     f"EC2Fleet-{fleet_id} instances",
                 )
-                self._logger.info(
-                    "Terminated EC2 Fleet %s instances: %s", fleet_id, instance_ids
-                )
+                self._logger.info("Terminated EC2 Fleet %s instances: %s", fleet_id, instance_ids)
 
                 if fleet_type == "maintain" and new_capacity == 0:
-                    self._logger.info(
-                        "EC2 Fleet %s capacity is zero, deleting fleet", fleet_id
-                    )
+                    self._logger.info("EC2 Fleet %s capacity is zero, deleting fleet", fleet_id)
                     self._delete_fleet(fleet_id)
                     self._maybe_cleanup_launch_template(fleet_details)
             else:

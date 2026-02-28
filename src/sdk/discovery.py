@@ -219,12 +219,18 @@ class SDKMethodDiscovery:
             if hasattr(handler_type, "__dataclass_fields__"):
                 # Pydantic/dataclass model
                 for field_name, field in handler_type.__dataclass_fields__.items():
+                    import dataclasses
+
+                    is_required = (
+                        field.default is dataclasses.MISSING
+                        and field.default_factory is dataclasses.MISSING  # type: ignore[misc]
+                    )
                     parameters[field_name] = {
                         "type": type_hints.get(field_name, "Any"),
-                        "required": field.default == field.default_factory(),
+                        "required": is_required,
                         "description": f"Parameter for {field_name}",
                     }
-                    if parameters[field_name]["required"]:
+                    if is_required:
                         required_params.append(field_name)
 
             # Generate description

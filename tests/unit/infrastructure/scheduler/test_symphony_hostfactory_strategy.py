@@ -2,8 +2,6 @@
 
 from unittest.mock import Mock
 
-import pytest
-
 from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
 from infrastructure.template.dtos import TemplateDTO
 

@@ -72,7 +72,9 @@ class TestFieldMappingIntegration:
         # Test instance type consistency
         mapped_data = {"instance_types": {"t2.micro": 1, "t2.small": 2}}
         result = HostFactoryTransformations.ensure_instance_type_consistency(mapped_data)
-        assert next(iter(result["instance_types"].keys())) == "t2.micro"  # First from instance_types
+        assert (
+            next(iter(result["instance_types"].keys())) == "t2.micro"
+        )  # First from instance_types
 
     def test_scheduler_field_mapping_ondemand(self):
         """Test scheduler field mapping for OnDemand template."""

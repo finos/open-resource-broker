@@ -4,7 +4,7 @@ import json
 import time
 import uuid
 from abc import abstractmethod
-from typing import Any, Callable, cast, Generic, Optional, TypeVar
+from typing import Any, Callable, Generic, Optional, TypeVar, cast
 
 from domain.base.exceptions import DomainException, EntityNotFoundError, ValidationError
 from infrastructure.handlers.base.base_handler import BaseHandler

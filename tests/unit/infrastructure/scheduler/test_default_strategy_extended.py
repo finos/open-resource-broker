@@ -6,8 +6,6 @@ import tempfile
 from typing import cast
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 
 
@@ -27,7 +25,9 @@ class TestFormatRequestResponse:
         assert "message" in result
 
     def test_dict_input_complete_status(self):
-        result = self.strategy.format_request_response({"request_id": "req-2", "status": "complete"})
+        result = self.strategy.format_request_response(
+            {"request_id": "req-2", "status": "complete"}
+        )
         assert result["request_id"] == "req-2"
         assert result["message"] == "Request completed successfully"
 
@@ -49,7 +49,9 @@ class TestFormatRequestResponse:
         assert result["request_id"] == "req-4"
 
     def test_cancelled_status(self):
-        result = self.strategy.format_request_response({"request_id": "req-5", "status": "cancelled"})
+        result = self.strategy.format_request_response(
+            {"request_id": "req-5", "status": "cancelled"}
+        )
         assert "error" in result
         assert result["request_id"] == "req-5"
 
@@ -59,7 +61,9 @@ class TestFormatRequestResponse:
         assert "message" in result
 
     def test_complete_status(self):
-        result = self.strategy.format_request_response({"request_id": "req-7", "status": "complete"})
+        result = self.strategy.format_request_response(
+            {"request_id": "req-7", "status": "complete"}
+        )
         assert result["request_id"] == "req-7"
         assert "message" in result
 

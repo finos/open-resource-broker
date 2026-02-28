@@ -46,10 +46,10 @@ from providers.aws.exceptions.aws_exceptions import (
 )
 from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from providers.aws.infrastructure.aws_client import AWSClient
-from providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
 from providers.aws.infrastructure.handlers.base_handler import AWSHandler
 from providers.aws.infrastructure.handlers.ec2_fleet.config_builder import EC2FleetConfigBuilder
 from providers.aws.infrastructure.handlers.ec2_fleet.release_manager import EC2FleetReleaseManager
+from providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
 from providers.aws.infrastructure.handlers.shared.fleet_grouping_mixin import FleetGroupingMixin
 from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
@@ -365,7 +365,9 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             metadata_updates["instance_ids"] = instance_ids
         return {"metadata_updates": metadata_updates}
 
-    def _resolve_provider_api(self, request: Request, aws_template: Optional[AWSTemplate] = None) -> str:
+    def _resolve_provider_api(
+        self, request: Request, aws_template: Optional[AWSTemplate] = None
+    ) -> str:
         """Resolve the provider_api value to stamp onto instance data."""
         if aws_template and aws_template.provider_api is not None:
             return (
@@ -505,7 +507,9 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 resource_id=fleet_id,
                 provider_api="EC2Fleet",
             )
-            return self._format_instance_data(instance_details, fleet_id, self._resolve_provider_api(request))
+            return self._format_instance_data(
+                instance_details, fleet_id, self._resolve_provider_api(request)
+            )
 
         except ClientError as e:
             error = self._convert_client_error(e)

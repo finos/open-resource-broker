@@ -70,9 +70,8 @@ def _register_template_services(container: DIContainer):
         from application.services.provider_registry_service import ProviderRegistryService
         from config.managers.configuration_manager import ConfigurationManager
         from domain.base.ports.scheduler_port import SchedulerPort
-        from domain.template.ports.template_defaults_port import TemplateDefaultsPort as TDP
-
         from domain.template.factory import TemplateFactory
+        from domain.template.ports.template_defaults_port import TemplateDefaultsPort as TDP
 
         return TemplateConfigurationManager(
             config_manager=c.get(ConfigurationManager),

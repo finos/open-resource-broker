@@ -30,7 +30,9 @@ class HandlerDefaultsConfig(BaseModel):
         """Reject values that are not valid ProviderApi registry keys."""
         if ProviderApi(v) is None:
             valid = [m.value for m in ProviderApi]
-            raise ValueError(f"default_handler {v!r} is not a valid ProviderApi value; expected one of {valid}")
+            raise ValueError(
+                f"default_handler {v!r} is not a valid ProviderApi value; expected one of {valid}"
+            )
         return v
 
 

@@ -3,8 +3,6 @@
 from typing import cast
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 
 
@@ -88,7 +86,10 @@ class TestApplyTemplateDefaults:
     def test_delegates_to_service_when_present(self):
         strategy = make_strategy()
         mock_service = MagicMock()
-        mock_service.resolve_template_defaults.return_value = {"template_id": "t1", "subnet_ids": ["s-1"]}
+        mock_service.resolve_template_defaults.return_value = {
+            "template_id": "t1",
+            "subnet_ids": ["s-1"],
+        }
         strategy._template_defaults_service = cast(None, mock_service)
 
         template = {"template_id": "t1"}

@@ -212,7 +212,9 @@ class TestEC2FleetHandlerNameTag:
         aws_ops = MagicMock()
         launch_template_manager = MagicMock()
         config_port = MagicMock()
-        config_port.get_resource_prefix.side_effect = lambda rt: "pfx-" if rt == "fleet" else "inst-"
+        config_port.get_resource_prefix.side_effect = (
+            lambda rt: "pfx-" if rt == "fleet" else "inst-"
+        )
 
         handler = EC2FleetHandler(
             aws_client, logger, aws_ops, launch_template_manager, config_port=config_port
@@ -237,7 +239,11 @@ class TestEC2FleetHandlerNameTag:
         fleet_config = handler._create_fleet_config(template, request, "lt-xyz", "$Default")
 
         instance_ts = next(
-            (ts for ts in fleet_config.get("TagSpecifications", []) if ts["ResourceType"] == "instance"),
+            (
+                ts
+                for ts in fleet_config.get("TagSpecifications", [])
+                if ts["ResourceType"] == "instance"
+            ),
             None,
         )
         assert instance_ts is not None, "No instance TagSpecification found"

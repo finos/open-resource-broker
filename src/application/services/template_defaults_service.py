@@ -5,11 +5,11 @@ from typing import Any, Optional
 from domain.base.dependency_injection import injectable
 from domain.base.ports.configuration_port import ConfigurationPort
 from domain.base.ports.logging_port import LoggingPort
+from domain.base.utils import extract_provider_type
 from domain.template.extensions import TemplateExtensionRegistry
 from domain.template.factory import TemplateFactoryPort
 from domain.template.ports.template_defaults_port import TemplateDefaultsPort
 from domain.template.template_aggregate import Template
-from domain.base.utils import extract_provider_type
 
 
 @injectable

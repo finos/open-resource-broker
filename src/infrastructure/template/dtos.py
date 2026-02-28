@@ -100,7 +100,11 @@ class TemplateDTO(BaseDTO):
     def from_domain(cls, template) -> "TemplateDTO":
         """Convert domain template to DTO."""
         _fleet_type = getattr(template, "fleet_type", None)
-        _fleet_type_str: Optional[str] = str(_fleet_type.value) if _fleet_type is not None and hasattr(_fleet_type, "value") else (_fleet_type if _fleet_type is None else str(_fleet_type))
+        _fleet_type_str: Optional[str] = (
+            str(_fleet_type.value)
+            if _fleet_type is not None and hasattr(_fleet_type, "value")
+            else (_fleet_type if _fleet_type is None else str(_fleet_type))
+        )
         _abis = getattr(template, "abis_instance_requirements", None)
         return cls(
             # Core fields

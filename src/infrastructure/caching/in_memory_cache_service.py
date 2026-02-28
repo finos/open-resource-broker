@@ -57,7 +57,5 @@ class InMemoryCacheService(CacheServicePort):
 
     def cache_request(self, request_id: str, request_dto: Any) -> None:
         """Synchronous cache write for request DTOs."""
-        expiry = (
-            time.monotonic() + self._default_ttl if self._default_ttl is not None else None
-        )
+        expiry = time.monotonic() + self._default_ttl if self._default_ttl is not None else None
         self._store[f"request:{request_id}"] = (request_dto, expiry)

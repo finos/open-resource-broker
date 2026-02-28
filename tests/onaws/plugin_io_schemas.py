@@ -90,7 +90,15 @@ expected_request_status_schema_hostfactory = {
                     "message": {"type": "string"},
                     "status": {
                         "type": "string",
-                        "enum": ["running", "complete", "complete_with_error", "failed", "partial", "cancelled", "timeout"],
+                        "enum": [
+                            "running",
+                            "complete",
+                            "complete_with_error",
+                            "failed",
+                            "partial",
+                            "cancelled",
+                            "timeout",
+                        ],
                     },
                     "machines": {
                         "type": "array",

@@ -48,9 +48,7 @@ class SpotFleetReleaseManager:
             fleet_details: SpotFleetRequestConfig dict from describe_spot_fleet_requests,
                            or empty dict to trigger a live fetch.
         """
-        self._logger.info(
-            "Processing Spot Fleet %s with %d instances", fleet_id, len(instance_ids)
-        )
+        self._logger.info("Processing Spot Fleet %s with %d instances", fleet_id, len(instance_ids))
 
         try:
             if not fleet_details:
@@ -64,9 +62,7 @@ class SpotFleetReleaseManager:
 
             fleet_config = fleet_details.get("SpotFleetRequestConfig", {}) if fleet_details else {}
             fleet_type = str(fleet_config.get("Type", "maintain")).lower()
-            target_capacity = int(
-                fleet_config.get("TargetCapacity", len(instance_ids or [])) or 0
-            )
+            target_capacity = int(fleet_config.get("TargetCapacity", len(instance_ids or [])) or 0)
             on_demand_capacity = int(fleet_config.get("OnDemandTargetCapacity", 0) or 0)
             new_target_capacity = None
 
@@ -93,9 +89,7 @@ class SpotFleetReleaseManager:
                 self._aws_ops.terminate_instances_with_fallback(
                     instance_ids, self._request_adapter, f"SpotFleet-{fleet_id} instances"
                 )
-                self._logger.info(
-                    "Terminated Spot Fleet %s instances: %s", fleet_id, instance_ids
-                )
+                self._logger.info("Terminated Spot Fleet %s instances: %s", fleet_id, instance_ids)
 
                 if fleet_type == AWSFleetType.MAINTAIN and new_target_capacity == 0:
                     self._logger.info(

@@ -1,7 +1,7 @@
 """End-to-end integration tests for dry-run functionality."""
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 from domain.request.aggregate import Request
 from domain.request.value_objects import RequestId, RequestType

@@ -13,10 +13,10 @@ from domain.base.ports.configuration_port import ConfigurationPort
 from domain.request.aggregate import Request
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.domain.template.value_objects import AWSFleetType
+from providers.aws.infrastructure.handlers.shared.base_config_builder import BaseConfigBuilder
 from providers.aws.infrastructure.handlers.shared.fleet_override_builder import (
     map_spot_fleet_allocation_strategy,
 )
-from providers.aws.infrastructure.handlers.shared.base_config_builder import BaseConfigBuilder
 from providers.aws.infrastructure.tags import build_resource_tags
 
 
@@ -123,9 +123,7 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
         capacity = self._calculate_capacity_distribution(template, requested_count)
 
         assert self._config_port is not None, "config_port must be injected"
-        fleet_name = (
-            f"{self._config_port.get_resource_prefix('spot_fleet')}{request.request_id}"
-        )
+        fleet_name = f"{self._config_port.get_resource_prefix('spot_fleet')}{request.request_id}"
 
         instance_overrides: list[dict[str, Any]] = []
         if template.machine_types and template.subnet_ids:
@@ -197,7 +195,10 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
 
         # Normalise service-linked role ARNs
         if fleet_role and "ec2fleet.amazonaws.com/AWSServiceRoleForEC2Fleet" in fleet_role:
-            from providers.aws.infrastructure.aws_client import AWSClient  # noqa: F401 – type hint only
+            from providers.aws.infrastructure.aws_client import (
+                AWSClient,  # noqa: F401 – type hint only
+            )
+
             # AWSClient is not available here; caller must pass a resolved role.
             # Log a warning and leave the role as-is — the handler should resolve it before calling.
             self._logger.warning(

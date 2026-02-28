@@ -9,7 +9,6 @@ backward compatibility while using the improved architecture.
 from typing import Any, Optional
 
 from domain.base.dependency_injection import injectable
-from providers.aws.configuration.config import AWSProviderConfig
 from domain.base.ports import ConfigurationPort, LoggingPort
 from domain.base.resource_manager import (
     ResourceAllocation,
@@ -20,6 +19,7 @@ from domain.base.resource_manager import (
 from infrastructure.adapters.ports.cloud_resource_manager_port import (
     CloudResourceManagerPort,
 )
+from providers.aws.configuration.config import AWSProviderConfig
 from providers.aws.exceptions.aws_exceptions import InfrastructureError
 from providers.aws.infrastructure.aws_client import AWSClient
 from providers.aws.managers.aws_resource_manager import AWSResourceManagerImpl

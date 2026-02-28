@@ -521,9 +521,6 @@ def test_performance_metrics_integration():
     """Test that performance metrics work across the integration."""
     try:
         from providers.aws.infrastructure.handlers.base_handler import AWSHandler
-        from providers.aws.infrastructure.handlers.spot_fleet.handler import (
-            SpotFleetHandler,
-        )
 
         print("   Testing performance metrics integration...")
 

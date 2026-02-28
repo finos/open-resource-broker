@@ -40,8 +40,11 @@ class TestHandlerMergeIntegration:
         mock_launch_template_manager = Mock()
 
         handler = EC2FleetHandler(
-            mock_aws_client, mock_logger, mock_aws_ops, mock_launch_template_manager,
-            config_port=Mock()
+            mock_aws_client,
+            mock_logger,
+            mock_aws_ops,
+            mock_launch_template_manager,
+            config_port=Mock(),
         )
 
         mock_native_service = Mock()
@@ -79,16 +82,23 @@ class TestHandlerMergeIntegration:
         mock_launch_template_manager = Mock()
 
         handler = SpotFleetHandler(
-            mock_aws_client, mock_logger, mock_aws_ops, mock_launch_template_manager,
-            config_port=Mock()
+            mock_aws_client,
+            mock_logger,
+            mock_aws_ops,
+            mock_launch_template_manager,
+            config_port=Mock(),
         )
 
         mock_native_service = Mock()
         mock_native_service.process_provider_api_spec_with_merge.return_value = {
-            "LaunchSpecifications": [{"LaunchTemplate": {
-                "LaunchTemplateId": "lt-123",
-                "Version": "1",
-            }}],
+            "LaunchSpecifications": [
+                {
+                    "LaunchTemplate": {
+                        "LaunchTemplateId": "lt-123",
+                        "Version": "1",
+                    }
+                }
+            ],
             "TargetCapacity": 5,
             "AllocationStrategy": "diversified",
         }
@@ -112,8 +122,11 @@ class TestHandlerMergeIntegration:
         mock_launch_template_manager = Mock()
 
         handler = EC2FleetHandler(
-            mock_aws_client, mock_logger, mock_aws_ops, mock_launch_template_manager,
-            config_port=Mock()
+            mock_aws_client,
+            mock_logger,
+            mock_aws_ops,
+            mock_launch_template_manager,
+            config_port=Mock(),
         )
 
         mock_native_service = Mock()
@@ -141,8 +154,11 @@ class TestHandlerMergeIntegration:
         mock_launch_template_manager = Mock()
 
         handler = EC2FleetHandler(
-            mock_aws_client, mock_logger, mock_aws_ops, mock_launch_template_manager,
-            config_port=Mock()
+            mock_aws_client,
+            mock_logger,
+            mock_aws_ops,
+            mock_launch_template_manager,
+            config_port=Mock(),
         )
         handler._fleet_config_builder._native_spec_service = None
 

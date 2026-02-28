@@ -41,8 +41,8 @@ from providers.aws.exceptions.aws_exceptions import (
 )
 from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from providers.aws.infrastructure.aws_client import AWSClient
-from providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
 from providers.aws.infrastructure.handlers.base_handler import AWSHandler
+from providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
 from providers.aws.infrastructure.handlers.shared.fleet_grouping_mixin import FleetGroupingMixin
 from providers.aws.infrastructure.handlers.spot_fleet.config_builder import SpotFleetConfigBuilder
 from providers.aws.infrastructure.handlers.spot_fleet.release_manager import SpotFleetReleaseManager
@@ -97,7 +97,9 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             aws_native_spec_service=aws_native_spec_service,
             config_port=config_port,
         )
-        self._spot_fleet_validator = spot_fleet_validator or SpotFleetValidator(aws_client, logger, aws_ops)
+        self._spot_fleet_validator = spot_fleet_validator or SpotFleetValidator(
+            aws_client, logger, aws_ops
+        )
         self._config_builder = config_builder or SpotFleetConfigBuilder(
             aws_native_spec_service, config_port, logger
         )
@@ -283,7 +285,9 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             instance_ids, request_id=request_id, resource_id=fleet_id, provider_api="SpotFleet"
         )
 
-    def _resolve_provider_api(self, request: Request, aws_template: Optional[AWSTemplate] = None) -> str:
+    def _resolve_provider_api(
+        self, request: Request, aws_template: Optional[AWSTemplate] = None
+    ) -> str:
         """Resolve the provider_api value to stamp onto instance data."""
         metadata = getattr(request, "metadata", {}) or {}
         return metadata.get("provider_api", "SpotFleet")

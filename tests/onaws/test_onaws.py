@@ -899,9 +899,7 @@ def setup_host_factory_mock(request, monkeypatch):
                     )
                     hfm.request_return_machines(machine_ids)
             except Exception as exc:
-                log.warning(
-                    "Fixture teardown: cleanup failed for request %s: %s", req_id, exc
-                )
+                log.warning("Fixture teardown: cleanup failed for request %s: %s", req_id, exc)
 
 
 @pytest.fixture
@@ -988,9 +986,7 @@ def setup_host_factory_mock_with_scenario(request, monkeypatch):
                     )
                     hfm.request_return_machines(machine_ids)
             except Exception as exc:
-                log.warning(
-                    "Fixture teardown: cleanup failed for request %s: %s", req_id, exc
-                )
+                log.warning("Fixture teardown: cleanup failed for request %s: %s", req_id, exc)
 
 
 def _check_request_machines_response_status(status_response):

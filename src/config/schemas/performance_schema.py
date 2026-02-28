@@ -178,7 +178,9 @@ class LazyLoadingConfig(BaseModel):
     enabled: bool = Field(True, description="Enable lazy loading of services")
     cache_instances: bool = Field(True, description="Cache lazily loaded instances")
     discovery_mode: str = Field("lazy", description="Handler discovery mode (lazy or eager)")
-    connection_mode: str = Field("lazy", description="Connection establishment mode (lazy or eager)")
+    connection_mode: str = Field(
+        "lazy", description="Connection establishment mode (lazy or eager)"
+    )
     preload_critical: list[str] = Field(
         default_factory=list, description="List of critical services to preload at startup"
     )

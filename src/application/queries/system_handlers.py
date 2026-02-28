@@ -457,7 +457,7 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Provid
                     "avg_response_time": 0.0,
                 }
 
-            summary = all_time_metrics
+            summary = metrics["summary"]
             return ProviderMetricsDTO(
                 provider_name=query.provider_name or "all",
                 total_requests=summary["total_requests"],

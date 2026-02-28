@@ -31,7 +31,13 @@ ORB_TAG_VALUE = "open-resource-broker"
 
 EC2_FLEET_ACTIVE_STATES: Sequence[str] = ("submitted", "active", "modifying")
 SPOT_FLEET_ACTIVE_STATES: Sequence[str] = ("submitted", "active", "modifying")
-INSTANCE_ACTIVE_STATES: Sequence[str] = ("pending", "running", "stopping", "stopped", "shutting-down")
+INSTANCE_ACTIVE_STATES: Sequence[str] = (
+    "pending",
+    "running",
+    "stopping",
+    "stopped",
+    "shutting-down",
+)
 
 
 def _utc_iso(value: Any) -> str:
@@ -64,10 +70,14 @@ def _ec2_tag_filters(tags: list[tuple[str, str]]) -> list[dict[str, Any]]:
 
 def _asg_tag_filters(tags: list[tuple[str, str]]) -> list[dict[str, Any]]:
     # ASG API uses tag-key / tag-value, not tag:<key>
-    return [f for k, v in tags for f in (
-        {"Name": "tag-key", "Values": [k]},
-        {"Name": "tag-value", "Values": [v]},
-    )]
+    return [
+        f
+        for k, v in tags
+        for f in (
+            {"Name": "tag-key", "Values": [k]},
+            {"Name": "tag-value", "Values": [v]},
+        )
+    ]
 
 
 def _matches_tags(resource_tags: list[dict[str, str]], tags: list[tuple[str, str]]) -> bool:
@@ -83,6 +93,7 @@ def _get_tag(tags: list[dict[str, str]], key: str) -> str:
 
 
 # ── Discovery ────────────────────────────────────────────────────────────────
+
 
 def _find_asgs(asg_client, tags: list[tuple[str, str]]) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
@@ -139,6 +150,7 @@ def _find_launch_templates(ec2_client, tags: list[tuple[str, str]]) -> list[dict
 
 # ── Printing ─────────────────────────────────────────────────────────────────
 
+
 def _print_asgs(asgs: list[dict[str, Any]]) -> None:
     print(f"\nAuto Scaling Groups ({len(asgs)}):")
     if not asgs:
@@ -150,7 +162,9 @@ def _print_asgs(asgs: list[dict[str, Any]]) -> None:
         instances = len(asg.get("Instances", []))
         created = _utc_iso(asg.get("CreatedTime"))
         request_id = _get_tag(asg.get("Tags", []), "orb:request-id")
-        print(f"  - {name} | desired={desired} instances={instances} request={request_id} created={created}")
+        print(
+            f"  - {name} | desired={desired} instances={instances} request={request_id} created={created}"
+        )
 
 
 def _print_ec2_fleets(fleets: list[dict[str, Any]]) -> None:
@@ -166,7 +180,9 @@ def _print_ec2_fleets(fleets: list[dict[str, Any]]) -> None:
         fulfilled = fleet.get("FulfilledCapacity", "-")
         created = _utc_iso(fleet.get("CreateTime"))
         request_id = _get_tag(fleet.get("Tags", []), "orb:request-id")
-        print(f"  - {fleet_id} | state={state} type={fleet_type} target={target} fulfilled={fulfilled} request={request_id} created={created}")
+        print(
+            f"  - {fleet_id} | state={state} type={fleet_type} target={target} fulfilled={fulfilled} request={request_id} created={created}"
+        )
 
 
 def _print_spot_fleets(fleets: list[dict[str, Any]]) -> None:
@@ -181,7 +197,9 @@ def _print_spot_fleets(fleets: list[dict[str, Any]]) -> None:
         target = config.get("TargetCapacity", "-")
         created = _utc_iso(fleet.get("CreateTime"))
         request_id = _get_tag(fleet.get("Tags", []), "orb:request-id")
-        print(f"  - {fleet_id} | state={state} target={target} request={request_id} created={created}")
+        print(
+            f"  - {fleet_id} | state={state} target={target} request={request_id} created={created}"
+        )
 
 
 def _print_instances(instances: list[dict[str, Any]]) -> None:
@@ -195,7 +213,9 @@ def _print_instances(instances: list[dict[str, Any]]) -> None:
         itype = inst.get("InstanceType", "-")
         launched = _utc_iso(inst.get("LaunchTime"))
         request_id = _get_tag(inst.get("Tags", []), "orb:request-id")
-        print(f"  - {inst_id} | state={state} type={itype} request={request_id} launched={launched}")
+        print(
+            f"  - {inst_id} | state={state} type={itype} request={request_id} launched={launched}"
+        )
 
 
 def _print_launch_templates(templates: list[dict[str, Any]]) -> None:
@@ -212,6 +232,7 @@ def _print_launch_templates(templates: list[dict[str, Any]]) -> None:
 
 
 # ── Termination ───────────────────────────────────────────────────────────────
+
 
 def _terminate_asgs(asg_client, asgs: list[dict[str, Any]], dry_run: bool) -> None:
     if not asgs:
@@ -246,7 +267,10 @@ def _terminate_ec2_fleets(ec2_client, fleets: list[dict[str, Any]], dry_run: boo
             for item in response.get("SuccessfulFleetDeletions", []):
                 print(f"  - deleted EC2 Fleet: {item.get('FleetId', '-')}")
             for item in response.get("UnsuccessfulFleetDeletions", []):
-                print(f"  - failed EC2 Fleet {item.get('FleetId', '-')}: {item.get('ErrorMessage', 'unknown')}", file=sys.stderr)
+                print(
+                    f"  - failed EC2 Fleet {item.get('FleetId', '-')}: {item.get('ErrorMessage', 'unknown')}",
+                    file=sys.stderr,
+                )
         except ClientError as exc:
             print(f"  - EC2 Fleet deletion error: {exc}", file=sys.stderr)
 
@@ -267,7 +291,10 @@ def _terminate_spot_fleets(ec2_client, fleets: list[dict[str, Any]], dry_run: bo
             for item in response.get("SuccessfulFleetRequests", []):
                 print(f"  - cancelled Spot Fleet: {item.get('SpotFleetRequestId', '-')}")
             for item in response.get("UnsuccessfulFleetRequests", []):
-                print(f"  - failed Spot Fleet {item.get('SpotFleetRequestId', '-')}: {item.get('ErrorMessage', 'unknown')}", file=sys.stderr)
+                print(
+                    f"  - failed Spot Fleet {item.get('SpotFleetRequestId', '-')}: {item.get('ErrorMessage', 'unknown')}",
+                    file=sys.stderr,
+                )
         except ClientError as exc:
             print(f"  - Spot Fleet cancellation error: {exc}", file=sys.stderr)
 
@@ -307,6 +334,7 @@ def _delete_launch_templates(ec2_client, templates: list[dict[str, Any]], dry_ru
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
@@ -315,7 +343,9 @@ def main() -> int:
             f"Covers ASGs, EC2 Fleets, Spot Fleets, RunInstances, and Launch Templates."
         )
     )
-    parser.add_argument("--region", default=DEFAULT_REGION, help=f"AWS region (default: {DEFAULT_REGION})")
+    parser.add_argument(
+        "--region", default=DEFAULT_REGION, help=f"AWS region (default: {DEFAULT_REGION})"
+    )
     parser.add_argument("--profile", default=None, help="AWS profile name")
     parser.add_argument(
         "--tag",
@@ -328,8 +358,12 @@ def main() -> int:
             f"Defaults to {ORB_TAG_KEY}={ORB_TAG_VALUE} when omitted."
         ),
     )
-    parser.add_argument("--terminate", action="store_true", help="Terminate all discovered resources")
-    parser.add_argument("--dry-run", action="store_true", help="Show what would be terminated without doing it")
+    parser.add_argument(
+        "--terminate", action="store_true", help="Terminate all discovered resources"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Show what would be terminated without doing it"
+    )
     args = parser.parse_args()
 
     if args.dry_run and not args.terminate:

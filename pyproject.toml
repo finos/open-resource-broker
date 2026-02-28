@@ -121,7 +121,9 @@ ci = [
     "requests-mock>=1.11.0,<2.0.0",
     # Security overrides for vulnerable dependencies
     "joserfc>=1.6.1",
-    "werkzeug>=3.1.4",
+    "werkzeug>=3.1.6",
+    # Security override for safety's vulnerable nltk dependency (GHSA-7p94-766c-hgjp)
+    "nltk>=3.9.3",
 
     # Essential Type Stubs
     "types-PyYAML>=6.0.12.12,<7.0.0",

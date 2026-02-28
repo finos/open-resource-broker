@@ -207,13 +207,12 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             return template
 
         try:
+            from domain.base.ports.configuration_port import ConfigurationPort
+            from infrastructure.di.container import get_container
             from providers.aws.infrastructure.caching.aws_image_cache import AWSImageCache
             from providers.aws.infrastructure.services.aws_image_resolution_service import (
                 AWSImageResolutionService,
             )
-
-            from infrastructure.di.container import get_container
-            from domain.base.ports.configuration_port import ConfigurationPort
 
             container = get_container()
             config = container.get(ConfigurationPort)

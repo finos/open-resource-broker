@@ -2,7 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 from botocore.exceptions import ClientError
 
 from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
@@ -250,14 +249,16 @@ class TestASGHandlerNameTag:
         """_get_asg_instances passes request_id and resource_id to _get_instance_details."""
         handler = _make_handler()
         handler.aws_client.autoscaling_client.describe_auto_scaling_groups = MagicMock(
-            return_value={
-                "AutoScalingGroups": [
-                    {"Instances": [{"InstanceId": "i-ctx1"}]}
-                ]
-            }
+            return_value={"AutoScalingGroups": [{"Instances": [{"InstanceId": "i-ctx1"}]}]}
         )
 
-        with patch.object(handler, "_retry_with_backoff", side_effect=lambda fn, **kw: fn(**{k: v for k, v in kw.items() if k != "operation_type"})):
+        with patch.object(
+            handler,
+            "_retry_with_backoff",
+            side_effect=lambda fn, **kw: fn(
+                **{k: v for k, v in kw.items() if k != "operation_type"}
+            ),
+        ):
             with patch.object(handler, "_get_instance_details", return_value=[]) as mock_details:
                 handler._get_asg_instances("asg-ctx", request_id="req-ctx", resource_id="asg-ctx")
 

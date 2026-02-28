@@ -100,9 +100,7 @@ class BaseConfigBuilder(ABC):
         """Return the provider API key used for native spec lookup (e.g. 'asg')."""
 
     @abstractmethod
-    def _prepare_template_context(
-        self, template: AWSTemplate, request: Request
-    ) -> dict[str, Any]:
+    def _prepare_template_context(self, template: AWSTemplate, request: Request) -> dict[str, Any]:
         """Build the context dict passed to the native spec renderer."""
 
     @abstractmethod

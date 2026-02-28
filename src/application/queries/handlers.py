@@ -34,9 +34,11 @@ if TYPE_CHECKING:
     pass
 from application.ports.command_bus_port import CommandBusPort
 from application.ports.template_dto_port import TemplateDTOPort
-from infrastructure.template.dtos import TemplateDTO  # noqa: PLC0415 — infrastructure DTO used at application boundary
 from domain.template.factory import TemplateFactory, get_default_template_factory
 from domain.template.template_aggregate import Template
+from infrastructure.template.dtos import (
+    TemplateDTO,  # noqa: PLC0415 — infrastructure DTO used at application boundary
+)
 
 T = TypeVar("T")
 
@@ -293,7 +295,9 @@ class ListReturnRequestsHandler(BaseQueryHandler[ListReturnRequestsQuery, list[R
                     filtered = []
                     for dto in request_dtos:
                         dto_dict = dto.model_dump()
-                        machines = dto_dict.get("machines") or dto_dict.get("machine_references") or []
+                        machines = (
+                            dto_dict.get("machines") or dto_dict.get("machine_references") or []
+                        )
                         names = {
                             m.get("name") or m.get("machine_id") or m.get("instance_id")
                             for m in machines

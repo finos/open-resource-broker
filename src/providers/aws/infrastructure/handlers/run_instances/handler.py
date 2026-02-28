@@ -37,16 +37,16 @@ from domain.request.aggregate import Request
 from domain.template.template_aggregate import Template
 from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from infrastructure.error.decorators import handle_infrastructure_exceptions
-from providers.aws.infrastructure.tags import build_system_tags, merge_tags
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from providers.aws.infrastructure.aws_client import AWSClient
-from providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
 from providers.aws.infrastructure.handlers.base_handler import AWSHandler
+from providers.aws.infrastructure.handlers.shared.base_context_mixin import BaseContextMixin
 from providers.aws.infrastructure.launch_template.manager import (
     AWSLaunchTemplateManager,
 )
+from providers.aws.infrastructure.tags import build_system_tags, merge_tags
 from providers.aws.utilities.aws_operations import AWSOperations
 
 
@@ -186,7 +186,9 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
 
         return response
 
-    def _resolve_provider_api(self, request: Request, aws_template: Optional[AWSTemplate] = None) -> str:
+    def _resolve_provider_api(
+        self, request: Request, aws_template: Optional[AWSTemplate] = None
+    ) -> str:
         """Resolve the provider_api value to stamp onto instance data."""
         if aws_template and aws_template.provider_api is not None:
             return (
@@ -422,7 +424,9 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 resource_id=resource_id,
             )
 
-            return self._format_instance_data(instance_details, resource_id, self._resolve_provider_api(request))
+            return self._format_instance_data(
+                instance_details, resource_id, self._resolve_provider_api(request)
+            )
 
         except Exception as e:
             self._logger.error("Unexpected error checking RunInstances status: %s", str(e))
@@ -519,7 +523,9 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                     resource_id=reservation_id,
                 )
                 formatted_instances.extend(
-                    self._format_instance_data(detailed_instances, reservation_id, self._resolve_provider_api(request))
+                    self._format_instance_data(
+                        detailed_instances, reservation_id, self._resolve_provider_api(request)
+                    )
                 )
 
             return formatted_instances

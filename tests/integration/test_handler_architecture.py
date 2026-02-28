@@ -417,9 +417,6 @@ def test_performance_metrics():
     """Test that handlers support performance metrics."""
     try:
         from providers.aws.infrastructure.handlers.base_handler import AWSHandler
-        from providers.aws.infrastructure.handlers.spot_fleet.handler import (
-            SpotFleetHandler,
-        )
 
         print("   Checking performance metrics support...")
 

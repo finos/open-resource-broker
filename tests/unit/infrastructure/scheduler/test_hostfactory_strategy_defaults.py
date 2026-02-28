@@ -47,8 +47,10 @@ class TestMapTemplateFieldsCallsApplyTemplateDefaults:
     def test_apply_template_defaults_not_called_when_service_none(self):
         self.strategy._template_defaults_service = cast(None, None)
 
-        with patch("infrastructure.di.container.is_container_ready", return_value=False), \
-             patch.object(self.strategy, "_get_provider_name", return_value="test-provider"):
+        with (
+            patch("infrastructure.di.container.is_container_ready", return_value=False),
+            patch.object(self.strategy, "_get_provider_name", return_value="test-provider"),
+        ):
             result = self.strategy._map_template_fields(self._minimal_template(), None)
 
         # Should complete without error and return a dict
@@ -81,7 +83,9 @@ class TestHFFormatRequestResponseUsesCoerceAndUnwrap:
         self.strategy = make_strategy()
 
     def test_dict_input_pending(self):
-        result = self.strategy.format_request_response({"request_id": "req-hf-1", "status": "pending"})
+        result = self.strategy.format_request_response(
+            {"request_id": "req-hf-1", "status": "pending"}
+        )
         assert result.get("requestId") == "req-hf-1"
         assert "message" in result
 
@@ -110,17 +114,23 @@ class TestHFFormatRequestResponseUsesCoerceAndUnwrap:
         assert result.get("requestId") == "req-hf-obj"
 
     def test_failed_status(self):
-        result = self.strategy.format_request_response({"request_id": "req-hf-4", "status": "failed"})
+        result = self.strategy.format_request_response(
+            {"request_id": "req-hf-4", "status": "failed"}
+        )
         assert "message" in result
         assert "failed" in result["message"].lower()
 
     def test_cancelled_status(self):
-        result = self.strategy.format_request_response({"request_id": "req-hf-5", "status": "cancelled"})
+        result = self.strategy.format_request_response(
+            {"request_id": "req-hf-5", "status": "cancelled"}
+        )
         assert "message" in result
         assert "cancelled" in result["message"].lower()
 
     def test_complete_status(self):
-        result = self.strategy.format_request_response({"request_id": "req-hf-6", "status": "complete"})
+        result = self.strategy.format_request_response(
+            {"request_id": "req-hf-6", "status": "complete"}
+        )
         assert result.get("requestId") == "req-hf-6"
         assert "completed" in result["message"].lower()
 

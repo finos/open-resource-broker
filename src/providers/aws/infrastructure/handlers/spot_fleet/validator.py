@@ -13,7 +13,9 @@ from providers.aws.utilities.aws_operations import AWSOperations
 class SpotFleetValidator:
     """Validates Spot Fleet prerequisites before fleet creation."""
 
-    def __init__(self, aws_client: AWSClient, logger: LoggingPort, aws_ops: AWSOperations = None) -> None:  # type: ignore[assignment]
+    def __init__(
+        self, aws_client: AWSClient, logger: LoggingPort, aws_ops: AWSOperations = None
+    ) -> None:  # type: ignore[assignment]
         self._aws_client = aws_client
         self._logger = logger
         self._aws_ops = aws_ops
@@ -70,10 +72,7 @@ class SpotFleetValidator:
         if (
             hasattr(template, "price_type")
             and template.price_type == "heterogeneous"
-            and (
-                not hasattr(template, "percent_on_demand")
-                or template.percent_on_demand is None
-            )
+            and (not hasattr(template, "percent_on_demand") or template.percent_on_demand is None)
         ):
             errors.append("percent_on_demand is required for heterogeneous price type")
 

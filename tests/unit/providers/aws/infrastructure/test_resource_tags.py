@@ -1,8 +1,6 @@
 """Tests verifying consistent orb: tag application across all AWS resource creation paths."""
 
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from providers.aws.domain.template.value_objects import AWSFleetType
 from providers.aws.infrastructure.handlers.asg.handler import ASGHandler
@@ -62,6 +60,7 @@ def _make_config_port(prefix=""):
 # tags.py unit tests
 # ---------------------------------------------------------------------------
 
+
 class TestBuildSystemTags:
     def test_returns_all_five_orb_keys(self):
         tags = build_system_tags("req-1", "tmpl-1", "ASG")
@@ -69,7 +68,9 @@ class TestBuildSystemTags:
         assert keys == ORB_SYSTEM_KEYS
 
     def test_values_are_set_correctly(self):
-        tags = build_system_tags("req-1", "tmpl-1", "SpotFleet", created_at="2026-01-01T00:00:00+00:00")
+        tags = build_system_tags(
+            "req-1", "tmpl-1", "SpotFleet", created_at="2026-01-01T00:00:00+00:00"
+        )
         d = _tag_dict(tags)
         assert d["orb:managed-by"] == "open-resource-broker"
         assert d["orb:request-id"] == "req-1"
@@ -108,6 +109,7 @@ class TestMergeTags:
 # ---------------------------------------------------------------------------
 # ASG handler tag tests
 # ---------------------------------------------------------------------------
+
 
 class TestASGHandlerTags:
     def _make_handler(self):
@@ -194,6 +196,7 @@ class TestASGHandlerTags:
 # EC2Fleet handler tag tests
 # ---------------------------------------------------------------------------
 
+
 class TestEC2FleetHandlerTags:
     def _make_handler(self):
         handler = EC2FleetHandler(
@@ -225,7 +228,9 @@ class TestEC2FleetHandlerTags:
         handler = self._make_handler()
         config = self._call_legacy(handler)
         fleet_spec = next(s for s in config["TagSpecifications"] if s["ResourceType"] == "fleet")
-        provider_api = next(t["Value"] for t in fleet_spec["Tags"] if t["Key"] == "orb:provider-api")
+        provider_api = next(
+            t["Value"] for t in fleet_spec["Tags"] if t["Key"] == "orb:provider-api"
+        )
         assert provider_api == "EC2Fleet"
 
     def test_instance_tags_present_for_maintain(self):
@@ -257,6 +262,7 @@ class TestEC2FleetHandlerTags:
 # ---------------------------------------------------------------------------
 # SpotFleet handler tag tests
 # ---------------------------------------------------------------------------
+
 
 class TestSpotFleetHandlerTags:
     def _make_handler(self):
@@ -316,6 +322,7 @@ class TestSpotFleetHandlerTags:
 # ---------------------------------------------------------------------------
 # LaunchTemplate manager tag tests
 # ---------------------------------------------------------------------------
+
 
 class TestLaunchTemplateManagerTags:
     def _make_manager(self):

@@ -124,7 +124,9 @@ def build_spot_fleet_overrides(
                     if spot_price_str:
                         override["SpotPrice"] = spot_price_str
                     overrides.append(override)
-                for idx, (instance_type, weight) in enumerate(_sorted_types(machine_types_ondemand)):
+                for idx, (instance_type, weight) in enumerate(
+                    _sorted_types(machine_types_ondemand)
+                ):
                     overrides.append(
                         {
                             "SubnetId": subnet_id,

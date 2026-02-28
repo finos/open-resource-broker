@@ -1,7 +1,5 @@
 """Integration tests for provider strategy system."""
 
-import pytest
-
 from config.managers.type_converter import ConfigTypeConverter
 from providers.aws.configuration.config import AWSProviderConfig
 
