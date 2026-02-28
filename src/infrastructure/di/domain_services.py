@@ -78,9 +78,10 @@ def register_domain_services(container: DIContainer) -> None:
 
     # ASG metadata service (SRP refactoring)
     def create_asg_metadata_service(c):
+        from domain.base.ports.asg_query_port import ASGQueryPort
         return ASGMetadataService(
             uow_factory=c.get(UnitOfWorkFactory),
-            container=c.get(ContainerPort),
+            asg_query_port=c.get(ASGQueryPort),
             logger=c.get(LoggingPort),
         )
 

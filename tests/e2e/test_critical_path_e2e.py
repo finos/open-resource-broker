@@ -363,13 +363,13 @@ class TestTemplateManagement:
     def test_list_templates_returns_templates(self, client: TestClient):
         """GET /api/v1/templates/ returns available templates."""
         mock_template = Mock()
-        mock_template.model_dump = Mock(
-            return_value={
-                "template_id": "tpl-001",
-                "name": "test-template",
-                "provider_api": "ec2_fleet",
-            }
-        )
+        template_data = {
+            "template_id": "tpl-001",
+            "name": "test-template",
+            "provider_api": "ec2_fleet",
+        }
+        mock_template.to_dict = Mock(return_value=template_data)
+        mock_template.model_dump = Mock(return_value=template_data)
 
         query_bus = _make_query_bus(return_value=[mock_template])
         container = _make_container(query_bus=query_bus)
@@ -385,9 +385,9 @@ class TestTemplateManagement:
     def test_get_template_by_id_returns_template(self, client: TestClient):
         """GET /api/v1/templates/{id} returns the template."""
         mock_template = Mock()
-        mock_template.model_dump = Mock(
-            return_value={"template_id": "tpl-001", "name": "test-template"}
-        )
+        template_data = {"template_id": "tpl-001", "name": "test-template"}
+        mock_template.to_dict = Mock(return_value=template_data)
+        mock_template.model_dump = Mock(return_value=template_data)
 
         query_bus = _make_query_bus(return_value=mock_template)
         container = _make_container(query_bus=query_bus)
@@ -524,9 +524,9 @@ class TestTemplateManagement:
 
         # Step 2: retrieve
         mock_template = Mock()
-        mock_template.model_dump = Mock(
-            return_value={"template_id": "tpl-flow-001", "provider_api": "ec2_fleet"}
-        )
+        flow_data = {"template_id": "tpl-flow-001", "provider_api": "ec2_fleet"}
+        mock_template.to_dict = Mock(return_value=flow_data)
+        mock_template.model_dump = Mock(return_value=flow_data)
         query_bus = _make_query_bus(return_value=mock_template)
         container2 = _make_container(query_bus=query_bus)
 
@@ -539,7 +539,9 @@ class TestTemplateManagement:
     def test_template_refresh_returns_count(self, client: TestClient):
         """POST /api/v1/templates/refresh returns refreshed template count."""
         mock_template = Mock()
-        mock_template.model_dump = Mock(return_value={"template_id": "tpl-001"})
+        refresh_data = {"template_id": "tpl-001"}
+        mock_template.to_dict = Mock(return_value=refresh_data)
+        mock_template.model_dump = Mock(return_value=refresh_data)
         query_bus = _make_query_bus(return_value=[mock_template])
         container = _make_container(query_bus=query_bus)
 
@@ -554,9 +556,9 @@ class TestTemplateManagement:
     def test_list_templates_with_provider_api_filter(self, client: TestClient):
         """GET /api/v1/templates/?provider_api=ec2_fleet passes filter to query bus."""
         mock_template = Mock()
-        mock_template.model_dump = Mock(
-            return_value={"template_id": "tpl-ec2", "provider_api": "ec2_fleet"}
-        )
+        ec2_data = {"template_id": "tpl-ec2", "provider_api": "ec2_fleet"}
+        mock_template.to_dict = Mock(return_value=ec2_data)
+        mock_template.model_dump = Mock(return_value=ec2_data)
         query_bus = _make_query_bus(return_value=[mock_template])
         container = _make_container(query_bus=query_bus)
 
@@ -592,14 +594,14 @@ class TestTemplateManagement:
 
         # Step 2: validate template exists via GET
         mock_template = Mock()
-        mock_template.model_dump = Mock(
-            return_value={
-                "template_id": template_id,
-                "name": "lifecycle-template",
-                "provider_api": "ec2_fleet",
-                "image_id": "ami-12345678",
-            }
-        )
+        get_data = {
+            "template_id": template_id,
+            "name": "lifecycle-template",
+            "provider_api": "ec2_fleet",
+            "image_id": "ami-12345678",
+        }
+        mock_template.to_dict = Mock(return_value=get_data)
+        mock_template.model_dump = Mock(return_value=get_data)
         query_bus = _make_query_bus(return_value=mock_template)
         container2 = _make_container(query_bus=query_bus)
 

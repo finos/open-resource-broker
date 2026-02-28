@@ -23,9 +23,8 @@ def _register_application_services(container: DIContainer) -> None:
     from infrastructure.di.buses import CommandBus
     from providers.registry import get_provider_registry
 
-    # Enhanced provider registry service - lazy initialization
     def create_provider_registry_service(c):
-        registry = get_provider_registry()  # This is safe - no DI dependencies
+        registry = get_provider_registry()
         validation_service = c.get(TemplateValidationDomainService)
         logger = c.get(LoggingPort)
         return ProviderRegistryService(registry, validation_service, logger)

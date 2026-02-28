@@ -11,7 +11,8 @@ from application.dto.template_generation_dto import (
     TemplateGenerationRequest,
     TemplateGenerationResult,
 )
-from domain.base.ports import ConfigurationPort, ContainerPort, LoggingPort, SchedulerPort
+from domain.base.ports import ConfigurationPort, LoggingPort, SchedulerPort
+from domain.base.ports.template_example_generator_port import TemplateExampleGeneratorPort
 from domain.base.utils import extract_provider_type
 
 
@@ -29,13 +30,13 @@ class TemplateGenerationService:
         scheduler_strategy: SchedulerPort,
         logger: LoggingPort,
         provider_registry_service: "ProviderRegistryService",
-        container: ContainerPort,
+        template_example_generator: TemplateExampleGeneratorPort,
     ):
         self._config_manager = config_manager
         self._scheduler_strategy = scheduler_strategy
         self._logger = logger
         self._provider_registry_service = provider_registry_service
-        self._container = container
+        self._template_example_generator = template_example_generator
 
     async def generate_templates(
         self, request: TemplateGenerationRequest
@@ -167,33 +168,14 @@ class TemplateGenerationService:
             )
             raise ValueError(error_msg)
 
-        # For AWS provider, use the existing handler factory
-        if provider_type == "aws":
-            from providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
+        # Generate example templates via injected port
+        example_templates = self._template_example_generator.generate_example_templates(
+            provider_type, provider_name, provider_api
+        )
+        if not example_templates:
+            raise ValueError(f"No example templates generated for provider: {provider_name}")
 
-            handler_factory = self._container.get(AWSHandlerFactory)
-            if not handler_factory:
-                raise ValueError(f"AWSHandlerFactory not available for provider: {provider_name}")
-
-            # Generate example templates
-            example_templates = handler_factory.generate_example_templates()
-            if not example_templates:
-                raise ValueError(f"No example templates generated for provider: {provider_name}")
-
-            # Filter by provider_api if specified
-            if provider_api:
-                example_templates = [
-                    template
-                    for template in example_templates
-                    if template.provider_api == provider_api
-                ]
-                if not example_templates:
-                    raise ValueError(f"No templates found for provider API: {provider_api}")
-
-            return example_templates  # type: ignore[return-value]
-        else:
-            # For other providers, return empty list for now
-            return []
+        return example_templates  # type: ignore[return-value]
 
     def _determine_filename(
         self, provider: Dict[str, str], request: TemplateGenerationRequest

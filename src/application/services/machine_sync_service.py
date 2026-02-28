@@ -57,7 +57,7 @@ class MachineSyncService:
         """Fetch machines from provider."""
         try:
             from domain.base.ports.configuration_port import ConfigurationPort
-            from providers.base.strategy import ProviderOperation, ProviderOperationType
+            from domain.base.operations import Operation as ProviderOperation, OperationType as ProviderOperationType
 
             # Use resource-level discovery when available (handles scaling/replacement)
             if request.resource_ids:

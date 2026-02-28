@@ -236,7 +236,7 @@ class ConvertMachineStatusQueryHandler(BaseQueryHandler[ConvertMachineStatusQuer
 
     async def execute_query(self, query: ConvertMachineStatusQuery) -> dict[str, str]:
         """Return the domain status for the given provider state."""
-        from providers.base.strategy import ProviderOperation, ProviderOperationType
+        from domain.base.operations import Operation as ProviderOperation, OperationType as ProviderOperationType
 
         operation = ProviderOperation(
             operation_type=ProviderOperationType.GET_INSTANCE_STATUS,
@@ -272,7 +272,7 @@ class ConvertBatchMachineStatusQueryHandler(BaseQueryHandler[ConvertBatchMachine
 
     async def execute_query(self, query: ConvertBatchMachineStatusQuery) -> dict:
         """Return domain statuses for all provider states in the batch."""
-        from providers.base.strategy import ProviderOperation, ProviderOperationType
+        from domain.base.operations import Operation as ProviderOperation, OperationType as ProviderOperationType
         from domain.machine.value_objects import MachineStatus
 
         statuses = []
@@ -308,7 +308,7 @@ class ValidateProviderStateQueryHandler(BaseQueryHandler[ValidateProviderStateQu
 
     async def execute_query(self, query: ValidateProviderStateQuery) -> dict:
         """Return whether the provider state is valid."""
-        from providers.base.strategy import ProviderOperation, ProviderOperationType
+        from domain.base.operations import Operation as ProviderOperation, OperationType as ProviderOperationType
         from domain.machine.value_objects import MachineStatus
 
         try:

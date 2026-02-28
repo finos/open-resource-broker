@@ -155,7 +155,7 @@ class DeprovisioningOrchestrator:
             self.logger.info("Using %s handler for resource %s", provider_api, resource_id)
 
             # Create operation using machine's actual provider context
-            from providers.base.strategy import ProviderOperation, ProviderOperationType
+            from domain.base.operations import Operation as ProviderOperation, OperationType as ProviderOperationType
 
             operation = ProviderOperation(
                 operation_type=ProviderOperationType.TERMINATE_INSTANCES,

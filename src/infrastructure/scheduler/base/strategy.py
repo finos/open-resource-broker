@@ -60,6 +60,8 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
     def _get_provider_name(self) -> str:
         """Get the active provider instance name."""
         try:
+            if self._provider_registry_service is None:
+                return "default"
             selection_result = self._provider_registry_service.select_active_provider()
             return selection_result.provider_name
         except Exception as e:
@@ -69,6 +71,8 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
     def _get_active_provider_type(self) -> str:
         """Get the active provider type."""
         try:
+            if self._provider_registry_service is None:
+                return "aws"
             selection_result = self._provider_registry_service.select_active_provider()
             provider_type = selection_result.provider_type
             self.logger.debug("Active provider type: %s", provider_type)

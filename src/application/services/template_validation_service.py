@@ -3,7 +3,7 @@
 from domain.base.ports.logging_port import LoggingPort
 from domain.services.template_validation_domain_service import TemplateValidationDomainService
 from domain.template.template_aggregate import Template
-from providers.results import ValidationResult
+from domain.base.results import ValidationResult
 
 
 class TemplateValidationService:

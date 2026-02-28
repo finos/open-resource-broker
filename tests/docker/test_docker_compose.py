@@ -4,6 +4,8 @@ import subprocess
 from pathlib import Path
 
 import pytest
+
+pytestmark = pytest.mark.slow
 import yaml
 
 

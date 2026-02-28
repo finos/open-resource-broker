@@ -90,7 +90,7 @@ class ProviderCommandFactory:
         **kwargs: Any,
     ) -> ExecuteProviderOperationCommand:
         """Create command to execute provider operation."""
-        from providers.base.strategy import ProviderOperation, ProviderOperationType
+        from domain.base.operations import Operation as ProviderOperation, OperationType as ProviderOperationType
 
         # Parse params if provided
         parsed_params = {}

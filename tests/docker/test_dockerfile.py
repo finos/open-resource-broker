@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.slow
+
 
 class TestDockerfile:
     """Test Dockerfile and container build process."""

@@ -20,12 +20,6 @@ from domain.base.events.provider_events import (
     ProviderStrategySelectedEvent,
 )
 from domain.base.ports import ContainerPort, ErrorHandlingPort, EventPublisherPort, LoggingPort
-from providers.base.strategy import (
-    ProviderOperation,
-    SelectionPolicy,
-    SelectorFactory,
-)
-
 
 @command_handler(SelectProviderStrategyCommand)  # type: ignore[arg-type]
 class SelectProviderStrategyHandler(BaseCommandHandler[SelectProviderStrategyCommand, None]):
@@ -57,42 +51,30 @@ class SelectProviderStrategyHandler(BaseCommandHandler[SelectProviderStrategyCom
         """Handle provider strategy selection. Result stored in command.result."""
         self.logger.info("Selecting provider strategy for operation: %s", command.operation_type)
         try:
-            selector = SelectorFactory.create_selector(SelectionPolicy.CAPABILITY_BASED, self.logger)
             available_strategies = self._provider_registry_service.get_available_strategies()
             if not available_strategies:
                 raise ValueError("No provider strategies available")
 
-            from providers.base.strategy import SelectionCriteria
-
-            operation = ProviderOperation(operation_type=command.operation_type, parameters={})
-            criteria = SelectionCriteria()
-            strategies_dict: dict[str, Any] = (
-                available_strategies
-                if isinstance(available_strategies, dict)
-                else {str(i): s for i, s in enumerate(available_strategies)}
-            )
-            selection_result = selector.select_strategy(
-                strategies_dict, {}, operation, criteria  # type: ignore[arg-type]
-            )
-            if not selection_result.selected_strategy:
+            selected = available_strategies[0] if available_strategies else None
+            if not selected:
                 raise ValueError("No suitable provider strategy found")
 
             event = ProviderStrategySelectedEvent(
-                strategy_name=str(selection_result.selected_strategy),
+                strategy_name=str(selected),
                 operation_type=str(command.operation_type),
                 selection_criteria=None,
-                selection_reason=selection_result.selection_reason,
+                selection_reason="first_available",
                 aggregate_id=str(command.operation_type),
                 aggregate_type="provider_strategy",
             )
             if self.event_publisher:
                 self.event_publisher.publish(event)
 
-            self.logger.info("Selected strategy: %s", selection_result.selected_strategy)
+            self.logger.info("Selected strategy: %s", selected)
             command.result = {
-                "selected_strategy": str(selection_result.selected_strategy),
-                "selection_reason": selection_result.selection_reason,
-                "alternatives": [str(s) for s in (selection_result.alternatives or [])],
+                "selected_strategy": str(selected),
+                "selection_reason": "first_available",
+                "alternatives": [str(s) for s in available_strategies[1:]],
             }
         except Exception as e:
             self.logger.error("Failed to select provider strategy: %s", str(e))
@@ -262,8 +244,9 @@ class UpdateProviderHealthHandler(BaseCommandHandler[UpdateProviderHealthCommand
         self.logger.debug("Updating health for provider: %s", command.provider_name)
         try:
             old_status = self._provider_registry_service.check_strategy_health(command.provider_name)
-            new_is_healthy = command.health_status.is_healthy if hasattr(command.health_status, "is_healthy") else False
-            if old_status is None or old_status.is_healthy != new_is_healthy:
+            new_is_healthy = command.health_status.get("is_healthy", False) if isinstance(command.health_status, dict) else getattr(command.health_status, "is_healthy", False)
+            old_is_healthy = old_status.get("is_healthy") if isinstance(old_status, dict) else getattr(old_status, "is_healthy", None)
+            if old_status is None or old_is_healthy != new_is_healthy:
                 event = ProviderHealthChangedEvent(
                     provider_name=command.provider_name,
                     old_status=str(old_status) if old_status is not None else None,
@@ -282,7 +265,7 @@ class UpdateProviderHealthHandler(BaseCommandHandler[UpdateProviderHealthCommand
                 )
             command.result = {
                 "provider_name": command.provider_name,
-                "health_status": command.health_status.model_dump() if hasattr(command.health_status, "model_dump") else str(command.health_status),
+                "health_status": command.health_status if isinstance(command.health_status, dict) else command.health_status.model_dump() if hasattr(command.health_status, "model_dump") else str(command.health_status),
                 "updated_at": command.timestamp or time.strftime("%Y-%m-%d %H:%M:%S"),
             }
         except Exception as e:

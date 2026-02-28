@@ -5,7 +5,7 @@ from domain.base.ports import LoggingPort
 from domain.request.aggregate import Request
 from domain.request.value_objects import RequestType
 from domain.template.template_aggregate import Template
-from providers.results import ProviderSelectionResult
+from domain.base.results import ProviderSelectionResult
 
 
 class RequestCreationService:

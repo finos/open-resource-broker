@@ -49,13 +49,14 @@ def _register_template_services(container: DIContainer):
             TemplateGenerationService,
         )
         from domain.base.ports.scheduler_port import SchedulerPort
+        from domain.base.ports.template_example_generator_port import TemplateExampleGeneratorPort
 
         return TemplateGenerationService(
             config_manager=c.get(ConfigurationPort),
             scheduler_strategy=c.get(SchedulerPort),
             logger=c.get(LoggingPort),
             provider_registry_service=c.get(ProviderRegistryService),
-            container=c,
+            template_example_generator=c.get(TemplateExampleGeneratorPort),
         )
 
     from application.services.template_generation_service import TemplateGenerationService

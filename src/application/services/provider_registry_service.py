@@ -25,46 +25,38 @@ class ProviderRegistryService:
     def select_provider_for_template(
         self, template: Template, provider_name: str | None = None
     ) -> ProviderSelectionResult:
-        """Select provider instance for template requirements."""
         return self._registry.select_provider_for_template(template, provider_name, self._logger)
 
     def select_active_provider(self) -> ProviderSelectionResult:
-        """Select active provider instance from configuration."""
         return self._registry.select_active_provider(self._logger)
 
     def validate_template_requirements(
         self, template: Template, provider_instance: str
     ) -> ValidationResult:
-        """Validate template requirements against provider capabilities."""
         return self._validation_service.validate_template_requirements(template, provider_instance)
 
     async def execute_operation(self, provider_id: str, operation: Any) -> Any:
-        """Execute operation using provider strategy."""
         strategy = self._registry.get_or_create_strategy(provider_id)
         if strategy is None:
             raise ValueError(f"No strategy found for provider: {provider_id}")
         return await strategy.execute_operation(operation)
 
     def get_strategy_capabilities(self, provider_id: str) -> Any:
-        """Get capabilities of provider strategy."""
         strategy = self._registry.get_or_create_strategy(provider_id)
         if strategy is None:
             return None
         return strategy.get_capabilities()
 
     def get_available_strategies(self) -> list[str]:
-        """Get list of available provider strategies."""
         return (
             self._registry.get_registered_providers()
             + self._registry.get_registered_provider_instances()
         )
 
     def register_provider_strategy(self, provider_type: str, config: Any = None) -> bool:
-        """Register a provider strategy."""
         return self._registry.ensure_provider_type_registered(provider_type)
 
     def check_strategy_health(self, provider_id: str) -> Any:
-        """Check health of provider strategy."""
         strategy = self._registry.get_or_create_strategy(provider_id)
         if strategy is None:
             return None

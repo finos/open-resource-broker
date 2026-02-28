@@ -17,6 +17,7 @@ from domain.base.ports import (
     LoggingPort,
     ProviderSelectionPort,
 )
+from domain.base.ports.asg_query_port import ASGQueryPort
 
 
 @command_handler(PopulateMachineIdsCommand)  # type: ignore[arg-type]
@@ -61,7 +62,7 @@ class PopulateMachineIdsHandler(BaseCommandHandler[PopulateMachineIdsCommand, No
     async def _discover_machine_ids(self, request) -> list[str]:
         """Discover machine IDs from provider resources."""
         try:
-            from providers.base.strategy import ProviderOperation, ProviderOperationType
+            from domain.base.operations import Operation as ProviderOperation, OperationType as ProviderOperationType
 
             if not request.resource_ids:
                 return []
@@ -119,6 +120,7 @@ class SyncRequestHandler(BaseCommandHandler[SyncRequestCommand, None]):  # type:
         container: ContainerPort,
         event_publisher: EventPublisherPort,
         error_handler: ErrorHandlingPort,
+        asg_query_port: ASGQueryPort,
     ) -> None:
         super().__init__(logger, event_publisher, error_handler)
         self.uow_factory = uow_factory
@@ -126,7 +128,7 @@ class SyncRequestHandler(BaseCommandHandler[SyncRequestCommand, None]):  # type:
 
         from application.services.asg_metadata_service import ASGMetadataService
 
-        self._asg_metadata_service = ASGMetadataService(uow_factory, container, logger)
+        self._asg_metadata_service = ASGMetadataService(uow_factory, asg_query_port, logger)
 
     async def execute_command(self, command: SyncRequestCommand) -> None:
         """Execute sync request command."""

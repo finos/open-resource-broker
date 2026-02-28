@@ -10,7 +10,8 @@ from datetime import datetime
 from typing import Any
 
 from domain.base import UnitOfWorkFactory
-from domain.base.ports import ContainerPort, LoggingPort
+from domain.base.ports import LoggingPort
+from domain.base.ports.asg_query_port import ASGQueryPort
 
 
 class ASGMetadataService:
@@ -19,18 +20,11 @@ class ASGMetadataService:
     def __init__(
         self,
         uow_factory: UnitOfWorkFactory,
-        container: ContainerPort,
+        asg_query_port: ASGQueryPort,
         logger: LoggingPort,
     ) -> None:
-        """Initialize the service.
-
-        Args:
-            uow_factory: Factory for creating unit of work instances
-            container: DI container for service resolution
-            logger: Logging port for structured logging
-        """
         self.uow_factory = uow_factory
-        self._container = container
+        self._asg_query_port = asg_query_port
         self.logger = logger
 
     async def update_asg_metadata_if_needed(self, request: Any, machines: list[Any]) -> None:
@@ -122,15 +116,11 @@ class ASGMetadataService:
             Dictionary with ASG details, or empty dict if not found
         """
         try:
-            from providers.aws.infrastructure.adapters.aws_client import (  # type: ignore
-                AWSClient,  # type: ignore[import]
-            )
-
-            aws_client = self._container.get(AWSClient)
-
-            response = aws_client.autoscaling_client.describe_auto_scaling_groups(
-                AutoScalingGroupNames=[asg_name]
-            )
+            response_dict = await self._asg_query_port.get_asg_details(asg_name)
+            if not response_dict:
+                return {}
+            # Wrap in describe_auto_scaling_groups response format for compatibility
+            response = {"AutoScalingGroups": [response_dict]}
 
             if response.get("AutoScalingGroups"):
                 return response["AutoScalingGroups"][0]
