@@ -132,10 +132,13 @@ class SpotFleetReleaseManager:
             Spot Fleet request ID if found, None otherwise.
         """
         try:
-            fleets = self._paginate(
-                self._aws_client.ec2_client.describe_spot_fleet_requests,
-                "SpotFleetRequestConfigs",
-                SpotFleetRequestStates=["active", "modifying"],
+            fleets = self._retry(
+                lambda: self._paginate(
+                    self._aws_client.ec2_client.describe_spot_fleet_requests,
+                    "SpotFleetRequestConfigs",
+                    SpotFleetRequestStates=["active", "modifying"],
+                ),
+                operation_type="read_only",
             )
 
             for fleet in fleets:
@@ -144,10 +147,13 @@ class SpotFleetReleaseManager:
                     continue
 
                 try:
-                    fleet_instances = self._paginate(
-                        self._aws_client.ec2_client.describe_spot_fleet_instances,
-                        "ActiveInstances",
-                        SpotFleetRequestId=fleet_id,
+                    fleet_instances = self._retry(
+                        lambda fid=fleet_id: self._paginate(
+                            self._aws_client.ec2_client.describe_spot_fleet_instances,
+                            "ActiveInstances",
+                            SpotFleetRequestId=fid,
+                        ),
+                        operation_type="read_only",
                     )
                     for instance in fleet_instances:
                         if instance.get("InstanceId") == instance_id:

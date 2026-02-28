@@ -104,7 +104,7 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
         if price_type == "ondemand":
             on_demand_count = requested_count
             spot_count = 0
-        elif price_type == "heterogeneous" and percent_on_demand is not None:
+        elif percent_on_demand is not None and percent_on_demand > 0:
             on_demand_count = max(1, int(requested_count * percent_on_demand / 100))
             spot_count = requested_count - on_demand_count
         else:

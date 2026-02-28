@@ -177,12 +177,18 @@ class AWSHandler(ABC):
         return result
 
     @abstractmethod
-    def release_hosts(self, request: Request) -> None:
+    def release_hosts(
+        self,
+        machine_ids: list[str],
+        resource_mapping: Optional[dict[str, tuple[Optional[str], int]]] = None,
+    ) -> None:
         """
-        Release hosts associated with a request.
+        Release hosts by instance ID.
 
         Args:
-            request: The request containing hosts to release
+            machine_ids: List of instance IDs to terminate
+            resource_mapping: Optional mapping of instance_id to (resource_id, desired_capacity)
+                              for intelligent resource management (e.g. ASG/fleet capacity reduction)
 
         Raises:
             AWSEntityNotFoundError: If the AWS resource is not found

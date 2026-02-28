@@ -97,7 +97,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             aws_native_spec_service=aws_native_spec_service,
             config_port=config_port,
         )
-        self._spot_fleet_validator = spot_fleet_validator or SpotFleetValidator(aws_client, logger)
+        self._spot_fleet_validator = spot_fleet_validator or SpotFleetValidator(aws_client, logger, aws_ops)
         self._config_builder = config_builder or SpotFleetConfigBuilder(
             aws_native_spec_service, config_port, logger
         )
@@ -154,6 +154,9 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             request.set_launch_template_info(  # type: ignore[attr-defined]
                 launch_template_result.template_id, launch_template_result.version
             )
+
+        # Resolve fleet role ARNs before building config (requires STS, lives on handler)
+        aws_template = self._resolve_fleet_role(aws_template)
 
         # Create spot fleet configuration
         fleet_config = self._config_builder.build(
@@ -285,7 +288,7 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         metadata = getattr(request, "metadata", {}) or {}
         return metadata.get("provider_api", "SpotFleet")
 
-    def release_hosts(  # type: ignore[override]
+    def release_hosts(
         self,
         machine_ids: list[str],
         resource_mapping: Optional[dict[str, tuple[Optional[str], int]]] = None,

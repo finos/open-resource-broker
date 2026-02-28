@@ -107,12 +107,12 @@ class TestContextFieldSupport:
         handler = ASGHandler(Mock(), Mock(), Mock(), Mock(), config_port=mock_config_port)
 
         # Test _create_asg_config method
-        config = handler._create_asg_config(
+        config = handler._config_builder.build(
             asg_name="test-asg",
-            aws_template=template,
+            template=template,
             request=request,
-            launch_template_id="lt-456",
-            launch_template_version="2",
+            lt_id="lt-456",
+            lt_version="2",
         )
 
         # Assert Context field is included
@@ -149,11 +149,11 @@ class TestContextFieldSupport:
         handler = SpotFleetHandler(aws_client, Mock(), Mock(), Mock(), config_port=Mock())
 
         # Test _create_spot_fleet_config method
-        config = handler._create_spot_fleet_config(
+        config = handler._config_builder.build(
             template=template,
             request=request,
-            launch_template_id="lt-789",
-            launch_template_version="3",
+            lt_id="lt-789",
+            lt_version="3",
         )
 
         # Assert Context field is included
@@ -192,11 +192,11 @@ class TestContextFieldSupport:
         handler = SpotFleetHandler(aws_client, Mock(), Mock(), Mock(), config_port=Mock())
         handler.aws_native_spec_service = None
 
-        config = handler._create_spot_fleet_config(
+        config = handler._config_builder.build(
             template=template,
             request=request,
-            launch_template_id="lt-123",
-            launch_template_version="1",
+            lt_id="lt-123",
+            lt_version="1",
         )
 
         assert config["OnDemandTargetCapacity"] == 2
@@ -1293,11 +1293,11 @@ class TestSpotFleetHandler:
         handler = SpotFleetHandler(aws_client, Mock(), Mock(), Mock(), config_port=Mock())
         handler.aws_native_spec_service = None
 
-        config = handler._create_spot_fleet_config(
+        config = handler._config_builder.build(
             template=template,
             request=request,
-            launch_template_id="lt-spot-maintain",
-            launch_template_version="1",
+            lt_id="lt-spot-maintain",
+            lt_version="1",
         )
 
         assert config["Type"] == "maintain"
@@ -1386,12 +1386,12 @@ class TestSpotFleetHandler:
         )
         request = SimpleNamespace(requested_count=2, metadata={}, request_id="req-asg-spot")
 
-        cfg = handler._create_asg_config_legacy(
+        cfg = handler._config_builder._build_legacy(
             asg_name="asg-spot",
-            aws_template=template,
+            template=template,
             request=request,
-            launch_template_id="lt-spot",
-            launch_template_version="1",
+            lt_id="lt-spot",
+            lt_version="1",
         )
 
         dist = cfg["MixedInstancesPolicy"]["InstancesDistribution"]
@@ -1419,12 +1419,12 @@ class TestSpotFleetHandler:
         )
         request = SimpleNamespace(requested_count=2, metadata={}, request_id="req-asg-ondemand")
 
-        cfg = handler._create_asg_config_legacy(
+        cfg = handler._config_builder._build_legacy(
             asg_name="asg-ondemand",
-            aws_template=template,
+            template=template,
             request=request,
-            launch_template_id="lt-ondemand",
-            launch_template_version="1",
+            lt_id="lt-ondemand",
+            lt_version="1",
         )
 
         dist = cfg["MixedInstancesPolicy"]["InstancesDistribution"]
@@ -1451,12 +1451,12 @@ class TestSpotFleetHandler:
         )
         request = SimpleNamespace(requested_count=2, metadata={}, request_id="req-asg-hetero")
 
-        cfg = handler._create_asg_config_legacy(
+        cfg = handler._config_builder._build_legacy(
             asg_name="asg-hetero",
-            aws_template=template,
+            template=template,
             request=request,
-            launch_template_id="lt-hetero",
-            launch_template_version="1",
+            lt_id="lt-hetero",
+            lt_version="1",
         )
 
         dist = cfg["MixedInstancesPolicy"]["InstancesDistribution"]
@@ -2448,11 +2448,11 @@ class TestABISOverrides:
         handler = SpotFleetHandler(aws_client, Mock(), Mock(), Mock(), config_port=Mock())
         handler.aws_native_spec_service = None
 
-        config = handler._create_spot_fleet_config(
+        config = handler._config_builder.build(
             template=template,
             request=request,
-            launch_template_id="lt-abis",
-            launch_template_version="1",
+            lt_id="lt-abis",
+            lt_version="1",
         )
 
         overrides = config["LaunchTemplateConfigs"][0].get("Overrides", [])
@@ -2468,12 +2468,12 @@ class TestABISOverrides:
         handler = ASGHandler(Mock(), Mock(), Mock(), Mock(), config_port=Mock())
         handler.aws_native_spec_service = None
 
-        config = handler._create_asg_config(
+        config = handler._config_builder.build(
             asg_name="asg-abis",
-            aws_template=template,
+            template=template,
             request=request,
-            launch_template_id="lt-abis",
-            launch_template_version="1",
+            lt_id="lt-abis",
+            lt_version="1",
         )
 
         mixed_policy = config.get("MixedInstancesPolicy")
@@ -2518,7 +2518,7 @@ class TestMultiInstanceOverrides:
         handler = EC2FleetHandler(Mock(), Mock(), Mock(), Mock(), config_port=Mock())
         handler.aws_native_spec_service = None
 
-        config = handler._create_fleet_config_legacy(
+        config = handler._fleet_config_builder._build_legacy(
             template=template,
             request=request,
             launch_template_id="lt-multi",
@@ -2541,11 +2541,11 @@ class TestMultiInstanceOverrides:
         handler = SpotFleetHandler(aws_client, Mock(), Mock(), Mock(), config_port=Mock())
         handler.aws_native_spec_service = None
 
-        config = handler._create_spot_fleet_config(
+        config = handler._config_builder.build(
             template=template,
             request=request,
-            launch_template_id="lt-spot",
-            launch_template_version="1",
+            lt_id="lt-spot",
+            lt_version="1",
         )
 
         overrides = config["LaunchTemplateConfigs"][0].get("Overrides", [])
@@ -2560,12 +2560,12 @@ class TestMultiInstanceOverrides:
         handler = ASGHandler(Mock(), Mock(), Mock(), Mock(), config_port=Mock())
         handler.aws_native_spec_service = None
 
-        config = handler._create_asg_config_legacy(
+        config = handler._config_builder._build_legacy(
             asg_name="asg-multi",
-            aws_template=template,
+            template=template,
             request=request,
-            launch_template_id="lt-asg",
-            launch_template_version="1",
+            lt_id="lt-asg",
+            lt_version="1",
         )
 
         policy = config.get("MixedInstancesPolicy")

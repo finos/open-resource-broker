@@ -7,14 +7,16 @@ from domain.base.ports import LoggingPort
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.exceptions.aws_exceptions import AWSValidationError
 from providers.aws.infrastructure.aws_client import AWSClient
+from providers.aws.utilities.aws_operations import AWSOperations
 
 
 class SpotFleetValidator:
     """Validates Spot Fleet prerequisites before fleet creation."""
 
-    def __init__(self, aws_client: AWSClient, logger: LoggingPort) -> None:
+    def __init__(self, aws_client: AWSClient, logger: LoggingPort, aws_ops: AWSOperations = None) -> None:  # type: ignore[assignment]
         self._aws_client = aws_client
         self._logger = logger
+        self._aws_ops = aws_ops
 
     def validate(self, template: AWSTemplate) -> None:
         """Validate Spot Fleet specific prerequisites.
@@ -51,7 +53,7 @@ class SpotFleetValidator:
                 iam_client = self._aws_client.session.client(
                     "iam", config=self._aws_client.boto_config
                 )
-                iam_client.get_role(RoleName=role_name)
+                self._retry(iam_client.get_role, operation_type="read_only", RoleName=role_name)
             except Exception as e:
                 errors.append(f"Invalid custom fleet role: {e!s}")
 
@@ -105,6 +107,13 @@ class SpotFleetValidator:
             raise AWSValidationError("\n".join(errors))
 
         self._logger.debug("All Spot Fleet prerequisites validation passed")
+
+    def _retry(self, func: Any, operation_type: str = "standard", **kwargs: Any) -> Any:
+        """Delegate to AWSOperations retry if available, else call directly."""
+        retry_method = getattr(self._aws_ops, "_retry_with_backoff", None)
+        if retry_method is not None:
+            return retry_method(func, operation_type=operation_type, **kwargs)
+        return func(**kwargs)
 
     def _is_valid_service_role(self, arn: str) -> bool:
         """Return True if the ARN matches the Spot Fleet service-linked role pattern."""
