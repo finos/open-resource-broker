@@ -297,7 +297,8 @@ class TestAWSProviderEnvironmentVariables:
                     "ORB_AWS_AWS_MAX_RETRIES": "12",
                 },
             ):
-                settings = ProviderSettingsRegistry.create_settings("aws", config_dict)
+                settings_class = ProviderSettingsRegistry.get_settings_class("aws")
+                settings = settings_class()
 
                 assert settings.region == "env-region"  # Not config-region
                 assert settings.profile == "env-profile"  # Not config-profile

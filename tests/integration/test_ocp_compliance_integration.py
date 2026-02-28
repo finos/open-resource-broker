@@ -175,7 +175,7 @@ class TestOCPComplianceIntegration:
         mock_registry_service.register_provider_strategy.assert_called_once_with(
             "test_provider", {"key": "value"}
         )
-        assert result is not None
+        assert result is None  # CQRS: command handlers return void
 
     def test_no_hard_coded_conditionals(self):
         """Test that no hard-coded provider conditionals exist in key files."""

@@ -7,9 +7,9 @@ strategy selection, operation execution, health updates, and configuration.
 from typing import Any, Optional
 
 from application.dto.base import BaseCommand
+from domain.base.operations import Operation
 from providers.base.strategy import (
     ProviderHealthStatus,
-    ProviderOperation,
     ProviderOperationType,
     SelectionCriteria,
 )
@@ -29,7 +29,7 @@ class SelectProviderStrategyCommand(BaseCommand):
 class ExecuteProviderOperationCommand(BaseCommand):
     """Command to execute a provider operation through strategy pattern."""
 
-    operation: ProviderOperation
+    operation: Operation
     strategy_override: Optional[str] = None
     retry_count: int = 0
     timeout_seconds: Optional[int] = None
