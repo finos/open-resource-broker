@@ -226,7 +226,7 @@ def update_pyproject_selective(pyproject_path: Path) -> None:
                     "warn_no_return = true",
                     "warn_unreachable = true",
                     "strict_equality = true",
-                    "explicit_package_bases = true",
+                    'mypy_path = "src"',
                     "namespace_packages = true",
                     "",
                 ]

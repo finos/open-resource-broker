@@ -511,7 +511,7 @@ class TestAPIValidationComprehensive:
     def test_validation_module_exists(self):
         """Test that validation module exists."""
         try:
-            import src.api.validation as validation_module
+            import api.validation as validation_module
 
             assert validation_module is not None
         except ImportError:

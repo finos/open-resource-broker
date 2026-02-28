@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.infrastructure.caching.ami_cache_service import AMICacheService
-from src.providers.aws.domain.services.ami_resolver import AWSAMIResolver
+from infrastructure.caching.ami_cache_service import AMICacheService
+from providers.aws.domain.services.ami_resolver import AWSAMIResolver
 
 
 class TestAMICacheService:

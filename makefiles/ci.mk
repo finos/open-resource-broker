@@ -18,7 +18,7 @@ ci-quality-radon:  ## Run radon complexity analysis
 
 ci-quality-mypy:  ## Run mypy type checking
 	@echo "Running mypy type check..."
-	$(call run-tool,mypy,.)
+	$(call run-tool,mypy,-p api -p application -p cli -p config -p domain -p infrastructure -p interface -p mcp -p metrics -p monitoring -p orb_py -p providers -p sdk)
 
 ci-quality-pyright:  ## Run pyright type checking
 	@echo "Running pyright type check..."
