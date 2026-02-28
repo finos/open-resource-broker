@@ -1,7 +1,7 @@
 """Spot Fleet prerequisite validator."""
 
 import re
-from typing import Any
+from typing import Any, Optional
 
 from domain.base.ports import LoggingPort
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
@@ -14,8 +14,8 @@ class SpotFleetValidator:
     """Validates Spot Fleet prerequisites before fleet creation."""
 
     def __init__(
-        self, aws_client: AWSClient, logger: LoggingPort, aws_ops: AWSOperations = None
-    ) -> None:  # type: ignore[assignment]
+        self, aws_client: AWSClient, logger: LoggingPort, aws_ops: Optional[AWSOperations] = None
+    ) -> None:
         self._aws_client = aws_client
         self._logger = logger
         self._aws_ops = aws_ops
