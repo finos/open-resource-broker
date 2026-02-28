@@ -103,10 +103,10 @@ async def stream_request_status(
             }
             try:
                 result = await handler.handle(api_request)
-                if hasattr(result, "model_dump"):
-                    data = result.model_dump()
-                elif hasattr(result, "to_dict"):
+                if hasattr(result, "to_dict"):
                     data = result.to_dict()
+                elif hasattr(result, "model_dump"):
+                    data = result.model_dump(by_alias=True)
                 else:
                     data = result
                 yield f"data: {json.dumps(data)}\n\n"

@@ -6,11 +6,10 @@ from typing import Any, Optional, cast
 try:
     from fastapi import APIRouter, Body, HTTPException, Query
     from fastapi.responses import JSONResponse
-    from pydantic import BaseModel, ConfigDict
-    from pydantic.alias_generators import to_camel
 except ImportError:
     raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
 
+from api.models.base import APIRequest
 from application.dto.queries import GetTemplateQuery, ListTemplatesQuery, ValidateTemplateQuery
 from application.template.commands import (
     CreateTemplateCommand,
@@ -49,13 +48,11 @@ def _serialize_datetime_fields(data: Any) -> Any:
         return data
 
 
-class TemplateCreateRequest(BaseModel):
+class TemplateCreateRequest(APIRequest):
     """Request model for creating templates.
 
     Accepts both camelCase and snake_case field names.
     """
-
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     template_id: str
     name: Optional[str] = None
@@ -70,13 +67,11 @@ class TemplateCreateRequest(BaseModel):
     version: Optional[str] = "1.0"
 
 
-class TemplateUpdateRequest(BaseModel):
+class TemplateUpdateRequest(APIRequest):
     """Request model for updating templates.
 
     Accepts both camelCase and snake_case field names.
     """
-
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     name: Optional[str] = None
     provider_api: Optional[str] = None
@@ -109,20 +104,17 @@ async def list_templates(
         if not query_bus:
             raise HTTPException(status_code=500, detail="QueryBus not available")
 
-        # Create and execute query through CQRS bus
         query = ListTemplatesQuery(provider_api=provider_api, active_only=True)
-
         templates = await query_bus.execute(query)
 
-        # Convert templates to JSON-serializable format
         serializable_templates = []
         for template in templates:
-            if hasattr(template, "model_dump"):
-                template_dict = template.model_dump()
+            if hasattr(template, "to_dict"):
+                template_dict = template.to_dict()
+            elif hasattr(template, "model_dump"):
+                template_dict = template.model_dump(by_alias=True)
             else:
                 template_dict = template
-
-            # Convert datetime objects to ISO format strings
             template_dict = _serialize_datetime_fields(template_dict)
             serializable_templates.append(template_dict)
 
@@ -161,18 +153,16 @@ async def get_template(
         if not query_bus:
             raise HTTPException(status_code=500, detail="QueryBus not available")
 
-        # Create and execute query through CQRS bus
         query = GetTemplateQuery(template_id=template_id)
         template = await query_bus.execute(query)
 
         if template:
-            # Convert template to JSON-serializable format
-            if hasattr(template, "model_dump"):
-                template_dict = template.model_dump()
+            if hasattr(template, "to_dict"):
+                template_dict = template.to_dict()
+            elif hasattr(template, "model_dump"):
+                template_dict = template.model_dump(by_alias=True)
             else:
                 template_dict = template
-
-            # Convert datetime objects to ISO format strings
             template_dict = _serialize_datetime_fields(template_dict)
 
             return JSONResponse(
@@ -206,10 +196,8 @@ async def create_template(template_data: TemplateCreateRequest) -> JSONResponse:
         if not command_bus:
             raise HTTPException(status_code=500, detail="CommandBus not available")
 
-        # Convert Pydantic model to dict
-        template_dict = template_data.dict(exclude_unset=True)
+        template_dict = template_data.model_dump(exclude_unset=True)
 
-        # Create command and execute through CQRS bus
         command = CreateTemplateCommand(
             template_id=template_dict["template_id"],
             name=template_dict.get("name"),
@@ -260,10 +248,8 @@ async def update_template(template_id: str, template_data: TemplateUpdateRequest
         if not command_bus:
             raise HTTPException(status_code=500, detail="CommandBus not available")
 
-        # Convert Pydantic model to dict, excluding unset values
-        template_dict = template_data.dict(exclude_unset=True)
+        template_dict = template_data.model_dump(exclude_unset=True)
 
-        # Create command and execute through CQRS bus
         command = UpdateTemplateCommand(
             template_id=template_id,
             name=template_dict.get("name"),
@@ -303,7 +289,6 @@ async def delete_template(template_id: str) -> JSONResponse:
         if not command_bus:
             raise HTTPException(status_code=500, detail="CommandBus not available")
 
-        # Create command and execute through CQRS bus
         command = DeleteTemplateCommand(template_id=template_id)
         await command_bus.execute(cast(Any, command))
 
@@ -343,11 +328,9 @@ async def validate_template(
         if not query_bus:
             raise HTTPException(status_code=500, detail="QueryBus not available")
 
-        # Create and execute validation query through CQRS bus
         query = ValidateTemplateQuery(template_config=template_data)
         validation_result = await query_bus.execute(query)
 
-        # Check if validation result has errors
         is_valid = not validation_result.errors if hasattr(validation_result, "errors") else True
 
         return JSONResponse(
@@ -384,10 +367,7 @@ async def refresh_templates() -> JSONResponse:
         if not query_bus:
             raise HTTPException(status_code=500, detail="QueryBus not available")
 
-        # Force refresh by listing templates - this will trigger cache refresh in
-        # the query handler
         query = ListTemplatesQuery(provider_api=None, active_only=True)
-
         templates = await query_bus.execute(query)
         template_count = len(templates) if templates else 0
 

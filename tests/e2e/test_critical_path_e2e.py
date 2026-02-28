@@ -258,6 +258,86 @@ class TestRequestLifecycle:
 
         assert response.status_code >= 500
 
+    def test_full_lifecycle_create_provision_return_cleanup(self, app, client: TestClient):
+        """Full request lifecycle: create -> provision -> poll running -> return -> poll completed."""
+        request_id = "req-acquire-full-lifecycle-001"
+        machine_ids = ["i-lifecycle-001", "i-lifecycle-002"]
+
+        # Step 1: create request
+        mock_create_response = Mock()
+        mock_create_response.to_dict = Mock(
+            return_value={"requestId": request_id, "status": "pending"}
+        )
+        mock_request_handler = AsyncMock()
+        mock_request_handler.handle = AsyncMock(return_value=mock_create_response)
+
+        app.dependency_overrides[get_request_machines_handler] = lambda: mock_request_handler
+        try:
+            create_resp = client.post(
+                "/api/v1/machines/request",
+                json={"template_id": "tpl-lifecycle", "machine_count": 2},
+            )
+        finally:
+            app.dependency_overrides.clear()
+
+        assert create_resp.status_code == 202
+        assert create_resp.json()["requestId"] == request_id
+
+        # Step 2: poll status - running with machines provisioned
+        mock_status_handler = AsyncMock()
+        mock_status_handler.handle = AsyncMock(
+            return_value={
+                "requestId": request_id,
+                "status": "running",
+                "machines": [{"machineId": mid, "status": "running"} for mid in machine_ids],
+            }
+        )
+        app.dependency_overrides[get_request_status_handler] = lambda: mock_status_handler
+        try:
+            status_resp = client.get(f"/api/v1/requests/{request_id}/status")
+        finally:
+            app.dependency_overrides.clear()
+
+        assert status_resp.status_code == 200
+        assert status_resp.json()["status"] == "running"
+        assert len(status_resp.json()["machines"]) == 2
+
+        # Step 3: return machines (cleanup)
+        mock_return_handler = AsyncMock()
+        mock_return_handler.handle = AsyncMock(
+            return_value={
+                "success": True,
+                "returnRequestIds": ["req-return-lifecycle-001"],
+                "processedMachines": machine_ids,
+            }
+        )
+        app.dependency_overrides[get_return_machines_handler] = lambda: mock_return_handler
+        try:
+            return_resp = client.post(
+                "/api/v1/machines/return",
+                json={"machine_ids": machine_ids},
+            )
+        finally:
+            app.dependency_overrides.clear()
+
+        assert return_resp.status_code == 200
+        return_data = return_resp.json()
+        assert return_data["success"] is True
+        assert set(return_data["processedMachines"]) == set(machine_ids)
+
+        # Step 4: poll original request - now completed
+        mock_status_handler.handle = AsyncMock(
+            return_value={"requestId": request_id, "status": "complete", "machines": []}
+        )
+        app.dependency_overrides[get_request_status_handler] = lambda: mock_status_handler
+        try:
+            final_resp = client.get(f"/api/v1/requests/{request_id}/status")
+        finally:
+            app.dependency_overrides.clear()
+
+        assert final_resp.status_code == 200
+        assert final_resp.json()["status"] == "complete"
+
 
 # ---------------------------------------------------------------------------
 # 2. Template Management
@@ -485,6 +565,78 @@ class TestTemplateManagement:
 
         assert response.status_code == 200
         assert query_bus.execute.called
+
+    def test_template_create_validate_then_use_in_request(self, app, client: TestClient):
+        """Full flow: create template -> validate it exists -> use template_id in a request."""
+        template_id = "tpl-create-use-001"
+
+        # Step 1: create template
+        mock_cmd_response = Mock()
+        mock_cmd_response.validation_errors = []
+        command_bus = _make_command_bus(return_value=mock_cmd_response)
+        container = _make_container(command_bus=command_bus)
+
+        with patch("api.routers.templates.get_container", return_value=container):
+            create_resp = client.post(
+                "/api/v1/templates/",
+                json={
+                    "template_id": template_id,
+                    "name": "lifecycle-template",
+                    "provider_api": "ec2_fleet",
+                    "image_id": "ami-12345678",
+                    "subnet_ids": ["subnet-abc"],
+                },
+            )
+        assert create_resp.status_code == 201
+        assert create_resp.json()["templateId"] == template_id
+
+        # Step 2: validate template exists via GET
+        mock_template = Mock()
+        mock_template.model_dump = Mock(
+            return_value={
+                "template_id": template_id,
+                "name": "lifecycle-template",
+                "provider_api": "ec2_fleet",
+                "image_id": "ami-12345678",
+            }
+        )
+        query_bus = _make_query_bus(return_value=mock_template)
+        container2 = _make_container(query_bus=query_bus)
+
+        with patch("api.routers.templates.get_container", return_value=container2):
+            get_resp = client.get(f"/api/v1/templates/{template_id}")
+        assert get_resp.status_code == 200
+        assert get_resp.json()["template"]["template_id"] == template_id
+
+        # Step 3: use the template_id in a machines request
+        request_id = "req-acquire-tpl-use-001"
+        mock_request_response = Mock()
+        mock_request_response.to_dict = Mock(
+            return_value={"requestId": request_id, "status": "pending"}
+        )
+        mock_request_handler = AsyncMock()
+        mock_request_handler.handle = AsyncMock(return_value=mock_request_response)
+
+        app.dependency_overrides[get_request_machines_handler] = lambda: mock_request_handler
+        try:
+            request_resp = client.post(
+                "/api/v1/machines/request",
+                json={"template_id": template_id, "machine_count": 1},
+            )
+        finally:
+            app.dependency_overrides.clear()
+
+        assert request_resp.status_code == 202
+        assert request_resp.json()["requestId"] == request_id
+
+        # Verify the handler was called with the correct template_id
+        call_arg = mock_request_handler.handle.call_args[0][0]
+        actual_template_id = (
+            call_arg.template["templateId"]
+            if hasattr(call_arg, "template")
+            else call_arg["input_data"]["templateId"]
+        )
+        assert actual_template_id == template_id
 
 
 # ---------------------------------------------------------------------------

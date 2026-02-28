@@ -6,12 +6,11 @@ try:
     from fastapi import APIRouter, Depends, Query
     from fastapi.encoders import jsonable_encoder
     from fastapi.responses import JSONResponse
-    from pydantic import BaseModel, ConfigDict
-    from pydantic.alias_generators import to_camel
 except ImportError:
     raise ImportError("FastAPI routing requires: pip install orb-py[api]") from None
 
 from api.dependencies import get_request_machines_handler, get_return_machines_handler
+from api.models.base import APIRequest
 from infrastructure.error.decorators import handle_rest_exceptions
 
 router = APIRouter(prefix="/machines", tags=["Machines"])
@@ -24,26 +23,22 @@ REQUEST_ID_QUERY = Query(None, description="Filter by request ID")
 LIMIT_QUERY = Query(None, description="Limit number of results")
 
 
-class RequestMachinesRequest(BaseModel):
+class RequestMachinesRequest(APIRequest):
     """Request for machine provisioning.
 
     Accepts both camelCase (templateId, machineCount) and snake_case field names.
     """
-
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     template_id: str
     machine_count: int
     additional_data: Optional[dict[str, Any]] = None
 
 
-class ReturnMachinesRequest(BaseModel):
+class ReturnMachinesRequest(APIRequest):
     """Request for machine return.
 
     Accepts both camelCase (machineIds) and snake_case field names.
     """
-
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     machine_ids: list[str]
 
@@ -83,7 +78,7 @@ async def request_machines(
     if hasattr(result, "to_dict"):
         response_content = result.to_dict()
     elif hasattr(result, "model_dump"):
-        response_content = result.model_dump()
+        response_content = result.model_dump(by_alias=True)
     else:
         response_content = result
 

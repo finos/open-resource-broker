@@ -265,7 +265,7 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
         if hasattr(request_data, "to_dict"):
             payload = request_data.to_dict()
         elif hasattr(request_data, "model_dump"):
-            payload = request_data.model_dump()
+            payload = request_data.model_dump(by_alias=True)
         elif isinstance(request_data, dict):
             payload = request_data
         else:
