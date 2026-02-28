@@ -115,7 +115,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             retry_fn=self._retry_with_backoff,
             paginate_fn=self._paginate,
             collect_with_next_token_fn=self._collect_with_next_token,
-            delete_orb_launch_template_fn=self._delete_orb_launch_template,
+            cleanup_on_zero_capacity_fn=self._cleanup_on_zero_capacity,
         )
 
     @handle_infrastructure_exceptions(context="ec2_fleet_creation")

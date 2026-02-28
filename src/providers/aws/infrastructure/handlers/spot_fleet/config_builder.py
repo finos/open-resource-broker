@@ -16,10 +16,11 @@ from providers.aws.domain.template.value_objects import AWSFleetType
 from providers.aws.infrastructure.handlers.fleet_override_builder import (
     map_spot_fleet_allocation_strategy,
 )
-from providers.aws.infrastructure.tags import build_system_tags, merge_tags
+from providers.aws.infrastructure.handlers.base_config_builder import BaseConfigBuilder
+from providers.aws.infrastructure.tags import build_resource_tags
 
 
-class SpotFleetConfigBuilder:
+class SpotFleetConfigBuilder(BaseConfigBuilder):
     """Builds the SpotFleetRequestConfig dict passed to request_spot_fleet."""
 
     def __init__(
@@ -28,9 +29,32 @@ class SpotFleetConfigBuilder:
         config_port: Optional[ConfigurationPort],
         logger: LoggingPort,
     ) -> None:
-        self._native_spec_service = native_spec_service
-        self._config_port = config_port
-        self._logger = logger
+        super().__init__(native_spec_service, config_port, logger)
+
+    def _api_key(self) -> str:
+        return "spotfleet"
+
+    def _inject_launch_template(
+        self,
+        native_spec: dict[str, Any],
+        template: AWSTemplate,
+        lt_id: str,
+        lt_version: str,
+    ) -> None:
+        """Patch LT id/version into the SpotFleet native spec in-place."""
+        if "LaunchSpecifications" in native_spec:
+            for spec in native_spec["LaunchSpecifications"]:
+                if "LaunchTemplate" not in spec:
+                    spec["LaunchTemplate"] = {}
+                spec["LaunchTemplate"]["LaunchTemplateId"] = lt_id
+                spec["LaunchTemplate"]["Version"] = lt_version
+        if template.abis_instance_requirements:
+            if "LaunchTemplateConfigs" in native_spec:
+                overrides = native_spec["LaunchTemplateConfigs"][0].get("Overrides", [])
+                if not any("InstanceRequirements" in o for o in overrides):
+                    native_spec["LaunchTemplateConfigs"][0]["Overrides"] = [
+                        {"InstanceRequirements": template.get_instance_requirements_payload()}
+                    ]
 
     # ------------------------------------------------------------------
     # Public API
@@ -49,38 +73,11 @@ class SpotFleetConfigBuilder:
         when no native spec service is available.
         """
         if self._native_spec_service:
-            context = self._prepare_template_context(template, request)
-            context.update(
-                {
-                    "launch_template_id": lt_id,
-                    "launch_template_version": lt_version,
-                }
-            )
-
-            native_spec = self._native_spec_service.process_provider_api_spec_with_merge(
-                template, request, "spotfleet", context
-            )
+            native_spec = self._process_native_spec(template, request, lt_id, lt_version)
             if native_spec:
-                if "LaunchSpecifications" in native_spec:
-                    for spec in native_spec["LaunchSpecifications"]:
-                        if "LaunchTemplate" not in spec:
-                            spec["LaunchTemplate"] = {}
-                        spec["LaunchTemplate"]["LaunchTemplateId"] = lt_id
-                        spec["LaunchTemplate"]["Version"] = lt_version
-                if template.abis_instance_requirements:
-                    if "LaunchTemplateConfigs" in native_spec:
-                        overrides = native_spec["LaunchTemplateConfigs"][0].get("Overrides", [])
-                        if not any("InstanceRequirements" in o for o in overrides):
-                            native_spec["LaunchTemplateConfigs"][0]["Overrides"] = [
-                                {"InstanceRequirements": template.get_instance_requirements_payload()}
-                            ]
-                self._logger.info(
-                    "Using native provider API spec with merge for SpotFleet template %s",
-                    template.template_id,
-                )
                 return native_spec
 
-            default_spec = self._native_spec_service.render_default_spec("spotfleet", context)
+            default_spec = self._render_default(template, request, lt_id, lt_version)
             if template.abis_instance_requirements:
                 if "LaunchTemplateConfigs" in default_spec:
                     overrides = default_spec["LaunchTemplateConfigs"][0].get("Overrides", [])
@@ -196,10 +193,6 @@ class SpotFleetConfigBuilder:
         lt_version: str,
     ) -> dict[str, Any]:
         """Build SpotFleetRequestConfig without a native spec service."""
-        from providers.aws.infrastructure.handlers.fleet_override_builder import (
-            build_spot_fleet_overrides,
-        )
-
         fleet_role = template.fleet_role
 
         # Normalise service-linked role ARNs
@@ -223,20 +216,14 @@ class SpotFleetConfigBuilder:
         on_demand_capacity = capacity["on_demand_count"]
 
         assert self._config_port is not None, "config_port must be injected"
-        user_tags = [
-            {
-                "Key": "Name",
-                "Value": f"{self._config_port.get_resource_prefix('spot_fleet')}{request.request_id}",
-            }
-        ]
-        if template.tags:
-            user_tags.extend([{"Key": k, "Value": v} for k, v in template.tags.items()])
-        system_tags = build_system_tags(
+        common_tags = build_resource_tags(
+            config_port=self._config_port,
             request_id=str(request.request_id),
             template_id=str(template.template_id),
+            resource_prefix_key="spot_fleet",
             provider_api="SpotFleet",
+            template_tags=template.tags,
         )
-        common_tags = merge_tags(user_tags, system_tags)
 
         fleet_type_value = (
             template.fleet_type.value  # type: ignore[union-attr]
@@ -291,13 +278,15 @@ class SpotFleetConfigBuilder:
                 overrides.append({"InstanceRequirements": instance_requirements_payload})
             fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
         else:
-            overrides = build_spot_fleet_overrides(
+            from providers.aws.infrastructure.handlers.instance_override_builder import (
+                build_fleet_overrides,
+            )
+
+            overrides = build_fleet_overrides(
                 template.machine_types,
-                template.machine_types_ondemand,
                 template.subnet_ids,
-                template.max_price,
-                template.price_type == "heterogeneous",
-                machine_types_priority=getattr(template, "machine_types_priority", None) or None,
+                include_priority=True,
+                max_price=template.max_price,
             )
             if overrides:
                 fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides

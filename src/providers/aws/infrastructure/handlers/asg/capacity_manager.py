@@ -12,7 +12,6 @@ termination in an Auto Scaling Group:
 from typing import Any, Callable, Optional
 
 from domain.base.ports import LoggingPort
-from domain.base.ports.configuration_port import ConfigurationPort
 from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from providers.aws.infrastructure.aws_client import AWSClient
 from providers.aws.utilities.aws_operations import AWSOperations
@@ -26,7 +25,7 @@ class ASGCapacityManager:
         aws_client: AWSClient,
         aws_ops: AWSOperations,
         request_adapter: Optional[RequestAdapterPort],
-        config_port: Optional[ConfigurationPort],
+        cleanup_on_zero_capacity_fn: Callable[[str, str], None],
         logger: LoggingPort,
         retry_with_backoff: Callable,
         chunk_list: Callable,
@@ -34,20 +33,15 @@ class ASGCapacityManager:
         self._aws_client = aws_client
         self._aws_ops = aws_ops
         self._request_adapter = request_adapter
-        self._config_port = config_port
+        self._cleanup_on_zero_capacity = cleanup_on_zero_capacity_fn
         self._logger = logger
         self._retry_with_backoff = retry_with_backoff
         self._chunk_list = chunk_list
         self._delete_asg_fn: Optional[Callable[[str], None]] = None
-        self._delete_launch_template_fn: Optional[Callable[[str], None]] = None
 
     def set_delete_asg_fn(self, fn: Callable[[str], None]) -> None:
         """Register the handler's ASG deletion callback."""
         self._delete_asg_fn = fn
-
-    def set_delete_launch_template_fn(self, fn: Callable[[str], None]) -> None:
-        """Register the handler's launch-template deletion callback."""
-        self._delete_launch_template_fn = fn
 
     def reduce_capacity(self, instance_ids: list[str]) -> None:
         """Reduce ASG DesiredCapacity and MinSize ahead of instance termination.
@@ -195,7 +189,7 @@ class ASGCapacityManager:
         if new_capacity == 0:
             self._logger.info("ASG %s capacity is zero, deleting ASG", asg_name)
             self._call_delete_asg(asg_name)
-            self._cleanup_launch_template(asg_name)
+            self._cleanup_on_zero_capacity("asg", asg_name)
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -221,19 +215,3 @@ class ASGCapacityManager:
         except Exception as exc:
             self._logger.warning("Failed to delete ASG %s: %s", asg_name, exc)
 
-    def _cleanup_launch_template(self, asg_name: str) -> None:
-        if self._config_port is None:
-            return
-        try:
-            cleanup = self._config_port.get_cleanup_config()
-        except Exception:
-            return
-        if not cleanup.get("enabled", True) or not cleanup.get("resources", {}).get("asg", True):
-            return
-        if self._delete_launch_template_fn is None:
-            return
-        prefix = self._config_port.get_resource_prefix("asg")
-        request_id = (
-            asg_name[len(prefix):] if prefix and asg_name.startswith(prefix) else asg_name
-        )
-        self._delete_launch_template_fn(request_id)

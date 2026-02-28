@@ -4,10 +4,9 @@ Encapsulates all release/teardown logic for Spot Fleet requests,
 keeping SpotFleetHandler focused on orchestration.
 """
 
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from domain.base.ports import LoggingPort
-from domain.base.ports.configuration_port import ConfigurationPort
 from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from providers.aws.domain.template.value_objects import AWSFleetType
 from providers.aws.infrastructure.aws_client import AWSClient
@@ -22,13 +21,13 @@ class SpotFleetReleaseManager:
         aws_client: AWSClient,
         aws_ops: AWSOperations,
         request_adapter: Optional[RequestAdapterPort],
-        config_port: Optional[ConfigurationPort],
+        cleanup_on_zero_capacity_fn: Callable[[str, str], None],
         logger: LoggingPort,
     ) -> None:
         self._aws_client = aws_client
         self._aws_ops = aws_ops
         self._request_adapter = request_adapter
-        self._config_port = config_port
+        self._cleanup_on_zero_capacity = cleanup_on_zero_capacity_fn
         self._logger = logger
 
     def release(
@@ -108,7 +107,7 @@ class SpotFleetReleaseManager:
                         SpotFleetRequestIds=[fleet_id],
                         TerminateInstances=False,
                     )
-                    self._cleanup_launch_template(fleet_details, fleet_config)
+                    self._maybe_cleanup_launch_template(fleet_details, fleet_config)
             else:
                 # No specific instances — cancel the entire fleet
                 self._retry(
@@ -181,24 +180,10 @@ class SpotFleetReleaseManager:
 
         return paginate(client_method, result_key, **kwargs)
 
-    def _cleanup_launch_template(
+    def _maybe_cleanup_launch_template(
         self, fleet_details: dict[str, Any], fleet_config: dict[str, Any]
     ) -> None:
-        """Delete the ORB-managed launch template associated with this fleet, if configured."""
-        if self._config_port is None:
-            return
-
-        cleanup: dict[str, Any] = {}
-        try:
-            cleanup = self._config_port.get_cleanup_config()
-        except Exception:
-            pass
-
-        if not cleanup.get("enabled", True) or not cleanup.get("resources", {}).get(
-            "spot_fleet", True
-        ):
-            return
-
+        """Delete the ORB-managed launch template associated with this fleet, if cleanup is enabled."""
         tags: dict[str, str] = {}
         if fleet_config.get("TagSpecifications"):
             tags = {
@@ -211,80 +196,4 @@ class SpotFleetReleaseManager:
 
         request_id = tags.get("orb:request-id", "")
         if request_id:
-            self._delete_orb_launch_template(request_id)
-
-    def _delete_orb_launch_template(self, request_id: str) -> None:
-        """Delete the ORB-managed launch template for a request, if one exists."""
-        from botocore.exceptions import ClientError
-
-        if self._config_port is None:
-            self._logger.warning(
-                "config_port not injected; skipping launch template cleanup for %s", request_id
-            )
-            return
-
-        try:
-            cleanup = self._config_port.get_cleanup_config()
-        except Exception as e:
-            self._logger.warning("Could not read cleanup config, skipping LT cleanup: %s", e)
-            return
-
-        if not cleanup.get("enabled", True) or not cleanup.get("delete_launch_template", True):
-            return
-
-        lt_name = f"{self._config_port.get_resource_prefix('launch_template')}{request_id}"
-        dry_run = cleanup.get("dry_run", False)
-
-        try:
-            response = self._aws_client.ec2_client.describe_launch_templates(
-                LaunchTemplateNames=[lt_name]
-            )
-            templates = response.get("LaunchTemplates", [])
-            if not templates:
-                self._logger.debug(
-                    "No launch template named %s found; nothing to clean up", lt_name
-                )
-                return
-
-            lt = templates[0]
-            lt_tags = {t["Key"]: t["Value"] for t in lt.get("Tags", [])}
-            if lt_tags.get("orb:managed-by") != "open-resource-broker":
-                self._logger.warning(
-                    "Launch template %s is not ORB-managed; skipping deletion", lt_name
-                )
-                return
-
-            lt_id = lt["LaunchTemplateId"]
-
-            if dry_run:
-                self._logger.info(
-                    "[dry-run] Would delete launch template %s (%s) for request %s",
-                    lt_name,
-                    lt_id,
-                    request_id,
-                )
-                return
-
-            self._aws_client.ec2_client.delete_launch_template(LaunchTemplateId=lt_id)
-            self._logger.info(
-                "Deleted launch template %s (%s) for request %s", lt_name, lt_id, request_id
-            )
-
-        except ClientError as e:
-            error_code = e.response["Error"]["Code"]
-            if error_code == "InvalidLaunchTemplateName.NotFoundException":
-                self._logger.debug("Launch template %s not found; nothing to clean up", lt_name)
-            else:
-                self._logger.warning(
-                    "Failed to delete launch template %s for request %s: %s",
-                    lt_name,
-                    request_id,
-                    e,
-                )
-        except Exception as e:
-            self._logger.warning(
-                "Unexpected error deleting launch template %s for request %s: %s",
-                lt_name,
-                request_id,
-                e,
-            )
+            self._cleanup_on_zero_capacity("spot_fleet", request_id)

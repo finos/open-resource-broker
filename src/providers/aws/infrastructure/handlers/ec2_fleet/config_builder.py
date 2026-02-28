@@ -15,10 +15,11 @@ from providers.aws.infrastructure.handlers.fleet_override_builder import (
     map_ec2_fleet_allocation_strategy,
     map_ec2_fleet_ondemand_strategy,
 )
-from providers.aws.infrastructure.tags import build_system_tags, merge_tags
+from providers.aws.infrastructure.handlers.base_config_builder import BaseConfigBuilder
+from providers.aws.infrastructure.tags import build_resource_tags
 
 
-class EC2FleetConfigBuilder:
+class EC2FleetConfigBuilder(BaseConfigBuilder):
     """Builds the create_fleet API payload from a template and request.
 
     Responsibilities:
@@ -33,9 +34,30 @@ class EC2FleetConfigBuilder:
         config_port: Optional[ConfigurationPort],
         logger: LoggingPort,
     ) -> None:
-        self._native_spec_service = native_spec_service
-        self._config_port = config_port
-        self._logger = logger
+        super().__init__(native_spec_service, config_port, logger)
+
+    def _api_key(self) -> str:
+        return "ec2fleet"
+
+    def _inject_launch_template(
+        self,
+        native_spec: dict[str, Any],
+        template: AWSTemplate,
+        lt_id: str,
+        lt_version: str,
+    ) -> None:
+        """Patch LT id/version into the EC2 Fleet native spec in-place."""
+        if "LaunchTemplateConfigs" in native_spec:
+            native_spec["LaunchTemplateConfigs"][0]["LaunchTemplateSpecification"] = {
+                "LaunchTemplateId": lt_id,
+                "Version": lt_version,
+            }
+            if template.abis_instance_requirements:
+                overrides = native_spec["LaunchTemplateConfigs"][0].get("Overrides", [])
+                if not any("InstanceRequirements" in o for o in overrides):
+                    native_spec["LaunchTemplateConfigs"][0]["Overrides"] = [
+                        {"InstanceRequirements": template.get_instance_requirements_payload()}
+                    ]
 
     def build(
         self,
@@ -59,36 +81,10 @@ class EC2FleetConfigBuilder:
             Dict suitable for passing directly to ec2_client.create_fleet(**payload).
         """
         if self._native_spec_service:
-            context = self._prepare_template_context(template, request)
-            context.update(
-                {
-                    "launch_template_id": lt_id,
-                    "launch_template_version": lt_version,
-                }
-            )
-
-            native_spec = self._native_spec_service.process_provider_api_spec_with_merge(
-                template, request, "ec2fleet", context
-            )
+            native_spec = self._process_native_spec(template, request, lt_id, lt_version)
             if native_spec:
-                if "LaunchTemplateConfigs" in native_spec:
-                    native_spec["LaunchTemplateConfigs"][0]["LaunchTemplateSpecification"] = {
-                        "LaunchTemplateId": lt_id,
-                        "Version": lt_version,
-                    }
-                    if template.abis_instance_requirements:
-                        overrides = native_spec["LaunchTemplateConfigs"][0].get("Overrides", [])
-                        if not any("InstanceRequirements" in o for o in overrides):
-                            native_spec["LaunchTemplateConfigs"][0]["Overrides"] = [
-                                {"InstanceRequirements": template.get_instance_requirements_payload()}
-                            ]
-                self._logger.info(
-                    "Using native provider API spec with merge for template %s",
-                    template.template_id,
-                )
                 return native_spec
-
-            return self._native_spec_service.render_default_spec("ec2fleet", context)
+            return self._render_default(template, request, lt_id, lt_version)
 
         return self._build_legacy(template, request, lt_id, lt_version)
 
@@ -121,21 +117,13 @@ class EC2FleetConfigBuilder:
         }
 
         assert self._config_port is not None, "config_port must be injected"
-        user_tags: list[dict[str, str]] = [
-            {
-                "Key": "Name",
-                "Value": f"{self._config_port.get_resource_prefix('fleet')}{request.request_id}",
-            }
-        ]
-        if template.tags:
-            user_tags.extend([{"Key": k, "Value": str(v)} for k, v in template.tags.items()])
-        fleet_tags = merge_tags(
-            user_tags,
-            build_system_tags(
-                request_id=str(request.request_id),
-                template_id=str(template.template_id),
-                provider_api="EC2Fleet",
-            ),
+        fleet_tags = build_resource_tags(
+            config_port=self._config_port,
+            request_id=str(request.request_id),
+            template_id=str(template.template_id),
+            resource_prefix_key="fleet",
+            provider_api="EC2Fleet",
+            template_tags=template.tags,
         )
         fleet_config["TagSpecifications"] = [
             {"ResourceType": "fleet", "Tags": fleet_tags},
@@ -200,16 +188,13 @@ class EC2FleetConfigBuilder:
                 overrides.append({"InstanceRequirements": instance_requirements_payload})
             fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
         else:
-            from providers.aws.infrastructure.handlers.fleet_override_builder import (
-                build_ec2_fleet_overrides,
+            from providers.aws.infrastructure.handlers.instance_override_builder import (
+                build_fleet_overrides,
             )
 
-            overrides = build_ec2_fleet_overrides(
+            overrides = build_fleet_overrides(
                 template.machine_types,
-                template.machine_types_ondemand,
                 template.subnet_ids,
-                price_type == "heterogeneous",
-                machine_types_priority=getattr(template, "machine_types_priority", None) or None,
             )
             if overrides:
                 fleet_config["LaunchTemplateConfigs"][0]["Overrides"] = overrides
@@ -322,5 +307,3 @@ class EC2FleetConfigBuilder:
             "max_spot_price": (str(template.max_price) if template.max_price is not None else None),
             "default_capacity_type": default_capacity_type,
         }
-
-

@@ -31,6 +31,7 @@ from providers.aws.exceptions.aws_exceptions import (
     ResourceInUseError,
 )
 from providers.aws.infrastructure.aws_client import AWSClient
+from providers.aws.infrastructure.tags import build_resource_tags
 
 T = TypeVar("T")
 
@@ -607,6 +608,67 @@ class AWSHandler(ABC):
             return "on-demand"
         else:  # heterogeneous or None
             return "on-demand"
+
+    def _build_resource_tags(
+        self,
+        request_id: str,
+        template: AWSTemplate,
+        resource_prefix_key: str,
+        provider_api: str,
+    ) -> list[dict]:
+        """Build the flat tag list for an AWS resource.
+
+        Combines a Name tag (prefix + request_id), any template-level tags, and
+        the standard ORB system tags into a single merged list.
+
+        Args:
+            request_id:          The ORB request UUID (string).
+            template:            The AWS template (provides template_id and tags).
+            resource_prefix_key: Key passed to config_port.get_resource_prefix
+                                 (e.g. "fleet", "spot_fleet", "asg").
+            provider_api:        AWS API label for the system tag (e.g. "EC2Fleet").
+
+        Returns:
+            Merged list of {"Key": k, "Value": v} dicts ready for AWS API calls.
+        """
+        assert self.config_port is not None, "config_port must be injected"
+        return build_resource_tags(
+            config_port=self.config_port,
+            request_id=request_id,
+            template_id=str(template.template_id),
+            resource_prefix_key=resource_prefix_key,
+            provider_api=provider_api,
+            template_tags=template.tags,
+        )
+
+    def _cleanup_on_zero_capacity(self, resource_type: str, request_id: str) -> None:
+        """Delete the ORB-managed launch template when a resource reaches zero capacity.
+
+        Reads the cleanup config, checks that cleanup is enabled and that the
+        resource type is included in the ``resources`` allow-list, then delegates
+        to ``_delete_orb_launch_template``.  All failures are warning-only so
+        that cleanup never blocks the main return flow.
+
+        Args:
+            resource_type: Cleanup config resource key, e.g. ``"asg"``,
+                ``"ec2_fleet"``, or ``"spot_fleet"``.
+            request_id: The ORB request ID used to locate the launch template.
+        """
+        if self.config_port is None:
+            return
+
+        try:
+            cleanup = self.config_port.get_cleanup_config()
+        except Exception:
+            return
+
+        if not cleanup.get("enabled", True):
+            return
+
+        if not cleanup.get("resources", {}).get(resource_type, True):
+            return
+
+        self._delete_orb_launch_template(request_id)
 
     def _delete_orb_launch_template(self, request_id: str) -> None:
         """Delete the ORB-managed launch template for a request, if one exists.

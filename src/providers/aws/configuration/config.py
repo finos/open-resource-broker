@@ -15,7 +15,7 @@ class HandlerCapabilityConfig(BaseModel):
 
     ec2_fleet: bool = Field(True, description="Enable EC2 Fleet handler")
     spot_fleet: bool = Field(True, description="Enable Spot Fleet handler")
-    auto_scaling_group: bool = Field(True, description="Enable Auto Scaling Group handler")
+    asg: bool = Field(True, description="Enable Auto Scaling Group handler")
     run_instances: bool = Field(True, description="Enable Run Instances handler")
 
 
@@ -54,7 +54,7 @@ class HandlersConfig(BaseModel):
     # Legacy fields for backward compatibility
     ec2_fleet: bool = Field(True, description="Enable EC2 Fleet handler (legacy)")
     spot_fleet: bool = Field(True, description="Enable Spot Fleet handler (legacy)")
-    auto_scaling_group: bool = Field(True, description="Enable Auto Scaling Group handler (legacy)")
+    asg: bool = Field(True, description="Enable Auto Scaling Group handler (legacy)")
     run_instances: bool = Field(True, description="Enable Run Instances handler (legacy)")
 
     @model_validator(mode="after")
@@ -64,12 +64,12 @@ class HandlersConfig(BaseModel):
         if (
             self.ec2_fleet != self.capabilities.ec2_fleet
             or self.spot_fleet != self.capabilities.spot_fleet
-            or self.auto_scaling_group != self.capabilities.auto_scaling_group
+            or self.asg != self.capabilities.asg
             or self.run_instances != self.capabilities.run_instances
         ):
             object.__setattr__(self.capabilities, "ec2_fleet", self.ec2_fleet)
             object.__setattr__(self.capabilities, "spot_fleet", self.spot_fleet)
-            object.__setattr__(self.capabilities, "auto_scaling_group", self.auto_scaling_group)
+            object.__setattr__(self.capabilities, "asg", self.asg)
             object.__setattr__(self.capabilities, "run_instances", self.run_instances)
 
         return self

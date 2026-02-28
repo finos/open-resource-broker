@@ -40,7 +40,6 @@ from infrastructure.error.decorators import handle_infrastructure_exceptions
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
-from providers.aws.infrastructure.tags import build_system_tags, merge_tags
 from providers.aws.infrastructure.aws_client import AWSClient
 from providers.aws.infrastructure.handlers.asg.capacity_manager import ASGCapacityManager
 from providers.aws.infrastructure.handlers.asg.config_builder import ASGConfigBuilder
@@ -92,15 +91,12 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             aws_client=aws_client,
             aws_ops=aws_ops,
             request_adapter=request_adapter,
-            config_port=config_port,
+            cleanup_on_zero_capacity_fn=self._cleanup_asg_on_zero_capacity,
             logger=logger,
             retry_with_backoff=self._retry_with_backoff,
             chunk_list=self._chunk_list,
         )
         self._capacity_manager.set_delete_asg_fn(lambda name: self._delete_asg(name))
-        self._capacity_manager.set_delete_launch_template_fn(
-            lambda rid: self._delete_orb_launch_template(rid)
-        )
 
     def _delete_asg(self, asg_name: str) -> None:
         """Delete an Auto Scaling Group when it's no longer needed."""
@@ -115,6 +111,17 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             self._logger.info("Successfully deleted ASG %s", asg_name)
         except Exception as e:
             self._logger.warning("Failed to delete ASG %s: %s", asg_name, e)
+
+    def _cleanup_asg_on_zero_capacity(self, resource_type: str, asg_name: str) -> None:
+        """Strip the ASG name prefix to recover the request ID, then delegate to base cleanup."""
+        if self.config_port is not None:
+            prefix = self.config_port.get_resource_prefix("asg")
+            request_id = (
+                asg_name[len(prefix):] if prefix and asg_name.startswith(prefix) else asg_name
+            )
+        else:
+            request_id = asg_name
+        self._cleanup_on_zero_capacity(resource_type, request_id)
 
     @handle_infrastructure_exceptions(context="asg_creation")
     def acquire_hosts(self, request: Request, aws_template: AWSTemplate) -> dict[str, Any]:
@@ -211,22 +218,11 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
     def _tag_asg(self, asg_name: str, aws_template: AWSTemplate, request_id: str) -> None:
         """Add tags to the Auto Scaling Group."""
         try:
-            assert self.config_port is not None, "config_port must be injected"
-            asg_name_tag = f"{self.config_port.get_resource_prefix('asg')}{request_id}"
-
-            user_tags: list[dict[str, str]] = [{"Key": "Name", "Value": asg_name_tag}]
-            if aws_template.tags:
-                user_tags.extend(
-                    [{"Key": k, "Value": str(v)} for k, v in aws_template.tags.items()]
-                )
-
-            flat_tags = merge_tags(
-                user_tags,
-                build_system_tags(
-                    request_id=request_id,
-                    template_id=str(aws_template.template_id),
-                    provider_api="ASG",
-                ),
+            flat_tags = self._build_resource_tags(
+                request_id=request_id,
+                template=aws_template,
+                resource_prefix_key="asg",
+                provider_api="ASG",
             )
 
             # ASG create_or_update_tags requires ResourceId, ResourceType, PropagateAtLaunch
@@ -550,7 +546,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 template_id="ASG-OnDemand",
                 name="Auto Scaling Group On-Demand",
                 description="Auto Scaling Group with on-demand instances only",
-                provider_api="AutoScalingGroup",
+                provider_api="ASG",
                 instance_type="t3.medium",
                 image_id="ami-12345678",
                 max_instances=15,
@@ -563,7 +559,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 template_id="ASG-Spot",
                 name="Auto Scaling Group Spot",
                 description="Auto Scaling Group with spot instances only",
-                provider_api="AutoScalingGroup",
+                provider_api="ASG",
                 instance_type="t3.medium",
                 image_id="ami-12345678",
                 max_instances=20,
@@ -577,7 +573,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 template_id="ASG-Mixed",
                 name="Auto Scaling Group Mixed",
                 description="Auto Scaling Group with mixed on-demand and spot instances",
-                provider_api="AutoScalingGroup",
+                provider_api="ASG",
                 machine_types={"t3.medium": 1, "t3.large": 2},
                 image_id="ami-12345678",
                 max_instances=25,

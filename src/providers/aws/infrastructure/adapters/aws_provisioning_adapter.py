@@ -442,7 +442,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
                         asg = response["AutoScalingGroups"][0]
                         return {
                             "resource_id": resource_id,
-                            "resource_type": "auto_scaling_group",
+                            "resource_type": "ASG",
                             "status": "active",
                             "desired_capacity": asg["DesiredCapacity"],
                             "current_capacity": len(asg["Instances"]),

@@ -89,7 +89,7 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
             "EC2Fleet",
             "SpotFleet",
             "RunInstances",
-            "AutoScalingGroup",
+            "ASG",
         ]:
             return "aws"
 

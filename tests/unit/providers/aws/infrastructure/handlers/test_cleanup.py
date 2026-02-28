@@ -254,10 +254,9 @@ class TestEC2FleetCleanupOnReturn:
     def test_full_return_triggers_lt_cleanup(self):
         config_port = _make_config_port()
         handler = _make_ec2_fleet_handler(config_port=config_port)
-        mock_delete_lt = MagicMock()
-        handler._fleet_release_manager._delete_orb_launch_template = mock_delete_lt
 
-        with patch.object(handler._fleet_release_manager, "_delete_fleet") as mock_delete_fleet:
+        with patch.object(handler._fleet_release_manager, "_delete_fleet") as mock_delete_fleet, \
+             patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt:
             handler._release_hosts_for_single_ec2_fleet(
                 "fleet-123",
                 ["i-1", "i-2"],
@@ -269,10 +268,9 @@ class TestEC2FleetCleanupOnReturn:
     def test_partial_return_does_not_trigger_lt_cleanup(self):
         config_port = _make_config_port()
         handler = _make_ec2_fleet_handler(config_port=config_port)
-        mock_delete_lt = MagicMock()
-        handler._fleet_release_manager._delete_orb_launch_template = mock_delete_lt
 
-        with patch.object(handler._fleet_release_manager, "_delete_fleet") as mock_delete_fleet:
+        with patch.object(handler._fleet_release_manager, "_delete_fleet") as mock_delete_fleet, \
+             patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt:
             handler._release_hosts_for_single_ec2_fleet(
                 "fleet-123",
                 ["i-1"],
@@ -284,10 +282,9 @@ class TestEC2FleetCleanupOnReturn:
     def test_ec2_fleet_cleanup_disabled_skips_lt(self):
         config_port = _make_config_port(ec2_fleet=False)
         handler = _make_ec2_fleet_handler(config_port=config_port)
-        mock_delete_lt = MagicMock()
-        handler._fleet_release_manager._delete_orb_launch_template = mock_delete_lt
 
-        with patch.object(handler._fleet_release_manager, "_delete_fleet") as mock_delete_fleet:
+        with patch.object(handler._fleet_release_manager, "_delete_fleet") as mock_delete_fleet, \
+             patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt:
             handler._release_hosts_for_single_ec2_fleet(
                 "fleet-123",
                 ["i-1", "i-2"],
@@ -299,10 +296,9 @@ class TestEC2FleetCleanupOnReturn:
     def test_missing_request_id_tag_skips_lt(self):
         config_port = _make_config_port()
         handler = _make_ec2_fleet_handler(config_port=config_port)
-        mock_delete_lt = MagicMock()
-        handler._fleet_release_manager._delete_orb_launch_template = mock_delete_lt
 
-        with patch.object(handler._fleet_release_manager, "_delete_fleet"):
+        with patch.object(handler._fleet_release_manager, "_delete_fleet"), \
+             patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt:
             handler._release_hosts_for_single_ec2_fleet(
                 "fleet-123",
                 ["i-1", "i-2"],
@@ -332,8 +328,8 @@ class TestSpotFleetCleanupOnReturn:
         config_port = _make_config_port()
         handler = _make_spot_fleet_handler(config_port=config_port)
 
-        with patch.object(handler._release_manager, "_retry_with_backoff", create=True), \
-             patch.object(handler._release_manager, "_delete_orb_launch_template") as mock_delete_lt:
+        with patch.object(handler._release_manager, "_retry", create=True), \
+             patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt:
             handler._release_hosts_for_single_spot_fleet(
                 "sfr-123",
                 ["i-1", "i-2"],
@@ -345,7 +341,7 @@ class TestSpotFleetCleanupOnReturn:
         config_port = _make_config_port()
         handler = _make_spot_fleet_handler(config_port=config_port)
 
-        with patch.object(handler._release_manager, "_delete_orb_launch_template") as mock_delete_lt:
+        with patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt:
             handler._release_hosts_for_single_spot_fleet(
                 "sfr-123",
                 ["i-1"],
@@ -357,7 +353,7 @@ class TestSpotFleetCleanupOnReturn:
         config_port = _make_config_port(spot_fleet=False)
         handler = _make_spot_fleet_handler(config_port=config_port)
 
-        with patch.object(handler._release_manager, "_delete_orb_launch_template") as mock_delete_lt:
+        with patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt:
             handler._release_hosts_for_single_spot_fleet(
                 "sfr-123",
                 ["i-1", "i-2"],
@@ -369,7 +365,7 @@ class TestSpotFleetCleanupOnReturn:
         config_port = _make_config_port()
         handler = _make_spot_fleet_handler(config_port=config_port)
 
-        with patch.object(handler._release_manager, "_delete_orb_launch_template") as mock_delete_lt:
+        with patch.object(handler, "_delete_orb_launch_template") as mock_delete_lt:
             handler._release_hosts_for_single_spot_fleet(
                 "sfr-123",
                 ["i-1", "i-2"],

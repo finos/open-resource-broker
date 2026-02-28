@@ -183,7 +183,7 @@ class TestAWSProviderEnvironmentVariables:
         try:
             from providers.aws.configuration.config import AWSProviderConfig
 
-            handlers_json = '{"ec2_fleet": false, "spot_fleet": true, "auto_scaling_group": false}'
+            handlers_json = '{"ec2_fleet": false, "spot_fleet": true, "asg": false}'
             launch_template_json = '{"create_per_request": false, "reuse_existing": true}'
 
             with patch.dict(

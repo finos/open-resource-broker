@@ -11,9 +11,10 @@ from domain.base.ports import LoggingPort
 from domain.base.ports.configuration_port import ConfigurationPort
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from domain.request.aggregate import Request
+from providers.aws.infrastructure.handlers.base_config_builder import BaseConfigBuilder
 
 
-class ASGConfigBuilder:
+class ASGConfigBuilder(BaseConfigBuilder):
     """Builds the CreateAutoScalingGroup API parameter dict for a given request."""
 
     def __init__(
@@ -22,9 +23,32 @@ class ASGConfigBuilder:
         config_port: Optional[ConfigurationPort],
         logger: LoggingPort,
     ) -> None:
-        self._native_spec_service = native_spec_service
-        self._config_port = config_port
-        self._logger = logger
+        super().__init__(native_spec_service, config_port, logger)
+
+    def _api_key(self) -> str:
+        return "asg"
+
+    def _inject_launch_template(
+        self,
+        native_spec: dict[str, Any],
+        template: AWSTemplate,
+        lt_id: str,
+        lt_version: str,
+    ) -> None:
+        """Patch LT id/version into the ASG native spec in-place."""
+        if "MixedInstancesPolicy" in native_spec:
+            mip = native_spec["MixedInstancesPolicy"]
+            lt_spec = mip.setdefault("LaunchTemplate", {}).setdefault(
+                "LaunchTemplateSpecification", {}
+            )
+            lt_spec.setdefault("LaunchTemplateId", lt_id)
+            lt_spec.setdefault("Version", lt_version)
+            native_spec.pop("LaunchTemplate", None)
+        else:
+            if "LaunchTemplate" not in native_spec:
+                native_spec["LaunchTemplate"] = {}
+            native_spec["LaunchTemplate"]["LaunchTemplateId"] = lt_id
+            native_spec["LaunchTemplate"]["Version"] = lt_version
 
     def build(
         self,
@@ -40,43 +64,18 @@ class ASGConfigBuilder:
         when no native spec service is configured or the spec renders nothing.
         """
         if self._native_spec_service:
-            context = self._prepare_template_context(template, request)
-            context.update(
-                {
-                    "launch_template_id": lt_id,
-                    "launch_template_version": lt_version,
-                    "asg_name": asg_name,
-                    "new_instances_protected_from_scale_in": True,
-                }
-            )
-
-            native_spec = self._native_spec_service.process_provider_api_spec_with_merge(
-                template, request, "asg", context
-            )
+            extra = {
+                "asg_name": asg_name,
+                "new_instances_protected_from_scale_in": True,
+            }
+            native_spec = self._process_native_spec(template, request, lt_id, lt_version, extra)
             if native_spec:
-                if "MixedInstancesPolicy" in native_spec:
-                    mip = native_spec["MixedInstancesPolicy"]
-                    lt_spec = mip.setdefault("LaunchTemplate", {}).setdefault(
-                        "LaunchTemplateSpecification", {}
-                    )
-                    lt_spec.setdefault("LaunchTemplateId", lt_id)
-                    lt_spec.setdefault("Version", lt_version)
-                    native_spec.pop("LaunchTemplate", None)
-                else:
-                    if "LaunchTemplate" not in native_spec:
-                        native_spec["LaunchTemplate"] = {}
-                    native_spec["LaunchTemplate"]["LaunchTemplateId"] = lt_id
-                    native_spec["LaunchTemplate"]["Version"] = lt_version
                 native_spec["AutoScalingGroupName"] = asg_name
                 native_spec.setdefault("NewInstancesProtectedFromScaleIn", True)
-                self._logger.info(
-                    "Using native provider API spec with merge for ASG template %s",
-                    template.template_id,
-                )
                 self._ensure_abis_in_native_spec(native_spec, template, lt_id, lt_version)
                 return native_spec
 
-            return self._native_spec_service.render_default_spec("asg", context)
+            return self._render_default(template, request, lt_id, lt_version, extra)
 
         return self._build_legacy(asg_name, template, request, lt_id, lt_version)
 

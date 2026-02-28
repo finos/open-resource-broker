@@ -35,7 +35,7 @@ class EC2FleetReleaseManager:
         retry_fn: Callable[..., Any],
         paginate_fn: Callable[..., Any],
         collect_with_next_token_fn: Callable[..., Any],
-        delete_orb_launch_template_fn: Callable[[str], None],
+        cleanup_on_zero_capacity_fn: Callable[[str, str], None],
     ) -> None:
         self._aws_client = aws_client
         self._aws_ops = aws_ops
@@ -45,7 +45,7 @@ class EC2FleetReleaseManager:
         self._retry = retry_fn
         self._paginate = paginate_fn
         self._collect_with_next_token = collect_with_next_token_fn
-        self._delete_orb_launch_template = delete_orb_launch_template_fn
+        self._cleanup_on_zero_capacity = cleanup_on_zero_capacity_fn
 
     # ------------------------------------------------------------------
     # Public interface
@@ -222,15 +222,7 @@ class EC2FleetReleaseManager:
 
     def _maybe_cleanup_launch_template(self, fleet_details: dict[str, Any]) -> None:
         """Delete the ORB launch template associated with this fleet, if cleanup is enabled."""
-        cleanup: dict = {}
-        if self._config_port is not None:
-            try:
-                cleanup = self._config_port.get_cleanup_config()
-            except Exception:
-                pass
-
-        if cleanup.get("enabled", True) and cleanup.get("resources", {}).get("ec2_fleet", True):
-            tags = {t["Key"]: t["Value"] for t in fleet_details.get("Tags", [])}
-            request_id = tags.get("orb:request-id", "")
-            if request_id:
-                self._delete_orb_launch_template(request_id)
+        tags = {t["Key"]: t["Value"] for t in fleet_details.get("Tags", [])}
+        request_id = tags.get("orb:request-id", "")
+        if request_id:
+            self._cleanup_on_zero_capacity("ec2_fleet", request_id)

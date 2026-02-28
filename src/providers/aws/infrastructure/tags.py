@@ -9,6 +9,7 @@ Key starts with ``orb:`` are silently stripped to prevent spoofing.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
 
 SYSTEM_TAG_PREFIX = "orb:"
 
@@ -40,6 +41,45 @@ def build_system_tags(
         {"Key": "orb:provider-api", "Value": provider_api},
         {"Key": "orb:created-at", "Value": ts},
     ]
+
+
+def build_resource_tags(
+    config_port: Any,
+    request_id: str,
+    template_id: str,
+    resource_prefix_key: str,
+    provider_api: str,
+    template_tags: dict[str, Any] | None = None,
+) -> list[dict[str, str]]:
+    """Build the flat tag list for an AWS resource.
+
+    Combines a Name tag (prefix + request_id), any template-level tags, and
+    the standard ORB system tags into a single merged list.
+
+    Args:
+        config_port:        ConfigurationPort used to resolve the resource prefix.
+        request_id:         The ORB request UUID (string).
+        template_id:        The ORB template UUID (string).
+        resource_prefix_key: Key passed to ``config_port.get_resource_prefix``
+                             (e.g. ``"fleet"``, ``"spot_fleet"``, ``"asg"``).
+        provider_api:       AWS API label for the system tag (e.g. ``"EC2Fleet"``).
+        template_tags:      Optional dict of user-supplied tags from the template.
+
+    Returns:
+        Merged list of ``{"Key": k, "Value": v}`` dicts ready for AWS API calls.
+    """
+    prefix = config_port.get_resource_prefix(resource_prefix_key)
+    user_tags: list[dict[str, str]] = [{"Key": "Name", "Value": f"{prefix}{request_id}"}]
+    if template_tags:
+        user_tags.extend([{"Key": k, "Value": str(v)} for k, v in template_tags.items()])
+    return merge_tags(
+        user_tags,
+        build_system_tags(
+            request_id=request_id,
+            template_id=template_id,
+            provider_api=provider_api,
+        ),
+    )
 
 
 def merge_tags(
