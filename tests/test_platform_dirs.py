@@ -284,7 +284,7 @@ class TestGetWorkLocation:
         """Test work location relative to config location."""
         with (
             patch.dict(os.environ, {}, clear=True),
-            patch("src.config.platform_dirs.get_config_location") as mock_config,
+            patch("config.platform_dirs.get_config_location") as mock_config,
         ):
             mock_config.return_value = Path("/base/config")
 
@@ -295,7 +295,7 @@ class TestGetWorkLocation:
         """Test empty ORB_WORK_DIR is ignored."""
         with (
             patch.dict(os.environ, {"ORB_WORK_DIR": ""}, clear=True),
-            patch("src.config.platform_dirs.get_config_location") as mock_config,
+            patch("config.platform_dirs.get_config_location") as mock_config,
         ):
             mock_config.return_value = Path("/base/config")
 
@@ -316,7 +316,7 @@ class TestGetLogsLocation:
         """Test logs location relative to config location."""
         with (
             patch.dict(os.environ, {}, clear=True),
-            patch("src.config.platform_dirs.get_config_location") as mock_config,
+            patch("config.platform_dirs.get_config_location") as mock_config,
         ):
             mock_config.return_value = Path("/base/config")
 
@@ -327,7 +327,7 @@ class TestGetLogsLocation:
         """Test empty ORB_LOG_DIR is ignored."""
         with (
             patch.dict(os.environ, {"ORB_LOG_DIR": ""}, clear=True),
-            patch("src.config.platform_dirs.get_config_location") as mock_config,
+            patch("config.platform_dirs.get_config_location") as mock_config,
         ):
             mock_config.return_value = Path("/base/config")
 
@@ -340,7 +340,7 @@ class TestGetScriptsLocation:
 
     def test_relative_to_config(self):
         """Test scripts location relative to config location."""
-        with patch("src.config.platform_dirs.get_config_location") as mock_config:
+        with patch("config.platform_dirs.get_config_location") as mock_config:
             mock_config.return_value = Path("/base/config")
 
             result = get_scripts_location()
@@ -368,7 +368,7 @@ class TestEnvironmentOverrides:
         """Test partial environment variable overrides."""
         with (
             patch.dict(os.environ, {"ORB_CONFIG_DIR": "/env/config"}, clear=True),
-            patch("src.config.platform_dirs.get_config_location") as mock_config,
+            patch("config.platform_dirs.get_config_location") as mock_config,
         ):
             # Config uses env var
             assert get_config_location() == Path("/env/config")
