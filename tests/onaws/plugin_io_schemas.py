@@ -204,11 +204,6 @@ expected_request_status_schema_default = {
                             "running",
                             "complete",
                             "complete_with_error",
-                            "in_progress",
-                            "failed",
-                            "partial",
-                            "cancelled",
-                            "timeout",
                         ],
                     },
                     "machines": {

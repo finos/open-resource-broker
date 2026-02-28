@@ -175,7 +175,7 @@ class Template(BaseModel):
         """Add a subnet ID."""
         if subnet_id not in self.subnet_ids:
             new_subnets = [*self.subnet_ids, subnet_id]
-            fields = self.model_dump()
+            fields = self.model_dump(mode="json")
             fields["subnet_ids"] = new_subnets
             fields["updated_at"] = datetime.now()
             return self.__class__.model_validate(fields)
@@ -185,7 +185,7 @@ class Template(BaseModel):
         """Remove a subnet ID."""
         if subnet_id in self.subnet_ids:
             new_subnets = [s for s in self.subnet_ids if s != subnet_id]
-            fields = self.model_dump()
+            fields = self.model_dump(mode="json")
             fields["subnet_ids"] = new_subnets
             fields["updated_at"] = datetime.now()
             return self.__class__.model_validate(fields)
@@ -195,7 +195,7 @@ class Template(BaseModel):
         """Add a security group ID."""
         if security_group_id not in self.security_group_ids:
             new_sgs = [*self.security_group_ids, security_group_id]
-            fields = self.model_dump()
+            fields = self.model_dump(mode="json")
             fields["security_group_ids"] = new_sgs
             fields["updated_at"] = datetime.now()
             return self.__class__.model_validate(fields)
@@ -205,7 +205,7 @@ class Template(BaseModel):
         """Remove a security group ID."""
         if security_group_id in self.security_group_ids:
             new_sgs = [sg for sg in self.security_group_ids if sg != security_group_id]
-            fields = self.model_dump()
+            fields = self.model_dump(mode="json")
             fields["security_group_ids"] = new_sgs
             fields["updated_at"] = datetime.now()
             return self.__class__.model_validate(fields)
@@ -213,7 +213,7 @@ class Template(BaseModel):
 
     def set_provider_config(self, config: dict[str, Any]) -> "Template":
         """Set provider-specific configuration."""
-        fields = self.model_dump()
+        fields = self.model_dump(mode="json")
         fields["provider_config"] = {**self.provider_config, **config}  # type: ignore[attr-defined]
         fields["updated_at"] = datetime.now()
         return Template.model_validate(fields)

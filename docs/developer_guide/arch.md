@@ -1,3 +1,4 @@
+```mermaid
 graph TD
     %% Interface Layer
     subgraph "Interface Layer"
@@ -133,3 +134,4 @@ graph TD
     class AGG1,AGG2,AGG3,PORTS,EVENTS domain
     class DI,PREG,SREG,STREG,AWS,K8S,OTHERPROV,HF,DEF,LSF,JSON,DYNAMO,SQL infrastructure
     class AWSAPI,K8SAPI,OTHERCLOUD,SYMPHONY,LSFAPI,CLOUDNATIVE,FILESYSTEM,SELFDB,MANAGEDDB external
+```

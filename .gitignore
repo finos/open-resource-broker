@@ -86,6 +86,7 @@ Thumbs.db
 .venv
 env/
 venv/
+test/
 ENV/
 env.bak/
 venv.bak/

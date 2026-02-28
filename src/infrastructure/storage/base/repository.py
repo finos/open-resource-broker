@@ -16,16 +16,18 @@ T = TypeVar("T")  # Entity type
 class StrategyBasedRepository(Repository[T], Generic[T]):
     """Repository implementation using a storage strategy."""
 
-    def __init__(self, entity_class: type, storage_strategy) -> None:
+    def __init__(self, entity_class: type, storage_strategy, event_bus=None) -> None:
         """
         Initialize repository.
 
         Args:
             entity_class: Entity class
             storage_strategy: Storage strategy to use
+            event_bus: Optional event bus for publishing domain events after save
         """
         self.entity_class = entity_class
         self.storage_strategy = storage_strategy
+        self.event_bus = event_bus
         self._cache: dict[str, T] = {}
         self._version_map: dict[str, int] = {}
         self.logger = get_logger(__name__)
@@ -166,41 +168,26 @@ class StrategyBasedRepository(Repository[T], Generic[T]):
             )
 
             # Publish events after successful save
-            if events:
-                # Lazy import to avoid circular imports
+            if events and self.event_bus is not None:
                 import asyncio
 
-                from infrastructure.events import get_event_bus
+                event_bus = self.event_bus
 
-                event_bus = get_event_bus()
-
-                # Handle both new EventBus and legacy publisher
+                # Handle both new EventBus (async publish) and legacy publisher (sync)
                 if hasattr(event_bus, "publish") and asyncio.iscoroutinefunction(event_bus.publish):
-                    # New EventBus (async)
                     for event in events:
                         try:
-                            # Run async publish in sync context
                             loop = asyncio.get_event_loop()
                             if loop.is_running():
-                                # If we're already in an async context, create a task
                                 _ = asyncio.create_task(event_bus.publish(event))
                             else:
-                                # If we're in sync context, run the coroutine
                                 loop.run_until_complete(event_bus.publish(event))
-                        except Exception:
-                            # Fallback to sync publish if available
-                            if hasattr(event_bus, "publish"):
-                                try:
-                                    result = event_bus.publish(event)  # type: ignore[assignment]
-                                    _ = result  # suppress unused coroutine warning
-                                except Exception as sync_error:
-                                    self.logger.error(
-                                        "Failed to publish event %s via sync fallback: %s",
-                                        event.__class__.__name__,
-                                        sync_error,
-                                    )
-                                    # Event publishing failed completely - this is
-                                    # serious for domain consistency
+                        except Exception as publish_error:
+                            self.logger.error(
+                                "Failed to publish event %s: %s",
+                                event.__class__.__name__,
+                                publish_error,
+                            )
                 else:
                     # Legacy publisher (sync)
                     for event in events:

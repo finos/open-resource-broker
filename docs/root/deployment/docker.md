@@ -182,7 +182,7 @@ docker logs -f orb-api
 docker exec -it orb-api bash
 
 # Run CLI commands
-docker exec orb-api python src/run.py templates list
+docker exec orb-api orb templates list
 
 # Health check
 docker exec orb-api curl -f http://localhost:8000/health

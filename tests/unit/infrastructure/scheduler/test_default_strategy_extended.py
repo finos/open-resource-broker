@@ -75,12 +75,12 @@ class TestFormatRequestResponse:
 
 
 class TestFormatRequestStatusResponse:
-    """Tests for DefaultSchedulerStrategy.format_request_status_response (domain pass-through)."""
+    """Tests for DefaultSchedulerStrategy.format_request_status_response (IBM HF spec mapping)."""
 
     def setup_method(self):
         self.strategy = make_strategy()
 
-    def test_returns_domain_native_format(self):
+    def test_returns_hf_mapped_statuses(self):
         dto1 = MagicMock()
         dto1.to_dict.return_value = {"request_id": "r1", "status": "complete"}
         dto2 = MagicMock()
@@ -91,14 +91,28 @@ class TestFormatRequestStatusResponse:
         assert "requests" in result
         assert len(result["requests"]) == 2
         assert result["requests"][0]["request_id"] == "r1"
-        assert result["requests"][1]["status"] == "pending"
+        # "complete" -> "complete", "pending" -> "running"
+        assert result["requests"][0]["status"] == "complete"
+        assert result["requests"][1]["status"] == "running"
 
-    def test_status_strings_passed_through_unchanged(self):
-        dto = MagicMock()
-        dto.to_dict.return_value = {"request_id": "r1", "status": "in_progress"}
-        result = self.strategy.format_request_status_response([dto])
-        # Domain status values must not be remapped
-        assert result["requests"][0]["status"] == "in_progress"
+    def test_domain_statuses_mapped_to_hf_spec(self):
+        # IBM HF spec only allows: running, complete, complete_with_error
+        cases = [
+            ("pending", "running"),
+            ("in_progress", "running"),
+            ("complete", "complete"),
+            ("failed", "complete_with_error"),
+            ("partial", "complete_with_error"),
+            ("cancelled", "complete_with_error"),
+            ("timeout", "complete_with_error"),
+        ]
+        for domain_status, expected_hf_status in cases:
+            dto = MagicMock()
+            dto.to_dict.return_value = {"request_id": "r1", "status": domain_status}
+            result = self.strategy.format_request_status_response([dto])
+            assert result["requests"][0]["status"] == expected_hf_status, (
+                f"Expected {domain_status!r} -> {expected_hf_status!r}"
+            )
 
     def test_count_field_present(self):
         dto = MagicMock()
