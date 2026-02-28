@@ -19,7 +19,7 @@ from domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
 from domain.services.generic_filter_service import GenericFilterService
 from domain.template.factory import TemplateFactory, get_default_template_factory
 from domain.template.template_aggregate import Template
-from infrastructure.template.dtos import TemplateDTO  # noqa: PLC0415
+from infrastructure.template.dtos import TemplateDTO
 
 
 @query_handler(GetTemplateQuery)

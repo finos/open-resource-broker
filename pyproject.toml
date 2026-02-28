@@ -269,6 +269,7 @@ ignore = [
     "E402",   # Module imports not at top - acceptable in scripts/tests
     "E712",   # Equality comparisons to True - style preference
     "E721",   # Type comparisons - style preference
+    "B009",   # getattr with constant — used intentionally after hasattr guards for duck-typing
     "B007",   # Unused loop variables - cosmetic
     "B904",   # Missing exception chaining - important but large effort
     "B024",   # Abstract base class without abstract methods - design choice
@@ -350,7 +351,7 @@ warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
 strict_equality = true
-mypy_path = "src"
+explicit_package_bases = true
 namespace_packages = true
 
 [tool.semantic_release]

@@ -200,11 +200,11 @@ class TemplateFactory(BaseTemplateFactory):
             return "aws"
 
         # Could add similar logic for other providers
-        # noqa:COMMENTED section-start
+        # section-start
         # provider1_specific_fields = {'vm_size', 'os_disk_type', ...}
         # if any(field in template_data for field in provider1_specific_fields):
         #     return 'provider1'
-        # noqa:COMMENTED section-end
+        # section-end
 
         return None
 

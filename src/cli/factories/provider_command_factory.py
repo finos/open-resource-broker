@@ -1,6 +1,5 @@
 """Provider command factory for creating provider-related commands and queries."""
 
-import json
 from typing import Any, Optional
 
 from application.provider.commands import ExecuteProviderOperationCommand
