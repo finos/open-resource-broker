@@ -90,9 +90,20 @@ class AWSHandlerFactory:
         )
         from providers.aws.utilities.aws_operations import AWSOperations
 
+        # Resolve ConfigurationPort from the container at construction time,
+        # falling back to the factory's stored config if the container is unavailable.
+        config_port = self._config
+        try:
+            from domain.base.ports.configuration_port import ConfigurationPort
+            from infrastructure.di.container import get_container
+
+            config_port = get_container().get(ConfigurationPort)
+        except Exception:
+            pass
+
         # Construct AWSNativeSpecService if application services are available
         aws_native_spec_service = None
-        if self._config is not None:
+        if config_port is not None:
             try:
                 from infrastructure.di.container import get_container
 
@@ -101,7 +112,7 @@ class AWSHandlerFactory:
 
                 aws_native_spec_service = AWSNativeSpecService(
                     native_spec_service=container.get(NativeSpecService),
-                    config_port=self._config,
+                    config_port=config_port,
                 )
             except Exception:
                 pass
@@ -113,13 +124,13 @@ class AWSHandlerFactory:
         launch_template_manager = AWSLaunchTemplateManager(
             aws_client=self._aws_client,
             logger=self._logger,
-            config_port=self._config,
+            config_port=config_port,
             aws_native_spec_service=aws_native_spec_service,
         )
         aws_ops = AWSOperations(
             aws_client=self._aws_client,
             logger=self._logger,
-            config_port=self._config,
+            config_port=config_port,
         )
 
         handler = handler_class(
@@ -128,7 +139,7 @@ class AWSHandlerFactory:
             aws_ops=aws_ops,
             launch_template_manager=launch_template_manager,
             machine_adapter=machine_adapter,
-            config_port=self._config,
+            config_port=config_port,
         )
 
         # Cache the handler for future use

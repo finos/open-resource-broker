@@ -429,6 +429,24 @@ def register_aws_services_with_di(container) -> None:
         container.register_singleton(TemplateAdapterPort, create_aws_template_adapter)
         logger.debug("AWS Template Adapter registered with DI container")
 
+        # Register TemplateExampleGeneratorPort backed by AWSHandlerFactory.
+        # The factory is constructed with no AWS client because generate_example_templates
+        # only calls handler classmethods — no live AWS connection is needed.
+        from domain.base.ports.template_example_generator_port import TemplateExampleGeneratorPort
+        from infrastructure.adapters.template_example_generator_adapter import (
+            AWSTemplateExampleGeneratorAdapter,
+        )
+        from providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
+
+        def create_template_example_generator(c):
+            factory = AWSHandlerFactory(aws_client=None, logger=c.get(LoggingPort))  # type: ignore[arg-type]
+            return AWSTemplateExampleGeneratorAdapter(aws_handler_factory=factory)
+
+        container.register_singleton(
+            TemplateExampleGeneratorPort, create_template_example_generator
+        )
+        logger.debug("TemplateExampleGeneratorPort registered with DI container")
+
         logger.debug("AWS utility services registered with DI container")
 
     except Exception as e:
