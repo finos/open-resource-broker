@@ -692,7 +692,9 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
         HostFactory scripts log to file by default, console only if enabled.
         """
         # 1. Config file override
-        if (val := getattr(self.config_manager.app_config.scheduler, "console_enabled", None)) is not None:
+        if (
+            val := getattr(self.config_manager.app_config.scheduler, "console_enabled", None)
+        ) is not None:
             return bool(val)
         # 2. Scheduler-specific env var (HF_LOGGING_CONSOLE_ENABLED via _get_scheduler_env_var)
         if val := self._get_scheduler_env_var("CONSOLE_ENABLED"):

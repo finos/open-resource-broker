@@ -429,48 +429,6 @@ def register_aws_services_with_di(container) -> None:
         container.register_singleton(TemplateAdapterPort, create_aws_template_adapter)
         logger.debug("AWS Template Adapter registered with DI container")
 
-        # Register AWS Machine Adapter
-        from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
-
-        def create_machine_adapter(c):
-            from providers.aws.infrastructure.aws_client import AWSClient
-
-            aws_client = c.get(AWSClient)
-            logger_port = c.get(LoggingPort)
-            return AWSMachineAdapter(aws_client, logger_port)
-
-        container.register_singleton(AWSMachineAdapter, create_machine_adapter)
-        logger.debug("AWS Machine Adapter registered with DI container")
-
-        # Register AWS-specific utility services only
-        from providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
-
-        # Image resolution now handled by generic service in provider strategy
-        # No need for separate AMI resolver registration
-
-        # Register AWS Launch Template Manager
-        container.register_singleton(AWSLaunchTemplateManager)
-        logger.debug("AWS Launch Template Manager registered with DI container")
-
-        # Register AWS Native Spec Service if not already registered
-        from providers.aws.infrastructure.services.aws_native_spec_service import (
-            AWSNativeSpecService,
-        )
-
-        if not container.is_registered(AWSNativeSpecService):
-
-            def create_aws_native_spec_service(c):
-                from application.services.native_spec_service import NativeSpecService
-                from domain.base.ports.configuration_port import ConfigurationPort
-
-                return AWSNativeSpecService(
-                    native_spec_service=c.get(NativeSpecService),
-                    config_port=c.get(ConfigurationPort),
-                )
-
-            container.register_singleton(AWSNativeSpecService, create_aws_native_spec_service)
-            logger.debug("AWS Native Spec Service registered with DI container")
-
         logger.debug("AWS utility services registered with DI container")
 
     except Exception as e:

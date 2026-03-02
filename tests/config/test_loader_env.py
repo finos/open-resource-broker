@@ -1,6 +1,5 @@
 """Tests for ConfigurationLoader environment variable handling."""
 
-
 from config.loader import ConfigurationLoader
 
 

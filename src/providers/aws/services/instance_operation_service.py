@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING, Optional
 
 from domain.base.ports import LoggingPort
+from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 from providers.base.strategy import ProviderOperation, ProviderResult
 
 if TYPE_CHECKING:
@@ -20,12 +21,14 @@ class AWSInstanceOperationService:
         aws_client: "AWSClient",
         logger: LoggingPort,
         provisioning_adapter: "AWSProvisioningAdapter",
+        machine_adapter: AWSMachineAdapter,
         provider_name: Optional[str] = None,
         provider_type: str = "aws",
     ):
         self._aws_client = aws_client
         self._logger = logger
         self._provisioning_adapter = provisioning_adapter
+        self._machine_adapter = machine_adapter
         self._provider_name = provider_name
         self._provider_type = provider_type
 
@@ -183,13 +186,20 @@ class AWSInstanceOperationService:
                     "Instance IDs are required for status query", "MISSING_INSTANCE_IDS"
                 )
 
+            provider_api = operation.parameters.get("provider_api", "RunInstances")
             response = self._aws_client.ec2_client.describe_instances(InstanceIds=instance_ids)
 
-            # Return raw AWS instances for domain layer processing
             instances = []
             for reservation in response["Reservations"]:
                 for aws_instance in reservation["Instances"]:
-                    instances.append(aws_instance)  # Raw AWS data
+                    instances.append(
+                        self._machine_adapter.create_machine_from_aws_instance(
+                            aws_instance,
+                            request_id="",
+                            provider_api=provider_api,
+                            resource_id="",
+                        )
+                    )
 
             return ProviderResult.success_result(
                 {"instances": instances, "queried_count": len(instance_ids)},
@@ -296,39 +306,3 @@ class AWSInstanceOperationService:
                 f"Failed to describe resource instances: {e}",
                 "DESCRIBE_RESOURCE_INSTANCES_ERROR",
             )
-
-    def _convert_aws_instance_to_machine(self, aws_instance: dict) -> dict:
-        """Convert AWS instance to domain machine format."""
-        from domain.machine.machine_status import MachineStatus
-
-        aws_state = aws_instance.get("State", {})
-        state_name = (
-            aws_state.get("Name", "unknown") if isinstance(aws_state, dict) else str(aws_state)
-        )
-
-        status_mapping = {
-            "pending": MachineStatus.PENDING,
-            "running": MachineStatus.RUNNING,
-            "shutting-down": MachineStatus.SHUTTING_DOWN,
-            "terminated": MachineStatus.TERMINATED,
-            "stopping": MachineStatus.STOPPING,
-            "stopped": MachineStatus.STOPPED,
-        }
-        machine_status = status_mapping.get(state_name, MachineStatus.UNKNOWN)
-
-        return {
-            "InstanceId": aws_instance.get("InstanceId"),
-            "status": machine_status.value,
-            "PrivateIpAddress": aws_instance.get("PrivateIpAddress"),
-            "PublicIpAddress": aws_instance.get("PublicIpAddress"),
-            "LaunchTime": aws_instance.get("LaunchTime"),
-            "InstanceType": aws_instance.get("InstanceType"),
-            "SubnetId": aws_instance.get("SubnetId"),
-            "VpcId": aws_instance.get("VpcId"),
-            "Placement": {
-                "AvailabilityZone": aws_instance.get("Placement", {}).get("AvailabilityZone")
-            },
-            "Tags": aws_instance.get("Tags", []),
-            "PrivateDnsName": aws_instance.get("PrivateDnsName"),
-            "PublicDnsName": aws_instance.get("PublicDnsName"),
-        }

@@ -334,7 +334,6 @@ class GetSystemStatusHandler(BaseQueryHandler[GetSystemStatusQuery, SystemStatus
             raise
 
 
-
 @query_handler(ValidateStorageQuery)
 class ValidateStorageHandler(BaseQueryHandler[ValidateStorageQuery, dict[str, Any]]):
     """Handler for validating storage connectivity."""

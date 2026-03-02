@@ -278,7 +278,9 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Provid
 
     async def execute_query(self, query: GetProviderMetricsQuery) -> ProviderMetricsDTO:
         """Execute provider metrics query."""
-        self.logger.info("Getting metrics for provider: %s, timeframe: %s", query.provider_name, query.timeframe)
+        self.logger.info(
+            "Getting metrics for provider: %s, timeframe: %s", query.provider_name, query.timeframe
+        )
 
         try:
             from datetime import datetime, timedelta, timezone
@@ -322,7 +324,9 @@ class GetProviderMetricsHandler(BaseQueryHandler[GetProviderMetricsQuery, Provid
                         "Provider metrics covering %d active providers", len(active_providers)
                     )
             except Exception as enrich_error:
-                self.logger.warning("Could not enrich metrics with provider details: %s", enrich_error)
+                self.logger.warning(
+                    "Could not enrich metrics with provider details: %s", enrich_error
+                )
 
             self.logger.info("Retrieved metrics for provider: %s", query.provider_name)
             return ProviderMetricsDTO(

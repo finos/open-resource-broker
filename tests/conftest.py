@@ -1,9 +1,23 @@
 """Global test configuration and fixtures."""
 
+import pytest
+
 # Files with broken imports that cannot be collected — exclude from default run.
 collect_ignore = [
     "integration/test_machine_status_cqrs_migration.py",
 ]
+
+
+def pytest_addoption(parser):
+    parser.addoption("--run-aws", action="store_true", default=False, help="Run tests requiring real AWS credentials")
+
+
+def pytest_collection_modifyitems(config, items):
+    if not config.getoption("--run-aws"):
+        skip = pytest.mark.skip(reason="requires real AWS credentials — pass --run-aws to run")
+        for item in items:
+            if "aws" in item.keywords:
+                item.add_marker(skip)
 
 
 import json
@@ -17,8 +31,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 from unittest.mock import Mock
-
-import pytest
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))

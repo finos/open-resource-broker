@@ -83,20 +83,51 @@ class AWSHandlerFactory:
         # Create the handler directly with factory's AWS client
         handler_class = self._handler_classes[handler_type]
 
-        # Get other dependencies from DI (not AWS client)
-        from infrastructure.di.container import get_container
         from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
         from providers.aws.infrastructure.launch_template.manager import AWSLaunchTemplateManager
+        from providers.aws.infrastructure.services.aws_native_spec_service import (
+            AWSNativeSpecService,
+        )
         from providers.aws.utilities.aws_operations import AWSOperations
 
-        container = get_container()
+        # Construct AWSNativeSpecService if application services are available
+        aws_native_spec_service = None
+        if self._config is not None:
+            try:
+                from infrastructure.di.container import get_container
+
+                container = get_container()
+                from application.services.native_spec_service import NativeSpecService
+
+                aws_native_spec_service = AWSNativeSpecService(
+                    native_spec_service=container.get(NativeSpecService),
+                    config_port=self._config,
+                )
+            except Exception:
+                pass
+
+        machine_adapter = AWSMachineAdapter(
+            aws_client=self._aws_client,
+            logger=self._logger,
+        )
+        launch_template_manager = AWSLaunchTemplateManager(
+            aws_client=self._aws_client,
+            logger=self._logger,
+            config_port=self._config,
+            aws_native_spec_service=aws_native_spec_service,
+        )
+        aws_ops = AWSOperations(
+            aws_client=self._aws_client,
+            logger=self._logger,
+            config_port=self._config,
+        )
 
         handler = handler_class(
             aws_client=self._aws_client,
             logger=self._logger,
-            aws_ops=container.get(AWSOperations),
-            launch_template_manager=container.get(AWSLaunchTemplateManager),
-            machine_adapter=container.get(AWSMachineAdapter),
+            aws_ops=aws_ops,
+            launch_template_manager=launch_template_manager,
+            machine_adapter=machine_adapter,
             config_port=self._config,
         )
 

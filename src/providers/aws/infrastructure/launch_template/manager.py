@@ -39,39 +39,26 @@ class LaunchTemplateResult:
 class AWSLaunchTemplateManager:
     """Manages AWS launch template creation and updates."""
 
-    def __init__(self, aws_client: AWSClient, logger: LoggingPort) -> None:
+    def __init__(
+        self,
+        aws_client: AWSClient,
+        logger: LoggingPort,
+        config_port: Optional[ConfigurationPort] = None,
+        aws_native_spec_service: Optional[Any] = None,
+    ) -> None:
         """
         Initialize the launch template manager.
 
         Args:
             aws_client: AWS client instance
             logger: Logger for logging messages
+            config_port: Configuration port for resource prefixes and package info
+            aws_native_spec_service: AWS native spec service for template rendering
         """
         self.aws_client = aws_client
         self._logger = logger
-
-        # Get configuration port from container for package info
-        from infrastructure.di.container import get_container
-
-        container = get_container()
-        try:
-            self.config_port: Optional[ConfigurationPort] = container.get(ConfigurationPort)
-        except Exception:
-            self.config_port = None
-
-        # Get AWS native spec service from container
-        from infrastructure.di.container import get_container
-
-        container = get_container()
-        try:
-            from providers.aws.infrastructure.services.aws_native_spec_service import (
-                AWSNativeSpecService,
-            )
-
-            self.aws_native_spec_service = container.get(AWSNativeSpecService)
-        except Exception:
-            # Service not available, native specs disabled
-            self.aws_native_spec_service = None
+        self.config_port = config_port
+        self.aws_native_spec_service = aws_native_spec_service
 
     def create_or_update_launch_template(
         self, aws_template: AWSTemplate, request: Request

@@ -298,16 +298,22 @@ class AWSProviderStrategy(ProviderStrategy):
             from providers.aws.infrastructure.adapters.aws_provisioning_adapter import (
                 AWSProvisioningAdapter,
             )
+            from providers.aws.infrastructure.adapters.machine_adapter import AWSMachineAdapter
 
             provisioning_adapter = AWSProvisioningAdapter(
                 aws_client=self.aws_client,  # type: ignore[arg-type]
                 logger=self._logger,
                 provider_strategy=self,
             )
+            machine_adapter = AWSMachineAdapter(
+                aws_client=self.aws_client,  # type: ignore[arg-type]
+                logger=self._logger,
+            )
             self._instance_service = AWSInstanceOperationService(
                 aws_client=self.aws_client,  # type: ignore[arg-type]
                 logger=self._logger,
                 provisioning_adapter=provisioning_adapter,
+                machine_adapter=machine_adapter,
                 provider_name=self._provider_name,
                 provider_type=self.provider_type,
             )
