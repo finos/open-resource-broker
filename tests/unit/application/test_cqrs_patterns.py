@@ -679,6 +679,8 @@ class TestQueryHandlerImplementation:
             logger=mock_logger,
             error_handler=mock_error_handler,
             container=mock_container,
+            provider_registry_service=Mock(),
+            machine_sync_service=Mock(),
         )
 
         # Mock UoW and repository with proper context manager
@@ -723,7 +725,6 @@ class TestQueryHandlerImplementation:
         mock_logger = Mock()
         mock_error_handler = Mock()
         mock_container = MagicMock()
-        mock_command_bus = Mock()
         mock_provider_registry = Mock()
         mock_container.get.return_value = Mock()
 
@@ -732,8 +733,8 @@ class TestQueryHandlerImplementation:
             logger=mock_logger,
             error_handler=mock_error_handler,
             container=mock_container,
-            command_bus=mock_command_bus,
             provider_registry_service=mock_provider_registry,
+            machine_sync_service=Mock(),
         )
 
         # Mock UoW and repository with proper context manager
