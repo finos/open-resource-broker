@@ -48,7 +48,7 @@ dependencies = [
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
     "sqlalchemy>=2.0.0",
-    "urllib3>=2.6.0", # Security: Fix CVE-2025-66471 and CVE-2025-66418
+    "urllib3>=2.6.3", # Security: Fix CVE-2025-66471, CVE-2025-66418, CVE-2026-21441
     "PyJWT>=2.8.0",
     "cryptography>=46.0.5", # Security: Fix CVE-2026-26007
     "filelock>=3.20.1", # Security: Fix CVE-2025-68146 race condition
@@ -94,6 +94,7 @@ ci = [
     # Code Quality Tools (ruff replaces black/isort/flake8/pylint)
     "ruff>=0.1.0",
     "pathspec>=0.11.0",  # For gitignore pattern matching in dev-tools
+    "pyright>=1.1.408,<2.0.0",
     "mypy>=1.6.1,<2.0.0",
     "bandit>=1.7.5,<2.0.0",
     "bandit-sarif-formatter>=1.1.1,<2.0.0",
