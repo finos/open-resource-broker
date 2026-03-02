@@ -2,195 +2,448 @@
   "scheduler_type": "hostfactory",
   "templates": [
     {
+      "createdAt": "2026-02-23T20:57:34.741006",
+      "templateId": "EC2Fleet-Instant-OnDemand",
+      "maxNumber": 10,
+      "providerApi": "EC2Fleet",
+      "name": "EC2 Fleet Instant On-Demand",
+      "providerType": "aws",
+      "subnetIds": [],
+      "securityGroupIds": [],
+      "vmTypes": {
+        "t3.medium": 1
+      },
+      "priceType": "ondemand",
+      "allocationStrategy": "lowest_price",
+      "instanceTags": {
+        "Environment": "dev",
+        "ManagedBy": "ORB"
+      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {}
+    },
+    {
+      "createdAt": "2026-02-23T20:57:34.741244",
+      "templateId": "EC2Fleet-Instant-Spot",
+      "maxNumber": 10,
+      "providerApi": "EC2Fleet",
+      "name": "EC2 Fleet Instant Spot",
+      "providerType": "aws",
+      "subnetIds": [],
+      "securityGroupIds": [],
+      "vmTypes": {
+        "t3.medium": 1
+      },
+      "priceType": "spot",
+      "maxSpotPrice": 0.05,
+      "allocationStrategy": "price_capacity_optimized",
+      "instanceTags": {
+        "Environment": "dev",
+        "ManagedBy": "ORB"
+      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {}
+    },
+    {
+      "createdAt": "2026-02-23T20:57:34.741258",
+      "templateId": "EC2Fleet-Instant-Mixed",
+      "maxNumber": 10,
+      "providerApi": "EC2Fleet",
+      "name": "EC2 Fleet Instant Mixed",
+      "providerType": "aws",
+      "subnetIds": [],
+      "securityGroupIds": [],
+      "vmTypes": {
+        "t3.medium": 1
+      },
+      "priceType": "heterogeneous",
+      "maxSpotPrice": 0.05,
+      "allocationStrategy": "diversified",
+      "instanceTags": {
+        "Environment": "dev",
+        "ManagedBy": "ORB"
+      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {}
+    },
+    {
+      "createdAt": "2026-02-23T20:57:34.741264",
+      "templateId": "EC2Fleet-Request-OnDemand",
+      "maxNumber": 15,
+      "providerApi": "EC2Fleet",
+      "name": "EC2 Fleet Request On-Demand",
+      "providerType": "aws",
+      "subnetIds": [],
+      "securityGroupIds": [],
+      "vmTypes": {
+        "t3.medium": 1
+      },
+      "priceType": "ondemand",
+      "allocationStrategy": "lowest_price",
+      "instanceTags": {
+        "Environment": "test",
+        "ManagedBy": "ORB"
+      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {}
+    },
+    {
+      "createdAt": "2026-02-23T20:57:34.741271",
+      "templateId": "EC2Fleet-Request-Spot",
+      "maxNumber": 20,
+      "providerApi": "EC2Fleet",
+      "name": "EC2 Fleet Request Spot",
+      "providerType": "aws",
+      "subnetIds": [],
+      "securityGroupIds": [],
+      "vmTypes": {
+        "t3.medium": 1
+      },
+      "priceType": "spot",
+      "maxSpotPrice": 0.08,
+      "allocationStrategy": "capacity_optimized",
+      "instanceTags": {
+        "Environment": "test",
+        "ManagedBy": "ORB"
+      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {}
+    },
+    {
+      "createdAt": "2026-02-23T20:57:34.741277",
+      "templateId": "EC2Fleet-Request-Mixed",
+      "maxNumber": 25,
+      "providerApi": "EC2Fleet",
+      "name": "EC2 Fleet Request Mixed",
+      "providerType": "aws",
+      "subnetIds": [],
+      "securityGroupIds": [],
+      "vmTypes": {
+        "t3.medium": 1,
+        "t3.large": 2
+      },
+      "priceType": "heterogeneous",
+      "maxSpotPrice": 0.08,
+      "allocationStrategy": "diversified",
+      "instanceTags": {
+        "Environment": "test",
+        "ManagedBy": "ORB"
+      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {}
+    },
+    {
+      "createdAt": "2026-02-23T20:57:34.741283",
+      "templateId": "EC2Fleet-Maintain-OnDemand",
+      "maxNumber": 12,
+      "providerApi": "EC2Fleet",
+      "name": "EC2 Fleet Maintain On-Demand",
+      "providerType": "aws",
+      "subnetIds": [],
+      "securityGroupIds": [],
+      "vmTypes": {
+        "t3.medium": 1
+      },
+      "priceType": "ondemand",
+      "allocationStrategy": "lowest_price",
+      "instanceTags": {
+        "Environment": "prod",
+        "ManagedBy": "ORB"
+      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {}
+    },
+    {
+      "createdAt": "2026-02-23T20:57:34.741288",
+      "templateId": "EC2Fleet-Maintain-Spot",
+      "maxNumber": 30,
+      "providerApi": "EC2Fleet",
+      "name": "EC2 Fleet Maintain Spot",
+      "providerType": "aws",
+      "subnetIds": [],
+      "securityGroupIds": [],
+      "vmTypes": {
+        "t3.medium": 1
+      },
+      "priceType": "spot",
+      "maxSpotPrice": 0.1,
+      "allocationStrategy": "price_capacity_optimized",
+      "instanceTags": {
+        "Environment": "prod",
+        "ManagedBy": "ORB"
+      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {}
+    },
+    {
+      "createdAt": "2026-02-23T20:57:34.741294",
+      "templateId": "EC2Fleet-Maintain-Mixed",
+      "maxNumber": 50,
+      "providerApi": "EC2Fleet",
+      "name": "EC2 Fleet Maintain Mixed",
+      "providerType": "aws",
+      "subnetIds": [],
+      "securityGroupIds": [],
+      "vmTypes": {
+        "t3.medium": 1,
+        "t3.large": 2,
+        "t3.xlarge": 3
+      },
+      "priceType": "heterogeneous",
+      "maxSpotPrice": 0.12,
+      "allocationStrategy": "capacity_optimized",
+      "instanceTags": {
+        "Environment": "prod",
+        "ManagedBy": "ORB"
+      },
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {}
+    },
+    {
+      "createdAt": "2026-02-23T20:57:34.741302",
       "templateId": "SpotFleet-Request-LowestPrice",
       "maxNumber": 20,
-      "imageId": "ami-12345678",
-      "fleetType": "request",
-      "securityGroupIds": [
-        "sg-12345678"
-      ],
+      "providerApi": "SpotFleet",
+      "name": "Spot Fleet Request - Lowest Price",
+      "providerType": "aws",
+      "subnetIds": [],
+      "securityGroupIds": [],
+      "vmTypes": {
+        "t3.medium": 1,
+        "t3.large": 2
+      },
       "priceType": "spot",
       "maxSpotPrice": 0.05,
-      "allocationStrategy": "lowestPrice",
-      "volumeType": "gp3",
+      "allocationStrategy": "lowest_price",
       "instanceTags": {
         "Environment": "dev",
         "ManagedBy": "ORB"
       },
-      "subnetId": "subnet-12345678"
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {}
     },
     {
+      "createdAt": "2026-02-23T20:57:34.741307",
       "templateId": "SpotFleet-Request-Diversified",
       "maxNumber": 25,
-      "imageId": "ami-12345678",
-      "fleetType": "request",
-      "securityGroupIds": [
-        "sg-12345678"
-      ],
+      "providerApi": "SpotFleet",
+      "name": "Spot Fleet Request - Diversified",
+      "providerType": "aws",
+      "subnetIds": [],
+      "securityGroupIds": [],
+      "vmTypes": {
+        "t3.medium": 1,
+        "t3.large": 2
+      },
       "priceType": "spot",
       "maxSpotPrice": 0.06,
       "allocationStrategy": "diversified",
-      "volumeType": "gp3",
       "instanceTags": {
         "Environment": "dev",
         "ManagedBy": "ORB"
       },
-      "subnetId": "subnet-12345678"
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {}
     },
     {
+      "createdAt": "2026-02-23T20:57:34.741310",
       "templateId": "SpotFleet-Request-CapacityOptimized",
       "maxNumber": 30,
-      "imageId": "ami-12345678",
-      "fleetType": "request",
-      "securityGroupIds": [
-        "sg-12345678"
-      ],
+      "providerApi": "SpotFleet",
+      "name": "Spot Fleet Request - Capacity Optimized",
+      "providerType": "aws",
+      "subnetIds": [],
+      "securityGroupIds": [],
+      "vmTypes": {
+        "t3.medium": 1,
+        "t3.large": 2
+      },
       "priceType": "spot",
       "maxSpotPrice": 0.07,
-      "allocationStrategy": "capacityOptimized",
-      "volumeType": "gp3",
+      "allocationStrategy": "capacity_optimized",
       "instanceTags": {
         "Environment": "dev",
         "ManagedBy": "ORB"
       },
-      "subnetId": "subnet-12345678"
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {}
     },
     {
+      "createdAt": "2026-02-23T20:57:34.741314",
       "templateId": "SpotFleet-Maintain-LowestPrice",
       "maxNumber": 15,
-      "imageId": "ami-12345678",
-      "fleetType": "maintain",
-      "securityGroupIds": [
-        "sg-12345678"
-      ],
+      "providerApi": "SpotFleet",
+      "name": "Spot Fleet Maintain - Lowest Price",
+      "providerType": "aws",
+      "subnetIds": [],
+      "securityGroupIds": [],
+      "vmTypes": {
+        "t3.medium": 1,
+        "t3.large": 2
+      },
       "priceType": "spot",
       "maxSpotPrice": 0.04,
-      "allocationStrategy": "lowestPrice",
-      "volumeType": "gp3",
+      "allocationStrategy": "lowest_price",
       "instanceTags": {
         "Environment": "prod",
         "ManagedBy": "ORB"
       },
-      "subnetId": "subnet-12345678"
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {}
     },
     {
+      "createdAt": "2026-02-23T20:57:34.741318",
       "templateId": "SpotFleet-Maintain-Diversified",
       "maxNumber": 20,
-      "imageId": "ami-12345678",
-      "fleetType": "maintain",
-      "securityGroupIds": [
-        "sg-12345678"
-      ],
+      "providerApi": "SpotFleet",
+      "name": "Spot Fleet Maintain - Diversified",
+      "providerType": "aws",
+      "subnetIds": [],
+      "securityGroupIds": [],
+      "vmTypes": {
+        "t3.medium": 1,
+        "t3.large": 2
+      },
       "priceType": "spot",
       "maxSpotPrice": 0.05,
       "allocationStrategy": "diversified",
-      "volumeType": "gp3",
       "instanceTags": {
         "Environment": "prod",
         "ManagedBy": "ORB"
       },
-      "subnetId": "subnet-12345678"
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {}
     },
     {
+      "createdAt": "2026-02-23T20:57:34.741321",
       "templateId": "SpotFleet-Maintain-CapacityOptimized",
       "maxNumber": 25,
-      "imageId": "ami-12345678",
-      "fleetType": "maintain",
-      "securityGroupIds": [
-        "sg-12345678"
-      ],
+      "providerApi": "SpotFleet",
+      "name": "Spot Fleet Maintain - Capacity Optimized",
+      "providerType": "aws",
+      "subnetIds": [],
+      "securityGroupIds": [],
+      "vmTypes": {
+        "t3.medium": 1,
+        "t3.large": 2
+      },
       "priceType": "spot",
       "maxSpotPrice": 0.06,
-      "allocationStrategy": "capacityOptimized",
-      "volumeType": "gp3",
+      "allocationStrategy": "capacity_optimized",
       "instanceTags": {
         "Environment": "prod",
         "ManagedBy": "ORB"
       },
-      "subnetId": "subnet-12345678"
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {}
     },
     {
+      "createdAt": "2026-02-23T20:57:34.741327",
       "templateId": "ASG-OnDemand",
       "maxNumber": 15,
-      "imageId": "ami-12345678",
-      "securityGroupIds": [
-        "sg-12345678"
-      ],
+      "providerApi": "ASG",
+      "name": "Auto Scaling Group On-Demand",
+      "providerType": "aws",
+      "subnetIds": [],
+      "securityGroupIds": [],
+      "vmTypes": {
+        "t3.medium": 1
+      },
       "priceType": "ondemand",
       "allocationStrategy": "lowest_price",
-      "volumeType": "gp3",
       "instanceTags": {
         "Environment": "prod",
         "ManagedBy": "ORB"
       },
-      "subnetId": "subnet-12345678"
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {}
     },
     {
+      "createdAt": "2026-02-23T20:57:34.741335",
       "templateId": "ASG-Spot",
       "maxNumber": 20,
-      "imageId": "ami-12345678",
-      "securityGroupIds": [
-        "sg-12345678"
-      ],
+      "providerApi": "ASG",
+      "name": "Auto Scaling Group Spot",
+      "providerType": "aws",
+      "subnetIds": [],
+      "securityGroupIds": [],
+      "vmTypes": {
+        "t3.medium": 1
+      },
       "priceType": "spot",
       "maxSpotPrice": 0.05,
       "allocationStrategy": "price_capacity_optimized",
-      "volumeType": "gp3",
       "instanceTags": {
         "Environment": "dev",
         "ManagedBy": "ORB"
       },
-      "subnetId": "subnet-12345678"
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {}
     },
     {
+      "createdAt": "2026-02-23T20:57:34.741342",
       "templateId": "ASG-Mixed",
       "maxNumber": 25,
-      "imageId": "ami-12345678",
-      "securityGroupIds": [
-        "sg-12345678"
-      ],
+      "providerApi": "ASG",
+      "name": "Auto Scaling Group Mixed",
+      "providerType": "aws",
+      "subnetIds": [],
+      "securityGroupIds": [],
+      "vmTypes": {
+        "t3.medium": 1,
+        "t3.large": 2
+      },
       "priceType": "heterogeneous",
-      "allocationStrategy": "lowestPrice",
-      "volumeType": "gp3",
+      "allocationStrategy": "lowest_price",
       "instanceTags": {
         "Environment": "prod",
         "ManagedBy": "ORB"
       },
-      "percentOnDemand": 30,
-      "subnetId": "subnet-12345678,subnet-87654321"
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {}
     },
     {
+      "createdAt": "2026-02-23T20:57:34.741348",
       "templateId": "RunInstances-OnDemand",
       "maxNumber": 5,
-      "imageId": "ami-12345678",
-      "securityGroupIds": [
-        "sg-12345678"
-      ],
+      "providerApi": "RunInstances",
+      "name": "Run Instances On-Demand",
+      "providerType": "aws",
+      "subnetIds": [],
+      "securityGroupIds": [],
+      "vmTypes": {
+        "t3.medium": 1
+      },
       "priceType": "ondemand",
       "allocationStrategy": "lowest_price",
-      "volumeType": "gp3",
       "instanceTags": {
         "Environment": "dev",
         "ManagedBy": "ORB"
       },
-      "subnetId": "subnet-12345678"
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {}
     },
     {
+      "createdAt": "2026-02-23T20:57:34.741355",
       "templateId": "RunInstances-Spot",
       "maxNumber": 10,
-      "imageId": "ami-12345678",
-      "securityGroupIds": [
-        "sg-12345678"
-      ],
+      "providerApi": "RunInstances",
+      "name": "Run Instances Spot",
+      "providerType": "aws",
+      "subnetIds": [],
+      "securityGroupIds": [],
+      "vmTypes": {
+        "t3.medium": 1
+      },
       "priceType": "spot",
       "maxSpotPrice": 0.05,
       "allocationStrategy": "price_capacity_optimized",
-      "volumeType": "gp3",
       "instanceTags": {
         "Environment": "dev",
         "ManagedBy": "ORB"
       },
-      "subnetId": "subnet-12345678"
+      "vmTypesOnDemand": {},
+      "vmTypesPriority": {}
     }
   ]
 }
