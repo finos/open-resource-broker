@@ -3,13 +3,15 @@
 from typing import Any, Optional
 
 from application.provider.commands import ExecuteProviderOperationCommand
-from infrastructure.utilities.json_utils import JSONParseError, safe_json_loads
 from application.provider.queries import (
     GetProviderCapabilitiesQuery,
     GetProviderHealthQuery,
     GetProviderStrategyConfigQuery,
     ListAvailableProvidersQuery,
 )
+from domain.base.operations import Operation as ProviderOperation
+from domain.base.operations import OperationType as ProviderOperationType
+from infrastructure.utilities.json_utils import JSONParseError, safe_json_loads
 
 
 class ProviderCommandFactory:
@@ -91,8 +93,6 @@ class ProviderCommandFactory:
         **kwargs: Any,
     ) -> ExecuteProviderOperationCommand:
         """Create command to execute provider operation."""
-        from domain.base.operations import Operation as ProviderOperation, OperationType as ProviderOperationType
-
         # Parse params if provided
         parsed_params = {}
         if params:
