@@ -234,3 +234,4 @@ class AllocationStrategy(str, Enum):
     CAPACITY_OPTIMIZED = "capacityOptimized"
     CAPACITY_OPTIMIZED_PRIORITIZED = "capacityOptimizedPrioritized"
     PRICE_CAPACITY_OPTIMIZED = "priceCapacityOptimized"
+    PRIORITIZED = "prioritized"

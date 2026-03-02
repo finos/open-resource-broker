@@ -38,7 +38,8 @@ from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPor
 from infrastructure.error.decorators import handle_infrastructure_exceptions
 from infrastructure.resilience import CircuitBreakerOpenError
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from providers.aws.domain.template.value_objects import AWSFleetType
+from domain.base.value_objects import AllocationStrategy
+from providers.aws.domain.template.value_objects import AWSAllocationStrategy, AWSFleetType
 from providers.aws.exceptions.aws_exceptions import (
     AWSEntityNotFoundError,
     AWSInfrastructureError,
@@ -798,7 +799,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 price_type="heterogeneous",
                 percent_on_demand=40,
                 allocation_strategy="diversified",
-                allocation_strategy_on_demand="lowestPrice",
+                allocation_strategy_on_demand=AWSAllocationStrategy.from_core(AllocationStrategy.LOWEST_PRICE),
                 max_price=0.08,
                 subnet_ids=["subnet-12345678", "subnet-87654321"],
                 security_group_ids=["sg-12345678"],
@@ -847,7 +848,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 price_type="heterogeneous",
                 percent_on_demand=50,
                 allocation_strategy="capacityOptimized",
-                allocation_strategy_on_demand="prioritized",
+                allocation_strategy_on_demand=AWSAllocationStrategy.from_core(AllocationStrategy.PRIORITIZED),
                 max_price=0.12,
                 subnet_ids=["subnet-12345678", "subnet-87654321", "subnet-11223344"],
                 security_group_ids=["sg-12345678"],

@@ -265,6 +265,7 @@ class AWSAllocationStrategy:
             AllocationStrategy.DIVERSIFIED: "diversified",
             AllocationStrategy.LOWEST_PRICE: "lowest-price",
             AllocationStrategy.PRICE_CAPACITY_OPTIMIZED: "price-capacity-optimized",
+            AllocationStrategy.PRIORITIZED: "prioritized",
         }
         return mapping.get(self._strategy, "lowest-price")
 

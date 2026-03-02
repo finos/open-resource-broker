@@ -2,7 +2,7 @@
 
 from typing import Any, Optional
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 from domain.base.value_objects import AllocationStrategy
 from domain.template.template_aggregate import Template
@@ -296,6 +296,15 @@ class AWSTemplate(Template):
                     )
 
         return self
+
+    @field_serializer("allocation_strategy_on_demand")
+    def serialize_allocation_strategy_on_demand(
+        self, value: Optional["AWSAllocationStrategy"]
+    ) -> Optional[str]:
+        """Serialize AWSAllocationStrategy to its string value."""
+        if value is None:
+            return None
+        return value.value
 
     def get_ec2_fleet_allocation_strategy(self) -> str:
         """Get allocation strategy in EC2 Fleet API format."""
