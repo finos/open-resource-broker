@@ -5,7 +5,6 @@ This module provides an adapter for AWS-specific request operations.
 It extracts AWS-specific logic from the domain layer.
 """
 
-import base64
 from typing import Any
 
 from botocore.exceptions import ClientError
@@ -32,81 +31,6 @@ class AWSRequestAdapter(RequestAdapterPort):
         """
         self._aws_client = aws_client
         self._logger = logger
-
-    def create_launch_template(
-        self, request: Request, template_data: dict[str, Any]
-    ) -> dict[str, Any]:
-        """
-        Create AWS launch template for request.
-
-        Args:
-            request: Request domain entity
-            template_data: Template configuration data
-
-        Returns:
-            Dictionary with launch template information
-
-        Raises:
-            ValueError: If launch template creation fails
-        """
-        try:
-            # Extract launch template data
-            user_data = template_data.get("user_data")
-            image_id = template_data.get("image_id")
-            instance_type = template_data.get("vm_type")
-            security_group_ids = template_data.get("security_group_ids", [])
-            subnet_id = template_data.get("subnet_id")
-            key_name = template_data.get("key_name")
-            instance_tags = template_data.get("instance_tags", {})
-
-            # Create launch template
-            response = self._aws_client.ec2_client.create_launch_template(
-                LaunchTemplateName=f"lt-{request.request_id}",
-                VersionDescription=f"Created for request {request.request_id}",
-                LaunchTemplateData={
-                    "ImageId": image_id,
-                    "InstanceType": instance_type,
-                    "SecurityGroupIds": security_group_ids,
-                    "KeyName": key_name,
-                    "UserData": base64.b64encode(user_data.encode("utf-8")).decode("ascii")
-                    if user_data
-                    else None,
-                    "TagSpecifications": [
-                        {
-                            "ResourceType": "instance",
-                            "Tags": [
-                                {"Key": key, "Value": value} for key, value in instance_tags.items()
-                            ]
-                            + [
-                                {"Key": "Name", "Value": f"hf-{request.request_id}"},
-                                {"Key": "RequestId", "Value": str(request.request_id)},
-                            ],
-                        }
-                    ],
-                    "NetworkInterfaces": (
-                        [
-                            {
-                                "DeviceIndex": 0,
-                                "SubnetId": subnet_id,
-                                "AssociatePublicIpAddress": True,
-                            }
-                        ]
-                        if subnet_id
-                        else []
-                    ),
-                },
-            )
-
-            return {
-                "launch_template_id": response["LaunchTemplate"]["LaunchTemplateId"],
-                "launch_template_name": response["LaunchTemplate"]["LaunchTemplateName"],
-                "version_number": response["LaunchTemplate"]["LatestVersionNumber"],
-                "created_time": response["LaunchTemplate"]["CreateTime"].isoformat(),
-            }
-
-        except Exception as e:
-            self._logger.error("Failed to create launch template: %s", str(e))
-            raise ValueError(f"Failed to create launch template: {e!s}")
 
     def get_request_status(self, request: Request) -> dict[str, Any]:
         """
