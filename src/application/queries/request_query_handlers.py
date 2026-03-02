@@ -11,7 +11,9 @@ from application.dto.queries import (
 )
 from application.dto.responses import RequestDTO
 from application.request.queries import ListRequestsQuery
+from application.services.machine_sync_service import MachineSyncService
 from application.services.provider_registry_service import ProviderRegistryService
+from application.services.request_status_service import RequestStatusService
 from domain.base import UnitOfWorkFactory
 from domain.base.exceptions import EntityNotFoundError
 from domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
@@ -29,18 +31,19 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
         error_handler: ErrorHandlingPort,
         container: ContainerPort,
         provider_registry_service: ProviderRegistryService,
+        machine_sync_service: MachineSyncService,
     ) -> None:
         """Initialize the instance."""
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
         self._container = container
         self._provider_registry_service = provider_registry_service
+        self._machine_sync_service = machine_sync_service
         self._cache_service = self._get_cache_service()
         self.event_publisher = self._get_event_publisher()
 
         from application.factories.request_dto_factory import RequestDTOFactory
         from application.services.request_query_service import RequestQueryService
-        from application.services.request_status_service import RequestStatusService
 
         self._query_service = RequestQueryService(uow_factory, logger)
         self._status_service = RequestStatusService(uow_factory, logger)
@@ -63,6 +66,38 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                 request_dto = self._dto_factory.create_from_domain(request, [])
                 self.logger.info("Retrieved lightweight request: %s", query.request_id)
                 return request_dto
+
+            # Read-through sync: refresh the read model (DB) from live AWS state before
+            # returning. This is intentional — the DB is a cache of provider state, and
+            # status queries must reflect reality. Do NOT remove this in the name of
+            # "CQRS purity". A query refreshing its own read model is not a domain command;
+            # no domain invariants are enforced here, no domain events are raised.
+            # The alternative (background polling) requires infrastructure that doesn't
+            # exist yet. If you want to remove this, implement a background sync first.
+            try:
+                await self._machine_sync_service.populate_missing_machine_ids(request)
+                db_machines = await self._query_service.get_machines_for_request(request)
+                (
+                    provider_machines,
+                    provider_metadata,
+                ) = await self._machine_sync_service.fetch_provider_machines(request, db_machines)
+                synced_machines, _ = await self._machine_sync_service.sync_machines_with_provider(
+                    request, db_machines, provider_machines
+                )
+                new_status, status_message = self._status_service.determine_status_from_machines(
+                    db_machines, synced_machines, request, provider_metadata
+                )
+                if new_status:
+                    await self._status_service.update_request_status(
+                        request, new_status, status_message or ""
+                    )
+                request = await self._query_service.get_request(query.request_id)
+            except Exception as sync_err:
+                self.logger.warning(
+                    "Sync failed for request %s, returning stored state: %s",
+                    query.request_id,
+                    sync_err,
+                )
 
             machine_objects = await self._query_service.get_machines_for_request(request)
             request_dto = self._dto_factory.create_from_domain(request, machine_objects)
@@ -267,10 +302,17 @@ class ListActiveRequestsHandler(BaseQueryHandler[ListActiveRequestsQuery, list[R
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
         generic_filter_service: GenericFilterService,
+        machine_sync_service: MachineSyncService,
     ) -> None:
         super().__init__(logger, error_handler)
         self.uow_factory = uow_factory
         self._generic_filter_service = generic_filter_service
+        self._machine_sync_service = machine_sync_service
+        self._status_service = RequestStatusService(uow_factory, logger)
+
+        from application.services.request_query_service import RequestQueryService
+
+        self._query_service = RequestQueryService(uow_factory, logger)
 
     async def execute_query(self, query: ListActiveRequestsQuery) -> list[RequestDTO]:
         """Execute list active requests query."""
@@ -295,38 +337,66 @@ class ListActiveRequestsHandler(BaseQueryHandler[ListActiveRequestsQuery, list[R
                 offset = query.offset or 0  # type: ignore[union-attr]
                 requests = requests[offset : offset + limit]
 
-                request_dtos = []
-                for request in requests:
-                    from domain.request.value_objects import RequestType
-
-                    if request.request_type == RequestType.RETURN:
-                        machines = uow.machines.find_by_return_request_id(
-                            str(request.request_id.value)
-                        )
-                    else:
-                        machines = uow.machines.find_by_request_id(str(request.request_id.value))
-
-                    from application.factories.request_dto_factory import RequestDTOFactory
-
-                    dto_factory = RequestDTOFactory()
-                    request_dto = dto_factory.create_from_domain(request, machines)
-                    request_dtos.append(request_dto)
-
-                if query.filter_expressions:
-                    request_dicts = [dto.model_dump() for dto in request_dtos]
-                    filtered_dicts = self._generic_filter_service.apply_filters(
-                        request_dicts, query.filter_expressions
+            # Read-through sync: refresh each request's read model from live AWS state.
+            # See GetRequestHandler for rationale — do NOT remove in the name of CQRS purity.
+            for request in requests:
+                try:
+                    await self._machine_sync_service.populate_missing_machine_ids(request)
+                    db_machines = await self._query_service.get_machines_for_request(request)
+                    (
+                        provider_machines,
+                        provider_metadata,
+                    ) = await self._machine_sync_service.fetch_provider_machines(
+                        request, db_machines
                     )
-                    request_dtos = [RequestDTO.model_validate(d) for d in filtered_dicts]
+                    (
+                        synced_machines,
+                        _,
+                    ) = await self._machine_sync_service.sync_machines_with_provider(
+                        request, db_machines, provider_machines
+                    )
+                    new_status, status_message = (
+                        self._status_service.determine_status_from_machines(
+                            db_machines, synced_machines, request, provider_metadata
+                        )
+                    )
+                    if new_status:
+                        await self._status_service.update_request_status(
+                            request, new_status, status_message or ""
+                        )
+                except Exception as sync_err:
+                    self.logger.warning(
+                        "Sync failed for request %s, returning stored state: %s",
+                        request.request_id.value,
+                        sync_err,
+                    )
 
-                self.logger.info(
-                    "Found %s active requests (total: %s, limit: %s, offset: %s)",
-                    len(request_dtos),
-                    total_count,
-                    limit,
-                    offset,
+            request_dtos = []
+            for request in requests:
+                request = await self._query_service.get_request(str(request.request_id.value))
+                db_machines = await self._query_service.get_machines_for_request(request)
+
+                from application.factories.request_dto_factory import RequestDTOFactory
+
+                dto_factory = RequestDTOFactory()
+                request_dto = dto_factory.create_from_domain(request, db_machines)
+                request_dtos.append(request_dto)
+
+            if query.filter_expressions:
+                request_dicts = [dto.model_dump() for dto in request_dtos]
+                filtered_dicts = self._generic_filter_service.apply_filters(
+                    request_dicts, query.filter_expressions
                 )
-                return request_dtos
+                request_dtos = [RequestDTO.model_validate(d) for d in filtered_dicts]
+
+            self.logger.info(
+                "Found %s active requests (total: %s, limit: %s, offset: %s)",
+                len(request_dtos),
+                total_count,
+                limit,
+                offset,
+            )
+            return request_dtos
 
         except Exception as e:
             self.logger.error("Failed to list active requests: %s", e)
