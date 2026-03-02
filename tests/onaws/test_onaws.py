@@ -874,10 +874,13 @@ def setup_host_factory_mock(request, monkeypatch):
 
     yield hfm
 
-    processor.cleanup_test_templates(test_name)
-
     # Best-effort cleanup of any AWS resources that were not returned during the test.
+    # Must happen BEFORE cleanup_test_templates so the config dir still exists for orb calls.
     if _tracked_request_ids:
+        import os
+
+        os.environ["ORB_CONFIG_DIR"] = str(test_config_dir / "config")
+        os.environ["HF_LOGDIR"] = str(test_config_dir / "logs")
         log.warning(
             "Fixture teardown: %d request(s) still tracked — attempting cleanup",
             len(_tracked_request_ids),
@@ -900,6 +903,8 @@ def setup_host_factory_mock(request, monkeypatch):
                     hfm.request_return_machines(machine_ids)
             except Exception as exc:
                 log.warning("Fixture teardown: cleanup failed for request %s: %s", req_id, exc)
+
+    processor.cleanup_test_templates(test_name)
 
 
 @pytest.fixture
@@ -961,10 +966,13 @@ def setup_host_factory_mock_with_scenario(request, monkeypatch):
 
     yield hfm
 
-    processor.cleanup_test_templates(test_name)
-
     # Best-effort cleanup of any AWS resources that were not returned during the test.
+    # Must happen BEFORE cleanup_test_templates so the config dir still exists for orb calls.
     if _tracked_request_ids:
+        import os
+
+        os.environ["ORB_CONFIG_DIR"] = str(test_config_dir / "config")
+        os.environ["HF_LOGDIR"] = str(test_config_dir / "logs")
         log.warning(
             "Fixture teardown: %d request(s) still tracked — attempting cleanup",
             len(_tracked_request_ids),
@@ -987,6 +995,8 @@ def setup_host_factory_mock_with_scenario(request, monkeypatch):
                     hfm.request_return_machines(machine_ids)
             except Exception as exc:
                 log.warning("Fixture teardown: cleanup failed for request %s: %s", req_id, exc)
+
+    processor.cleanup_test_templates(test_name)
 
 
 def _check_request_machines_response_status(status_response):
