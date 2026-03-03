@@ -53,31 +53,29 @@ def _get_aws_profile_and_region() -> tuple[str | None, str | None]:
     return None, region
 
 
-@pytest.fixture(scope="session", autouse=True)
-def check_aws_credentials():
-    """Skip all onaws tests if AWS credentials are missing or expired.
+def pytest_sessionstart(session: pytest.Session) -> None:  # noqa: ARG001
+    """Check AWS credentials once before any tests run.
 
-    Calls sts:GetCallerIdentity once per session. If it fails (no credentials,
-    expired token, etc.) all tests are skipped with the raw AWS error message
-    rather than failing deep inside provisioning with cryptic errors.
+    Calls sts:GetCallerIdentity. If it fails, exits immediately with the
+    raw AWS error so no tests are attempted with invalid credentials.
     """
     profile, region = _get_aws_profile_and_region()
     region = region or "eu-west-1"
     try:
-        session = Session(profile_name=profile, region_name=region)
-        sts = session.client("sts", region_name=region)
+        boto_session = Session(profile_name=profile, region_name=region)
+        sts = boto_session.client("sts", region_name=region)
         identity = sts.get_caller_identity()
         print(
             f"\n✓ AWS credentials valid: {identity.get('Arn')} (account: {identity.get('Account')})"
         )
     except NoCredentialsError as e:
-        pytest.skip(f"AWS credentials not found (profile={profile!r}): {e}")
+        pytest.exit(f"AWS credentials not found (profile={profile!r}): {e}", returncode=1)
     except ClientError as e:
         code = e.response.get("Error", {}).get("Code", "Unknown")
         msg = e.response.get("Error", {}).get("Message", str(e))
-        pytest.skip(f"AWS credentials invalid [{code}]: {msg}")
+        pytest.exit(f"AWS credentials invalid [{code}]: {msg}", returncode=1)
     except Exception as e:
-        pytest.skip(f"AWS credential check failed: {e}")
+        pytest.exit(f"AWS credential check failed: {e}", returncode=1)
 
 
 @pytest.fixture(autouse=True)
