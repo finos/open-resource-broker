@@ -348,28 +348,27 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 }
 
         # Add additional tags for instances (beyond launch template)
-        tag_specifications = [
-            {
-                "ResourceType": "instance",
-                "Tags": merge_tags(
-                    [
-                        {
-                            "Key": "Name",
-                            "Value": f"{self.config_port.get_resource_prefix('instance')}{request.request_id}",  # type: ignore[union-attr]
-                        },
-                        *(
-                            [{"Key": k, "Value": v} for k, v in aws_template.tags.items()]
-                            if aws_template.tags
-                            else []
-                        ),
-                    ],
-                    build_system_tags(
-                        request_id=str(request.request_id),
-                        template_id=str(aws_template.template_id),
-                        provider_api="RunInstances",
-                    ),
+        instance_tags = merge_tags(
+            [
+                {
+                    "Key": "Name",
+                    "Value": f"{self.config_port.get_resource_prefix('instance')}{request.request_id}",  # type: ignore[union-attr]
+                },
+                *(
+                    [{"Key": k, "Value": v} for k, v in aws_template.tags.items()]
+                    if aws_template.tags
+                    else []
                 ),
-            }
+            ],
+            build_system_tags(
+                request_id=str(request.request_id),
+                template_id=str(aws_template.template_id),
+                provider_api="RunInstances",
+            ),
+        )
+        tag_specifications = [
+            {"ResourceType": "instance", "Tags": instance_tags},
+            {"ResourceType": "spot-instances-request", "Tags": instance_tags},
         ]
 
         params["TagSpecifications"] = tag_specifications
