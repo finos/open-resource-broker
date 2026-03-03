@@ -108,21 +108,26 @@ class RequestStatusService:
                 # that don't exactly match target. Use running instance count as the
                 # authoritative signal when it meets the requested count.
                 fleet_type = fleet_capacity.get("fleet_type", "")
-                is_synchronous = fleet_type in ("instant", "request")
+                fleet_errors = provider_metadata.get("fleet_errors") or []
 
                 instance_target = request.requested_count
                 if (running_count >= instance_target and failed_count == 0) or (
                     effective_fulfilled >= effective_target and failed_count == 0
                 ):
                     return RequestStatus.COMPLETED.value, "All instances running successfully"
-                elif is_synchronous and pending_count == 0:
+                elif fleet_type == "instant" and pending_count == 0:
+                    error_detail = (
+                        f": {'; '.join(e.get('error_code', '') for e in fleet_errors if e.get('error_code'))}"
+                        if fleet_errors
+                        else ""
+                    )
                     if running_count > 0:
                         return (
                             RequestStatus.PARTIAL.value,
-                            f"{running_count}/{instance_target} instances running (fleet fulfilled {int(effective_fulfilled)}/{effective_target})",
+                            f"{running_count}/{instance_target} instances running{error_detail}",
                         )
                     else:
-                        return RequestStatus.FAILED.value, "All instances failed"
+                        return RequestStatus.FAILED.value, f"All instances failed{error_detail}"
                 elif failed_count == total_count and total_count > 0:
                     return RequestStatus.FAILED.value, "All instances failed"
                 elif pending_count > 0:
