@@ -32,13 +32,13 @@ from botocore.exceptions import ClientError
 
 from domain.base.dependency_injection import injectable
 from domain.base.ports import LoggingPort
+from domain.base.value_objects import AllocationStrategy
 from domain.request.aggregate import Request
 from domain.template.template_aggregate import Template
 from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from infrastructure.error.decorators import handle_infrastructure_exceptions
 from infrastructure.resilience import CircuitBreakerOpenError
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-from domain.base.value_objects import AllocationStrategy
 from providers.aws.domain.template.value_objects import AWSAllocationStrategy, AWSFleetType
 from providers.aws.exceptions.aws_exceptions import (
     AWSEntityNotFoundError,
