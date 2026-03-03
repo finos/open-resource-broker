@@ -71,6 +71,9 @@ ci-security-trivy-fs: dev-install  ## Run Trivy filesystem scan
 ci-security-trufflehog: dev-install  ## Run TruffleHog secrets scan
 	@./dev-tools/ci/ci_security_dispatcher.py trufflehog
 
+ci-security-container: dev-install  ## Run container security scans (Trivy image + Hadolint)
+	@./dev-tools/security/security_container.py
+
 # Composite target
 ci-security: ci-security-bandit ci-security-safety ci-security-semgrep ci-security-trivy-fs ci-security-trufflehog  ## Run all security scans
 

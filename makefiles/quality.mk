@@ -81,6 +81,12 @@ clean-whitespace:  ## Clean whitespace in blank lines from all files
 	@echo "Cleaning whitespace in blank lines..."
 	./dev-tools/quality/dev_tools_runner.py clean-whitespace
 
+check-requirements:  ## Check requirements for conflicts, duplicates, and vulnerabilities
+	@./dev-tools/ci/check_requirements.sh
+
+quality-check-custom:  ## Run custom quality checks (naming, docstrings, magic numbers)
+	@./dev-tools/quality/quality_check.py
+
 # @SECTION Security
 security: dev-install  ## Run security checks (usage: make security [quick] [all])
 	@./dev-tools/security/security_check.py $(if $(findstring quick,$(MAKECMDGOALS)),--quick,) $(if $(findstring all,$(MAKECMDGOALS)),--all,)

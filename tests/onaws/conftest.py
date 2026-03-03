@@ -53,12 +53,14 @@ def _get_aws_profile_and_region() -> tuple[str | None, str | None]:
     return None, region
 
 
-def pytest_sessionstart(session: pytest.Session) -> None:  # noqa: ARG001
-    """Check AWS credentials once before any tests run.
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """Check AWS credentials once before any AWS tests run.
 
-    Calls sts:GetCallerIdentity. If it fails, exits immediately with the
-    raw AWS error so no tests are attempted with invalid credentials.
+    Only runs when --run-aws is passed. Calls sts:GetCallerIdentity and exits
+    immediately if credentials are invalid so no tests are attempted.
     """
+    if not session.config.getoption("--run-aws", default=False):
+        return
     profile, region = _get_aws_profile_and_region()
     region = region or "eu-west-1"
     try:

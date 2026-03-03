@@ -20,6 +20,12 @@ container-show-version: dev-install  ## Show container version info
 container-run: dev-install  ## Run container build
 	@./dev-tools/container/container_dispatcher.py run
 
+container-health-check:  ## Poll container health check endpoint
+	@./dev-tools/container/container_health_check.py
+
+test-docker:  ## Run Docker test suite (build, startup, security, pytest tests/docker/)
+	@./dev-tools/testing/test-docker.sh
+
 # Dummy targets removed (consolidated in quality.mk)
 
 # @SECTION Documentation
