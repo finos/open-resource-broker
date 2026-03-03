@@ -132,6 +132,17 @@ class TestCQRSArchitectureIntegration:
         port.select_provider_for_template.return_value = selection_result
         port.get_available_strategies.return_value = ["aws-aws-default"]
 
+        from domain.base.results import ValidationResult
+
+        port.validate_template_requirements.return_value = ValidationResult(
+            is_valid=True,
+            provider_instance="aws-default",
+            errors=[],
+            warnings=[],
+            supported_features=[],
+            unsupported_features=[],
+        )
+
         # Mock execute_operation as async
         from providers.base.strategy.provider_strategy import ProviderResult
 

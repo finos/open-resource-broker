@@ -44,6 +44,7 @@ def _make_config(provider_type="aws", supported_apis=None):
     config = MagicMock()
     config.get_provider_instance_config = MagicMock(return_value=provider_instance_config)
     config.get_provider_config = MagicMock(return_value=provider_config_root)
+    config.get_handler_capabilities = MagicMock(return_value={})
     return config
 
 

@@ -169,6 +169,10 @@ class MockConfigurationPort(ConfigurationPort):
         """Get package information."""
         return {"name": "test", "version": "0.0.1"}
 
+    def get_handler_capabilities(self) -> dict[str, Any]:
+        """Get per-API handler capabilities."""
+        return {}
+
 
 class TestInjectableMigration(unittest.TestCase):
     """Test case for verifying the injectable decorator migration."""
