@@ -17,7 +17,9 @@ def register_all_provider_types() -> None:
     # register_provider2_provider(registry)
 
 
-def register_fallback_provider(primary_strategy, fallback_strategies, config=None, logger=None) -> None:
+def register_fallback_provider(
+    primary_strategy, fallback_strategies, config=None, logger=None
+) -> None:
     """Construct and register a FallbackProviderStrategy with the provider registry.
 
     The strategy is constructed here (not in the DI container) and registered
