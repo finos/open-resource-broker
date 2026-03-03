@@ -337,30 +337,6 @@ class ConfigurationAdapter(ConfigurationPort):
         except Exception:
             return ""
 
-    def get_handler_capabilities(self) -> dict[str, Any]:
-        """Get per-API handler capabilities from provider configuration."""
-        try:
-            provider_config = self._config_manager.get_provider_config()
-            if not provider_config:
-                return {}
-            result: dict[str, Any] = {}
-            for defaults in provider_config.provider_defaults.values():
-                for api_name, handler_cfg in defaults.handlers.items():
-                    extra = handler_cfg.model_extra or {}
-                    result[api_name] = {
-                        "supports_spot": extra.get("supports_spot", False),
-                        "supports_on_demand": extra.get(
-                            "supports_ondemand", extra.get("supports_on_demand", True)
-                        ),
-                        "supported_fleet_types": extra.get("supported_fleet_types") or [],
-                    }
-            return result
-        except Exception as e:
-            _logger.warning(
-                "Failed to load handler capabilities, validation will be permissive: %s", e
-            )
-            return {}
-
     def get_cleanup_config(self) -> dict[str, Any]:
         """Get cleanup configuration."""
         try:

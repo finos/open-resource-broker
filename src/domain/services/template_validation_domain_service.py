@@ -125,10 +125,21 @@ class TemplateValidationDomainService:
         effective_handlers = provider_config.get_effective_handlers(provider_defaults)
         supported_apis = list(effective_handlers.keys())
 
+        api_capabilities: dict[str, Any] = {}
+        for api_name, handler_cfg in effective_handlers.items():
+            extra = getattr(handler_cfg, "model_extra", None) or {}
+            api_capabilities[api_name] = {
+                "supports_spot": extra.get("supports_spot", False),
+                "supports_on_demand": extra.get(
+                    "supports_ondemand", extra.get("supports_on_demand", True)
+                ),
+                "supported_fleet_types": extra.get("supported_fleet_types") or [],
+            }
+
         return _ProviderCapabilities(
             provider_type=provider_config.type,
             supported_apis=supported_apis,
-            features={"api_capabilities": self.config.get_handler_capabilities()},
+            features={"api_capabilities": api_capabilities},
         )
 
     def _validate_api_support(self, template: Any, capabilities: Any, result: Any) -> None:

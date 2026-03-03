@@ -98,10 +98,6 @@ class ConfigurationPort(ProviderConfigPort):
         """Get cleanup configuration."""
 
     @abstractmethod
-    def get_handler_capabilities(self) -> dict[str, Any]:
-        """Get per-API handler capabilities (supports_spot, supports_on_demand, supported_fleet_types)."""
-
-    @abstractmethod
     def get_config_file_path(self) -> str:
         """Get the config file path."""
 
