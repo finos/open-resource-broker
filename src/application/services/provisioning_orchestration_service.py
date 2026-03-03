@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from domain.base.ports.provider_selection_port import ProviderSelectionPort
 
-from domain.base.ports import ContainerPort, LoggingPort, ProviderConfigPort
+from domain.base.ports import ConfigurationPort, ContainerPort, LoggingPort, ProviderConfigPort
 from domain.base.results import ProviderSelectionResult
 from domain.request.aggregate import Request
 from domain.request.request_types import RequestStatus
@@ -25,15 +25,7 @@ class ProvisioningResult:
     provider_data: dict[str, Any]
     error_message: str | None = None
     fulfilled_count: int = 0
-    is_terminal: bool = True
-
-
-_DEFAULT_FULFILLMENT_CONFIG = {
-    "max_retries": 3,
-    "timeout_seconds": 300,
-    "batch_size": 1000,
-    "fallback_template_id": None,
-}
+    is_final: bool = True
 
 
 class ProvisioningOrchestrationService:
@@ -45,17 +37,34 @@ class ProvisioningOrchestrationService:
         logger: LoggingPort,
         provider_selection_port: "ProviderSelectionPort",
         provider_config_port: ProviderConfigPort,
+        config_port: ConfigurationPort | None = None,
     ):
         self._container = container
         self._logger = logger
         self._provider_selection_port = provider_selection_port
         self._provider_config_port = provider_config_port
+        self._config_port = config_port
 
     async def execute_provisioning(
         self, template: Template, request: Request, selection_result: ProviderSelectionResult
     ) -> ProvisioningResult:
         """Execute provisioning with capacity top-up retry loop."""
-        config = {**_DEFAULT_FULFILLMENT_CONFIG, **request.metadata.get("fulfillment_config", {})}
+        if self._config_port is not None:
+            request_config = self._config_port.get_request_config()
+            default_config: dict[str, Any] = {
+                "max_retries": request_config.get("fulfillment_max_retries", 3),
+                "timeout_seconds": request_config.get("fulfillment_timeout_seconds", 300),
+                "batch_size": request_config.get("fulfillment_batch_size", 1000),
+                "fallback_template_id": request_config.get("fulfillment_fallback_template_id"),
+            }
+        else:
+            default_config = {
+                "max_retries": 3,
+                "timeout_seconds": 300,
+                "batch_size": 1000,
+                "fallback_template_id": None,
+            }
+        config = {**default_config, **request.metadata.get("fulfillment_config", {})}
         max_retries: int = int(config["max_retries"])
         timeout_seconds: float = float(config["timeout_seconds"])
         batch_size: int = int(config["batch_size"])
@@ -92,6 +101,9 @@ class ProvisioningOrchestrationService:
                 remaining,
             )
 
+            # Stamp attempt number so provider-level idempotency tokens are unique per attempt
+            request.metadata["provisioning_attempt"] = attempt_number
+
             last_result = await self._dispatch_single_attempt(
                 template, request, selection_result, attempt_count
             )
@@ -126,7 +138,7 @@ class ProvisioningOrchestrationService:
                 )
                 break
 
-            if remaining > 0 and not last_result.is_terminal:
+            if remaining > 0 and not last_result.is_final:
                 # Partial fulfillment, retry may help — persist ACQUIRING status
                 self._logger.info(
                     "Attempt %d: %d/%d fulfilled, %d remaining — retrying",
@@ -136,7 +148,7 @@ class ProvisioningOrchestrationService:
                     remaining,
                 )
                 request = self._persist_acquiring(request)
-            elif last_result.is_terminal:
+            elif last_result.is_final:
                 # No point retrying
                 break
 
@@ -151,7 +163,7 @@ class ProvisioningOrchestrationService:
             provider_data=accumulated_provider_data,
             error_message=last_result.error_message if last_result else "No provisioning attempted",
             fulfilled_count=total_fulfilled,
-            is_terminal=last_result.is_terminal if last_result else True,
+            is_final=last_result.is_final if last_result else True,
         )
 
     def _persist_acquiring(self, request: Request) -> Request:
@@ -193,6 +205,7 @@ class ProvisioningOrchestrationService:
                     "template_config": scheduler.format_template_for_provider(template),
                     "count": count,
                     "request_id": str(request.request_id),
+                    "request_metadata": dict(request.metadata),
                 },
                 context={
                     "correlation_id": str(request.request_id),
@@ -214,7 +227,9 @@ class ProvisioningOrchestrationService:
                 resource_ids = result.data.get("resource_ids", [])
                 instances = result.data.get("instances", [])
 
-                fleet_errors = result.data.get("provider_data", {}).get("fleet_errors") or []
+                provider_data = result.data.get("provider_data", {})
+                fleet_errors = provider_data.get("fleet_errors") or []
+                fulfillment_final = provider_data.get("fulfillment_final", False)
                 capacity_error_codes = {
                     "InsufficientInstanceCapacity",
                     "SpotMaxPriceTooLow",
@@ -231,7 +246,8 @@ class ProvisioningOrchestrationService:
                     instances=instances,
                     provider_data=result.metadata or {},
                     fulfilled_count=len(instances),
-                    is_terminal=not has_capacity_error,
+                    is_final=(not has_capacity_error and len(instances) >= count)
+                    or fulfillment_final,
                 )
             else:
                 return ProvisioningResult(

@@ -110,6 +110,10 @@ class ConfigurationAdapter(ConfigurationPort):
                 "default_timeout": getattr(request_config, "default_timeout", 300),
                 "min_timeout": getattr(request_config, "min_timeout", 30),
                 "max_timeout": getattr(request_config, "max_timeout", 3600),
+                "fulfillment_max_retries": request_config.fulfillment_max_retries,
+                "fulfillment_timeout_seconds": request_config.fulfillment_timeout_seconds,
+                "fulfillment_batch_size": request_config.fulfillment_batch_size,
+                "fulfillment_fallback_template_id": request_config.fulfillment_fallback_template_id,
             }
         except Exception as e:
             _logger.warning("Failed to load request config, using defaults: %s", e)
@@ -118,6 +122,10 @@ class ConfigurationAdapter(ConfigurationPort):
                 "default_timeout": 300,
                 "min_timeout": 30,
                 "max_timeout": 3600,
+                "fulfillment_max_retries": 3,
+                "fulfillment_timeout_seconds": 300,
+                "fulfillment_batch_size": 1000,
+                "fulfillment_fallback_template_id": None,
             }
 
     def get_template_config(self) -> dict[str, Any]:

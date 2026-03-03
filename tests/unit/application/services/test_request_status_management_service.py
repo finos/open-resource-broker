@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock
 
+from application.services.provisioning_orchestration_service import ProvisioningResult
 from application.services.request_status_management_service import RequestStatusManagementService
 from domain.request.request_types import RequestStatus
 
@@ -138,49 +139,51 @@ class TestHandleProvisioningFailure:
         assert req.metadata["error_message"] == "Provisioning failed (no error details)"
 
 
+def _make_result(**kwargs) -> ProvisioningResult:
+    defaults: dict = dict(
+        success=True,
+        resource_ids=[],
+        instance_ids=[],
+        instances=[],
+        provider_data={},
+        fulfilled_count=0,
+        is_final=True,
+    )
+    defaults.update(kwargs)
+    return ProvisioningResult(**defaults)
+
+
 class TestExtractInstanceIds:
     def setup_method(self):
         self.svc = _make_service()
 
     def test_extract_from_instance_ids_key(self):
-        # _extract_instance_ids uses dict-style access: result.get() and result["key"]
-        result = {"instance_ids": ["i-abc", "i-def"]}
+        result = _make_result(instance_ids=["i-abc", "i-def"])
         ids = self.svc._extract_instance_ids(result)
         assert ids == ["i-abc", "i-def"]
 
     def test_extract_from_instances_list(self):
-        result = {
-            "instances": [
-                {"instance_id": "i-aaa"},
-                {"instance_id": "i-bbb"},
-            ]
-        }
+        result = _make_result(instances=[{"instance_id": "i-aaa"}, {"instance_id": "i-bbb"}])
         ids = self.svc._extract_instance_ids(result)
         assert ids == ["i-aaa", "i-bbb"]
 
     def test_extract_skips_instances_without_id(self):
-        result = {
-            "instances": [
-                {"instance_id": "i-aaa"},
-                {"other_key": "no-id"},
-            ]
-        }
+        result = _make_result(instances=[{"instance_id": "i-aaa"}, {"other_key": "no-id"}])
         ids = self.svc._extract_instance_ids(result)
         assert ids == ["i-aaa"]
 
     def test_returns_empty_when_no_relevant_keys(self):
-        result = {"other": "data"}
+        result = _make_result()
         ids = self.svc._extract_instance_ids(result)
         assert ids == []
 
-    def test_returns_empty_on_attribute_error(self):
-        # Pass an object that raises AttributeError on .get()
-        class BadResult:
-            def get(self, *a):
-                raise AttributeError("no get")
-
-        ids = self.svc._extract_instance_ids(BadResult())
-        assert ids == []
+    def test_instance_ids_takes_precedence_over_instances(self):
+        result = _make_result(
+            instance_ids=["i-abc"],
+            instances=[{"instance_id": "i-aaa"}],
+        )
+        ids = self.svc._extract_instance_ids(result)
+        assert ids == ["i-abc"]
 
 
 class TestCreateMachineAggregate:

@@ -116,7 +116,8 @@ class AWSLaunchTemplateManager:
         # Get the launch template name
         assert self.config_port is not None, "config_port must be injected"
         launch_template_name = (
-            f"{self.config_port.get_resource_prefix('launch_template')}{request.request_id}"
+            f"{self.config_port.get_resource_prefix('launch_template')}"
+            f"{request.request_id}-{aws_template.template_id}"
         )
 
         # Generate a deterministic client token for idempotency
@@ -128,30 +129,21 @@ class AWSLaunchTemplateManager:
                 LaunchTemplateNames=[launch_template_name]
             )
 
-            # Template exists, create a new version
+            # Template exists — reuse the default version, no new version needed for same config
             template_id = existing_template["LaunchTemplates"][0]["LaunchTemplateId"]
+            default_version = str(existing_template["LaunchTemplates"][0]["DefaultVersionNumber"])
             self._logger.info(
-                "Launch template %s exists with ID %s. Creating/reusing version.",
+                "Launch template %s exists (id=%s), reusing default version %s",
                 launch_template_name,
                 template_id,
+                default_version,
             )
-
-            response = self.aws_client.ec2_client.create_launch_template_version(
-                LaunchTemplateId=template_id,
-                VersionDescription=f"For request {request.request_id}",
-                LaunchTemplateData=launch_template_data,
-                ClientToken=client_token,  # Key for idempotency!
-            )
-
-            version = str(response["LaunchTemplateVersion"]["VersionNumber"])
-            self._logger.info("Using version %s of launch template %s", version, template_id)
-
             return LaunchTemplateResult(
                 template_id=template_id,
-                version=version,
+                version=default_version,
                 template_name=launch_template_name,
                 is_new_template=False,
-                is_new_version=True,
+                is_new_version=False,
             )
 
         except ClientError as e:
@@ -565,7 +557,8 @@ class AWSLaunchTemplateManager:
         """
         assert self.config_port is not None, "config_port must be injected"
         template_name = (
-            f"{self.config_port.get_resource_prefix('launch_template')}{request.request_id}"
+            f"{self.config_port.get_resource_prefix('launch_template')}"
+            f"{request.request_id}-{aws_template.template_id}"
         )
 
         return merge_tags(

@@ -14,6 +14,7 @@ from application.ports.query_bus_port import QueryBusPort
 from domain.base import UnitOfWorkFactory
 from domain.base.exceptions import ApplicationError, EntityNotFoundError
 from domain.base.ports import (
+    ConfigurationPort,
     ContainerPort,
     ErrorHandlingPort,
     EventPublisherPort,
@@ -61,7 +62,11 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
 
         self._request_creation_service = RequestCreationService(logger)
         self._provisioning_service = ProvisioningOrchestrationService(
-            container, logger, provider_selection_port, provider_config_port
+            container,
+            logger,
+            provider_selection_port,
+            provider_config_port,
+            config_port=container.get(ConfigurationPort),
         )
         self._status_service = RequestStatusManagementService(uow_factory, logger)
         self._provider_validation_service = ProviderValidationService(

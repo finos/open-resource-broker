@@ -1,4 +1,5 @@
 """Tests for BatchingPolicy."""
+
 from application.value_objects.batching_policy import BatchingPolicy
 
 

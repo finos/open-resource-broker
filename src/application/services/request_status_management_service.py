@@ -1,6 +1,6 @@
 """Service for managing request status updates and persistence."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
 from domain.base import UnitOfWorkFactory
 from domain.base.ports import LoggingPort
@@ -147,26 +147,28 @@ class RequestStatusManagementService:
 
         return request
 
-    def _extract_instance_ids(self, result: Any) -> List[str]:
+    def _extract_instance_ids(self, result: ProvisioningResult) -> List[str]:
         """Extract instance IDs if available in provider result."""
         try:
-            if result.get("instance_ids"):
-                return result["instance_ids"]
-            elif result.get("instances"):
-                instances = result["instances"]
+            if result.instance_ids:
+                return result.instance_ids
+            elif result.instances:
+                instances = result.instances
                 if isinstance(instances, list) and instances:
-                    return [
-                        instance.get("instance_id")
-                        for instance in instances
-                        if instance.get("instance_id")
-                    ]
+                    return cast(
+                        List[str],
+                        [
+                            str(instance["instance_id"])
+                            for instance in instances
+                            if instance.get("instance_id")
+                        ],
+                    )
             return []
         except (KeyError, TypeError, AttributeError) as e:
             self._logger.warning(
                 "Failed to extract instance IDs from provider result: %s",
                 e,
                 exc_info=True,
-                extra={"result_keys": list(result.keys()) if isinstance(result, dict) else None},
             )
             return []
 

@@ -22,11 +22,21 @@ def run_whitespace_cleanup():
         return False
 
 
+def run_ruff_format():
+    """Run ruff format on the entire project."""
+    try:
+        subprocess.run(["uv", "run", "ruff", "format", "."], check=True)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
 def main():
     parsed = parse_args(sys.argv[1:])
     success = True
 
     if parsed["fix_mode"]:
+        success &= run_ruff_format()
         success &= run_whitespace_cleanup()
 
     return 0 if success else 1

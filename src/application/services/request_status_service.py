@@ -85,17 +85,14 @@ class RequestStatusService:
                 pending_count = sum(
                     1 for m in machines_to_check if m.status.value in ["pending", "starting"]
                 )
-                failed_count = sum(
-                    1 for m in machines_to_check if m.status.value == "failed"
-                )
+                failed_count = sum(1 for m in machines_to_check if m.status.value == "failed")
                 total_count = len(machines_to_check)
 
                 # Use fleet capacity metrics when available (fleets/ASGs report their own
                 # target and fulfilled capacity). Fall back to instance counts otherwise.
                 fleet_capacity = provider_metadata.get("fleet_capacity_fulfilment") or {}
                 effective_target = (
-                    fleet_capacity.get("target_capacity_units")
-                    or request.requested_count
+                    fleet_capacity.get("target_capacity_units") or request.requested_count
                 )
                 fulfilled_from_metadata = fleet_capacity.get("fulfilled_capacity_units")
                 effective_fulfilled: float = (

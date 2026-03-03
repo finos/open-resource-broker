@@ -904,7 +904,10 @@ def setup_host_factory_mock(request, monkeypatch):
             except Exception as exc:
                 log.warning("Fixture teardown: cleanup failed for request %s: %s", req_id, exc)
 
-    processor.cleanup_test_templates(test_name)
+    if not request.config.getoption("--keep-logs", default=False):
+        processor.cleanup_test_templates(test_name)
+    else:
+        log.info("--keep-logs set: preserving test directory %s", test_config_dir)
 
 
 @pytest.fixture
@@ -996,7 +999,10 @@ def setup_host_factory_mock_with_scenario(request, monkeypatch):
             except Exception as exc:
                 log.warning("Fixture teardown: cleanup failed for request %s: %s", req_id, exc)
 
-    processor.cleanup_test_templates(test_name)
+    if not request.config.getoption("--keep-logs", default=False):
+        processor.cleanup_test_templates(test_name)
+    else:
+        log.info("--keep-logs set: preserving test directory %s", test_config_dir)
 
 
 def _check_request_machines_response_status(status_response):

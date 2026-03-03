@@ -9,7 +9,18 @@ collect_ignore = [
 
 
 def pytest_addoption(parser):
-    parser.addoption("--run-aws", action="store_true", default=False, help="Run tests requiring real AWS credentials")
+    parser.addoption(
+        "--run-aws",
+        action="store_true",
+        default=False,
+        help="Run tests requiring real AWS credentials",
+    )
+    parser.addoption(
+        "--keep-logs",
+        action="store_true",
+        default=False,
+        help="Keep per-test run_templates directories after test (for log inspection)",
+    )
 
 
 def pytest_collection_modifyitems(config, items):

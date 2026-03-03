@@ -191,6 +191,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                     "fleet_errors": fleet_result.get("metadata_updates", {}).get(
                         "fleet_errors", []
                     ),
+                    "fulfillment_final": fleet_type is not AWSFleetType.INSTANT,
                 },
             }
         except Exception as e:
@@ -799,7 +800,9 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 price_type="heterogeneous",
                 percent_on_demand=40,
                 allocation_strategy="diversified",
-                allocation_strategy_on_demand=AWSAllocationStrategy.from_core(AllocationStrategy.LOWEST_PRICE),
+                allocation_strategy_on_demand=AWSAllocationStrategy.from_core(
+                    AllocationStrategy.LOWEST_PRICE
+                ),
                 max_price=0.08,
                 subnet_ids=["subnet-12345678", "subnet-87654321"],
                 security_group_ids=["sg-12345678"],
@@ -848,7 +851,9 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 price_type="heterogeneous",
                 percent_on_demand=50,
                 allocation_strategy="capacityOptimized",
-                allocation_strategy_on_demand=AWSAllocationStrategy.from_core(AllocationStrategy.PRIORITIZED),
+                allocation_strategy_on_demand=AWSAllocationStrategy.from_core(
+                    AllocationStrategy.PRIORITIZED
+                ),
                 max_price=0.12,
                 subnet_ids=["subnet-12345678", "subnet-87654321", "subnet-11223344"],
                 security_group_ids=["sg-12345678"],

@@ -1,5 +1,7 @@
 """Common configuration schemas."""
 
+from typing import Optional
+
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
@@ -183,6 +185,16 @@ class RequestConfig(BaseModel):
     max_machines_per_request: int = Field(100, description="Maximum number of machines per request")
     default_grace_period: int = Field(
         300, description="Default grace period in seconds for return requests"
+    )
+    fulfillment_max_retries: int = Field(
+        3, description="Maximum number of provisioning retry attempts"
+    )
+    fulfillment_timeout_seconds: int = Field(300, description="Provisioning timeout in seconds")
+    fulfillment_batch_size: int = Field(
+        1000, description="Maximum instances per provisioning attempt"
+    )
+    fulfillment_fallback_template_id: Optional[str] = Field(
+        None, description="Fallback template ID for provisioning"
     )
 
     @field_validator("max_machines_per_request")

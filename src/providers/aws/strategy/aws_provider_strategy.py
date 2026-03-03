@@ -549,10 +549,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 return ProviderResult.success_result({"resolved_images": {}})
 
             # Partition specs — only create the service (and activate aws_client) if needed
-            needs_resolution = [
-                s for s in image_specifications
-                if not s.startswith("ami-")
-            ]
+            needs_resolution = [s for s in image_specifications if not s.startswith("ami-")]
 
             resolved_images = {s: s for s in image_specifications}  # default: pass-through
 
