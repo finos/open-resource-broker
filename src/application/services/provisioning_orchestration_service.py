@@ -1,6 +1,7 @@
 """Service for orchestrating provider provisioning operations."""
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -9,6 +10,7 @@ if TYPE_CHECKING:
 from domain.base.ports import ContainerPort, LoggingPort, ProviderConfigPort
 from domain.base.results import ProviderSelectionResult
 from domain.request.aggregate import Request
+from domain.request.request_types import RequestStatus
 from domain.template.template_aggregate import Template
 
 
@@ -24,6 +26,14 @@ class ProvisioningResult:
     error_message: str | None = None
     fulfilled_count: int = 0
     is_terminal: bool = True
+
+
+_DEFAULT_FULFILLMENT_CONFIG = {
+    "max_retries": 3,
+    "timeout_seconds": 300,
+    "batch_size": 1000,
+    "fallback_template_id": None,
+}
 
 
 class ProvisioningOrchestrationService:
@@ -44,7 +54,130 @@ class ProvisioningOrchestrationService:
     async def execute_provisioning(
         self, template: Template, request: Request, selection_result: ProviderSelectionResult
     ) -> ProvisioningResult:
-        """Execute provisioning via selected provider using registry execution."""
+        """Execute provisioning with capacity top-up retry loop."""
+        config = {**_DEFAULT_FULFILLMENT_CONFIG, **request.metadata.get("fulfillment_config", {})}
+        max_retries: int = int(config["max_retries"])
+        timeout_seconds: float = float(config["timeout_seconds"])
+        batch_size: int = int(config["batch_size"])
+
+        started_at = datetime.now(timezone.utc)
+        remaining = request.requested_count
+        attempt_number = 0
+
+        accumulated_resource_ids: list[str] = []
+        accumulated_instance_ids: list[str] = []
+        accumulated_instances: list[dict[str, Any]] = []
+        accumulated_provider_data: dict[str, Any] = {}
+        last_result: ProvisioningResult | None = None
+
+        while remaining > 0 and attempt_number <= max_retries:
+            elapsed = (datetime.now(timezone.utc) - started_at).total_seconds()
+            if elapsed >= timeout_seconds:
+                self._logger.warning(
+                    "Provisioning timeout after %.1fs for request %s",
+                    elapsed,
+                    request.request_id,
+                )
+                break
+
+            attempt_number += 1
+            attempt_count = min(remaining, batch_size)
+            attempt_started = datetime.now(timezone.utc)
+
+            self._logger.info(
+                "Provisioning attempt %d/%d: requesting %d of %d remaining instances",
+                attempt_number,
+                max_retries + 1,
+                attempt_count,
+                remaining,
+            )
+
+            last_result = await self._dispatch_single_attempt(
+                template, request, selection_result, attempt_count
+            )
+
+            attempt_completed = datetime.now(timezone.utc)
+
+            # Accumulate results
+            accumulated_resource_ids.extend(last_result.resource_ids)
+            accumulated_instance_ids.extend(last_result.instance_ids)
+            accumulated_instances.extend(last_result.instances)
+            accumulated_provider_data.update(last_result.provider_data)
+
+            fulfilled_this_attempt = last_result.fulfilled_count
+            remaining -= fulfilled_this_attempt
+
+            # Append to fulfillment_attempts audit trail
+            attempt_record = {
+                "attempt": attempt_number,
+                "requested": attempt_count,
+                "fulfilled": fulfilled_this_attempt,
+                "resource_ids": last_result.resource_ids,
+                "started_at": attempt_started.isoformat(),
+                "completed_at": attempt_completed.isoformat(),
+            }
+            if "fulfillment_attempts" not in request.metadata:
+                request.metadata["fulfillment_attempts"] = []
+            request.metadata["fulfillment_attempts"].append(attempt_record)
+
+            if not last_result.success:
+                self._logger.warning(
+                    "Attempt %d failed: %s", attempt_number, last_result.error_message
+                )
+                break
+
+            if remaining > 0 and not last_result.is_terminal:
+                # Partial fulfillment, retry may help — persist ACQUIRING status
+                self._logger.info(
+                    "Attempt %d: %d/%d fulfilled, %d remaining — retrying",
+                    attempt_number,
+                    request.requested_count - remaining,
+                    request.requested_count,
+                    remaining,
+                )
+                request = self._persist_acquiring(request)
+            elif last_result.is_terminal:
+                # No point retrying
+                break
+
+        total_fulfilled = len(accumulated_instances)
+        success = last_result.success if last_result else False
+
+        return ProvisioningResult(
+            success=success,
+            resource_ids=accumulated_resource_ids,
+            instance_ids=accumulated_instance_ids,
+            instances=accumulated_instances,
+            provider_data=accumulated_provider_data,
+            error_message=last_result.error_message if last_result else "No provisioning attempted",
+            fulfilled_count=total_fulfilled,
+            is_terminal=last_result.is_terminal if last_result else True,
+        )
+
+    def _persist_acquiring(self, request: Request) -> Request:
+        """Persist request with ACQUIRING status between retry attempts."""
+        from domain.base import UnitOfWorkFactory
+
+        try:
+            updated = request.update_status(
+                RequestStatus.ACQUIRING, "Partial fulfillment, retrying"
+            )
+            uow_factory = self._container.get(UnitOfWorkFactory)
+            with uow_factory.create_unit_of_work() as uow:
+                uow.requests.save(updated)
+            return updated
+        except Exception as e:
+            self._logger.warning("Failed to persist ACQUIRING status: %s", e)
+            return request
+
+    async def _dispatch_single_attempt(
+        self,
+        template: Template,
+        request: Request,
+        selection_result: ProviderSelectionResult,
+        count: int,
+    ) -> ProvisioningResult:
+        """Dispatch a single provisioning attempt for `count` instances."""
         try:
             from domain.base.operations import (
                 Operation as ProviderOperation,
@@ -58,7 +191,7 @@ class ProvisioningOrchestrationService:
                 operation_type=ProviderOperationType.CREATE_INSTANCES,
                 parameters={
                     "template_config": scheduler.format_template_for_provider(template),
-                    "count": request.requested_count,
+                    "count": count,
                     "request_id": str(request.request_id),
                 },
                 context={
@@ -80,22 +213,6 @@ class ProvisioningOrchestrationService:
 
                 resource_ids = result.data.get("resource_ids", [])
                 instances = result.data.get("instances", [])
-
-                self._logger.info(
-                    "Extracted resource_ids: %s (type: %s)",
-                    resource_ids,
-                    type(resource_ids),
-                )
-                self._logger.info("Extracted instances: %s instances", len(instances))
-
-                if resource_ids:
-                    for i, resource_id in enumerate(resource_ids):
-                        self._logger.info(
-                            "Resource ID %s: %s (type: %s)",
-                            i + 1,
-                            resource_id,
-                            type(resource_id),
-                        )
 
                 fleet_errors = result.data.get("provider_data", {}).get("fleet_errors") or []
                 capacity_error_codes = {
@@ -128,7 +245,7 @@ class ProvisioningOrchestrationService:
 
         except Exception as e:
             self._logger.error(
-                "Provisioning execution failed for template %s: %s",
+                "Provisioning dispatch failed for template %s: %s",
                 template.template_id if hasattr(template, "template_id") else "unknown",
                 e,
                 exc_info=True,
