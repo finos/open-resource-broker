@@ -29,66 +29,105 @@ class RequestStatusService:
     ) -> Tuple[Optional[str], Optional[str]]:
         """Determine request status from machine states."""
         try:
-            # Use provider machines if available, otherwise DB machines
-            machines_to_check = provider_machines if provider_machines else db_machines
-
-            if not machines_to_check:
-                # No machines yet, check if request is still in progress
-                if request.status in [RequestStatus.PENDING, RequestStatus.IN_PROGRESS]:
-                    return None, None  # Keep current status
-                return None, None
-
-            # Count machine states
-            running_count = sum(1 for m in machines_to_check if m.status.value == "running")
-            failed_count = sum(
-                1 for m in machines_to_check if m.status.value in ["terminated", "failed"]
-            )
-            pending_count = sum(
-                1 for m in machines_to_check if m.status.value in ["pending", "starting"]
-            )
-            total_count = len(machines_to_check)
+            db_machine_count = len(db_machines)
 
             # Determine new status based on request type
             if request.request_type.value == "return":
-                # Return request logic — shutting-down counts as in-progress toward termination
-                terminated_count = sum(
-                    1
-                    for m in machines_to_check
-                    if m.status.value in ["terminated", "stopped", "shutting-down", "stopping"]
-                )
-                fully_terminated_count = sum(
-                    1 for m in machines_to_check if m.status.value in ["terminated", "stopped"]
-                )
-                if fully_terminated_count == total_count:
-                    return RequestStatus.COMPLETED.value, "All instances terminated successfully"
-                elif terminated_count == total_count:
-                    # All shutting-down — still in progress but nearly done
-                    return RequestStatus.IN_PROGRESS.value, "Instances terminating"
-                elif fully_terminated_count > 0:
+                # For return requests: empty provider_machines means instances are gone from AWS → COMPLETED
+                if not provider_machines:
                     return (
-                        RequestStatus.PARTIAL.value,
-                        f"{fully_terminated_count}/{total_count} instances terminated",
+                        RequestStatus.COMPLETED.value,
+                        f"Return request completed: all machines terminated "
+                        f"(no longer visible in provider) (total in DB: {db_machine_count})",
+                    )
+
+                shutting_down_count = sum(
+                    1 for m in provider_machines if m.status.value in ["shutting-down", "stopping"]
+                )
+                terminated_count = sum(
+                    1 for m in provider_machines if m.status.value in ["terminated", "stopped"]
+                )
+                running_count = sum(1 for m in provider_machines if m.status.value == "running")
+                failed_count = sum(1 for m in provider_machines if m.status.value == "failed")
+                total_count = len(provider_machines)
+
+                # shutting-down is irreversible — treat it as terminated for completion purposes
+                effectively_done_count = terminated_count + shutting_down_count
+                if effectively_done_count == total_count and running_count == 0:
+                    return (
+                        RequestStatus.COMPLETED.value,
+                        f"Return request completed: {terminated_count} terminated, "
+                        f"{shutting_down_count} shutting down "
+                        f"(total in DB: {db_machine_count})",
+                    )
+                elif running_count > 0:
+                    return (
+                        RequestStatus.IN_PROGRESS.value,
+                        f"Return in progress: {running_count} machines still running, "
+                        f"awaiting termination (total in DB: {db_machine_count})",
+                    )
+                elif failed_count > 0:
+                    return (
+                        RequestStatus.FAILED.value,
+                        f"Return request failed: {failed_count} machines failed to terminate "
+                        f"(total in DB: {db_machine_count})",
                     )
                 else:
                     return RequestStatus.IN_PROGRESS.value, "Instances terminating"
-            # Acquisition request logic - running states
+            # Acquisition request logic
             else:
-                requested_count = request.requested_count
-                if total_count < requested_count or pending_count > 0:
-                    # Not all instances visible yet, or some still starting — keep polling
+                machines_to_check = provider_machines if provider_machines else db_machines
+
+                if not machines_to_check:
+                    return None, None
+
+                running_count = sum(1 for m in machines_to_check if m.status.value == "running")
+                pending_count = sum(
+                    1 for m in machines_to_check if m.status.value in ["pending", "starting"]
+                )
+                failed_count = sum(
+                    1 for m in machines_to_check if m.status.value == "failed"
+                )
+                total_count = len(machines_to_check)
+
+                # Use fleet capacity metrics when available (fleets/ASGs report their own
+                # target and fulfilled capacity). Fall back to instance counts otherwise.
+                fleet_capacity = provider_metadata.get("fleet_capacity_fulfilment") or {}
+                effective_target = (
+                    fleet_capacity.get("target_capacity_units")
+                    or request.requested_count
+                )
+                fulfilled_from_metadata = fleet_capacity.get("fulfilled_capacity_units")
+                effective_fulfilled: float = (
+                    float(fulfilled_from_metadata)
+                    if fulfilled_from_metadata is not None
+                    else float(running_count + pending_count)
+                )
+
+                # Fleet metadata (FulfilledCapacity) can lag or use floating-point values
+                # that don't exactly match target. Use running instance count as the
+                # authoritative signal when it meets the requested count.
+                instance_target = request.requested_count
+                if (running_count >= instance_target and failed_count == 0) or (
+                    effective_fulfilled >= effective_target and failed_count == 0
+                ):
+                    return RequestStatus.COMPLETED.value, "All instances running successfully"
+                elif failed_count == total_count and total_count > 0:
+                    return RequestStatus.FAILED.value, "All instances failed"
+                elif pending_count > 0:
                     return (
                         RequestStatus.IN_PROGRESS.value,
-                        f"{running_count}/{requested_count} instances running, waiting for more",
+                        f"{running_count}/{effective_target} instances running, waiting for {pending_count} more",
                     )
-                elif running_count >= requested_count:
-                    return RequestStatus.COMPLETED.value, "All instances running successfully"
-                elif failed_count == total_count:
-                    return RequestStatus.FAILED.value, "All instances failed"
-                elif running_count > 0:
-                    # All instances terminal, mix of running and failed
+                elif running_count > 0 and (running_count + failed_count) >= effective_target:
                     return (
                         RequestStatus.PARTIAL.value,
-                        f"{running_count}/{requested_count} instances running",
+                        f"{running_count}/{effective_target} instances running",
+                    )
+                elif running_count > 0:
+                    return (
+                        RequestStatus.IN_PROGRESS.value,
+                        f"{running_count}/{effective_target} instances running, waiting for more",
                     )
                 else:
                     return RequestStatus.IN_PROGRESS.value, "Instances starting"

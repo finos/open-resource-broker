@@ -62,8 +62,17 @@ class MachineSyncService:
             )
             from domain.base.ports.configuration_port import ConfigurationPort
 
-            # Use resource-level discovery when available (handles scaling/replacement)
-            if request.resource_ids:
+            # For return requests, always use instance-level status for the specific
+            # machines being returned — not resource-level discovery which returns all
+            # ASG/fleet instances including unrelated ones.
+            if request.request_type.value == "return" and request.machine_ids:
+                operation_type = ProviderOperationType.GET_INSTANCE_STATUS
+                parameters = {
+                    "instance_ids": request.machine_ids,
+                    "template_id": request.template_id,
+                }
+            # Use resource-level discovery for acquire requests (handles scaling/replacement)
+            elif request.resource_ids:
                 operation_type = ProviderOperationType.DESCRIBE_RESOURCE_INSTANCES
                 parameters = {
                     "resource_ids": request.resource_ids,
@@ -76,13 +85,6 @@ class MachineSyncService:
                 instance_ids = [m.machine_id.value for m in db_machines]
                 parameters = {
                     "instance_ids": instance_ids,
-                    "template_id": request.template_id,
-                }
-            # Use machine_ids for return requests when available
-            elif request.request_type.value == "return" and request.machine_ids:
-                operation_type = ProviderOperationType.GET_INSTANCE_STATUS
-                parameters = {
-                    "instance_ids": request.machine_ids,
                     "template_id": request.template_id,
                 }
             else:

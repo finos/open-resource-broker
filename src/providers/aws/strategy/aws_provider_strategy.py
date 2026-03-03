@@ -407,21 +407,21 @@ class AWSProviderStrategy(ProviderStrategy):
 
             instance_details = handler.check_hosts_status(request)
 
+            metadata: dict[str, Any] = {
+                "operation": "describe_resource_instances",
+                "resource_ids": resource_ids,
+                "provider_api": provider_api_value,
+                "instance_count": len(instance_details),
+            }
+            self._augment_capacity_metadata(metadata, provider_api_value, resource_ids)
+
             if not instance_details:
                 self._logger.info("No instances found for resources: %s", resource_ids)
-                return ProviderResult.success_result(
-                    {"instances": []},
-                    {"operation": "describe_resource_instances", "resource_ids": resource_ids},
-                )
+                return ProviderResult.success_result({"instances": []}, metadata)
 
             return ProviderResult.success_result(
                 data={"instances": instance_details},
-                metadata={
-                    "operation": "describe_resource_instances",
-                    "resource_ids": resource_ids,
-                    "provider_api": provider_api_value,
-                    "instance_count": len(instance_details),
-                },
+                metadata=metadata,
             )
 
         except Exception as e:
@@ -475,6 +475,67 @@ class AWSProviderStrategy(ProviderStrategy):
             self._initialized = False
         except Exception as e:
             self._logger.warning("Failed during AWS provider cleanup: %s", e, exc_info=True)
+
+    def _augment_capacity_metadata(
+        self, metadata: dict[str, Any], provider_api: str, resource_ids: list[str]
+    ) -> None:
+        """Add fleet capacity fulfillment data to metadata for fleet-based providers."""
+        if not resource_ids or not self.aws_client:
+            return
+        try:
+            resource_id = resource_ids[0]
+            if provider_api == "EC2Fleet":
+                response = self.aws_client.ec2_client.describe_fleets(FleetIds=[resource_id])
+                fleets = response.get("Fleets", [])
+                if fleets:
+                    fleet = fleets[0]
+                    spec = fleet.get("TargetCapacitySpecification") or {}
+                    target = spec.get("TotalTargetCapacity")
+                    fulfilled = fleet.get("FulfilledCapacity") or 0
+                    metadata["fleet_capacity_fulfilment"] = {
+                        "target_capacity_units": target,
+                        "fulfilled_capacity_units": fulfilled,
+                        "provisioned_instance_count": int(fulfilled),
+                        "state": fleet.get("FleetState"),
+                    }
+            elif provider_api == "SpotFleet":
+                response = self.aws_client.ec2_client.describe_spot_fleet_requests(
+                    SpotFleetRequestIds=[resource_id]
+                )
+                configs = response.get("SpotFleetRequestConfigs", [])
+                if configs:
+                    cfg = configs[0].get("SpotFleetRequestConfig") or {}
+                    fulfilled = cfg.get("FulfilledCapacity") or 0
+                    metadata["fleet_capacity_fulfilment"] = {
+                        "target_capacity_units": cfg.get("TargetCapacity"),
+                        "fulfilled_capacity_units": fulfilled,
+                        "provisioned_instance_count": int(fulfilled),
+                        "state": configs[0].get("SpotFleetRequestState"),
+                    }
+            elif provider_api == "ASG":
+                response = self.aws_client.autoscaling_client.describe_auto_scaling_groups(
+                    AutoScalingGroupNames=[resource_id]
+                )
+                groups = response.get("AutoScalingGroups", [])
+                if groups:
+                    group = groups[0]
+                    instances = group.get("Instances") or []
+                    fulfilled = sum(
+                        int(inst.get("WeightedCapacity", 1))
+                        for inst in instances
+                        if inst.get("LifecycleState") == "InService"
+                    )
+                    provisioned = sum(
+                        1 for inst in instances if inst.get("LifecycleState") == "InService"
+                    )
+                    metadata["fleet_capacity_fulfilment"] = {
+                        "target_capacity_units": int(group.get("DesiredCapacity") or 0),
+                        "fulfilled_capacity_units": fulfilled,
+                        "provisioned_instance_count": provisioned,
+                        "state": group.get("Status"),
+                    }
+        except Exception as e:
+            self._logger.warning("Failed to augment capacity metadata: %s", e)
 
     async def _handle_resolve_image(self, operation: ProviderOperation) -> ProviderResult:
         """Handle image resolution using registry-based service."""
