@@ -72,25 +72,26 @@ class RequestStatusService:
                 else:
                     return RequestStatus.IN_PROGRESS.value, "Instances terminating"
             # Acquisition request logic - running states
-            elif running_count == total_count:
-                return RequestStatus.COMPLETED.value, "All instances running successfully"
-            elif failed_count == total_count:
-                return RequestStatus.FAILED.value, "All instances failed"
-            elif pending_count > 0:
-                # Still have pending/starting instances — keep polling
-                return (
-                    RequestStatus.IN_PROGRESS.value,
-                    f"{running_count}/{total_count} instances running, waiting for {pending_count} more",
-                )
-            elif running_count > 0:
-                # All instances terminal, mix of running and failed
-                return (
-                    RequestStatus.PARTIAL.value,
-                    f"{running_count}/{total_count} instances running",
-                )
             else:
-                # All pending/starting
-                return RequestStatus.IN_PROGRESS.value, "Instances starting"
+                requested_count = request.requested_count
+                if total_count < requested_count or pending_count > 0:
+                    # Not all instances visible yet, or some still starting — keep polling
+                    return (
+                        RequestStatus.IN_PROGRESS.value,
+                        f"{running_count}/{requested_count} instances running, waiting for more",
+                    )
+                elif running_count >= requested_count:
+                    return RequestStatus.COMPLETED.value, "All instances running successfully"
+                elif failed_count == total_count:
+                    return RequestStatus.FAILED.value, "All instances failed"
+                elif running_count > 0:
+                    # All instances terminal, mix of running and failed
+                    return (
+                        RequestStatus.PARTIAL.value,
+                        f"{running_count}/{requested_count} instances running",
+                    )
+                else:
+                    return RequestStatus.IN_PROGRESS.value, "Instances starting"
 
         except Exception as e:
             self.logger.error(f"Failed to determine status from machines: {e}")
