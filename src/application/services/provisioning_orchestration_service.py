@@ -227,7 +227,9 @@ class ProvisioningOrchestrationService:
                 resource_ids = result.data.get("resource_ids", [])
                 instances = result.data.get("instances", [])
 
-                provider_data = result.data.get("provider_data", {})
+                provider_data = result.data.get("provider_data", None) or (
+                    result.metadata or {}
+                ).get("provider_data", {})
                 fleet_errors = provider_data.get("fleet_errors") or []
                 fulfillment_final = provider_data.get("fulfillment_final", False)
                 capacity_error_codes = {

@@ -5,6 +5,18 @@ import time
 from enum import Enum
 from typing import Any
 
+from botocore.exceptions import ClientError
+
+NON_RETRYABLE_CODES = {
+    "AlreadyExists",
+    "InvalidParameterValue",
+    "ValidationError",
+    "UnauthorizedOperation",
+    "AccessDenied",
+    "InvalidClientTokenId",
+    "OptInRequired",
+}
+
 from infrastructure.logging.logger import get_logger
 from infrastructure.resilience.exceptions import CircuitBreakerOpenError
 from infrastructure.resilience.strategy.base import RetryStrategy
@@ -102,6 +114,12 @@ class CircuitBreakerStrategy(RetryStrategy):
         Returns:
             True if should retry, False otherwise
         """
+        # Never retry non-idempotent errors
+        if isinstance(exception, ClientError):
+            code = exception.response.get("Error", {}).get("Code", "")
+            if code in NON_RETRYABLE_CODES:
+                return False
+
         current_time = time.time()
         circuit_state = self._circuit_states[self.service_name]
 
