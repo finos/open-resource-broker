@@ -9,6 +9,7 @@ from typing import Any, Optional
 
 from domain.base.dependency_injection import injectable
 from domain.base.ports import LoggingPort
+from domain.base.ports.configuration_port import ConfigurationPort
 from domain.request.aggregate import Request
 from domain.template.template_aggregate import Template
 from infrastructure.adapters.ports.resource_provisioning_port import (
@@ -43,6 +44,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         logger: LoggingPort,
         provider_strategy: Any,  # AWSProviderStrategy
         template_config_manager: Optional[TemplateConfigurationManager] = None,
+        config_port: Optional[ConfigurationPort] = None,
     ) -> None:
         """
         Initialize the adapter.
@@ -52,11 +54,13 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             logger: Logger for logging messages
             provider_strategy: AWS provider strategy for handler creation
             template_config_manager: Optional template configuration manager instance
+            config_port: Configuration port for accessing application config
         """
         self._aws_client = aws_client
         self._logger = logger
         self._provider_strategy = provider_strategy
         self._template_config_manager = template_config_manager
+        self._config_port = config_port
         self._handlers = {}  # Cache for handlers
 
     @property
@@ -206,16 +210,12 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             return template
 
         try:
-            from domain.base.ports.configuration_port import ConfigurationPort
-            from infrastructure.di.container import get_container
             from providers.aws.infrastructure.caching.aws_image_cache import AWSImageCache
             from providers.aws.infrastructure.services.aws_image_resolution_service import (
                 AWSImageResolutionService,
             )
 
-            container = get_container()
-            config = container.get(ConfigurationPort)
-            cache_dir = config.get_cache_dir()
+            cache_dir = self._config_port.get_cache_dir() if self._config_port else ""
 
             cache = AWSImageCache(
                 provider_name="aws",

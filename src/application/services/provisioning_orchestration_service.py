@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from domain.base.ports.provider_selection_port import ProviderSelectionPort
 
+from domain.base.exceptions import QuotaError
 from domain.base.ports import ConfigurationPort, ContainerPort, LoggingPort, ProviderConfigPort
 from infrastructure.resilience.exceptions import CircuitBreakerOpenError
 from infrastructure.resilience.strategy.circuit_breaker import CircuitBreakerStrategy
@@ -116,6 +117,7 @@ class ProvisioningOrchestrationService:
                     selection_result.provider_name,
                     e,
                 )
+                self._record_provider_failure(selection_result.provider_name)
                 break
 
             attempt_completed = datetime.now(timezone.utc)
@@ -146,6 +148,7 @@ class ProvisioningOrchestrationService:
                 self._logger.warning(
                     "Attempt %d failed: %s", attempt_number, last_result.error_message
                 )
+                self._record_provider_failure(selection_result.provider_name)
                 break
 
             if remaining > 0 and not last_result.is_final:
@@ -201,6 +204,36 @@ class ProvisioningOrchestrationService:
         except Exception as e:
             self._logger.warning(
                 "Failed to reset circuit breaker state for %s: %s", provider_name, e
+            )
+
+    def _record_provider_failure(self, provider_name: str) -> None:
+        """Increment circuit breaker failure count and open circuit if threshold is reached."""
+        import time
+
+        from infrastructure.resilience.strategy.circuit_breaker import CircuitState
+
+        cb_key = f"provider:{provider_name}"
+        try:
+            state = CircuitBreakerStrategy._circuit_states.get(cb_key)
+            if state is None:
+                return
+            state["failure_count"] += 1
+            state["last_failure_time"] = time.time()
+            # Use the default failure_threshold (5) — same default as CircuitBreakerStrategy
+            failure_threshold = 5
+            if (
+                state["state"] == CircuitState.CLOSED
+                and state["failure_count"] >= failure_threshold
+            ):
+                state["state"] = CircuitState.OPEN
+                self._logger.warning(
+                    "Circuit breaker opened for provider %s after %d failures",
+                    provider_name,
+                    state["failure_count"],
+                )
+        except Exception as e:
+            self._logger.warning(
+                "Failed to record circuit breaker failure for %s: %s", provider_name, e
             )
 
     async def _dispatch_single_attempt(
@@ -285,6 +318,29 @@ class ProvisioningOrchestrationService:
 
         except CircuitBreakerOpenError:
             raise  # do not swallow — let it propagate to execute_provisioning
+
+        except QuotaError as e:
+            self._logger.error(
+                "Quota error during provisioning for template %s: %s",
+                template.template_id if hasattr(template, "template_id") else "unknown",
+                e,
+                extra={
+                    "request_id": str(request.request_id)
+                    if hasattr(request, "request_id")
+                    else None,
+                    "provider_name": selection_result.provider_name if selection_result else None,
+                    "error_type": type(e).__name__,
+                },
+            )
+            return ProvisioningResult(
+                success=False,
+                resource_ids=[],
+                instance_ids=[],
+                instances=[],
+                provider_data={},
+                error_message=f"Quota exceeded: {e}",
+                is_final=True,
+            )
 
         except Exception as e:
             self._logger.error(

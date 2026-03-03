@@ -61,3 +61,7 @@ class ProviderRegistryService:
         if strategy is None:
             return None
         return strategy.check_health()
+
+    def update_provider_health(self, provider_name: str, health_data: dict) -> None:
+        """Persist health state for a provider into the registry."""
+        self._registry.update_provider_health(provider_name, health_data)

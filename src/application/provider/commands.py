@@ -8,22 +8,6 @@ from typing import Any, Optional
 
 from application.dto.base import BaseCommand
 from domain.base.operations import Operation
-from providers.base.strategy import (
-    ProviderHealthStatus,
-    ProviderOperationType,
-    SelectionCriteria,
-)
-
-
-class SelectProviderStrategyCommand(BaseCommand):
-    """Command to select optimal provider strategy for an operation."""
-
-    operation_type: ProviderOperationType
-    selection_criteria: SelectionCriteria
-    context: Optional[dict[str, Any]] = None
-
-    # Result stored here after execution (CQRS: execute_command returns None)
-    result: Optional[dict[str, Any]] = None
 
 
 class ExecuteProviderOperationCommand(BaseCommand):
@@ -58,22 +42,9 @@ class UpdateProviderHealthCommand(BaseCommand):
     """
 
     provider_name: str
-    health_status: ProviderHealthStatus
+    health_status: Any
     source: str = "system"
     timestamp: Optional[str] = None
 
     # Store results for caller to access after command execution
-    result: Optional[dict[str, Any]] = None
-
-
-class ConfigureProviderStrategyCommand(BaseCommand):
-    """Command to configure provider strategy selection policies."""
-
-    default_selection_policy: str
-    selection_criteria: dict[str, Any]
-    fallback_strategies: Optional[list[str]] = None
-    health_check_interval: int = 300  # 5 minutes default
-    circuit_breaker_config: Optional[dict[str, Any]] = None
-
-    # Result stored here after execution (CQRS: execute_command returns None)
     result: Optional[dict[str, Any]] = None

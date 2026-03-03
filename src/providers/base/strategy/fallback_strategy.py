@@ -12,7 +12,6 @@ from enum import Enum
 from threading import Lock
 from typing import Any, Optional
 
-from domain.base.dependency_injection import injectable
 from domain.base.ports import LoggingPort
 from infrastructure.interfaces.provider import BaseProviderConfig
 from providers.base.strategy.provider_strategy import (
@@ -25,7 +24,6 @@ from providers.base.strategy.provider_strategy import (
 )
 
 
-@injectable
 class FallbackMode(str, Enum):
     """Modes for fallback strategy behavior."""
 
@@ -35,7 +33,6 @@ class FallbackMode(str, Enum):
     HEALTH_BASED = "health_based"  # Fallback based on health checks
 
 
-@injectable
 class CircuitState(str, Enum):
     """States for circuit breaker pattern."""
 
@@ -101,7 +98,6 @@ class CircuitBreakerState:
         self.last_failure_time = time.time()
 
 
-@injectable
 class FallbackProviderStrategy(ProviderStrategy):
     """
     Fallback provider strategy with resilience and failover capabilities.

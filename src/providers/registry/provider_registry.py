@@ -24,15 +24,33 @@ class ProviderRegistry(BaseRegistry):
         # Provider is MULTI_CHOICE - multiple provider strategies simultaneously
         super().__init__(mode=RegistryMode.MULTI_CHOICE)
         self._strategy_cache: dict[str, Any] = {}
+        self._health_states: dict[str, dict] = {}
         self._config_port = config_port
+        self._fallback_strategy: Optional[Any] = None
         # Create logger directly since BaseRegistry no longer provides it
         from infrastructure.logging.logger import get_logger
 
         self._logger = get_logger(__name__)
 
+    def register_fallback_strategy(self, strategy: Any) -> None:
+        """Register a fallback strategy used when no provider matches.
+
+        Args:
+            strategy: A constructed ProviderStrategy instance to use as fallback.
+        """
+        self._fallback_strategy = strategy
+
+    def get_fallback_strategy(self) -> Optional[Any]:
+        """Return the registered fallback strategy, or None if not set."""
+        return self._fallback_strategy
+
     def get_strategy(self, provider_identifier: str) -> Optional[Any]:
         """Get cached strategy instance."""
         return self._strategy_cache.get(provider_identifier)
+
+    def update_provider_health(self, provider_name: str, health_data: dict) -> None:
+        """Store health state for a provider."""
+        self._health_states[provider_name] = health_data
 
     def get_or_create_strategy(self, provider_identifier: str, config: Any = None) -> Optional[Any]:
         """
@@ -634,6 +652,10 @@ class ProviderRegistry(BaseRegistry):
         """Select default provider from configuration."""
         provider_config = self._get_provider_config()
         if not provider_config:
+            if self._fallback_strategy is not None:
+                if logger:
+                    logger.info("No provider configuration available, using fallback strategy")
+                return self._fallback_strategy
             raise ValueError("No provider configuration available")
 
         default_provider_type: Optional[str] = getattr(

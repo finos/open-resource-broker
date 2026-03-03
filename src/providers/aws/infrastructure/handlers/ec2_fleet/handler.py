@@ -210,20 +210,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         if not aws_template.fleet_type:
             raise AWSValidationError("Fleet type is required for EC2Fleet")
 
-        # Validate fleet type using existing validation system
-        from providers.aws.infrastructure.adapters.aws_validation_adapter import (
-            create_aws_validation_adapter,
-        )
-
-        validation_adapter = create_aws_validation_adapter(self._logger)
-        valid_types = validation_adapter.get_valid_fleet_types_for_api("EC2Fleet")
-
         fleet_type = aws_template.fleet_type
-        if fleet_type.value not in valid_types:
-            raise AWSValidationError(
-                f"Invalid EC2 fleet type: {aws_template.fleet_type}. "
-                f"Must be one of: {', '.join(valid_types)}"
-            )
 
         # Create launch template using the new manager
         launch_template_result = self.launch_template_manager.create_or_update_launch_template(

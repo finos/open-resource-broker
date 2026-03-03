@@ -378,7 +378,14 @@ class AWSHandler(ABC):
 
         if error_code in ["ValidationError", "InvalidParameterValue"]:
             return AWSValidationError(error_message)
-        elif error_code in ["LimitExceeded", "InstanceLimitExceeded"]:
+        elif error_code in [
+            "LimitExceeded",
+            "InstanceLimitExceeded",
+            "VcpuLimitExceeded",
+            "MaxSpotInstanceCountExceeded",
+            "ServiceQuotaExceededException",
+            "ResourceCountExceeded",
+        ]:
             return QuotaExceededError(error_message)
         elif error_code == "ResourceInUse":
             return ResourceInUseError(error_message)

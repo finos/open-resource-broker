@@ -6,10 +6,8 @@ through clean command/query interfaces.
 """
 
 from .commands import (
-    ConfigureProviderStrategyCommand,
     ExecuteProviderOperationCommand,
     RegisterProviderStrategyCommand,
-    SelectProviderStrategyCommand,
     UpdateProviderHealthCommand,
 )
 from .queries import (
@@ -21,7 +19,6 @@ from .queries import (
 )
 
 __all__: list[str] = [
-    "ConfigureProviderStrategyCommand",
     "ExecuteProviderOperationCommand",
     "GetProviderCapabilitiesQuery",
     # Queries
@@ -31,6 +28,5 @@ __all__: list[str] = [
     "ListAvailableProvidersQuery",
     "RegisterProviderStrategyCommand",
     # Commands
-    "SelectProviderStrategyCommand",
     "UpdateProviderHealthCommand",
 ]

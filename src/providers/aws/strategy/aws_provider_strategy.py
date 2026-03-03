@@ -291,6 +291,7 @@ class AWSProviderStrategy(ProviderStrategy):
                 aws_client=self.aws_client,  # type: ignore[arg-type]
                 logger=self._logger,
                 provider_strategy=self,
+                config_port=self._config_port,
             )
             machine_adapter = AWSMachineAdapter(
                 aws_client=self.aws_client,  # type: ignore[arg-type]

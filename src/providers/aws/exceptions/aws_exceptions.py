@@ -3,6 +3,7 @@
 from typing import Any, Optional
 
 from domain.base.exceptions import InfrastructureError
+from domain.base.exceptions import QuotaExceededError as DomainQuotaExceededError
 
 
 class AWSError(InfrastructureError):
@@ -40,7 +41,7 @@ class AWSEntityNotFoundError(AWSError):
     """Raised when an AWS resource is not found."""
 
 
-class QuotaExceededError(AWSError):
+class QuotaExceededError(AWSError, DomainQuotaExceededError):
     """Raised when AWS service quotas would be exceeded."""
 
 

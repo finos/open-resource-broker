@@ -84,3 +84,11 @@ class ConfigurationError(DomainException):
 
 class ApplicationError(DomainException):
     """Raised when application layer operations fail."""
+
+
+class QuotaError(DomainException):
+    """Raised when a provider quota or limit is exceeded."""
+
+
+class QuotaExceededError(QuotaError):
+    """Raised when a specific provider quota is exceeded."""

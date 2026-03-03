@@ -446,9 +446,9 @@ class TestEC2FleetHandler:
         template = SimpleNamespace(template_id="tmpl-123", fleet_type=AWSFleetType.INSTANT)
 
         with patch(
-            "providers.aws.infrastructure.adapters.aws_validation_adapter.create_aws_validation_adapter"
-        ) as mock_validation:
-            mock_validation.return_value.get_valid_fleet_types_for_api.return_value = [
+            "providers.aws.infrastructure.handlers.ec2_fleet.handler.AWSValidationAdapter"
+        ) as mock_validation_cls:
+            mock_validation_cls.return_value.get_valid_fleet_types_for_api.return_value = [
                 "instant",
                 "request",
                 "maintain",
@@ -505,9 +505,9 @@ class TestEC2FleetHandler:
         template = SimpleNamespace(template_id="tmpl-789", fleet_type=AWSFleetType.INSTANT)
 
         with patch(
-            "providers.aws.infrastructure.adapters.aws_validation_adapter.create_aws_validation_adapter"
-        ) as mock_validation:
-            mock_validation.return_value.get_valid_fleet_types_for_api.return_value = [
+            "providers.aws.infrastructure.handlers.ec2_fleet.handler.AWSValidationAdapter"
+        ) as mock_validation_cls:
+            mock_validation_cls.return_value.get_valid_fleet_types_for_api.return_value = [
                 "instant",
                 "request",
                 "maintain",
@@ -550,9 +550,9 @@ class TestEC2FleetHandler:
         template = SimpleNamespace(template_id="tmpl-456", fleet_type=AWSFleetType.INSTANT)
 
         with patch(
-            "providers.aws.infrastructure.adapters.aws_validation_adapter.create_aws_validation_adapter"
-        ) as mock_validation:
-            mock_validation.return_value.get_valid_fleet_types_for_api.return_value = [
+            "providers.aws.infrastructure.handlers.ec2_fleet.handler.AWSValidationAdapter"
+        ) as mock_validation_cls:
+            mock_validation_cls.return_value.get_valid_fleet_types_for_api.return_value = [
                 "instant",
                 "request",
                 "maintain",

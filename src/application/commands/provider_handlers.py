@@ -5,10 +5,8 @@ import time
 from application.base.handlers import BaseCommandHandler
 from application.decorators import command_handler
 from application.provider.commands import (
-    ConfigureProviderStrategyCommand,
     ExecuteProviderOperationCommand,
     RegisterProviderStrategyCommand,
-    SelectProviderStrategyCommand,
     UpdateProviderHealthCommand,
 )
 from application.services.provider_registry_service import ProviderRegistryService
@@ -16,69 +14,8 @@ from domain.base.events.provider_events import (
     ProviderHealthChangedEvent,
     ProviderOperationExecutedEvent,
     ProviderStrategyRegisteredEvent,
-    ProviderStrategySelectedEvent,
 )
 from domain.base.ports import ContainerPort, ErrorHandlingPort, EventPublisherPort, LoggingPort
-
-
-@command_handler(SelectProviderStrategyCommand)  # type: ignore[arg-type]
-class SelectProviderStrategyHandler(BaseCommandHandler[SelectProviderStrategyCommand, None]):
-    """Handler for selecting optimal provider strategy.
-
-    CQRS Compliance: Returns None. Result stored in command.result.
-    """
-
-    def __init__(
-        self,
-        container: ContainerPort,
-        logger: LoggingPort,
-        event_publisher: EventPublisherPort,
-        error_handler: ErrorHandlingPort,
-        provider_registry_service: ProviderRegistryService,
-    ) -> None:
-        """Initialize the instance."""
-        super().__init__(logger, event_publisher, error_handler)
-        self._container = container
-        self._provider_registry_service = provider_registry_service
-
-    async def validate_command(self, command: SelectProviderStrategyCommand) -> None:
-        """Validate select provider strategy command."""
-        await super().validate_command(command)
-        if not command.operation_type:
-            raise ValueError("operation_type is required")
-
-    async def execute_command(self, command: SelectProviderStrategyCommand) -> None:
-        """Handle provider strategy selection. Result stored in command.result."""
-        self.logger.info("Selecting provider strategy for operation: %s", command.operation_type)
-        try:
-            available_strategies = self._provider_registry_service.get_available_strategies()
-            if not available_strategies:
-                raise ValueError("No provider strategies available")
-
-            selected = available_strategies[0] if available_strategies else None
-            if not selected:
-                raise ValueError("No suitable provider strategy found")
-
-            event = ProviderStrategySelectedEvent(
-                strategy_name=str(selected),
-                operation_type=str(command.operation_type),
-                selection_criteria=None,
-                selection_reason="first_available",
-                aggregate_id=str(command.operation_type),
-                aggregate_type="provider_strategy",
-            )
-            if self.event_publisher:
-                self.event_publisher.publish(event)
-
-            self.logger.info("Selected strategy: %s", selected)
-            command.result = {
-                "selected_strategy": str(selected),
-                "selection_reason": "first_available",
-                "alternatives": [str(s) for s in available_strategies[1:]],
-            }
-        except Exception as e:
-            self.logger.error("Failed to select provider strategy: %s", str(e))
-            raise
 
 
 @command_handler(ExecuteProviderOperationCommand)  # type: ignore[arg-type]
@@ -273,58 +210,21 @@ class UpdateProviderHealthHandler(BaseCommandHandler[UpdateProviderHealthCommand
                     command.provider_name,
                     "healthy" if is_healthy else "unhealthy",
                 )
-            command.result = {
-                "provider_name": command.provider_name,
-                "health_status": command.health_status
+            health_data = (
+                command.health_status
                 if isinstance(command.health_status, dict)
                 else command.health_status.model_dump()
                 if hasattr(command.health_status, "model_dump")
-                else str(command.health_status),
+                else {"status": str(command.health_status)}
+            )
+            self._provider_registry_service.update_provider_health(
+                command.provider_name, health_data
+            )
+            command.result = {
+                "provider_name": command.provider_name,
+                "health_status": health_data,
                 "updated_at": command.timestamp or time.strftime("%Y-%m-%d %H:%M:%S"),
             }
         except Exception as e:
             self.logger.error("Failed to update provider health: %s", str(e))
-            raise
-
-
-@command_handler(ConfigureProviderStrategyCommand)  # type: ignore[arg-type]
-class ConfigureProviderStrategyHandler(BaseCommandHandler[ConfigureProviderStrategyCommand, None]):
-    """Handler for configuring provider strategy policies.
-
-    CQRS Compliance: Returns None. Result stored in command.result.
-    """
-
-    def __init__(
-        self,
-        container: ContainerPort,
-        logger: LoggingPort,
-        event_publisher: EventPublisherPort,
-        error_handler: ErrorHandlingPort,
-    ) -> None:
-        super().__init__(logger, event_publisher, error_handler)
-        self._container = container
-
-    async def validate_command(self, command: ConfigureProviderStrategyCommand) -> None:
-        """Validate configure provider strategy command."""
-        await super().validate_command(command)
-
-    async def execute_command(self, command: ConfigureProviderStrategyCommand) -> None:
-        """Handle provider strategy configuration. Result stored in command.result."""
-        self.logger.info("Configuring provider strategy policies")
-        try:
-            config_updates = {
-                "default_selection_policy": command.default_selection_policy,
-                "selection_criteria": command.selection_criteria,
-                "fallback_strategies": command.fallback_strategies or [],
-                "health_check_interval": command.health_check_interval,
-                "circuit_breaker_config": command.circuit_breaker_config or {},
-            }
-            self.logger.info("Provider strategy configuration updated successfully")
-            command.result = {
-                "status": "configured",
-                "configuration": config_updates,
-                "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-            }
-        except Exception as e:
-            self.logger.error("Failed to configure provider strategy: %s", str(e))
             raise
