@@ -366,10 +366,13 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 provider_api="RunInstances",
             ),
         )
-        tag_specifications = [
+        tag_specifications: list[dict[str, Any]] = [
             {"ResourceType": "instance", "Tags": instance_tags},
-            {"ResourceType": "spot-instances-request", "Tags": instance_tags},
         ]
+        if aws_template.price_type == "spot":
+            tag_specifications.append(
+                {"ResourceType": "spot-instances-request", "Tags": instance_tags}
+            )
 
         params["TagSpecifications"] = tag_specifications
 

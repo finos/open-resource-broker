@@ -38,6 +38,7 @@ INSTANCE_ACTIVE_STATES: Sequence[str] = (
     "stopped",
     "shutting-down",
 )
+SPOT_REQUEST_ACTIVE_STATES: Sequence[str] = ("open", "active")
 
 
 def _utc_iso(value: Any) -> str:
