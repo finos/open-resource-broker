@@ -56,7 +56,7 @@ class TemplateValidationDomainService:
         self,
         template: Any,
         provider_instance: str,
-        validation_level: ValidationLevel = ValidationLevel.STRICT,
+        validation_level: ValidationLevel = ValidationLevel.PERMISSIVE,
     ) -> ValidationResult:
         """Business logic for template validation."""
         self._ensure_initialized()

@@ -51,7 +51,7 @@ class GetTemplateHandler(BaseQueryHandler[GetTemplateQuery, TemplateDTOPort]):
             template_data = template_dto.model_dump()
             template_data.setdefault("template_id", template_dto.template_id)
             template_data.setdefault("name", template_dto.name or template_dto.template_id)
-            template_data.setdefault("provider_api", template_dto.provider_api or "aws")
+            template_data.setdefault("provider_api", template_dto.provider_api)
 
             from application.services.template_defaults_service import TemplateDefaultsService
 

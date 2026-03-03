@@ -229,7 +229,7 @@ async def handle_request_machines(
     try:
         await command_bus.execute(command)  # type: ignore[arg-type]
     except Exception as e:
-        error_response = {"request_id": request_id, "status": "failed", "error": str(e)}
+        error_response = {"request_id": request_id, "status": "failed", "status_message": str(e)}
         if scheduler_strategy:
             return scheduler_strategy.format_request_response(error_response), 1
         return error_response, 1

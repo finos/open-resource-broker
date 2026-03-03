@@ -92,8 +92,6 @@ class TemplateDTO(BaseDTO):
         if isinstance(data, dict):
             if not data.get("name"):
                 data["name"] = data.get("template_id")
-            if not data.get("provider_api"):
-                data["provider_api"] = "aws"
         return data
 
     @classmethod
