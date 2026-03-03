@@ -47,7 +47,7 @@
             ],
             "default_fleet_type": "request",
             "supports_spot": true,
-            "supports_ondemand": false
+            "supports_ondemand": true
           },
           "ASG": {
             "handler_class": "ASGHandler",
