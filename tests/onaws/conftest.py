@@ -58,7 +58,7 @@ def check_aws_credentials(request):
     """Skip all onaws tests if AWS credentials are missing or expired.
 
     Calls sts:GetCallerIdentity once per session. If it fails (no credentials,
-    expired Midway token, etc.) all tests are skipped with a clear message
+    expired token, etc.) all tests are skipped with the raw AWS error message
     rather than failing deep inside provisioning with cryptic errors.
     """
     if not request.config.getoption("--run-aws", default=False):
