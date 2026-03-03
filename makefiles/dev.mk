@@ -90,6 +90,9 @@ test-cov: dev-install
 test-html: dev-install
 	@./dev-tools/testing/test_dispatcher.py html-coverage
 
+test-docker: dev-install  ## Run Docker containerization tests
+	@./dev-tools/testing/test-docker.sh
+
 # Dummy targets removed (consolidated in quality.mk)
 
 # @SECTION Development Tools

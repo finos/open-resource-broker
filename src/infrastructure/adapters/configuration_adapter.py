@@ -337,6 +337,26 @@ class ConfigurationAdapter(ConfigurationPort):
         except Exception:
             return ""
 
+    def get_handler_capabilities(self) -> dict[str, Any]:
+        """Get per-API handler capabilities from AWS handler configuration."""
+        try:
+            from providers.aws.configuration.validator import AWSHandlerConfig
+
+            handler_config = AWSHandlerConfig()
+            return {
+                api: {
+                    "supports_spot": caps.supports_spot,
+                    "supports_on_demand": caps.supports_on_demand,
+                    "supported_fleet_types": caps.supported_fleet_types or [],
+                }
+                for api, caps in handler_config.capabilities.items()
+            }
+        except Exception as e:
+            _logger.warning(
+                "Failed to load handler capabilities, validation will be permissive: %s", e
+            )
+            return {}
+
     def get_cleanup_config(self) -> dict[str, Any]:
         """Get cleanup configuration."""
         try:

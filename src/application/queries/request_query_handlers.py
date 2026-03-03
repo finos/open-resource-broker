@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
+
 from application.base.handlers import BaseQueryHandler
 from application.decorators import query_handler
 from application.dto.queries import (
@@ -92,12 +94,20 @@ class GetRequestHandler(BaseQueryHandler[GetRequestQuery, RequestDTO]):
                         request, new_status, status_message or ""
                     )
                 request = await self._query_service.get_request(query.request_id)
-            except Exception as sync_err:
+            except (ClientError, NoCredentialsError, BotoCoreError) as sync_err:
                 self.logger.warning(
-                    "Sync failed for request %s, returning stored state: %s",
+                    "AWS connectivity error syncing request %s, returning stored state: %s",
                     query.request_id,
                     sync_err,
                 )
+            except Exception as sync_err:
+                self.logger.error(
+                    "Unexpected error syncing request %s: %s",
+                    query.request_id,
+                    sync_err,
+                    exc_info=True,
+                )
+                raise
 
             machine_objects = await self._query_service.get_machines_for_request(request)
             request_dto = self._dto_factory.create_from_domain(request, machine_objects)

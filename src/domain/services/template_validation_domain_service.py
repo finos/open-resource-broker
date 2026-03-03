@@ -128,7 +128,7 @@ class TemplateValidationDomainService:
         return _ProviderCapabilities(
             provider_type=provider_config.type,
             supported_apis=supported_apis,
-            features={},
+            features={"api_capabilities": self.config.get_handler_capabilities()},
         )
 
     def _validate_api_support(self, template: Any, capabilities: Any, result: Any) -> None:
