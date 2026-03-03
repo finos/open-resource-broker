@@ -530,6 +530,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
                 )
                 formatted_template["attributes"] = self._build_hf_attributes(instance_type)
 
+            formatted_template = {k: v for k, v in formatted_template.items() if v is not None}
             formatted_templates.append(formatted_template)
 
         return {

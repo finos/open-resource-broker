@@ -200,6 +200,16 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         Returns the template unchanged if no resolution is needed.
         """
         fleet_role = aws_template.fleet_role
+        if not fleet_role and self.config_port is not None:
+            provider_config = self.config_port.get_provider_config()
+            if provider_config is not None:
+                active_override = self.config_port.get_active_provider_override()
+                providers = getattr(provider_config, "providers", [])
+                for p in providers:
+                    if active_override is None or p.name == active_override:
+                        fleet_role = (p.config or {}).get("fleet_role")
+                        if fleet_role:
+                            break
         if not fleet_role:
             return aws_template
 

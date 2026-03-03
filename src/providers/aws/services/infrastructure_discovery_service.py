@@ -508,7 +508,11 @@ class AWSInfrastructureDiscoveryService:
                         f"Provider {provider_config.get('name', 'unknown')}: Security group validation failed: {e}"
                     )
 
-            # Validate fleet_role IAM role
+            # Validate fleet_role IAM role (may be in config or template_defaults)
+            provider_instance_config = provider_config.get("config", {})
+            if "fleet_role" not in template_defaults and "fleet_role" in provider_instance_config:
+                template_defaults = dict(template_defaults)
+                template_defaults["fleet_role"] = provider_instance_config["fleet_role"]
             if "fleet_role" in template_defaults:
                 try:
                     fleet_role_arn = template_defaults["fleet_role"]

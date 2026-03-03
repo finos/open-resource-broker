@@ -653,7 +653,17 @@ def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
         # Add template_defaults if infrastructure was discovered
         infrastructure_defaults = provider_data.get("infrastructure_defaults", {})
         if infrastructure_defaults:
-            provider_instance["template_defaults"] = infrastructure_defaults
+            template_level = {
+                k: v
+                for k, v in infrastructure_defaults.items()
+                if k in ("subnet_ids", "security_group_ids")
+            }
+            if template_level:
+                provider_instance["template_defaults"] = template_level
+            if "fleet_role" in infrastructure_defaults:
+                provider_instance.setdefault("config", {})["fleet_role"] = infrastructure_defaults[
+                    "fleet_role"
+                ]
 
         providers_list.append(provider_instance)
 
