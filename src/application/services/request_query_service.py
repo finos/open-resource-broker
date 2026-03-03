@@ -1,7 +1,7 @@
 """Request query service for pure data retrieval."""
 
 from domain.base import UnitOfWorkFactory
-from domain.base.exceptions import EntityNotFoundError
+from domain.request.exceptions import RequestNotFoundError
 from domain.base.ports.logging_port import LoggingPort
 from domain.machine.aggregate import Machine
 from domain.request.aggregate import Request
@@ -27,7 +27,7 @@ class RequestQueryService:
             request = uow.requests.get_by_id(request_id_obj)
 
             if not request:
-                raise EntityNotFoundError("Request", request_id)
+                raise RequestNotFoundError(request_id)
 
             return request
 

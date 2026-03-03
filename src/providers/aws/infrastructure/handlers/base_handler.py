@@ -483,9 +483,9 @@ class AWSHandler(ABC):
     def _get_instance_details(
         self,
         instance_ids: list[str],
+        provider_api: str,
         request_id: Optional[str] = None,
         resource_id: Optional[str] = None,
-        provider_api: str = "EC2",
     ) -> list[dict[str, Any]]:
         """
         Get detailed information about EC2 instances using machine adapter for proper formatting.

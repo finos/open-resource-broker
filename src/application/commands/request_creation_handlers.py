@@ -89,9 +89,6 @@ class CreateMachineRequestHandler(BaseCommandHandler[CreateRequestCommand, None]
         """
         self.logger.info("Creating machine request for template: %s", command.template_id)
 
-        # Validate provider availability using service
-        await self._provider_validation_service.validate_provider_availability()
-
         # Load template and select provider
         template = await self._load_template(command.template_id)
         selection_result = await self._provider_validation_service.select_and_validate_provider(

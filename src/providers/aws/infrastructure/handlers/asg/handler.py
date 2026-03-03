@@ -275,6 +275,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             instance_ids,
             request_id=request_id,
             resource_id=resource_id or asg_name,
+            provider_api="ASG",
         )
 
     def _resolve_provider_api(

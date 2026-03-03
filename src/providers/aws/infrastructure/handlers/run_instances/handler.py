@@ -427,6 +427,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                 instance_ids,
                 request_id=str(request.request_id),
                 resource_id=resource_id,
+                provider_api="RunInstances",
             )
 
             return self._format_instance_data(
@@ -461,6 +462,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                             instance_ids,
                             request_id=str(request.request_id),
                             resource_id=resource_id,
+                            provider_api="RunInstances",
                         )
                         formatted = self._format_instance_data(
                             detailed_instances, resource_id, self._resolve_provider_api(request)
@@ -526,6 +528,7 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
                     instance_ids,
                     request_id=str(request.request_id),
                     resource_id=reservation_id,
+                    provider_api="RunInstances",
                 )
                 formatted_instances.extend(
                     self._format_instance_data(
