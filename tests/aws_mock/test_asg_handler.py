@@ -57,26 +57,27 @@ class TestASGHandlerAcquireHosts:
         assert groups[0]["AutoScalingGroupName"] == asg_name
         assert groups[0]["DesiredCapacity"] == 2
 
-    def test_acquire_hosts_missing_subnet_returns_failure(self, handler):
-        """acquire_hosts returns failure when subnet_ids is empty."""
+    def test_acquire_hosts_missing_subnet_raises_validation_error(self, handler):
+        """acquire_hosts raises AWSValidationError when subnet_ids is empty."""
+        from providers.aws.exceptions.aws_exceptions import AWSValidationError
+
         bad_template = make_aws_template(subnet_id="", sg_id="sg-12345678")
         bad_template = bad_template.model_copy(update={"subnet_ids": []})
         request = make_request(request_id="req-asg-003")
 
-        result = handler.acquire_hosts(request, bad_template)
+        with pytest.raises(AWSValidationError, match="subnet"):
+            handler.acquire_hosts(request, bad_template)
 
-        assert result["success"] is False
-        assert "error_message" in result
+    def test_acquire_hosts_missing_sg_raises_validation_error(self, handler, vpc_resources):
+        """acquire_hosts raises AWSValidationError when security_group_ids is empty."""
+        from providers.aws.exceptions.aws_exceptions import AWSValidationError
 
-    def test_acquire_hosts_missing_sg_returns_failure(self, handler, vpc_resources):
-        """acquire_hosts returns failure when security_group_ids is empty."""
         bad_template = make_aws_template(subnet_id=vpc_resources["subnet_id"], sg_id="sg-12345678")
         bad_template = bad_template.model_copy(update={"security_group_ids": []})
         request = make_request(request_id="req-asg-004")
 
-        result = handler.acquire_hosts(request, bad_template)
-
-        assert result["success"] is False
+        with pytest.raises(AWSValidationError, match="security"):
+            handler.acquire_hosts(request, bad_template)
 
 
 # ---------------------------------------------------------------------------

@@ -79,8 +79,10 @@ class TestRunInstancesHandlerAcquireHosts:
         assert result["success"] is True
         assert len(result["provider_data"]["instance_ids"]) >= 1
 
-    def test_acquire_hosts_missing_image_id_returns_failure(self, handler, vpc_resources):
-        """acquire_hosts returns failure when image_id is missing."""
+    def test_acquire_hosts_missing_image_id_raises_validation_error(self, handler, vpc_resources):
+        """acquire_hosts raises AWSValidationError when image_id is missing."""
+        from providers.aws.exceptions.aws_exceptions import AWSValidationError
+
         bad_template = make_aws_template(
             subnet_id=vpc_resources["subnet_id"],
             sg_id=vpc_resources["sg_id"],
@@ -88,12 +90,13 @@ class TestRunInstancesHandlerAcquireHosts:
         bad_template = bad_template.model_copy(update={"image_id": None})
         request = make_request(request_id="req-run-005")
 
-        result = handler.acquire_hosts(request, bad_template)
+        with pytest.raises(AWSValidationError, match="Image ID"):
+            handler.acquire_hosts(request, bad_template)
 
-        assert result["success"] is False
+    def test_acquire_hosts_missing_subnet_raises_validation_error(self, handler, vpc_resources):
+        """acquire_hosts raises AWSValidationError when subnet_ids is empty."""
+        from providers.aws.exceptions.aws_exceptions import AWSValidationError
 
-    def test_acquire_hosts_missing_subnet_returns_failure(self, handler, vpc_resources):
-        """acquire_hosts returns failure when subnet_ids is empty."""
         bad_template = make_aws_template(
             subnet_id=vpc_resources["subnet_id"],
             sg_id=vpc_resources["sg_id"],
@@ -101,9 +104,8 @@ class TestRunInstancesHandlerAcquireHosts:
         bad_template = bad_template.model_copy(update={"subnet_ids": []})
         request = make_request(request_id="req-run-006")
 
-        result = handler.acquire_hosts(request, bad_template)
-
-        assert result["success"] is False
+        with pytest.raises(AWSValidationError, match="subnet"):
+            handler.acquire_hosts(request, bad_template)
 
 
 # ---------------------------------------------------------------------------
