@@ -140,6 +140,9 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         self, request: Request, aws_template: AWSTemplate
     ) -> dict[str, Any]:
         """Create Spot Fleet and return full AWS response."""
+        # Resolve fleet role ARNs before validation (requires STS, lives on handler)
+        aws_template = self._resolve_fleet_role(aws_template)
+
         # Validate Spot Fleet specific prerequisites
         self._validate_spot_prerequisites(aws_template)
 
@@ -157,9 +160,6 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             request.set_launch_template_info(  # type: ignore[attr-defined]
                 launch_template_result.template_id, launch_template_result.version
             )
-
-        # Resolve fleet role ARNs before building config (requires STS, lives on handler)
-        aws_template = self._resolve_fleet_role(aws_template)
 
         # Create spot fleet configuration
         fleet_config = self._config_builder.build(
@@ -500,14 +500,13 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Spot Fleet request with lowest price allocation",
                 provider_api="SpotFleet",
                 machine_types={"t3.medium": 1, "t3.large": 2},
-                image_id="ami-12345678",
                 max_instances=20,
                 price_type="spot",
                 allocation_strategy="lowestPrice",
                 fleet_type="request",
                 max_price=0.05,
-                subnet_ids=["subnet-12345678"],
-                security_group_ids=["sg-12345678"],
+                subnet_ids=[],
+                security_group_ids=[],
                 tags={"Environment": "dev"},
             ),
             AWSTemplate(
@@ -516,14 +515,13 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Spot Fleet request with diversified allocation",
                 provider_api="SpotFleet",
                 machine_types={"t3.medium": 1, "t3.large": 2},
-                image_id="ami-12345678",
                 max_instances=25,
                 price_type="spot",
                 allocation_strategy="diversified",
                 fleet_type="request",
                 max_price=0.06,
-                subnet_ids=["subnet-12345678"],
-                security_group_ids=["sg-12345678"],
+                subnet_ids=[],
+                security_group_ids=[],
                 tags={"Environment": "dev"},
             ),
             AWSTemplate(
@@ -532,14 +530,13 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Spot Fleet request with capacity optimized allocation",
                 provider_api="SpotFleet",
                 machine_types={"t3.medium": 1, "t3.large": 2},
-                image_id="ami-12345678",
                 max_instances=30,
                 price_type="spot",
                 allocation_strategy="capacityOptimized",
                 fleet_type="request",
                 max_price=0.07,
-                subnet_ids=["subnet-12345678"],
-                security_group_ids=["sg-12345678"],
+                subnet_ids=[],
+                security_group_ids=[],
                 tags={"Environment": "dev"},
             ),
             # Maintain fleet type examples
@@ -549,14 +546,13 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Spot Fleet maintain with lowest price allocation",
                 provider_api="SpotFleet",
                 machine_types={"t3.medium": 1, "t3.large": 2},
-                image_id="ami-12345678",
                 max_instances=15,
                 price_type="spot",
                 allocation_strategy="lowestPrice",
                 fleet_type="maintain",
                 max_price=0.04,
-                subnet_ids=["subnet-12345678"],
-                security_group_ids=["sg-12345678"],
+                subnet_ids=[],
+                security_group_ids=[],
                 tags={"Environment": "prod"},
             ),
             AWSTemplate(
@@ -565,14 +561,13 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Spot Fleet maintain with diversified allocation",
                 provider_api="SpotFleet",
                 machine_types={"t3.medium": 1, "t3.large": 2},
-                image_id="ami-12345678",
                 max_instances=20,
                 price_type="spot",
                 allocation_strategy="diversified",
                 fleet_type="maintain",
                 max_price=0.05,
-                subnet_ids=["subnet-12345678"],
-                security_group_ids=["sg-12345678"],
+                subnet_ids=[],
+                security_group_ids=[],
                 tags={"Environment": "prod"},
             ),
             AWSTemplate(
@@ -581,14 +576,13 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 description="Spot Fleet maintain with capacity optimized allocation",
                 provider_api="SpotFleet",
                 machine_types={"t3.medium": 1, "t3.large": 2},
-                image_id="ami-12345678",
                 max_instances=25,
                 price_type="spot",
                 allocation_strategy="capacityOptimized",
                 fleet_type="maintain",
                 max_price=0.06,
-                subnet_ids=["subnet-12345678"],
-                security_group_ids=["sg-12345678"],
+                subnet_ids=[],
+                security_group_ids=[],
                 tags={"Environment": "prod"},
             ),
         ]

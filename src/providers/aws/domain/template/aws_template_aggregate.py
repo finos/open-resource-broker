@@ -245,12 +245,9 @@ class AWSTemplate(Template):
     @model_validator(mode="after")
     def validate_aws_template(self) -> "AWSTemplate":
         """AWS-specific template validation."""
-        # AWS-specific required fields
-        if not self.image_id:
-            raise ValueError("image_id is required for AWS templates")
-
-        if not self.subnet_ids:
-            raise ValueError("At least one subnet_id is required for AWS templates")
+        # AWS-specific required fields — only enforced when values are present
+        # (generic/example templates may have empty subnet_ids/image_id, filled at runtime
+        # from provider.template_defaults via _coalesce_merge)
 
         # Auto-assign default fleet_type if not provided
         # Set fleet_type from metadata if not already set

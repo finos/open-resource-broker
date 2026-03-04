@@ -259,7 +259,7 @@ async def handle_request_machines(
             "resource_ids": resource_ids,
             "template_id": template_id,
             "status": status,
-            "error_message": error_msg,
+            "status_message": error_msg,
         }
 
         # Return success response using scheduler strategy formatting

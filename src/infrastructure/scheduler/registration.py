@@ -18,7 +18,8 @@ def create_symphony_hostfactory_strategy(config: Any) -> "SchedulerPort":
     """Create Symphony HostFactory scheduler strategy.
 
     Args:
-        config: Scheduler configuration
+        config: Scheduler configuration — either a DI container (during normal
+            startup) or a plain dict (non-container call paths).
 
     Returns:
         SchedulerPort: Symphony HostFactory scheduler strategy instance
@@ -27,7 +28,6 @@ def create_symphony_hostfactory_strategy(config: Any) -> "SchedulerPort":
     from domain.base.ports.configuration_port import ConfigurationPort
     from domain.base.ports.logging_port import LoggingPort
     from domain.template.ports.template_defaults_port import TemplateDefaultsPort
-    from infrastructure.di.container import get_container, is_container_ready
     from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
         HostFactorySchedulerStrategy,
     )
@@ -37,12 +37,11 @@ def create_symphony_hostfactory_strategy(config: Any) -> "SchedulerPort":
     logger = None
     provider_registry_service = None
 
-    if is_container_ready():
-        container = get_container()
-        template_defaults_service = container.get_optional(TemplateDefaultsPort)
-        config_port = container.get_optional(ConfigurationPort)
-        logger = container.get_optional(LoggingPort)
-        provider_registry_service = container.get_optional(ProviderRegistryService)
+    if hasattr(config, "get_optional"):
+        template_defaults_service = config.get_optional(TemplateDefaultsPort)
+        config_port = config.get_optional(ConfigurationPort)
+        logger = config.get_optional(LoggingPort)
+        provider_registry_service = config.get_optional(ProviderRegistryService)
 
     return HostFactorySchedulerStrategy(
         template_defaults_service=template_defaults_service,
@@ -85,7 +84,8 @@ def create_default_strategy(config: Any) -> "SchedulerPort":
     """Create default scheduler strategy.
 
     Args:
-        config: Scheduler configuration
+        config: Scheduler configuration — either a DI container (during normal
+            startup) or a plain dict (non-container call paths).
 
     Returns:
         SchedulerPort: Default scheduler strategy instance
@@ -94,7 +94,6 @@ def create_default_strategy(config: Any) -> "SchedulerPort":
     from domain.base.ports.configuration_port import ConfigurationPort
     from domain.base.ports.logging_port import LoggingPort
     from domain.template.ports.template_defaults_port import TemplateDefaultsPort
-    from infrastructure.di.container import get_container, is_container_ready
     from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 
     template_defaults_service = None
@@ -102,12 +101,11 @@ def create_default_strategy(config: Any) -> "SchedulerPort":
     logger = None
     provider_registry_service = None
 
-    if is_container_ready():
-        container = get_container()
-        template_defaults_service = container.get_optional(TemplateDefaultsPort)
-        config_port = container.get_optional(ConfigurationPort)
-        logger = container.get_optional(LoggingPort)
-        provider_registry_service = container.get_optional(ProviderRegistryService)
+    if hasattr(config, "get_optional"):
+        template_defaults_service = config.get_optional(TemplateDefaultsPort)
+        config_port = config.get_optional(ConfigurationPort)
+        logger = config.get_optional(LoggingPort)
+        provider_registry_service = config.get_optional(ProviderRegistryService)
 
     return DefaultSchedulerStrategy(
         template_defaults_service=template_defaults_service,
