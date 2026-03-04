@@ -555,7 +555,9 @@ def _get_default_config(args) -> Dict[str, Any]:
     providers = _get_available_providers()
     default_provider = providers[0]["type"] if providers else "aws"
 
-    # Build infrastructure_defaults from CLI flags if provided
+    # Build infrastructure_defaults from CLI flags if provided.
+    # These args (subnet_ids, security_group_ids, fleet_role) are AWS-specific;
+    # other providers would contribute their own CLI args here.
     infrastructure_defaults: Dict[str, Any] = {}
     if getattr(args, "subnet_ids", None):
         infrastructure_defaults["subnet_ids"] = [s.strip() for s in args.subnet_ids.split(",")]
@@ -650,13 +652,14 @@ def _write_config_file(config_file: Path, user_config: Dict[str, Any]):
         if provider_data.get("is_default", False):
             provider_instance["default"] = True
 
-        # Add template_defaults if infrastructure was discovered
+        # Add template_defaults if infrastructure was discovered.
+        # Promote all infrastructure_defaults to template_defaults except for keys
+        # that belong in provider config (e.g. fleet_role) — those are handled separately.
+        _CONFIG_ONLY_KEYS = {"fleet_role"}
         infrastructure_defaults = provider_data.get("infrastructure_defaults", {})
         if infrastructure_defaults:
             template_level = {
-                k: v
-                for k, v in infrastructure_defaults.items()
-                if k in ("subnet_ids", "security_group_ids")
+                k: v for k, v in infrastructure_defaults.items() if k not in _CONFIG_ONLY_KEYS
             }
             if template_level:
                 provider_instance["template_defaults"] = template_level

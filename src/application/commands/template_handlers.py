@@ -87,8 +87,8 @@ class CreateTemplateHandler(BaseCommandHandler[CreateTemplateCommand, None]):  #
                 provider_api=command.provider_api,
                 instance_type=command.instance_type,
                 image_id=command.image_id,
-                subnet_ids=command.subnet_ids,
-                security_group_ids=command.security_group_ids,
+                subnet_ids=command.configuration.get("subnet_ids", []),
+                security_group_ids=command.configuration.get("security_group_ids", []),
                 tags=command.tags,
                 configuration=command.configuration,
             )

@@ -9,8 +9,8 @@ class HostFactoryTransformations:
     """HostFactory-specific field transformations."""
 
     @staticmethod
-    def transform_subnet_id(value: Any) -> list[str]:
-        """Transform HostFactory subnetId field to subnet_ids list.
+    def transform_aws_subnet_id(value: Any) -> list[str]:
+        """Transform AWS subnetId field to subnet_ids list.
 
         Handles both single subnet and comma-delimited multiple subnets.
         """
@@ -118,7 +118,7 @@ class HostFactoryTransformations:
         # Transform subnet_ids
         if "subnet_ids" in mapped_data:
             original_value = mapped_data["subnet_ids"]
-            mapped_data["subnet_ids"] = HostFactoryTransformations.transform_subnet_id(
+            mapped_data["subnet_ids"] = HostFactoryTransformations.transform_aws_subnet_id(
                 original_value
             )
             logger.debug(

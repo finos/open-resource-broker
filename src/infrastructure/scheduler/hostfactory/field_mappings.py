@@ -16,10 +16,6 @@ class HostFactoryFieldMappings:
             "imageId": "image_id",
             "keyName": "key_name",
             "fleetType": "fleet_type",
-            # Network configuration
-            "subnetId": "subnet_ids",  # Will be converted to list
-            "subnetIds": "subnet_ids",  # Preserve full list when provided
-            "securityGroupIds": "security_group_ids",
             # Instance configuration
             "vmType": "machine_types",
             "vmTypes": "machine_types",
@@ -42,6 +38,10 @@ class HostFactoryFieldMappings:
         },
         # AWS-specific fields (only mapped when AWS provider is active)
         "aws": {
+            # AWS VPC network configuration
+            "subnetId": "subnet_ids",  # Will be converted to list
+            "subnetIds": "subnet_ids",  # Preserve full list when provided
+            "securityGroupIds": "security_group_ids",
             # AWS instance type configurations
             "vmTypesOnDemand": "machine_types_ondemand",
             "vmTypesPriority": "machine_types_priority",

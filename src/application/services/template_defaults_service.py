@@ -111,22 +111,17 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         """
         Merge dictionaries with coalesce logic for empty collections.
 
-        Empty collections in infrastructure fields are treated as "unset"
-        so provider defaults can apply.
+        Empty list values in overrides are treated as "unset" so provider
+        defaults can fill them in. An empty list is never a meaningful value
+        for any template field, so this is safe to apply generically.
         """
-        infrastructure_fields = {
-            "subnet_ids",
-            "security_group_ids",
-            "network_zones",
-            "instance_types",
-        }
         result = defaults.copy()
 
         for key, value in overrides.items():
             if value is not None:
-                # For infrastructure fields, treat empty collections as "unset"
-                if key in infrastructure_fields and self._is_empty_collection(value):
-                    continue  # Skip empty collections, keep default
+                # Treat empty lists as "unset" — let the default win
+                if self._is_empty_collection(value):
+                    continue
                 result[key] = value
 
         return result

@@ -291,11 +291,12 @@ async def handle_provider_show(args) -> int:
 
             if provider.get("template_defaults"):
                 print_info("Template Defaults:")
-                defaults = provider["template_defaults"]
-                if defaults.get("subnet_ids"):
-                    print_info(f"  Subnets: {', '.join(defaults['subnet_ids'])}")
-                if defaults.get("security_group_ids"):
-                    print_info(f"  Security Groups: {', '.join(defaults['security_group_ids'])}")
+                for key, value in provider["template_defaults"].items():
+                    label = key.replace("_", " ").title()
+                    if isinstance(value, list):
+                        print_info(f"  {label}: {', '.join(value)}")
+                    else:
+                        print_info(f"  {label}: {value}")
         else:
             # Show default provider
             default_provider = config.get("provider", {}).get("default_provider")

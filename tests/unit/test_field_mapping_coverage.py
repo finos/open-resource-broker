@@ -12,9 +12,6 @@ REQUIRED_GENERIC_FIELDS = [
     "imageId",
     "keyName",
     "fleetType",
-    "subnetId",
-    "subnetIds",
-    "securityGroupIds",
     "vmType",
     "vmTypes",
     "priceType",
@@ -32,6 +29,11 @@ REQUIRED_GENERIC_FIELDS = [
 ]
 
 REQUIRED_AWS_FIELDS = [
+    # AWS VPC network configuration
+    "subnetId",
+    "subnetIds",
+    "securityGroupIds",
+    # AWS fleet/instance configuration
     "vmTypesOnDemand",
     "vmTypesPriority",
     "abisInstanceRequirements",

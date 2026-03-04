@@ -114,21 +114,14 @@ def _show_provider_infrastructure(provider: Dict[str, Any]) -> None:
     template_defaults = provider.get("template_defaults", {})
     if template_defaults:
         print_info("\nInfrastructure Defaults:")
-        if "subnet_ids" in template_defaults:
-            subnets = template_defaults["subnet_ids"]
-            print_info(f"  Subnets ({len(subnets)}):")
-            for subnet in subnets:
-                print_info(f"    - {subnet}")
-
-        if "security_group_ids" in template_defaults:
-            sgs = template_defaults["security_group_ids"]
-            print_info(f"  Security Groups ({len(sgs)}):")
-            for sg in sgs:
-                print_info(f"    - {sg}")
-
-        if "fleet_role" in template_defaults:
-            fleet_role = template_defaults["fleet_role"]
-            print_info(f"  Fleet Role: {fleet_role}")
+        for key, value in template_defaults.items():
+            label = key.replace("_", " ").title()
+            if isinstance(value, list):
+                print_info(f"  {label} ({len(value)}):")
+                for item in value:
+                    print_info(f"    - {item}")
+            else:
+                print_info(f"  {label}: {value}")
     else:
         print_info("\nNo infrastructure defaults configured")
         print_info("To configure infrastructure defaults:")

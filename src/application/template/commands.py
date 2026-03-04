@@ -19,8 +19,6 @@ class CreateTemplateCommand(BaseCommand):
     provider_api: str
     instance_type: Optional[str] = None
     image_id: str
-    subnet_ids: list[str] = Field(default_factory=list)
-    security_group_ids: list[str] = Field(default_factory=list)
     tags: dict[str, str] = Field(default_factory=dict)
     configuration: dict[str, Any] = Field(default_factory=dict)
 

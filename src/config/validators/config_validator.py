@@ -84,16 +84,6 @@ class ConfigValidator:
                             f"AWS provider '{provider.name}' aws_read_timeout is very high, consider reducing to avoid long waits"
                         )
 
-        # Validate template configuration
-        if config.template:
-            template_config = config.template
-
-            if len(getattr(template_config, "subnet_ids", [])) > 16:
-                result.add_error("Too many subnet IDs specified (maximum 16)")
-
-            if len(getattr(template_config, "security_group_ids", [])) > 5:
-                result.add_error("Too many security group IDs specified (maximum 5)")
-
         # Validate performance settings
         if config.performance.max_workers > 50:
             result.add_warning("High number of max_workers may cause resource contention")

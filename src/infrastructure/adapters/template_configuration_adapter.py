@@ -83,29 +83,6 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
 
         return errors
 
-    def _determine_provider_type(self, config: dict[str, Any]) -> Optional[str]:
-        """Determine provider type from configuration."""
-        provider_api = config.get("provider_api", "")
-
-        if provider_api in [
-            "EC2Fleet",
-            "SpotFleet",
-            "RunInstances",
-            "ASG",
-        ]:
-            return "aws"
-
-        aws_fields = [
-            "fleet_type",
-            "allocation_strategy",
-            "spot_fleet_request_expiry",
-            "fleet_role",
-        ]
-        if any(field in config for field in aws_fields):
-            return "aws"
-
-        return None
-
     # Additional convenience methods for application layer
 
     async def get_template_by_id(self, template_id: str) -> Optional[TemplateDTO]:
