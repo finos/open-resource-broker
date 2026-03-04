@@ -226,12 +226,3 @@ class PriceType(str, Enum):
     HETEROGENEOUS = "heterogeneous"  # Mix of different pricing types
 
 
-class AllocationStrategy(str, Enum):
-    """Allocation strategy enumeration."""
-
-    LOWEST_PRICE = "lowest_price"
-    DIVERSIFIED = "diversified"
-    CAPACITY_OPTIMIZED = "capacity_optimized"
-    CAPACITY_OPTIMIZED_PRIORITIZED = "capacity_optimized_prioritized"
-    PRICE_CAPACITY_OPTIMIZED = "price_capacity_optimized"
-    PRIORITIZED = "prioritized"

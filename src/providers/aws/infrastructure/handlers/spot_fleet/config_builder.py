@@ -14,9 +14,6 @@ from domain.request.aggregate import Request
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.domain.template.value_objects import AWSFleetType
 from providers.aws.infrastructure.handlers.shared.base_config_builder import BaseConfigBuilder
-from providers.aws.infrastructure.handlers.shared.fleet_override_builder import (
-    map_spot_fleet_allocation_strategy,
-)
 from providers.aws.infrastructure.tags import build_resource_tags
 
 
@@ -243,12 +240,11 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
             ],
             "TargetCapacity": target_capacity,
             "IamFleetRole": fleet_role,
-            "AllocationStrategy": map_spot_fleet_allocation_strategy(
-                template.allocation_strategy or ""
-            ),
+            "AllocationStrategy": template.get_spot_fleet_allocation_strategy(),
             "Type": fleet_type_value,
             "TagSpecifications": [
                 {"ResourceType": "spot-fleet-request", "Tags": common_tags},
+                {"ResourceType": "instance", "Tags": common_tags},
             ],
         }
 
@@ -299,5 +295,5 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
         if template.context:
             fleet_config["Context"] = template.context
 
-        self._logger.debug("Spot Fleet configuration: %s", json.dumps(fleet_config, indent=2))
+        self._logger.debug("Spot Fleet configuration: %s", json.dumps(fleet_config, indent=2, default=str))
         return fleet_config

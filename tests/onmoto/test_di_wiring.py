@@ -63,11 +63,13 @@ def test_container_resolves_template_configuration_manager(orb_config_dir):
 
 def test_scheduler_strategy_has_template_defaults_service(orb_config_dir):
     """Scheduler strategy's _template_defaults_service is not None after DI boot."""
+    from typing import Any
+
     from domain.base.ports.scheduler_port import SchedulerPort
     from infrastructure.di.container import get_container
 
     container = get_container()
-    scheduler = container.get(SchedulerPort)
+    scheduler: Any = container.get(SchedulerPort)
 
     assert scheduler._template_defaults_service is not None, (
         "_template_defaults_service is None — DI wiring bug (is_container_ready guard "
@@ -82,11 +84,13 @@ def test_scheduler_strategy_has_template_defaults_service(orb_config_dir):
 
 def test_template_defaults_service_resolves_defaults(orb_config_dir, moto_vpc_resources):
     """template_defaults_service.get_effective_template_defaults returns subnet/sg data."""
+    from typing import Any
+
     from domain.base.ports.scheduler_port import SchedulerPort
     from infrastructure.di.container import get_container
 
     container = get_container()
-    scheduler = container.get(SchedulerPort)
+    scheduler: Any = container.get(SchedulerPort)
     svc = scheduler._template_defaults_service
 
     # The config fixture names the provider "aws_moto_eu-west-2"
@@ -208,11 +212,10 @@ def test_aws_template_accepts_allocation_strategy_as_string():
 
 def test_aws_template_accepts_allocation_strategy_as_enum():
     """AWSTemplate accepts an AWSAllocationStrategy object directly (no coercion needed)."""
-    from domain.base.value_objects import AllocationStrategy
     from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
     from providers.aws.domain.template.value_objects import AWSAllocationStrategy
 
-    strategy = AWSAllocationStrategy.from_core(AllocationStrategy.LOWEST_PRICE)
+    strategy = AWSAllocationStrategy.from_string("lowestPrice")
     template = AWSTemplate(
         template_id="test-tpl-2",
         name="test2",

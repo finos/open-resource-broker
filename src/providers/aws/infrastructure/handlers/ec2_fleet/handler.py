@@ -33,7 +33,6 @@ from botocore.exceptions import ClientError
 from domain.base.dependency_injection import injectable
 from domain.base.ports import LoggingPort
 from domain.base.ports.configuration_port import ConfigurationPort
-from domain.base.value_objects import AllocationStrategy
 from domain.request.aggregate import Request
 from domain.template.template_aggregate import Template
 from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
@@ -767,7 +766,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 machine_types={"t3.medium": 1},
                 max_instances=20,
                 price_type="spot",
-                allocation_strategy="capacity_optimized",
+                allocation_strategy="capacityOptimized",
                 max_price=0.08,
                 subnet_ids=[],
                 security_group_ids=[],
@@ -784,9 +783,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 price_type="heterogeneous",
                 percent_on_demand=40,
                 allocation_strategy="diversified",
-                allocation_strategy_on_demand=AWSAllocationStrategy.from_core(
-                    AllocationStrategy.LOWEST_PRICE
-                ),
+                allocation_strategy_on_demand=AWSAllocationStrategy.from_string("lowestPrice"),
                 max_price=0.08,
                 subnet_ids=[],
                 security_group_ids=[],
@@ -815,7 +812,7 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 machine_types={"t3.medium": 1},
                 max_instances=30,
                 price_type="spot",
-                allocation_strategy="price_capacity_optimized",
+                allocation_strategy="priceCapacityOptimized",
                 max_price=0.10,
                 subnet_ids=[],
                 security_group_ids=[],
@@ -831,10 +828,8 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 max_instances=50,
                 price_type="heterogeneous",
                 percent_on_demand=50,
-                allocation_strategy="capacity_optimized",
-                allocation_strategy_on_demand=AWSAllocationStrategy.from_core(
-                    AllocationStrategy.PRIORITIZED
-                ),
+                allocation_strategy="capacityOptimized",
+                allocation_strategy_on_demand=AWSAllocationStrategy.from_string("prioritized"),
                 max_price=0.12,
                 subnet_ids=[],
                 security_group_ids=[],

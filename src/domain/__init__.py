@@ -20,7 +20,6 @@ Each bounded context contains:
 from .base import (
     AggregateRepository,
     AggregateRoot,
-    AllocationStrategy,
     DomainEvent,
     DomainException,
     Entity,
@@ -42,7 +41,6 @@ from .template import Template
 __all__: list[str] = [
     "AggregateRepository",
     "AggregateRoot",
-    "AllocationStrategy",
     "DomainEvent",
     "DomainException",
     # Base primitives

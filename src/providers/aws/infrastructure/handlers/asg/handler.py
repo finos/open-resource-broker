@@ -562,7 +562,7 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
                 max_instances=25,
                 price_type="heterogeneous",
                 percent_on_demand=30,
-                allocation_strategy="lowest_price",
+                allocation_strategy="lowestPrice",
                 subnet_ids=[],
                 security_group_ids=[],
                 tags={"Environment": "prod"},

@@ -50,7 +50,6 @@ from .exceptions import (
 )
 from .value_objects import (
     ARN,
-    AllocationStrategy,
     InstanceType,
     IPAddress,
     PriceType,
@@ -63,7 +62,6 @@ __all__: list[str] = [
     "ARN",
     "AggregateRepository",
     "AggregateRoot",
-    "AllocationStrategy",
     "BusinessRuleViolationError",
     "ConcurrencyError",
     "ConfigurationError",

@@ -102,7 +102,7 @@ class TestSymphonyHostFactorySchedulerStrategy:
         assert template.subnet_ids == ["subnet-123"]  # Provided
         assert template.security_group_ids == []  # Default empty list
         assert template.price_type == "ondemand"  # Default
-        assert template.allocation_strategy == "lowest_price"  # Default
+        assert template.allocation_strategy == "lowestPrice"  # Default
         assert template.tags == {}  # Default empty dict
         assert template.metadata == {}  # Default empty dict
         assert template.is_active is True  # Default

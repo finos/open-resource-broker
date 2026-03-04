@@ -12,10 +12,6 @@ from domain.request.aggregate import Request
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.domain.template.value_objects import AWSFleetType
 from providers.aws.infrastructure.handlers.shared.base_config_builder import BaseConfigBuilder
-from providers.aws.infrastructure.handlers.shared.fleet_override_builder import (
-    map_ec2_fleet_allocation_strategy,
-    map_ec2_fleet_ondemand_strategy,
-)
 from providers.aws.infrastructure.tags import build_resource_tags
 
 
@@ -125,9 +121,10 @@ class EC2FleetConfigBuilder(BaseConfigBuilder):
             provider_api="EC2Fleet",
             template_tags=template.tags,
         )
-        tag_specs = [{"ResourceType": "fleet", "Tags": fleet_tags}]
-        if template.fleet_type == AWSFleetType.INSTANT:
-            tag_specs.append({"ResourceType": "instance", "Tags": fleet_tags})
+        tag_specs = [
+            {"ResourceType": "fleet", "Tags": fleet_tags},
+            {"ResourceType": "instance", "Tags": fleet_tags},
+        ]
         fleet_config["TagSpecifications"] = tag_specs
 
         if template.fleet_type == AWSFleetType.MAINTAIN:
@@ -141,9 +138,7 @@ class EC2FleetConfigBuilder(BaseConfigBuilder):
             fleet_config["TargetCapacitySpecification"]["DefaultTargetCapacityType"] = "spot"
             if template.allocation_strategy:
                 fleet_config["SpotOptions"] = {
-                    "AllocationStrategy": map_ec2_fleet_allocation_strategy(
-                        template.allocation_strategy
-                    )
+                    "AllocationStrategy": template.get_ec2_fleet_allocation_strategy()
                 }
             if template.max_price is not None:
                 if "SpotOptions" not in fleet_config:
@@ -160,17 +155,11 @@ class EC2FleetConfigBuilder(BaseConfigBuilder):
 
             if template.allocation_strategy:
                 fleet_config["SpotOptions"] = {
-                    "AllocationStrategy": map_ec2_fleet_allocation_strategy(
-                        template.allocation_strategy
-                    )
+                    "AllocationStrategy": template.get_ec2_fleet_allocation_strategy()
                 }
             if template.allocation_strategy_on_demand:
                 fleet_config["OnDemandOptions"] = {
-                    "AllocationStrategy": map_ec2_fleet_ondemand_strategy(
-                        template.allocation_strategy_on_demand.value
-                        if hasattr(template.allocation_strategy_on_demand, "value")
-                        else str(template.allocation_strategy_on_demand)
-                    )
+                    "AllocationStrategy": template.get_ec2_fleet_on_demand_allocation_strategy()
                 }
             if template.max_price is not None:
                 if "SpotOptions" not in fleet_config:
@@ -295,16 +284,12 @@ class EC2FleetConfigBuilder(BaseConfigBuilder):
             "on_demand_count": on_demand_count,
             "spot_count": spot_count,
             "allocation_strategy": (
-                map_ec2_fleet_allocation_strategy(template.allocation_strategy)
+                template.get_ec2_fleet_allocation_strategy()
                 if template.allocation_strategy
                 else None
             ),
             "allocation_strategy_on_demand": (
-                map_ec2_fleet_ondemand_strategy(
-                    template.allocation_strategy_on_demand.value
-                    if hasattr(template.allocation_strategy_on_demand, "value")
-                    else str(template.allocation_strategy_on_demand)
-                )
+                template.get_ec2_fleet_on_demand_allocation_strategy()
                 if template.allocation_strategy_on_demand
                 else None
             ),

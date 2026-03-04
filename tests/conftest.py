@@ -30,7 +30,7 @@ def pytest_collection_modifyitems(config, items):
         return
     skip = pytest.mark.skip(reason="requires real AWS credentials — pass --run-aws to run")
     for item in items:
-        if "aws" in item.keywords and "provider_contract" not in item.keywords:
+        if item.get_closest_marker("aws") and not item.get_closest_marker("provider_contract"):
             item.add_marker(skip)
 
 

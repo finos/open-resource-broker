@@ -9,7 +9,6 @@ from pydantic import ConfigDict, field_validator, model_validator
 # Import core domain primitives
 from domain.base.value_objects import (
     ARN,
-    AllocationStrategy,
     InstanceType,
     PriceType,
     ResourceId as _BaseResourceId,
@@ -242,52 +241,140 @@ class AWSFleetType(str, Enum):
 
 
 class AWSAllocationStrategy:
-    """AWS-specific allocation strategy wrapper with AWS API formatting."""
+    """AWS-specific allocation strategy with AWS API formatting.
 
-    def __init__(self, strategy: AllocationStrategy) -> None:
-        """Initialize the instance."""
-        self._strategy = strategy
+    Accepts any allocation strategy string format (camelCase, hyphenated, or snake_case)
+    and normalises it to the canonical camelCase form internally.
+    """
+
+    _FORMAT_MAPS: ClassVar[dict[str, dict[str, str]]] = {
+        "ec2_fleet": {
+            "capacityOptimized": "capacity-optimized",
+            "capacityOptimizedPrioritized": "capacity-optimized-prioritized",
+            "diversified": "diversified",
+            "lowestPrice": "lowest-price",
+            "priceCapacityOptimized": "price-capacity-optimized",
+            "prioritized": "prioritized",
+        },
+        "spot_fleet": {
+            "capacityOptimized": "capacityOptimized",
+            "capacityOptimizedPrioritized": "capacityOptimizedPrioritized",
+            "diversified": "diversified",
+            "lowestPrice": "lowestPrice",
+            "priceCapacityOptimized": "priceCapacityOptimized",
+        },
+        "asg": {
+            "capacityOptimized": "capacity-optimized",
+            "capacityOptimizedPrioritized": "capacity-optimized-prioritized",
+            "diversified": "diversified",
+            "lowestPrice": "lowest-price",
+            "priceCapacityOptimized": "price-capacity-optimized",
+        },
+    }
+
+    _DEFAULTS: ClassVar[dict[str, str]] = {
+        "ec2_fleet": "lowest-price",
+        "spot_fleet": "lowestPrice",
+        "asg": "lowest-price",
+    }
+
+    def __init__(self, strategy: str) -> None:
+        """Initialise from any accepted strategy string format."""
+        self._canonical = normalise_allocation_strategy(strategy)
 
     @property
     def value(self) -> str:
-        """Get the strategy value."""
-        return self._strategy.value
+        """Return the canonical camelCase strategy value."""
+        return self._canonical
 
     @classmethod
-    def from_core(cls, strategy: AllocationStrategy) -> "AWSAllocationStrategy":
-        """Create from core allocation strategy."""
+    def from_string(cls, strategy: str) -> "AWSAllocationStrategy":
+        """Create from any strategy string (camelCase, hyphenated, or snake_case)."""
         return cls(strategy)
 
+    @classmethod
+    def from_core(cls, strategy: Any) -> "AWSAllocationStrategy":
+        """Create from a legacy AllocationStrategy enum or plain string.
+
+        Kept for backwards compatibility — prefer from_string() for new code.
+        """
+        return cls(str(strategy.value) if hasattr(strategy, "value") else str(strategy))
+
+    def to_api_format(self, api: str) -> str:
+        """Convert to the wire format for the given AWS API."""
+        fmt_map = self._FORMAT_MAPS.get(api, {})
+        return fmt_map.get(self._canonical, self._DEFAULTS.get(api, self._canonical))
+
     def to_ec2_fleet_format(self) -> str:
-        """Convert to EC2 Fleet API format."""
-        mapping = {
-            AllocationStrategy.CAPACITY_OPTIMIZED: "capacity-optimized",
-            AllocationStrategy.DIVERSIFIED: "diversified",
-            AllocationStrategy.LOWEST_PRICE: "lowest-price",
-            AllocationStrategy.PRICE_CAPACITY_OPTIMIZED: "price-capacity-optimized",
-            AllocationStrategy.PRIORITIZED: "prioritized",
-        }
-        return mapping.get(self._strategy, "lowest-price")
+        """Convert to EC2 Fleet API format (hyphenated)."""
+        return self.to_api_format("ec2_fleet")
 
     def to_spot_fleet_format(self) -> str:
-        """Convert to Spot Fleet API format."""
-        mapping = {
-            AllocationStrategy.CAPACITY_OPTIMIZED: "capacityOptimized",
-            AllocationStrategy.DIVERSIFIED: "diversified",
-            AllocationStrategy.LOWEST_PRICE: "lowestPrice",
-            AllocationStrategy.PRICE_CAPACITY_OPTIMIZED: "priceCapacityOptimized",
-        }
-        return mapping.get(self._strategy, "lowestPrice")
+        """Convert to Spot Fleet API format (camelCase)."""
+        return self.to_api_format("spot_fleet")
 
     def to_asg_format(self) -> str:
-        """Convert to Auto Scaling Group API format."""
-        mapping = {
-            AllocationStrategy.CAPACITY_OPTIMIZED: "capacity-optimized",
-            AllocationStrategy.DIVERSIFIED: "diversified",
-            AllocationStrategy.LOWEST_PRICE: "lowest-price",
-            AllocationStrategy.PRICE_CAPACITY_OPTIMIZED: "price-capacity-optimized",
-        }
-        return mapping.get(self._strategy, "lowest-price")
+        """Convert to Auto Scaling Group API format (hyphenated)."""
+        return self.to_api_format("asg")
+
+
+# Canonical (camelCase) allocation strategy values — the authoritative set used on disk
+# and by the HF/SpotFleet wire format.
+CANONICAL_ALLOCATION_STRATEGIES: frozenset[str] = frozenset(
+    {
+        "capacityOptimized",
+        "capacityOptimizedPrioritized",
+        "diversified",
+        "lowestPrice",
+        "priceCapacityOptimized",
+        "prioritized",
+    }
+)
+
+# Maps every accepted input variant to its canonical camelCase form.
+_ALLOCATION_STRATEGY_NORMALISATION_MAP: dict[str, str] = {
+    # camelCase (HF / SpotFleet wire format) — identity mappings
+    "capacityOptimized": "capacityOptimized",
+    "capacityOptimizedPrioritized": "capacityOptimizedPrioritized",
+    "diversified": "diversified",
+    "lowestPrice": "lowestPrice",
+    "priceCapacityOptimized": "priceCapacityOptimized",
+    "prioritized": "prioritized",
+    # hyphenated (EC2Fleet / ASG API format)
+    "capacity-optimized": "capacityOptimized",
+    "capacity-optimized-prioritized": "capacityOptimizedPrioritized",
+    "lowest-price": "lowestPrice",
+    "price-capacity-optimized": "priceCapacityOptimized",
+    # snake_case (legacy domain enum values)
+    "capacity_optimized": "capacityOptimized",
+    "capacity_optimized_prioritized": "capacityOptimizedPrioritized",
+    "lowest_price": "lowestPrice",
+    "price_capacity_optimized": "priceCapacityOptimized",
+}
+
+
+def normalise_allocation_strategy(value: str) -> str:
+    """Return the canonical camelCase form of an allocation strategy string.
+
+    Accepts any of the three formats used across the AWS provider:
+    - camelCase (HF/SpotFleet wire format): ``capacityOptimized``, ``lowestPrice``, …
+    - hyphenated (EC2Fleet/ASG API format): ``capacity-optimized``, ``lowest-price``, …
+    - snake_case (legacy domain enum): ``capacity_optimized``, ``lowest_price``, …
+
+    Returns the canonical camelCase string, which is the form stored on disk in
+    ``aws_templates.json`` and used by the HF scheduler.
+
+    Raises:
+        ValueError: if *value* does not match any known allocation strategy.
+    """
+    canonical = _ALLOCATION_STRATEGY_NORMALISATION_MAP.get(value)
+    if canonical is None:
+        valid = ", ".join(sorted(CANONICAL_ALLOCATION_STRATEGIES))
+        raise ValueError(
+            f"Unknown allocation strategy {value!r}. "
+            f"Valid canonical values are: {valid}"
+        )
+    return canonical
 
 
 class AWSConfiguration(ValueObject):
@@ -297,8 +384,7 @@ class AWSConfiguration(ValueObject):
 
     handler_type: ProviderApi
     fleet_type: Optional[AWSFleetType] = None
-    # Use core enum, not wrapper
-    allocation_strategy: Optional[AllocationStrategy] = None
+    allocation_strategy: Optional[str] = None
     price_type: Optional[PriceType] = None
     subnet_ids: list[AWSSubnetId] = []
     security_group_ids: list[AWSSecurityGroupId] = []
@@ -313,7 +399,7 @@ class AWSConfiguration(ValueObject):
 
         # Set default allocation strategy if not provided
         if not self.allocation_strategy:
-            object.__setattr__(self, "allocation_strategy", AllocationStrategy.LOWEST_PRICE)
+            object.__setattr__(self, "allocation_strategy", "lowestPrice")
 
         # Set default price type if not provided
         if not self.price_type:
@@ -326,9 +412,7 @@ class AWSConfiguration(ValueObject):
         return {
             "handler_type": self.handler_type.value,
             "fleet_type": self.fleet_type.value if self.fleet_type else None,
-            "allocation_strategy": (
-                self.allocation_strategy.value if self.allocation_strategy else None
-            ),
+            "allocation_strategy": self.allocation_strategy,
             "price_type": self.price_type.value if self.price_type else None,
             "subnet_ids": [subnet.value for subnet in self.subnet_ids],
             "security_group_ids": [sg.value for sg in self.security_group_ids],

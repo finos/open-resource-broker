@@ -109,9 +109,9 @@ class Template(BaseModel):
         # Set allocation strategy default based on price type
         if self.allocation_strategy is None:
             if self.price_type == "spot":
-                self.allocation_strategy = "price_capacity_optimized"
+                self.allocation_strategy = "priceCapacityOptimized"
             else:  # ondemand, heterogeneous
-                self.allocation_strategy = "lowest_price"
+                self.allocation_strategy = "lowestPrice"
 
         # Reject tag keys that use the reserved system namespace
         reserved_keys = [k for k in self.tags if k.startswith("orb:")]

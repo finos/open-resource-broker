@@ -12,7 +12,6 @@ from pydantic import (
     model_validator,
 )
 
-from domain.base.value_objects import AllocationStrategy
 from domain.template.template_aggregate import Template
 from providers.aws.domain.template.value_objects import (
     AWSAllocationStrategy,
@@ -23,6 +22,7 @@ from providers.aws.domain.template.value_objects import (
     AWSSubnetId,
     AWSTags,
     ProviderApi,
+    normalise_allocation_strategy,
 )
 
 
@@ -305,7 +305,7 @@ class AWSTemplate(Template):
         if value is None or isinstance(value, AWSAllocationStrategy):
             return value
         if isinstance(value, str):
-            return AWSAllocationStrategy.from_core(AllocationStrategy(value))
+            return AWSAllocationStrategy.from_string(value)
         return value
 
     @field_serializer("allocation_strategy_on_demand")
@@ -317,27 +317,25 @@ class AWSTemplate(Template):
             return None
         return value.value
 
+    def _get_allocation_strategy_for_api(self, api: str, default: str) -> str:
+        """Resolve allocation_strategy to the wire format for the given AWS API."""
+        if isinstance(self.allocation_strategy, AWSAllocationStrategy):
+            return self.allocation_strategy.to_api_format(api)
+        if isinstance(self.allocation_strategy, str) and self.allocation_strategy:
+            return AWSAllocationStrategy.from_string(self.allocation_strategy).to_api_format(api)
+        return default
+
     def get_ec2_fleet_allocation_strategy(self) -> str:
         """Get allocation strategy in EC2 Fleet API format."""
-        if isinstance(self.allocation_strategy, AWSAllocationStrategy):
-            return self.allocation_strategy.to_ec2_fleet_format()
-        return AWSAllocationStrategy.from_core(
-            AllocationStrategy.LOWEST_PRICE
-        ).to_ec2_fleet_format()
+        return self._get_allocation_strategy_for_api("ec2_fleet", "lowest-price")
 
     def get_spot_fleet_allocation_strategy(self) -> str:
         """Get allocation strategy in Spot Fleet API format."""
-        if isinstance(self.allocation_strategy, AWSAllocationStrategy):
-            return self.allocation_strategy.to_spot_fleet_format()
-        return AWSAllocationStrategy.from_core(
-            AllocationStrategy.LOWEST_PRICE
-        ).to_spot_fleet_format()
+        return self._get_allocation_strategy_for_api("spot_fleet", "lowestPrice")
 
     def get_asg_allocation_strategy(self) -> str:
         """Get allocation strategy in Auto Scaling Group API format."""
-        if isinstance(self.allocation_strategy, AWSAllocationStrategy):
-            return self.allocation_strategy.to_asg_format()
-        return AWSAllocationStrategy.from_core(AllocationStrategy.LOWEST_PRICE).to_asg_format()
+        return self._get_allocation_strategy_for_api("asg", "lowest-price")
 
     def get_ec2_fleet_on_demand_allocation_strategy(self) -> str:
         """Get on-demand allocation strategy in EC2 Fleet API format."""
@@ -424,13 +422,13 @@ class AWSTemplate(Template):
 
         # Handle optional AWS-specific fields
         if "allocation_strategy" in data:
-            aws_data["allocation_strategy"] = AWSAllocationStrategy.from_core(
-                AllocationStrategy(data["allocation_strategy"])
+            aws_data["allocation_strategy"] = AWSAllocationStrategy.from_string(
+                data["allocation_strategy"]
             )
 
         if "allocation_strategy_on_demand" in data:
-            aws_data["allocation_strategy_on_demand"] = AWSAllocationStrategy.from_core(
-                AllocationStrategy(data["allocation_strategy_on_demand"])
+            aws_data["allocation_strategy_on_demand"] = AWSAllocationStrategy.from_string(
+                data["allocation_strategy_on_demand"]
             )
 
         if "price_type" in data:
@@ -464,11 +462,11 @@ class AWSTemplate(Template):
         """Get AWS configuration object."""
         from domain.base.value_objects import PriceType
 
-        allocation_strategy: AllocationStrategy | None = None
+        allocation_strategy: str | None = None
         if isinstance(self.allocation_strategy, AWSAllocationStrategy):
-            allocation_strategy = AllocationStrategy(self.allocation_strategy.value)
-        elif isinstance(self.allocation_strategy, AllocationStrategy):
-            allocation_strategy = self.allocation_strategy
+            allocation_strategy = self.allocation_strategy.value
+        elif isinstance(self.allocation_strategy, str) and self.allocation_strategy:
+            allocation_strategy = normalise_allocation_strategy(self.allocation_strategy)
 
         price_type: PriceType | None = None
         if isinstance(self.price_type, PriceType):

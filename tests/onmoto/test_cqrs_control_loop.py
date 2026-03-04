@@ -50,35 +50,13 @@ def patch_moto_compat():
        SSM parameters without real credentials. Returning False makes the
        provisioning adapter skip SSM resolution and pass the value through as-is.
 
-    2. AllocationStrategy accepts camelCase wire values
-       default_config.json extensions set allocation_strategy_on_demand='lowestPrice'
-       (AWS wire format). The validator only accepts core AllocationStrategy enum
-       values (e.g. 'lowest_price'). We patch __new__ to map camelCase wire
-       values to their core equivalents before validation.
-
-    3. AWSProvisioningAdapter._provision_via_handlers populates instances from instance_ids
+    2. AWSProvisioningAdapter._provision_via_handlers populates instances from instance_ids
        RunInstances returns instance_ids but not instances in the result dict.
        The provisioning orchestration service uses len(instances) as fulfilled_count,
        so with instances=[] it retries indefinitely. We patch the adapter to
        synthesise instances from instance_ids so fulfilled_count > 0.
     """
     from unittest.mock import patch
-
-    # Mapping from AWS wire format -> core AllocationStrategy value
-    _WIRE_TO_CORE = {
-        "lowestPrice": "lowest_price",
-        "diversified": "diversified",
-        "capacityOptimized": "capacity_optimized",
-        "capacityOptimizedPrioritized": "capacity_optimized_prioritized",
-        "priceCapacityOptimized": "price_capacity_optimized",
-    }
-
-    from domain.base.value_objects import AllocationStrategy
-    _original_new = AllocationStrategy.__new__
-
-    def _patched_alloc_new(cls, value: Any) -> Any:
-        mapped = _WIRE_TO_CORE.get(value, value)
-        return _original_new(cls, mapped)
 
     from providers.aws.infrastructure.adapters.aws_provisioning_adapter import (
         AWSProvisioningAdapter,
@@ -103,9 +81,7 @@ def patch_moto_compat():
         "providers.aws.infrastructure.services.aws_image_resolution_service"
         ".AWSImageResolutionService.is_resolution_needed",
         return_value=False,
-    ), patch.object(AllocationStrategy, "__new__", _patched_alloc_new), patch.object(
-        AWSProvisioningAdapter, "_provision_via_handlers", _patched_provision
-    ):
+    ), patch.object(AWSProvisioningAdapter, "_provision_via_handlers", _patched_provision):
         yield
 
 

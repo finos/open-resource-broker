@@ -36,10 +36,15 @@ class TestAWSLaunchTemplateManager:
         self.mock_aws_client = Mock()
         self.mock_logger = Mock()
 
+        self.mock_config_port = Mock()
+        self.mock_config_port.get_resource_prefix.return_value = ""
+        self.mock_config_port.get_cleanup_config.return_value = {"enabled": False}
+
         # Create manager instance
         self.manager = AWSLaunchTemplateManager(
             aws_client=self.mock_aws_client,
             logger=self.mock_logger,
+            config_port=self.mock_config_port,
         )
 
         # Sample AWS template
@@ -98,13 +103,14 @@ class TestAWSLaunchTemplateManager:
         self.mock_aws_client.ec2_client.create_launch_template.assert_called_once()
 
     def test_create_or_update_launch_template_reuses_existing(self):
-        """Test launch template versioning when template already exists."""
+        """Test that an existing launch template is reused at its default version."""
         mock_describe_response = {
             "LaunchTemplates": [
                 {
                     "LaunchTemplateId": "lt-existing",
                     "LaunchTemplateName": "orb-req-00000000-0000-0000-0000-000000000123",
                     "LatestVersionNumber": 3,
+                    "DefaultVersionNumber": 3,
                 }
             ]
         }
@@ -112,23 +118,13 @@ class TestAWSLaunchTemplateManager:
             mock_describe_response
         )
 
-        mock_version_response = {
-            "LaunchTemplateVersion": {
-                "LaunchTemplateId": "lt-existing",
-                "VersionNumber": 4,
-            }
-        }
-        self.mock_aws_client.ec2_client.create_launch_template_version.return_value = (
-            mock_version_response
-        )
-
         result = self.manager.create_or_update_launch_template(self.aws_template, self.request)
 
         assert result.template_id == "lt-existing"
-        assert result.version == "4"
+        assert result.version == "3"
         assert result.is_new_template is False
-        assert result.is_new_version is True
-        self.mock_aws_client.ec2_client.create_launch_template_version.assert_called_once()
+        assert result.is_new_version is False
+        self.mock_aws_client.ec2_client.create_launch_template_version.assert_not_called()
 
     def test_create_launch_template_data_basic_fields(self):
         """Test launch template data creation with basic fields."""

@@ -147,7 +147,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
 
         mapped.setdefault("max_instances", 1)
         mapped.setdefault("price_type", "ondemand")
-        mapped.setdefault("allocation_strategy", "lowest_price")
+        mapped.setdefault("allocation_strategy", "lowestPrice")
         mapped.setdefault("subnet_ids", [])
         mapped.setdefault("security_group_ids", [])
         mapped.setdefault("tags", {})
@@ -435,7 +435,7 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             "security_group_ids": raw_data.get("securityGroupIds", []),
             # Pricing and allocation
             "price_type": raw_data.get("priceType", "ondemand"),
-            "allocation_strategy": raw_data.get("allocationStrategy", "lowest_price"),
+            "allocation_strategy": raw_data.get("allocationStrategy", "lowestPrice"),
             "max_price": raw_data.get("maxPrice"),
             # Tags and metadata
             "tags": raw_data.get("tags", {}),

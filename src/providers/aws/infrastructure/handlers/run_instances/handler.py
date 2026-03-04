@@ -248,6 +248,10 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             "lowest_price": "one-time",
             "diversified": "one-time",  # RunInstances doesn't support diversified directly
             "capacity_optimized": "one-time",  # RunInstances doesn't support capacity-optimized directly
+            "lowestPrice": "one-time",
+            "capacityOptimized": "one-time",
+            "capacityOptimizedPrioritized": "one-time",
+            "priceCapacityOptimized": "one-time",
         }
         return strategy_map.get(allocation_strategy, "one-time")
 

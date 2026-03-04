@@ -4,7 +4,6 @@ import pytest
 
 from domain.base.value_objects_pure import (
     ARN,
-    AllocationStrategy,
     InstanceId,
     InstanceType,
     IPAddress,
@@ -241,13 +240,3 @@ class TestPriceType:
         assert PriceType.SPOT == "spot"
 
 
-class TestAllocationStrategy:
-    def test_values(self):
-        assert AllocationStrategy.LOWEST_PRICE.value == "lowest_price"
-        assert AllocationStrategy.DIVERSIFIED.value == "diversified"
-        assert AllocationStrategy.CAPACITY_OPTIMIZED.value == "capacity_optimized"
-        assert AllocationStrategy.PRICE_CAPACITY_OPTIMIZED.value == "price_capacity_optimized"
-
-    def test_is_str(self):
-        assert isinstance(AllocationStrategy.DIVERSIFIED, str)
-        assert AllocationStrategy.DIVERSIFIED == "diversified"

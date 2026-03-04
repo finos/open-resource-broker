@@ -1,47 +1,5 @@
 from typing import Any
 
-# ---------------------------------------------------------------------------
-# Allocation strategy mapping functions
-# ---------------------------------------------------------------------------
-
-_EC2_FLEET_SPOT_STRATEGY_MAP: dict[str, str] = {
-    "capacity_optimized": "capacity-optimized",
-    "capacity_optimized_prioritized": "capacity-optimized-prioritized",
-    "diversified": "diversified",
-    "lowest_price": "lowest-price",
-    "price_capacity_optimized": "price-capacity-optimized",
-}
-
-_EC2_FLEET_ONDEMAND_STRATEGY_MAP: dict[str, str] = {
-    "lowest_price": "lowest-price",
-    "prioritized": "prioritized",
-}
-
-_SPOT_FLEET_STRATEGY_MAP: dict[str, str] = {
-    "capacity_optimized": "capacityOptimized",
-    "capacity_optimized_prioritized": "capacityOptimizedPrioritized",
-    "diversified": "diversified",
-    "lowest_price": "lowestPrice",
-    "price_capacity_optimized": "priceCapacityOptimized",
-}
-
-
-def map_ec2_fleet_allocation_strategy(strategy: str) -> str:
-    """Map a domain allocation strategy value to the EC2 Fleet API value (hyphenated)."""
-    return _EC2_FLEET_SPOT_STRATEGY_MAP.get(strategy, "lowest-price")
-
-
-def map_ec2_fleet_ondemand_strategy(strategy: str) -> str:
-    """Map a domain on-demand allocation strategy value to the EC2 Fleet API value."""
-    return _EC2_FLEET_ONDEMAND_STRATEGY_MAP.get(strategy, "lowest-price")
-
-
-def map_spot_fleet_allocation_strategy(strategy: str) -> str:
-    """Map a domain allocation strategy value to the Spot Fleet API value (camelCase)."""
-    if not strategy:
-        return "lowestPrice"
-    return _SPOT_FLEET_STRATEGY_MAP.get(strategy, "lowestPrice")
-
 
 def build_ec2_fleet_overrides(
     machine_types: dict[str, Any] | None,
