@@ -485,62 +485,82 @@ class AWSProviderStrategy(ProviderStrategy):
             return
         try:
             resource_id = resource_ids[0]
-            if provider_api == "EC2Fleet":
-                response = self.aws_client.ec2_client.describe_fleets(FleetIds=[resource_id])
-                fleets = response.get("Fleets", [])
-                if fleets:
-                    fleet = fleets[0]
-                    spec = fleet.get("TargetCapacitySpecification") or {}
-                    target = spec.get("TotalTargetCapacity")
-                    fulfilled = fleet.get("FulfilledCapacity") or 0
-                    fleet_type_val = (fleet.get("Type") or "maintain").lower()
-                    metadata["fleet_capacity_fulfilment"] = {
-                        "target_capacity_units": target,
-                        "fulfilled_capacity_units": fulfilled,
-                        "provisioned_instance_count": int(fulfilled),
-                        "state": fleet.get("FleetState"),
-                        "fleet_type": fleet_type_val,
-                        "fulfillment_final": fleet_type_val == "instant",
-                    }
-            elif provider_api == "SpotFleet":
-                response = self.aws_client.ec2_client.describe_spot_fleet_requests(
-                    SpotFleetRequestIds=[resource_id]
-                )
-                configs = response.get("SpotFleetRequestConfigs", [])
-                if configs:
-                    cfg = configs[0].get("SpotFleetRequestConfig") or {}
-                    fulfilled = cfg.get("FulfilledCapacity") or 0
-                    metadata["fleet_capacity_fulfilment"] = {
-                        "target_capacity_units": cfg.get("TargetCapacity"),
-                        "fulfilled_capacity_units": fulfilled,
-                        "provisioned_instance_count": int(fulfilled),
-                        "state": configs[0].get("SpotFleetRequestState"),
-                        "fleet_type": (cfg.get("Type") or "request").lower(),
-                    }
-            elif provider_api == "ASG":
-                response = self.aws_client.autoscaling_client.describe_auto_scaling_groups(
-                    AutoScalingGroupNames=[resource_id]
-                )
-                groups = response.get("AutoScalingGroups", [])
-                if groups:
-                    group = groups[0]
-                    instances = group.get("Instances") or []
-                    fulfilled = sum(
-                        int(inst.get("WeightedCapacity", 1))
-                        for inst in instances
-                        if inst.get("LifecycleState") == "InService"
-                    )
-                    provisioned = sum(
-                        1 for inst in instances if inst.get("LifecycleState") == "InService"
-                    )
-                    metadata["fleet_capacity_fulfilment"] = {
-                        "target_capacity_units": int(group.get("DesiredCapacity") or 0),
-                        "fulfilled_capacity_units": fulfilled,
-                        "provisioned_instance_count": provisioned,
-                        "state": group.get("Status"),
-                    }
+            capacity_fetchers: dict[str, Callable[[str], Optional[dict[str, Any]]]] = {
+                "EC2Fleet": self._fetch_ec2_fleet_capacity,
+                "SpotFleet": self._fetch_spot_fleet_capacity,
+                "ASG": self._fetch_asg_capacity,
+            }
+            fetcher = capacity_fetchers.get(provider_api)
+            if fetcher:
+                result = fetcher(resource_id)
+                if result is not None:
+                    metadata["fleet_capacity_fulfilment"] = result
         except Exception as e:
             self._logger.warning("Failed to augment capacity metadata: %s", e)
+
+    def _fetch_ec2_fleet_capacity(self, resource_id: str) -> Optional[dict[str, Any]]:
+        """Fetch capacity fulfillment data for an EC2Fleet resource."""
+        assert self.aws_client is not None
+        response = self.aws_client.ec2_client.describe_fleets(FleetIds=[resource_id])
+        fleets = response.get("Fleets", [])
+        if not fleets:
+            return None
+        fleet = fleets[0]
+        spec = fleet.get("TargetCapacitySpecification") or {}
+        target = spec.get("TotalTargetCapacity")
+        fulfilled = fleet.get("FulfilledCapacity") or 0
+        fleet_type_val = (fleet.get("Type") or "maintain").lower()
+        return {
+            "target_capacity_units": target,
+            "fulfilled_capacity_units": fulfilled,
+            "provisioned_instance_count": int(fulfilled),
+            "state": fleet.get("FleetState"),
+            "fleet_type": fleet_type_val,
+            "fulfillment_final": fleet_type_val == "instant",
+        }
+
+    def _fetch_spot_fleet_capacity(self, resource_id: str) -> Optional[dict[str, Any]]:
+        """Fetch capacity fulfillment data for a SpotFleet resource."""
+        assert self.aws_client is not None
+        response = self.aws_client.ec2_client.describe_spot_fleet_requests(
+            SpotFleetRequestIds=[resource_id]
+        )
+        configs = response.get("SpotFleetRequestConfigs", [])
+        if not configs:
+            return None
+        cfg = configs[0].get("SpotFleetRequestConfig") or {}
+        fulfilled = cfg.get("FulfilledCapacity") or 0
+        return {
+            "target_capacity_units": cfg.get("TargetCapacity"),
+            "fulfilled_capacity_units": fulfilled,
+            "provisioned_instance_count": int(fulfilled),
+            "state": configs[0].get("SpotFleetRequestState"),
+            "fleet_type": (cfg.get("Type") or "request").lower(),
+        }
+
+    def _fetch_asg_capacity(self, resource_id: str) -> Optional[dict[str, Any]]:
+        """Fetch capacity fulfillment data for an Auto Scaling Group resource."""
+        assert self.aws_client is not None
+        response = self.aws_client.autoscaling_client.describe_auto_scaling_groups(
+            AutoScalingGroupNames=[resource_id]
+        )
+        groups = response.get("AutoScalingGroups", [])
+        if not groups:
+            return None
+        group = groups[0]
+        instances = group.get("Instances") or []
+        fulfilled = sum(
+            int(inst.get("WeightedCapacity", 1))
+            for inst in instances
+            if inst.get("LifecycleState") == "InService"
+        )
+        provisioned = sum(1 for inst in instances if inst.get("LifecycleState") == "InService")
+        return {
+            "target_capacity_units": int(group.get("DesiredCapacity") or 0),
+            "fulfilled_capacity_units": fulfilled,
+            "provisioned_instance_count": provisioned,
+            "state": group.get("Status"),
+        }
 
     async def _handle_resolve_image(self, operation: ProviderOperation) -> ProviderResult:
         """Handle image resolution using registry-based service."""

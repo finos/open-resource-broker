@@ -381,6 +381,25 @@ class ASGHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
             self._logger.error("Failed to release ASG hosts: %s", str(e))
             raise AWSInfrastructureError(f"Failed to release ASG hosts: {e!s}")
 
+    def cancel_resource(self, resource_id: str, request_id: str) -> dict[str, Any]:
+        """Cancel an Auto Scaling Group by deleting it.
+
+        Args:
+            resource_id: The ASG name to cancel.
+            request_id: The ORB request ID, used for launch template cleanup.
+
+        Returns:
+            Dictionary with ``status`` of ``"success"`` or ``"error"``.
+        """
+        try:
+            self._delete_asg(resource_id)
+            if request_id:
+                self._cleanup_on_zero_capacity("asg", request_id)
+            return {"status": "success", "message": f"Auto Scaling Group {resource_id} deleted"}
+        except Exception as e:
+            self._logger.error("Failed to cancel ASG %s: %s", resource_id, e)
+            return {"status": "error", "message": f"Failed to cancel ASG {resource_id}: {e!s}"}
+
     def _release_hosts_for_single_asg(
         self, asg_name: str, asg_instance_ids: list[str], asg_details: dict
     ) -> None:

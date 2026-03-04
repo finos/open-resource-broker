@@ -690,6 +690,23 @@ class EC2FleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         """Find the EC2 Fleet ID for a specific instance by querying active fleets."""
         return self._fleet_release_manager.find_fleet_for_instance(instance_id)
 
+    def cancel_resource(self, resource_id: str, request_id: str) -> dict[str, Any]:
+        """Cancel an EC2 Fleet by deleting it and terminating its instances.
+
+        Args:
+            resource_id: The EC2 Fleet ID to cancel.
+            request_id: The ORB request ID, used for launch template cleanup.
+
+        Returns:
+            Dictionary with ``status`` of ``"success"`` or ``"error"``.
+        """
+        try:
+            self._fleet_release_manager.release(resource_id, [], {})
+            return {"status": "success", "message": f"EC2 Fleet {resource_id} cancelled"}
+        except Exception as e:
+            self._logger.error("Failed to cancel EC2 Fleet %s: %s", resource_id, e)
+            return {"status": "error", "message": f"Failed to cancel EC2 Fleet {resource_id}: {e!s}"}
+
     def _release_hosts_for_single_ec2_fleet(
         self, fleet_id: str, fleet_instance_ids: list[str], fleet_details: dict
     ) -> None:

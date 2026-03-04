@@ -216,6 +216,24 @@ class AWSHandler(ABC):
             InfrastructureError: For other AWS API errors
         """
 
+    @abstractmethod
+    def cancel_resource(self, resource_id: str, request_id: str) -> dict[str, Any]:
+        """
+        Cancel the AWS resource associated with a request.
+
+        Called when a request needs to be cancelled before instances are
+        assigned. Each handler implements the appropriate teardown for its
+        resource type (delete fleet, cancel spot fleet, delete ASG, etc.).
+
+        Args:
+            resource_id: The AWS resource ID (fleet ID, ASG name, etc.)
+            request_id: The ORB request ID, used for launch template cleanup
+
+        Returns:
+            Dictionary with cancellation results containing at minimum a
+            ``status`` key of ``"success"`` or ``"error"``.
+        """
+
     @classmethod
     @abstractmethod
     def get_example_templates(cls) -> list[Template]:

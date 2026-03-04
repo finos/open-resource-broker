@@ -581,6 +581,61 @@ class RunInstancesHandler(AWSHandler, BaseContextMixin):
             self._logger.error("Unexpected error releasing RunInstances resources: %s", str(e))
             raise AWSInfrastructureError(f"Failed to release RunInstances resources: {e!s}")
 
+    def cancel_resource(self, resource_id: str, request_id: str) -> dict[str, Any]:
+        """Cancel a RunInstances reservation by terminating its instances.
+
+        RunInstances has no fleet-level cancel concept — instances are
+        terminated directly. If no instance IDs are available from the
+        resource_id, this is a no-op (instances may not have launched yet).
+
+        Args:
+            resource_id: The reservation ID (used to locate instances).
+            request_id: The ORB request ID, used for launch template cleanup.
+
+        Returns:
+            Dictionary with ``status`` of ``"success"`` or ``"error"``.
+        """
+        try:
+            # Locate instances belonging to this reservation
+            instance_ids: list[str] = []
+            try:
+                response = self.aws_client.ec2_client.describe_instances(
+                    Filters=[{"Name": "reservation-id", "Values": [resource_id]}]
+                )
+                for reservation in response.get("Reservations", []):
+                    for instance in reservation.get("Instances", []):
+                        iid = instance.get("InstanceId")
+                        if iid:
+                            instance_ids.append(iid)
+            except Exception as e:
+                self._logger.warning(
+                    "Could not look up instances for reservation %s: %s", resource_id, e
+                )
+
+            if instance_ids:
+                self.aws_ops.terminate_instances_with_fallback(
+                    instance_ids, self._request_adapter, f"RunInstances reservation {resource_id}"
+                )
+                self._logger.info(
+                    "Terminated RunInstances reservation %s instances: %s", resource_id, instance_ids
+                )
+            else:
+                self._logger.info(
+                    "No instances found for RunInstances reservation %s — nothing to terminate",
+                    resource_id,
+                )
+
+            if request_id:
+                self._cleanup_on_zero_capacity("run_instances", request_id)
+
+            return {"status": "success", "message": f"RunInstances reservation {resource_id} cancelled"}
+        except Exception as e:
+            self._logger.error("Failed to cancel RunInstances reservation %s: %s", resource_id, e)
+            return {
+                "status": "error",
+                "message": f"Failed to cancel RunInstances reservation {resource_id}: {e!s}",
+            }
+
     @classmethod
     def get_example_templates(cls) -> list[Template]:
         """Get example templates for RunInstances handler."""

@@ -480,6 +480,23 @@ class SpotFleetHandler(AWSHandler, BaseContextMixin, FleetGroupingMixin):
         """Find the Spot Fleet request ID for a specific instance."""
         return self._release_manager.find_fleet_for_instance(instance_id)
 
+    def cancel_resource(self, resource_id: str, request_id: str) -> dict[str, Any]:
+        """Cancel a Spot Fleet request by cancelling it and terminating its instances.
+
+        Args:
+            resource_id: The Spot Fleet request ID to cancel.
+            request_id: The ORB request ID, used for launch template cleanup.
+
+        Returns:
+            Dictionary with ``status`` of ``"success"`` or ``"error"``.
+        """
+        try:
+            self._release_manager.release(resource_id, [], {})
+            return {"status": "success", "message": f"Spot Fleet {resource_id} cancelled"}
+        except Exception as e:
+            self._logger.error("Failed to cancel Spot Fleet %s: %s", resource_id, e)
+            return {"status": "error", "message": f"Failed to cancel Spot Fleet {resource_id}: {e!s}"}
+
     def _release_hosts_for_single_spot_fleet(
         self, fleet_id: str, fleet_instance_ids: list[str], fleet_details: dict
     ) -> None:

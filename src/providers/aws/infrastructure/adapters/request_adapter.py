@@ -5,7 +5,8 @@ This module provides an adapter for AWS-specific request operations.
 It extracts AWS-specific logic from the domain layer.
 """
 
-from typing import Any
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Optional
 
 from botocore.exceptions import ClientError
 
@@ -16,21 +17,31 @@ from domain.request.value_objects import RequestType
 from infrastructure.adapters.ports.request_adapter_port import RequestAdapterPort
 from providers.aws.infrastructure.aws_client import AWSClient
 
+if TYPE_CHECKING:
+    from providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
+
 
 @injectable
 class AWSRequestAdapter(RequestAdapterPort):
     """Adapter for AWS-specific request operations."""
 
-    def __init__(self, aws_client: AWSClient, logger: LoggingPort) -> None:
+    def __init__(
+        self,
+        aws_client: AWSClient,
+        logger: LoggingPort,
+        handler_factory: Optional["AWSHandlerFactory"] = None,
+    ) -> None:
         """
         Initialize the adapter.
 
         Args:
             aws_client: AWS client instance
             logger: Logger for logging messages
+            handler_factory: Optional handler factory for delegating cancel operations
         """
         self._aws_client = aws_client
         self._logger = logger
+        self._handler_factory = handler_factory
 
     def get_request_status(self, request: Request) -> dict[str, Any]:
         """
@@ -73,19 +84,19 @@ class AWSRequestAdapter(RequestAdapterPort):
         Returns:
             Dictionary with status information
         """
-        if request.provider_api and "EC2Fleet" in request.provider_api:
-            return self._get_ec2_fleet_status(request)
-        elif request.provider_api and "SpotFleet" in request.provider_api:
-            return self._get_spot_fleet_status(request)
-        elif request.provider_api == "ASG":
-            return self._get_asg_status(request)
-        elif request.provider_api == "RunInstances":
-            return self._get_run_instances_status(request)
-        else:
+        dispatch: dict[str, Callable[[Request], dict[str, Any]]] = {
+            "EC2Fleet": self._get_ec2_fleet_status,
+            "SpotFleet": self._get_spot_fleet_status,
+            "ASG": self._get_asg_status,
+            "RunInstances": self._get_run_instances_status,
+        }
+        handler = dispatch.get(request.provider_api or "")
+        if handler is None:
             return {
                 "status": "unknown",
                 "message": f"Unknown provider API: {request.provider_api}",
             }
+        return handler(request)
 
     def _get_ec2_fleet_status(self, request: Request) -> dict[str, Any]:
         """
@@ -374,41 +385,77 @@ class AWSRequestAdapter(RequestAdapterPort):
         """
         Cancel fleet request.
 
+        Delegates to the appropriate handler's cancel_resource method when a
+        handler factory is available. Falls back to direct AWS API calls
+        otherwise.
+
         Args:
             request: Request domain entity
 
         Returns:
             Dictionary with cancellation results
         """
+        if not request.provider_api:
+            return {
+                "status": "error",
+                "message": "No provider API specified on request",
+            }
+
+        if not request.resource_id:
+            return {
+                "status": "error",
+                "message": "No resource ID specified on request",
+            }
+
+        if self._handler_factory is not None:
+            try:
+                handler = self._handler_factory.create_handler(request.provider_api)
+                return handler.cancel_resource(
+                    resource_id=request.resource_id,
+                    request_id=str(request.request_id) if request.request_id else "",
+                )
+            except Exception as e:
+                self._logger.error("Failed to cancel fleet request via handler: %s", str(e))
+                return {
+                    "status": "error",
+                    "message": f"Failed to cancel fleet request: {e!s}",
+                }
+
+        # Fallback: no handler factory — use direct AWS API calls
+        self._logger.warning(
+            "No handler factory available; using direct AWS API for cancel of %s %s",
+            request.provider_api,
+            request.resource_id,
+        )
+        return self._cancel_direct(request)
+
+    def _cancel_direct(self, request: Request) -> dict[str, Any]:
+        """Cancel a fleet resource via direct AWS API calls (no handler factory)."""
         try:
-            if request.provider_api and "EC2Fleet" in request.provider_api:
+            provider_api = request.provider_api or ""
+            if "EC2Fleet" in provider_api:
                 response = self._aws_client.ec2_client.delete_fleets(
                     FleetIds=[request.resource_id], TerminateInstances=True
                 )
-
                 return {
                     "status": "success",
                     "successful_fleets": [
                         fleet["FleetId"] for fleet in response["SuccessfulFleetDeletions"]
                     ],
                     "unsuccessful_fleets": [
-                        {
-                            "fleet_id": fleet["FleetId"],
-                            "error": fleet["Error"]["Message"],
-                        }
+                        {"fleet_id": fleet["FleetId"], "error": fleet["Error"]["Message"]}
                         for fleet in response["UnsuccessfulFleetDeletions"]
                     ],
                 }
-
-            elif request.provider_api and "SpotFleet" in request.provider_api:
+            elif "SpotFleet" in provider_api:
                 response = self._aws_client.ec2_client.cancel_spot_fleet_requests(
                     SpotFleetRequestIds=[request.resource_id], TerminateInstances=True
                 )
-
                 return {
                     "status": "success",
                     "successful_fleets": [
-                        fleet["SpotFleetRequestId"] for fleet in response["SuccessfulFleetRequests"]
+                        fleet["SpotFleetRequestId"]
+                        for fleet in response["SuccessfulFleetRequests"]
                     ],
                     "unsuccessful_fleets": [
                         {
@@ -418,23 +465,19 @@ class AWSRequestAdapter(RequestAdapterPort):
                         for fleet in response["UnsuccessfulFleetRequests"]
                     ],
                 }
-
-            elif request.provider_api == "ASG":
+            elif provider_api == "ASG":
                 self._aws_client.autoscaling_client.delete_auto_scaling_group(
                     AutoScalingGroupName=request.resource_id, ForceDelete=True
                 )
-
                 return {
                     "status": "success",
                     "message": f"Auto Scaling Group {request.resource_id} deleted",
                 }
-
             else:
                 return {
                     "status": "error",
                     "message": f"Unsupported provider API for cancellation: {request.provider_api}",
                 }
-
         except Exception as e:
             self._logger.error("Failed to cancel fleet request: %s", str(e))
             return {
