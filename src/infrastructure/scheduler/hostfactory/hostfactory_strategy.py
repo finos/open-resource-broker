@@ -61,6 +61,26 @@ class HostFactorySchedulerStrategy(BaseSchedulerStrategy):
             return []
 
         try:
+            import json
+
+            with open(template_path) as f:
+                raw_data = json.load(f)
+
+            file_scheduler_type = (
+                raw_data.get("scheduler_type") if isinstance(raw_data, dict) else None
+            )
+
+            if file_scheduler_type and file_scheduler_type != self.get_scheduler_type():
+                delegated = self._delegate_load_to_strategy(
+                    file_scheduler_type, template_path, provider_override
+                )
+                if delegated is not None:
+                    return delegated
+                self.logger.warning(
+                    "Could not delegate to '%s' strategy, loading best-effort with HF field mapping",
+                    file_scheduler_type,
+                )
+
             templates = self._load_single_file(template_path)
             self.logger.debug("Loaded %d templates from %s", len(templates), template_path)
 

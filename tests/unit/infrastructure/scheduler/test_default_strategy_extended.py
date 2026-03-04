@@ -7,6 +7,7 @@ from typing import cast
 from unittest.mock import MagicMock, patch
 
 from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+from infrastructure.scheduler.hostfactory.hostfactory_strategy import HostFactorySchedulerStrategy
 
 
 def make_strategy():
@@ -189,3 +190,203 @@ class TestLoadTemplatesFromPath:
             assert call_args[0][1] == "override-provider"
         finally:
             os.unlink(path)
+
+
+def _write_json(data: dict) -> str:
+    """Write JSON to a temp file and return the path."""
+    f = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+    json.dump(data, f)
+    f.close()
+    return f.name
+
+
+class TestCrossSchedulerDelegation:
+    """Tests for cross-scheduler template loading via registry delegation."""
+
+    def setup_method(self):
+        self.default_strategy = DefaultSchedulerStrategy()
+        self.default_strategy._logger = MagicMock()
+        self.hf_strategy = HostFactorySchedulerStrategy()
+        self.hf_strategy._logger = MagicMock()
+
+    def test_default_delegates_to_hf_when_scheduler_type_is_hostfactory(self):
+        hf_templates = {
+            "scheduler_type": "hostfactory",
+            "templates": [{"templateId": "t1", "vmType": "t3.medium", "maxNumber": 5}],
+        }
+        path = _write_json(hf_templates)
+        try:
+            mock_delegate_result = [{"template_id": "t1", "instance_type": "t3.medium"}]
+            with patch.object(
+                self.default_strategy,
+                "_delegate_load_to_strategy",
+                return_value=mock_delegate_result,
+            ) as mock_delegate:
+                result = self.default_strategy.load_templates_from_path(path)
+
+            mock_delegate.assert_called_once_with("hostfactory", path, None)
+            assert result == mock_delegate_result
+        finally:
+            os.unlink(path)
+
+    def test_default_falls_back_to_best_effort_when_delegation_returns_none(self):
+        templates_data = {
+            "scheduler_type": "hostfactory",
+            "templates": [{"template_id": "t1"}],
+        }
+        path = _write_json(templates_data)
+        try:
+            with patch.object(
+                self.default_strategy, "_delegate_load_to_strategy", return_value=None
+            ):
+                result = self.default_strategy.load_templates_from_path(path)
+
+            # Falls back to best-effort: loads raw templates without field mapping
+            assert len(result) == 1
+            assert result[0]["template_id"] == "t1"
+        finally:
+            os.unlink(path)
+
+    def test_default_loads_normally_when_scheduler_type_matches(self):
+        templates_data = {
+            "scheduler_type": "default",
+            "templates": [{"template_id": "t1", "image_id": "ami-abc"}],
+        }
+        path = _write_json(templates_data)
+        try:
+            with patch.object(self.default_strategy, "_delegate_load_to_strategy") as mock_delegate:
+                result = self.default_strategy.load_templates_from_path(path)
+
+            mock_delegate.assert_not_called()
+            assert len(result) == 1
+            assert result[0]["template_id"] == "t1"
+        finally:
+            os.unlink(path)
+
+    def test_default_loads_normally_when_no_scheduler_type_in_file(self):
+        templates_data = {"templates": [{"template_id": "t1"}]}
+        path = _write_json(templates_data)
+        try:
+            with patch.object(self.default_strategy, "_delegate_load_to_strategy") as mock_delegate:
+                result = self.default_strategy.load_templates_from_path(path)
+
+            mock_delegate.assert_not_called()
+            assert len(result) == 1
+        finally:
+            os.unlink(path)
+
+    def test_hf_delegates_to_default_when_scheduler_type_is_default(self):
+        default_templates = {
+            "scheduler_type": "default",
+            "templates": [{"template_id": "t1", "image_id": "ami-xyz"}],
+        }
+        path = _write_json(default_templates)
+        try:
+            mock_delegate_result = [{"template_id": "t1", "image_id": "ami-xyz"}]
+            with patch.object(
+                self.hf_strategy,
+                "_delegate_load_to_strategy",
+                return_value=mock_delegate_result,
+            ) as mock_delegate:
+                result = self.hf_strategy.load_templates_from_path(path)
+
+            mock_delegate.assert_called_once_with("default", path, None)
+            assert result == mock_delegate_result
+        finally:
+            os.unlink(path)
+
+    def test_hf_falls_back_to_best_effort_when_delegation_returns_none(self):
+        templates_data = {
+            "scheduler_type": "default",
+            "templates": [{"templateId": "t1", "vmType": "t3.small"}],
+        }
+        path = _write_json(templates_data)
+        try:
+            with patch.object(self.hf_strategy, "_delegate_load_to_strategy", return_value=None):
+                # Should not raise — falls back to HF field mapping
+                result = self.hf_strategy.load_templates_from_path(path)
+
+            assert isinstance(result, list)
+        finally:
+            os.unlink(path)
+
+    def test_hf_loads_normally_when_scheduler_type_matches(self):
+        templates_data = {
+            "scheduler_type": "hostfactory",
+            "templates": [{"templateId": "t1", "vmType": "t3.large", "maxNumber": 2}],
+        }
+        path = _write_json(templates_data)
+        try:
+            with patch.object(self.hf_strategy, "_delegate_load_to_strategy") as mock_delegate:
+                result = self.hf_strategy.load_templates_from_path(path)
+
+            mock_delegate.assert_not_called()
+            assert len(result) == 1
+        finally:
+            os.unlink(path)
+
+    def test_hf_loads_normally_when_no_scheduler_type_in_file(self):
+        # Legacy files without scheduler_type should load via HF path (backward compat)
+        templates_data = {"templates": [{"templateId": "t1", "vmType": "t3.micro"}]}
+        path = _write_json(templates_data)
+        try:
+            with patch.object(self.hf_strategy, "_delegate_load_to_strategy") as mock_delegate:
+                result = self.hf_strategy.load_templates_from_path(path)
+
+            mock_delegate.assert_not_called()
+            assert len(result) == 1
+        finally:
+            os.unlink(path)
+
+    def test_delegate_load_warns_and_returns_none_for_unregistered_type(self):
+        strategy = DefaultSchedulerStrategy()
+        strategy._logger = MagicMock()
+
+        with patch("infrastructure.scheduler.registry.get_scheduler_registry") as mock_get_registry:
+            mock_registry = MagicMock()
+            mock_registry.is_registered.return_value = False
+            mock_get_registry.return_value = mock_registry
+
+            result = strategy._delegate_load_to_strategy("unknown_type", "/some/path.json")
+
+        assert result is None
+        strategy._logger.warning.assert_called_once()
+
+    def test_delegate_load_returns_none_on_construction_failure(self):
+        strategy = DefaultSchedulerStrategy()
+        strategy._logger = MagicMock()
+
+        with patch("infrastructure.scheduler.registry.get_scheduler_registry") as mock_get_registry:
+            mock_registry = MagicMock()
+            mock_registry.is_registered.return_value = True
+            mock_registry.get_strategy_class.side_effect = RuntimeError("boom")
+            mock_get_registry.return_value = mock_registry
+
+            result = strategy._delegate_load_to_strategy("hostfactory", "/some/path.json")
+
+        assert result is None
+        strategy._logger.warning.assert_called_once()
+
+    def test_delegate_passes_provider_override(self):
+        strategy = DefaultSchedulerStrategy()
+        strategy._logger = MagicMock()
+
+        mock_delegate_strategy = MagicMock()
+        mock_delegate_strategy.load_templates_from_path.return_value = [{"template_id": "t1"}]
+
+        with patch("infrastructure.scheduler.registry.get_scheduler_registry") as mock_get_registry:
+            mock_registry = MagicMock()
+            mock_registry.is_registered.return_value = True
+            mock_registry.get_strategy_class.return_value = MagicMock(
+                return_value=mock_delegate_strategy
+            )
+            mock_get_registry.return_value = mock_registry
+
+            result = strategy._delegate_load_to_strategy(
+                "hostfactory", "/some/path.json", "my-provider"
+            )
+
+        mock_delegate_strategy.load_templates_from_path.assert_called_once_with(
+            "/some/path.json", "my-provider"
+        )
+        assert result == [{"template_id": "t1"}]

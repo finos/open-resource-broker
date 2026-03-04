@@ -329,6 +329,43 @@ class BaseSchedulerStrategy(SchedulerPort, ABC):
             return str(value.value)
         return str(value)
 
+    def _delegate_load_to_strategy(
+        self, scheduler_type: str, template_path: str, provider_override: Any = None
+    ) -> "list[dict[str, Any]] | None":
+        """Delegate template loading to the strategy that owns the given scheduler type.
+
+        Uses the scheduler registry to resolve the correct strategy class, then
+        constructs a minimal instance with the same injected dependencies so that
+        template defaults are applied consistently.
+
+        Returns None when the scheduler type is not registered or construction fails,
+        allowing the caller to fall back to best-effort loading.
+        """
+        from infrastructure.scheduler.registry import get_scheduler_registry
+
+        registry = get_scheduler_registry()
+        if not registry.is_registered(scheduler_type):
+            self.logger.warning(
+                "Scheduler type '%s' not registered, cannot delegate template loading",
+                scheduler_type,
+            )
+            return None
+
+        try:
+            strategy_class = registry.get_strategy_class(scheduler_type)
+            delegate = strategy_class(
+                template_defaults_service=self._template_defaults_service,
+                config_port=self._config_manager,
+                logger=self._logger,
+                provider_registry_service=self._provider_registry_service,
+            )
+            return delegate.load_templates_from_path(template_path, provider_override)
+        except Exception as e:
+            self.logger.warning(
+                "Failed to delegate template loading to '%s' strategy: %s", scheduler_type, e
+            )
+            return None
+
     @staticmethod
     def _coerce_to_dict(request_data: Any) -> dict[str, Any]:
         """Coerce request_data to a plain dict regardless of its type."""

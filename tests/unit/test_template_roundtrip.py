@@ -67,9 +67,7 @@ class TestTemplateRoundTrip:
                 return obj.isoformat()
             raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".json", delete=False
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(hf_dicts, f, default=_default)
             tmp_path = f.name
 
@@ -111,9 +109,7 @@ class TestTemplateRoundTrip:
     def test_machine_types_survives_roundtrip(self):
         for template in self.example_templates:
             result = self._roundtrip(template)
-            assert result.get("machine_types"), (
-                f"machine_types missing for {template.template_id}"
-            )
+            assert result.get("machine_types"), f"machine_types missing for {template.template_id}"
             assert result["machine_types"] == template.machine_types, (
                 f"machine_types mismatch for {template.template_id}"
             )
@@ -175,9 +171,7 @@ class TestTemplateRoundTrip:
 
     def test_heterogeneous_multi_machine_types_survives_roundtrip(self):
         """Templates with multiple machine types must preserve the full dict."""
-        multi = [
-            t for t in self.example_templates if len(t.machine_types) > 1
-        ]
+        multi = [t for t in self.example_templates if len(t.machine_types) > 1]
         assert multi, "Expected at least one multi-machine-type template"
 
         for template in multi:

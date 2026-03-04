@@ -71,10 +71,14 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
 
             file_scheduler_type = data.get("scheduler_type") if isinstance(data, dict) else None
 
-            if file_scheduler_type and file_scheduler_type != "default":
+            if file_scheduler_type and file_scheduler_type != self.get_scheduler_type():
+                delegated = self._delegate_load_to_strategy(
+                    file_scheduler_type, template_path, provider_override
+                )
+                if delegated is not None:
+                    return delegated
                 self.logger.warning(
-                    "Templates file scheduler_type is '%s', expected 'default'. "
-                    "Loading best-effort without field mapping.",
+                    "Could not delegate to '%s' strategy, loading best-effort without field mapping",
                     file_scheduler_type,
                 )
 

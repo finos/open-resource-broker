@@ -21,6 +21,7 @@ from infrastructure.scheduler.hostfactory.response_formatter import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_strategy() -> HostFactorySchedulerStrategy:
     """Return a strategy with all external dependencies mocked out."""
     strategy = HostFactorySchedulerStrategy.__new__(HostFactorySchedulerStrategy)
@@ -35,6 +36,7 @@ def _make_strategy() -> HostFactorySchedulerStrategy:
 # ---------------------------------------------------------------------------
 # format_request_response (requestMachines / requestReturnMachines)
 # ---------------------------------------------------------------------------
+
 
 class TestRequestResponseShape:
     """format_request_response must use camelCase HF keys."""
@@ -123,6 +125,7 @@ class TestRequestResponseShape:
 # convert_domain_to_hostfactory_output — requestMachines
 # ---------------------------------------------------------------------------
 
+
 class TestRequestMachinesOutputShape:
     """convert_domain_to_hostfactory_output('requestMachines') contract."""
 
@@ -130,9 +133,7 @@ class TestRequestMachinesOutputShape:
         self.strategy = _make_strategy()
 
     def test_string_input_returns_requestId(self):
-        result = self.strategy.convert_domain_to_hostfactory_output(
-            "requestMachines", "req-abc"
-        )
+        result = self.strategy.convert_domain_to_hostfactory_output("requestMachines", "req-abc")
         assert "requestId" in result
         assert "message" in result
 
@@ -153,6 +154,7 @@ class TestRequestMachinesOutputShape:
 # ---------------------------------------------------------------------------
 # convert_domain_to_hostfactory_output — getRequestStatus
 # ---------------------------------------------------------------------------
+
 
 class TestGetRequestStatusOutputShape:
     """convert_domain_to_hostfactory_output('getRequestStatus') contract."""
@@ -228,6 +230,7 @@ class TestGetRequestStatusOutputShape:
 # format_request_status_response (list of RequestDTOs)
 # ---------------------------------------------------------------------------
 
+
 class TestFormatRequestStatusResponseShape:
     """format_request_status_response must produce HF-compliant request objects."""
 
@@ -264,6 +267,7 @@ class TestFormatRequestStatusResponseShape:
 # ---------------------------------------------------------------------------
 # HostFactoryResponseFormatter (standalone formatter class)
 # ---------------------------------------------------------------------------
+
 
 class TestResponseFormatterShape:
     """HostFactoryResponseFormatter must produce the same HF-compliant shapes."""

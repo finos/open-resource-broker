@@ -68,6 +68,7 @@ def _make_handler(config_port=None, validator=None) -> SpotFleetHandler:
 # Call-order tests
 # ---------------------------------------------------------------------------
 
+
 class TestResolveBeforeValidate:
     """_resolve_fleet_role must be called before _validate_spot_prerequisites."""
 
@@ -97,9 +98,7 @@ class TestResolveBeforeValidate:
         )
         handler._config_builder = MagicMock()
         handler._config_builder.build.return_value = {}
-        handler._retry_with_backoff = MagicMock(
-            return_value={"SpotFleetRequestId": "sfr-test-123"}
-        )
+        handler._retry_with_backoff = MagicMock(return_value={"SpotFleetRequestId": "sfr-test-123"})
 
         template = _make_template(fleet_role=None)
         request = MagicMock()
@@ -123,9 +122,7 @@ class TestResolveBeforeValidate:
         handler._validate_spot_prerequisites = tracking_validate
         handler._config_builder = MagicMock()
         handler._config_builder.build.return_value = {}
-        handler._retry_with_backoff = MagicMock(
-            return_value={"SpotFleetRequestId": "sfr-test-456"}
-        )
+        handler._retry_with_backoff = MagicMock(return_value={"SpotFleetRequestId": "sfr-test-456"})
 
         # Template starts with no fleet_role; _resolve_fleet_role will populate it
         # by calling STS (aws_client is already mocked to return account 123456789012)
@@ -150,6 +147,7 @@ class TestResolveBeforeValidate:
 # ---------------------------------------------------------------------------
 # Functional: template with resolvable fleet_role passes validation
 # ---------------------------------------------------------------------------
+
 
 class TestFleetRoleResolutionPassesValidation:
     """End-to-end: a template with no fleet_role but config-provided role succeeds."""
@@ -214,15 +212,14 @@ class TestFleetRoleResolutionPassesValidation:
 # Validator unit tests (standalone)
 # ---------------------------------------------------------------------------
 
+
 class TestSpotFleetValidatorFleetRole:
     """SpotFleetValidator.validate() fleet_role checks."""
 
     def setup_method(self):
         self.aws_client = MagicMock()
         self.logger = MagicMock()
-        self.validator = SpotFleetValidator(
-            aws_client=self.aws_client, logger=self.logger
-        )
+        self.validator = SpotFleetValidator(aws_client=self.aws_client, logger=self.logger)
 
     def test_missing_fleet_role_raises(self):
         from providers.aws.exceptions.aws_exceptions import AWSValidationError
