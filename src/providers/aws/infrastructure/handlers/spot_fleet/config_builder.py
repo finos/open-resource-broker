@@ -152,6 +152,18 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
 
         abis_instance_requirements = template.get_instance_requirements_payload()
 
+        _ft = template.fleet_type
+        fleet_type = (
+            _ft.value if _ft is not None and hasattr(_ft, "value") else str(_ft or "request")
+        )
+
+        tag_context = self._build_tag_context(
+            request_id=str(request.request_id),
+            template_id=str(template.template_id),
+            provider_api="SpotFleet",
+            template_tags=template.tags,
+        )
+
         context: dict[str, Any] = {
             "fleet_name": fleet_name,
             "target_capacity": capacity["target_capacity"],
@@ -164,6 +176,8 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
             "instance_overrides": instance_overrides,
             "has_overrides": len(instance_overrides) > 1,
             "fleet_role": template.fleet_role,
+            "fleet_type": fleet_type,
+            "is_heterogeneous": template.price_type == "heterogeneous",
             "allocation_strategy": template.get_spot_fleet_allocation_strategy(),
             "instance_interruption_behavior": getattr(
                 template, "instance_interruption_behavior", "terminate"
@@ -177,6 +191,7 @@ class SpotFleetConfigBuilder(BaseConfigBuilder):
             "has_spot_price": hasattr(template, "max_price") and template.max_price is not None,
             "abis_instance_requirements": abis_instance_requirements,
             "has_abis": bool(abis_instance_requirements),
+            **tag_context,
         }
         return context
 

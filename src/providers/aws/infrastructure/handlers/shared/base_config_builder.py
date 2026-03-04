@@ -112,3 +112,39 @@ class BaseConfigBuilder(ABC):
         lt_version: str,
     ) -> None:
         """Patch launch template id/version into the rendered native spec in-place."""
+
+    def _build_tag_context(
+        self,
+        request_id: str,
+        template_id: str,
+        provider_api: str,
+        template_tags: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        """Build base_tags and custom_tags for Jinja template rendering.
+
+        Returns a dict with keys: base_tags, custom_tags, has_custom_tags.
+        Tags are in lowercase-key format ({"key": ..., "value": ...}) as
+        expected by the Jinja default specs.
+        """
+        from providers.aws.infrastructure.tags import SYSTEM_TAG_PREFIX, build_system_tags
+
+        system_tags = build_system_tags(
+            request_id=request_id,
+            template_id=template_id,
+            provider_api=provider_api,
+        )
+        base_tags = [{"key": t["Key"], "value": t["Value"]} for t in system_tags]
+
+        custom_tags: list[dict[str, str]] = []
+        if template_tags:
+            custom_tags = [
+                {"key": k, "value": str(v)}
+                for k, v in template_tags.items()
+                if not k.startswith(SYSTEM_TAG_PREFIX)
+            ]
+
+        return {
+            "base_tags": base_tags,
+            "custom_tags": custom_tags,
+            "has_custom_tags": bool(custom_tags),
+        }

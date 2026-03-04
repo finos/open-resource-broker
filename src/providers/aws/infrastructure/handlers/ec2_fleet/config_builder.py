@@ -266,9 +266,17 @@ class EC2FleetConfigBuilder(BaseConfigBuilder):
         else:
             default_capacity_type = "on-demand"
 
+        tag_context = self._build_tag_context(
+            request_id=str(request.request_id),
+            template_id=str(template.template_id),
+            provider_api="EC2Fleet",
+            template_tags=template.tags,
+        )
+
         return {
             "fleet_type": template.fleet_type.value,  # type: ignore[union-attr]
             "fleet_name": f"{self._config_port.get_resource_prefix('fleet')}{request.request_id}",
+            "target_capacity": request.requested_count,
             "instance_overrides": instance_overrides,
             "ondemand_overrides": ondemand_overrides,
             "needs_overrides": bool(instance_overrides or ondemand_overrides),
@@ -295,4 +303,5 @@ class EC2FleetConfigBuilder(BaseConfigBuilder):
             ),
             "max_spot_price": (str(template.max_price) if template.max_price is not None else None),
             "default_capacity_type": default_capacity_type,
+            **tag_context,
         }

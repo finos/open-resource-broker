@@ -243,12 +243,21 @@ class ASGConfigBuilder(BaseConfigBuilder):
             else []
         )
 
+        tag_context = self._build_tag_context(
+            request_id=str(request.request_id),
+            template_id=str(template.template_id),
+            provider_api="ASG",
+            template_tags=template.tags,
+        )
+
         return {
             "request_id": str(request.request_id),
             "requested_count": request.requested_count,
+            "desired_capacity": request.requested_count,
             "image_id": template.image_id,
             "instance_type": next(iter(template.machine_types or {}), None),
             "subnet_ids": template.subnet_ids or [],
+            "has_subnets": bool(template.subnet_ids),
             "security_group_ids": template.security_group_ids or [],
             "tags": template.tags or {},
             "price_type": getattr(template, "price_type", "ondemand"),
@@ -273,6 +282,7 @@ class ASGConfigBuilder(BaseConfigBuilder):
             "percent_on_demand": percent_on_demand,
             "on_demand_count": on_demand_count,
             "spot_count": spot_count,
+            **tag_context,
         }
 
     def _calculate_capacity_distribution(
