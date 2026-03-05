@@ -1,424 +1,373 @@
-#!/usr/bin/env python3
-"""Template processor for onaws tests - generates populated templates from base templates and config."""
+"""Template processor for onaws integration tests.
+
+Generates per-test configuration directories by copying the real config files
+from ./config/ and applying scenario-specific overrides directly to the template
+list.  This replaces the old placeholder-based approach and keeps test configs
+aligned with the actual runtime format.
+
+Flow:
+    config/aws_templates.json  ──load_templates_from_path──►  raw dicts (with real image_id)
+                               ──format_templates_for_generation──►  scheduler wire format
+                               ──copy + override──►  run_templates/<test>/aws_templates.json
+    config/config.json         ──merge overrides──►  run_templates/<test>/config.json
+    config/default_config.json ──copy──────────────►  run_templates/<test>/default_config.json
+"""
 
 import json
 import logging
+import shutil
 from pathlib import Path
 from typing import Any, Dict
 
 log = logging.getLogger(__name__)
 
+# Fields that can be overridden directly on each template entry
+TEMPLATE_OVERRIDE_KEYS = {
+    "providerApi",
+    "provider_api",
+    "priceType",
+    "price_type",
+    "fleetType",
+    "fleet_type",
+    "percentOnDemand",
+    "percent_on_demand",
+    "vmTypes",
+    "vm_types",
+    "instance_types",
+    "vmType",
+    "vm_type",
+    "vmTypesOnDemand",
+    "vmTypesPriority",
+    "allocationStrategy",
+    "allocation_strategy",
+    "allocationStrategyOnDemand",
+    "allocation_strategy_on_demand",
+    "abisInstanceRequirements",
+    "abis_instance_requirements",
+    "maxSpotPrice",
+    "max_spot_price",
+    "instanceTags",
+    "instance_tags",
+    "maxNumber",
+    "max_number",
+    "fleetRole",
+    "fleet_role",
+}
+
+# Canonical camelCase → snake_case key mappings for template override keys
+_CAMEL_TO_SNAKE: dict[str, str] = {
+    "providerApi": "provider_api",
+    "priceType": "price_type",
+    "fleetType": "fleet_type",
+    "percentOnDemand": "percent_on_demand",
+    "vmTypes": "vm_types",
+    "vmType": "vm_type",
+    "allocationStrategy": "allocation_strategy",
+    "allocationStrategyOnDemand": "allocation_strategy_on_demand",
+    "abisInstanceRequirements": "abis_instance_requirements",
+    "maxSpotPrice": "max_spot_price",
+    "instanceTags": "instance_tags",
+    "maxNumber": "max_number",
+    "fleetRole": "fleet_role",
+}
+_SNAKE_TO_CAMEL: dict[str, str] = {v: k for k, v in _CAMEL_TO_SNAKE.items()}
+
+
+def _detect_template_format(tmpl: dict) -> str:
+    """Return 'camel' if template uses camelCase keys, 'snake' if snake_case."""
+    if "provider_api" in tmpl:
+        return "snake"
+    if "providerApi" in tmpl:
+        return "camel"
+    if "template_id" in tmpl:
+        return "snake"
+    return "camel"
+
+
+def _normalize_key(key: str, target_fmt: str) -> str:
+    """Return key normalized to target_fmt ('camel' or 'snake'), unchanged if no mapping."""
+    if target_fmt == "snake":
+        return _CAMEL_TO_SNAKE.get(key, key)
+    return _SNAKE_TO_CAMEL.get(key, key)
+
 
 class TemplateProcessor:
-    """Processes base templates and generates populated templates for tests."""
+    """Generates per-test config directories from the real project config files."""
 
-    def __init__(self, base_dir: str = None):
-        """Initialize the template processor.
-
-        Args:
-            base_dir: Base directory for the onaws tests (defaults to current file's directory)
-        """
+    def __init__(self, base_dir: str | None = None):
+        resolved: Path
         if base_dir is None:
-            base_dir = Path(__file__).parent
+            resolved = Path(__file__).parent
         else:
-            base_dir = Path(base_dir)
+            resolved = Path(base_dir)
 
-        self.base_dir = base_dir
-        self.config_templates_dir = base_dir / "config_templates"
-        # Use the main config folder as source
-        self.config_source_dir = base_dir.parent.parent / "config"
-        self.run_templates_dir = base_dir / "run_templates"
+        self.base_dir = resolved
+        self.config_source_dir = resolved.parent.parent / "config"
+        self.run_templates_dir = resolved / "run_templates"
 
-    def detect_scheduler_type(self, overrides: dict) -> str:
-        """
-        Detect scheduler type from overrides.
-
-        Args:
-            overrides: Dictionary containing test overrides
-
-        Returns:
-            Scheduler type: "default" or "hostfactory"
-            Defaults to "hostfactory" for backward compatibility
-        """
-        scheduler_type = overrides.get("scheduler", "hostfactory") if overrides else "hostfactory"
-        log.info(f"Detected scheduler type: {scheduler_type}")
-        return scheduler_type
-
-    def select_base_template_for_scheduler(self, base_name: str, scheduler_type: str) -> str:
-        """
-        Select appropriate base template based on scheduler type.
-
-        Args:
-            base_name: Base template name (e.g., "awsprov_templates")
-            scheduler_type: "default" or "hostfactory"
-
-        Returns:
-            Template filename to use
-
-        Mapping:
-            - templates + default → templates.base.json (snake_case fields)
-            - awsprov_templates + hostfactory → awsprov_templates.base.json (camelCase fields)
-            - default_config/config → corresponding *.base.json files
-        """
-        if base_name == "awsprov_templates" and scheduler_type == "default":
-            return "templates"
-        return base_name
-
-    def load_config_source(self) -> Dict[str, Any]:
-        """Load configuration values from the main config directory."""
-        # Load from config.json
-        config_file = self.config_source_dir / "config.json"
-        awsprov_templates_file = self.config_source_dir / "awsprov_templates.json"
-
-        if not config_file.exists():
-            raise FileNotFoundError(f"Configuration source not found: {config_file}")
-
-        if not awsprov_templates_file.exists():
-            raise FileNotFoundError(f"AWS provider templates not found: {awsprov_templates_file}")
-
-        # Load config.json
-        with open(config_file) as f:
-            config_data = json.load(f)
-
-        # Load awsprov_templates.json
-        with open(awsprov_templates_file) as f:
-            templates_data = json.load(f)
-
-        # Extract configuration values from the loaded files
-        extracted_config = {}
-
-        # Extract from config.json
-        if "provider" in config_data:
-            # Extract active_provider
-            extracted_config["active_provider"] = config_data["provider"].get(
-                "active_provider", "aws-default"
-            )
-
-            if "providers" in config_data["provider"]:
-                provider = config_data["provider"]["providers"][0]
-                if "config" in provider:
-                    provider_config = provider["config"]
-                    extracted_config["region"] = provider_config.get("region", "us-east-1")
-                    extracted_config["profile"] = provider_config.get("profile", "default")
-                    extracted_config["aws_read_timeout"] = provider_config.get(
-                        "aws_read_timeout", provider_config.get("timeout", 30)
-                    )
-
-            # Extract template defaults if available
-            if "provider_defaults" in config_data["provider"]:
-                aws_defaults = config_data["provider"]["provider_defaults"].get("aws", {})
-                template_defaults = aws_defaults.get("template_defaults", {})
-
-                extracted_config["image_id"] = template_defaults.get("image_id", "ami-12345678")
-                extracted_config["security_group_ids"] = template_defaults.get(
-                    "security_group_ids", ["sg-12345678"]
-                )
-                extracted_config["subnet_ids"] = template_defaults.get(
-                    "subnet_ids", ["subnet-12345678"]
-                )
-
-                # Keep legacy keys for backward compatibility
-                extracted_config["imageId"] = extracted_config["image_id"]
-                if extracted_config["subnet_ids"]:
-                    extracted_config["subnetId"] = extracted_config["subnet_ids"][0]
-                else:
-                    extracted_config["subnetId"] = "subnet-12345678"
-                extracted_config["securityGroupIds"] = extracted_config["security_group_ids"]
-
-        # Extract from awsprov_templates.json (use first template as reference)
-        # Only use these values if they're not already set from config.json
-        if templates_data.get("templates"):
-            first_template = templates_data["templates"][0]
-
-            # Override with actual values from templates if available and not already set
-            if "imageId" in first_template and "imageId" not in extracted_config:
-                extracted_config["imageId"] = first_template["imageId"]
-            if "subnetId" in first_template and "subnetId" not in extracted_config:
-                extracted_config["subnetId"] = first_template["subnetId"]
-            if "securityGroupIds" in first_template and "securityGroupIds" not in extracted_config:
-                extracted_config["securityGroupIds"] = first_template["securityGroupIds"]
-            if "instanceProfile" in first_template:
-                extracted_config["instanceProfile"] = first_template["instanceProfile"]
-            if "fleetRole" in first_template:
-                extracted_config["fleetRole"] = first_template["fleetRole"]
-            if "userDataScript" in first_template:
-                extracted_config["userDataScript"] = first_template["userDataScript"]
-
-        # Set default values for fields that might be overridden
-        extracted_config.setdefault("fleetType", "request")  # Default fleet type
-        extracted_config.setdefault("providerApi", "EC2Fleet")
-        extracted_config.setdefault("priceType", "ondemand")  # Default price type
-        # Default to 100% on-demand to avoid unintentionally requesting spot capacity
-        extracted_config.setdefault("percentOnDemand", 100)
-        extracted_config.setdefault("aws_read_timeout", 30)
-
-        return extracted_config
-
-    def load_base_template(self, template_name: str) -> Dict[str, Any]:
-        """Load a base template file.
-
-        Args:
-            template_name: Name of the template file (e.g., 'awsprov_templates.base.json', 'config.base.json')
-        """
-        # If template_name doesn't have extension, add .base.json for backward compatibility
-        if not template_name.endswith(".base.json"):
-            template_name = f"{template_name}.base.json"
-
-        template_file = self.config_templates_dir / template_name
-        if not template_file.exists():
-            raise FileNotFoundError(f"Base template not found: {template_file}")
-
-        with open(template_file) as f:
-            return json.load(f)
-
-    def replace_placeholders(
-        self, template: Dict[str, Any], config: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Replace placeholders in template with actual config values.
-
-        Args:
-            template: Template dictionary with {{placeholder}} values
-            config: Configuration dictionary with actual values
-
-        Returns:
-            Template with placeholders replaced
-        """
-        # Convert template to JSON string for easy replacement
-        template_str = json.dumps(template, indent=2)
-
-        # Replace each placeholder
-        for key, value in config.items():
-            placeholder = f"{{{{{key}}}}}"
-            if isinstance(value, list):
-                # Handle arrays (like securityGroupIds)
-                value_str = json.dumps(value)
-            elif isinstance(value, str):
-                value_str = f'"{value}"'
-            else:
-                value_str = json.dumps(value)
-
-            template_str = template_str.replace(f'"{placeholder}"', value_str)
-
-        # Parse back to dictionary
-        return json.loads(template_str)
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
     def generate_test_templates(
         self,
         test_name: str,
-        base_template: str = None,
-        awsprov_base_template: str = None,
-        overrides: dict = None,
+        overrides: dict | None = None,
         metrics_config: dict | None = None,
+        # Legacy parameters accepted but ignored
+        base_template: str | None = None,
+        awsprov_base_template: str | None = None,
     ) -> None:
-        """Generate populated templates for a specific test.
+        """Generate a per-test config directory with overridden templates.
 
         Args:
-            test_name: Name of the test (used as directory name)
-            base_template: Optional base template name to use for config files (defaults to standard templates)
-            awsprov_base_template: Optional base template name for awsprov_templates (e.g., "awsprov_templates1", "awsprov_templates2")
-            overrides: Optional dictionary of configuration overrides
+            test_name: Directory name under run_templates/
+            overrides: Scenario overrides (providerApi, priceType, scheduler, etc.)
+            metrics_config: Optional metrics configuration to inject into config.json
         """
-        # Detect scheduler type from overrides
-        scheduler_type = self.detect_scheduler_type(overrides)
+        overrides = overrides or {}
+        scheduler_type = overrides.get("scheduler", "hostfactory")
 
-        # Create test directory
+        # Prepare output directory
         test_dir = self.run_templates_dir / test_name
         test_dir.mkdir(parents=True, exist_ok=True)
-        metrics_dir = None
+
+        # 1. Generate aws_templates.json (with overrides applied)
+        # Try programmatic generation first; fall back to filesystem copy
+        try:
+            templates_data = self.generate_templates_programmatically(scheduler_type)
+            log.debug("Generated templates programmatically from handler classmethods")
+        except Exception as exc:
+            log.warning(
+                "Programmatic template generation failed (%s), falling back to filesystem", exc
+            )
+            templates_data = self._load_json(self._find_templates_source())
+        self._apply_template_overrides(templates_data, overrides)
+        template_filename = "aws_templates.json"
+        config_dir = test_dir / "config"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        self._write_json(config_dir / template_filename, templates_data)
+        log.info(
+            "Generated %s with %d templates",
+            template_filename,
+            len(templates_data.get("templates", [])),
+        )
+
+        # 2. Generate config.json (with scheduler/provider overrides)
+        config_dir = test_dir / "config"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        config_data = self._load_json(self.config_source_dir / "config.json")
+        self._apply_config_overrides(config_data, overrides, scheduler_type)
+        self._set_storage_paths(config_data, test_dir)
         if metrics_config:
             metrics_dir = test_dir / "metrics"
             metrics_dir.mkdir(parents=True, exist_ok=True)
+            mc = metrics_config.copy()
+            if not mc.get("metrics_dir"):
+                mc["metrics_dir"] = str(metrics_dir)
+            config_data["metrics"] = mc
+        self._write_json(config_dir / "config.json", config_data)
 
-        # Load configuration
-        config = self.load_config_source()
-        if metrics_config and metrics_dir:
-            metrics_config = metrics_config.copy()
-            if not metrics_config.get("metrics_dir"):
-                metrics_config["metrics_dir"] = str(metrics_dir)
-            config["metrics_dir"] = metrics_config["metrics_dir"]
+        # 3. Copy default_config.json as-is
+        default_config_src = self.config_source_dir / "default_config.json"
+        if default_config_src.exists():
+            shutil.copy2(default_config_src, config_dir / "default_config.json")
 
-        # Apply overrides if provided
-        if overrides:
-            config.update(overrides)
-            # Normalize legacy timeout override to aws_read_timeout for template placeholders
-            if "timeout" in overrides and "aws_read_timeout" not in overrides:
-                config["aws_read_timeout"] = overrides["timeout"]
-            if "aws_read_timeout" in overrides and "timeout" not in overrides:
-                config["timeout"] = overrides["aws_read_timeout"]
-            # Handle legacy field mappings for overrides
-            if "imageId" in overrides:
-                config["image_id"] = overrides["imageId"]
-            if "subnetId" in overrides:
-                config["subnet_ids"] = [overrides["subnetId"]]
-            if "securityGroupIds" in overrides:
-                config["security_group_ids"] = overrides["securityGroupIds"]
-            # Normalize vmTypes to snake_case for default scheduler configs
-            if "vmTypes" in overrides and "vm_types" not in overrides:
-                config["vm_types"] = overrides["vmTypes"]
-                overrides["vm_types"] = overrides["vmTypes"]
-            # Also map to instance_types for default scheduler templates that expect this key
-            if "vm_types" in overrides and "instance_types" not in overrides:
-                config["instance_types"] = overrides["vm_types"]
-                overrides["instance_types"] = overrides["vm_types"]
-
-            # Set percentOnDemand based on priceType (only for provider APIs that support it)
-            if "priceType" in overrides:
-                provider_api = overrides.get("providerApi", config.get("providerApi", "EC2Fleet"))
-
-                # If percentOnDemand is explicitly provided in overrides, use it
-                if "percentOnDemand" in overrides:
-                    config["percentOnDemand"] = overrides["percentOnDemand"]
-                elif provider_api in ["EC2Fleet", "SpotFleet"]:
-                    # EC2Fleet and SpotFleet support percentOnDemand
-                    if overrides["priceType"] == "spot":
-                        config["percentOnDemand"] = 0  # 100% spot instances
-                    elif overrides["priceType"] == "ondemand":
-                        config["percentOnDemand"] = 100  # 100% on-demand instances
-                elif provider_api in ["RunInstances", "ASG"]:
-                    # RunInstances and ASG don't use percentOnDemand the same way as fleets.
-                    # Ensure on-demand requests stay on-demand; spot explicitly sets 0.
-                    if overrides["priceType"] == "spot":
-                        config["percentOnDemand"] = 0
-                    else:
-                        config["percentOnDemand"] = 100
-            # Normalize allocation strategy keys between camel/snake for both schedulers
-            if "allocationStrategy" in overrides:
-                config["allocation_strategy"] = overrides["allocationStrategy"]
-            if "allocation_strategy" in overrides:
-                config["allocationStrategy"] = overrides["allocation_strategy"]
-
-        # Set scheduler type in config for template replacement (after overrides)
-        config["scheduler"] = scheduler_type
-        log.info(f"Config scheduler value for template replacement: {config.get('scheduler')}")
-
-        # Generate each required file
-        # Note: awsprov_templates.json is only for hostfactory scheduler
-        template_files = [
-            ("default_config", "default_config.json"),
-            ("config", "config.json"),
-        ]
-
-        if scheduler_type == "hostfactory":
-            template_files.insert(0, ("awsprov_templates", "awsprov_templates.json"))
-        elif scheduler_type == "default":
-            template_files.insert(0, ("templates", "templates.json"))
-
-        for base_name, output_name in template_files:
-            try:
-                # Determine which base template to use
-                if base_name == "awsprov_templates" and awsprov_base_template:
-                    # Use specified awsprov base template
-                    template_name = awsprov_base_template
-                elif base_name == "config" and base_template:
-                    # Use specified config base template
-                    template_name = base_template
-                else:
-                    # Use scheduler-aware template selection
-                    template_name = self.select_base_template_for_scheduler(
-                        base_name, scheduler_type
-                    )
-
-                # Load base template
-                base_template_data = self.load_base_template(template_name)
-
-                # Replace placeholders
-                populated_template = self.replace_placeholders(base_template_data, config)
-
-                # Inject metrics configuration into config.json when provided
-                if (
-                    base_name == "config"
-                    and isinstance(populated_template, dict)
-                    and metrics_config
-                ):
-                    populated_template["metrics"] = metrics_config
-
-                # Apply explicit overrides for fields not covered by placeholders
-                if overrides and isinstance(populated_template, dict):
-                    templates_list = populated_template.get("templates", [])
-                    for tmpl in templates_list:
-                        # Apply overrides with scheduler-aware key mapping
-                        scheduler_is_default = config.get("scheduler") == "default"
-
-                        # Handle VM types separately to avoid duplicate fields
-                        if any(k in overrides for k in ("vm_types", "vmTypes", "instance_types")):
-                            vm_override = (
-                                overrides.get("instance_types")
-                                or overrides.get("vm_types")
-                                or overrides.get("vmTypes")
-                            )
-                            if scheduler_is_default:
-                                tmpl["instance_types"] = vm_override
-                                tmpl.pop("vm_type", None)
-                                tmpl.pop("vmTypes", None)
-                                tmpl.pop("vm_types", None)
-                            else:
-                                tmpl["vmTypes"] = vm_override
-                                tmpl.pop("vm_type", None)
-                                tmpl.pop("vm_types", None)
-                                tmpl.pop("instance_types", None)
-
-                        # Apply other known override keys directly
-                        for key in [
-                            "vmType",
-                            "abisInstanceRequirements",
-                            "abis_instance_requirements",
-                            "instance_types",
-                            "instanceTypes",
-                            "allocationStrategy",
-                            "allocation_strategy",
-                            "allocationStrategyOnDemand",
-                        ]:
-                            if key in overrides:
-                                tmpl[key] = overrides[key]
-
-                # Write populated template (always use standard output name)
-                output_file = test_dir / output_name
-                with open(output_file, "w") as f:
-                    json.dump(populated_template, f, indent=2)
-
-                # Show the actual template file used
-                actual_template_name = (
-                    template_name
-                    if template_name.endswith(".base.json")
-                    else f"{template_name}.base.json"
-                )
-                log.info(
-                    f"Selected base template: {actual_template_name} for scheduler: {scheduler_type}"
-                )
-                print(f"Generated {output_file} from {actual_template_name}")
-
-            except Exception as e:
-                print(f"Error generating {base_name}: {e}")
-                raise
+        print(f"Generated test config in {test_dir}")
 
     def cleanup_test_templates(self, test_name: str) -> None:
-        """Clean up generated templates for a test.
-
-        Args:
-            test_name: Name of the test
-        """
+        """Remove generated test directory."""
         test_dir = self.run_templates_dir / test_name
         if test_dir.exists():
-            import shutil
-
             shutil.rmtree(test_dir)
             print(f"Cleaned up {test_dir}")
 
+    def generate_combined_templates(
+        self,
+        test_name: str,
+        template_configs: list[dict],
+        scheduler_type: str = "hostfactory",
+    ) -> None:
+        """Generate a config directory with multiple custom templates combined.
 
-def main():
-    """Main function for testing the template processor."""
-    processor = TemplateProcessor()
+        Used by multi-termination tests that need several templates with
+        different providerApi/fleetType settings in a single config dir.
 
-    # Generate templates for a test
-    test_name = "test_get_available_templates"
-    print(f"Generating templates for {test_name}...")
+        Args:
+            test_name: Directory name under run_templates/
+            template_configs: List of dicts with 'template_name' and 'overrides' keys.
+            scheduler_type: Scheduler type - "hostfactory" (camelCase) or "default" (snake_case).
+        """
+        test_dir = self.run_templates_dir / test_name
+        test_dir.mkdir(parents=True, exist_ok=True)
 
-    try:
-        processor.generate_test_templates(test_name)
-        print(f"Successfully generated templates for {test_name}")
-    except Exception as e:
-        print(f"Error: {e}")
+        # Load source templates and config
+        try:
+            source_templates = self.generate_templates_programmatically(scheduler_type)
+        except Exception as exc:
+            log.warning(
+                "Programmatic template generation failed (%s), falling back to filesystem", exc
+            )
+            source_templates = self._load_json(self._find_templates_source())
+        config_data = self._load_json(self.config_source_dir / "config.json")
+
+        # Build combined template list: one entry per template_config,
+        # cloned from the first source template with overrides applied
+        # Key name depends on scheduler wire format: camelCase for HF, snake_case for default
+        template_id_key = "templateId" if scheduler_type == "hostfactory" else "template_id"
+        base_entry = source_templates.get("templates", [{}])[0]
+        combined = []
+        for tc in template_configs:
+            entry = dict(base_entry)
+            entry[template_id_key] = tc["template_name"]
+            for k, v in tc.get("overrides", {}).items():
+                if k in TEMPLATE_OVERRIDE_KEYS:
+                    entry[k] = v
+            combined.append(entry)
+
+        config_dir = test_dir / "config"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        self._write_json(
+            config_dir / "aws_templates.json",
+            {"scheduler_type": scheduler_type, "templates": combined},
+        )
+        self._set_storage_paths(config_data, test_dir)
+        self._write_json(config_dir / "config.json", config_data)
+
+        default_config_src = self.config_source_dir / "default_config.json"
+        if default_config_src.exists():
+            shutil.copy2(default_config_src, config_dir / "default_config.json")
+
+        print(f"Generated combined config with {len(combined)} templates in {test_dir}")
+
+    # ------------------------------------------------------------------
+    # Programmatic template generation
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def generate_templates_programmatically(scheduler_type: str = "hostfactory") -> Dict[str, Any]:
+        """Load templates from the real config file using the production scheduler path.
+
+        Uses load_templates_from_path (same as runtime) so templates have real image_id,
+        subnet_ids, security_group_ids etc from the generated config/aws_templates.json.
+        Then formats via format_templates_for_generation for the correct scheduler wire format.
+
+        Returns:
+            {"templates": [...]} dict in the format expected by the scheduler
+        """
+        import sys
+
+        sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+
+        # Find the real generated templates file in config/
+        config_dir = Path(__file__).parent.parent.parent / "config"
+        templates_file = config_dir / "aws_templates.json"
+        if not templates_file.exists():
+            raise FileNotFoundError(
+                f"No generated templates found at {templates_file}. "
+                "Run 'orb templates generate' first."
+            )
+
+        # The source file is always in hostfactory camelCase format.
+        # Load via HostFactorySchedulerStrategy so camelCase→snake_case mapping is applied,
+        # preserving image_id, subnet_ids, security_group_ids etc.
+        # Then format via the target strategy for the correct wire format.
+        hf_strategy = TemplateProcessor._make_strategy("hostfactory")
+        raw_dicts = hf_strategy.load_templates_from_path(str(templates_file))
+
+        target_strategy = TemplateProcessor._make_strategy(scheduler_type)
+        formatted = target_strategy.format_templates_for_generation(raw_dicts)
+
+        return {"scheduler_type": scheduler_type, "templates": formatted}
+
+    @staticmethod
+    def _make_strategy(scheduler_type: str):
+        """Return the production scheduler strategy instance for the given type."""
+        if scheduler_type == "hostfactory":
+            from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
+                HostFactorySchedulerStrategy,
+            )
+
+            return HostFactorySchedulerStrategy()
+        else:
+            from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
+
+            return DefaultSchedulerStrategy()
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _find_templates_source(self) -> Path:
+        """Find the templates source file in config/."""
+        for name in ("aws_templates.json", "templates.json"):
+            path = self.config_source_dir / name
+            if path.exists():
+                return path
+        raise FileNotFoundError(
+            f"No template file found in {self.config_source_dir}. "
+            "Run 'orb init && orb templates generate' first."
+        )
+
+    def _apply_template_overrides(self, templates_data: Dict[str, Any], overrides: dict) -> None:
+        """Apply scenario overrides to every template, normalizing key case to match template format."""
+        template_overrides = {k: v for k, v in overrides.items() if k in TEMPLATE_OVERRIDE_KEYS}
+        if not template_overrides:
+            return
+
+        for tmpl in templates_data.get("templates", []):
+            fmt = _detect_template_format(tmpl)
+            for k, v in template_overrides.items():
+                normalized_key = _normalize_key(k, fmt)
+                opposite_key = _normalize_key(k, "snake" if fmt == "camel" else "camel")
+                if opposite_key != normalized_key and opposite_key in tmpl:
+                    del tmpl[opposite_key]
+                tmpl[normalized_key] = v
+
+    def _apply_config_overrides(
+        self, config_data: Dict[str, Any], overrides: dict, scheduler_type: str
+    ) -> None:
+        """Apply scheduler type and other config-level overrides."""
+        # Set scheduler type
+        config_data.setdefault("scheduler", {})
+        config_data["scheduler"]["type"] = scheduler_type
+
+        # Apply region/profile overrides if provided
+        if "region" in overrides or "profile" in overrides:
+            providers = config_data.get("provider", {}).get("providers", [])
+            for provider in providers:
+                cfg = provider.setdefault("config", {})
+                if "region" in overrides:
+                    cfg["region"] = overrides["region"]
+                if "profile" in overrides:
+                    cfg["profile"] = overrides["profile"]
+
+    @staticmethod
+    def _set_storage_paths(config_data: Dict[str, Any], test_dir: Path) -> None:
+        """Point storage paths at the test directory to isolate parallel runs."""
+        data_dir = str(test_dir / "data")
+        config_data.setdefault("storage", {})
+        config_data["storage"]["default_storage_path"] = data_dir
+        config_data["storage"].setdefault("json_strategy", {})
+        config_data["storage"]["json_strategy"]["base_path"] = data_dir
+
+    @staticmethod
+    def _load_json(path: Path) -> Dict[str, Any]:
+        if not path.exists():
+            raise FileNotFoundError(f"Configuration file not found: {path}")
+        with open(path) as f:
+            return json.load(f)
+
+    @staticmethod
+    def _write_json(path: Path, data: Dict[str, Any]) -> None:
+        with open(path, "w") as f:
+            json.dump(data, f, indent=2)
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    processor = TemplateProcessor()
+    name = sys.argv[1] if len(sys.argv) > 1 else "manual_test"
+    processor.generate_test_templates(name)
+    print(f"Generated test templates in: {processor.run_templates_dir / name}")

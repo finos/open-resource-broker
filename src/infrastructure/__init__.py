@@ -8,7 +8,7 @@ concrete implementations of the interfaces defined in the domain and
 application layers.
 
 Key Components:
-    - persistence: Data storage and retrieval implementations
+    - storage: Data storage and retrieval implementations
     - events: Event publishing and handling infrastructure
     - logging: Logging and monitoring utilities
     - config: Configuration management

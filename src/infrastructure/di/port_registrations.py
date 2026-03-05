@@ -1,21 +1,23 @@
 """Port adapter registrations for dependency injection."""
 
-# Import configuration manager
-from config.manager import get_config_manager
+from config.managers.configuration_manager import ConfigurationManager
 from domain.base.ports import (
     ConfigurationPort,
     ContainerPort,
     ErrorHandlingPort,
     EventPublisherPort,
-    LoggingPort,
+    ProviderConfigPort,
+    ProviderSelectionPort,
     SchedulerPort,
     TemplateConfigurationPort,
 )
+from domain.base.ports.logging_port import LoggingPort
 from domain.base.ports.spec_rendering_port import SpecRenderingPort
 from infrastructure.adapters.error_handling_adapter import ErrorHandlingAdapter
 from infrastructure.adapters.factories.container_adapter_factory import (
     ContainerAdapterFactory,
 )
+from infrastructure.adapters.logging_adapter import LoggingAdapter
 from infrastructure.template.configuration_manager import TemplateConfigurationManager
 
 
@@ -23,27 +25,31 @@ def register_port_adapters(container):
     """Register all port adapters in the DI container."""
 
     # Register configuration port with adapter
-    def create_configuration_adapter(c):
-        """Create configuration adapter bridging domain port to infrastructure manager."""
-        from config.manager import get_config_manager
+    def create_configuration_adapter(container):
+        """Create configuration adapter using DI-managed ConfigurationManager."""
         from infrastructure.adapters.configuration_adapter import ConfigurationAdapter
 
-        return ConfigurationAdapter(get_config_manager())
+        config_manager = container.get(ConfigurationManager)  # Use DI instance
+        return ConfigurationAdapter(config_manager)
 
     container.register_singleton(ConfigurationPort, create_configuration_adapter)
+
+    # Register focused ProviderConfigPort - reuse the same ConfigurationAdapter
+    # since ConfigurationPort extends ProviderConfigPort (DIP: depend on abstraction)
+    container.register_singleton(ProviderConfigPort, lambda c: c.get(ConfigurationPort))
 
     # Register UnitOfWorkFactory (abstract -> concrete mapping)
     # This was previously in _setup_core_dependencies but got lost during DI cleanup
     # Using consistent Base* naming pattern for abstract classes
-    from domain.base import UnitOfWorkFactory as BaseUnitOfWorkFactory
-    from infrastructure.adapters.logging_adapter import LoggingAdapter
-    from infrastructure.utilities.factories.repository_factory import UnitOfWorkFactory
+    def create_unit_of_work_factory(c):
+        from infrastructure.utilities.factories.repository_factory import UnitOfWorkFactory
 
-    config_manager = get_config_manager()
-    container.register_instance(
-        BaseUnitOfWorkFactory,
-        UnitOfWorkFactory(config_manager, LoggingAdapter("unit_of_work")),
-    )
+        config_manager = c.get(ConfigurationManager)
+        return UnitOfWorkFactory(config_manager, LoggingAdapter("unit_of_work"))
+
+    from domain.base import UnitOfWorkFactory as BaseUnitOfWorkFactory
+
+    container.register_singleton(BaseUnitOfWorkFactory, create_unit_of_work_factory)
 
     # Register logging port adapter
     container.register_singleton(LoggingPort, lambda c: LoggingAdapter("application"))
@@ -59,17 +65,13 @@ def register_port_adapters(container):
     # optional dependencies)
     def create_template_configuration_manager(c):
         """Create template configuration manager with dependencies."""
-        # Import here to avoid circular imports
-        from application.services.provider_capability_service import (
-            ProviderCapabilityService,
-        )
-
         return TemplateConfigurationManager(
-            config_manager=c.get(ConfigurationPort),
-            scheduler_strategy=c.get(SchedulerPort),
+            config_manager=c.get(
+                ConfigurationManager
+            ),  # Use ConfigurationManager directly to break circular dependency
+            scheduler_strategy=c.get_optional(SchedulerPort),
             logger=c.get(LoggingPort),
             event_publisher=c.get_optional(EventPublisherPort),
-            provider_capability_service=c.get_optional(ProviderCapabilityService),
         )
 
     container.register_singleton(
@@ -100,3 +102,23 @@ def register_port_adapters(container):
         return JinjaSpecRenderer(logger=c.get(LoggingPort))
 
     container.register_singleton(SpecRenderingPort, create_spec_renderer)
+
+    # Register provider selection port adapter
+    def create_provider_selection_adapter(c):
+        """Create provider selection adapter wrapping ProviderRegistryService."""
+        from application.services.provider_registry_service import ProviderRegistryService
+        from infrastructure.adapters.provider_selection_adapter import ProviderSelectionAdapter
+
+        provider_registry_service = c.get(ProviderRegistryService)
+        return ProviderSelectionAdapter(provider_registry_service)
+
+    container.register_singleton(ProviderSelectionPort, create_provider_selection_adapter)
+
+    # Register in-memory cache service as CacheServicePort implementation.
+    # The handler (GetRequestHandler) calls only the sync convenience methods
+    # (get_cached_request / cache_request / is_caching_enabled).
+    # TODO: replace with a config-driven implementation (Redis etc.) when needed.
+    from application.ports.cache_service_port import CacheServicePort
+    from infrastructure.caching.in_memory_cache_service import InMemoryCacheService
+
+    container.register_singleton(CacheServicePort, lambda _: InMemoryCacheService())

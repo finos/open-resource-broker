@@ -11,7 +11,7 @@ on:
       - 'src/**'
       - 'pyproject.toml'
       - 'deployment/docker/**'
-      - 'dev-tools/scripts/container_build.sh'
+      - 'dev-tools/container/container_build.sh'
       - '.github/workflows/dev-containers.yml'
   workflow_run:
     workflows: ["Quality Checks", "Unit Tests"]
@@ -24,7 +24,7 @@ on:
       - 'src/**'
       - 'pyproject.toml'
       - 'deployment/docker/**'
-      - 'dev-tools/scripts/container_build.sh'
+      - 'dev-tools/container/container_build.sh'
       - '.github/workflows/dev-containers.yml'
   workflow_dispatch:
     inputs:

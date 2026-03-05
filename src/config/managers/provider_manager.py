@@ -33,7 +33,22 @@ class ProviderConfigManager:
 
     def get_provider_type(self) -> str:
         """Get provider type from configuration."""
-        return self._get_nested_value("provider.type", "aws")
+        # Get first available provider as default
+        default_provider = "aws"  # Keep as fallback
+        try:
+            from providers.registry import get_provider_registry
+
+            registry = get_provider_registry()
+            registered_types = registry.get_registered_providers()
+            if registered_types:
+                default_provider = registered_types[0]
+        except Exception as e:
+            from infrastructure.logging.logger import get_logger
+
+            logger = get_logger(__name__)
+            logger.debug(f"Failed to get default provider: {e}")  # Use fallback
+
+        return self._get_nested_value("provider.type", default_provider)
 
     def get_provider_config(self) -> Optional["ProviderConfig"]:
         """Get provider configuration."""
@@ -46,13 +61,13 @@ class ProviderConfigManager:
 
             return ProviderConfig(**provider_data)
         except Exception as e:
-            logger.error("Failed to load provider config: %s", e)
+            logger.error("Failed to load provider config: %s", e, exc_info=True)
             return None
 
     def is_provider_strategy_enabled(self) -> bool:
         """Check if provider strategy mode is enabled."""
         provider_mode = self.get_provider_mode()
-        return provider_mode == ProviderMode.STRATEGY.value
+        return provider_mode == ProviderMode.MULTI.value
 
     def is_multi_provider_mode(self) -> bool:
         """Check if multi-provider mode is enabled."""
@@ -64,7 +79,7 @@ class ProviderConfigManager:
 
     def get_provider_mode(self) -> str:
         """Get current provider mode."""
-        return self._get_nested_value("provider.mode", ProviderMode.LEGACY.value)
+        return self._get_nested_value("provider.mode", ProviderMode.SINGLE.value)
 
     def get_active_provider_names(self) -> list[str]:
         """Get list of active provider names."""
@@ -105,7 +120,7 @@ class ProviderConfigManager:
 
             logger.info("Provider configuration saved")
         except Exception as e:
-            logger.error("Failed to save provider config: %s", e)
+            logger.error("Failed to save provider config: %s", e, exc_info=True)
             raise ConfigurationError(f"Failed to save provider configuration: {e}")
 
     def _get_nested_value(self, key: str, default: Any = None) -> Any:

@@ -1,5 +1,6 @@
 """Tests for base scheduler strategy."""
 
+from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
 
@@ -14,8 +15,13 @@ from infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
 class ConcreteSchedulerStrategy(BaseSchedulerStrategy):
     """Concrete implementation for testing."""
 
-    def get_templates_file_path(self) -> str:
-        return "/test/templates.json"
+    def __init__(self, config_manager_instance=None, logger_instance=None):
+        self._config_manager_instance = config_manager_instance
+        self._logger_instance = logger_instance
+
+    @property
+    def config_manager(self) -> Any:
+        return self._config_manager_instance
 
     def get_config_file_path(self) -> str:
         return "/test/config.json"
@@ -71,11 +77,26 @@ class ConcreteSchedulerStrategy(BaseSchedulerStrategy):
     def get_working_directory(self) -> str:
         return "/test/workdir"
 
+    def format_machine_details_response(self, machine_data: dict) -> dict:
+        return {"machine": machine_data}
+
     def get_config_directory(self) -> str:
         return "/test/confdir"
 
     def get_logs_directory(self) -> str:
         return "/test/logsdir"
+
+    def get_scripts_directory(self) -> Path | None:
+        return None
+
+    def get_scheduler_type(self) -> str:
+        return "test"
+
+    def _get_provider_name(self) -> str:
+        return "test_provider"
+
+    def _get_active_provider_type(self) -> str:
+        return "aws"
 
 
 class TestBaseSchedulerStrategy:
@@ -89,7 +110,6 @@ class TestBaseSchedulerStrategy:
         strategy = ConcreteSchedulerStrategy(config_manager, logger)
 
         assert strategy.config_manager is config_manager
-        assert strategy.logger is logger
 
     def test_scheduler_port_methods_implemented(self):
         """Test that concrete implementation provides required SchedulerPort methods."""
@@ -99,7 +119,6 @@ class TestBaseSchedulerStrategy:
         strategy = ConcreteSchedulerStrategy(config_manager, logger)
 
         # Test all SchedulerPort methods are implemented
-        assert strategy.get_templates_file_path() == "/test/templates.json"
         assert strategy.get_config_file_path() == "/test/config.json"
         assert strategy.parse_request_data({"test": "data"}) == {"parsed": True}
         assert strategy.format_templates_response([]) == {"templates": []}
@@ -116,3 +135,38 @@ class TestBaseSchedulerStrategy:
 
         with pytest.raises(TypeError):
             BaseSchedulerStrategy(config_manager, logger)
+
+    def test_get_log_level_reads_from_injected_config(self):
+        """get_log_level returns level from injected config when no scheduler override."""
+        config_manager = Mock()
+        config_manager.app_config.scheduler.log_level = None
+        config_manager.get_logging_config.return_value = {"level": "DEBUG"}
+
+        strategy = ConcreteSchedulerStrategy(config_manager)
+        strategy._init_base(config_port=config_manager)
+
+        assert strategy.get_log_level() == "DEBUG"
+
+    def test_get_log_level_does_not_read_env_directly(self, monkeypatch):
+        """get_log_level does not fall back to os.environ for ORB_LOG_LEVEL."""
+        monkeypatch.setenv("ORB_LOG_LEVEL", "WARNING")
+
+        config_manager = Mock()
+        config_manager.app_config.scheduler.log_level = None
+        config_manager.get_logging_config.return_value = {}
+
+        strategy = ConcreteSchedulerStrategy(config_manager)
+        strategy._init_base(config_port=config_manager)
+
+        # No env fallback — returns hard default
+        assert strategy.get_log_level() == "INFO"
+
+    def test_coalesce_directory_uses_default_factory_when_no_override(self):
+        """_coalesce_directory calls default_factory when config and env are absent."""
+        strategy = ConcreteSchedulerStrategy()
+        result = strategy._coalesce_directory(
+            config_override=None,
+            env_var_name="NONEXISTENT_VAR",
+            default_factory=lambda: "/default/path",
+        )
+        assert result == "/default/path"

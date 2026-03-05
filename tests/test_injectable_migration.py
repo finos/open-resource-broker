@@ -79,9 +79,62 @@ class MockConfigurationPort(ConfigurationPort):
         """Get provider configuration."""
         return self._config.get("provider", {})
 
+    def get_provider_instance_config(self, provider_name: str) -> Any:
+        """Get configuration for a specific provider instance."""
+        providers = self._config.get("providers", [])
+        for p in providers:
+            if p.get("name") == provider_name:
+                return p
+        return None
+
+    def get_validation_config(self) -> dict[str, Any]:
+        """Get validation configuration."""
+        return self._config.get("validation", {})
+
+    def get_metrics_config(self) -> dict[str, Any]:
+        """Get metrics configuration."""
+        return self._config.get("metrics", {})
+
+    def get_active_provider_override(self) -> str | None:
+        """Get current provider override from CLI."""
+        return None
+
+    def override_provider_instance(self, provider_name: str) -> None:
+        """Override the active provider instance."""
+
+    def override_provider_region(self, region: str) -> None:
+        """Override the provider region for this session."""
+
+    def override_provider_profile(self, profile: str) -> None:
+        """Override the provider credential profile for this session."""
+
+    def get_effective_region(self, default_region: str = "us-east-1") -> str:
+        """Get effective provider region."""
+        return default_region
+
+    def get_effective_profile(self, default_profile: str = "default") -> str:
+        """Get effective provider credential profile."""
+        return default_profile
+
+    def get_configuration_sources(self) -> dict[str, Any]:
+        """Get configuration source information."""
+        return {}
+
+    def set_configuration_value(self, key: str, value: Any) -> None:
+        """Set configuration value."""
+        self.set(key, value)
+
+    def get_configuration_value(self, key: str, default: Any = None) -> Any:
+        """Get configuration value."""
+        return self.get(key, default)
+
     def get_storage_config(self) -> dict[str, Any]:
         """Get storage configuration."""
         return self._config.get("storage", {})
+
+    def get_cache_dir(self) -> str:
+        """Get cache directory."""
+        return "/tmp/orb-test/cache"
 
     def get_events_config(self) -> dict[str, Any]:
         """Get events configuration."""
@@ -91,6 +144,23 @@ class MockConfigurationPort(ConfigurationPort):
         """Get logging configuration."""
         return self._config.get("logging", {})
 
+    def get_resource_prefix(self, resource_type: str) -> str:
+        """Get resource prefix for a given resource type."""
+        return ""
+
+    def get_cleanup_config(self) -> dict[str, Any]:
+        """Get cleanup configuration."""
+        return {
+            "enabled": True,
+            "delete_launch_template": True,
+            "dry_run": False,
+            "resources": {"asg": True, "ec2_fleet": True, "spot_fleet": True},
+        }
+
+    def get_config_file_path(self) -> str:
+        """Get the config file path."""
+        return ""
+
     def get_native_spec_config(self) -> dict[str, Any]:
         """Get native spec configuration."""
         return self._config.get("native_spec", {})
@@ -98,6 +168,10 @@ class MockConfigurationPort(ConfigurationPort):
     def get_package_info(self) -> dict[str, Any]:
         """Get package information."""
         return {"name": "test", "version": "0.0.1"}
+
+    def get_handler_capabilities(self) -> dict[str, Any]:
+        """Get per-API handler capabilities."""
+        return {}
 
 
 class TestInjectableMigration(unittest.TestCase):
@@ -167,13 +241,6 @@ class TestInjectableMigration(unittest.TestCase):
         self.container.register_singleton(AWSInstanceManager)
         instance_manager = self.container.get(AWSInstanceManager)
         self.assertIsNotNone(instance_manager)
-
-        # Register and test AWSResourceManagerImpl
-        from providers.aws.managers.aws_resource_manager import AWSResourceManagerImpl
-
-        self.container.register_singleton(AWSResourceManagerImpl)
-        resource_manager = self.container.get(AWSResourceManagerImpl)
-        self.assertIsNotNone(resource_manager)
 
 
 if __name__ == "__main__":

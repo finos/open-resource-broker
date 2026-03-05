@@ -145,9 +145,6 @@ def hash_string(value: str, algorithm: str = "sha256") -> str:
     if algorithm == "md5":
         # Use usedforsecurity=False to indicate this is not for security purposes
         return hashlib.md5(value.encode(), usedforsecurity=False).hexdigest()
-    elif algorithm == "sha1":
-        # Use usedforsecurity=False to indicate this is not for security purposes
-        return hashlib.sha1(value.encode(), usedforsecurity=False).hexdigest()
     elif algorithm == "sha256":
         return hashlib.sha256(value.encode()).hexdigest()
     elif algorithm == "sha512":
@@ -240,3 +237,23 @@ def convert_dict_keys(data: dict[str, Any], case_type: str) -> dict[str, Any]:
             result[new_key] = value
 
     return result
+
+
+def extract_provider_type(provider_name: str) -> str:
+    """Extract provider type from a provider name.
+
+    Handles both underscore-separated (e.g. 'aws_us_east_1' -> 'aws')
+    and hyphen-separated (e.g. 'aws-us-east-1' -> 'aws') formats.
+    Falls back to the full name if no separator is found.
+
+    Args:
+        provider_name: Provider name string
+
+    Returns:
+        Provider type (the prefix before the first separator)
+    """
+    if "_" in provider_name:
+        return provider_name.split("_")[0]
+    if "-" in provider_name:
+        return provider_name.split("-")[0]
+    return provider_name

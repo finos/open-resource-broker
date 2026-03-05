@@ -9,33 +9,46 @@ This module provides registration functions for different scheduler strategies:
 
 from typing import TYPE_CHECKING, Any
 
-from domain.base.ports.configuration_port import ConfigurationPort
-
 if TYPE_CHECKING:
     from domain.base.ports.scheduler_port import SchedulerPort
-    from infrastructure.di.container import DIContainer
-    from infrastructure.registry.scheduler_registry import SchedulerRegistry
+    from infrastructure.scheduler.registry import SchedulerRegistry
 
 
-def create_symphony_hostfactory_strategy(container: "DIContainer") -> "SchedulerPort":
+def create_symphony_hostfactory_strategy(config: Any) -> "SchedulerPort":
     """Create Symphony HostFactory scheduler strategy.
 
     Args:
-        container: Dependency injection container
+        config: Scheduler configuration — either a DI container (during normal
+            startup) or a plain dict (non-container call paths).
 
     Returns:
         SchedulerPort: Symphony HostFactory scheduler strategy instance
     """
-    from domain.base.ports import LoggingPort
+    from application.services.provider_registry_service import ProviderRegistryService
+    from domain.base.ports.configuration_port import ConfigurationPort
+    from domain.base.ports.logging_port import LoggingPort
     from domain.template.ports.template_defaults_port import TemplateDefaultsPort
     from infrastructure.scheduler.hostfactory.hostfactory_strategy import (
         HostFactorySchedulerStrategy,
     )
 
-    config_manager = container.get(ConfigurationPort)
-    logger = container.get(LoggingPort)
-    template_defaults_service = container.get(TemplateDefaultsPort)
-    return HostFactorySchedulerStrategy(config_manager, logger, template_defaults_service)
+    template_defaults_service = None
+    config_port = None
+    logger = None
+    provider_registry_service = None
+
+    if hasattr(config, "get_optional"):
+        template_defaults_service = config.get_optional(TemplateDefaultsPort)
+        config_port = config.get_optional(ConfigurationPort)
+        logger = config.get_optional(LoggingPort)
+        provider_registry_service = config.get_optional(ProviderRegistryService)
+
+    return HostFactorySchedulerStrategy(
+        template_defaults_service=template_defaults_service,
+        config_port=config_port,
+        logger=logger,
+        provider_registry_service=provider_registry_service,
+    )
 
 
 def create_hostfactory_config(data: dict[str, Any]) -> Any:
@@ -44,59 +57,62 @@ def create_hostfactory_config(data: dict[str, Any]) -> Any:
 
 
 def register_symphony_hostfactory_scheduler(
-    registry: "SchedulerRegistry" = None,
+    registry: "SchedulerRegistry | None" = None,
 ) -> None:
-    """Register Symphony HostFactory scheduler."""
+    """Register Symphony HostFactory scheduler (idempotent)."""
     if registry is None:
-        from infrastructure.registry.scheduler_registry import get_scheduler_registry
+        from infrastructure.scheduler.registry import get_scheduler_registry
 
         registry = get_scheduler_registry()
 
-    try:
-        registry.register(
-            scheduler_type="hostfactory",
-            strategy_factory=create_symphony_hostfactory_strategy,
-            config_factory=create_hostfactory_config,
-        )
+    # Registry handles idempotent registration
+    registry.register(
+        type_name="hostfactory",
+        strategy_factory=create_symphony_hostfactory_strategy,
+        config_factory=create_hostfactory_config,
+    )
 
-        # Also register with 'hf' alias
-        registry.register(
-            scheduler_type="hf",
-            strategy_factory=create_symphony_hostfactory_strategy,
-            config_factory=create_hostfactory_config,
-        )
-    except ValueError as e:
-        # Ignore if already registered (idempotent registration)
-        if "already registered" in str(e):
-            from infrastructure.logging.logger import get_logger
-
-            logger = get_logger(__name__)
-            logger.debug("Scheduler types already registered: %s", str(e))
-        else:
-            raise
-    except Exception as e:
-        from infrastructure.logging.logger import get_logger
-
-        logger = get_logger(__name__)
-        logger.error("Failed to register Symphony HostFactory scheduler: %s", str(e))
-        raise
+    # Also register with 'hf' alias
+    registry.register(
+        type_name="hf",
+        strategy_factory=create_symphony_hostfactory_strategy,
+        config_factory=create_hostfactory_config,
+    )
 
 
-def create_default_strategy(container: "DIContainer") -> "SchedulerPort":
+def create_default_strategy(config: Any) -> "SchedulerPort":
     """Create default scheduler strategy.
 
     Args:
-        container: Dependency injection container
+        config: Scheduler configuration — either a DI container (during normal
+            startup) or a plain dict (non-container call paths).
 
     Returns:
         SchedulerPort: Default scheduler strategy instance
     """
-    from domain.base.ports import LoggingPort
+    from application.services.provider_registry_service import ProviderRegistryService
+    from domain.base.ports.configuration_port import ConfigurationPort
+    from domain.base.ports.logging_port import LoggingPort
+    from domain.template.ports.template_defaults_port import TemplateDefaultsPort
     from infrastructure.scheduler.default.default_strategy import DefaultSchedulerStrategy
 
-    config_manager = container.get(ConfigurationPort)
-    logger = container.get(LoggingPort)
-    return DefaultSchedulerStrategy(config_manager, logger)
+    template_defaults_service = None
+    config_port = None
+    logger = None
+    provider_registry_service = None
+
+    if hasattr(config, "get_optional"):
+        template_defaults_service = config.get_optional(TemplateDefaultsPort)
+        config_port = config.get_optional(ConfigurationPort)
+        logger = config.get_optional(LoggingPort)
+        provider_registry_service = config.get_optional(ProviderRegistryService)
+
+    return DefaultSchedulerStrategy(
+        template_defaults_service=template_defaults_service,
+        config_port=config_port,
+        logger=logger,
+        provider_registry_service=provider_registry_service,
+    )
 
 
 def create_default_config(data: dict[str, Any]) -> Any:
@@ -104,34 +120,19 @@ def create_default_config(data: dict[str, Any]) -> Any:
     return data
 
 
-def register_default_scheduler(registry: "SchedulerRegistry" = None) -> None:
-    """Register default scheduler."""
+def register_default_scheduler(registry: "SchedulerRegistry | None" = None) -> None:
+    """Register default scheduler (idempotent)."""
     if registry is None:
-        from infrastructure.registry.scheduler_registry import get_scheduler_registry
+        from infrastructure.scheduler.registry import get_scheduler_registry
 
         registry = get_scheduler_registry()
 
-    try:
-        registry.register(
-            scheduler_type="default",
-            strategy_factory=create_default_strategy,
-            config_factory=create_default_config,
-        )
-    except ValueError as e:
-        # Ignore if already registered (idempotent registration)
-        if "already registered" in str(e):
-            from infrastructure.logging.logger import get_logger
-
-            logger = get_logger(__name__)
-            logger.debug("Default scheduler already registered: %s", str(e))
-        else:
-            raise
-    except Exception as e:
-        from infrastructure.logging.logger import get_logger
-
-        logger = get_logger(__name__)
-        logger.error("Failed to register default scheduler: %s", str(e))
-        raise
+    # Registry handles idempotent registration
+    registry.register(
+        type_name="default",
+        strategy_factory=create_default_strategy,
+        config_factory=create_default_config,
+    )
 
 
 def register_all_scheduler_types() -> None:
@@ -169,36 +170,7 @@ def register_active_scheduler_only(scheduler_type: str = "default") -> bool:
         return True
 
     except Exception as e:
-        logger.error("Failed to register active scheduler '%s': %s", scheduler_type, e)
-        return False
-
-
-def register_scheduler_on_demand(scheduler_type: str) -> bool:
-    """
-    Register a specific scheduler type on demand .
-
-    Args:
-        scheduler_type: Name of the scheduler type to register
-
-    Returns:
-        True if registration was successful, False otherwise
-    """
-    from infrastructure.logging.logger import get_logger
-
-    logger = get_logger(__name__)
-
-    try:
-        if scheduler_type in ["hostfactory", "hf"]:
-            register_symphony_hostfactory_scheduler()
-        elif scheduler_type == "default":
-            register_default_scheduler()
-        else:
-            logger.error("Unknown scheduler type: %s", scheduler_type)
-            return False
-
-        logger.info("Successfully registered scheduler type on demand: %s", scheduler_type)
-        return True
-
-    except Exception as e:
-        logger.error("Failed to register scheduler type '%s' on demand: %s", scheduler_type, e)
+        logger.error(
+            "Failed to register active scheduler '%s': %s", scheduler_type, e, exc_info=True
+        )
         return False

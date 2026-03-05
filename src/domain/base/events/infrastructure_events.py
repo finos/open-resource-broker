@@ -22,7 +22,7 @@ class ResourceEvent(InfrastructureEvent):
 class ResourceCreatedEvent(ResourceEvent):
     """Event raised when an infrastructure resource is created."""
 
-    resource_id: Optional[str] = None  # Generic resource identifier
+    resource_id: Optional[str] = None  # type: ignore[assignment]  # Generic resource identifier
     creation_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

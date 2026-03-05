@@ -7,6 +7,7 @@ from typing import Any, Callable, Optional, Union
 
 from _package import PACKAGE_NAME, __version__
 from infrastructure.logging.logger import get_logger
+from infrastructure.utilities.json_utils import JSONParseError, safe_json_dumps, safe_json_loads
 
 
 class MCPMessageType(Enum):
@@ -151,7 +152,7 @@ class OpenResourceBrokerMCPServer:
         """
         try:
             # Parse message
-            data = json.loads(message)
+            data = safe_json_loads(message, raise_on_error=True, context="MCP message parsing")
             mcp_msg = MCPMessage(**data)
 
             # Handle different message types
@@ -162,15 +163,17 @@ class OpenResourceBrokerMCPServer:
                     id=mcp_msg.id, error={"code": -32600, "message": "Invalid Request"}
                 )
 
-            return json.dumps(response.__dict__, default=str)
+            return safe_json_dumps(
+                response.__dict__, default="{}", context="MCP response serialization"
+            )
 
-        except json.JSONDecodeError:
+        except JSONParseError:
             error_response = MCPMessage(error={"code": -32700, "message": "Parse error"})
-            return json.dumps(error_response.__dict__)
+            return safe_json_dumps(error_response.__dict__, default="{}")
         except Exception as e:
-            self.logger.error("Error handling MCP message: %s", e)
+            self.logger.error("Error handling MCP message: %s", e, exc_info=True)
             error_response = MCPMessage(
-                id=getattr(mcp_msg, "id", None) if "mcp_msg" in locals() else None,
+                id=getattr(mcp_msg, "id", None) if "mcp_msg" in dir() else None,  # type: ignore[possibly-undefined]
                 error={"code": -32603, "message": f"Internal error: {e!s}"},
             )
             return json.dumps(error_response.__dict__)
@@ -204,7 +207,7 @@ class OpenResourceBrokerMCPServer:
             return MCPMessage(id=message.id, result=result)
 
         except Exception as e:
-            self.logger.error("Error handling method %s: %s", method, e)
+            self.logger.error("Error handling method %s: %s", method, e, exc_info=True)
             return MCPMessage(
                 id=message.id,
                 error={"code": -32603, "message": f"Internal error: {e!s}"},
@@ -375,13 +378,13 @@ class OpenResourceBrokerMCPServer:
 
         if "template" in tool_name:
             return {"template_id": common_props["template_id"]}
-        elif "request" in tool_name:
-            return {"request_id": common_props["request_id"]}
         elif "machine" in tool_name:
             return {
                 "template_id": common_props["template_id"],
                 "count": common_props["count"],
             }
+        elif "request" in tool_name:
+            return {"request_id": common_props["request_id"]}
         else:
             return {"provider": common_props["provider"]}
 
@@ -400,8 +403,14 @@ class OpenResourceBrokerMCPServer:
 
     async def _get_machines_resource(self, uri: str) -> dict[str, Any]:
         """Get machines resource data."""
-        # For now, return empty list - would need actual machine listing
-        return {"machines": [], "message": "Machine listing not yet implemented"}
+        return {
+            "error": "Not implemented",
+            "endpoint": "machines resource",
+            "message": (
+                "Machine listing is planned but not yet available. "
+                "Use the list_return_requests tool to check provisioning status."
+            ),
+        }
 
     async def _get_providers_resource(self, uri: str) -> dict[str, Any]:
         """Get providers resource data."""
@@ -440,7 +449,22 @@ Use the available MCP tools to diagnose the issue."""
 
     def _generate_best_practices_prompt(self, arguments: dict[str, Any]) -> str:
         """Generate best practices prompt."""
-        provider = arguments.get("provider", "aws")
+        # Get first available provider as default
+        default_provider = "aws"  # Keep as fallback
+        try:
+            from providers.registry import get_provider_registry
+
+            registry = get_provider_registry()
+            registered_types = registry.get_registered_providers()
+            if registered_types:
+                default_provider = registered_types[0]
+        except Exception as e:
+            from infrastructure.logging.logger import get_logger
+
+            logger = get_logger(__name__)
+            logger.debug(f"Failed to get default provider: {e}")  # Use fallback
+
+        provider = arguments.get("provider", default_provider)
 
         return f"""Please provide infrastructure deployment best practices for {provider} using the Open Resource Broker.
 

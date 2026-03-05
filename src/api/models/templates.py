@@ -63,7 +63,7 @@ class GetAvailableTemplatesResponse(APIResponse):
     """Get available templates response model."""
 
     templates: list[Template] = Field(description="List of available templates")
-    message: str = Field(
+    message: str = Field(  # type: ignore[assignment]
         default="Get available templates success.",
         description="Any additional message the caller should know",
     )

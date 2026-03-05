@@ -127,7 +127,7 @@ class TestJinjaAdvancedRendering:
         context = {
             "user_data": "#!/bin/bash\necho 'Hello World'",
             "base_capacity": 10.7,
-            "environment": None,
+            # environment is intentionally omitted so default filter applies
         }
 
         result = self.renderer.render_spec(spec, context)

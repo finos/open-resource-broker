@@ -50,8 +50,6 @@ from .exceptions import (
 )
 from .value_objects import (
     ARN,
-    AllocationStrategy,
-    InstanceId,
     InstanceType,
     IPAddress,
     PriceType,
@@ -64,7 +62,6 @@ __all__: list[str] = [
     "ARN",
     "AggregateRepository",
     "AggregateRoot",
-    "AllocationStrategy",
     "BusinessRuleViolationError",
     "ConcurrencyError",
     "ConfigurationError",
@@ -103,11 +100,8 @@ __all__: list[str] = [
     "EntityNotFoundError",
     "EventPublisher",
     "IPAddress",
-    "IRepository",
-    "IUnitOfWork",
     "InfrastructureError",
     "InfrastructureEvent",
-    "InstanceId",
     "InstanceType",
     "InvariantViolationError",
     "PriceType",

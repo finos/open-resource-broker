@@ -18,6 +18,7 @@ from providers.base.strategy.provider_strategy import (
     ProviderOperation,
     ProviderStrategy,
 )
+from providers.base.strategy.selector_utils import is_strategy_suitable
 
 
 @injectable
@@ -40,12 +41,12 @@ class SelectionPolicy(str, Enum):
 class SelectionCriteria:
     """Criteria for strategy selection."""
 
-    required_capabilities: list[str] = None
+    required_capabilities: Optional[list[str]] = None
     min_success_rate: float = 0.0
     max_response_time_ms: float = float("inf")
     require_healthy: bool = True
-    exclude_strategies: list[str] = None
-    prefer_strategies: list[str] = None
+    exclude_strategies: Optional[list[str]] = None
+    prefer_strategies: Optional[list[str]] = None
     custom_filter: Optional[Callable[[ProviderStrategy, dict], bool]] = None
 
     def __post_init__(self) -> None:
@@ -64,7 +65,7 @@ class SelectionResult:
 
     selected_strategy: Optional[ProviderStrategy]
     selection_reason: str
-    alternatives: list[ProviderStrategy] = None
+    alternatives: Optional[list[ProviderStrategy]] = None
     selection_time_ms: float = 0.0
 
     def __post_init__(self) -> None:
@@ -84,7 +85,7 @@ class ProviderSelector(ABC):
     Abstract base class for provider strategy selectors.
 
     This class defines the interface for strategy selection algorithms
-    that can be used by the ProviderContext to choose the most appropriate
+    that can be used by the Provider Registry to choose the most appropriate
     strategy for a given operation.
     """
 
@@ -98,7 +99,7 @@ class ProviderSelector(ABC):
         strategies: dict[str, ProviderStrategy],
         metrics: dict[str, dict],
         operation: ProviderOperation,
-        criteria: SelectionCriteria = None,
+        criteria: Optional[SelectionCriteria] = None,
     ) -> SelectionResult:
         """
         Select the best strategy for the given operation.
@@ -123,14 +124,14 @@ class FirstAvailableSelector(ProviderSelector):
         strategies: dict[str, ProviderStrategy],
         metrics: dict[str, dict],
         operation: ProviderOperation,
-        criteria: SelectionCriteria = None,
+        criteria: Optional[SelectionCriteria] = None,
     ) -> SelectionResult:
         """Select the first available strategy."""
         start_time = time.time()
         criteria = criteria or SelectionCriteria()
 
         for strategy_type, strategy in strategies.items():
-            if self._is_strategy_suitable(strategy, metrics.get(strategy_type), criteria):
+            if is_strategy_suitable(strategy, metrics.get(strategy_type), criteria):
                 selection_time = (time.time() - start_time) * 1000
                 return SelectionResult(
                     selected_strategy=strategy,
@@ -144,49 +145,6 @@ class FirstAvailableSelector(ProviderSelector):
             selection_reason="No suitable strategy found",
             selection_time_ms=selection_time,
         )
-
-    def _is_strategy_suitable(
-        self,
-        strategy: ProviderStrategy,
-        metrics: Optional[dict],
-        criteria: SelectionCriteria,
-    ) -> bool:
-        """Check if strategy meets the criteria."""
-        # Check exclusions
-        if strategy.provider_type in criteria.exclude_strategies:
-            return False
-
-        # Check health if required
-        if criteria.require_healthy:
-            try:
-                health = strategy.check_health()
-                if not health.is_healthy:
-                    return False
-            except Exception:
-                return False
-
-        # Check capabilities
-        if criteria.required_capabilities:
-            try:
-                capabilities = strategy.get_capabilities()
-                for required_cap in criteria.required_capabilities:
-                    if not capabilities.get_feature(required_cap, False):
-                        return False
-            except Exception:
-                return False
-
-        # Check metrics if available
-        if metrics:
-            if metrics.success_rate < criteria.min_success_rate:
-                return False
-            if metrics.average_response_time_ms > criteria.max_response_time_ms:
-                return False
-
-        # Check custom filter
-        if criteria.custom_filter and not criteria.custom_filter(strategy, metrics):
-            return False
-
-        return True
 
 
 @injectable
@@ -203,7 +161,7 @@ class RoundRobinSelector(ProviderSelector):
         strategies: dict[str, ProviderStrategy],
         metrics: dict[str, dict],
         operation: ProviderOperation,
-        criteria: SelectionCriteria = None,
+        criteria: Optional[SelectionCriteria] = None,
     ) -> SelectionResult:
         """Select strategy using round-robin algorithm."""
         start_time = time.time()
@@ -212,7 +170,7 @@ class RoundRobinSelector(ProviderSelector):
         # Filter suitable strategies
         suitable_strategies = []
         for strategy_type, strategy in strategies.items():
-            if self._is_strategy_suitable(strategy, metrics.get(strategy_type), criteria):
+            if is_strategy_suitable(strategy, metrics.get(strategy_type), criteria):
                 suitable_strategies.append((strategy_type, strategy))
 
         if not suitable_strategies:
@@ -235,15 +193,6 @@ class RoundRobinSelector(ProviderSelector):
             selection_time_ms=selection_time,
         )
 
-    def _is_strategy_suitable(
-        self,
-        strategy: ProviderStrategy,
-        metrics: Optional[dict],
-        criteria: SelectionCriteria,
-    ) -> bool:
-        """Reuse the suitability check from FirstAvailableSelector."""
-        return FirstAvailableSelector._is_strategy_suitable(self, strategy, metrics, criteria)
-
 
 @injectable
 class PerformanceBasedSelector(ProviderSelector):
@@ -254,7 +203,7 @@ class PerformanceBasedSelector(ProviderSelector):
         strategies: dict[str, ProviderStrategy],
         metrics: dict[str, dict],
         operation: ProviderOperation,
-        criteria: SelectionCriteria = None,
+        criteria: Optional[SelectionCriteria] = None,
     ) -> SelectionResult:
         """Select strategy with best performance metrics."""
         start_time = time.time()
@@ -264,7 +213,7 @@ class PerformanceBasedSelector(ProviderSelector):
         scored_strategies = []
         for strategy_type, strategy in strategies.items():
             strategy_metrics = metrics.get(strategy_type)
-            if self._is_strategy_suitable(strategy, strategy_metrics, criteria):
+            if is_strategy_suitable(strategy, strategy_metrics, criteria):
                 score = self._calculate_performance_score(strategy_metrics)
                 scored_strategies.append((score, strategy_type, strategy))
 
@@ -290,33 +239,31 @@ class PerformanceBasedSelector(ProviderSelector):
 
     def _calculate_performance_score(self, metrics: Optional[dict]) -> float:
         """Calculate performance score for a strategy."""
-        if not metrics or metrics.total_operations == 0:
+        if not metrics:
+            return 0.0
+
+        # Check if metrics has required attributes
+        total_ops = metrics.get("total_operations", 0)
+        if total_ops == 0:
             return 0.0
 
         # Weighted score based on success rate and response time
         success_weight = 0.7
         speed_weight = 0.3
 
-        success_score = metrics.success_rate / 100.0  # Normalize to 0-1
+        success_rate = metrics.get("success_rate", 0.0)
+        success_score = success_rate / 100.0  # Normalize to 0-1
 
         # Inverse response time score (faster = better)
         # Use 1000ms as baseline - strategies faster than this get bonus
         baseline_response_time = 1000.0
-        if metrics.average_response_time_ms > 0:
-            speed_score = min(1.0, baseline_response_time / metrics.average_response_time_ms)
+        avg_response_time = metrics.get("average_response_time_ms", 0.0)
+        if avg_response_time > 0:
+            speed_score = min(1.0, baseline_response_time / avg_response_time)
         else:
             speed_score = 1.0
 
         return (success_score * success_weight) + (speed_score * speed_weight)
-
-    def _is_strategy_suitable(
-        self,
-        strategy: ProviderStrategy,
-        metrics: Optional[dict],
-        criteria: SelectionCriteria,
-    ) -> bool:
-        """Reuse the suitability check from FirstAvailableSelector."""
-        return FirstAvailableSelector._is_strategy_suitable(self, strategy, metrics, criteria)
 
 
 @injectable
@@ -328,7 +275,7 @@ class RandomSelector(ProviderSelector):
         strategies: dict[str, ProviderStrategy],
         metrics: dict[str, dict],
         operation: ProviderOperation,
-        criteria: SelectionCriteria = None,
+        criteria: Optional[SelectionCriteria] = None,
     ) -> SelectionResult:
         """Select strategy randomly."""
         start_time = time.time()
@@ -337,7 +284,7 @@ class RandomSelector(ProviderSelector):
         # Filter suitable strategies
         suitable_strategies = []
         for strategy_type, strategy in strategies.items():
-            if self._is_strategy_suitable(strategy, metrics.get(strategy_type), criteria):
+            if is_strategy_suitable(strategy, metrics.get(strategy_type), criteria):
                 suitable_strategies.append((strategy_type, strategy))
 
         if not suitable_strategies:
@@ -358,15 +305,6 @@ class RandomSelector(ProviderSelector):
             alternatives=[s[1] for s in suitable_strategies if s[1] != selected_strategy],
             selection_time_ms=selection_time,
         )
-
-    def _is_strategy_suitable(
-        self,
-        strategy: ProviderStrategy,
-        metrics: Optional[dict],
-        criteria: SelectionCriteria,
-    ) -> bool:
-        """Reuse the suitability check from FirstAvailableSelector."""
-        return FirstAvailableSelector._is_strategy_suitable(self, strategy, metrics, criteria)
 
 
 class SelectorFactory:

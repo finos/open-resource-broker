@@ -16,6 +16,7 @@ from application.decorators import (
 )
 
 from .exceptions import HandlerDiscoveryError, MethodExecutionError
+from .parameter_mapping import ParameterMapper
 
 
 @dataclass
@@ -116,7 +117,7 @@ class SDKMethodDiscovery:
 
         Examples:
         - ListTemplatesQuery -> list_templates
-        - GetRequestStatusQuery -> get_request_status
+        - GetRequestQuery -> get_request
         """
         name = query_type.__name__
         if name.endswith("Query"):
@@ -135,6 +136,61 @@ class SDKMethodDiscovery:
         if name.endswith("Command"):
             name = name[:-7]  # Remove 'Command'
         return self._camel_to_snake(name)
+
+    def _standardize_return_type(self, result: Any) -> Any:
+        """
+        Standardize return type to dict format for consistent SDK API.
+
+        Args:
+            result: Raw result from CQRS handler (DTO, list of DTOs, or primitive)
+
+        Returns:
+            Standardized result (dict, list of dicts, or primitive) with JSON-serializable values
+        """
+        if result is None:
+            return None
+
+        # Single DTO with to_dict method
+        if hasattr(result, "to_dict"):
+            return self._make_json_serializable(result.to_dict())
+
+        # List of DTOs
+        if isinstance(result, list) and result and hasattr(result[0], "to_dict"):
+            return [self._make_json_serializable(item.to_dict()) for item in result]
+
+        # Already a dict or primitive type
+        return self._make_json_serializable(result) if isinstance(result, dict) else result
+
+    def _make_json_serializable(self, data: dict) -> dict:
+        """
+        Convert dict values to JSON-serializable format.
+
+        Args:
+            data: Dictionary that may contain non-JSON-serializable values
+
+        Returns:
+            Dictionary with JSON-serializable values
+        """
+        from datetime import datetime
+
+        result = {}
+        for key, value in data.items():
+            if isinstance(value, datetime):
+                result[key] = value.isoformat()
+            elif isinstance(value, dict):
+                result[key] = self._make_json_serializable(value)
+            elif isinstance(value, list):
+                result[key] = [
+                    item.isoformat()
+                    if isinstance(item, datetime)
+                    else self._make_json_serializable(item)
+                    if isinstance(item, dict)
+                    else item
+                    for item in value
+                ]
+            else:
+                result[key] = value
+        return result
 
     def _camel_to_snake(self, name: str) -> str:
         """Convert CamelCase to snake_case."""
@@ -163,12 +219,18 @@ class SDKMethodDiscovery:
             if hasattr(handler_type, "__dataclass_fields__"):
                 # Pydantic/dataclass model
                 for field_name, field in handler_type.__dataclass_fields__.items():
+                    import dataclasses
+
+                    is_required = (
+                        field.default is dataclasses.MISSING
+                        and field.default_factory is dataclasses.MISSING  # type: ignore[misc]
+                    )
                     parameters[field_name] = {
                         "type": type_hints.get(field_name, "Any"),
-                        "required": field.default == field.default_factory(),
+                        "required": is_required,
                         "description": f"Parameter for {field_name}",
                     }
-                    if parameters[field_name]["required"]:
+                    if is_required:
                         required_params.append(field_name)
 
             # Generate description
@@ -209,20 +271,27 @@ class SDKMethodDiscovery:
 
         async def sdk_method(**kwargs):
             try:
-                # Create query instance
-                query = query_type(**kwargs)
+                # Map CLI-style parameters to CQRS parameters
+                mapped_kwargs = ParameterMapper.map_parameters(query_type, kwargs)
+
+                # Create query instance with mapped parameters
+                query = query_type(**mapped_kwargs)
 
                 # Execute via query bus directly
                 result = await query_bus.execute(query)
 
-                # Return result (DTOs already have camelCase support)
-                return result
+                # Standardize return type to dict
+                return self._standardize_return_type(result)
 
             except Exception as e:
                 raise MethodExecutionError(
                     f"Failed to execute {method_info.name}: {e!s}",
                     method_name=method_info.name,
-                    details={"query_type": query_type.__name__, "kwargs": kwargs},
+                    details={
+                        "query_type": query_type.__name__,
+                        "original_kwargs": kwargs,
+                        "mapped_kwargs": ParameterMapper.map_parameters(query_type, kwargs),
+                    },
                 )
 
         # Add metadata to the method
@@ -239,20 +308,27 @@ class SDKMethodDiscovery:
 
         async def sdk_method(**kwargs):
             try:
-                # Create command instance
-                command = command_type(**kwargs)
+                # Map CLI-style parameters to CQRS parameters
+                mapped_kwargs = ParameterMapper.map_parameters(command_type, kwargs)
+
+                # Create command instance with mapped parameters
+                command = command_type(**mapped_kwargs)
 
                 # Execute via command bus directly
                 result = await command_bus.execute(command)
 
-                # Return result
-                return result
+                # Standardize return type to dict
+                return self._standardize_return_type(result)
 
             except Exception as e:
                 raise MethodExecutionError(
                     f"Failed to execute {method_info.name}: {e!s}",
                     method_name=method_info.name,
-                    details={"command_type": command_type.__name__, "kwargs": kwargs},
+                    details={
+                        "command_type": command_type.__name__,
+                        "original_kwargs": kwargs,
+                        "mapped_kwargs": ParameterMapper.map_parameters(command_type, kwargs),
+                    },
                 )
 
         # Add metadata to the method

@@ -384,8 +384,8 @@ New providers can be added while maintaining HostFactory compatibility:
       "type": "aws"
     },
     {
-      "name": "azure-secondary",
-      "type": "azure"
+      "name": "provider1-secondary",
+      "type": "provider1"
     }
   ]
 }

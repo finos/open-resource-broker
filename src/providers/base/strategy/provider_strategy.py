@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from infrastructure.interfaces.provider import BaseProviderConfig
 
@@ -25,6 +25,7 @@ class ProviderOperationType(str, Enum):
     VALIDATE_TEMPLATE = "validate_template"
     GET_AVAILABLE_TEMPLATES = "get_available_templates"
     HEALTH_CHECK = "health_check"
+    RESOLVE_IMAGE = "resolve_image"
 
 
 @dataclass
@@ -55,6 +56,12 @@ class ProviderResult(BaseModel):
     error_code: Optional[str] = None
     metadata: dict[str, Any] = {}
 
+    @model_validator(mode="after")
+    def error_message_required_on_failure(self) -> "ProviderResult":
+        if not self.success and not self.error_message:
+            raise ValueError("error_message is required when success=False")
+        return self
+
     @classmethod
     def success_result(
         cls, data: Any = None, metadata: Optional[dict[str, Any]] = None
@@ -83,6 +90,7 @@ class ProviderCapabilities(BaseModel):
 
     provider_type: str
     supported_operations: list[ProviderOperationType]
+    supported_apis: list[str] = []
     features: dict[str, Any] = {}
     limitations: dict[str, Any] = {}
     performance_metrics: dict[str, Any] = {}
@@ -219,7 +227,7 @@ class ProviderStrategy(ABC):
         # Run sync version in thread pool to avoid blocking event loop
         loop = asyncio.get_event_loop()
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            return await loop.run_in_executor(executor, self.execute_operation, operation)
+            return await loop.run_in_executor(executor, self.execute_operation, operation)  # type: ignore[arg-type]
 
     @abstractmethod
     def get_capabilities(self) -> ProviderCapabilities:
@@ -273,6 +281,37 @@ class ProviderStrategy(ABC):
             Pattern string (e.g., "{type}_{profile}_{region}")
         """
 
+    def get_available_credential_sources(self) -> list[dict]:
+        """Get available credential sources for this provider.
+
+        Returns:
+            List of credential sources with name and description.
+            Default implementation returns empty list.
+        """
+        return []
+
+    def test_credentials(self, credential_source: Optional[str] = None, **kwargs) -> dict:
+        """Test credentials and return metadata.
+
+        Args:
+            credential_source: Optional credential source identifier
+            **kwargs: Additional parameters (region, etc.)
+
+        Returns:
+            Dict with success status and metadata.
+            Default implementation returns failure.
+        """
+        return {"success": False, "error": "Credential testing not implemented"}
+
+    def get_credential_requirements(self) -> dict:
+        """Get required credential parameters for this provider.
+
+        Returns:
+            Dict mapping parameter names to requirement info.
+            Default implementation returns empty dict.
+        """
+        return {}
+
     @abstractmethod
     def cleanup(self) -> None:
         """
@@ -282,6 +321,7 @@ class ProviderStrategy(ABC):
         to ensure resource cleanup (connections, handles, etc.).
         Default implementation does nothing - override if cleanup is needed.
         """
+        pass
 
     def __enter__(self) -> "ProviderStrategy":
         """Context manager entry."""

@@ -8,7 +8,7 @@ from domain.base.domain_interfaces import AggregateRepository
 from .template_aggregate import Template
 
 
-class TemplateRepository(AggregateRepository[Template]):
+class TemplateRepository(AggregateRepository[Template]):  # type: ignore[type-var]
     """Repository interface for template aggregates."""
 
     @abstractmethod

@@ -23,4 +23,4 @@
 # Container and deployment
 /Dockerfile @fgogolli @kirillsc @canonicalname
 /deployment/ @fgogolli @kirillsc @canonicalname
-/dev-tools/scripts/container-build.sh @fgogolli @kirillsc @canonicalname
+/dev-tools/container/container_build.sh @fgogolli @kirillsc @canonicalname

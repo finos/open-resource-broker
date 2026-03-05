@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.config.platform_dirs import (
+from config.platform_dirs import (
     get_config_location,
     get_logs_location,
     get_scripts_location,
@@ -15,6 +15,16 @@ from src.config.platform_dirs import (
     in_virtualenv,
     is_system_install,
     is_user_install,
+)
+
+# Helpers to disable venv detection in tests that need to reach later branches.
+# in_virtualenv() returns True if sys.prefix != sys.base_prefix OR if
+# sys.executable is outside sys.prefix (symlink-venv branch).
+# To reliably get False we must patch all three.
+_NO_VENV = dict(
+    prefix="/some/path",
+    base_prefix="/some/path",
+    executable="/some/path/bin/python",
 )
 
 
@@ -34,6 +44,7 @@ class TestInVirtualenv:
         with (
             patch.object(sys, "prefix", "/usr/local"),
             patch.object(sys, "base_prefix", "/usr/local"),
+            patch.object(sys, "executable", "/usr/local/bin/python"),
         ):
             assert in_virtualenv() is False
 
@@ -121,15 +132,18 @@ class TestGetConfigLocation:
 
     def test_env_override_empty_string(self):
         """Test empty ORB_CONFIG_DIR is ignored."""
-        with patch.dict(os.environ, {"ORB_CONFIG_DIR": ""}, clear=True):
-            with (
-                patch("pathlib.Path.cwd") as mock_cwd,
-                patch("pathlib.Path.exists") as mock_exists,
-            ):
-                mock_cwd.return_value = Path("/fallback")
-                mock_exists.return_value = False
-                result = get_config_location()
-                assert result == Path("/fallback/config")
+        with (
+            patch.dict(os.environ, {"ORB_CONFIG_DIR": ""}, clear=True),
+            patch("pathlib.Path.cwd") as mock_cwd,
+            patch("pathlib.Path.exists") as mock_exists,
+            patch.object(sys, "prefix", _NO_VENV["prefix"]),
+            patch.object(sys, "base_prefix", _NO_VENV["base_prefix"]),
+            patch.object(sys, "executable", _NO_VENV["executable"]),
+        ):
+            mock_cwd.return_value = Path("/fallback")
+            mock_exists.return_value = False
+            result = get_config_location()
+            assert result == Path("/fallback/config")
 
     def test_development_mode_current_dir(self):
         """Test development mode: pyproject.toml in current directory."""
@@ -137,6 +151,9 @@ class TestGetConfigLocation:
             patch.dict(os.environ, {}, clear=True),
             patch("pathlib.Path.cwd") as mock_cwd,
             patch("pathlib.Path.exists") as mock_exists,
+            patch.object(sys, "prefix", _NO_VENV["prefix"]),
+            patch.object(sys, "base_prefix", _NO_VENV["base_prefix"]),
+            patch.object(sys, "executable", _NO_VENV["executable"]),
         ):
             mock_cwd.return_value = Path("/dev/project")
             mock_exists.side_effect = lambda: True  # pyproject.toml exists
@@ -149,6 +166,9 @@ class TestGetConfigLocation:
         with (
             patch.dict(os.environ, {}, clear=True),
             patch("pathlib.Path.cwd") as mock_cwd,
+            patch.object(sys, "prefix", _NO_VENV["prefix"]),
+            patch.object(sys, "base_prefix", _NO_VENV["base_prefix"]),
+            patch.object(sys, "executable", _NO_VENV["executable"]),
         ):
             mock_cwd.return_value = Path("/dev/project/subdir")
 
@@ -168,6 +188,8 @@ class TestGetConfigLocation:
             patch("pathlib.Path.exists") as mock_exists,
             patch("pathlib.Path.home") as mock_home,
             patch.object(sys, "prefix", "/home/user/.local"),
+            patch.object(sys, "base_prefix", "/home/user/.local"),
+            patch.object(sys, "executable", "/home/user/.local/bin/python"),
         ):
             mock_cwd.return_value = Path("/somewhere")
             mock_exists.return_value = False
@@ -184,6 +206,8 @@ class TestGetConfigLocation:
             patch("pathlib.Path.exists") as mock_exists,
             patch("pathlib.Path.home") as mock_home,
             patch.object(sys, "prefix", "/usr/local"),
+            patch.object(sys, "base_prefix", "/usr/local"),
+            patch.object(sys, "executable", "/usr/local/bin/python"),
         ):
             mock_cwd.return_value = Path("/somewhere")
             mock_exists.return_value = False
@@ -200,6 +224,8 @@ class TestGetConfigLocation:
             patch("pathlib.Path.exists") as mock_exists,
             patch("pathlib.Path.home") as mock_home,
             patch.object(sys, "prefix", "/opt/python3.11"),
+            patch.object(sys, "base_prefix", "/opt/python3.11"),
+            patch.object(sys, "executable", "/opt/python3.11/bin/python"),
         ):
             mock_cwd.return_value = Path("/somewhere")
             mock_exists.return_value = False
@@ -217,6 +243,7 @@ class TestGetConfigLocation:
             patch("pathlib.Path.home") as mock_home,
             patch.object(sys, "prefix", "/project/.venv"),
             patch.object(sys, "base_prefix", "/usr/local"),
+            patch.object(sys, "executable", "/project/.venv/bin/python"),
         ):
             mock_cwd.return_value = Path("/somewhere")
             mock_exists.return_value = False
@@ -234,6 +261,7 @@ class TestGetConfigLocation:
             patch("pathlib.Path.home") as mock_home,
             patch.object(sys, "prefix", "/random/path"),
             patch.object(sys, "base_prefix", "/random/path"),
+            patch.object(sys, "executable", "/random/path/bin/python"),
         ):
             mock_cwd.return_value = Path("/fallback/dir")
             mock_exists.return_value = False
@@ -256,7 +284,7 @@ class TestGetWorkLocation:
         """Test work location relative to config location."""
         with (
             patch.dict(os.environ, {}, clear=True),
-            patch("src.config.platform_dirs.get_config_location") as mock_config,
+            patch("config.platform_dirs.get_config_location") as mock_config,
         ):
             mock_config.return_value = Path("/base/config")
 
@@ -267,7 +295,7 @@ class TestGetWorkLocation:
         """Test empty ORB_WORK_DIR is ignored."""
         with (
             patch.dict(os.environ, {"ORB_WORK_DIR": ""}, clear=True),
-            patch("src.config.platform_dirs.get_config_location") as mock_config,
+            patch("config.platform_dirs.get_config_location") as mock_config,
         ):
             mock_config.return_value = Path("/base/config")
 
@@ -288,7 +316,7 @@ class TestGetLogsLocation:
         """Test logs location relative to config location."""
         with (
             patch.dict(os.environ, {}, clear=True),
-            patch("src.config.platform_dirs.get_config_location") as mock_config,
+            patch("config.platform_dirs.get_config_location") as mock_config,
         ):
             mock_config.return_value = Path("/base/config")
 
@@ -299,7 +327,7 @@ class TestGetLogsLocation:
         """Test empty ORB_LOG_DIR is ignored."""
         with (
             patch.dict(os.environ, {"ORB_LOG_DIR": ""}, clear=True),
-            patch("src.config.platform_dirs.get_config_location") as mock_config,
+            patch("config.platform_dirs.get_config_location") as mock_config,
         ):
             mock_config.return_value = Path("/base/config")
 
@@ -312,7 +340,7 @@ class TestGetScriptsLocation:
 
     def test_relative_to_config(self):
         """Test scripts location relative to config location."""
-        with patch("src.config.platform_dirs.get_config_location") as mock_config:
+        with patch("config.platform_dirs.get_config_location") as mock_config:
             mock_config.return_value = Path("/base/config")
 
             result = get_scripts_location()
@@ -340,7 +368,7 @@ class TestEnvironmentOverrides:
         """Test partial environment variable overrides."""
         with (
             patch.dict(os.environ, {"ORB_CONFIG_DIR": "/env/config"}, clear=True),
-            patch("src.config.platform_dirs.get_config_location") as mock_config,
+            patch("config.platform_dirs.get_config_location") as mock_config,
         ):
             # Config uses env var
             assert get_config_location() == Path("/env/config")
@@ -387,6 +415,7 @@ class TestEdgeCases:
             patch("pathlib.Path.home") as mock_home,
             patch.object(sys, "prefix", "/some/path"),
             patch.object(sys, "base_prefix", "/some/path"),
+            patch.object(sys, "executable", "/some/path/bin/python"),
         ):
             mock_cwd.return_value = Path("/deep/nested/directory")
             mock_exists.return_value = False  # No pyproject.toml anywhere
@@ -400,6 +429,9 @@ class TestEdgeCases:
         with (
             patch.dict(os.environ, {}, clear=True),
             patch("pathlib.Path.cwd") as mock_cwd,
+            patch.object(sys, "prefix", _NO_VENV["prefix"]),
+            patch.object(sys, "base_prefix", _NO_VENV["base_prefix"]),
+            patch.object(sys, "executable", _NO_VENV["executable"]),
         ):
             mock_cwd.side_effect = PermissionError("Permission denied")
 

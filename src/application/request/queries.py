@@ -5,20 +5,15 @@ from typing import Optional
 from application.dto.base import BaseQuery
 
 
-class GetRequestStatusQuery(BaseQuery):
-    """Query to get request status."""
-
-    request_id: str
-    include_machines: bool = True
-
-
 class ListRequestsQuery(BaseQuery):
     """Query to list requests with optional filtering."""
 
+    provider_name: Optional[str] = None
     status: Optional[str] = None
     template_id: Optional[str] = None
     limit: int = 50
     offset: int = 0
+    filter_expressions: list[str] = []
 
 
 class GetRequestHistoryQuery(BaseQuery):
@@ -33,6 +28,7 @@ class GetActiveRequestsQuery(BaseQuery):
 
     template_id: Optional[str] = None
     limit: int = 100
+    filter_expressions: list[str] = []
 
 
 class GetRequestMetricsQuery(BaseQuery):

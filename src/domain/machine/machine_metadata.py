@@ -74,7 +74,7 @@ class MachineConfiguration(ValueObject):
 
     def to_dict(self) -> dict[str, Any]:
         """Convert configuration to dictionary."""
-        result = {
+        config_dict = {
             "instanceType": self.instance_type,
             "privateIpAddress": str(self.private_ip),
             "providerApi": self.provider_api,
@@ -83,11 +83,11 @@ class MachineConfiguration(ValueObject):
         }
 
         if self.public_ip:
-            result["publicIpAddress"] = str(self.public_ip)
+            config_dict["publicIpAddress"] = str(self.public_ip)
         if self.cloud_host_id:
-            result["cloudHostId"] = self.cloud_host_id
+            config_dict["cloudHostId"] = self.cloud_host_id
 
-        return result
+        return config_dict
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> MachineConfiguration:
@@ -105,8 +105,12 @@ class MachineConfiguration(ValueObject):
         )
 
 
-class MachineEvent(ValueObject):
-    """Machine lifecycle event."""
+class MachineHistoryEvent(ValueObject):
+    """Machine lifecycle history record (state transition log entry).
+
+    This is a value object capturing a historical state change, not a domain event.
+    For domain events see domain.base.events.domain_events.MachineEvent.
+    """
 
     timestamp: datetime
     event_type: str
@@ -115,14 +119,14 @@ class MachineEvent(ValueObject):
     details: Optional[dict[str, Any]] = None
 
     @model_validator(mode="after")
-    def validate_event(self) -> MachineEvent:
-        """Validate machine event."""
+    def validate_event(self) -> MachineHistoryEvent:
+        """Validate machine history event."""
         if not self.event_type:
             raise ValueError("Event type is required")
         return self
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert event to dictionary."""
+        """Convert history event to dictionary."""
         return {
             "timestamp": self.timestamp.isoformat(),
             "eventType": self.event_type,
@@ -362,7 +366,7 @@ class ResourceTag(ValueObject):
             return cls(key=data["Key"], value=data["Value"])
         else:
             # Handle case where data is in key-value format
-            return [cls(key=k, value=v) for k, v in data.items()]
+            return [cls(key=k, value=v) for k, v in data.items()]  # type: ignore[return-value]
 
     @classmethod
     def get_default_tags(cls) -> list[ResourceTag]:

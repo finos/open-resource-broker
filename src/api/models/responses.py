@@ -32,7 +32,7 @@ def format_success_for_api(message: str, data: Optional[dict[str, Any]] = None) 
     """Format success response for API consumption."""
     response = {"status": "success", "message": message}
     if data is not None:
-        response["data"] = data
+        response["data"] = data  # type: ignore[assignment]
     return response
 
 

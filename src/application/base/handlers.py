@@ -13,17 +13,42 @@ from datetime import datetime
 from functools import wraps
 from typing import Any, Callable, Optional, TypeVar
 
-from application.dto.base import BaseCommand, BaseResponse
+from application.dto.base import BaseCommand
 from application.interfaces.command_handler import CommandHandler
 from application.interfaces.command_query import QueryHandler
+from application.ports.error_response_port import ErrorResponsePort
 from domain.base.events import DomainEvent
 from domain.base.ports import ErrorHandlingPort, EventPublisherPort, LoggingPort
-from infrastructure.error.exception_handler import InfrastructureErrorResponse
 
 TCommand = TypeVar("TCommand", bound=BaseCommand)
-TResponse = TypeVar("TResponse", bound=BaseResponse)
+TResponse = TypeVar("TResponse")  # Allow None for CQRS compliance
 TQuery = TypeVar("TQuery")
 TResult = TypeVar("TResult")
+
+
+class _NoOpLogger(LoggingPort):
+    """No-op logger used when no logger is provided."""
+
+    def debug(self, message: str, *args: Any, **kwargs: Any) -> None:
+        """No-op debug."""
+
+    def info(self, message: str, *args: Any, **kwargs: Any) -> None:
+        """No-op info."""
+
+    def warning(self, message: str, *args: Any, **kwargs: Any) -> None:
+        """No-op warning."""
+
+    def error(self, message: str, *args: Any, **kwargs: Any) -> None:
+        """No-op error."""
+
+    def critical(self, message: str, *args: Any, **kwargs: Any) -> None:
+        """No-op critical."""
+
+    def exception(self, message: str, *args: Any, **kwargs: Any) -> None:
+        """No-op exception."""
+
+    def log(self, level: int, message: str, *args: Any, **kwargs: Any) -> None:
+        """No-op log."""
 
 
 class BaseHandler(ABC):
@@ -41,7 +66,7 @@ class BaseHandler(ABC):
         error_handler: Optional[ErrorHandlingPort] = None,
     ) -> None:
         """Initialize base handler with optional logger and error handler."""
-        self.logger = logger
+        self.logger: LoggingPort = logger if logger is not None else _NoOpLogger()
         self.error_handler = error_handler
         self._metrics: dict[str, Any] = {}
 
@@ -75,13 +100,10 @@ class BaseHandler(ABC):
                 return await operation()
             except Exception as e:
                 if self.logger:
-                    self.logger.log_domain_event(
-                        "error",
-                        {
-                            "context": context,
-                            "error": str(e),
-                            "handler": self.__class__.__name__,
-                        },
+                    self.logger.error(
+                        "Handler error in %s: %s",
+                        context,
+                        str(e),
                     )
                 raise
 
@@ -185,24 +207,30 @@ class BaseHandler(ABC):
         """Get handler performance metrics."""
         return self._metrics.copy()
 
-    def handle_error(self, error: Exception, context: str) -> InfrastructureErrorResponse:
+    def handle_error(self, error: Exception, context: str) -> ErrorResponsePort:
         """
         Centralized error handling for all handlers.
 
         Creates consistent error responses across all handler types.
+        Returns an ErrorResponsePort interface instead of concrete implementation.
         """
         if self.logger:
             self.logger.error("Handler error in %s: %s", context, str(error))
 
-        return InfrastructureErrorResponse.from_exception(error, context)
+        # This will need to be injected via error_handler port
+        # For now, raise the exception to be handled by infrastructure layer
+        raise error
 
 
-class BaseCommandHandler(BaseHandler, CommandHandler[TCommand, TResponse]):
+class BaseCommandHandler(BaseHandler, CommandHandler[TCommand, TResponse]):  # type: ignore[type-var]
     """
     Base for all CQRS command handlers.
 
     Provides command-specific functionality including validation,
     event publishing, and transaction management.
+
+    CQRS Compliance: Commands should return None (void) to maintain
+    command-query separation. Use TResponse = None for proper CQRS commands.
     """
 
     def __init__(
@@ -243,8 +271,8 @@ class BaseCommandHandler(BaseHandler, CommandHandler[TCommand, TResponse]):
         result = await self.execute_command(command)
 
         # Publish events if any
-        if hasattr(result, "events") and result.events:
-            await self.publish_events(result.events)
+        if result is not None and hasattr(result, "events") and result.events:  # type: ignore[union-attr]
+            await self.publish_events(result.events)  # type: ignore[union-attr]
 
         # Log completion
         duration = time.time() - start_time
@@ -274,7 +302,7 @@ class BaseCommandHandler(BaseHandler, CommandHandler[TCommand, TResponse]):
         """Publish domain events after successful command execution."""
         if self.event_publisher:
             for event in events:
-                await self.event_publisher.publish(event)
+                self.event_publisher.publish(event)
 
 
 class BaseQueryHandler(BaseHandler, QueryHandler[TQuery, TResult]):

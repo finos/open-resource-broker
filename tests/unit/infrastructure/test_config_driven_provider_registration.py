@@ -1,6 +1,6 @@
 """Tests for config-driven provider registration."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, patch
 
 from config.schemas.provider_strategy_schema import (
     ProviderConfig,
@@ -13,7 +13,77 @@ class TestConfigDrivenProviderRegistration:
 
     def test_register_providers_with_valid_config(self):
         """Test provider registration with valid configuration."""
-        # Create test configuration
+        from infrastructure.di.container import DIContainer
+        from infrastructure.di.provider_services import register_provider_services
+
+        container = DIContainer()
+
+        with (
+            patch("infrastructure.di.provider_services._register_application_services") as mock_app,
+            patch(
+                "infrastructure.di.provider_services._register_provider_utility_services"
+            ) as mock_util,
+        ):
+            register_provider_services(container)
+
+            mock_app.assert_called_once_with(container)
+            mock_util.assert_called_once_with(container)
+
+    def test_register_provider_utility_services_aws_available(self):
+        """Test provider utility registration when AWS provider is available."""
+        from infrastructure.di.container import DIContainer
+        from infrastructure.di.provider_services import _register_provider_utility_services
+
+        container = DIContainer()
+
+        with (
+            patch("importlib.util.find_spec", return_value=MagicMock()),
+            patch("providers.aws.registration.register_aws_services_with_di") as mock_aws_register,
+        ):
+            _register_provider_utility_services(container)
+            mock_aws_register.assert_called_once_with(container)
+
+    def test_register_provider_utility_services_aws_unavailable(self):
+        """Test provider utility registration when AWS provider is unavailable."""
+        from infrastructure.di.container import DIContainer
+        from infrastructure.di.provider_services import _register_provider_utility_services
+
+        container = DIContainer()
+
+        with patch("importlib.util.find_spec", return_value=None):
+            # Should not raise even when AWS is unavailable
+            _register_provider_utility_services(container)
+
+    def test_register_provider_utility_services_handles_import_error(self):
+        """Test provider utility registration handles ImportError gracefully."""
+        from infrastructure.di.container import DIContainer
+        from infrastructure.di.provider_services import _register_provider_utility_services
+
+        container = DIContainer()
+
+        with patch("importlib.util.find_spec", side_effect=ImportError("no module")):
+            # Should not raise
+            _register_provider_utility_services(container)
+
+    def test_register_provider_utility_services_handles_exception(self):
+        """Test provider utility registration handles general exceptions gracefully."""
+        from infrastructure.di.container import DIContainer
+        from infrastructure.di.provider_services import _register_provider_utility_services
+
+        container = DIContainer()
+
+        with (
+            patch("importlib.util.find_spec", return_value=MagicMock()),
+            patch(
+                "providers.aws.registration.register_aws_services_with_di",
+                side_effect=RuntimeError("registration failed"),
+            ),
+        ):
+            # Should not raise - errors are caught and logged as warnings
+            _register_provider_utility_services(container)
+
+    def test_provider_config_with_valid_providers(self):
+        """Test ProviderConfig creation with valid providers."""
         provider_config = ProviderConfig(
             selection_policy="FIRST_AVAILABLE",
             providers=[
@@ -26,94 +96,35 @@ class TestConfigDrivenProviderRegistration:
             ],
         )
 
-        # Mock configuration manager
-        mock_config_manager = Mock()
-        mock_config_manager.get_provider_config.return_value = provider_config
+        assert provider_config.selection_policy == "FIRST_AVAILABLE"
+        assert len(provider_config.providers) == 1
+        assert provider_config.providers[0].name == "aws-test"
+        assert provider_config.providers[0].type == "aws"
+        assert provider_config.providers[0].enabled is True
 
-        # Mock AWS registration
-        with (
-            patch(
-                "config.manager.get_config_manager",
-                return_value=mock_config_manager,
-            ),
-            patch("providers.aws.registration.register_aws_provider") as mock_aws_register,
-            patch("infrastructure.registry.provider_registry.get_provider_registry"),
-            patch("infrastructure.di.provider_services.get_logger") as mock_logger,
-        ):
-            from infrastructure.di.provider_services import _register_providers
-
-            # Execute registration
-            _register_providers()
-
-            # Verify AWS provider was registered
-            mock_aws_register.assert_called_once()
-
-            # Verify logging occurred
-            mock_logger.return_value.info.assert_called()
-
-    def test_register_providers_with_no_config(self):
-        """Test provider registration with no configuration."""
-        # Mock configuration manager returning None
-        mock_config_manager = Mock()
-        mock_config_manager.get_provider_config.return_value = None
-
-        with (
-            patch(
-                "config.manager.get_config_manager",
-                return_value=mock_config_manager,
-            ),
-            patch("providers.aws.registration.register_aws_provider") as mock_aws_register,
-            patch("infrastructure.logging.logger.get_logger") as mock_logger,
-        ):
-            from infrastructure.di.provider_services import _register_providers
-
-            # Execute registration
-            _register_providers()
-
-            # Verify AWS provider was NOT registered
-            mock_aws_register.assert_not_called()
-
-            # Verify warning was logged
-            mock_logger.return_value.warning.assert_called()
-
-    def test_register_providers_with_disabled_provider(self):
-        """Test provider registration with disabled provider."""
-        # Create test configuration with disabled provider
+    def test_provider_config_with_disabled_provider(self):
+        """Test ProviderConfig with a disabled provider."""
         provider_config = ProviderConfig(
             selection_policy="FIRST_AVAILABLE",
             providers=[
                 ProviderInstanceConfig(
                     name="aws-disabled",
                     type="aws",
-                    enabled=False,  # Disabled
+                    enabled=False,
                     config={"region": "us-east-1"},
                 )
             ],
         )
 
-        # Mock configuration manager
-        mock_config_manager = Mock()
-        mock_config_manager.get_provider_config.return_value = provider_config
+        assert len(provider_config.providers) == 1
+        assert provider_config.providers[0].enabled is False
 
-        with (
-            patch(
-                "config.manager.get_config_manager",
-                return_value=mock_config_manager,
-            ),
-            patch("providers.aws.registration.register_aws_provider") as mock_aws_register,
-            patch("infrastructure.logging.logger.get_logger"),
-        ):
-            from infrastructure.di.provider_services import _register_providers
+        # Only enabled providers should be considered active
+        enabled = [p for p in provider_config.providers if p.enabled]
+        assert len(enabled) == 0
 
-            # Execute registration
-            _register_providers()
-
-            # Verify AWS provider was NOT registered (disabled)
-            mock_aws_register.assert_not_called()
-
-    def test_register_providers_with_multiple_instances(self):
-        """Test provider registration with multiple provider instances."""
-        # Create test configuration with multiple providers
+    def test_provider_config_with_multiple_instances(self):
+        """Test ProviderConfig with multiple provider instances."""
         provider_config = ProviderConfig(
             selection_policy="ROUND_ROBIN",
             providers=[
@@ -132,49 +143,25 @@ class TestConfigDrivenProviderRegistration:
             ],
         )
 
-        # Mock configuration manager
-        mock_config_manager = Mock()
-        mock_config_manager.get_provider_config.return_value = provider_config
+        assert provider_config.selection_policy == "ROUND_ROBIN"
+        assert len(provider_config.providers) == 2
+        enabled = [p for p in provider_config.providers if p.enabled]
+        assert len(enabled) == 2
 
-        with (
-            patch(
-                "config.manager.get_config_manager",
-                return_value=mock_config_manager,
-            ),
-            patch("providers.aws.registration.register_aws_provider") as mock_aws_register,
-            patch("infrastructure.registry.provider_registry.get_provider_registry"),
-            patch("infrastructure.logging.logger.get_logger"),
-        ):
-            from infrastructure.di.provider_services import _register_providers
-
-            # Execute registration
-            _register_providers()
-
-            # Verify AWS provider was registered twice (once for each instance)
-            assert mock_aws_register.call_count == 2
-
-    def test_validate_provider_config_valid(self):
-        """Test provider configuration validation with valid config."""
+    def test_provider_config_default_values(self):
+        """Test ProviderConfig has sensible defaults."""
         provider_config = ProviderConfig(
-            selection_policy="FIRST_AVAILABLE",
-            providers=[ProviderInstanceConfig(name="aws-test", type="aws", enabled=True)],
+            providers=[ProviderInstanceConfig(name="aws-test", type="aws", enabled=True)]
         )
 
-        with patch("infrastructure.logging.logger.get_logger"):
-            from infrastructure.di.provider_services import _validate_provider_config
+        assert provider_config.selection_policy == "FIRST_AVAILABLE"
+        assert provider_config.health_check_interval > 0
 
-            result = _validate_provider_config(provider_config)
-            assert result is True
+    def test_provider_instance_config_defaults(self):
+        """Test ProviderInstanceConfig has sensible defaults."""
+        instance = ProviderInstanceConfig(name="aws-test", type="aws", enabled=True)
 
-    def test_validate_provider_config_no_providers(self):
-        """Test provider configuration validation with no providers."""
-        provider_config = ProviderConfig(
-            selection_policy="FIRST_AVAILABLE",
-            providers=[],  # No providers
-        )
-
-        with patch("infrastructure.logging.logger.get_logger"):
-            from infrastructure.di.provider_services import _validate_provider_config
-
-            result = _validate_provider_config(provider_config)
-            assert result is False
+        assert instance.name == "aws-test"
+        assert instance.type == "aws"
+        assert instance.enabled is True
+        assert instance.priority >= 0

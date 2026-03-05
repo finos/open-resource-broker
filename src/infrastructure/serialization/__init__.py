@@ -3,7 +3,7 @@
 This package provides serialization and deserialization utilities for
 converting between different data formats and representations.
 
-The serialization utilities support the persistence layer and external
+The serialization utilities support the storage layer and external
 integrations by providing consistent data transformation capabilities.
 
 Key Components:

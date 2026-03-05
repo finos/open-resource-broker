@@ -52,8 +52,13 @@ def validate_request_body(model_class: type[T], request_body: Union[str, dict[st
             try:
                 data = json.loads(request_body)
             except json.JSONDecodeError as e:
-                logger.error("Invalid JSON in request body: %s", e)
-                raise ValidationException(f"Invalid JSON in request body: {e}")
+                logger.error(
+                    "Invalid JSON in request body: %s",
+                    e,
+                    exc_info=True,
+                    extra={"body_length": len(request_body), "error_type": type(e).__name__},
+                )
+                raise ValidationException(f"Invalid JSON in request body: {e}") from e
         else:
             data = request_body
 
@@ -71,8 +76,14 @@ def validate_request_body(model_class: type[T], request_body: Union[str, dict[st
                 }
             )
 
-        logger.error("Validation error: %s", e)
-        raise ValidationException(f"Validation error: {e}", error_details)
+        logger.error(
+            "Validation error for model %s: %s",
+            model_class.__name__,
+            e,
+            exc_info=True,
+            extra={"model": model_class.__name__, "error_count": len(error_details)},
+        )
+        raise ValidationException(f"Validation error: {e}", error_details) from e
 
 
 def create_error_response(
@@ -91,7 +102,7 @@ def create_error_response(
     response = {"status": "error", "message": message}
 
     if errors:
-        response["errors"] = errors
+        response["errors"] = errors  # type: ignore[assignment]
 
     return response
 

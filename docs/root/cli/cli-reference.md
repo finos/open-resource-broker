@@ -9,16 +9,24 @@ Available for all commands:
 | Flag | Description | Example |
 |------|-------------|---------|
 | `--config` | Configuration file path | `--config /path/to/config.json` |
-| `--log-level` | Set logging level | `--log-level DEBUG` |
-| `--format` | Output format | `--format table` |
-| `--output` | Output file | `--output results.json` |
+| `--log-level` | Set logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`) | `--log-level DEBUG` |
+| `--format` | Output format (`json`, `yaml`, `table`, `list`) | `--format table` |
+| `--output` | Write output to file instead of stdout | `--output results.json` |
 | `--quiet` | Suppress non-essential output | `--quiet` |
 | `--verbose` | Enable verbose output | `--verbose` |
-| `--dry-run` | Show what would be done | `--dry-run` |
-| `--scheduler` | Override scheduler strategy | `--scheduler hostfactory` |
+| `--no-color` | Disable colored output | `--no-color` |
+| `--dry-run` | Show what would be done without executing | `--dry-run` |
+| `--yes, -y` | Assume yes to all prompts | `--yes` |
+| `--all` | Apply operation to all resources | `--all` |
+| `--limit` | Maximum number of results to return | `--limit 50` |
+| `--offset` | Number of results to skip (for pagination) | `--offset 100` |
+| `--filter` | Filter using `field=value`, `field~value`, or `field=~regex`. Repeatable (AND logic). | `--filter "status=running"` |
+| `--region` | AWS region override | `--region us-west-2` |
+| `--profile` | AWS profile override | `--profile production` |
+| `--scheduler` | Override scheduler strategy (`default`, `hostfactory`, `hf`) | `--scheduler hostfactory` |
 | `--provider` | Override provider instance | `--provider aws_prod_us-east-1` |
-| `--completion` | Generate shell completion | `--completion bash` |
-| `--version` | Show version | `--version` |
+| `--completion` | Generate shell completion script (`bash`, `zsh`) | `--completion bash` |
+| `--version` | Show version and exit | `--version` |
 
 ### HostFactory Compatibility
 
@@ -250,9 +258,29 @@ orb machines list [OPTIONS]
 **Options:**
 | Flag | Description | Example |
 |------|-------------|---------|
-| `--status` | Filter by machine status | `--status running` |
-| `--template-id` | Filter by template ID | `--template-id aws-basic` |
+| `--status` | Filter by machine status (specific filter) | `--status running` |
+| `--template-id` | Filter by template ID (specific filter) | `--template-id aws-basic` |
+| `--timestamp-format` | Timestamp format: `auto`, `unix`, `iso` | `--timestamp-format iso` |
+| `--filter` | Generic filter: `field=value`, `field~value`, `field=~regex`. Repeatable (AND logic). | `--filter "machine_types~t3"` |
 | `--format` | Output format | `--format table` |
+
+**Filter Examples:**
+```bash
+# Filter by machine type substring
+orb machines list --filter "machine_types~t3"
+
+# Exact match on a field
+orb machines list --filter "status=running"
+
+# Regex match
+orb machines list --filter "machine_id=~i-[0-9a-f]{17}"
+
+# Combine multiple filters (AND logic)
+orb machines list --filter "status=running" --filter "machine_types~t3"
+
+# Mix specific and generic filters
+orb machines list --status running --filter "machine_types~t3"
+```
 
 #### `machines show`
 
@@ -337,12 +365,88 @@ Check machine status.
 **Usage:**
 ```bash
 orb machines status MACHINE_IDS...
+orb machines status --machine-id MACHINE_ID [--machine-id MACHINE_ID...] [OPTIONS]
 ```
 
 **Arguments:**
 | Argument | Description | Required |
 |----------|-------------|----------|
-| `MACHINE_IDS` | Machine IDs to check | Yes |
+| `MACHINE_IDS` | Machine IDs to check (positional) | Yes* |
+
+**Options:**
+| Flag | Description | Example |
+|------|-------------|---------|
+| `--machine-id, -m` | Machine ID to check (flag, repeatable) | `--machine-id i-abc --machine-id i-def` |
+
+#### `machines terminate`
+
+Terminate (return) machines. Alias for `machines return`.
+
+**Usage:**
+```bash
+orb machines terminate [MACHINE_IDS...] [OPTIONS]
+```
+
+**Arguments:**
+| Argument | Description | Required |
+|----------|-------------|----------|
+| `MACHINE_IDS` | Machine IDs to terminate (positional) | Yes* |
+
+**Options:**
+| Flag | Description | Example |
+|------|-------------|---------|
+| `--force` | Force termination without confirmation | `--force` |
+
+**Examples:**
+```bash
+orb machines terminate i-1234567890abcdef0
+orb machines terminate i-aaa i-bbb --force
+```
+
+#### `machines stop`
+
+Stop running machines.
+
+**Usage:**
+```bash
+orb machines stop [MACHINE_IDS...] [OPTIONS]
+```
+
+**Arguments:**
+| Argument | Description | Required |
+|----------|-------------|----------|
+| `MACHINE_IDS` | Machine IDs to stop (positional) | Yes* |
+
+**Options:**
+| Flag | Description | Example |
+|------|-------------|---------|
+| `--force` | Force stop without confirmation | `--force` |
+
+**Examples:**
+```bash
+orb machines stop i-1234567890abcdef0
+orb machines stop i-aaa i-bbb --force
+```
+
+#### `machines start`
+
+Start stopped machines.
+
+**Usage:**
+```bash
+orb machines start [MACHINE_IDS...] [OPTIONS]
+```
+
+**Arguments:**
+| Argument | Description | Required |
+|----------|-------------|----------|
+| `MACHINE_IDS` | Machine IDs to start (positional) | Yes* |
+
+**Examples:**
+```bash
+orb machines start i-1234567890abcdef0
+orb machines start i-aaa i-bbb
+```
 
 ### Requests
 
@@ -360,8 +464,9 @@ orb requests list [OPTIONS]
 **Options:**
 | Flag | Description | Example |
 |------|-------------|---------|
-| `--status` | Filter by request status | `--status pending` |
-| `--template-id` | Filter by template ID | `--template-id aws-basic` |
+| `--status` | Filter by request status (specific filter) | `--status pending` |
+| `--template-id` | Filter by template ID (specific filter) | `--template-id aws-basic` |
+| `--filter` | Generic filter: `field=value`, `field~value`, `field=~regex`. Repeatable (AND logic). | `--filter "template_id~spot"` |
 | `--format` | Output format | `--format table` |
 
 **Status Values:**
@@ -373,9 +478,21 @@ orb requests list [OPTIONS]
 - `partial` - Request partially completed
 - `timeout` - Request timed out
 
+**Filter Examples:**
+```bash
+# Filter by status
+orb requests list --status pending
+
+# Generic filter by template ID substring
+orb requests list --filter "template_id~spot"
+
+# Combine filters (AND logic)
+orb requests list --status in_progress --filter "template_id~ec2fleet"
+```
+
 #### `requests show`
 
-Show request details.
+Show details for a specific request.
 
 **Usage:**
 ```bash
@@ -385,12 +502,18 @@ orb requests show REQUEST_ID [OPTIONS]
 **Arguments:**
 | Argument | Description | Required |
 |----------|-------------|----------|
-| `REQUEST_ID` | Request ID to show | Yes |
+| `REQUEST_ID` | Request ID to show (positional) | Yes* |
 
 **Options:**
 | Flag | Description | Example |
 |------|-------------|---------|
 | `--format` | Output format | `--format yaml` |
+
+**Examples:**
+```bash
+orb requests show req-abc123
+orb requests show req-abc123 --format yaml
+```
 
 #### `requests cancel`
 
@@ -616,6 +739,108 @@ orb providers health [OPTIONS]
 |------|-------------|---------|
 | `--format` | Output format | `--format table` |
 | `--provider` | Check specific provider health | `--provider aws_prod_us-east-1` |
+
+#### `providers add`
+
+Add a new provider instance.
+
+**Usage:**
+```bash
+orb providers add [OPTIONS]
+```
+
+**Options:**
+| Flag | Description | Example |
+|------|-------------|---------|
+| `--name` | Provider instance name | `--name aws-prod` |
+| `--aws-profile` | AWS profile name | `--aws-profile production` |
+| `--aws-region` | AWS region | `--aws-region us-east-1` |
+| `--discover` | Discover infrastructure after adding | `--discover` |
+
+**Examples:**
+```bash
+orb providers add --name aws-prod --aws-profile production --aws-region us-east-1
+orb providers add --name aws-dev --aws-profile dev --aws-region us-west-2 --discover
+```
+
+#### `providers remove`
+
+Remove a provider instance.
+
+**Usage:**
+```bash
+orb providers remove PROVIDER_NAME [OPTIONS]
+```
+
+**Arguments:**
+| Argument | Description | Required |
+|----------|-------------|----------|
+| `PROVIDER_NAME` | Provider instance name to remove | Yes |
+
+**Examples:**
+```bash
+orb providers remove aws-dev
+```
+
+#### `providers update`
+
+Update provider configuration.
+
+**Usage:**
+```bash
+orb providers update PROVIDER_NAME [OPTIONS]
+```
+
+**Arguments:**
+| Argument | Description | Required |
+|----------|-------------|----------|
+| `PROVIDER_NAME` | Provider instance name | Yes |
+
+**Options:**
+| Flag | Description | Example |
+|------|-------------|---------|
+| `--aws-region` | Update region | `--aws-region eu-west-1` |
+| `--aws-profile` | Update profile | `--aws-profile new-profile` |
+
+**Examples:**
+```bash
+orb providers update aws-prod --aws-region eu-west-1
+orb providers update aws-prod --aws-profile updated-profile
+```
+
+#### `providers set-default`
+
+Set the default provider instance.
+
+**Usage:**
+```bash
+orb providers set-default PROVIDER_NAME
+```
+
+**Arguments:**
+| Argument | Description | Required |
+|----------|-------------|----------|
+| `PROVIDER_NAME` | Provider name to set as default | Yes |
+
+**Examples:**
+```bash
+orb providers set-default aws-prod
+```
+
+#### `providers get-default`
+
+Show the current default provider.
+
+**Usage:**
+```bash
+orb providers get-default [OPTIONS]
+```
+
+**Examples:**
+```bash
+orb providers get-default
+orb providers get-default --format yaml
+```
 
 #### `providers select`
 
@@ -903,6 +1128,49 @@ orb mcp serve [OPTIONS]
 | `--stdio` | Run in stdio mode for direct MCP client communication | `false` | `--stdio` |
 | `--log-level` | Logging level for MCP server | `INFO` | `--log-level DEBUG` |
 
+### Infrastructure
+
+Discover and manage AWS infrastructure (VPCs, subnets, security groups) used by ORB.
+
+See [infrastructure-commands.md](./infrastructure-commands.md) for full documentation.
+
+#### `infrastructure discover`
+
+Scan your AWS account for available VPCs, subnets, and security groups.
+
+**Usage:**
+```bash
+orb infrastructure discover [OPTIONS]
+orb infra discover [OPTIONS]
+```
+
+**Options:**
+| Flag | Description | Example |
+|------|-------------|---------|
+| `--show` | Show specific resources: `vpcs`, `subnets`, `security-groups` (or `sg`), or `all` | `--show subnets` |
+| `--summary` | Show only summary counts, no details | `--summary` |
+| `--all-providers` | Discover across all providers | `--all-providers` |
+
+#### `infrastructure show`
+
+Display the infrastructure ORB is currently configured to use.
+
+**Usage:**
+```bash
+orb infrastructure show [OPTIONS]
+orb infra show [OPTIONS]
+```
+
+#### `infrastructure validate`
+
+Verify that the configured infrastructure still exists in AWS.
+
+**Usage:**
+```bash
+orb infrastructure validate [OPTIONS]
+orb infra validate [OPTIONS]
+```
+
 ### Init
 
 Initialize ORB configuration.
@@ -926,6 +1194,25 @@ orb init [OPTIONS]
 | `--region` | AWS region | `--region us-west-2` |
 | `--profile` | AWS profile | `--profile production` |
 | `--config-dir` | Custom configuration directory | `--config-dir /custom/config` |
+| `--subnet-ids` | Comma-separated subnet IDs for `template_defaults` (non-interactive only) | `--subnet-ids subnet-aaa,subnet-bbb` |
+| `--security-group-ids` | Comma-separated security group IDs for `template_defaults` (non-interactive only) | `--security-group-ids sg-111,sg-222` |
+| `--fleet-role` | Spot Fleet IAM role ARN or name for `template_defaults` (non-interactive only) | `--fleet-role arn:aws:iam::123456789012:role/SpotFleetRole` |
+
+**Notes:**
+- `--subnet-ids`, `--security-group-ids`, and `--fleet-role` are only used with `--non-interactive`. In interactive mode, ORB discovers these values from your AWS account automatically.
+- These values are stored in `template_defaults` in `config.json` and applied at runtime when provisioning machines — they are not baked into template files.
+
+**Examples:**
+```bash
+# Interactive init (discovers infrastructure from AWS)
+orb init --scheduler hostfactory --provider aws --region us-east-1
+
+# Non-interactive init with pre-known infrastructure values
+orb init --non-interactive --region us-east-1 \
+  --subnet-ids subnet-aaa111,subnet-bbb222 \
+  --security-group-ids sg-11111111 \
+  --fleet-role arn:aws:iam::123456789012:role/SpotFleetRole
+```
 
 ## Argument Patterns
 

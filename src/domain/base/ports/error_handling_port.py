@@ -1,7 +1,7 @@
 """Error handling port for application layer."""
 
 from abc import ABC, abstractmethod
-from typing import Callable, Optional, TypeVar
+from typing import Any, Callable, Optional, TypeVar
 
 T = TypeVar("T")
 
@@ -24,3 +24,7 @@ class ErrorHandlingPort(ABC):
     @abstractmethod
     def handle_domain_exceptions(self, exception: Exception) -> Optional[str]:
         """Handle domain-specific exceptions and return error message."""
+
+    async def handle_error(self, exception: Exception, context: Any = None) -> None:
+        """Handle an error with optional context. Default implementation re-raises."""
+        raise exception

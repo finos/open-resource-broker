@@ -1,7 +1,5 @@
 """Integration tests for provider strategy system."""
 
-import pytest
-
 from config.managers.type_converter import ConfigTypeConverter
 from providers.aws.configuration.config import AWSProviderConfig
 
@@ -209,18 +207,19 @@ class TestProviderStrategyIntegration:
         assert aws_config.region == "us-east-1"
         assert aws_config.profile == "primary-profile"
 
-    def test_provider_validation_with_invalid_config(self):
-        """Test provider validation with invalid configuration."""
+    def test_provider_validation_with_minimal_config(self):
+        """Test that AWSProviderConfig accepts region-only config (auth validated at session creation)."""
         config = {
             "provider": {
                 "providers": [
                     {
-                        "name": "aws-invalid",
+                        "name": "aws-minimal",
                         "type": "aws",
                         "enabled": True,
                         "config": {
                             "region": "us-east-1"
-                            # Missing required authentication (profile, role_arn, etc.)
+                            # No auth method — valid at config construction time;
+                            # auth is validated later at session creation boundary.
                         },
                     }
                 ]
@@ -228,11 +227,9 @@ class TestProviderStrategyIntegration:
         }
 
         converter = ConfigTypeConverter(config)
+        aws_config = converter.get_typed(AWSProviderConfig)
 
-        with pytest.raises(Exception) as exc_info:
-            converter.get_typed(AWSProviderConfig)
-
-        assert "At least one authentication method must be provided" in str(exc_info.value)
+        assert aws_config.region == "us-east-1"
 
     def test_provider_name_validation(self):
         """Test provider name validation requirements."""

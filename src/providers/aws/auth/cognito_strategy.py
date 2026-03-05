@@ -4,7 +4,14 @@ from typing import Optional
 
 import boto3
 import jwt
+from botocore.config import Config
 from botocore.exceptions import ClientError
+
+_DEFAULT_CONFIG = Config(
+    connect_timeout=10,
+    read_timeout=30,
+    retries={"max_attempts": 3},
+)
 
 from domain.base.dependency_injection import injectable
 from domain.base.ports import LoggingPort
@@ -55,7 +62,9 @@ class CognitoAuthStrategy(AuthPort):
 
         # Initialize Cognito client
         try:
-            self.cognito_client = boto3.client("cognito-idp", region_name=region)
+            self.cognito_client = boto3.client(
+                "cognito-idp", region_name=region, config=_DEFAULT_CONFIG
+            )
         except Exception as e:
             self._logger.error("Failed to initialize Cognito client: %s", e)
             self.enabled = False

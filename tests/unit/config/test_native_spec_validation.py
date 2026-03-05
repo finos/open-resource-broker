@@ -48,7 +48,7 @@ class TestNativeSpecValidation:
         template = AWSTemplate(
             template_id="test-template",
             image_id="ami-12345",
-            instance_type="t3.micro",
+            machine_types={"t3.micro": 1},
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
             provider_api=ProviderApi.EC2_FLEET,
@@ -65,7 +65,7 @@ class TestNativeSpecValidation:
             AWSTemplate(
                 template_id="test-template",
                 image_id="ami-12345",
-                instance_type="t3.micro",
+                machine_types={"t3.micro": 1},
                 subnet_ids=["subnet-123"],
                 security_group_ids=["sg-123"],
                 provider_api=ProviderApi.EC2_FLEET,
@@ -83,7 +83,7 @@ class TestNativeSpecValidation:
             AWSTemplate(
                 template_id="test-template",
                 image_id="ami-12345",
-                instance_type="t3.micro",
+                machine_types={"t3.micro": 1},
                 subnet_ids=["subnet-123"],
                 security_group_ids=["sg-123"],
                 provider_api=ProviderApi.EC2_FLEET,
@@ -101,7 +101,7 @@ class TestNativeSpecValidation:
         template1 = AWSTemplate(
             template_id="test1",
             image_id="ami-12345",
-            instance_type="t3.micro",
+            machine_types={"t3.micro": 1},
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
             provider_api=ProviderApi.EC2_FLEET,
@@ -115,7 +115,7 @@ class TestNativeSpecValidation:
         template2 = AWSTemplate(
             template_id="test2",
             image_id="ami-12345",
-            instance_type="t3.micro",
+            machine_types={"t3.micro": 1},
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
             provider_api=ProviderApi.EC2_FLEET,
@@ -129,7 +129,7 @@ class TestNativeSpecValidation:
         template3 = AWSTemplate(
             template_id="test3",
             image_id="ami-12345",
-            instance_type="t3.micro",
+            machine_types={"t3.micro": 1},
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
             provider_api=ProviderApi.EC2_FLEET,
@@ -144,7 +144,7 @@ class TestNativeSpecValidation:
         template = AWSTemplate(
             template_id="legacy-template",
             image_id="ami-12345",
-            instance_type="t3.micro",
+            machine_types={"t3.micro": 1},
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
             provider_api=ProviderApi.EC2_FLEET,
@@ -191,7 +191,7 @@ class TestNativeSpecValidation:
         template = AWSTemplate(
             template_id="test-template",
             image_id="ami-12345",
-            instance_type="t3.micro",
+            machine_types={"t3.micro": 1},
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
             provider_api=ProviderApi.EC2_FLEET,
@@ -207,7 +207,7 @@ class TestNativeSpecValidation:
         template = AWSTemplate(
             template_id="test-template",
             image_id="ami-12345",
-            instance_type="t3.micro",
+            machine_types={"t3.micro": 1},
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
             provider_api=ProviderApi.EC2_FLEET,

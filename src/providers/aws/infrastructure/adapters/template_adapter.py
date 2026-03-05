@@ -87,7 +87,7 @@ class AWSTemplateAdapter(TemplateAdapterPort):
         self._aws_client = aws_client
         self._logger = logger
 
-    def validate_template(self, template: Template) -> list[str]:
+    def validate_template(self, template: Template) -> list[str]:  # type: ignore[override]
         """
         Validate template for AWS-specific requirements.
 
@@ -128,10 +128,6 @@ class AWSTemplateAdapter(TemplateAdapterPort):
         if not template.provider_api:
             template.provider_api = self._determine_provider_api(template)
 
-        # Set default fleet type if not specified
-        if not hasattr(template, "fleet_type") or not template.fleet_type:
-            template.fleet_type = "instant"
-
         # Extend with AWS-specific metadata
         if not template.metadata:
             template.metadata = {}
@@ -142,7 +138,7 @@ class AWSTemplateAdapter(TemplateAdapterPort):
         # Add AWS-specific metadata
         template.metadata["aws"].update(
             {
-                "fleet_type": getattr(template, "fleet_type", "instant"),
+                "fleet_type": getattr(template, "fleet_type", None),
                 "supported_fields": self._AWS_SUPPORTED_FIELDS,
                 "validation_enabled": True,
             }
@@ -197,19 +193,16 @@ class AWSTemplateAdapter(TemplateAdapterPort):
             errors["image_id"] = f"Invalid AMI ID format: {template.image_id}"
 
         # Validate instance type(s)
-        instance_types_map = getattr(template, "instance_types", None)
+        machine_types_map = template.machine_types
         abis = getattr(template, "abis_instance_requirements", None)
-        if not (template.instance_type or instance_types_map or abis):
-            errors["instance_type"] = (
-                "Either instance_type, instance_types, or abis_instance_requirements must be specified"
+        if not (machine_types_map or abis):
+            errors["machine_types"] = (
+                "Either machine_types or abis_instance_requirements must be specified"
             )
-        elif template.instance_type:
-            if not self._is_valid_instance_type(template.instance_type):
-                errors["instance_type"] = f"Invalid instance type: {template.instance_type}"
-        elif instance_types_map:
-            for itype in instance_types_map.keys():
+        elif machine_types_map:
+            for itype in machine_types_map.keys():
                 if not self._is_valid_instance_type(itype):
-                    errors["instance_type"] = f"Invalid instance type in instance_types: {itype}"
+                    errors["machine_types"] = f"Invalid instance type in machine_types: {itype}"
                     break
 
         # Validate subnet IDs
@@ -241,15 +234,15 @@ class AWSTemplateAdapter(TemplateAdapterPort):
 
     # === PORT INTERFACE METHODS ===
 
-    async def get_template_by_id(self, template_id: str) -> Optional[TemplateDTO]:
+    async def get_template_by_id(self, template_id: str) -> Optional[TemplateDTO]:  # type: ignore[override]
         """Get a template by its ID."""
         return await self._template_config_manager.get_template_by_id(template_id)
 
-    async def get_all_templates(self) -> list[TemplateDTO]:
+    async def get_all_templates(self) -> list[TemplateDTO]:  # type: ignore[override]
         """Get all available templates."""
         return await self._template_config_manager.get_all_templates()
 
-    async def get_templates_by_provider_api(self, provider_api: str) -> list[TemplateDTO]:
+    async def get_templates_by_provider_api(self, provider_api: str) -> list[TemplateDTO]:  # type: ignore[override]
         """Get templates filtered by provider API."""
         return await self._template_config_manager.get_templates_by_provider(provider_api)
 
@@ -257,7 +250,7 @@ class AWSTemplateAdapter(TemplateAdapterPort):
         """Validate a template configuration."""
         return await self._template_config_manager.validate_template(template)
 
-    async def save_template(self, template: TemplateDTO) -> None:
+    async def save_template(self, template: TemplateDTO) -> None:  # type: ignore[override]
         """Save a template."""
         await self._template_config_manager.save_template(template)
 
@@ -267,7 +260,25 @@ class AWSTemplateAdapter(TemplateAdapterPort):
 
     def get_supported_provider_apis(self) -> list[str]:
         """Get the list of provider APIs supported by this adapter."""
-        return ["EC2Fleet", "SpotFleet", "ASG", "RunInstances"]
+        try:
+            from config.managers.configuration_manager import ConfigurationManager
+            from infrastructure.di.container import get_container
+
+            container = get_container()
+            config_manager = container.get(ConfigurationManager)
+            raw_config = config_manager.get_raw_config()
+
+            aws_handlers = (
+                raw_config.get("provider", {})
+                .get("provider_defaults", {})
+                .get("aws", {})
+                .get("handlers", {})
+            )
+
+            return list(aws_handlers.keys())
+        except Exception as e:
+            self._logger.error("Error getting supported AWS APIs: %s", e)
+            return []
 
     def get_adapter_info(self) -> dict[str, Any]:
         """Get information about this adapter."""
@@ -359,7 +370,7 @@ class AWSTemplateAdapter(TemplateAdapterPort):
             True if AMI is valid and usable, False otherwise
         """
         try:
-            ec2_client = self._aws_client.get_client("ec2")
+            ec2_client = self._aws_client.ec2_client
             response = ec2_client.describe_images(ImageIds=[ami_id])
 
             if not response.get("Images"):
@@ -381,8 +392,8 @@ class AWSTemplateAdapter(TemplateAdapterPort):
         if not template.image_id:
             errors.append("Image ID is required for AWS templates")
 
-        if not (template.instance_type or getattr(template, "instance_types", None)):
-            errors.append("Instance type is required for AWS templates")
+        if not template.machine_types:
+            errors.append("Machine types are required for AWS templates")
 
         if not template.subnet_ids or len(template.subnet_ids) == 0:
             errors.append("At least one subnet ID is required for AWS templates")
@@ -451,7 +462,7 @@ class AWSTemplateAdapter(TemplateAdapterPort):
             return self._ssm_parameter_cache[parameter_path]
 
         try:
-            ssm_client = self._aws_client.get_client("ssm")
+            ssm_client = self._aws_client.ssm_client
 
             def get_parameter_func():
                 """Retrieve parameter value from SSM."""
@@ -459,12 +470,7 @@ class AWSTemplateAdapter(TemplateAdapterPort):
                 return response["Parameter"]["Value"]
 
             # Use retry logic if available
-            if hasattr(self._aws_client, "retry_with_backoff"):
-                parameter_value = self._aws_client.retry_with_backoff(
-                    get_parameter_func, max_retries=3, base_delay=1, max_delay=5
-                )
-            else:
-                parameter_value = get_parameter_func()
+            parameter_value = get_parameter_func()
 
             # Cache the result
             self._ssm_parameter_cache[parameter_path] = parameter_value
@@ -507,4 +513,7 @@ def create_aws_template_adapter(
     Returns:
         AWS template adapter instance
     """
-    return AWSTemplateAdapter(aws_client, logger, config)
+    from infrastructure.template.configuration_manager import TemplateConfigurationManager
+
+    template_config_manager = TemplateConfigurationManager(aws_client, logger)  # type: ignore[arg-type]
+    return AWSTemplateAdapter(template_config_manager, aws_client, logger)

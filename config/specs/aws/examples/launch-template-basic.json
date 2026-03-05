@@ -12,7 +12,7 @@
     "BlockDeviceMappings": [{
       "DeviceName": "/dev/xvda",
       "Ebs": {
-        "VolumeSize": "{{ root_volume_size | default(20) }}",
+        "VolumeSize": "{{ root_device_volume_size | default(20) }}",
         "VolumeType": "{{ volume_type | default('gp3') }}",
         "DeleteOnTermination": true,
         "Encrypted": "{{ encrypt_volumes | default(true) }}"

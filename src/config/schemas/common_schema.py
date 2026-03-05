@@ -1,5 +1,7 @@
 """Common configuration schemas."""
 
+from typing import Optional
+
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
@@ -11,7 +13,8 @@ class ResourcePrefixConfig(BaseModel):
     return_prefix: str = Field("ret-", description="Prefix for return request IDs")
     launch_template: str = Field("", description="Prefix for launch template names")
     instance: str = Field("", description="Prefix for instance names")
-    fleet: str = Field("", description="Prefix for fleet names")
+    fleet: str = Field("", description="Prefix for EC2 Fleet names")
+    spot_fleet: str = Field("", description="Prefix for Spot Fleet names")
     asg: str = Field("", description="Prefix for Auto Scaling group names")
     tag: str = Field("", description="Prefix for resource tags")
 
@@ -20,7 +23,7 @@ class ResourceConfig(BaseModel):
     """Resource configuration."""
 
     default_prefix: str = Field("", description="Default prefix for all resources")
-    prefixes: ResourcePrefixConfig = Field(default_factory=lambda: ResourcePrefixConfig())
+    prefixes: ResourcePrefixConfig = Field(default_factory=lambda: ResourcePrefixConfig())  # type: ignore[call-arg]
 
     @model_validator(mode="after")
     def set_default_prefix(self) -> "ResourceConfig":
@@ -172,14 +175,27 @@ class NamingConfig(BaseModel):
         },
         description="Validation patterns for various resources",
     )
-    prefixes: PrefixConfig = Field(default_factory=lambda: PrefixConfig())
-    limits: LimitsConfig = Field(default_factory=lambda: LimitsConfig())
+    prefixes: PrefixConfig = Field(default_factory=lambda: PrefixConfig())  # type: ignore[call-arg]
+    limits: LimitsConfig = Field(default_factory=lambda: LimitsConfig())  # type: ignore[call-arg]
 
 
 class RequestConfig(BaseModel):
     """Request configuration."""
 
     max_machines_per_request: int = Field(100, description="Maximum number of machines per request")
+    default_grace_period: int = Field(
+        300, description="Default grace period in seconds for return requests"
+    )
+    fulfillment_max_retries: int = Field(
+        3, description="Maximum number of provisioning retry attempts"
+    )
+    fulfillment_timeout_seconds: int = Field(300, description="Provisioning timeout in seconds")
+    fulfillment_batch_size: int = Field(
+        1000, description="Maximum instances per provisioning attempt"
+    )
+    fulfillment_fallback_template_id: Optional[str] = Field(
+        None, description="Fallback template ID for provisioning"
+    )
 
     @field_validator("max_machines_per_request")
     @classmethod

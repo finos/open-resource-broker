@@ -7,9 +7,10 @@ import logging
 import logging.handlers
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
-from config import LoggingConfig
+if TYPE_CHECKING:
+    from config.schemas.logging_schema import LoggingConfig
 
 
 class ColoredFormatter(logging.Formatter):
@@ -57,7 +58,7 @@ class JsonFormatter(logging.Formatter):
         except Exception as e:
             # Can't use logger here to avoid recursion
             # Just use full path and continue
-            print(  # noqa: logging bootstrap
+            print(  # logging bootstrap
                 f"Warning: Error formatting log path: {e}"
             )  # Simple console output for logging system errors
 
@@ -78,14 +79,14 @@ class JsonFormatter(logging.Formatter):
             message["exception"] = self.formatException(record.exc_info)
 
         if hasattr(record, "request_id"):
-            message["request_id"] = record.request_id
+            message["request_id"] = record.request_id  # type: ignore[attr-defined]
 
         if hasattr(record, "correlation_id"):
-            message["correlation_id"] = record.correlation_id
+            message["correlation_id"] = record.correlation_id  # type: ignore[attr-defined]
 
         # Include any extra fields provided in the log call
         if hasattr(record, "extra"):
-            message.update(record.extra)
+            message.update(record.extra)  # type: ignore[attr-defined]
 
         return json.dumps(message)
 
@@ -107,7 +108,7 @@ class ContextLogger(logging.Logger):
         for key in keys:
             self._context.pop(key, None)
 
-    def _log(
+    def _log(  # type: ignore[override]
         self,
         level: int,
         msg: str,
@@ -205,18 +206,8 @@ def setup_logging(config: LoggingConfig) -> None:
         root_logger.addHandler(file_handler)
 
     # Configure console logging after file logging
-    # Use ConfigurationManager to get console_enabled value
-    from config.manager import get_config_manager
-
-    try:
-        config_manager = get_config_manager()
-        console_enabled = config_manager.get("logging.console_enabled", config.console_enabled)
-        if isinstance(console_enabled, str):
-            console_enabled = console_enabled.lower() in ("true", "1", "yes")
-    except Exception as e:
-        # Fallback to config if ConfigurationManager fails
-        logger.debug(f"Could not get console_enabled from ConfigurationManager: {e!s}")
-        console_enabled = config.console_enabled
+    # Use config directly to avoid circular dependency during DI container initialization
+    console_enabled = config.console_enabled
 
     if console_enabled:
         console_handler = logging.StreamHandler()
@@ -245,17 +236,19 @@ def get_logger(name: str) -> ContextLogger:
     Returns:
         Logger instance
     """
-    return logging.getLogger(name)
+    return logging.getLogger(name)  # type: ignore[return-value]
 
 
 class LoggerAdapter(logging.LoggerAdapter):
     """Adapter that adds context to log records."""
 
-    def process(self, msg: str, kwargs: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
+    def process(self, msg: str, kwargs: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:  # type: ignore[override]
         """Process log record to add context."""
         if "extra" not in kwargs:
             kwargs["extra"] = {}
-        kwargs["extra"].update(self.extra)
+        extra = kwargs["extra"]
+        if isinstance(extra, dict) and isinstance(self.extra, dict):
+            extra.update(self.extra)
         return msg, kwargs
 
 

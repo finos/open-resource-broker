@@ -118,8 +118,9 @@ async def handle_provider_config(args) -> dict[str, Any]:
 async def handle_validate_provider_config(args) -> dict[str, Any]:
     """Handle validate provider config operations."""
     return {
-        "validation": {"status": "valid", "errors": []},
-        "message": "Provider configuration validated successfully",
+        "error": "Not implemented",
+        "endpoint": "validate_provider_config",
+        "message": "Provider configuration validation is planned but not yet available.",
     }
 
 
@@ -127,15 +128,31 @@ async def handle_validate_provider_config(args) -> dict[str, Any]:
 async def handle_reload_provider_config(args) -> dict[str, Any]:
     """Handle reload provider config operations."""
     return {
-        "result": {"status": "reloaded"},
-        "message": "Provider configuration reloaded successfully",
+        "error": "Not implemented",
+        "endpoint": "reload_provider_config",
+        "message": "Provider configuration reload is planned but not yet available.",
     }
 
 
 @handle_interface_exceptions(context="select_provider_strategy", interface_type="cli")
 async def handle_select_provider_strategy(args) -> dict[str, Any]:
     """Handle select provider strategy operations."""
-    provider = getattr(args, "provider", "aws")
+    # Get first available provider as default
+    default_provider = "aws"  # Keep as fallback
+    try:
+        from providers.registry import get_provider_registry
+
+        registry = get_provider_registry()
+        registered_types = registry.get_registered_providers()
+        if registered_types:
+            default_provider = registered_types[0]
+    except Exception as e:
+        from infrastructure.logging.logger import get_logger
+
+        logger = get_logger(__name__)
+        logger.debug(f"Failed to get default provider: {e}")  # Use fallback
+
+    provider = getattr(args, "provider", default_provider)
     return {
         "result": {"selected_provider": provider},
         "message": "Provider strategy selected successfully",
@@ -145,10 +162,10 @@ async def handle_select_provider_strategy(args) -> dict[str, Any]:
 @handle_interface_exceptions(context="execute_provider_operation", interface_type="cli")
 async def handle_execute_provider_operation(args) -> dict[str, Any]:
     """Handle execute provider operation operations."""
-    operation = getattr(args, "operation", "status")
     return {
-        "result": {"operation": operation, "status": "completed"},
-        "message": "Provider operation executed successfully",
+        "error": "Not implemented",
+        "endpoint": "execute_provider_operation",
+        "message": "Generic provider operation execution is planned but not yet available.",
     }
 
 
@@ -158,12 +175,28 @@ async def handle_provider_metrics(args) -> dict[str, Any]:
     container = get_container()
     query_bus = container.get(QueryBus)
 
-    from application.queries.system import GetProviderMetricsQuery
+    from application.provider.queries import GetProviderMetricsQuery
 
     query = GetProviderMetricsQuery(provider_name=getattr(args, "provider", None))
-    metrics = await query_bus.execute(query)
+    metrics = await query_bus.execute(query)  # type: ignore[arg-type]
 
     return {"metrics": metrics, "message": "Provider metrics retrieved successfully"}
+
+
+@handle_interface_exceptions(context="system_status", interface_type="cli")
+async def handle_system_status(args) -> dict[str, Any]:
+    """Handle system status query."""
+    container = get_container()
+    query_bus = container.get(QueryBus)
+
+    from application.queries.system import GetSystemStatusQuery
+
+    query = GetSystemStatusQuery(
+        include_provider_health=True, detailed=getattr(args, "detailed", False)
+    )
+    status = await query_bus.execute(query)
+
+    return {"system_status": status, "message": "System status retrieved successfully"}
 
 
 @handle_interface_exceptions(context="system_metrics", interface_type="cli")

@@ -18,7 +18,7 @@ The Provider Strategy Factory creates appropriate provider strategies based on c
 ### Factory Implementation
 
 ```python
-# src/infrastructure/factories/provider_strategy_factory.py
+# src/infrastructure/storage/factory.py
 from typing import Dict, Any, List
 from src.domain.base.ports import LoggingPort, ConfigurationPort
 from src.providers.base.strategy.provider_strategy import ProviderStrategy
@@ -41,8 +41,8 @@ class ProviderStrategyFactory:
         self._strategy_registry = {
             "aws": self._create_aws_strategy,
             # Future providers can be added here
-            # "azure": self._create_azure_strategy,
-            # "gcp": self._create_gcp_strategy,
+            # "provider1": self._create_provider1_strategy,
+            # "provider2": self._create_provider2_strategy,
         }
 
     def create_strategy(self, provider_type: str, config_override: Dict[str, Any] = None) -> ProviderStrategy:
@@ -240,7 +240,7 @@ The Repository Factory creates appropriate repository implementations based on s
 ### Repository Factory Implementation
 
 ```python
-# src/infrastructure/utilities/factories/repository_factory.py
+# src/infrastructure/storage/repository_factory.py
 from typing import Dict, Type, Any
 from src.domain.base.ports import LoggingPort, ConfigurationPort
 from src.domain.template.repository import TemplateRepository
@@ -261,12 +261,12 @@ class RepositoryFactory:
     def _register_repository_implementations(self):
         """Register available repository implementations."""
         # Import implementations
-        from src.infrastructure.persistence.dynamodb.template_repository import DynamoDBTemplateRepository
-        from src.infrastructure.persistence.dynamodb.request_repository import DynamoDBRequestRepository
-        from src.infrastructure.persistence.dynamodb.machine_repository import DynamoDBMachineRepository
-        from src.infrastructure.persistence.memory.template_repository import InMemoryTemplateRepository
-        from src.infrastructure.persistence.memory.request_repository import InMemoryRequestRepository
-        from src.infrastructure.persistence.memory.machine_repository import InMemoryMachineRepository
+        from src.infrastructure.storage.dynamodb.template_repository import DynamoDBTemplateRepository
+        from src.infrastructure.storage.dynamodb.request_repository import DynamoDBRequestRepository
+        from src.infrastructure.storage.dynamodb.machine_repository import DynamoDBMachineRepository
+        from src.infrastructure.storage.memory.template_repository import InMemoryTemplateRepository
+        from src.infrastructure.storage.memory.request_repository import InMemoryRequestRepository
+        from src.infrastructure.storage.memory.machine_repository import InMemoryMachineRepository
 
         self._repository_registry = {
             "dynamodb": {

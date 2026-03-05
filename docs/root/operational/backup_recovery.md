@@ -34,7 +34,7 @@ The application supports multiple backup strategies depending on your storage co
 ```bash
 # Create manual backup
 python -c "
-from src.infrastructure.persistence.repository_migrator import RepositoryMigrator
+from src.infrastructure.storage.repository_migrator import RepositoryMigrator
 from src.infrastructure.di.container import get_container
 
 container = get_container()
@@ -72,7 +72,7 @@ mkdir -p "$BACKUP_DIR"
 
 # Create backup
 python -c "
-from src.infrastructure.persistence.repository_migrator import RepositoryMigrator
+from src.infrastructure.storage.repository_migrator import RepositoryMigrator
 from src.infrastructure.di.container import get_container
 import os
 
@@ -286,7 +286,7 @@ echo "SSM template backup completed: ssm_templates_$DATE.json"
 ```bash
 # Restore from backup
 python -c "
-from src.infrastructure.persistence.repository_migrator import RepositoryMigrator
+from src.infrastructure.storage.repository_migrator import RepositoryMigrator
 from src.infrastructure.di.container import get_container
 
 container = get_container()

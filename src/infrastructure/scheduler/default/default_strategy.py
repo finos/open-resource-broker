@@ -1,13 +1,16 @@
 """Default scheduler strategy using native domain fields - no conversion needed."""
 
-from typing import Any, Union
+import os
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
-from config.manager import ConfigurationManager
-from domain.base.ports.logging_port import LoggingPort
 from domain.machine.aggregate import Machine
 from domain.template.template_aggregate import Template
 from infrastructure.scheduler.base.strategy import BaseSchedulerStrategy
 from infrastructure.scheduler.default.field_mapper import DefaultFieldMapper
+
+if TYPE_CHECKING:
+    from domain.template.ports.template_defaults_port import TemplateDefaultsPort
 
 
 class DefaultSchedulerStrategy(BaseSchedulerStrategy):
@@ -21,68 +24,80 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
     - Simple integration for systems using domain format directly
     """
 
-    def __init__(self, config_manager: ConfigurationManager, logger: "LoggingPort") -> None:
+    def __init__(
+        self,
+        template_defaults_service: "TemplateDefaultsPort | None" = None,
+        config_port: "Any | None" = None,
+        logger: "Any | None" = None,
+        provider_registry_service: "Any | None" = None,
+    ) -> None:
         """Initialize the instance."""
-        self.config_manager = config_manager
-        self._logger = logger
-
-        # Initialize provider selection service for provider selection
-        from application.services.provider_selection_service import (
-            ProviderSelectionService,
+        self._template_defaults_service = template_defaults_service
+        self._init_base(
+            config_port=config_port,
+            logger=logger,
+            provider_registry_service=provider_registry_service,
         )
-        from infrastructure.di.container import get_container
-
-        container = get_container()
-        self._provider_selection_service = container.get(ProviderSelectionService)
-
         # Initialize field mapper
         self.field_mapper = DefaultFieldMapper()
 
-    def get_templates_file_path(self) -> str:
-        """Get templates file path using strategy pattern."""
-        try:
-            # Use provider selection service that respects CLI override
-            selection_result = (
-                self._provider_selection_service.select_provider_for_template_loading()
-            )
-            provider_name = selection_result.provider_instance
-            provider_type = selection_result.provider_type
+    def get_scheduler_type(self) -> str:
+        """Return the scheduler type identifier."""
+        return "default"
 
-            # Use scheduler strategy for filename (consistent with generation)
-            filename = self.get_templates_filename(provider_name, provider_type)
+    def get_scripts_directory(self) -> Path | None:
+        """Default strategy has no scripts directory."""
+        return None
 
-            # Use ConfigurationManager to resolve the file path
-            return self.config_manager.resolve_file("template", filename)
+    def _templates_filename_pattern_key(self) -> str:
+        return "provider_type"
 
-        except Exception as e:
-            self._logger.error("Failed to determine templates file path: %s", e)
-            # Fallback to default behavior
-            filename = self.get_templates_filename("default", "default")
-            return self.config_manager.resolve_file("template", filename)
+    def _templates_filename_fallback(self, provider_name: str, provider_type: str) -> str:
+        return f"{provider_type}_templates.json"
 
-    def get_template_paths(self) -> list[str]:
-        """Get template file paths."""
-        return [self.get_templates_file_path()]
+    def load_templates_from_path(
+        self, template_path: str, provider_override: Any = None
+    ) -> list[dict[str, Any]]:
+        """Load templates from a specific path."""
+        if not os.path.exists(template_path):
+            self.logger.debug("Template file not found: %s", template_path)
+            return []
 
-    def load_templates_from_path(self, template_path: str) -> list[dict[str, Any]]:
-        """Load templates from path - no field mapping needed."""
         try:
             import json
 
             with open(template_path) as f:
                 data = json.load(f)
 
-            # Handle different template file formats
-            if isinstance(data, dict) and "templates" in data:
-                return data["templates"]
-            elif isinstance(data, list):
-                return data
-            else:
-                return []
+            file_scheduler_type = data.get("scheduler_type") if isinstance(data, dict) else None
 
-        except Exception:
-            # Return empty list on error - let caller handle logging
+            if file_scheduler_type and file_scheduler_type != self.get_scheduler_type():
+                delegated = self._delegate_load_to_strategy(
+                    file_scheduler_type, template_path, provider_override
+                )
+                if delegated is not None:
+                    return delegated
+                self.logger.warning(
+                    "Could not delegate to '%s' strategy, loading best-effort without field mapping",
+                    file_scheduler_type,
+                )
+
+            raw_templates = self._load_single_file_from_data(data)
+            provider_name = provider_override or self._get_provider_name()
+            templates = [self._apply_template_defaults(t, provider_name) for t in raw_templates]
+            self.logger.debug("Loaded %d templates from %s", len(templates), template_path)
+            return templates
+        except Exception as e:
+            self.logger.error("Error loading templates from %s: %s", template_path, e)
             return []
+
+    def _load_single_file_from_data(self, data: Any) -> list[dict[str, Any]]:
+        """Extract templates list from already-parsed JSON data."""
+        if isinstance(data, dict) and "templates" in data:
+            return data["templates"]
+        elif isinstance(data, list):
+            return data
+        return []
 
     def get_config_file_path(self) -> str:
         """Get config file path - using default configuration."""
@@ -103,9 +118,7 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
             # Provide helpful error message for debugging
             raise ValueError(f"Failed to create Template from data: {e}. Data: {raw_data}")
 
-    def parse_request_data(
-        self, raw_data: dict[str, Any]
-    ) -> Union[dict[str, Any], list[dict[str, Any]]]:
+    def parse_request_data(self, raw_data: dict[str, Any]) -> dict[str, Any] | list[dict[str, Any]]:
         """
         Parse request data using native domain format - no conversion needed.
 
@@ -114,15 +127,22 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
 
         # Request Status
         if "requests" in raw_data:
-            return [{"request_id": req.get("request_id")} for req in raw_data["requests"]]
+            return [
+                {"request_id": req.get("request_id") or req.get("requestId")}
+                for req in raw_data["requests"]
+            ]
 
-        # Request Machines - handle nested format: {"template": {"template_id": ..., "machine_count": ...}}
+        # Request Machines - handle nested format (both snake_case and HF camelCase):
+        # {"template": {"template_id": ..., "machine_count": ...}}
+        # {"template": {"templateId": ..., "machineCount": ...}}
         if "template" in raw_data:
             template_data = raw_data["template"]
             return {
-                "template_id": template_data.get("template_id"),
-                "requested_count": template_data.get("machine_count", 1),
-                "request_type": template_data.get("request_type", "provision"),
+                "template_id": template_data.get("template_id") or template_data.get("templateId"),
+                "requested_count": template_data.get("machine_count")
+                or template_data.get("machineCount", 1),
+                "request_type": template_data.get("request_type")
+                or template_data.get("requestType", "provision"),
                 "metadata": raw_data.get("metadata", {}),
             }
 
@@ -136,7 +156,7 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
             "metadata": raw_data.get("metadata", {}),
         }
 
-    def format_templates_response(self, templates: list[Template]) -> dict[str, Any]:
+    def format_templates_response(self, templates: list[Any]) -> dict[str, Any]:
         """
         Format domain Templates to native domain response format.
 
@@ -145,8 +165,20 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
         return {
             "templates": [self.format_template_for_display(template) for template in templates],
             "message": "Templates retrieved successfully",
-            "count": len(templates),
+            "total_count": len(templates),
         }
+
+    def format_template_for_display(self, template: Any) -> dict[str, Any]:
+        """Format template for display, adding required schema fields."""
+        d = template.to_dict()
+        # Schema requires max_capacity (alias for max_instances)
+        if "max_capacity" not in d:
+            d["max_capacity"] = d.get("max_instances", 1)
+        # Schema requires instance_type - derive from machine_types if available
+        if "instance_type" not in d:
+            machine_types = d.get("machine_types", {})
+            d["instance_type"] = next(iter(machine_types), "") if machine_types else ""
+        return d
 
     def format_templates_for_generation(self, templates: list[dict]) -> list[dict]:
         """No conversion needed - use field mapper (identity mapping)."""
@@ -164,30 +196,25 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
             "count": len(machines),
         }
 
-    def get_storage_base_path(self) -> str:
-        """Get storage base path within working directory."""
-        import os
-
-        workdir = self.get_working_directory()
-        return os.path.join(workdir, "data")
-
-    @classmethod
-    def get_templates_filename(
-        cls, provider_name: str, provider_type: str, config: dict = None
-    ) -> str:
-        """Get templates filename with config override support.
-
-        Can be called as classmethod (before app init) or instance method.
-        """
-        # Check config override first
-        if config:
-            scheduler_config = config.get("scheduler", {})
-            config_filename = scheduler_config.get("templates_filename")
-            if config_filename:
-                return config_filename
-
-        # Use Default scheduler default: 'templates.json'
-        return "templates.json"
+    def format_machine_details_response(self, machine_data: dict) -> dict:
+        """Format machine details with default fields."""
+        return {
+            "id": machine_data.get("id"),
+            "name": machine_data.get("name"),
+            "status": machine_data.get("status"),
+            "provider": "default",
+            "instance_type": machine_data.get("instance_type"),
+            "region": machine_data.get("region"),
+            "image_id": machine_data.get("image_id"),
+            "private_ip": machine_data.get("private_ip"),
+            "public_ip": machine_data.get("public_ip"),
+            "subnet_id": machine_data.get("subnet_id"),
+            "security_group_ids": machine_data.get("security_group_ids"),
+            "status_reason": machine_data.get("status_reason"),
+            "launch_time": machine_data.get("launch_time"),
+            "termination_time": machine_data.get("termination_time"),
+            "tags": machine_data.get("tags"),
+        }
 
     def should_log_to_console(self) -> bool:
         """Check if logs should be written to console for Default scheduler.
@@ -198,11 +225,10 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
 
     def format_error_response(self, error: Exception, context: dict[str, Any]) -> dict[str, Any]:
         """Format error response for Default scheduler (console + JSON)."""
-        import sys
         import traceback
 
-        # Print to console
-        print(f"ERROR: {error}", file=sys.stderr)
+        # Log error
+        self.logger.error("Scheduler error: %s", error)
         if context.get("verbose"):
             traceback.print_exc()
 
@@ -213,22 +239,6 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
             response["traceback"] = traceback.format_exc()
 
         return response
-
-    def get_exit_code_for_status(self, status: str) -> int:
-        """Default scheduler exit codes: 1 for any problem, 0 for success."""
-        problem_statuses = ["failed", "cancelled", "timeout", "partial"]
-        return 1 if status in problem_statuses else 0
-
-    def format_health_response(self, checks: list[dict[str, Any]]) -> dict[str, Any]:
-        """Format health check response for Default scheduler."""
-        passed = sum(1 for c in checks if c.get("status") == "pass")
-        failed = len(checks) - passed
-
-        return {
-            "success": failed == 0,
-            "checks": checks,
-            "summary": {"total": len(checks), "passed": passed, "failed": failed},
-        }
 
     def get_directory(self, file_type: str) -> str | None:
         """Get directory path for the given file type."""
@@ -245,21 +255,24 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
         else:
             return workdir
 
-    def format_request_response(self, request_data: dict[str, Any]) -> dict[str, Any]:
+    def format_request_response(self, request_data: Any) -> dict[str, Any]:
         """Format request creation response to native domain format."""
+        request_dict = self._coerce_to_dict(request_data)
+
         # If this is a status/detail response, pass through the requests list and status
-        if "requests" in request_data:
+        if "requests" in request_dict:
             return {
-                "requests": request_data.get("requests", []),
-                "status": request_data.get("status", "complete"),
-                "message": request_data.get("message", "Status retrieved successfully"),
-                "errors": request_data.get("errors"),
+                "requests": request_dict.get("requests", []),
+                "status": request_dict.get("status", "complete"),
+                "message": request_dict.get("message", "Status retrieved successfully"),
+                "errors": request_dict.get("errors"),
             }
 
         # Get status and error info
-        status = request_data.get("status", "pending")
-        error_message = request_data.get("error_message")
-        request_id = request_data.get("request_id", request_data.get("requestId"))
+        status = request_dict.get("status", "pending")
+        error_message = request_dict.get("status_message") or request_dict.get("message")
+        raw_id = request_dict.get("request_id", request_dict.get("requestId"))
+        request_id = self._unwrap_request_id(raw_id)
 
         # Status-based message and response logic
         if status == "failed":
@@ -279,11 +292,11 @@ class DefaultSchedulerStrategy(BaseSchedulerStrategy):
         elif status == "complete":
             return {"request_id": request_id, "message": "Request completed successfully"}
         elif status == "in_progress":
-            return {"request_id": request_id, "message": "Request in progress"}
+            return {"request_id": request_id, "message": "Request submitted successfully."}
         elif status == "pending":
-            return {"request_id": request_id, "message": "Request submitted successfully"}
+            return {"request_id": request_id, "message": "Request submitted successfully."}
         else:
             return {
                 "request_id": request_id,
-                "message": request_data.get("message", "Request status unknown"),
+                "message": request_dict.get("message", "Request status unknown"),
             }

@@ -171,7 +171,7 @@ class TestAuthenticationSecurity:
             # Should be rejected
             assert response.status_code == 401
 
-        except Exception:
+        except Exception:  # nosec B110
             # If JWT library prevents 'none' algorithm, that's also good
             pass
 

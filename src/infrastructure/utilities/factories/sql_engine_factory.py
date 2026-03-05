@@ -2,14 +2,15 @@
 
 import os
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import QueuePool
 
-from config import SqlStrategyConfig
 from config.manager import ConfigurationManager
+from config.schemas.storage_schema import SqlStrategyConfig
 from infrastructure.logging.logger import get_logger
 
 
@@ -62,7 +63,7 @@ class SQLEngineFactory:
         db_type = config.type
 
         # Create engine with appropriate settings
-        engine_kwargs = {
+        engine_kwargs: dict[str, Any] = {
             "echo": False,  # Default to no echo, can be overridden in config
         }
 

@@ -1,38 +1,31 @@
-"""Domain port for storage operations."""
+"""Domain port for storage operations.
 
-from abc import ABC, abstractmethod
-from typing import Generic, Optional, TypeVar
+This is a composite interface that combines focused storage interfaces.
+Clients should depend on the specific focused interfaces they need rather than this fat interface.
+"""
+
+from abc import ABC
+from typing import Generic, TypeVar
+
+from .storage_lifecycle_port import StorageLifecyclePort
+from .storage_reader_port import StorageReaderPort
+from .storage_writer_port import StorageWriterPort
 
 T = TypeVar("T")
 
 
-class StoragePort(ABC, Generic[T]):
-    """Domain port for storage operations."""
+class StoragePort(
+    StorageReaderPort[T], StorageWriterPort[T], StorageLifecyclePort, ABC, Generic[T]
+):
+    """Composite storage port combining read, write, and lifecycle operations.
 
-    @abstractmethod
-    def save(self, entity: T) -> None:
-        """Save an entity to storage."""
+    This interface is provided for backward compatibility and for implementations
+    that need all storage operations. New code should depend on the focused interfaces:
+    - StorageReaderPort: For read-only operations
+    - StorageWriterPort: For write-only operations
+    - StorageLifecyclePort: For lifecycle management
 
-    @abstractmethod
-    def find_by_id(self, entity_id: str) -> Optional[T]:
-        """Find entity by ID."""
+    This follows ISP by allowing clients to depend on minimal interfaces.
+    """
 
-    @abstractmethod
-    def find_all(self) -> list[T]:
-        """Find all entities."""
-
-    @abstractmethod
-    def delete(self, entity_id: str) -> None:
-        """Delete entity by ID."""
-
-    @abstractmethod
-    def exists(self, entity_id: str) -> bool:
-        """Check if entity exists."""
-
-    @abstractmethod
-    def count(self) -> int:
-        """Count total entities."""
-
-    @abstractmethod
-    def cleanup(self) -> None:
-        """Clean up storage resources."""
+    pass

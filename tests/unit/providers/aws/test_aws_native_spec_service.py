@@ -33,7 +33,7 @@ class TestAWSNativeSpecService:
         template = Mock()
         template.template_id = "test-template"
         template.image_id = "ami-12345678"
-        template.instance_type = "t2.micro"
+        template.machine_types = {"t2.micro": 1}
         template.launch_template_spec = {
             "LaunchTemplateName": "custom-template",
             "LaunchTemplateData": {
@@ -90,7 +90,7 @@ class TestAWSNativeSpecService:
         template = Mock()
         template.template_id = "test-template"
         template.image_id = "ami-12345678"
-        template.instance_type = "t2.micro"
+        template.machine_types = {"t2.micro": 1}
         template.launch_template_spec = None
         template.launch_template_spec_file = None
         template.provider_api_spec = None

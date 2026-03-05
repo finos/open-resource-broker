@@ -19,6 +19,7 @@ class MachineStatus(str, Enum):
     # Define with default values
     # External states (HostFactory-facing)
     PENDING = "pending"
+    LAUNCHING = "launching"
     RUNNING = "running"
     STOPPING = "stopping"
     STOPPED = "stopped"
@@ -46,6 +47,7 @@ class MachineStatus(str, Enum):
         # Direct mapping for domain values
         status_map = {
             "pending": cls.PENDING,
+            "launching": cls.LAUNCHING,
             "running": cls.RUNNING,
             "stopping": cls.STOPPING,
             "stopped": cls.STOPPED,
@@ -65,7 +67,8 @@ class MachineStatus(str, Enum):
     def can_transition_to(self, new_status: MachineStatus) -> bool:
         """Validate state transition."""
         valid_transitions = {
-            self.PENDING: {self.RUNNING, self.FAILED},
+            self.PENDING: {self.LAUNCHING, self.FAILED},
+            self.LAUNCHING: {self.RUNNING, self.FAILED},
             self.RUNNING: {self.STOPPING, self.SHUTTING_DOWN},
             self.STOPPING: {self.STOPPED, self.FAILED},
             self.STOPPED: {self.RUNNING, self.TERMINATED},
@@ -85,4 +88,4 @@ class MachineStatus(str, Enum):
     @property
     def is_active(self) -> bool:
         """Check if status is active."""
-        return self in {self.PENDING, self.RUNNING}
+        return self in {self.PENDING, self.LAUNCHING, self.RUNNING}

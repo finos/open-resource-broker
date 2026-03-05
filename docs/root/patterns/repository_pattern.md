@@ -215,7 +215,7 @@ DynamoDB implementations provide scalable, managed NoSQL storage.
 ### DynamoDB Template Repository
 
 ```python
-# src/infrastructure/persistence/dynamodb/template_repository.py
+# src/infrastructure/storage/dynamodb/template_repository.py
 from typing import List, Optional, Dict, Any
 import boto3
 from boto3.dynamodb.conditions import Key, Attr
@@ -428,7 +428,7 @@ In-memory implementations provide fast access for development and testing.
 ### In-Memory Template Repository
 
 ```python
-# src/infrastructure/persistence/memory/template_repository.py
+# src/infrastructure/storage/memory/template_repository.py
 from typing import List, Optional, Dict, Any
 from src.domain.template.repository import TemplateRepository
 from src.domain.template.aggregate import Template

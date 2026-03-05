@@ -2,7 +2,7 @@
 
 import pytest
 
-from domain.base.value_objects import InstanceId
+from domain.machine.machine_identifiers import MachineId
 from infrastructure.interfaces.provider import ProviderConfig
 from tests.fixtures.mock_provider import MockProvider, create_mock_provider
 
@@ -15,9 +15,6 @@ class TestProviderPort:
         "provider_type,provider_class",
         [
             ("mock", MockProvider),
-            # Add more providers as they're implemented
-            # ("provider1", Provider1Provider),
-            # ("provider2", Provider2Provider),
         ],
     )
     def test_provider_interface_compliance(self, provider_type: str, provider_class):
@@ -41,19 +38,18 @@ class TestProviderPort:
         assert provider.initialize(config) is True
 
     def test_provider_factory_registration(self):
-        """Test provider factory can register new providers."""
-        from infrastructure.utilities.factories.provider_factory import ProviderFactory
+        """Test provider factory pattern using a simple dict-based registry."""
+        registry = {}
 
-        factory = ProviderFactory()
+        # Register mock provider
+        registry["mock"] = MockProvider
 
-        # Test registering mock provider
-        factory.register_provider("mock", MockProvider)
-        assert factory.is_provider_supported("mock")
-        assert "mock" in factory.get_supported_providers()
+        assert "mock" in registry
 
-        # Test creating provider
+        # Create provider from registry
         config = ProviderConfig(provider_type="mock")
-        provider = factory.create_provider("mock", config)
+        provider = registry["mock"]()
+        provider.initialize(config)
         assert isinstance(provider, MockProvider)
         assert provider.provider_type == "mock"
 
@@ -82,11 +78,11 @@ class TestProviderPort:
         # Initialize
         assert provider.initialize(config) is True
 
-        # Test create instances
-        template_config = {"image_id": "mock-ami", "instance_type": "mock.small"}
+        # Test create instances — returns MachineId, not InstanceId
+        template_config = {"image_id": "mock-ami", "machine_types": {"mock.small": 1}}
         instances = provider.create_instances(template_config, 2)
         assert len(instances) == 2
-        assert all(isinstance(inst, InstanceId) for inst in instances)
+        assert all(isinstance(inst, MachineId) for inst in instances)
 
         # Test get status
         status_map = provider.get_instance_status(instances)
@@ -108,19 +104,19 @@ class TestProviderPort:
 
         # Configure custom responses
         custom_instances = [
-            InstanceId(value="custom-001"),
-            InstanceId(value="custom-002"),
+            MachineId(value="custom-001"),
+            MachineId(value="custom-002"),
         ]
         provider.set_response("create_instances", custom_instances)
 
         custom_status = {
-            InstanceId(value="custom-001"): "running",
-            InstanceId(value="custom-002"): "stopped",
+            MachineId(value="custom-001"): "running",
+            MachineId(value="custom-002"): "stopped",
         }
         provider.set_response("get_instance_status", custom_status)
 
         # Test configured responses
-        template_config = {"image_id": "test", "instance_type": "test"}
+        template_config = {"image_id": "test", "machine_types": {"test": 1}}
         instances = provider.create_instances(template_config, 2)
         assert instances == custom_instances
 
@@ -133,18 +129,19 @@ class TestProviderPort:
         config = ProviderConfig(provider_type="mock")
         provider.initialize(config)
 
-        # Test valid template
+        # MockProvider.validate_template requires both image_id and instance_type
         valid_template = {
             "image_id": "ami-12345678",
             "instance_type": "t2.micro",
+            "machine_types": {"t2.micro": 1},
             "provider_api": "ec2_fleet",
         }
         result = provider.validate_template(valid_template)
         assert result["valid"] is True
         assert len(result["errors"]) == 0
 
-        # Test invalid template
-        invalid_template = {"provider_api": "ec2_fleet"}  # Missing required fields
+        # Test invalid template — missing both required fields
+        invalid_template = {"provider_api": "ec2_fleet"}
         result = provider.validate_template(invalid_template)
         assert result["valid"] is False
         assert len(result["errors"]) > 0

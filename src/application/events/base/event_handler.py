@@ -11,14 +11,8 @@ import time
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
-# Import types - using string imports to avoid circular dependencies
-try:
-    from domain.base.events import DomainEvent
-    from domain.base.ports import LoggingPort
-except ImportError:
-    # Fallback for testing or when dependencies aren't available
-    DomainEvent = Any
-    LoggingPort = Any
+from domain.base.events import DomainEvent
+from domain.base.ports import LoggingPort
 
 
 class EventHandler(ABC):
@@ -113,8 +107,7 @@ class EventHandler(ABC):
         if self.logger:
             self.logger.debug("Processing event: %s", event.event_type)
 
-    @abstractmethod
-    async def _post_process(self, event: DomainEvent) -> None:
+    async def _post_process(self, event: DomainEvent) -> None:  # noqa: B027
         """
         Perform common post-processing logic.
 
@@ -125,7 +118,6 @@ class EventHandler(ABC):
         Args:
             event: The domain event that was processed
         """
-        # Future: Add metrics collection, audit logging, etc.
 
     async def _process_with_retry(self, event: DomainEvent):
         """
@@ -224,8 +216,8 @@ class EventHandler(ABC):
             if hasattr(event, field_name):
                 result[field_name] = getattr(event, field_name)
             # Then try event data if it exists
-            elif hasattr(event, "data") and isinstance(event.data, dict):
-                result[field_name] = event.data.get(field_name, default_value)
+            elif hasattr(event, "data") and isinstance(getattr(event, "data", None), dict):
+                result[field_name] = event.data.get(field_name, default_value)  # type: ignore[union-attr]
             else:
                 result[field_name] = default_value
 

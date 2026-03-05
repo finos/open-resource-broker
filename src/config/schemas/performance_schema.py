@@ -16,8 +16,41 @@ class BatchSizesConfig(BaseModel):
     create_tags: int = Field(20, description="Batch size for create_tags operations")
     describe_instances: int = Field(25, description="Batch size for describe_instances operations")
     run_instances: int = Field(10, description="Batch size for run_instances operations")
+    describe_spot_fleet_instances: int = Field(
+        20, description="Batch size for describe_spot_fleet_instances operations"
+    )
+    describe_auto_scaling_groups: int = Field(
+        20, description="Batch size for describe_auto_scaling_groups operations"
+    )
+    describe_launch_templates: int = Field(
+        20, description="Batch size for describe_launch_templates operations"
+    )
+    describe_spot_fleet_requests: int = Field(
+        20, description="Batch size for describe_spot_fleet_requests operations"
+    )
+    describe_ec2_fleet_instances: int = Field(
+        20, description="Batch size for describe_ec2_fleet_instances operations"
+    )
+    describe_images: int = Field(15, description="Batch size for describe_images operations")
+    describe_security_groups: int = Field(
+        25, description="Batch size for describe_security_groups operations"
+    )
+    describe_subnets: int = Field(25, description="Batch size for describe_subnets operations")
 
-    @field_validator("terminate_instances", "create_tags", "describe_instances", "run_instances")
+    @field_validator(
+        "terminate_instances",
+        "create_tags",
+        "describe_instances",
+        "run_instances",
+        "describe_spot_fleet_instances",
+        "describe_auto_scaling_groups",
+        "describe_launch_templates",
+        "describe_spot_fleet_requests",
+        "describe_ec2_fleet_instances",
+        "describe_images",
+        "describe_security_groups",
+        "describe_subnets",
+    )
     @classmethod
     def validate_batch_size(cls, v: int) -> int:
         """Validate batch size."""
@@ -129,21 +162,38 @@ class CachingConfig(BaseModel):
     """Caching configuration for performance optimization."""
 
     ami_resolution: AMIResolutionCacheConfig = Field(
-        default_factory=lambda: AMIResolutionCacheConfig()
+        default_factory=lambda: AMIResolutionCacheConfig()  # type: ignore[call-arg]
     )
     handler_discovery: HandlerDiscoveryCacheConfig = Field(
-        default_factory=lambda: HandlerDiscoveryCacheConfig()
+        default_factory=lambda: HandlerDiscoveryCacheConfig()  # type: ignore[call-arg]
     )
     request_status: RequestStatusCacheConfig = Field(
-        default_factory=lambda: RequestStatusCacheConfig()
+        default_factory=lambda: RequestStatusCacheConfig()  # type: ignore[call-arg]
+    )
+
+
+class LazyLoadingConfig(BaseModel):
+    """Lazy loading configuration for the DI container."""
+
+    enabled: bool = Field(True, description="Enable lazy loading of services")
+    cache_instances: bool = Field(True, description="Cache lazily loaded instances")
+    discovery_mode: str = Field("lazy", description="Handler discovery mode (lazy or eager)")
+    connection_mode: str = Field(
+        "lazy", description="Connection establishment mode (lazy or eager)"
+    )
+    preload_critical: list[str] = Field(
+        default_factory=list, description="List of critical services to preload at startup"
     )
 
 
 class PerformanceConfig(BaseModel):
     """Performance optimization configuration."""
 
+    lazy_loading: LazyLoadingConfig = Field(
+        default_factory=lambda: LazyLoadingConfig()  # type: ignore[call-arg]
+    )
     enable_batching: bool = Field(True, description="Whether to enable batching of API calls")
-    batch_sizes: BatchSizesConfig = Field(default_factory=lambda: BatchSizesConfig())
+    batch_sizes: BatchSizesConfig = Field(default_factory=lambda: BatchSizesConfig())  # type: ignore[call-arg]
     enable_parallel: bool = Field(True, description="Whether to enable parallel processing")
     max_workers: int = Field(
         10, description="Maximum number of worker threads for parallel processing"
@@ -154,9 +204,9 @@ class PerformanceConfig(BaseModel):
         True, description="Whether to enable adaptive batch sizing"
     )
     adaptive_batch_sizing: AdaptiveBatchSizingConfig = Field(
-        default_factory=lambda: AdaptiveBatchSizingConfig()
+        default_factory=lambda: AdaptiveBatchSizingConfig()  # type: ignore[call-arg]
     )
-    caching: CachingConfig = Field(default_factory=lambda: CachingConfig())
+    caching: CachingConfig = Field(default_factory=lambda: CachingConfig())  # type: ignore[call-arg]
 
     @field_validator("max_workers")
     @classmethod

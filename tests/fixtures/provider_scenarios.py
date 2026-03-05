@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from domain.base.value_objects import InstanceId
+from domain.machine.machine_identifiers import MachineId
 
 
 class ProviderScenarios:
@@ -16,12 +16,12 @@ class ProviderScenarios:
                 "name": "all_instances_succeed",
                 "description": "All instances created and running successfully",
                 "create_instances": [
-                    InstanceId(value="test-001"),
-                    InstanceId(value="test-002"),
+                    MachineId(value="test-001"),
+                    MachineId(value="test-002"),
                 ],
                 "instance_status": {
-                    InstanceId(value="test-001"): "running",
-                    InstanceId(value="test-002"): "running",
+                    MachineId(value="test-001"): "running",
+                    MachineId(value="test-002"): "running",
                 },
                 "expected_request_status": "complete",
                 "expected_machine_results": ["succeed", "succeed"],
@@ -30,17 +30,17 @@ class ProviderScenarios:
                 "name": "instances_pending_then_running",
                 "description": "Instances start pending then become running",
                 "create_instances": [
-                    InstanceId(value="test-003"),
-                    InstanceId(value="test-004"),
+                    MachineId(value="test-003"),
+                    MachineId(value="test-004"),
                 ],
                 "status_progression": [
                     {
-                        InstanceId(value="test-003"): "pending",
-                        InstanceId(value="test-004"): "pending",
+                        MachineId(value="test-003"): "pending",
+                        MachineId(value="test-004"): "pending",
                     },
                     {
-                        InstanceId(value="test-003"): "running",
-                        InstanceId(value="test-004"): "running",
+                        MachineId(value="test-003"): "running",
+                        MachineId(value="test-004"): "running",
                     },
                 ],
                 "expected_request_status": "complete",
@@ -63,10 +63,10 @@ class ProviderScenarios:
             {
                 "name": "some_instances_fail",
                 "description": "Some instances succeed, others fail",
-                "create_instances": [InstanceId(value="test-005")],
+                "create_instances": [MachineId(value="test-005")],
                 "instance_status": {
-                    InstanceId(value="test-005"): "running",
-                    InstanceId(value="test-006"): "terminated",  # Failed to start
+                    MachineId(value="test-005"): "running",
+                    MachineId(value="test-006"): "terminated",  # Failed to start
                 },
                 "expected_request_status": "complete_with_error",
                 "expected_machine_results": ["succeed", "fail"],

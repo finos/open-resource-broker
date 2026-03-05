@@ -21,7 +21,7 @@ PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 cd "$PROJECT_ROOT"
 
 # Use centralized tool runner
-RUN_TOOL="./dev-tools/scripts/run_tool.sh"
+RUN_TOOL="./dev-tools/setup/run_tool.sh"
 
 # Clean previous builds
 if [ "$QUIET" = false ]; then

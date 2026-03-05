@@ -71,28 +71,18 @@ class ConfigValidator:
                     aws_config = provider.config
 
                     # Validate AWS-specific business rules
-                    if hasattr(aws_config, "aws_max_retries") and aws_config.aws_max_retries > 10:
+                    if hasattr(aws_config, "aws_max_retries") and aws_config.aws_max_retries > 10:  # type: ignore[union-attr]
                         result.add_warning(
                             f"AWS provider '{provider.name}' aws_max_retries is very high, consider reducing for better performance"
                         )
 
                     if (
                         hasattr(aws_config, "aws_read_timeout")
-                        and aws_config.aws_read_timeout > 300
+                        and aws_config.aws_read_timeout > 300  # type: ignore[union-attr]
                     ):
                         result.add_warning(
                             f"AWS provider '{provider.name}' aws_read_timeout is very high, consider reducing to avoid long waits"
                         )
-
-        # Validate template configuration
-        if config.template:
-            template_config = config.template
-
-            if len(template_config.subnet_ids) > 16:
-                result.add_error("Too many subnet IDs specified (maximum 16)")
-
-            if len(template_config.security_group_ids) > 5:
-                result.add_error("Too many security group IDs specified (maximum 5)")
 
         # Validate performance settings
         if config.performance.max_workers > 50:

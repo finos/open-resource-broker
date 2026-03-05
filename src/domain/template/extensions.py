@@ -139,13 +139,13 @@ class TemplateExtensionRegistry:
         # Try extension instance first
         extension_instance = cls.get_extension_instance(provider_type)
         if extension_instance:
-            return extension_instance.to_template_defaults()
+            return extension_instance.to_template_defaults()  # type: ignore[attr-defined]
 
         # Try creating from extension class
         if config_data:
             extension_config = cls.create_extension_config(provider_type, config_data)
             if extension_config and hasattr(extension_config, "to_template_defaults"):
-                return extension_config.to_template_defaults()
+                return extension_config.to_template_defaults()  # type: ignore[attr-defined]
 
         return {}
 

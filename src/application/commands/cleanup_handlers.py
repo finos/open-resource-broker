@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Any
 
 from application.base.handlers import BaseCommandHandler
 from application.decorators import command_handler
@@ -18,9 +17,12 @@ from domain.machine.repository import MachineRepository
 from domain.request.repository import RequestRepository
 
 
-@command_handler(CleanupOldRequestsCommand)
-class CleanupOldRequestsHandler(BaseCommandHandler[CleanupOldRequestsCommand, dict[str, Any]]):
-    """Handler for cleaning up old requests using domain commands."""
+@command_handler(CleanupOldRequestsCommand)  # type: ignore[arg-type]
+class CleanupOldRequestsHandler(BaseCommandHandler[CleanupOldRequestsCommand, None]):  # type: ignore[type-var]
+    """Handler for cleaning up old requests using domain commands.
+
+    CQRS Compliance: Returns None. Results are stored in command fields.
+    """
 
     def __init__(
         self,
@@ -38,11 +40,16 @@ class CleanupOldRequestsHandler(BaseCommandHandler[CleanupOldRequestsCommand, di
     async def validate_command(self, command: CleanupOldRequestsCommand) -> None:
         """Validate cleanup old requests command."""
         await super().validate_command(command)
-        if command.older_than_days <= 0:
+        if not hasattr(command, "older_than_days") or command.older_than_days <= 0:
             raise ValueError("older_than_days must be positive")
 
-    async def execute_command(self, command: CleanupOldRequestsCommand) -> dict[str, Any]:
-        """Handle cleanup old requests command."""
+    async def execute_command(self, command: CleanupOldRequestsCommand) -> None:
+        """Handle cleanup old requests command.
+
+        CQRS Compliance: Returns None. Results stored in command fields:
+        - command.requests_cleaned: Number of requests cleaned
+        - command.request_ids_found: List of request IDs found (dry run)
+        """
         self.logger.info("Cleaning up requests older than %s days", command.older_than_days)
         cutoff_date = datetime.utcnow() - timedelta(days=command.older_than_days)
 
@@ -55,11 +62,9 @@ class CleanupOldRequestsHandler(BaseCommandHandler[CleanupOldRequestsCommand, di
 
                 if command.dry_run:
                     self.logger.info("DRY RUN: Would cleanup %s requests", len(old_requests))
-                    return {
-                        "dry_run": True,
-                        "requests_found": len(old_requests),
-                        "request_ids": [str(req.request_id) for req in old_requests],
-                    }
+                    command.requests_cleaned = 0
+                    command.request_ids_found = [str(req.request_id) for req in old_requests]
+                    return
 
                 # Actually cleanup requests
                 cleaned_count = 0
@@ -84,23 +89,26 @@ class CleanupOldRequestsHandler(BaseCommandHandler[CleanupOldRequestsCommand, di
                     resource_count=cleaned_count,
                     cleanup_reason=f"Cleanup requests older than {command.older_than_days} days",
                 )
-                self.event_publisher.publish(cleanup_event)
+                if self.event_publisher is not None:
+                    self.event_publisher.publish(cleanup_event)
+
+                # Store results in command
+                command.requests_cleaned = cleaned_count
+                command.request_ids_found = []
 
                 self.logger.info("Successfully cleaned up %s old requests", cleaned_count)
-                return {
-                    "success": True,
-                    "requests_cleaned": cleaned_count,
-                    "cutoff_date": cutoff_date.isoformat(),
-                }
 
         except Exception as e:
             self.logger.error("Failed to cleanup old requests: %s", e)
             raise
 
 
-@command_handler(CleanupAllResourcesCommand)
-class CleanupAllResourcesHandler(BaseCommandHandler[CleanupAllResourcesCommand, dict[str, Any]]):
-    """Handler for cleaning up all resources (requests and machines)."""
+@command_handler(CleanupAllResourcesCommand)  # type: ignore[arg-type]
+class CleanupAllResourcesHandler(BaseCommandHandler[CleanupAllResourcesCommand, None]):  # type: ignore[type-var]
+    """Handler for cleaning up all resources (requests and machines).
+
+    CQRS Compliance: Returns None. Results are stored in command fields.
+    """
 
     def __init__(
         self,
@@ -122,8 +130,14 @@ class CleanupAllResourcesHandler(BaseCommandHandler[CleanupAllResourcesCommand, 
         if command.older_than_days <= 0:
             raise ValueError("older_than_days must be positive")
 
-    async def execute_command(self, command: CleanupAllResourcesCommand) -> dict[str, Any]:
-        """Handle cleanup all resources command."""
+    async def execute_command(self, command: CleanupAllResourcesCommand) -> None:
+        """Handle cleanup all resources command.
+
+        CQRS Compliance: Returns None. Results stored in command fields:
+        - command.requests_cleaned: Number of requests cleaned
+        - command.machines_cleaned: Number of machines cleaned
+        - command.total_cleaned: Total resources cleaned
+        """
         self.logger.info("Cleaning up all resources older than %s days", command.older_than_days)
         cutoff_date = datetime.utcnow() - timedelta(days=command.older_than_days)
 
@@ -145,11 +159,10 @@ class CleanupAllResourcesHandler(BaseCommandHandler[CleanupAllResourcesCommand, 
                         len(old_requests),
                         len(old_machines),
                     )
-                    return {
-                        "dry_run": True,
-                        "requests_found": len(old_requests),
-                        "machines_found": len(old_machines),
-                    }
+                    command.requests_cleaned = 0
+                    command.machines_cleaned = 0
+                    command.total_cleaned = 0
+                    return
 
                 # Cleanup resources
                 requests_cleaned = 0
@@ -185,21 +198,19 @@ class CleanupAllResourcesHandler(BaseCommandHandler[CleanupAllResourcesCommand, 
                     resource_count=requests_cleaned + machines_cleaned,
                     cleanup_reason=f"Cleanup all resources older than {command.older_than_days} days",
                 )
-                self.event_publisher.publish(cleanup_event)
+                if self.event_publisher is not None:
+                    self.event_publisher.publish(cleanup_event)
+
+                # Store results in command
+                command.requests_cleaned = requests_cleaned
+                command.machines_cleaned = machines_cleaned
+                command.total_cleaned = requests_cleaned + machines_cleaned
 
                 self.logger.info(
                     "Successfully cleaned up %s requests and %s machines",
                     requests_cleaned,
                     machines_cleaned,
                 )
-
-                return {
-                    "success": True,
-                    "requests_cleaned": requests_cleaned,
-                    "machines_cleaned": machines_cleaned,
-                    "total_cleaned": requests_cleaned + machines_cleaned,
-                    "cutoff_date": cutoff_date.isoformat(),
-                }
 
         except Exception as e:
             self.logger.error("Failed to cleanup all resources: %s", e)

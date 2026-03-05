@@ -60,7 +60,7 @@ def handle_version():
 def handle_run():
     """Handle run command."""
     # Static script path - no user input validation needed
-    script_path = "./dev-tools/scripts/container_build.sh"
+    script_path = "./dev-tools/container/container_build.sh"
     try:
         subprocess.run([script_path], check=True)
         return 0
@@ -109,7 +109,7 @@ def handle_multi(push):
     if not isinstance(push, bool):
         raise ValueError(f"Invalid push parameter: {push}")
 
-    script_path = "./dev-tools/scripts/container_build.sh"
+    script_path = "./dev-tools/container/container_build.sh"
     cmd = [script_path]
 
     if push:

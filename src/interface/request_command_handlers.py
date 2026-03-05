@@ -1,8 +1,9 @@
 """Request-related command handlers for the interface layer."""
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Union
 
 from domain.base.ports.scheduler_port import SchedulerPort
+from domain.request.exceptions import RequestNotFoundError
 from infrastructure.di.buses import CommandBus, QueryBus
 from infrastructure.di.container import get_container
 from infrastructure.error.decorators import handle_interface_exceptions
@@ -12,9 +13,11 @@ if TYPE_CHECKING:
 
 
 @handle_interface_exceptions(context="get_request_status", interface_type="cli")
-async def handle_get_request_status(args: "argparse.Namespace") -> dict[str, Any]:
+async def handle_get_request_status(
+    args: "argparse.Namespace",
+) -> Union[dict[str, Any], tuple[dict[str, Any], int], list[Any]]:
     """
-    Handle get request status operations.
+    Handle get request status operations with --all support.
 
     Args:
         args: Argument namespace with resource/action structure
@@ -26,50 +29,134 @@ async def handle_get_request_status(args: "argparse.Namespace") -> dict[str, Any
     query_bus = container.get(QueryBus)
     scheduler_strategy = container.get(SchedulerPort)
 
-    # Pass raw input data to scheduler strategy (scheduler-agnostic)
-    # First precedence is input data, then arguments
-    if hasattr(args, "input_data") and args.input_data:
-        raw_request_data = args.input_data
-    else:
-        request_ids_from_args = []
-        # Merge positional and flag arguments
-        if hasattr(args, "request_ids") and args.request_ids:
-            request_ids_from_args.extend(args.request_ids)
-        if hasattr(args, "flag_request_ids") and args.flag_request_ids:
-            request_ids_from_args.extend(args.flag_request_ids)
-        elif hasattr(args, "request_id") and args.request_id:
-            request_ids_from_args.append(args.request_id)
+    # Validation: Prevent --all with specific IDs
+    has_all = getattr(args, "all", False)
+    has_specific_ids = bool(
+        getattr(args, "request_ids", []) or getattr(args, "flag_request_ids", [])
+    )
 
-        raw_request_data = {
-            "requests": [{"request_id": request_id} for request_id in request_ids_from_args]
+    if has_all and has_specific_ids:
+        return {
+            "error": "Cannot use --all with specific request IDs",
+            "message": "Use either --all or specific IDs, not both",
         }
 
-    # Let scheduler strategy parse the raw data (each scheduler handles its own format)
-    parsed_data_list = scheduler_strategy.parse_request_data(raw_request_data)
+    if has_all:
+        # Create query for all active requests
+        from application.dto.queries import ListActiveRequestsQuery
 
-    # Validate parsed data
-    if not isinstance(parsed_data_list, list) or len(parsed_data_list) == 0:
-        return {"error": "No request ID provided", "message": "Request ID is required"}
+        query = ListActiveRequestsQuery(all_resources=True)
+        request_dtos = await query_bus.execute(query)
 
-    request_dtos = []
+        # Format response using scheduler strategy
+        return scheduler_strategy.format_request_status_response(request_dtos)
+    else:
+        # Existing specific ID logic
+        # Pass raw input data to scheduler strategy (scheduler-agnostic)
+        # First precedence is input data, then arguments
+        if hasattr(args, "input_data") and args.input_data:
+            raw_request_data = args.input_data
+        else:
+            request_ids_from_args = []
 
-    from application.dto.queries import GetRequestQuery
+            # Handle request_id that might be a list (from CLI command factory)
+            if hasattr(args, "request_id") and args.request_id:
+                if isinstance(args.request_id, list):
+                    request_ids_from_args.extend(args.request_id)
+                else:
+                    request_ids_from_args.append(args.request_id)
 
-    for parsed_data in parsed_data_list:
-        request_id = parsed_data.get("request_id")
-        if not request_id:
-            continue
+            # Merge positional and flag arguments
+            if hasattr(args, "request_ids") and args.request_ids:
+                request_ids_from_args.extend(args.request_ids)
+            if hasattr(args, "flag_request_ids") and args.flag_request_ids:
+                request_ids_from_args.extend(args.flag_request_ids)
 
-        query = GetRequestQuery(request_id=request_id)
-        request_dto = await query_bus.execute(query)
-        request_dtos.append(request_dto)
+            raw_request_data = {
+                "requests": [{"request_id": request_id} for request_id in request_ids_from_args]
+            }
 
-    # Pass domain DTO to scheduler strategy - NO formatting logic here
-    return scheduler_strategy.format_request_status_response(request_dtos)
+        # Let scheduler strategy parse the raw data (each scheduler handles its own format)
+        parsed_result = scheduler_strategy.parse_request_data(raw_request_data)
+
+        # Validate parsed data - runtime may return a list despite port typing dict
+        parsed_data_list: list[dict[str, Any]] = (
+            parsed_result if isinstance(parsed_result, list) else [parsed_result]
+        )
+
+        if not parsed_data_list:
+            return {"error": "No request ID provided", "message": "Request ID is required"}
+
+        request_dtos = []
+
+        # Extract request IDs from parsed data
+        request_ids = [
+            item.get("request_id")
+            for item in parsed_data_list
+            if isinstance(item, dict) and item.get("request_id")
+        ]
+
+        if not request_ids:
+            return {"error": "No valid request IDs provided", "message": "Request IDs are required"}
+
+        # Use batch query if multiple IDs, individual queries otherwise
+        if len(request_ids) == 1:
+            from application.dto.queries import GetRequestQuery
+
+            try:
+                query = GetRequestQuery(request_id=str(request_ids[0]))
+                request_dto = await query_bus.execute(query)
+                if request_dto:
+                    request_dtos.append(request_dto)
+            except RequestNotFoundError:
+                from datetime import datetime
+
+                from application.request.dto import RequestDTO
+
+                request_dtos.append(
+                    RequestDTO(
+                        request_id=str(request_ids[0]),
+                        status="pending",
+                        requested_count=0,
+                        created_at=datetime.utcnow(),
+                    )
+                )
+            except Exception:
+                raise
+        else:
+            # For multiple IDs, we need to query each individually since there's no batch query yet
+            from application.dto.queries import GetRequestQuery
+
+            for request_id in request_ids:
+                try:
+                    query = GetRequestQuery(request_id=str(request_id))
+                    request_dto = await query_bus.execute(query)
+                    if request_dto:
+                        request_dtos.append(request_dto)
+                except RequestNotFoundError:
+                    from datetime import datetime
+
+                    from application.request.dto import RequestDTO
+
+                    request_dtos.append(
+                        RequestDTO(
+                            request_id=str(request_id),
+                            status="pending",
+                            requested_count=0,
+                            created_at=datetime.utcnow(),
+                        )
+                    )
+                except Exception:
+                    raise
+
+        # Format response using scheduler strategy
+        return scheduler_strategy.format_request_status_response(request_dtos)
 
 
 @handle_interface_exceptions(context="request_machines", interface_type="cli")
-async def handle_request_machines(args: "argparse.Namespace") -> dict[str, Any]:
+async def handle_request_machines(
+    args: "argparse.Namespace",
+) -> Union[dict[str, Any], tuple[dict[str, Any], int]]:
     """
     Handle request machines operations.
 
@@ -87,6 +174,7 @@ async def handle_request_machines(args: "argparse.Namespace") -> dict[str, Any]:
     from infrastructure.mocking.dry_run_context import is_dry_run_active
 
     # Pass raw input data to scheduler strategy (scheduler-agnostic)
+    # Each strategy's parse_request_data() owns envelope unwrapping for its own format
     if hasattr(args, "input_data") and args.input_data:
         raw_request_data = args.input_data
     else:
@@ -104,7 +192,8 @@ async def handle_request_machines(args: "argparse.Namespace") -> dict[str, Any]:
         }
 
     # Let scheduler strategy parse the raw data (each scheduler handles its own format)
-    parsed_data = scheduler_strategy.parse_request_data(raw_request_data)
+    parsed_result = scheduler_strategy.parse_request_data(raw_request_data)
+    parsed_data: dict[str, Any] = parsed_result if isinstance(parsed_result, dict) else {}
     template_id = parsed_data.get("template_id")
     machine_count = parsed_data.get("requested_count", 1)
 
@@ -124,12 +213,26 @@ async def handle_request_machines(args: "argparse.Namespace") -> dict[str, Any]:
     metadata = getattr(args, "metadata", {})
     metadata["dry_run"] = is_dry_run_active()
 
+    from api.utils.request_id_generator import generate_request_id
+    from domain.request.request_types import RequestType
+
+    request_id = generate_request_id(RequestType.ACQUIRE)
+
     command = CreateRequestCommand(
-        template_id=template_id, requested_count=int(machine_count), metadata=metadata
+        request_id=request_id,
+        template_id=template_id,
+        requested_count=int(machine_count),
+        metadata=metadata,
     )
 
-    # Execute command and get request ID - let exceptions bubble up
-    request_id = await command_bus.execute(command)
+    # Execute command — CQRS commands return None; use pre-generated request_id
+    try:
+        await command_bus.execute(command)  # type: ignore[arg-type]
+    except Exception as e:
+        error_response = {"request_id": request_id, "status": "failed", "status_message": str(e)}
+        if scheduler_strategy:
+            return scheduler_strategy.format_request_response(error_response), 1
+        return error_response, 1
 
     # Get the request details to include resource ID information
     try:
@@ -143,7 +246,7 @@ async def handle_request_machines(args: "argparse.Namespace") -> dict[str, Any]:
         resource_ids = getattr(request_dto, "resource_ids", []) if request_dto else []
 
         # Create response data with resource ID information
-        status = request_dto.status if request_dto else "unknown"
+        status = request_dto.status if request_dto else "pending"
         error_msg = None
         if request_dto and hasattr(request_dto, "metadata"):
             if isinstance(request_dto.metadata, dict):
@@ -156,13 +259,13 @@ async def handle_request_machines(args: "argparse.Namespace") -> dict[str, Any]:
             "resource_ids": resource_ids,
             "template_id": template_id,
             "status": status,
-            "error_message": error_msg,
+            "status_message": error_msg,
         }
 
         # Return success response using scheduler strategy formatting
         if scheduler_strategy:
             response = scheduler_strategy.format_request_response(request_data)
-            status = request_dto.status if request_dto else "unknown"
+            status = request_dto.status if request_dto else "pending"
             exit_code = scheduler_strategy.get_exit_code_for_status(status)
             return response, exit_code
         else:
@@ -195,22 +298,31 @@ async def handle_get_return_requests(args: "argparse.Namespace") -> dict[str, An
         args: Argument namespace with resource/action structure
 
     Returns:
-        Return requests list
+        Return requests list in scheduler format
     """
     container = get_container()
     query_bus = container.get(QueryBus)
-    container.get(SchedulerPort)
+    scheduler_strategy = container.get(SchedulerPort)
 
     from application.dto.queries import ListReturnRequestsQuery
 
-    query = ListReturnRequestsQuery()
-    requests = await query_bus.execute(query)
+    # Extract machine name filter from JSON input if provided
+    machine_names: list[str] = []
+    if hasattr(args, "input_data") and args.input_data:
+        raw = args.input_data
+        if "machines" in raw:
+            machine_names = [
+                name
+                for m in raw["machines"]
+                if isinstance(m, dict)
+                for name in [m.get("name") or m.get("machineId") or m.get("machine_id")]
+                if name is not None
+            ]
 
-    return {
-        "requests": requests,
-        "count": len(requests),
-        "message": "Return requests retrieved successfully",
-    }
+    query = ListReturnRequestsQuery(machine_names=machine_names)
+    request_dtos = await query_bus.execute(query)
+
+    return scheduler_strategy.format_request_status_response(request_dtos)
 
 
 @handle_interface_exceptions(context="request_return_machines", interface_type="cli")
@@ -226,18 +338,17 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> dict[str
     """
     container = get_container()
     command_bus = container.get(CommandBus)
-    # scheduler_strategy = container.get(SchedulerPort)
+    query_bus = container.get(QueryBus)
 
     from application.dto.commands import CreateReturnRequestCommand
 
-    # Handle input data from -f flag (HostFactory compatibility)
+    # Validation: Prevent --all with specific IDs
+    has_all = getattr(args, "all", False)
     machine_ids = []
+
+    # Handle input data from -f flag (HostFactory compatibility)
     if hasattr(args, "input_data") and args.input_data:
         # Extract machine IDs from JSON input data
-        # There is a discrepency in the documentation of the original HF https://www.ibm.com/docs/en/spectrum-symphony/7.3.2?topic=specification-requestreturnmachines
-        # documented expected format {"name": "(mandatory)(string) Host name of the machine that must be returned"}
-        # but in practice we get the following:
-        # Format: {"machines": [{"name": "192.168.0.1", "machineId": "i-xxx"}, {{"name": "192.168.0.2", "machineId": "i-yyy"}]}
         raw_request_data = args.input_data
         if "machines" in raw_request_data:
             machine_ids = [
@@ -249,6 +360,46 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> dict[str
         # Use positional arguments
         machine_ids = getattr(args, "machine_ids", [])
 
+    has_specific_ids = bool(machine_ids)
+
+    if has_all and has_specific_ids:
+        return {
+            "error": "Cannot use --all with specific machine IDs",
+            "message": "Use either --all or specific IDs, not both",
+        }
+
+    if has_all:
+        # Safety confirmation for destructive --all operations
+        has_force = getattr(args, "force", False)
+        if not has_force:
+            return {
+                "error": "Destructive operation requires --force flag",
+                "message": "Use --force to confirm returning all machines",
+            }
+
+        # Get all active machines
+        from application.dto.queries import ListMachinesQuery
+
+        query = ListMachinesQuery(all_resources=True, active_only=True)
+        machine_dtos = await query_bus.execute(query)
+
+        # Extract machine IDs from DTOs (handle both dict and object DTOs)
+        machine_ids = []
+        for machine in machine_dtos:
+            if isinstance(machine, dict):
+                machine_id = machine.get("machine_id")
+            else:
+                machine_id = getattr(machine, "machine_id", None)
+
+            if machine_id:
+                machine_ids.append(machine_id)
+
+        if not machine_ids:
+            return {
+                "error": "No active machines found",
+                "message": "No machines available to return",
+            }
+
     if not machine_ids:
         return {
             "error": "Machine IDs are required",
@@ -256,9 +407,41 @@ async def handle_request_return_machines(args: "argparse.Namespace") -> dict[str
         }
 
     command = CreateReturnRequestCommand(
-        request_id=getattr(args, "request_id", None),
         machine_ids=machine_ids,
+        force_return=getattr(args, "force", False),
     )
-    result = await command_bus.execute(command)
 
-    return {"result": result, "message": "Return request created successfully"}
+    # Execute command — CQRS commands return None; read results from command fields
+    await command_bus.execute(command)  # type: ignore[arg-type]
+
+    created_ids = getattr(command, "created_request_ids", None) or []
+    request_id = created_ids[0] if created_ids else None
+
+    scheduler_strategy = container.get(SchedulerPort)
+    request_data = {"request_id": request_id, "status": "pending"}
+    if scheduler_strategy:
+        return scheduler_strategy.format_request_response(request_data)
+    return {"requestId": request_id, "message": "Return request created successfully"}
+
+
+@handle_interface_exceptions(context="cancel_request", interface_type="cli")
+async def handle_cancel_request(args: "argparse.Namespace") -> dict[str, Any]:
+    """Handle cancel request operations."""
+    container = get_container()
+    command_bus = container.get(CommandBus)
+    scheduler_strategy = container.get(SchedulerPort)
+
+    from application.dto.commands import CancelRequestCommand
+
+    request_id = getattr(args, "request_id", None) or getattr(args, "flag_request_id", None)
+    if not request_id:
+        return {"error": "Request ID is required", "message": "Request ID must be provided"}
+
+    reason = getattr(args, "reason", None) or ""
+    command = CancelRequestCommand(request_id=request_id, reason=reason)
+    await command_bus.execute(command)  # type: ignore[arg-type]
+
+    request_data = {"request_id": request_id, "status": "cancelled"}
+    if scheduler_strategy:
+        return scheduler_strategy.format_request_response(request_data)
+    return {"request_id": request_id, "message": "Request cancelled successfully"}

@@ -8,8 +8,8 @@ It implements the ResourceProvisioningPort interface from the domain layer.
 from typing import Any, Optional
 
 from domain.base.dependency_injection import injectable
-from domain.base.exceptions import EntityNotFoundError
 from domain.base.ports import LoggingPort
+from domain.base.ports.configuration_port import ConfigurationPort
 from domain.request.aggregate import Request
 from domain.template.template_aggregate import Template
 from infrastructure.adapters.ports.resource_provisioning_port import (
@@ -23,7 +23,6 @@ from providers.aws.exceptions.aws_exceptions import (
     QuotaExceededError,
 )
 from providers.aws.infrastructure.aws_client import AWSClient
-from providers.aws.infrastructure.aws_handler_factory import AWSHandlerFactory
 from providers.aws.infrastructure.handlers.base_handler import AWSHandler
 
 # Removed TYPE_CHECKING import to avoid circular dependency issues during DI resolution
@@ -43,9 +42,9 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         self,
         aws_client: AWSClient,
         logger: LoggingPort,
-        aws_handler_factory: AWSHandlerFactory,
+        provider_strategy: Any,  # AWSProviderStrategy
         template_config_manager: Optional[TemplateConfigurationManager] = None,
-        provider_strategy: Optional[Any] = None,
+        config_port: Optional[ConfigurationPort] = None,
     ) -> None:
         """
         Initialize the adapter.
@@ -53,15 +52,15 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         Args:
             aws_client: AWS client instance
             logger: Logger for logging messages
-            aws_handler_factory: AWS handler factory instance
+            provider_strategy: AWS provider strategy for handler creation
             template_config_manager: Optional template configuration manager instance
-            provider_strategy: Optional AWS provider strategy for dry-run support
+            config_port: Configuration port for accessing application config
         """
         self._aws_client = aws_client
         self._logger = logger
-        self._aws_handler_factory = aws_handler_factory
-        self._template_config_manager = template_config_manager
         self._provider_strategy = provider_strategy
+        self._template_config_manager = template_config_manager
+        self._config_port = config_port
         self._handlers = {}  # Cache for handlers
 
     @property
@@ -69,7 +68,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         """Get the AWS client instance."""
         return self._aws_client
 
-    async def provision_resources(self, request: Request, template: Template) -> dict[str, Any]:
+    async def provision_resources(self, request: Request, template: Template) -> dict[str, Any]:  # type: ignore[override]
         """
         Provision AWS resources based on the request and template.
 
@@ -94,16 +93,11 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         # Check if dry-run mode is requested
         is_dry_run = request.metadata.get("dry_run", False)
 
-        if is_dry_run and self._provider_strategy:
-            # Use provider strategy for dry-run operations
-            return await self._provision_via_strategy(request, template, dry_run=True)
-        else:
-            # Use legacy handler approach for normal operations
-            return self._provision_via_handlers(request, template)
+        return self._provision_via_handlers(request, template, dry_run=is_dry_run)
 
     async def _provision_via_strategy(
         self, request: Request, template: Template, dry_run: bool = False
-    ) -> str:
+    ) -> dict[str, Any]:  # type: ignore[return]
         """
         Provision resources using the provider strategy pattern.
 
@@ -147,7 +141,9 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             self._logger.error("Provider strategy operation failed: %s", result.error_message)
             raise InfrastructureError(f"Failed to provision resources: {result.error_message}")
 
-    def _provision_via_handlers(self, request: Request, template: Template) -> dict[str, Any]:
+    def _provision_via_handlers(
+        self, request: Request, template: Template, dry_run: bool = False
+    ) -> dict[str, Any]:
         """
         Provision resources using the legacy handler approach.
 
@@ -158,12 +154,29 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         Returns:
             dict: The provisioning result with resource_ids list
         """
+        if dry_run:
+            self._logger.info(
+                "Dry-run mode: skipping actual provisioning for template %s", template.template_id
+            )
+            return {"success": True, "resource_ids": [], "instances": [], "dry_run": True}
+
         # Get the appropriate handler for the template
         handler = self._get_handler_for_template(template)
 
+        # Resolve SSM parameter paths to real AMI IDs before calling the handler
+        template = self._resolve_template_image(template)
+
+        # Convert domain Template to AWSTemplate so handlers can access AWS-specific fields
+        from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
+
+        if isinstance(template, AWSTemplate):
+            aws_template = template
+        else:
+            aws_template = AWSTemplate.model_validate(template.model_dump())
+
         try:
             # Acquire hosts using the handler
-            result = handler.acquire_hosts(request, template)
+            result = handler.acquire_hosts(request, aws_template)  # type: ignore[arg-type]
 
             # Handle both string (legacy) and dict (new) return types
             if isinstance(result, dict):
@@ -188,73 +201,54 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             raise
         except Exception as e:
             self._logger.error("Error during resource provisioning: %s", str(e))
-            raise InfrastructureError(f"Failed to provision resources: {e!s}")
+            raise InfrastructureError(str(e))
 
-    # KBG TODO: this function is not used.
-    def check_resources_status(self, request: Request) -> list[dict[str, Any]]:
-        """
-        Check the status of provisioned AWS resources.
-
-        Args:
-            request: The request containing resource identifier
-
-        Returns:
-            List of resource details
-
-        Raises:
-            AWSEntityNotFoundError: If the resource is not found
-            InfrastructureError: For other infrastructure errors
-        """
-        self._logger.info("Checking status of resources for request %s", request.request_id)
-
-        if not request.resource_id:
-            self._logger.error("No resource ID found in request %s", request.request_id)
-            raise AWSEntityNotFoundError(f"No resource ID found in request {request.request_id}")
-
-        # Get the template to determine the handler type
-        if not self._template_config_manager:
-            self._logger.warning(
-                "TemplateConfigurationManager not injected, getting from container"
-            )
-            from infrastructure.di.container import get_container
-
-            container = get_container()
-            self._template_config_manager = container.get(TemplateConfigurationManager)
-
-        # Ensure template_id is not None
-        if not request.template_id:
-            raise AWSValidationError("Template ID is required")
-
-        # Get template using the configuration manager
-        template = self._template_config_manager.get_template(str(request.template_id))
-        if not template:
-            raise EntityNotFoundError("Template", str(request.template_id))
-
-        # Get the appropriate handler for the template
-        handler = self._get_handler_for_template(template)
+    def _resolve_template_image(self, template: Template) -> Template:
+        """Resolve SSM parameter paths in template.image_id to real AMI IDs."""
+        image_id = template.image_id
+        if not image_id:
+            return template
 
         try:
-            # Check hosts status using the handler
-            status = handler.check_hosts_status(request)
-            self._logger.info(
-                "Successfully checked status of resources for request %s",
-                request.request_id,
+            from providers.aws.infrastructure.caching.aws_image_cache import AWSImageCache
+            from providers.aws.infrastructure.services.aws_image_resolution_service import (
+                AWSImageResolutionService,
             )
-            return status
-        except AWSEntityNotFoundError as e:
-            self._logger.error("Resource not found during status check: %s", str(e))
-            raise
+
+            cache_dir = self._config_port.get_cache_dir() if self._config_port else ""
+
+            cache = AWSImageCache(
+                provider_name="aws",
+                cache_dir=cache_dir,
+                ttl_seconds=3600,
+            )
+            service = AWSImageResolutionService(
+                aws_client=self._aws_client,
+                cache=cache,
+                logger=self._logger,
+            )
+
+            if service.is_resolution_needed(image_id):
+                resolved = service.resolve_image_id(image_id)
+                self._logger.info("Resolved image_id %s -> %s", image_id, resolved)
+                return template.update_image_id(resolved)
         except Exception as e:
-            self._logger.error("Error during resource status check: %s", str(e))
-            raise InfrastructureError(f"Failed to check resource status: {e!s}")
+            self._logger.error("Failed to resolve image_id '%s': %s", image_id, e)
+            raise InfrastructureError(
+                f"Failed to resolve AMI ID for image_id '{image_id}': {e}. "
+                "Ensure the SSM parameter path is valid and the IAM role has ssm:GetParameter permission."
+            )
+
+        return template
 
     def release_resources(
         self,
         machine_ids: list[str],
         template_id: str,
         provider_api: str,
-        context: dict = None,
+        context: dict = None,  # type: ignore[assignment]
         resource_mapping: Optional[dict[str, tuple[Optional[str], int]]] = None,
+        request_id: str = "",
     ) -> None:
         """
         Release provisioned AWS resources using direct parameters.
@@ -265,6 +259,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             provider_api: Provider API type (ASG, EC2Fleet, SpotFleet, RunInstances)
             context: Context dictionary (unused in new flow)
             resource_mapping: Dict mapping instance_id -> (resource_id or None, desired_capacity)
+            request_id: Original provisioning request ID, used for launch template cleanup
 
         Raises:
             AWSEntityNotFoundError: If the resource is not found
@@ -294,7 +289,9 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
 
         # Call handler's release_hosts method for all provider APIs
         try:
-            handler.release_hosts(machine_ids, resource_mapping=resource_mapping)
+            handler.release_hosts(
+                machine_ids, resource_mapping=resource_mapping, request_id=request_id
+            )  # type: ignore[call-arg]
 
         except Exception as e:
             self._logger.error(
@@ -306,6 +303,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
             "Successfully released %d instances using %s handler", len(machine_ids), provider_api
         )
 
+    # No current caller — available for a future health endpoint
     def get_resource_health(self, resource_id: str) -> dict[str, Any]:
         """
         Get health information for a specific AWS resource.
@@ -389,7 +387,7 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
                         asg = response["AutoScalingGroups"][0]
                         return {
                             "resource_id": resource_id,
-                            "resource_type": "auto_scaling_group",
+                            "resource_type": "ASG",
                             "status": "active",
                             "desired_capacity": asg["DesiredCapacity"],
                             "current_capacity": len(asg["Instances"]),
@@ -430,10 +428,10 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         if handler_type in self._handlers:
             return self._handlers[handler_type]
 
-        # Use the handler factory to create the handler
-        handler = self._aws_handler_factory.create_handler(handler_type)
+        handler = self._provider_strategy.get_handler(handler_type)
+        if not handler:
+            raise AWSValidationError(f"No handler available for type: {handler_type}")
 
-        # Cache the handler for future use
         self._handlers[handler_type] = handler
         return handler
 
@@ -454,9 +452,9 @@ class AWSProvisioningAdapter(ResourceProvisioningPort):
         if provider_api in self._handlers:
             return self._handlers[provider_api]
 
-        # Use the handler factory to create the handler
-        handler = self._aws_handler_factory.create_handler(provider_api)
+        handler = self._provider_strategy.get_handler(provider_api)
+        if not handler:
+            raise AWSValidationError(f"No handler available for type: {provider_api}")
 
-        # Cache the handler for future use
         self._handlers[provider_api] = handler
         return handler

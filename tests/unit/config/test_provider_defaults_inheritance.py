@@ -1,5 +1,7 @@
 """Unit tests for provider defaults inheritance system."""
 
+from unittest.mock import patch
+
 from config.schemas.provider_strategy_schema import (
     HandlerConfig,
     ProviderConfig,
@@ -178,55 +180,62 @@ class TestProviderDefaultsInheritance:
 
     def test_multi_provider_type_inheritance(self):
         """Test inheritance works independently for different provider types."""
-        config_data = {
-            "provider_defaults": {
-                "aws": {
-                    "handlers": {
-                        "EC2Fleet": {"handler_class": "EC2FleetHandler"},
-                        "SpotFleet": {"handler_class": "SpotFleetHandler"},
-                    }
+        mock_registry = patch(
+            "providers.registry.get_provider_registry",
+            return_value=type(
+                "R", (), {"get_registered_providers": lambda self: ["aws", "provider1"]}
+            )(),
+        )
+        with mock_registry:
+            config_data = {
+                "provider_defaults": {
+                    "aws": {
+                        "handlers": {
+                            "EC2Fleet": {"handler_class": "EC2FleetHandler"},
+                            "SpotFleet": {"handler_class": "SpotFleetHandler"},
+                        }
+                    },
+                    "provider1": {
+                        "handlers": {
+                            "VMSS": {"handler_class": "VMSSHandler"},
+                            "VM": {"handler_class": "VMHandler"},
+                        }
+                    },
                 },
-                "provider1": {
-                    "handlers": {
-                        "VMSS": {"handler_class": "VMSSHandler"},
-                        "VM": {"handler_class": "VMHandler"},
-                    }
-                },
-            },
-            "providers": [
-                {
-                    "name": "aws-east",
-                    "type": "aws",
-                    "enabled": True,
-                    "config": {"region": "us-east-1"},
-                },
-                {
-                    "name": "provider1-west",
-                    "type": "provider1",
-                    "enabled": True,
-                    "config": {"region": "westus2"},
-                },
-            ],
-        }
+                "providers": [
+                    {
+                        "name": "aws-east",
+                        "type": "aws",
+                        "enabled": True,
+                        "config": {"region": "us-east-1"},
+                    },
+                    {
+                        "name": "provider1-west",
+                        "type": "provider1",
+                        "enabled": True,
+                        "config": {"region": "westus2"},
+                    },
+                ],
+            }
 
-        provider_config = ProviderConfig(**config_data)
+            provider_config = ProviderConfig(**config_data)
 
-        aws_provider = provider_config.providers[0]
-        provider1_provider = provider_config.providers[1]
+            aws_provider = provider_config.providers[0]
+            provider1_provider = provider_config.providers[1]
 
-        aws_defaults = provider_config.provider_defaults.get("aws")
-        provider1_defaults = provider_config.provider_defaults.get("provider1")
+            aws_defaults = provider_config.provider_defaults.get("aws")
+            provider1_defaults = provider_config.provider_defaults.get("provider1")
 
-        aws_handlers = aws_provider.get_effective_handlers(aws_defaults)
-        provider1_handlers = provider1_provider.get_effective_handlers(provider1_defaults)
+            aws_handlers = aws_provider.get_effective_handlers(aws_defaults)
+            provider1_handlers = provider1_provider.get_effective_handlers(provider1_defaults)
 
-        assert len(aws_handlers) == 2
-        assert "EC2Fleet" in aws_handlers
-        assert "SpotFleet" in aws_handlers
+            assert len(aws_handlers) == 2
+            assert "EC2Fleet" in aws_handlers
+            assert "SpotFleet" in aws_handlers
 
-        assert len(provider1_handlers) == 2
-        assert "VMSS" in provider1_handlers
-        assert "VM" in provider1_handlers
+            assert len(provider1_handlers) == 2
+            assert "VMSS" in provider1_handlers
+            assert "VM" in provider1_handlers
 
     def test_complex_regional_limitations_scenario(self):
         """Test realistic multi-region AWS scenario with various limitations."""
@@ -358,14 +367,21 @@ class TestProviderDefaultsInheritance:
 
     def test_inheritance_with_missing_defaults(self):
         """Test behavior when provider type has no defaults defined."""
-        provider = ProviderInstanceConfig(
-            name="test-provider",
-            type="provider2",  # Valid type but no defaults provided
-            enabled=True,
-            config={"region": "test-region"},
+        mock_registry = patch(
+            "providers.registry.get_provider_registry",
+            return_value=type(
+                "R", (), {"get_registered_providers": lambda self: ["aws", "provider2"]}
+            )(),
         )
+        with mock_registry:
+            provider = ProviderInstanceConfig(
+                name="test-provider",
+                type="provider2",  # Valid type but no defaults provided
+                enabled=True,
+                config={"region": "test-region"},
+            )
 
-        effective_handlers = provider.get_effective_handlers(None)
+            effective_handlers = provider.get_effective_handlers(None)
 
-        assert len(effective_handlers) == 0
-        assert isinstance(effective_handlers, dict)
+            assert len(effective_handlers) == 0
+            assert isinstance(effective_handlers, dict)

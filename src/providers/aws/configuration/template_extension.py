@@ -1,6 +1,6 @@
 """AWS-specific template extension configuration."""
 
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -25,7 +25,8 @@ class AWSTemplateExtensionConfig(BaseModel):
 
     # AMI resolution configuration
     ami_resolution: AMIResolutionConfig = Field(
-        default_factory=AMIResolutionConfig, description="AMI resolution configuration"
+        default_factory=AMIResolutionConfig,  # type: ignore[arg-type]
+        description="AMI resolution configuration",
     )
 
     # AWS instance configuration defaults
@@ -40,9 +41,11 @@ class AWSTemplateExtensionConfig(BaseModel):
     spot_fleet_request_expiry: int = Field(
         30, description="Time before unfulfilled requests are canceled (minutes)"
     )
-    allocation_strategy: str = Field("capacityOptimized", description="Strategy for Spot instances")
+    allocation_strategy: str = Field(
+        "capacity_optimized", description="Strategy for Spot instances"
+    )
     allocation_strategy_on_demand: str = Field(
-        "lowestPrice", description="Strategy for On-Demand instances"
+        "lowest_price", description="Strategy for On-Demand instances"
     )
     percent_on_demand: int = Field(
         0, description="Percentage of On-Demand capacity in heterogeneous"
@@ -61,10 +64,10 @@ class AWSTemplateExtensionConfig(BaseModel):
     vm_types: Optional[dict[str, int]] = Field(
         None, description="Map of instance types and weights for spot/heterogeneous"
     )
-    vm_types_on_demand: Optional[dict[str, int]] = Field(
+    machine_types_ondemand: Optional[dict[str, int]] = Field(
         None, description="On-Demand instance types for heterogeneous"
     )
-    vm_types_priority: Optional[dict[str, int]] = Field(
+    machine_types_priority: Optional[dict[str, int]] = Field(
         None, description="Priority settings for instance types"
     )
 
@@ -111,7 +114,7 @@ class AWSTemplateExtensionConfig(BaseModel):
             raise ValueError("Percent on demand must be between 0 and 100")
         return v
 
-    def to_template_defaults(self) -> dict[str, any]:
+    def to_template_defaults(self) -> dict[str, Any]:
         """Convert extension config to template defaults format.
 
         This method converts the extension configuration to the format

@@ -81,15 +81,6 @@ class TemplateFactory(BaseTemplateFactory):
             if self._logger:
                 self._logger.warning("AWS template class not available for registration")
 
-        # Future providers can be registered here or via register_provider_template_class
-        # noqa:COMMENTED section-start
-        # try:
-        #     from providers.provider1.domain.template.aggregate import Provider1Template
-        #     self._provider_template_classes['provider1'] = Provider1Template
-        # except ImportError:
-        #     pass
-        # noqa:COMMENTED section-end
-
     def register_provider_template_class(self, provider_type: str, template_class: type) -> None:
         """Register a provider-specific template class.
 
@@ -209,11 +200,11 @@ class TemplateFactory(BaseTemplateFactory):
             return "aws"
 
         # Could add similar logic for other providers
-        # noqa:COMMENTED section-start
+        # section-start
         # provider1_specific_fields = {'vm_size', 'os_disk_type', ...}
         # if any(field in template_data for field in provider1_specific_fields):
         #     return 'provider1'
-        # noqa:COMMENTED section-end
+        # section-end
 
         return None
 

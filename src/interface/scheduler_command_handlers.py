@@ -25,7 +25,7 @@ async def handle_list_scheduler_strategies(args) -> dict[str, Any]:
     query_bus = container.get(QueryBus)
     container.get(SchedulerPort)
 
-    from application.queries.system import ListSchedulerStrategiesQuery
+    from application.queries.scheduler import ListSchedulerStrategiesQuery
 
     query = ListSchedulerStrategiesQuery()
     strategies = await query_bus.execute(query)
@@ -51,7 +51,7 @@ async def handle_show_scheduler_config(args) -> dict[str, Any]:
     container = get_container()
     query_bus = container.get(QueryBus)
 
-    from application.queries.system import GetSchedulerConfigurationQuery
+    from application.queries.scheduler import GetSchedulerConfigurationQuery
 
     query = GetSchedulerConfigurationQuery()
     config = await query_bus.execute(query)
@@ -76,7 +76,7 @@ async def handle_validate_scheduler_config(args) -> dict[str, Any]:
     container = get_container()
     query_bus = container.get(QueryBus)
 
-    from application.queries.system import ValidateSchedulerConfigurationQuery
+    from application.queries.scheduler import ValidateSchedulerConfigurationQuery
 
     query = ValidateSchedulerConfigurationQuery()
     validation = await query_bus.execute(query)

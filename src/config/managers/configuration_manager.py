@@ -40,6 +40,12 @@ class ConfigurationManager:
 
     def __init__(self, config_file: Optional[str] = None) -> None:
         """Initialize configuration manager with lazy loading."""
+        # Use platform dirs for default config file discovery
+        if config_file is None:
+            from config.platform_dirs import get_config_location
+
+            config_file = str(get_config_location() / "config.json")
+
         self._config_file = config_file
         self._loader: Optional[ConfigurationLoader] = None
         self._app_config: Optional[AppConfig] = None
@@ -54,6 +60,8 @@ class ConfigurationManager:
         # Scheduler override support
         self._scheduler_override: Optional[str] = None
         self._provider_override: Optional[str] = None
+        self._aws_region_override: Optional[str] = None
+        self._aws_profile_override: Optional[str] = None
 
     @property
     def loader(self) -> ConfigurationLoader:
@@ -77,7 +85,7 @@ class ConfigurationManager:
             raw_config = self.loader.load(self._config_file, config_manager=self)
             return self.loader.create_app_config(raw_config)
         except Exception as e:
-            logger.error("Failed to load app config: %s", e)
+            logger.error("Failed to load app config: %s", e, exc_info=True)
             raise
 
     def _ensure_raw_config(self) -> dict[str, Any]:
@@ -122,26 +130,43 @@ class ConfigurationManager:
 
         return config_instance
 
+    def get_typed_with_defaults(self, config_type: type[T]) -> T:
+        """Get typed configuration with guaranteed defaults."""
+        try:
+            return self.get_typed(config_type)
+        except (ConfigurationError, Exception) as e:
+            logger.warning(
+                f"Configuration loading failed for {config_type.__name__}: {e}", exc_info=True
+            )
+            logger.info(f"Using default configuration for {config_type.__name__}")
+            return config_type()  # Use Pydantic defaults
+
     def reload(self) -> None:
         """Reload configuration from sources."""
         try:
+            # Re-derive config file path in case ORB_CONFIG_DIR changed between tests
+            from config.platform_dirs import get_config_location
+
+            self._config_file = str(get_config_location() / "config.json")
+
             # Clear all caches
             self._cache_manager.clear_cache()
             self._raw_config = None
             self._app_config = None
             self._type_converter = None
+            self._path_resolver = None
             self._provider_manager = None
 
             # Force reload of loader
             if self._loader:
-                self._loader.reload()
+                self._loader.reload()  # type: ignore[attr-defined]
 
             # Mark reload time
             self._cache_manager.mark_reload(time.time())
 
             logger.info("Configuration reloaded successfully")
         except Exception as e:
-            logger.error("Failed to reload configuration: %s", e)
+            logger.error("Failed to reload configuration: %s", e, exc_info=True)
             raise ConfigurationError(f"Configuration reload failed: {e}")
 
     # Delegate type conversion methods
@@ -190,6 +215,12 @@ class ConfigurationManager:
         """Get work directory path."""
         return self._ensure_path_resolver().get_work_dir(default_path, config_path)
 
+    def get_cache_dir(
+        self, default_path: Optional[str] = None, config_path: Optional[str] = None
+    ) -> str:
+        """Get cache directory path."""
+        return self._ensure_path_resolver().get_cache_dir(default_path, config_path)
+
     def get_conf_dir(
         self, default_path: Optional[str] = None, config_path: Optional[str] = None
     ) -> str:
@@ -225,9 +256,48 @@ class ConfigurationManager:
         """Temporarily override provider instance."""
         self._provider_override = provider_name
 
+    def override_aws_region(self, region: str) -> None:
+        """Temporarily override AWS region."""
+        self._aws_region_override = region
+
+    def override_aws_profile(self, profile: str) -> None:
+        """Temporarily override AWS profile."""
+        self._aws_profile_override = profile
+
+    def get_aws_region_override(self) -> Optional[str]:
+        """Get current AWS region override."""
+        return self._aws_region_override
+
+    def get_aws_profile_override(self) -> Optional[str]:
+        """Get current AWS profile override."""
+        return self._aws_profile_override
+
+    def get_effective_aws_region(self, default_region: str = "us-east-1") -> str:
+        """Get effective AWS region (override or default)."""
+        return self._aws_region_override or default_region
+
+    def get_effective_aws_profile(self, default_profile: str = "default") -> str:
+        """Get effective AWS profile (override or default)."""
+        return self._aws_profile_override or default_profile
+
     def get_active_provider_override(self) -> Optional[str]:
         """Get current provider override."""
         return self._provider_override
+
+    def get_loaded_config_file(self) -> str | None:
+        """Get the actual config file that was loaded."""
+        # Check standard locations that exist
+        import os
+
+        # Get current working directory and check relative paths
+        candidates = [
+            "config/config.json",  # Relative to project root
+            "conf/config.json",  # Alternative location
+        ]
+        for path in candidates:
+            if os.path.exists(path):
+                return os.path.abspath(path)
+        return None
 
     def get_provider_type(self) -> str:
         """Get provider type."""
@@ -237,6 +307,10 @@ class ConfigurationManager:
         """Get provider configuration."""
         return self._ensure_provider_manager().get_provider_config()
 
+    def get_provider_instance_config(self, provider_name: str):
+        """Get configuration for a specific provider instance."""
+        return self._ensure_provider_manager().get_provider_instance_config(provider_name)
+
     def save(self, config_path: str) -> None:
         """Save configuration to file."""
         try:
@@ -245,7 +319,7 @@ class ConfigurationManager:
                 json.dump(raw_config, f, indent=2)
             logger.info("Configuration saved to %s", config_path)
         except Exception as e:
-            logger.error("Failed to save configuration: %s", e)
+            logger.error("Failed to save configuration: %s", e, exc_info=True)
             raise ConfigurationError(f"Failed to save configuration: {e}")
 
     def get_raw_config(self) -> dict[str, Any]:
@@ -284,6 +358,7 @@ class ConfigurationManager:
             filename = explicit_path
 
         # 2. Try scheduler-provided directory + filename
+        scheduler_dir: Optional[str] = None
         try:
             scheduler_dir = self._get_scheduler_directory(file_type)
             if scheduler_dir:
@@ -372,7 +447,7 @@ class ConfigurationManager:
                 if os.path.exists(path):
                     logger.info("Using templates file: %s", filename)
                     return path
-            except Exception as e:  # nosec B112
+            except Exception as e:
                 logger.debug("Template file %s not found: %s", filename, e)
                 continue
 

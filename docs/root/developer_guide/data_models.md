@@ -349,7 +349,7 @@ class TemplateDTO(BaseValidatedModel):
     description: Optional[str] = Field(default=None, description="Template description")
 
     # Provider configuration
-    provider_api: str = Field(description="Provider API type (aws, azure, etc.)")
+    provider_api: str = Field(description="Provider API type (aws, provider1, etc.)")
     provider_type: Optional[str] = Field(default=None, description="Provider type")
     provider_name: Optional[str] = Field(default=None, description="Provider instance name")
 

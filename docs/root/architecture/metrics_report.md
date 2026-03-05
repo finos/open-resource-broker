@@ -46,7 +46,7 @@ The following files exceed the 600-line threshold and may benefit from refactori
 | `config/loader.py` | 735 | Consider splitting into smaller modules |
 | `providers/base/strategy/composite_strategy.py` | 637 | Consider splitting into smaller modules |
 | `providers/base/strategy/fallback_strategy.py` | 635 | Consider splitting into smaller modules |
-| `infrastructure/persistence/json/template.py` | 623 | Consider splitting into smaller modules |
+| `infrastructure/storage/json/template.py` | 623 | Consider splitting into smaller modules |
 | `providers/aws/infrastructure/handlers/spot_fleet_handler.py` | 605 | Consider splitting into smaller modules |
 
 ## Quality Indicators

@@ -10,6 +10,9 @@ This module provides a integrated interface to all command handlers organized by
 
 # Import base handler
 from application.base.command_handler import CLICommandHandler
+from interface.machine_command_handlers import (
+    handle_get_machine_status,
+)
 from interface.request_command_handlers import (
     handle_get_request_status,
     handle_get_return_requests,
@@ -54,6 +57,7 @@ __all__: list[str] = [
     # Request handlers (function-based)
     "handle_get_request_status",
     "handle_get_return_requests",
+    "handle_get_machine_status",
     "handle_get_template",
     "handle_list_providers",
     # Scheduler handlers (function-based)

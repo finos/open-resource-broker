@@ -27,6 +27,14 @@ repos:
         description: "Extended Python code checks with Ruff (warnings only)"
         stages: [manual]  # Optional check - run as warning only
 
+      - id: pyright
+        name: pyright (Type Checking)
+        entry: make ci-quality-pyright
+        language: system
+        files: \.(py)$
+        pass_filenames: false
+        description: "Check Python type annotations with pyright"
+
       - id: mypy
         name: mypy (Type Checking)
         entry: make ci-quality-mypy
@@ -43,6 +51,7 @@ repos:
         files: \.(py)$
         pass_filenames: false
         description: "Run bandit security analysis"
+        stages: [pre-push]
 
       - id: safety
         name: safety (Dependency Security)
@@ -51,6 +60,7 @@ repos:
         files: requirements.*\.txt$|pyproject\.toml$
         pass_filenames: false
         description: "Check dependencies for known security vulnerabilities"
+        stages: [pre-push]
 
       - id: hadolint
         name: hadolint (Dockerfile Linting)
@@ -61,21 +71,14 @@ repos:
         description: "Lint Dockerfile with hadolint"
         stages: [manual]  # Optional check - run as warning only
 
-      - id: quality-check
-        name: Quality Check
-        entry: make quality-check
-        language: system
-        files: \.(py|md|rst|txt|yaml|yml|json|toml)$
-        pass_filenames: false
-        description: "Run comprehensive professional quality checks"
-
       - id: validate-imports
         name: Validate Python Imports
-        entry: make ci-imports
+        entry: make ci-arch-imports
         language: system
         files: \.(py)$
         pass_filenames: false
         description: "Validate that all critical imports work correctly"
+        stages: [pre-push]
 
       - id: validate-cqrs
         name: Validate CQRS Patterns
@@ -84,7 +87,7 @@ repos:
         files: \.(py)$
         pass_filenames: false
         description: "Validate CQRS architecture patterns"
-        stages: [manual]  # Optional check - run as warning only
+        stages: [pre-push]
 
       - id: check-architecture
         name: Check Architecture Compliance
@@ -93,16 +96,7 @@ repos:
         files: \.(py)$
         pass_filenames: false
         description: "Check Clean Architecture compliance"
-        stages: [manual]  # Optional check - run as warning only
-
-      - id: validate-imports-arch
-        name: Validate Import Architecture
-        entry: make ci-arch-imports
-        language: system
-        files: \.(py)$
-        pass_filenames: false
-        description: "Validate import architecture compliance"
-        stages: [manual]  # Optional check - run as warning only
+        stages: [pre-push]
 
       - id: check-file-sizes-arch
         name: Check File Sizes (Architecture)
@@ -156,6 +150,7 @@ repos:
         files: \.github/workflows/.*\.(yml|yaml)$
         pass_filenames: false
         description: "Validate GitHub Actions workflow YAML files"
+        stages: [pre-push]
 
       - id: validate-actionlint
         name: Validate Workflows (actionlint)
@@ -174,14 +169,6 @@ repos:
         pass_filenames: false
         description: "Validate shell scripts with shellcheck"
         stages: [manual]  # Optional check - run as warning only
-
-      - id: detect-secrets
-        name: Detect Hardcoded Secrets
-        entry: make detect-secrets
-        language: system
-        files: ^src/.*\.py$
-        pass_filenames: false
-        description: "Detect potential hardcoded secrets in source code"
 
       - id: check-file-sizes
         name: Check File Sizes

@@ -5,6 +5,7 @@ from typing import Any, Optional
 from domain.base.dependency_injection import injectable
 from domain.base.ports.configuration_port import ConfigurationPort
 from domain.base.ports.logging_port import LoggingPort
+from domain.base.utils import extract_provider_type
 from domain.template.extensions import TemplateExtensionRegistry
 from domain.template.factory import TemplateFactoryPort
 from domain.template.ports.template_defaults_port import TemplateDefaultsPort
@@ -57,7 +58,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
 
         Args:
             template_dict: Raw template data from file
-            provider_instance_name: Name of provider instance for context
+            provider_name: Name of provider instance for context
 
         Returns:
             Template dictionary with defaults applied
@@ -99,13 +100,35 @@ class TemplateDefaultsService(TemplateDefaultsPort):
                 )
 
         # 4. Apply template values (highest priority - only for missing fields)
-        result = {**resolved_defaults}
-        for key, value in template_dict.items():
-            if value is not None:  # Don't override with None values
-                result[key] = value
+        result = self._coalesce_merge(resolved_defaults, template_dict)
 
         self.logger.debug("Final template has %s fields after default resolution", len(result))
         return result
+
+    def _coalesce_merge(
+        self, defaults: dict[str, Any], overrides: dict[str, Any]
+    ) -> dict[str, Any]:
+        """
+        Merge dictionaries with coalesce logic for empty collections.
+
+        Empty list values in overrides are treated as "unset" so provider
+        defaults can fill them in. An empty list is never a meaningful value
+        for any template field, so this is safe to apply generically.
+        """
+        result = defaults.copy()
+
+        for key, value in overrides.items():
+            if value is not None:
+                # Treat empty lists as "unset" — let the default win
+                if self._is_empty_collection(value):
+                    continue
+                result[key] = value
+
+        return result
+
+    def _is_empty_collection(self, value: Any) -> bool:
+        """Check if value is an empty collection (list, dict, set, tuple)."""
+        return isinstance(value, (list, dict, set, tuple)) and len(value) == 0
 
     def resolve_provider_api_default(
         self,
@@ -195,9 +218,11 @@ class TemplateDefaultsService(TemplateDefaultsPort):
         try:
             template_config = self.config_manager.get_template_config()
             if hasattr(template_config, "model_dump"):
-                config_dict = template_config.model_dump(exclude_none=True)
-            else:
+                config_dict = template_config.model_dump(exclude_none=True)  # type: ignore[union-attr]
+            elif isinstance(template_config, dict):
                 config_dict = template_config
+            else:
+                config_dict = {}
 
             # Extract only default-like fields from cleaned schema
             global_defaults = {}
@@ -227,7 +252,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             provider_config = self.config_manager.get_provider_config()
 
             if hasattr(provider_config, "provider_defaults"):
-                provider_defaults = provider_config.provider_defaults.get(provider_type)
+                provider_defaults = provider_config.provider_defaults.get(provider_type)  # type: ignore[union-attr]
                 if provider_defaults and hasattr(provider_defaults, "template_defaults"):
                     return provider_defaults.template_defaults or {}
 
@@ -243,7 +268,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             provider_config = self.config_manager.get_provider_config()
 
             if hasattr(provider_config, "providers"):
-                for provider in provider_config.providers:
+                for provider in provider_config.providers:  # type: ignore[union-attr]
                     if provider.name == provider_instance_name:
                         return provider.template_defaults or {}
 
@@ -263,15 +288,12 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             provider_config = self.config_manager.get_provider_config()
 
             if hasattr(provider_config, "providers"):
-                for provider in provider_config.providers:
+                for provider in provider_config.providers:  # type: ignore[union-attr]
                     if provider.name == provider_instance_name:
                         return provider.type
 
             # Fallback: extract from name (e.g., 'aws-primary' -> 'aws')
-            if "-" in provider_instance_name:
-                return provider_instance_name.split("-")[0]
-
-            return provider_instance_name
+            return extract_provider_type(provider_instance_name)
 
         except Exception as e:
             self.logger.warning(
@@ -456,7 +478,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             provider_config = self.config_manager.get_provider_config()
 
             if hasattr(provider_config, "providers"):
-                for provider in provider_config.providers:
+                for provider in provider_config.providers:  # type: ignore[union-attr]
                     if (
                         provider.name == provider_instance_name
                         and hasattr(provider, "extensions")
@@ -536,7 +558,7 @@ class TemplateDefaultsService(TemplateDefaultsPort):
             # Additional validation for domain template
             if hasattr(template, "validate"):
                 try:
-                    template.validate()
+                    template.validate()  # type: ignore[call-arg]
                     validation_result["domain_validation"] = "passed"
                 except Exception as e:
                     validation_result["warnings"].append(f"Domain validation failed: {e}")

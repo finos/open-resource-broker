@@ -13,29 +13,29 @@ SOLID principles and CQRS best practices:
 No middleware complexity - handlers own their cross-cutting concerns.
 """
 
-from typing import TypeVar
+from typing import Any
 
 from application.decorators import (
     get_command_handler_for_type,
     get_query_handler_for_type,
 )
 from application.interfaces.command_query import Command, Query
-from domain.base.ports import LoggingPort
+from application.ports.command_bus_port import CommandBusPort
+from application.ports.query_bus_port import QueryBusPort
+from domain.base.ports.logging_port import LoggingPort
 from infrastructure.di.container import DIContainer
 
-TQuery = TypeVar("TQuery", bound=Query)
-TCommand = TypeVar("TCommand", bound=Command)
-TResult = TypeVar("TResult")
 
-
-class QueryBus:
+class QueryBus(QueryBusPort):
     """
     Pure CQRS Query Bus - Thin routing layer only.
+
+    Implements QueryBusPort to satisfy Dependency Inversion Principle.
 
     Follows SOLID principles:
     - SRP: Only routes queries to handlers
     - OCP: Easy to add handlers without changing bus
-    - DIP: No concrete dependencies on middleware
+    - DIP: Implements port interface, no concrete dependencies on middleware
 
     Handlers own their cross-cutting concerns (logging, validation, caching).
     """
@@ -45,7 +45,7 @@ class QueryBus:
         self.container = container
         self.logger = logger
 
-    async def execute(self, query: TQuery) -> TResult:
+    async def execute(self, query: Query) -> Any:
         """
         Execute a query through pure routing with lazy handler discovery.
 
@@ -94,36 +94,53 @@ class QueryBus:
             self.logger.error("Query execution failed: %s", str(e))
             raise
 
-    def execute_sync(self, query: TQuery) -> TResult:
-        """Execute query synchronously for sync contexts."""
+    def execute_sync(self, query: Query) -> Any:
+        """Execute query synchronously for sync contexts.
+
+        Uses asyncio.run() when no event loop is running. When called from
+        within a running loop (e.g. Jupyter, some test frameworks), raises
+        RuntimeError with a clear message rather than deadlocking.
+        """
         import asyncio
 
         try:
-            return asyncio.run(self.execute(query))
+            loop = asyncio.get_running_loop()
         except RuntimeError:
-            # Event loop already running
-            loop = asyncio.get_event_loop()
-            return loop.run_until_complete(self.execute(query))
+            loop = None
+
+        if loop is not None and loop.is_running():
+            raise RuntimeError(
+                "execute_sync() called from within a running event loop. "
+                "Use 'await execute()' instead, or run from a sync context."
+            )
+
+        return asyncio.run(self.execute(query))
 
     def _trigger_lazy_cqrs_setup(self) -> None:
         """Trigger lazy CQRS infrastructure setup."""
         try:
-            from infrastructure.di.container import _setup_cqrs_infrastructure
+            from infrastructure.di.services import setup_cqrs_infrastructure
 
             self.logger.info("Triggering lazy CQRS infrastructure setup")
-            _setup_cqrs_infrastructure(self.container)
+            setup_cqrs_infrastructure(self.container)
         except Exception as e:
             self.logger.error("Failed to trigger lazy CQRS setup: %s", e)
 
+    def register(self, query_type: type, handler: Any) -> None:
+        """Register a query handler for a specific query type."""
+        self.container.register_instance(type(handler), handler)
 
-class CommandBus:
+
+class CommandBus(CommandBusPort):
     """
     Pure CQRS Command Bus - Thin routing layer only.
+
+    Implements CommandBusPort to satisfy Dependency Inversion Principle.
 
     Follows SOLID principles:
     - SRP: Only routes commands to handlers
     - OCP: Easy to add handlers without changing bus
-    - DIP: No concrete dependencies on middleware
+    - DIP: Implements port interface, no concrete dependencies on middleware
 
     Handlers own their cross-cutting concerns (logging, validation, events).
     """
@@ -132,7 +149,7 @@ class CommandBus:
         self.container = container
         self.logger = logger
 
-    async def execute(self, command: TCommand) -> TResult:
+    async def execute(self, command: Command) -> Any:
         """
         Execute a command through pure routing with lazy handler discovery.
 
@@ -184,12 +201,16 @@ class CommandBus:
     def _trigger_lazy_cqrs_setup(self) -> None:
         """Trigger lazy CQRS infrastructure setup."""
         try:
-            from infrastructure.di.container import _setup_cqrs_infrastructure
+            from infrastructure.di.services import setup_cqrs_infrastructure
 
             self.logger.info("Triggering lazy CQRS infrastructure setup")
-            _setup_cqrs_infrastructure(self.container)
+            setup_cqrs_infrastructure(self.container)
         except Exception as e:
             self.logger.error("Failed to trigger lazy CQRS setup: %s", e)
+
+    def register(self, command_type: type, handler: Any) -> None:
+        """Register a command handler for a specific command type."""
+        self.container.register_instance(type(handler), handler)
 
 
 class BusFactory:

@@ -1,15 +1,11 @@
 """End-to-end integration tests for dry-run functionality."""
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
-from application.commands.request_handlers import CreateMachineRequestHandler
-from application.dto.commands import CreateRequestCommand
-from config.manager import ConfigurationManager
 from domain.request.aggregate import Request
 from domain.request.value_objects import RequestId, RequestType
 from domain.template.template_aggregate import Template
-from infrastructure.adapters.ports.resource_provisioning_port import ResourceProvisioningPort
 from infrastructure.mocking.dry_run_context import dry_run_context
 from providers.aws.configuration.config import AWSProviderConfig
 from providers.aws.infrastructure.adapters import AWSProvisioningAdapter
@@ -21,295 +17,112 @@ class TestEndToEndDryRun:
 
     def setup_method(self):
         """Set up test fixtures."""
-        # Mock dependencies
         self.mock_logger = Mock()
-        self.mock_uow_factory = Mock()
-        self.mock_event_publisher = Mock()
-        self.mock_error_handler = Mock()
-        self.mock_container = Mock()
-        self.mock_query_bus = Mock()
-        self.mock_provider_selection_service = Mock()
-        self.mock_provider_capability_service = Mock()
-        self.mock_provider_port = Mock()
-
-        # Create AWS provider strategy
         self.aws_config = AWSProviderConfig(region="us-east-1", profile="default")
-        self.aws_strategy = AWSProviderStrategy(config=self.aws_config, logger=self.mock_logger)
-
-        # Mock strategy initialization
-        with patch.object(self.aws_strategy, "initialize", return_value=True):
-            self.aws_strategy.initialize()
+        self.mock_aws_client = Mock()
+        self.aws_strategy = AWSProviderStrategy(
+            config=self.aws_config,
+            logger=self.mock_logger,
+            aws_client_resolver=lambda: self.mock_aws_client,
+        )
         self.aws_strategy._initialized = True
 
-        # Mock internal managers
-        self.mock_instance_manager = Mock()
-        self.aws_strategy._instance_manager = self.mock_instance_manager
-
-        # Create provisioning adapter with strategy
-        self.mock_aws_client = Mock()
-        self.mock_handler_factory = Mock()
         self.provisioning_adapter = AWSProvisioningAdapter(
             aws_client=self.mock_aws_client,
             logger=self.mock_logger,
-            aws_handler_factory=self.mock_handler_factory,
             provider_strategy=self.aws_strategy,
         )
 
-        # Mock the provisioning adapter methods to track calls
-        self.provisioning_adapter.provision_resources = AsyncMock(
-            wraps=self.provisioning_adapter.provision_resources
-        )
-        self.provisioning_adapter._provision_via_strategy = AsyncMock(
-            wraps=self.provisioning_adapter._provision_via_strategy
-        )
-        self.provisioning_adapter._provision_via_handlers = Mock(
-            wraps=self.provisioning_adapter._provision_via_handlers
-        )
-
-        # Mock container to return appropriate services
-        mock_config_manager = Mock()
-        mock_config_manager.get.return_value = "aws"
-
-        def container_get(service_type):
-            if service_type == ConfigurationManager:
-                return mock_config_manager
-            elif service_type == ResourceProvisioningPort:
-                return self.provisioning_adapter
-            else:
-                return Mock()
-
-        self.mock_container.get.side_effect = container_get
-
-        # Mock UoW factory to return mock UoW with repositories
-        mock_uow = Mock()
-        mock_uow.request_repository = Mock()
-        mock_uow.machine_repository = Mock()
-        mock_uow.__enter__ = Mock(return_value=mock_uow)
-        mock_uow.__exit__ = Mock(return_value=False)
-        self.mock_uow_factory.create_unit_of_work.return_value = mock_uow
-        self.mock_uow = mock_uow
-
-        # Create command handler
-        self.command_handler = CreateMachineRequestHandler(
-            uow_factory=self.mock_uow_factory,
-            logger=self.mock_logger,
-            container=self.mock_container,
-            event_publisher=self.mock_event_publisher,
-            error_handler=self.mock_error_handler,
-            query_bus=self.mock_query_bus,
-            provider_selection_service=self.mock_provider_selection_service,
-            provider_capability_service=self.mock_provider_capability_service,
-            provider_port=self.mock_provider_port,
+    def _make_request(self, dry_run: bool = False) -> Request:
+        return Request(
+            request_id=RequestId.generate(RequestType.ACQUIRE),
+            request_type=RequestType.ACQUIRE,
+            provider_type="aws",
+            template_id="test-template",
+            requested_count=1,
+            metadata={"dry_run": dry_run},
         )
 
-    @patch("providers.aws.infrastructure.dry_run_adapter.aws_dry_run_context")
-    def test_dry_run_command_propagates_to_provider_strategy(self, mock_dry_run_context):
-        """Test that dry-run context from command propagates to provider strategy."""
-        # Mock template query response
-        mock_template = Template(
+    def _make_template(self) -> Template:
+        return Template(
             template_id="test-template",
             provider_api="EC2Fleet",
-            vm_type="t2.micro",
+            machine_types={"t2.micro": 1},
+            max_number=10,
             image_id="ami-12345678",
             subnet_ids=["subnet-12345678"],
-            security_group_ids=["sg-12345678"],
-            max_number=10,
         )
 
-        mock_template_dto = Mock()
-        mock_template_dto.model_dump.return_value = mock_template.model_dump()
-        self.mock_query_bus.dispatch.return_value = mock_template_dto
+    def test_dry_run_uses_provider_strategy(self):
+        """Dry-run requests short-circuit in _provision_via_handlers before reaching AWS."""
+        request = self._make_request(dry_run=True)
+        template = self._make_template()
 
-        # Mock instance manager response
-        self.mock_instance_manager.create_instances.return_value = ["i-1234567890abcdef0"]
+        result = asyncio.run(self.provisioning_adapter.provision_resources(request, template))
 
-        # Mock dry-run context manager
-        mock_context_manager = MagicMock()
-        mock_dry_run_context.return_value = mock_context_manager
+        assert result == {"dry_run": True, "instances": [], "resource_ids": [], "success": True}
 
-        # Mock request repository save
-        self.mock_uow.request_repository.save.return_value = []
+    def test_normal_request_uses_handler_path(self):
+        """Normal (non-dry-run) requests are routed through the handler path."""
+        request = self._make_request(dry_run=False)
+        template = self._make_template()
 
-        # Create command with dry-run enabled
-        command = CreateRequestCommand(
-            template_id="test-template",
-            requested_count=1,
-            metadata={"test": "data"},
-            dry_run=True,  # Enable dry-run
-        )
-
-        # Execute command
-        request_id = self.command_handler.handle(command)
-
-        # Verify request was created
-        assert request_id is not None
-
-        # Verify request repository was called with dry-run in metadata
-        self.mock_uow.request_repository.save.assert_called_once()
-        saved_request = self.mock_uow.request_repository.save.call_args[0][0]
-        assert saved_request.metadata["dry_run"] is True
-
-        # Verify dry-run context was used in provider strategy
-        mock_dry_run_context.assert_called_once()
-        mock_context_manager.__enter__.assert_called_once()
-        mock_context_manager.__exit__.assert_called_once()
-
-        # Verify instance manager was called within dry-run context
-        self.mock_instance_manager.create_instances.assert_called_once()
-
-    def test_normal_command_does_not_use_dry_run(self):
-        """Test that normal commands do not trigger dry-run mode."""
-        # Mock template query response
-        mock_template_dto = Mock()
-        mock_template_dto.model_dump.return_value = {
-            "template_id": "test-template",
-            "vm_type": "t2.micro",
-            "image_id": "ami-12345678",
-        }
-        self.mock_query_bus.dispatch.return_value = mock_template_dto
-
-        # Mock legacy handler for normal operations
         mock_handler = Mock()
-        mock_handler.acquire_hosts.return_value = "fleet-12345"
-        self.mock_handler_factory.get_handler.return_value = mock_handler
+        mock_handler.acquire_hosts.return_value = {
+            "success": True,
+            "resource_ids": ["fleet-123"],
+            "instances": [],
+        }
 
-        # Mock request repository save
-        self.mock_uow.request_repository.save.return_value = []
+        expected = {"success": True, "resource_ids": ["fleet-123"], "instances": []}
 
-        # Create command without dry-run
-        command = CreateRequestCommand(
-            template_id="test-template",
-            requested_count=1,
-            metadata={"test": "data"},
-            dry_run=False,  # Normal operation
-        )
+        with patch.object(
+            AWSProvisioningAdapter,
+            "_get_handler_for_template",
+            return_value=mock_handler,
+        ):
+            result = asyncio.run(self.provisioning_adapter.provision_resources(request, template))
 
-        # Execute command
-        request_id = self.command_handler.handle(command)
-
-        # Verify request was created
-        assert request_id is not None
-
-        # Verify request repository was called without dry-run in metadata
-        self.mock_uow.request_repository.save.assert_called_once()
-        saved_request = self.mock_uow.request_repository.save.call_args[0][0]
-        assert saved_request.metadata["dry_run"] is False
-
-        # Verify legacy handler was used (not provider strategy)
+        assert result == expected
         mock_handler.acquire_hosts.assert_called_once()
 
-        # Verify instance manager was NOT called (legacy path used)
-        self.mock_instance_manager.create_instances.assert_not_called()
+    def test_dry_run_strategy_failure_raises(self):
+        """A dry-run request returns the short-circuit response, not an error."""
+        request = self._make_request(dry_run=True)
+        template = self._make_template()
 
-    @patch("providers.aws.infrastructure.dry_run_adapter.aws_dry_run_context")
-    def test_global_dry_run_context_with_command_dry_run(self, mock_dry_run_context):
-        """Test interaction between global dry-run context and command dry-run flag."""
-        # Mock template query response
-        mock_template_dto = Mock()
-        mock_template_dto.model_dump.return_value = {
-            "template_id": "test-template",
-            "vm_type": "t2.micro",
-            "image_id": "ami-12345678",
-        }
-        self.mock_query_bus.dispatch.return_value = mock_template_dto
+        result = asyncio.run(self.provisioning_adapter.provision_resources(request, template))
 
-        # Mock instance manager response
-        self.mock_instance_manager.create_instances.return_value = ["i-1234567890abcdef0"]
+        assert result == {"dry_run": True, "instances": [], "resource_ids": [], "success": True}
 
-        # Mock dry-run context manager
-        mock_context_manager = MagicMock()
-        mock_dry_run_context.return_value = mock_context_manager
-
-        # Mock request repository save
-        self.mock_uow.request_repository.save.return_value = []
-
-        # Create command with dry-run enabled
-        command = CreateRequestCommand(
-            template_id="test-template",
-            requested_count=1,
-            metadata={"test": "data"},
-            dry_run=True,
-        )
-
-        # Execute command within global dry-run context
+    def test_dry_run_context_manager(self):
+        """dry_run_context sets and clears the global dry-run flag."""
         with dry_run_context(True):
-            request_id = self.command_handler.handle(command)
+            from infrastructure.mocking.dry_run_context import is_dry_run_active
 
-        # Verify request was created
-        assert request_id is not None
+            assert is_dry_run_active()
 
-        # Verify both global and command dry-run contexts are respected
-        self.mock_uow.request_repository.save.assert_called_once()
-        saved_request = self.mock_uow.request_repository.save.call_args[0][0]
-        assert saved_request.metadata["dry_run"] is True
+        from infrastructure.mocking.dry_run_context import is_dry_run_active
 
-        # Verify provider strategy dry-run context was used
-        mock_dry_run_context.assert_called_once()
+        assert not is_dry_run_active()
 
-    def test_provisioning_adapter_strategy_selection(self):
-        """Test that provisioning adapter correctly selects strategy vs handlers."""
-        # Create test request with dry-run metadata
-        request = Request(
-            request_id=RequestId.generate(RequestType.ACQUIRE),
-            request_type=RequestType.ACQUIRE,
-            provider_type="aws",
-            template_id="test-template",
-            requested_count=1,
-            metadata={"dry_run": True},
+    def test_no_strategy_falls_back_to_handlers(self):
+        """When no provider strategy is set, dry-run short-circuits in the handler path."""
+        adapter = AWSProvisioningAdapter(
+            aws_client=self.mock_aws_client,
+            logger=self.mock_logger,
+            provider_strategy=None,
         )
+        request = self._make_request(dry_run=True)
+        template = self._make_template()
 
-        # Create test template
-        template = Template(
-            template_id="test-template",
-            provider_api="EC2Fleet",
-            vm_type="t2.micro",
-            image_id="ami-12345678",
-        )
-
-        # Mock instance manager response for strategy path
-        self.mock_instance_manager.create_instances.return_value = ["i-1234567890abcdef0"]
-
-        # Execute provisioning
-        resource_id = asyncio.run(self.provisioning_adapter.provision_resources(request, template))
-
-        # Verify strategy path was used
-        assert resource_id == "i-1234567890abcdef0"
-        self.mock_instance_manager.create_instances.assert_called_once()
-
-        # Verify handler factory was NOT used
-        self.mock_handler_factory.get_handler.assert_not_called()
-
-    def test_provisioning_adapter_handler_selection(self):
-        """Test that provisioning adapter uses handlers for normal operations."""
-        # Create test request without dry-run metadata
-        request = Request(
-            request_id=RequestId.generate(RequestType.ACQUIRE),
-            request_type=RequestType.ACQUIRE,
-            provider_type="aws",
-            template_id="test-template",
-            requested_count=1,
-            metadata={"dry_run": False},
-        )
-
-        # Create test template
-        template = Template(
-            template_id="test-template",
-            provider_api="EC2Fleet",
-            vm_type="t2.micro",
-            image_id="ami-12345678",
-        )
-
-        # Mock handler response for legacy path
         mock_handler = Mock()
-        mock_handler.acquire_hosts.return_value = "fleet-12345"
-        self.mock_handler_factory.get_handler.return_value = mock_handler
 
-        # Execute provisioning
-        resource_id = asyncio.run(self.provisioning_adapter.provision_resources(request, template))
+        with patch.object(
+            AWSProvisioningAdapter,
+            "_get_handler_for_template",
+            return_value=mock_handler,
+        ):
+            result = asyncio.run(adapter.provision_resources(request, template))
 
-        # Verify handler path was used
-        assert resource_id == "fleet-12345"
-        mock_handler.acquire_hosts.assert_called_once()
-
-        # Verify strategy was NOT used
-        self.mock_instance_manager.create_instances.assert_not_called()
+        assert result == {"dry_run": True, "instances": [], "resource_ids": [], "success": True}

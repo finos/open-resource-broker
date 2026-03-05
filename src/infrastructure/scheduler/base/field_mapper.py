@@ -31,7 +31,9 @@ class SchedulerFieldMapper(ABC):
 
         return mapped
 
-    def map_output_fields(self, internal_template: Dict[str, Any]) -> Dict[str, Any]:
+    def map_output_fields(
+        self, internal_template: Dict[str, Any], copy_unmapped: bool = True
+    ) -> Dict[str, Any]:
         """Map internal format → external format + transformations."""
         # Apply internal → external mappings
         reverse_mappings = {v: k for k, v in self.field_mappings.items()}
@@ -42,9 +44,10 @@ class SchedulerFieldMapper(ABC):
                 mapped[external_field] = internal_template[internal_field]
 
         # Copy unmapped fields
-        for key, value in internal_template.items():
-            if key not in reverse_mappings:
-                mapped[key] = value
+        if copy_unmapped:
+            for key, value in internal_template.items():
+                if key not in reverse_mappings:
+                    mapped[key] = value
 
         # Apply scheduler-specific transformations
         return self._apply_output_transformations(mapped)
@@ -57,7 +60,7 @@ class SchedulerFieldMapper(ABC):
 
         for template in internal_templates:
             # Use the same logic as map_output_fields to get transformations
-            formatted_template = self.map_output_fields(template)
+            formatted_template = self.map_output_fields(template, copy_unmapped=False)
             formatted.append(formatted_template)
 
         return formatted

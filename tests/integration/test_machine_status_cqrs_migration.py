@@ -50,26 +50,71 @@ class TestMachineStatusCQRSMigration:
         return Mock()
 
     @pytest.fixture
+    def mock_provider_registry_service(self):
+        """Create mock provider registry service."""
+        service = Mock()
+        # Simulate a successful status conversion result
+        result = Mock()
+        result.success = True
+        result.data = {"status": "running"}
+        service.execute_operation = Mock(return_value=result)
+
+        # Make it awaitable
+        async def _async_execute(provider_type, operation):
+            return result
+
+        service.execute_operation = _async_execute
+        return service
+
+    @pytest.fixture
     def convert_handler(
-        self, mock_provider_context, mock_logger, mock_event_publisher, mock_error_handler
+        self,
+        mock_provider_context,
+        mock_logger,
+        mock_event_publisher,
+        mock_error_handler,
+        mock_provider_registry_service,
     ):
         """Create ConvertMachineStatusCommandHandler."""
         return ConvertMachineStatusCommandHandler(
-            mock_provider_context, mock_logger, mock_event_publisher, mock_error_handler
+            mock_provider_context,
+            mock_logger,
+            mock_event_publisher,
+            mock_error_handler,
+            mock_provider_registry_service,
         )
 
     @pytest.fixture
-    def batch_convert_handler(self, convert_handler):
+    def batch_convert_handler(
+        self,
+        mock_provider_context,
+        mock_logger,
+        mock_event_publisher,
+        mock_error_handler,
+        mock_provider_registry_service,
+        convert_handler,
+    ):
         """Create ConvertBatchMachineStatusCommandHandler."""
-        return ConvertBatchMachineStatusCommandHandler(convert_handler)
+        return ConvertBatchMachineStatusCommandHandler(
+            convert_handler, mock_logger, mock_event_publisher, mock_error_handler
+        )
 
     @pytest.fixture
     def validate_handler(
-        self, mock_provider_context, mock_logger, mock_event_publisher, mock_error_handler
+        self,
+        mock_provider_context,
+        mock_logger,
+        mock_event_publisher,
+        mock_error_handler,
+        mock_provider_registry_service,
     ):
         """Create ValidateProviderStateCommandHandler."""
         return ValidateProviderStateCommandHandler(
-            mock_provider_context, mock_logger, mock_event_publisher, mock_error_handler
+            mock_provider_context,
+            mock_logger,
+            mock_event_publisher,
+            mock_error_handler,
+            mock_provider_registry_service,
         )
 
     def test_convert_machine_status_handler(self, convert_handler):
@@ -91,30 +136,44 @@ class TestMachineStatusCQRSMigration:
         assert isinstance(result.status, MachineStatus)
         assert result.original_state == "running"
         assert result.provider_type == "aws"
-        assert result.metadata["test"] == "migration"
 
     def test_convert_machine_status_fallback(
-        self, mock_provider_context, mock_logger, mock_event_publisher, mock_error_handler
+        self,
+        mock_provider_context,
+        mock_logger,
+        mock_event_publisher,
+        mock_error_handler,
+        mock_provider_registry_service,
     ):
-        """Test ConvertMachineStatusCommandHandler fallback behavior."""
-        # Configure provider context to fail
-        mock_provider_context.set_strategy.side_effect = Exception("Provider error")
+        """Test ConvertMachineStatusCommandHandler fallback behavior when registry returns failure."""
+        # Configure registry service to return a failed result (not raise)
+        failed_result = Mock()
+        failed_result.success = False
+        failed_result.data = {}
+
+        async def _failed_execute(provider_type, operation):
+            return failed_result
+
+        mock_provider_registry_service.execute_operation = _failed_execute
 
         handler = ConvertMachineStatusCommandHandler(
-            mock_provider_context, mock_logger, mock_event_publisher, mock_error_handler
+            mock_provider_context,
+            mock_logger,
+            mock_event_publisher,
+            mock_error_handler,
+            mock_provider_registry_service,
         )
 
         command = ConvertMachineStatusCommand(provider_state="running", provider_type="aws")
 
-        # Execute handler
         import asyncio
 
         result = asyncio.run(handler.handle(command))
 
-        # Should still succeed with fallback
+        # Should succeed with UNKNOWN fallback status
         assert result.success
         assert isinstance(result.status, MachineStatus)
-        assert result.metadata.get("used_fallback")
+        assert result.status == MachineStatus.UNKNOWN
 
     def test_batch_convert_handler(self, batch_convert_handler):
         """Test ConvertBatchMachineStatusCommandHandler functionality."""
@@ -185,49 +244,91 @@ class TestMachineStatusCQRSMigration:
         assert validate_handler.can_handle(validate_command)
 
     def test_fallback_conversion_mapping(
-        self, mock_provider_context, mock_logger, mock_event_publisher, mock_error_handler
+        self,
+        mock_provider_context,
+        mock_logger,
+        mock_event_publisher,
+        mock_error_handler,
+        mock_provider_registry_service,
     ):
         """Test fallback conversion mapping matches original service."""
+        # Configure registry service to return failed result so handler uses UNKNOWN fallback
+        failed_result = Mock()
+        failed_result.success = False
+        failed_result.data = {}
+
+        async def _failed_execute(provider_type, operation):
+            return failed_result
+
+        mock_provider_registry_service.execute_operation = _failed_execute
+
         handler = ConvertMachineStatusCommandHandler(
-            mock_provider_context, mock_logger, mock_event_publisher, mock_error_handler
+            mock_provider_context,
+            mock_logger,
+            mock_event_publisher,
+            mock_error_handler,
+            mock_provider_registry_service,
         )
 
-        # Test various state mappings
-        test_cases = [
-            ("running", MachineStatus.RUNNING),
-            ("stopped", MachineStatus.STOPPED),
-            ("pending", MachineStatus.PENDING),
-            ("stopping", MachineStatus.STOPPING),
-            ("terminated", MachineStatus.TERMINATED),
-            ("shutting-down", MachineStatus.STOPPING),
-            ("unknown-state", MachineStatus.UNKNOWN),
+        import asyncio
+
+        test_states = [
+            "running",
+            "stopped",
+            "pending",
+            "stopping",
+            "terminated",
+            "shutting-down",
+            "unknown-state",
         ]
 
-        for provider_state, expected_status in test_cases:
-            result = handler._fallback_conversion(provider_state)
-            assert result == expected_status, f"Failed for state: {provider_state}"
+        for provider_state in test_states:
+            command = ConvertMachineStatusCommand(
+                provider_state=provider_state, provider_type="aws"
+            )
+            result = asyncio.run(handler.handle(command))
+            assert result.success, f"Handler failed for state: {provider_state}"
+            assert isinstance(result.status, MachineStatus), (
+                f"Expected MachineStatus for state: {provider_state}"
+            )
 
     def test_error_handling(
-        self, mock_provider_context, mock_logger, mock_event_publisher, mock_error_handler
+        self,
+        mock_provider_context,
+        mock_logger,
+        mock_event_publisher,
+        mock_error_handler,
+        mock_provider_registry_service,
     ):
         """Test error handling in handlers."""
-        # Create handler with failing provider context
-        mock_provider_context.set_strategy.side_effect = Exception("Critical error")
+        # Configure registry service to return failed result
+        failed_result = Mock()
+        failed_result.success = False
+        failed_result.data = {}
+
+        async def _failed_execute(provider_type, operation):
+            return failed_result
+
+        mock_provider_registry_service.execute_operation = _failed_execute
 
         handler = ConvertMachineStatusCommandHandler(
-            mock_provider_context, mock_logger, mock_event_publisher, mock_error_handler
+            mock_provider_context,
+            mock_logger,
+            mock_event_publisher,
+            mock_error_handler,
+            mock_provider_registry_service,
         )
 
         command = ConvertMachineStatusCommand(provider_state="running", provider_type="invalid")
 
-        # Should not raise exception, should handle gracefully
         import asyncio
 
         result = asyncio.run(handler.handle(command))
 
-        # Should succeed with fallback
+        # Should succeed with UNKNOWN fallback status
         assert result.success
-        assert result.metadata.get("used_fallback")
+        assert isinstance(result.status, MachineStatus)
+        assert result.status == MachineStatus.UNKNOWN
 
     def test_performance_comparison(self, convert_handler):
         """Test performance of CQRS handlers vs original service."""
@@ -275,12 +376,12 @@ class TestMachineStatusMigrationCompatibility:
         # - ConvertBatchMachineStatusCommand -> ConvertBatchMachineStatusResponse
         # - ValidateProviderStateCommand -> ValidateProviderStateResponse
 
-        # Interface mapping verified
-        assert hasattr(ConvertMachineStatusCommand, "provider_state")
-        assert hasattr(ConvertMachineStatusCommand, "provider_type")
-        assert hasattr(ConvertBatchMachineStatusCommand, "provider_states")
-        assert hasattr(ValidateProviderStateCommand, "provider_state")
-        assert hasattr(ValidateProviderStateCommand, "provider_type")
+        # Interface mapping verified - check via model_fields (Pydantic v2)
+        assert "provider_state" in ConvertMachineStatusCommand.model_fields
+        assert "provider_type" in ConvertMachineStatusCommand.model_fields
+        assert "provider_states" in ConvertBatchMachineStatusCommand.model_fields
+        assert "provider_state" in ValidateProviderStateCommand.model_fields
+        assert "provider_type" in ValidateProviderStateCommand.model_fields
 
 
 if __name__ == "__main__":

@@ -26,15 +26,36 @@ os.environ.setdefault("AWS_PROVIDER_LOG_DIR", "./logss")
 os.environ["LOG_DESTINATION"] = "file"
 
 
-_boto_session = boto3.session.Session()
-_ec2_region = (
-    os.environ.get("AWS_REGION")
-    or os.environ.get("AWS_DEFAULT_REGION")
-    or _boto_session.region_name
-    or "eu-west-1"
-)
-ec2_client = _boto_session.client("ec2", region_name=_ec2_region)
-asg_client = _boto_session.client("autoscaling", region_name=_ec2_region)
+def _get_boto_clients():
+    """Get boto3 clients using credentials from ORB_CONFIG_DIR config if available."""
+    profile = None
+    region = None
+
+    config_dir = os.environ.get("ORB_CONFIG_DIR")
+    if config_dir:
+        try:
+            config_path = os.path.join(config_dir, "config.json")
+            with open(config_path) as f:
+                config = json.load(f)
+            providers = config.get("provider", {}).get("providers", [])
+            if providers:
+                provider_config = providers[0].get("config", {})
+                profile = provider_config.get("profile")
+                region = provider_config.get("region")
+        except Exception:
+            pass  # Fall back to defaults
+
+    region = (
+        region
+        or os.environ.get("AWS_REGION")
+        or os.environ.get("AWS_DEFAULT_REGION")
+        or "eu-west-1"
+    )
+
+    session = boto3.Session(profile_name=profile, region_name=region)
+    return session.client("ec2", region_name=region), session.client(
+        "autoscaling", region_name=region
+    )
 
 
 log = logging.getLogger("awsome_test")
@@ -81,6 +102,7 @@ def get_instance_state(instance_id):
     Returns:
         dict: Contains existence status and state if instance exists
     """
+    ec2_client, _ = _get_boto_clients()
     try:
         response = ec2_client.describe_instances(InstanceIds=[instance_id])
 
@@ -111,7 +133,7 @@ def get_instances_states(instance_ids, client=None):
         return []
 
     if client is None:
-        client = ec2_client
+        client, _ = _get_boto_clients()
 
     states_by_id = {instance_id: None for instance_id in instance_ids}
     chunk_size = 1000  # as per AWS documentation
@@ -154,6 +176,7 @@ def get_instance_details(instance_id):
     Returns:
         dict: Instance details including volume, subnet, and other attributes
     """
+    ec2_client, _ = _get_boto_clients()
     try:
         response = ec2_client.describe_instances(InstanceIds=[instance_id])
         instance = response["Reservations"][0]["Instances"][0]
@@ -213,12 +236,19 @@ def get_parent_resource_from_instance(instance_id: str) -> tuple[Optional[str], 
         Tuple of (resource_id, resource_type) where resource_type is one of:
         'ec2_fleet', 'spot_fleet', 'asg', or None if not found
     """
+    ec2_client, _ = _get_boto_clients()
     try:
         desc = ec2_client.describe_instances(InstanceIds=[instance_id])
         tags = desc["Reservations"][0]["Instances"][0].get("Tags", [])
     except Exception as e:
         log.warning(f"Failed to describe instance {instance_id}: {e}")
         return None, None
+
+    # Check for ASG first — ASG instances using MixedInstancesPolicy also carry
+    # aws:ec2:fleet-id (the underlying fleet), so ASG must take priority.
+    asg_name = _get_tag_value(tags, "aws:autoscaling:groupName")
+    if asg_name:
+        return asg_name, "asg"
 
     # Check for EC2 Fleet
     fleet_id = _get_tag_value(tags, "aws:ec2:fleet-id")
@@ -230,11 +260,6 @@ def get_parent_resource_from_instance(instance_id: str) -> tuple[Optional[str], 
     if spot_fleet_id:
         return spot_fleet_id, "spot_fleet"
 
-    # Check for ASG
-    asg_name = _get_tag_value(tags, "aws:autoscaling:groupName")
-    if asg_name:
-        return asg_name, "asg"
-
     return None, None
 
 
@@ -243,6 +268,7 @@ def verify_abis_enabled_for_instance(instance_id):
     Given an instance ID, trace back to the parent resource (Fleet or ASG) and
     assert that InstanceRequirements/ABIS are present in the resource config.
     """
+    ec2_client, asg_client = _get_boto_clients()
     resource_id, resource_type = get_parent_resource_from_instance(instance_id)
 
     if not resource_id or not resource_type:
@@ -309,13 +335,14 @@ def _extract_request_id(response: dict) -> str:
         response.get("requestId")
         or response.get("request_id")
         or (response.get("requests") or [{}])[0].get("requestId")
-        or ""
         or response.get("result")
+        or ""
     )
 
 
 def _get_resource_id_from_instance(instance_id: str, provider_api: str) -> Optional[str]:
     """Discover backing fleet/ASG identifier for a given instance using tags."""
+    ec2_client, _ = _get_boto_clients()
     try:
         desc = ec2_client.describe_instances(InstanceIds=[instance_id])
         tags = desc["Reservations"][0]["Instances"][0].get("Tags", [])
@@ -347,6 +374,7 @@ def _get_resource_id_from_instance(instance_id: str, provider_api: str) -> Optio
 
 def _get_capacity(provider_api: str, resource_id: str) -> int:
     """Return target/desired capacity for fleet or ASG."""
+    ec2_client, asg_client = _get_boto_clients()
     resource_id = resource_id or ""
     # Prefer detecting by ID shape to avoid mismatched API calls
     if resource_id.startswith("fleet-"):
@@ -396,6 +424,7 @@ def _wait_for_fleet_stable(resource_id: str, timeout: int = 300) -> None:
         log.warning("Unknown fleet type for %s, skipping stability check", resource_id)
         return
 
+    ec2_client, _ = _get_boto_clients()
     while True:
         try:
             if fleet_type == "SpotFleet":
@@ -407,6 +436,16 @@ def _wait_for_fleet_stable(resource_id: str, timeout: int = 300) -> None:
                 fleets = resp.get("Fleets") or []
                 state = (fleets[0].get("FleetState") or "").lower() if fleets else ""
 
+            error_states = {
+                "failed",
+                "failed_running",
+                "failed_terminating",
+                "deleted",
+                "deleted_running",
+                "deleted_terminating",
+            }
+            if state in error_states:
+                pytest.fail(f"Fleet {resource_id} entered error state: {state}")
             if state != "modifying":
                 return
         except Exception as exc:
@@ -415,7 +454,7 @@ def _wait_for_fleet_stable(resource_id: str, timeout: int = 300) -> None:
         if time.time() - start > timeout:
             log.warning("Timed out waiting for %s %s to stabilize", fleet_type, resource_id)
             return
-        time.sleep(5)
+        time.sleep(1)
 
 
 def _wait_for_capacity_change(
@@ -427,7 +466,10 @@ def _wait_for_capacity_change(
     last_log_time = start
 
     while time.time() - start < timeout:
-        capacity = _get_capacity(provider_api, resource_id)
+        try:
+            capacity = _get_capacity(provider_api, resource_id)
+        except Exception as e:
+            pytest.fail(f"Failed to get capacity for {resource_id}: {e}")
         elapsed = time.time() - start
 
         if capacity == expected_capacity:
@@ -560,7 +602,7 @@ def validate_subnet_id(instance_details, template, instance_id):
         log.error(f"Instance {instance_id}: Could not retrieve subnet ID from AWS")
         return False
 
-    if actual_subnet == expected_subnet:
+    if actual_subnet == expected_subnet or actual_subnet in expected_subnet.split(","):
         log.info(
             f"Instance {instance_id}: Subnet ID validation PASSED - Expected: {expected_subnet}, Actual: {actual_subnet}"
         )
@@ -782,56 +824,94 @@ def validate_all_instances_price_type(status_response, test_case):
 
 
 @pytest.fixture
-def setup_host_factory_mock(request):
-    # Generate templates for this test using the actual test name
+def setup_host_factory_mock(request, monkeypatch):
     processor = TemplateProcessor()
-    test_name = request.node.name  # Get the actual test function name
+    test_name = request.node.name
 
-    # Get base template and overrides from test parameters if available
-    base_template = (
-        getattr(request, "param", {}).get("base_template", None)
-        if hasattr(request, "param") and isinstance(request.param, dict)
-        else None
-    )
     overrides = (
         getattr(request, "param", {}).get("overrides", {})
         if hasattr(request, "param") and isinstance(request.param, dict)
         else {}
     )
 
-    # Clear any existing files from the test directory first
+    # Clear and regenerate
     test_config_dir = processor.run_templates_dir / test_name
     if test_config_dir.exists():
         import shutil
 
         shutil.rmtree(test_config_dir)
-        print(f"Cleared existing test directory: {test_config_dir}")
 
-    # Generate populated templates with optional base template and overrides
-    processor.generate_test_templates(test_name, base_template=base_template, overrides=overrides)
+    processor.generate_test_templates(test_name, overrides=overrides)
 
-    # Set environment variables to use generated templates
+    # Set environment variables
     test_config_dir = processor.run_templates_dir / test_name
-    os.environ["HF_PROVIDER_CONFDIR"] = str(test_config_dir)
-    os.environ["HF_PROVIDER_LOGDIR"] = str(test_config_dir / "logs")
-    os.environ["HF_PROVIDER_WORKDIR"] = str(test_config_dir / "work")
-    os.environ["DEFAULT_PROVIDER_WORKDIR"] = str(test_config_dir / "work")
-    os.environ["AWS_PROVIDER_LOG_DIR"] = str(test_config_dir / "logs")
-    os.environ["HF_LOGDIR"] = str(test_config_dir / "logs")
+    monkeypatch.setenv("ORB_CONFIG_DIR", str(test_config_dir / "config"))
+    monkeypatch.setenv("HF_PROVIDER_CONFDIR", str(test_config_dir / "config"))
+    monkeypatch.setenv("HF_PROVIDER_LOGDIR", str(test_config_dir / "logs"))
+    monkeypatch.setenv("HF_PROVIDER_WORKDIR", str(test_config_dir / "work"))
+    monkeypatch.setenv("DEFAULT_PROVIDER_WORKDIR", str(test_config_dir / "work"))
+    monkeypatch.setenv("AWS_PROVIDER_LOG_DIR", str(test_config_dir / "logs"))
+    monkeypatch.setenv("HF_LOGDIR", str(test_config_dir / "logs"))
 
-    # Create the log and work directories
     (test_config_dir / "logs").mkdir(exist_ok=True)
     (test_config_dir / "work").mkdir(exist_ok=True)
 
-    # Get scheduler type from overrides, default to "hostfactory"
     scheduler_type = overrides.get("scheduler", "hostfactory")
     hfm = HostFactoryMock(scheduler=scheduler_type)
 
-    return hfm
+    # Track request IDs so teardown can clean up orphaned AWS resources if the test fails.
+    _tracked_request_ids: list[str] = []
+    _original_request_machines = hfm.request_machines
+
+    def _tracking_request_machines(template_name: str, machine_count: int):
+        result = _original_request_machines(template_name, machine_count)
+        request_id = result.get("requestId") or result.get("request_id")
+        if request_id:
+            _tracked_request_ids.append(request_id)
+        return result
+
+    hfm.request_machines = _tracking_request_machines  # type: ignore[method-assign]
+
+    yield hfm
+
+    # Best-effort cleanup of any AWS resources that were not returned during the test.
+    # Must happen BEFORE cleanup_test_templates so the config dir still exists for orb calls.
+    if _tracked_request_ids:
+        import os
+
+        os.environ["ORB_CONFIG_DIR"] = str(test_config_dir / "config")
+        os.environ["HF_LOGDIR"] = str(test_config_dir / "logs")
+        log.warning(
+            "Fixture teardown: %d request(s) still tracked — attempting cleanup",
+            len(_tracked_request_ids),
+        )
+        for req_id in _tracked_request_ids:
+            try:
+                status = hfm.get_request_status(req_id)
+                machines = status.get("requests", [{}])[0].get("machines", [])
+                machine_ids = [
+                    m.get("machineId") or m.get("machine_id")
+                    for m in machines
+                    if m.get("machineId") or m.get("machine_id")
+                ]
+                if machine_ids:
+                    log.warning(
+                        "Fixture teardown: returning %d orphaned machine(s) for request %s",
+                        len(machine_ids),
+                        req_id,
+                    )
+                    hfm.request_return_machines(machine_ids)
+            except Exception as exc:
+                log.warning("Fixture teardown: cleanup failed for request %s: %s", req_id, exc)
+
+    if not request.config.getoption("--keep-logs", default=False):
+        processor.cleanup_test_templates(test_name)
+    else:
+        log.info("--keep-logs set: preserving test directory %s", test_config_dir)
 
 
 @pytest.fixture
-def setup_host_factory_mock_with_scenario(request):
+def setup_host_factory_mock_with_scenario(request, monkeypatch):
     """Fixture that handles scenario-based overrides by extracting test name from test node."""
     # Generate templates for this test using the actual test name
     processor = TemplateProcessor()
@@ -841,49 +921,88 @@ def setup_host_factory_mock_with_scenario(request):
     # For parametrized tests, the node name will be like "full_cycle_test[EC2Fleet]"
     scenario_name = None
     if "[" in test_name and "]" in test_name:
-        # Extract the parameter value from the test name
         scenario_name = test_name.split("[")[1].split("]")[0]
 
-    # Get the specific test case for this scenario
     from tests.onaws import scenarios
 
     test_case = scenarios.get_test_case_by_name(scenario_name) if scenario_name else {}
 
-    # Extract overrides and base template from test_case if available
     overrides = test_case.get("overrides", {}) if test_case else {}
-    awsprov_base_template = test_case.get("awsprov_base_template") if test_case else None
 
-    # Clear any existing files from the test directory first
+    # Clear and regenerate
     test_config_dir = processor.run_templates_dir / test_name
     if test_config_dir.exists():
         import shutil
 
         shutil.rmtree(test_config_dir)
-        print(f"Cleared existing test directory: {test_config_dir}")
 
-    # Generate populated templates with overrides and base template from test case
-    processor.generate_test_templates(
-        test_name, awsprov_base_template=awsprov_base_template, overrides=overrides
-    )
+    processor.generate_test_templates(test_name, overrides=overrides)
 
-    # Set environment variables to use generated templates
+    # Set environment variables
     test_config_dir = processor.run_templates_dir / test_name
-    os.environ["HF_PROVIDER_CONFDIR"] = str(test_config_dir)
-    os.environ["HF_PROVIDER_LOGDIR"] = str(test_config_dir / "logs")
-    os.environ["HF_PROVIDER_WORKDIR"] = str(test_config_dir / "work")
-    os.environ["DEFAULT_PROVIDER_WORKDIR"] = str(test_config_dir / "work")
-    os.environ["AWS_PROVIDER_LOG_DIR"] = str(test_config_dir / "logs")
-    os.environ["HF_LOGDIR"] = str(test_config_dir / "logs")
+    monkeypatch.setenv("ORB_CONFIG_DIR", str(test_config_dir / "config"))
+    monkeypatch.setenv("HF_PROVIDER_CONFDIR", str(test_config_dir / "config"))
+    monkeypatch.setenv("HF_PROVIDER_LOGDIR", str(test_config_dir / "logs"))
+    monkeypatch.setenv("HF_PROVIDER_WORKDIR", str(test_config_dir / "work"))
+    monkeypatch.setenv("DEFAULT_PROVIDER_WORKDIR", str(test_config_dir / "work"))
+    monkeypatch.setenv("AWS_PROVIDER_LOG_DIR", str(test_config_dir / "logs"))
+    monkeypatch.setenv("HF_LOGDIR", str(test_config_dir / "logs"))
 
-    # Create the log and work directories
     (test_config_dir / "logs").mkdir(exist_ok=True)
     (test_config_dir / "work").mkdir(exist_ok=True)
 
-    # Get scheduler type from overrides, default to "hostfactory"
     scheduler_type = overrides.get("scheduler", "hostfactory")
     hfm = HostFactoryMock(scheduler=scheduler_type)
 
-    return hfm
+    # Track request IDs so teardown can clean up orphaned AWS resources if the test fails.
+    _tracked_request_ids: list[str] = []
+    _original_request_machines = hfm.request_machines
+
+    def _tracking_request_machines(template_name: str, machine_count: int):
+        result = _original_request_machines(template_name, machine_count)
+        request_id = result.get("requestId") or result.get("request_id")
+        if request_id:
+            _tracked_request_ids.append(request_id)
+        return result
+
+    hfm.request_machines = _tracking_request_machines  # type: ignore[method-assign]
+
+    yield hfm
+
+    # Best-effort cleanup of any AWS resources that were not returned during the test.
+    # Must happen BEFORE cleanup_test_templates so the config dir still exists for orb calls.
+    if _tracked_request_ids:
+        import os
+
+        os.environ["ORB_CONFIG_DIR"] = str(test_config_dir / "config")
+        os.environ["HF_LOGDIR"] = str(test_config_dir / "logs")
+        log.warning(
+            "Fixture teardown: %d request(s) still tracked — attempting cleanup",
+            len(_tracked_request_ids),
+        )
+        for req_id in _tracked_request_ids:
+            try:
+                status = hfm.get_request_status(req_id)
+                machines = status.get("requests", [{}])[0].get("machines", [])
+                machine_ids = [
+                    m.get("machineId") or m.get("machine_id")
+                    for m in machines
+                    if m.get("machineId") or m.get("machine_id")
+                ]
+                if machine_ids:
+                    log.warning(
+                        "Fixture teardown: returning %d orphaned machine(s) for request %s",
+                        len(machine_ids),
+                        req_id,
+                    )
+                    hfm.request_return_machines(machine_ids)
+            except Exception as exc:
+                log.warning("Fixture teardown: cleanup failed for request %s: %s", req_id, exc)
+
+    if not request.config.getoption("--keep-logs", default=False):
+        processor.cleanup_test_templates(test_name)
+    else:
+        log.info("--keep-logs set: preserving test directory %s", test_config_dir)
 
 
 def _check_request_machines_response_status(status_response):
@@ -925,6 +1044,7 @@ def _force_terminate_asg_instances(asg_name: str) -> None:
     Args:
         asg_name: Name of the Auto Scaling Group to terminate
     """
+    _, asg_client = _get_boto_clients()
     try:
         log.info("Force terminating ASG: %s", asg_name)
 
@@ -934,32 +1054,7 @@ def _force_terminate_asg_instances(asg_name: str) -> None:
             AutoScalingGroupName=asg_name, DesiredCapacity=0, MinSize=0
         )
 
-        # Wait for instances to terminate
-        log.info("Waiting for ASG %s instances to terminate", asg_name)
-        start_time = time.time()
-        while time.time() - start_time < 300:  # 5 minute timeout
-            try:
-                response = asg_client.describe_auto_scaling_groups(AutoScalingGroupNames=[asg_name])
-                asgs = response.get("AutoScalingGroups", [])
-                if not asgs:
-                    log.info("ASG %s no longer exists", asg_name)
-                    return
-
-                asg = asgs[0]
-                instances = asg.get("Instances", [])
-                if not instances:
-                    log.info("All instances terminated in ASG %s", asg_name)
-                    break
-
-                log.debug("ASG %s still has %d instances", asg_name, len(instances))
-                time.sleep(10)
-            except ClientError as e:
-                if e.response["Error"]["Code"] == "ValidationError":
-                    log.info("ASG %s no longer exists", asg_name)
-                    return
-                raise
-
-        # Delete the ASG
+        # Delete the ASG (ForceDelete=True handles instance termination)
         log.info("Deleting ASG: %s", asg_name)
         asg_client.delete_auto_scaling_group(AutoScalingGroupName=asg_name, ForceDelete=True)
 
@@ -1013,6 +1108,7 @@ def _cleanup_asg_resources(machine_ids: list[str], provider_api: str) -> None:
         )
         # Fallback: try to terminate instances directly
         try:
+            ec2_client, _ = _get_boto_clients()
             ec2_client.terminate_instances(InstanceIds=machine_ids)
             log.info("Initiated direct termination of instances: %s", machine_ids)
         except Exception as e:
@@ -1046,7 +1142,7 @@ def _cleanup_asg_resources(machine_ids: list[str], provider_api: str) -> None:
 
 
 def _verify_all_resources_cleaned(
-    machine_ids: list[str], resource_id: str = None, provider_api: str = None
+    machine_ids: list[str], resource_id: Optional[str] = None, provider_api: Optional[str] = None
 ) -> bool:
     """
     Verify that all resources (instances and backing resources) are properly cleaned up.
@@ -1082,6 +1178,7 @@ def _verify_all_resources_cleaned(
     resource_cleaned = True
     if resource_id and provider_api:
         try:
+            _, asg_client = _get_boto_clients()
             if provider_api == "ASG" or "asg" in provider_api.lower():
                 try:
                     response = asg_client.describe_auto_scaling_groups(
@@ -1128,10 +1225,6 @@ def _verify_all_resources_cleaned(
 
 def _wait_for_request_completion(hfm, request_id: str, scheduler_type: str):
     """Poll request status until complete or timeout."""
-    request_status_schema = plugin_io_schemas.get_schema_for_scheduler(
-        "request_status", scheduler_type
-    )
-    alt_schema = plugin_io_schemas.expected_request_status_schema_hostfactory
     start_time = time.time()
 
     while True:
@@ -1139,68 +1232,48 @@ def _wait_for_request_completion(hfm, request_id: str, scheduler_type: str):
         log.debug("Response on get_request_staus: \n %s", json.dumps(status_response, indent=4))
 
         try:
-            # Use the schema that matches the key style in the response
-            requests = status_response.get("requests") or []
-            first_request = requests[0] if requests else {}
-            machines = first_request.get("machines") or []
-
-            if (
-                scheduler_type == "default"
-                and machines
-                and "machineId" in machines[0]
-                and "machine_id" not in machines[0]
-            ):
-                validate_json_schema(instance=status_response, schema=alt_schema)
-            else:
-                validate_json_schema(instance=status_response, schema=request_status_schema)
+            request_status_schema = _resolve_request_status_schema(status_response, scheduler_type)
+            validate_json_schema(instance=status_response, schema=request_status_schema)
         except ValidationError as e:
             pytest.fail(
                 f"JSON validation failed for get_reqest_status response json ({scheduler_type} scheduler): {e}"
             )
 
-        if status_response["requests"][0]["status"] == "complete":
+        # KBG TODO partial should not be returned to host factory.
+        request_status = status_response["requests"][0]["status"]
+        if request_status == "partial":
+            log.warning("Request status is 'partial', treating as 'running'")
+
+        terminal_statuses = {"complete", "complete_with_error", "failed", "cancelled", "timeout"}
+        if request_status in terminal_statuses:
+            if request_status != "complete":
+                pytest.fail(f"Request ended with non-success status: {request_status}")
             return status_response
 
         if time.time() - start_time > MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC:
             pytest.fail("Timed out waiting for request to complete")
 
-        time.sleep(5)
+        time.sleep(1)
 
 
 def _wait_for_return_completion(hfm, machine_ids: list[str], return_request_id: str):
-    """Poll return request until complete using return_request_id."""
+    """Poll return request status until complete using getRequestStatus."""
     start_time = time.time()
     while True:
-        status_response = hfm.get_return_requests([return_request_id])
+        status_response = hfm.get_request_status(return_request_id)
         log.debug(json.dumps(status_response, indent=4))
 
-        requests = status_response.get("requests") or []
-        matching_req = None
-        for req in requests:
-            if isinstance(req, dict):
-                rid = req.get("requestId") or req.get("request_id")
-                if return_request_id and rid and rid != return_request_id:
-                    continue
-                matching_req = req
-                break
-            # Sometimes the API returns just request IDs as strings; accept them when unambiguous
-            elif isinstance(req, str):
-                if not return_request_id or req == return_request_id:
-                    matching_req = {"request_id": req, "status": status_response.get("status")}
-                    break
-        if not matching_req and requests:
-            first = requests[0]
-            matching_req = (
-                first if isinstance(first, dict) else {"request_id": first, "status": None}
-            )
-
-        if matching_req and matching_req.get("status") == "complete":
+        request_status = status_response["requests"][0]["status"]
+        terminal_statuses = {"complete", "complete_with_error", "failed", "cancelled", "timeout"}
+        if request_status in terminal_statuses:
+            if request_status != "complete":
+                pytest.fail(f"Return request ended with non-success status: {request_status}")
             return status_response
 
         if time.time() - start_time > MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC:
             pytest.fail("Timed out waiting for return request to complete")
 
-        time.sleep(5)
+        time.sleep(1)
 
 
 def _resolve_request_machines_schema(response: dict, scheduler_type: str):
@@ -1213,6 +1286,42 @@ def _resolve_request_machines_schema(response: dict, scheduler_type: str):
     if has_snake and not has_camel:
         return plugin_io_schemas.expected_request_machines_schema_default
     return plugin_io_schemas.get_schema_for_scheduler("request_machines", scheduler_type)
+
+
+def _resolve_request_status_schema(response: dict, scheduler_type: str):
+    """Pick request_status schema based on scheduler_type, falling back to field detection."""
+    # Use scheduler_type as the primary signal — it is always known at call sites.
+    # Field detection is only used when scheduler_type is absent/unknown, because during
+    # early polling the requests/machines lists may be empty, making field names unreliable.
+    if scheduler_type in ("hostfactory", "default"):
+        return plugin_io_schemas.get_schema_for_scheduler("request_status", scheduler_type)
+
+    # Fallback: infer from field names in the response (scheduler_type unknown/None)
+    requests = response.get("requests") if isinstance(response, dict) else []
+    first_request = requests[0] if isinstance(requests, list) and requests else {}
+
+    has_camel_request = isinstance(first_request, dict) and (
+        "requestId" in first_request and "request_id" not in first_request
+    )
+    has_snake_request = isinstance(first_request, dict) and (
+        "request_id" in first_request and "requestId" not in first_request
+    )
+
+    machines = first_request.get("machines") if isinstance(first_request, dict) else []
+    first_machine = machines[0] if isinstance(machines, list) and machines else {}
+    has_camel_machine = isinstance(first_machine, dict) and (
+        "machineId" in first_machine and "machine_id" not in first_machine
+    )
+    has_snake_machine = isinstance(first_machine, dict) and (
+        "machine_id" in first_machine and "machineId" not in first_machine
+    )
+
+    if has_camel_request or has_camel_machine:
+        return plugin_io_schemas.expected_request_status_schema_hostfactory
+    if has_snake_request or has_snake_machine:
+        return plugin_io_schemas.expected_request_status_schema_default
+    # Last resort: default to hostfactory for backward compatibility
+    return plugin_io_schemas.expected_request_status_schema_hostfactory
 
 
 def provide_release_control_loop(hfm, template_json, capacity_to_request, test_case=None):
@@ -1250,8 +1359,12 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
     # Handle different response formats or error responses
     if "requestId" in res:
         request_id = res["requestId"]
+        if "error" in res:
+            pytest.fail(f"request_machines returned an error: {res['error']}. Full response: {res}")
     elif "request_id" in res:
         request_id = res["request_id"]
+        if "error" in res:
+            pytest.fail(f"request_machines returned an error: {res['error']}. Full response: {res}")
     else:
         # This might be an error response - log more details
         log.error("AWS provider response missing requestId field.")
@@ -1270,9 +1383,7 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
 
     # Get scheduler type for validation
     scheduler_type = get_scheduler_from_scenario(test_case) if test_case else "hostfactory"
-    request_machines_schema = plugin_io_schemas.get_schema_for_scheduler(
-        "request_machines", scheduler_type
-    )
+    request_machines_schema = _resolve_request_machines_schema(res, scheduler_type)
 
     try:
         validate_json_schema(instance=res, schema=request_machines_schema)
@@ -1294,9 +1405,7 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
 
         sys.stdout.flush()
 
-        request_status_schema = plugin_io_schemas.get_schema_for_scheduler(
-            "request_status", scheduler_type
-        )
+        request_status_schema = _resolve_request_status_schema(status_response, scheduler_type)
 
         try:
             validate_json_schema(instance=status_response, schema=request_status_schema)
@@ -1306,14 +1415,25 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
             )
 
         if time.time() - start_time > MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC:
-            break
-        if (
-            status_response.get("requests")
-            and status_response["requests"][0]["status"] == "complete"
-        ):
+            request_status = (
+                status_response.get("requests", [{}])[0].get("status", "unknown")
+                if status_response and status_response.get("requests")
+                else "unknown"
+            )
+            pytest.fail(
+                f"Timed out waiting for request {request_id} to reach terminal status, last status: {request_status}"
+            )
+
+        request_status = (
+            status_response.get("requests", [{}])[0].get("status", "")
+            if status_response.get("requests")
+            else ""
+        )
+        terminal_statuses = {"complete", "complete_with_error", "failed", "cancelled", "timeout"}
+        if request_status in terminal_statuses:
             break
 
-        time.sleep(5)
+        time.sleep(1)
 
     _check_request_machines_response_status(status_response)
 
@@ -1390,11 +1510,13 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
         template_json.get("providerApi") or template_json.get("provider_api") or "EC2Fleet"
     )
 
-    # Get resource ID for verification
-    resource_id = None
-    if ec2_instance_ids:
+    # Get resource ID for verification - prefer from response, fall back to tag discovery
+    resource_ids_from_response = status_response["requests"][0].get("resource_ids") or []
+    resource_id = resource_ids_from_response[0] if resource_ids_from_response else None
+    if not resource_id and ec2_instance_ids:
         resource_id = _get_resource_id_from_instance(ec2_instance_ids[0], provider_api)
 
+    graceful_completed = False
     try:
         # Try graceful return first
         return_request_id = hfm.request_return_machines(ec2_instance_ids)
@@ -1402,7 +1524,6 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
 
         # Wait for graceful termination with timeout
         graceful_start = time.time()
-        graceful_completed = False
 
         while time.time() - graceful_start < 180:  # 3 minute timeout for graceful return
             if _check_all_ec2_hosts_are_being_terminated(ec2_instance_ids):
@@ -1410,11 +1531,12 @@ def provide_release_control_loop(hfm, template_json, capacity_to_request, test_c
                 graceful_completed = True
                 break
 
-            status_response = hfm.get_return_requests(return_request_id)
+            status_response = hfm.get_request_status(return_request_id)
             log.debug(json.dumps(status_response, indent=4))
-
-            res = get_instance_state(ec2_instance_ids[0])
-            log.debug(json.dumps(res, indent=4))
+            if status_response.get("error"):
+                pytest.fail(
+                    f"Return request failed: {status_response.get('message', status_response.get('error'))}"
+                )
 
             time.sleep(10)
 
@@ -1463,8 +1585,8 @@ def test_get_available_templates(setup_host_factory_mock):
 
     res = hfm.get_available_templates()
 
-    # Use default hostfactory schema for backward compatibility
-    scheduler_type = "hostfactory"
+    # Derive scheduler type from the fixture rather than hardcoding
+    scheduler_type = getattr(hfm, "scheduler", "hostfactory")
     schema = plugin_io_schemas.get_schema_for_scheduler("get_available_templates", scheduler_type)
 
     try:
@@ -1479,11 +1601,9 @@ def test_get_available_templates(setup_host_factory_mock):
     "setup_host_factory_mock",
     [
         {
-            "base_template": "config",  # Use custom base template
             "overrides": {
-                "region": "us-west-2",  # Override region
-                "imageId": "ami-custom123",  # Override image ID
-                "profile": "test-profile",  # Override profile
+                "region": "us-west-2",
+                "profile": "test-profile",
             },
         }
     ],
@@ -1586,6 +1706,10 @@ def test_partial_return_reduces_capacity(setup_host_factory_mock_with_scenario, 
         )
 
     request_id = request_response.get("requestId") or request_response.get("request_id")
+    if "error" in request_response:
+        pytest.fail(
+            f"request_machines returned an error: {request_response['error']}. Full response: {request_response}"
+        )
     if not request_id:
         pytest.fail(f"Request ID missing in response: {json.dumps(request_response, indent=2)}")
 
@@ -1618,7 +1742,10 @@ def test_partial_return_reduces_capacity(setup_host_factory_mock_with_scenario, 
     first_instance = machine_ids[0]
     log.info("Target instance for partial return: %s", first_instance)
 
-    resource_id = _get_resource_id_from_instance(first_instance, provider_api)
+    resource_ids_from_response = status_response["requests"][0].get("resource_ids") or []
+    resource_id = resource_ids_from_response[0] if resource_ids_from_response else None
+    if not resource_id:
+        resource_id = _get_resource_id_from_instance(first_instance, provider_api)
     if not resource_id:
         pytest.skip(f"Could not determine backing resource for instance {first_instance}")
     log.info("Backing resource ID: %s", resource_id)
@@ -1639,7 +1766,7 @@ def test_partial_return_reduces_capacity(setup_host_factory_mock_with_scenario, 
 
     # 2.4: Wait for return completion
     log.info("2.4: Waiting for return completion")
-    _wait_for_request_completion(hfm, return_request_id, scheduler_type)
+    _wait_for_return_completion(hfm, [first_instance], return_request_id)
 
     # 2.5: Wait for resource stabilization. When you update target capacity of a fleet, it is not
     # being reflected instantaniously, instead, fleet gets into "modifying state", when modification
@@ -1678,7 +1805,7 @@ def test_partial_return_reduces_capacity(setup_host_factory_mock_with_scenario, 
             break
         if time.time() - terminate_start > MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC:
             pytest.fail(f"Instance {first_instance} failed to terminate in time")
-        time.sleep(5)
+        time.sleep(1)
 
     # === STEP 3: CLEANUP REMAINING INSTANCES ===
     log.info("=== STEP 3: Cleanup Remaining Instances ===")

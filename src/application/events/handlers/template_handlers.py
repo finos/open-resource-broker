@@ -6,21 +6,13 @@ with a clean, maintainable architecture following DDD/SOLID/DRY principles.
 """
 
 # Import the new base classes and decorator
-from application.base.event_handlers import BaseLoggingEventHandler
+from application.events.base.logging_event_handler import LoggingEventHandler
 from application.events.decorators import event_handler
-
-# Import types - using string imports to avoid circular dependencies
-try:
-    from domain.base.events import DomainEvent
-    from domain.base.ports import LoggingPort
-except ImportError:
-    # Fallback for testing or when dependencies aren't available
-    DomainEvent = object
-    LoggingPort = object
+from domain.base.events import DomainEvent
 
 
-@event_handler("TemplateValidatedEvent")
-class TemplateValidatedHandler(BaseLoggingEventHandler):
+@event_handler("TemplateValidatedEvent")  # type: ignore[arg-type]
+class TemplateValidatedHandler(LoggingEventHandler):
     """Handle template validation events - DRY compliant."""
 
     def format_message(self, event: DomainEvent) -> str:
@@ -49,8 +41,8 @@ class TemplateValidatedHandler(BaseLoggingEventHandler):
         return message
 
 
-@event_handler("TemplateUpdatedEvent")
-class TemplateUpdatedHandler(BaseLoggingEventHandler):
+@event_handler("TemplateUpdatedEvent")  # type: ignore[arg-type]
+class TemplateUpdatedHandler(LoggingEventHandler):
     """Handle template update events - DRY compliant."""
 
     def format_message(self, event: DomainEvent) -> str:

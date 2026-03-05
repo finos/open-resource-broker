@@ -242,12 +242,14 @@ class TestServiceRegistry:
 
         def register_and_retrieve(thread_id: int):
             try:
-                # Register with thread-specific instance
+                # Register with thread-specific instance using a unique class per thread
                 instance = TestClass(thread_id)
-                self.registry.register_instance(f"TestClass_{thread_id}", instance)
+                # Use a unique key object per thread to avoid type key collision
+                key = type(f"TestClass_{thread_id}", (), {})
+                self.registry.register_instance(key, instance)
 
                 # Retrieve and verify
-                retrieved = self.registry.get_singleton_instance(f"TestClass_{thread_id}")
+                retrieved = self.registry.get_singleton_instance(key)
                 if retrieved and retrieved.value == thread_id:
                     results.append(thread_id)
                 else:

@@ -7,690 +7,356 @@
 [![PyPI Version](https://img.shields.io/pypi/v/orb-py)](https://pypi.org/project/orb-py/)
 [![License](https://img.shields.io/github/license/awslabs/open-resource-broker)](LICENSE)
 
-A cloud provider integration plugin for IBM Spectrum Symphony Host Factory, enabling dynamic provisioning of compute resources with a REST API interface and structured architecture implementation.
+A cloud provider integration plugin for IBM Spectrum Symphony Host Factory, enabling dynamic provisioning of AWS compute resources via a CLI and REST API.
 
-## Overview
+**Supported providers:** AWS (RunInstances, EC2Fleet, SpotFleet, Auto Scaling Groups)
 
-The Open Resource Broker provides integration between IBM Spectrum Symphony Host Factory and cloud providers, implementing industry-standard patterns including Domain-Driven Design (DDD), Command Query Responsibility Segregation (CQRS), and structured architecture principles.
+---
 
-**Currently Supported Providers:**
-- **AWS** - Amazon Web Services (RunInstances, EC2Fleet, SpotFleet, Auto Scaling Groups)
-  - Context field support for EC2Fleet, SpotFleet, and Auto Scaling Groups
+## Prerequisites
 
-## Key Features
+Before you start, make sure you have:
 
-### Core Functionality
-- **HostFactory Compatible Output**: Native compatibility with IBM Symphony Host Factory requirements
-- **Extensible Architecture**: Extensible provider system with AWS support
-- **REST API Interface**: REST API with OpenAPI/Swagger documentation
-- **Configuration-Driven**: Dynamic provider selection and configuration through centralized config system
+- Python 3.10 or higher
+- AWS credentials configured (see below)
+- An AWS account with the IAM permissions listed below
 
-### Key Architecture Features
-- **Clean Architecture**: Domain-driven design with clear separation of concerns
-- **CQRS Pattern**: Command Query Responsibility Segregation for scalable operations
-- **Event-Driven Architecture**: Domain events with optional event publishing for template operations
-- **Dependency Injection**: Comprehensive DI container with automatic dependency resolution
-- **Strategy Pattern**: Pluggable provider strategies with runtime selection
-- **Resilience Patterns**: Built-in retry mechanisms, circuit breakers, and error handling
+### AWS credentials
 
-### Output Formats and Compatibility
-- **Flexible Field Control**: Configurable output fields for different use cases
-- **Multiple Output Formats**: JSON, YAML, Table, and List formats
-- **Legacy Compatibility**: Support for camelCase field naming conventions
-- **Professional Tables**: Rich Unicode table formatting for CLI output
-
-## Quick Start
-
-### PyPI Installation (Recommended)
+ORB uses the standard AWS credential chain. The simplest setup:
 
 ```bash
-# Minimal install (CLI only, 10 dependencies)
-pip install orb-py
-
-# With colored CLI output
-pip install orb-py[cli]
-
-# With API server (for REST API mode)
-pip install orb-py[api]
-
-# With monitoring (OpenTelemetry, Prometheus)
-pip install orb-py[monitoring]
-
-# Everything (all features)
-pip install orb-py[all]
-
-# Initialize configuration
-orb init
-
-# Generate example templates
-orb templates generate
-
-# List available templates
-orb templates list
-
-# Request machines
-orb requests create --template-id EC2FleetInstant --count 3
+aws configure
 ```
 
-### Docker Deployment
+Or use an IAM instance profile if running on EC2, or set environment variables:
 
 ```bash
-# Clone repository
-git clone https://github.com/awslabs/open-resource-broker.git
-cd open-resource-broker
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your configuration
-
-# Start services
-docker-compose up -d
-
-# Verify deployment
-curl http://localhost:8000/health
+export AWS_ACCESS_KEY_ID=...
+export AWS_SECRET_ACCESS_KEY=...
+export AWS_DEFAULT_REGION=us-east-1
 ```
 
-## Installation
-
-### Package Installation (Recommended)
+Verify your credentials work before proceeding:
 
 ```bash
-# Minimal install (CLI only, 10 dependencies)
-pip install orb-py
-
-# With colored CLI output
-pip install orb-py[cli]
-
-# With API server (for REST API mode)
-pip install orb-py[api]
-
-# With monitoring (OpenTelemetry, Prometheus)
-pip install orb-py[monitoring]
-
-# Everything (all features)
-pip install orb-py[all]
-
-# Initialize configuration (required after installation)
-orb init
-
-# Verify installation
-orb --version
-orb --help
+aws sts get-caller-identity
 ```
 
-### System-Wide Installation (Production)
+### Required IAM permissions
 
-```bash
-# Auto-detects best location (no sudo needed if not available)
-make install-system
-
-# Or install to custom directory (requires sudo if needed)
-ORB_INSTALL_DIR=/opt/orb make install-system
-
-# Installation will output the actual location and next steps
-# Add to PATH as instructed by the installer
-orb --version
-```
-
-### Local Development Installation
-
-```bash
-# Clone repository
-git clone https://github.com/awslabs/open-resource-broker.git
-cd open-resource-broker
-
-# Install local development environment
-make dev-install
-
-# Or full development workflow (recommended)
-make dev
-```
-
-### Installation Comparison
-
-| Method | Location | Use Case | Command |
-|--------|----------|----------|---------|
-| **PyPI** | System Python | End users | `pip install orb-py` |
-| **System** | `/usr/local/orb/` or `~/.local/orb/` | Production deployment | `make install-system` |
-| **Local** | `./.venv/` | Development | `make dev-install` |
-
-### Fast Development Setup with UV (Advanced)
-
-For faster dependency resolution and installation, use [uv](https://github.com/astral-sh/uv):
-
-```bash
-# Install uv (if not already installed)
-pip install uv
-
-# Clone repository
-git clone https://github.com/awslabs/open-resource-broker.git
-cd open-resource-broker
-
-# Fast development setup with uv
-make dev-install
-
-# Generate lock files for reproducible builds
-make uv-lock
-
-# Sync with lock files (fastest)
-make uv-sync-dev
-```
-
-# Or manually
-pip install -e ".[dev]"
-```
-
-## Usage Examples
-
-### MCP Server Mode (AI Assistant Integration)
-
-The plugin provides a Model Context Protocol (MCP) server for AI assistant integration:
-
-```bash
-# Start MCP server in stdio mode (recommended for AI assistants)
-orb mcp serve --stdio
-
-# Start MCP server as TCP server (for development/testing)
-orb mcp serve --port 3000 --host localhost
-
-# Configure logging level
-orb mcp serve --stdio --log-level DEBUG
-```
-
-#### Available MCP Tools
-
-The MCP server exposes all CLI functionality as tools for AI assistants:
-
-- **Provider Management**: `check_provider_health`, `list_providers`, `get_provider_config`, `get_provider_metrics`
-- **Template Operations**: `list_templates`, `get_template`, `validate_template`
-- **Infrastructure Requests**: `request_machines`, `get_request_status`, `list_return_requests`, `return_machines`
-
-#### Available MCP Resources
-
-Access domain objects via MCP resource URIs:
-
-- `templates://` - Available compute templates
-- `requests://` - Provisioning requests
-- `machines://` - Compute instances
-- `providers://` - Cloud providers
-
-#### AI Assistant Prompts
-
-Pre-built prompts for common infrastructure tasks:
-
-- `provision_infrastructure` - Guide infrastructure provisioning workflows
-- `troubleshoot_deployment` - Help diagnose deployment issues
-- `infrastructure_best_practices` - Provide deployment best practices
-
-#### Integration Examples
-
-**Claude Desktop Configuration:**
-```json
-{
-  "mcpServers": {
-    "open-resource-broker": {
-      "command": "orb",
-      "args": ["mcp", "serve", "--stdio"]
-    }
-  }
-}
-```
-
-**Python MCP Client:**
-```python
-import asyncio
-from mcp import ClientSession, StdioServerParameters
-
-async def use_hostfactory():
-    server_params = StdioServerParameters(
-        command="orb",
-        args=["mcp", "serve", "--stdio"]
-    )
-
-    async with ClientSession(server_params) as session:
-        # List available tools
-        tools = await session.list_tools()
-
-        # Request infrastructure
-        result = await session.call_tool(
-            "request_machines",
-            {"template_id": "EC2FleetInstant", "count": 3}
-        )
-```
-
-#### CLI Flag Patterns
-
-The CLI supports both positional arguments and flags for consistent usage:
-
-**Template Operations:**
-```bash
-# Both patterns supported
-orb templates show template-id               # Positional
-orb templates show --template-id template-id # Flag
-
-orb templates delete template-id             # Positional  
-orb templates delete --template-id template-id # Flag
-
-orb templates update template-id --file new.json    # Positional + flag
-orb templates update --template-id template-id --file new.json # All flags
-```
-
-**Request Operations:**
-```bash
-# Single request ID
-orb requests status req-123                  # Positional
-orb requests status --request-id req-123     # Flag
-orb requests status -r req-123               # Short flag
-
-# Multiple request IDs
-orb requests status req-123 req-456          # Multiple positional
-orb requests status -r req-123 -r req-456    # Multiple flags
-orb requests status req-123 --request-id req-456 # Mixed patterns
-```
-
-**Machine Operations:**
-```bash
-# Request machines
-orb machines request template-id 5           # Positional
-orb machines request --template-id template-id --count 5 # Flags
-
-# Show machine details
-orb machines show machine-id                 # Positional
-orb machines show --machine-id machine-id    # Flag
-```
-
-**Global Provider Override:**
-```bash
-# Works with any command
-orb --provider aws_prod_us-west-2 [any-command]
-orb --provider aws_dev_eu-west-1 templates list
-orb --provider aws_prod_us-east-1 machines request template-id 3
-```
-
-### Command Line Interface
-
-#### Initial Setup
-
-```bash
-# Initialize ORB configuration (required after pip install)
-orb init
-
-# Interactive setup with prompts
-orb init --interactive
-
-# Non-interactive with defaults
-orb init --non-interactive --scheduler default --provider aws --region us-east-1
-
-# Custom configuration location
-orb init --config-dir /path/to/config
-```
-
-#### Template Management (Full CRUD Operations)
-
-```bash
-# Generate example templates (after orb init)
-orb templates generate
-
-# Multi-provider template generation
-orb templates generate --all-providers      # Generate for all active providers
-orb templates generate --provider aws-prod  # Generate for specific provider instance
-orb templates generate --provider-api EC2Fleet  # Generate for specific handler
-
-# List available templates
-orb templates list
-orb templates list --long                    # Detailed information
-orb templates list --format table           # Table format
-
-# Provider override for template operations
-orb --provider aws-prod templates list      # Use specific provider instance
-orb --provider aws-dev templates show template-id  # Override provider for command
-
-# Show specific template (supports both positional and flag arguments)
-orb templates show TEMPLATE_ID              # Positional argument
-orb templates show --template-id TEMPLATE_ID  # Flag argument
-
-# Create new template
-orb templates create --file template.json
-orb templates create --file template.yaml --validate-only
-
-# Update existing template (supports both argument patterns)
-orb templates update TEMPLATE_ID --file updated-template.json  # Positional
-orb templates update --template-id TEMPLATE_ID --file updated-template.json  # Flag
-
-# Delete template (supports both argument patterns)
-orb templates delete TEMPLATE_ID            # Positional
-orb templates delete --template-id TEMPLATE_ID  # Flag
-orb templates delete TEMPLATE_ID --force    # Force without confirmation
-
-# Validate template configuration
-orb templates validate --file template.json
-
-# Refresh template cache
-orb templates refresh
-orb templates refresh --force               # Force complete refresh
-```
-
-#### Machine and Request Management
-
-```bash
-# Request machines (supports both positional and flag arguments)
-orb requests create --template-id my-template --count 5
-orb machines request TEMPLATE_ID COUNT       # Positional arguments
-orb machines request --template-id TEMPLATE_ID --count COUNT  # Flag arguments
-
-# Check request status (supports both patterns)
-orb requests status REQUEST_ID               # Positional argument
-orb requests status --request-id REQUEST_ID  # Flag argument
-orb requests status -r REQUEST_ID            # Short flag
-
-# Multiple request IDs (both patterns supported)
-orb requests status req-123 req-456 req-789  # Multiple positional
-orb requests status --request-id req-123 --request-id req-456  # Multiple flags
-orb requests status -r req-123 -r req-456    # Multiple short flags
-
-# Provider override for requests
-orb --provider aws-prod machines request template-id 5
-orb --provider aws-dev requests status req-123
-
-# List active machines
-orb machines list
-
-# Show specific machine (supports both patterns)
-orb machines show MACHINE_ID                 # Positional argument
-orb machines show --machine-id MACHINE_ID    # Flag argument
-
-# Return machines
-orb requests return --request-id req-12345
-```
-
-#### Storage Management
-
-```bash
-orb storage list                    # List available storage strategies
-orb storage show                    # Show current storage configuration
-orb storage health                  # Check storage health
-orb storage validate                # Validate storage configuration
-orb storage test                    # Test storage connectivity
-orb storage metrics                 # Show storage performance metrics
-```
-
-### REST API
-
-```bash
-# Get available templates
-curl -X GET "http://localhost:8000/api/v1/templates"
-
-# Create machine request
-curl -X POST "http://localhost:8000/api/v1/requests" \
-  -H "Content-Type: application/json" \
-  -d '{"templateId": "my-template", "maxNumber": 5}'
-
-# Check request status
-curl -X GET "http://localhost:8000/api/v1/requests/req-12345"
-```
-
-## Architecture
-
-The plugin implements Clean Architecture principles with the following layers:
-
-- **Domain Layer**: Core business logic, entities, and domain services
-- **Application Layer**: Use cases, command/query handlers, and application services
-- **Infrastructure Layer**: External integrations, persistence, and technical concerns
-- **Interface Layer**: REST API, CLI, and external interfaces
-
-### Design Patterns
-
-- **Domain-Driven Design (DDD)**: Rich domain models with clear bounded contexts
-- **CQRS**: Separate command and query responsibilities for scalability
-- **Ports and Adapters**: Hexagonal architecture for testability and flexibility
-- **Strategy Pattern**: Pluggable provider implementations
-- **Factory Pattern**: Dynamic object creation based on configuration
-- **Repository Pattern**: Data access abstraction with multiple storage strategies
-- **Clean Architecture**: Strict layer separation with dependency inversion principles
-
-## Configuration
-
-### Environment Configuration
-
-```bash
-# Provider configuration
-PROVIDER_TYPE=aws
-AWS_REGION=us-east-1
-AWS_PROFILE=default
-
-# API configuration
-API_HOST=0.0.0.0
-API_PORT=8000
-
-# Storage configuration
-STORAGE_TYPE=dynamodb
-STORAGE_TABLE_PREFIX=hostfactory
-
-# Scheduler directory configuration
-# HostFactory scheduler
-HF_PROVIDER_WORKDIR=/path/to/working/directory
-HF_PROVIDER_CONFDIR=/path/to/config/directory
-HF_PROVIDER_LOGDIR=/path/to/logs/directory
-
-# Default scheduler
-DEFAULT_PROVIDER_WORKDIR=/path/to/working/directory
-DEFAULT_PROVIDER_CONFDIR=/path/to/config/directory
-DEFAULT_PROVIDER_LOGDIR=/path/to/logs/directory
-```
-
-### Provider Configuration
-
-```yaml
-# config/providers.yml
-providers:
-  - name: aws-primary
-    type: aws
-    config:
-      region: us-east-1
-      profile: default
-      handlers:
-        default: ec2_fleet
-        spot_fleet:
-          enabled: true
-        auto_scaling_group:
-          enabled: true
-    template_defaults:
-```
-
-#### Provider Naming Convention
-
-Provider instances follow the pattern: `{type}_{profile}_{region}`
-
-**Examples:**
-- `aws_default_us-east-1` - AWS default profile in us-east-1
-- `aws_prod_us-west-2` - AWS production profile in us-west-2  
-- `aws_dev_eu-west-1` - AWS development profile in eu-west-1
-
-**Usage with Provider Override:**
-```bash
-# Use specific provider instance for any command
-orb --provider aws_prod_us-west-2 templates list
-orb --provider aws_dev_eu-west-1 machines request template-id 3
-
-# List available provider instances
-orb providers list
-```
-
-#### Multi-Provider Operations
-
-```bash
-# Generate templates for all active providers
-orb templates generate --all-providers
-
-# Generate templates for specific provider instance
-orb templates generate --provider aws_prod_us-west-2
-
-# Generate templates for specific provider API
-orb templates generate --provider-api EC2Fleet
-
-# Override provider for any command
-orb --provider aws_dev_eu-west-1 system health
-orb --provider aws_prod_us-west-2 requests status req-123
-```
-
-## Development
-
-### Prerequisites
-
-- Python 3.10+ (tested on 3.10, 3.11, 3.12, 3.13, 3.14)
-- Docker and Docker Compose
-- AWS CLI (for AWS provider)
-
-### Development Setup
-
-```bash
-# Clone repository
-git clone https://github.com/awslabs/open-resource-broker.git
-cd open-resource-broker
-
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate
-
-# Install development dependencies
-pip install -r requirements-dev.txt
-
-# Install in development mode
-pip install -e .
-
-# Run tests
-make test
-
-# Format code (Ruff replaces Black + isort)
-make format
-
-# Check code quality
-make lint
-
-# Run before committing (replaces pre-commit hooks)
-make pre-commit
-```
-
-### Testing
-
-```bash
-# Run all tests
-make test
-
-# Run with coverage
-make test-coverage
-
-# Run integration tests
-make test-integration
-
-# Run performance tests
-make test-performance
-```
-
-### Project Health & Metrics
-
-[![Python Versions](https://img.shields.io/pypi/pyversions/orb-py)](https://pypi.org/project/orb-py/)
-[![Success Rate](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/ec3393a523fa3a6b6ff89a0636de3085/raw/success-rate.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/health-monitoring.yml)
-[![Avg Duration](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/ec3393a523fa3a6b6ff89a0636de3085/raw/avg-duration.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/health-monitoring.yml)
-[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/22c627f01aad3fc08ca69a676ebf9696/raw/coverage.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/advanced-metrics.yml)
-[![Lines of Code](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/22c627f01aad3fc08ca69a676ebf9696/raw/lines-of-code.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/advanced-metrics.yml)
-[![Comments](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/22c627f01aad3fc08ca69a676ebf9696/raw/comments.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/advanced-metrics.yml)
-[![Test Duration](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/fgogolli/22c627f01aad3fc08ca69a676ebf9696/raw/test-duration.json)](https://github.com/awslabs/open-resource-broker/actions/workflows/advanced-metrics.yml)
-
-These badges show real-time project health metrics including workflow success rates, test coverage, code quality indicators, and performance metrics. Dynamic badges are populated by automated workflows and may show "resource not found" until the first workflow runs complete.
-
-### Release Workflow
-
-The project uses semantic-release for automated version management:
-
-```bash
-# Create a new release
-git commit -m "release: add new features and bug fixes"
-git push origin main
-```
-
-**Release Process:**
-- Uses conventional commits for version calculation
-- `feat:` → minor version bump
-- `fix:` → patch version bump  
-- `BREAKING CHANGE:` → major version bump
-- Commit with "release:" prefix triggers semantic-release
-- Automatically publishes to PyPI, builds containers, and deploys documentation
-
-See [Release Management Guide](docs/root/developer_guide/releases.md) for complete documentation.
-
-## Documentation
-
-Comprehensive documentation is available at:
-
-- **Architecture Guide**: Understanding the system design and patterns
-- **API Reference**: Complete REST API documentation
-- **Configuration Guide**: Detailed configuration options
-- **Developer Guide**: Contributing and extending the plugin
-- **Deployment Guide**: Production deployment scenarios
-
-## HostFactory Integration
-
-The plugin is designed for seamless integration with IBM Spectrum Symphony Host Factory:
-
-- **API Compatibility**: Full compatibility with HostFactory API requirements
-- **Attribute Generation**: Automatic CPU and RAM specifications based on AWS instance types
-- **Output Format Compliance**: Native support for expected output formats with accurate resource specifications
-- **Configuration Integration**: Easy integration with existing HostFactory configurations
-- **Monitoring Integration**: Compatible with HostFactory monitoring and logging
-
-### Resource Specifications
-
-The plugin generates HostFactory attributes based on AWS instance types:
+Your AWS identity needs at minimum:
 
 ```json
 {
-  "templates": [
+  "Version": "2012-10-17",
+  "Statement": [
     {
-      "templateId": "t3-medium-template",
-      "maxNumber": 5,
-      "attributes": {
-        "type": ["String", "X86_64"],
-        "ncpus": ["Numeric", "2"],
-        "nram": ["Numeric", "4096"]
-      }
-    },
-    {
-      "templateId": "m5-xlarge-template",
-      "maxNumber": 3,
-      "attributes": {
-        "type": ["String", "X86_64"],
-        "ncpus": ["Numeric", "4"],
-        "nram": ["Numeric", "16384"]
-      }
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeVpcs",
+        "ec2:DescribeSubnets",
+        "ec2:DescribeSecurityGroups",
+        "ec2:DescribeImages",
+        "ec2:DescribeInstances",
+        "ec2:DescribeInstanceTypes",
+        "ec2:RunInstances",
+        "ec2:TerminateInstances",
+        "ec2:CreateFleet",
+        "ec2:DeleteFleet",
+        "ec2:DescribeFleets",
+        "ec2:RequestSpotFleet",
+        "ec2:CancelSpotFleetRequests",
+        "ec2:DescribeSpotFleetRequests",
+        "ec2:DescribeSpotFleetInstances",
+        "ec2:CreateTags",
+        "autoscaling:CreateAutoScalingGroup",
+        "autoscaling:UpdateAutoScalingGroup",
+        "autoscaling:DeleteAutoScalingGroup",
+        "autoscaling:DescribeAutoScalingGroups",
+        "autoscaling:CreateLaunchConfiguration",
+        "autoscaling:DeleteLaunchConfiguration",
+        "ec2:CreateLaunchTemplate",
+        "ec2:DeleteLaunchTemplate",
+        "ec2:DescribeLaunchTemplates",
+        "iam:PassRole"
+      ],
+      "Resource": "*"
     }
   ]
 }
 ```
 
-**Supported Instance Types**: Common AWS instance types with appropriate CPU and RAM mappings
+For SpotFleet, you also need the `AWSServiceRoleForEC2SpotFleet` service-linked role in your account. If it doesn't exist yet:
 
-## Support and Contributing
+```bash
+aws iam create-service-linked-role --aws-service-name spotfleet.amazonaws.com
+```
 
-### Getting Help
+---
 
-- **Documentation**: Comprehensive guides and API reference
-- **Issues**: GitHub Issues for bug reports and feature requests
-- **Discussions**: Community discussions and questions
+## Installation
 
-### Contributing
+```bash
+pip install orb-py
+```
 
-We welcome contributions! Please see our Contributing Guide for details on:
+For colored CLI output:
 
-- Code style and standards
-- Testing requirements
-- Pull request process
-- Development workflow
+```bash
+pip install orb-py[cli]
+```
+
+Verify the install:
+
+```bash
+orb --version
+```
+
+---
+
+## Getting started
+
+This walkthrough takes you from a fresh install to your first machine request.
+
+### Step 1: Initialize
+
+Run `orb init` interactively. It discovers your AWS VPCs, subnets, and security groups and writes them into the config so templates work out of the box:
+
+```bash
+orb init
+```
+
+Follow the prompts to select your region, VPC, subnets, and security groups. When it asks for a SpotFleet IAM role, provide the ARN of a role that has the `AmazonEC2SpotFleetTaggingRole` managed policy attached, or press Enter to skip if you won't use SpotFleet.
+
+If you need non-interactive mode (CI/CD), pass infrastructure details explicitly — otherwise `machines request` will fail with placeholder subnet/SG values:
+
+```bash
+orb init --non-interactive \
+  --region us-east-1 \
+  --subnet-ids subnet-0abc1234,subnet-0def5678 \
+  --security-group-ids sg-0abc1234 \
+  --fleet-role arn:aws:iam::123456789012:role/MySpotFleetRole
+```
+
+### Step 2: Verify infrastructure
+
+Confirm ORB picked up your VPC config:
+
+```bash
+orb infrastructure show
+```
+
+If subnets or security groups are missing, run discovery:
+
+```bash
+orb infrastructure discover
+```
+
+### Step 3: Generate templates
+
+Generate example templates for your configured provider:
+
+```bash
+orb templates generate
+```
+
+### Step 4: List templates and copy a template ID
+
+```bash
+orb templates list
+```
+
+For a more readable view:
+
+```bash
+orb templates list --format table
+```
+
+Copy one of the template IDs from the output — you'll use it in the next step.
+
+### Step 5: Request machines
+
+```bash
+orb machines request <template-id> 1
+```
+
+For example:
+
+```bash
+orb machines request aws-ec2fleet-basic 1
+```
+
+The command returns a request ID. Check its status:
+
+```bash
+orb requests status <request-id>
+```
+
+Status values: `pending`, `in_progress`, `completed`, `failed`, `cancelled`, `partial`, `timeout`.
+
+### Step 6: Return machines when done
+
+```bash
+orb machines return --request-id <request-id>
+```
+
+---
+
+## Common CLI commands
+
+```bash
+# Configuration
+orb config show                          # Show current config
+orb config validate                      # Validate config
+
+# Templates
+orb templates list                       # List all templates
+orb templates list --format table        # Table view
+orb templates show <template-id>         # Show one template
+orb templates generate                   # Generate example templates
+orb templates validate --file t.json     # Validate a template file
+
+# Machines and requests
+orb machines request <template-id> <n>   # Request n machines
+orb requests status <request-id>         # Check request status
+orb machines list                        # List active machines
+orb machines return --request-id <id>    # Return machines
+
+# Infrastructure
+orb infrastructure show                  # Show configured infra
+orb infrastructure discover              # Scan AWS for VPCs/subnets/SGs
+orb infrastructure validate              # Verify infra still exists in AWS
+
+# Providers
+orb providers list                       # List configured providers
+```
+
+---
+
+## Configuration
+
+ORB stores its config in `~/.config/orb/config.json` (Linux/macOS) after `orb init`. You can override the location:
+
+```bash
+export ORB_CONFIG_DIR=/path/to/config
+```
+
+Key environment variables:
+
+```bash
+ORB_LOG_LEVEL=DEBUG          # Logging level (DEBUG, INFO, WARNING, ERROR)
+ORB_AWS_REGION=us-east-1     # AWS region override
+ORB_AWS_PROFILE=production   # AWS credential profile override
+```
+
+See [Configuration Guide](docs/root/user_guide/configuration.md) for the full reference.
+
+---
+
+## Troubleshooting
+
+**AWS credentials error**
+
+```bash
+aws sts get-caller-identity   # Verify credentials are active
+```
+
+**Templates not loading after init**
+
+If `orb templates list` returns empty after `orb templates generate`, your provider config may be missing subnet/SG values. Check:
+
+```bash
+orb config show
+orb infrastructure show
+```
+
+If subnets are empty, re-run `orb init` (interactive) or `orb infrastructure discover`.
+
+**`machines request` fails with subnet/SG errors**
+
+This happens when `orb init --non-interactive` was used without passing `--subnet-ids` and `--security-group-ids`. The generated templates contain placeholder values. Fix by running interactive init or passing the flags explicitly.
+
+**Permission denied errors from AWS**
+
+Check that your IAM identity has the permissions listed in the Prerequisites section above. For SpotFleet specifically, verify the service-linked role exists:
+
+```bash
+aws iam get-role --role-name AWSServiceRoleForEC2SpotFleet
+```
+
+**Debug logging**
+
+```bash
+ORB_LOG_LEVEL=DEBUG orb <command>
+```
+
+**Validate your setup**
+
+```bash
+orb config validate
+orb infrastructure validate
+```
+
+See [Troubleshooting Guide](docs/root/user_guide/troubleshooting.md) for more.
+
+---
+
+## Architecture
+
+ORB implements Clean Architecture with Domain-Driven Design (DDD) and CQRS:
+
+- **Domain layer** — pure business logic, no infrastructure dependencies
+- **Application layer** — command/query handlers using abstract ports
+- **Infrastructure layer** — AWS adapters, DI container, storage strategies
+- **Interface layer** — CLI, REST API, MCP server
+
+See [Architecture Guide](docs/root/developer_guide/architecture.md) for details.
+
+---
+
+## Development
+
+```bash
+git clone https://github.com/awslabs/open-resource-broker.git
+cd open-resource-broker
+
+python -m venv .venv
+source .venv/bin/activate
+
+pip install -e ".[dev]"
+
+make test       # Run tests
+make lint       # Check code quality
+make format     # Format code
+```
+
+---
+
+## Documentation
+
+- [Quick Start](docs/root/getting_started/quick_start.md)
+- [CLI Reference](docs/root/cli/cli-reference.md)
+- [Configuration Guide](docs/root/user_guide/configuration.md)
+- [Template Management](docs/root/user_guide/templates.md)
+- [Troubleshooting](docs/root/user_guide/troubleshooting.md)
+- [Architecture](docs/root/developer_guide/architecture.md)
+- [Deployment](docs/root/deployment/readme.md)
+
+---
+
+## HostFactory integration
+
+ORB is designed for seamless integration with IBM Spectrum Symphony Host Factory. It is fully compatible with the HostFactory API, generates correct CPU/RAM attributes from AWS instance types, and supports both camelCase (legacy) and snake_case output formats.
+
+See [HostFactory Integration Guide](docs/root/hostfactory/integration_guide.md) for details.
+
+---
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+Apache License 2.0 — see [LICENSE](LICENSE).
 
 ## Security
 
-For security concerns, please see our [Security Policy](SECURITY.md) for responsible disclosure procedures.
+See [SECURITY.md](SECURITY.md) for responsible disclosure procedures.

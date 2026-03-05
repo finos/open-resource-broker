@@ -1,0 +1,5 @@
+#!/bin/bash
+set -e
+
+# Run pre-commit checks (reads .pre-commit-config.yaml, skips manual-stage hooks)
+pre-commit run

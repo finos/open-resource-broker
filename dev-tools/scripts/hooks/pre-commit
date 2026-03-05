@@ -1,0 +1,11 @@
+#!/bin/sh
+# Pre-commit hook dispatcher
+
+# Ruff autoformat: format and re-stage staged Python files
+STAGED_PY=$(git diff --cached --name-only --diff-filter=ACM | grep '\.py$')
+if [ -n "$STAGED_PY" ]; then
+    echo "Running ruff format..."
+    echo "$STAGED_PY" | xargs ruff format
+    echo "$STAGED_PY" | xargs ruff check --fix --silent 2>/dev/null || true
+    echo "$STAGED_PY" | xargs git add
+fi

@@ -16,7 +16,7 @@ def test_template_repository_enhancements():
 
     try:
         from domain.template.template_aggregate import Template
-        from infrastructure.persistence.repositories.template_repository import (
+        from infrastructure.storage.repositories.template_repository import (
             TemplateSerializer,
         )
 
@@ -33,9 +33,9 @@ def test_template_repository_enhancements():
             "instance_types": {"t2.micro": 1, "t2.small": 2},
             "primary_instance_type": "t2.micro",
             "network_zones": ["subnet-123", "subnet-456"],
-            "root_volume_size": 20,
+            "root_device_volume_size": 20,
             "storage_encryption": True,
-            "key_pair_name": "my-key",
+            "key_name": "my-key",
             "monitoring_enabled": True,
             "price_type": "spot",
             "allocation_strategy": "capacity_optimized",
@@ -82,7 +82,7 @@ def test_request_repository_enhancements():
     try:
         from domain.request.aggregate import Request
         from domain.request.value_objects import RequestId, RequestType
-        from infrastructure.persistence.repositories.request_repository import (
+        from infrastructure.storage.repositories.request_repository import (
             RequestSerializer,
         )
 
@@ -141,19 +141,19 @@ def test_machine_repository_enhancements():
     print("\n=== Machine Repository Enhancement Test ===")
 
     try:
-        from domain.base.value_objects import InstanceId, InstanceType, Tags
+        from domain.base.value_objects import Tags
         from domain.machine.aggregate import Machine
-        from infrastructure.persistence.repositories.machine_repository import (
+        from infrastructure.storage.repositories.machine_repository import (
             MachineSerializer,
         )
 
         # Create a machine with additional fields
         machine = Machine(
-            instance_id=InstanceId(value="i-123456789"),
+            machine_id="i-123456789",
             template_id="test-template",
             request_id="req-123",
             provider_type="aws",
-            instance_type=InstanceType(value="t2.micro"),
+            machine_types={"t2.micro": 1},
             image_id="ami-123456",
             # Additional network fields
             private_ip="10.0.1.100",

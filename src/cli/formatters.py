@@ -89,8 +89,8 @@ def format_generic_table(items: list[dict], title: str = "Items") -> str:
 
         # Capture output using shared console
         console = get_console()
-        with console.capture() as capture:
-            console.print(table)
+        with console.capture() as capture:  # type: ignore[union-attr]
+            console.print(table)  # type: ignore[arg-type]
         return capture.get()
 
     except ImportError:
@@ -114,7 +114,7 @@ def format_generic_table(items: list[dict], title: str = "Items") -> str:
                 col_widths[i] = max(col_widths[i], value_len)
 
         # Build table
-        lines = [title, "=" * len(title), ""]
+        lines = [f"{title}:", "=" * (len(title) + 1), ""]
 
         # Header row
         header_row = " | ".join(header.ljust(width) for header, width in zip(headers, col_widths))

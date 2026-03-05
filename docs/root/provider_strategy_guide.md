@@ -329,8 +329,8 @@ python run.py executeProviderOperation --data '{"operation_type": "HEALTH_CHECK"
 ##  **FUTURE ENHANCEMENTS**
 
 ### **Planned Features:**
-- **Azure Provider Strategy**: Microsoft Azure integration
-- **GCP Provider Strategy**: Google Cloud Platform integration
+- **Provider1 Strategy**: Generic Provider1 integration
+- **Provider2 Strategy**: Generic Provider2 integration
 - **Advanced Load Balancing**: Weighted algorithms with real-time metrics
 - **Cost Optimization**: Provider selection based on cost metrics
 - **Geographic Distribution**: Location-based provider selection

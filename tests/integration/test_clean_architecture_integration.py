@@ -29,7 +29,6 @@ class TestCleanArchitectureIntegration:
         template_config = Mock()
         template_config.model_dump.return_value = {
             "max_number": 10,
-            "templates_file_path": "config/templates.json",
             "default_price_type": "ondemand",
             "default_provider_api": "EC2Fleet",
         }
@@ -41,7 +40,7 @@ class TestCleanArchitectureIntegration:
             "aws": Mock(
                 template_defaults={
                     "image_id": "ami-12345678",
-                    "instance_type": "t2.micro",
+                    "machine_types": {"t2.micro": 1},
                     "provider_api": "EC2Fleet",
                     "price_type": "ondemand",
                 },
@@ -51,7 +50,7 @@ class TestCleanArchitectureIntegration:
                         "fallback_on_failure": True,
                         "cache_enabled": True,
                     },
-                    "allocation_strategy": "capacityOptimized",
+                    "allocation_strategy": "capacity_optimized",
                     "volume_type": "gp3",
                 },
             )
@@ -61,7 +60,7 @@ class TestCleanArchitectureIntegration:
         aws_provider = Mock()
         aws_provider.name = "aws-primary"
         aws_provider.type = "aws"
-        aws_provider.template_defaults = {"instance_type": "t3.small"}  # Override
+        aws_provider.template_defaults = {"machine_types": {"t3.small": 1}}  # Override
         aws_provider.extensions = {"volume_type": "gp2"}  # Override
 
         provider_config.providers = [aws_provider]
@@ -99,7 +98,7 @@ class TestCleanArchitectureIntegration:
 
         # Test extension defaults - must provide non-empty config_data or it returns {}
         extension_defaults = TemplateExtensionRegistry.get_extension_defaults(
-            "aws", {"allocation_strategy": "capacityOptimized"}
+            "aws", {"allocation_strategy": "capacity_optimized"}
         )
         assert isinstance(extension_defaults, dict)
         assert "allocation_strategy" in extension_defaults
@@ -111,7 +110,6 @@ class TestCleanArchitectureIntegration:
         # Test clean configuration (no AWS-specific fields)
         clean_config = {
             "max_number": 10,
-            "templates_file_path": "config/templates.json",
             "default_price_type": "ondemand",
             "default_provider_api": "EC2Fleet",
         }
@@ -140,14 +138,14 @@ class TestCleanArchitectureIntegration:
         """Test AWS extension configuration works correctly."""
         # Test AWS extension config
         aws_extension_config = AWSTemplateExtensionConfig(
-            allocation_strategy="capacityOptimized",
+            allocation_strategy="capacity_optimized",
             volume_type="gp3",
             spot_fleet_request_expiry=30,
         )
 
         # Test conversion to template defaults
         defaults = aws_extension_config.to_template_defaults()
-        assert defaults["allocation_strategy"] == "capacityOptimized"
+        assert defaults["allocation_strategy"] == "capacity_optimized"
         assert defaults["volume_type"] == "gp3"
         assert defaults["spot_fleet_request_expiry"] == 30
 
@@ -275,7 +273,7 @@ class TestCleanArchitectureIntegration:
         provider_instance = ProviderInstanceConfig(
             name="aws-test",
             type="aws",
-            template_defaults={"instance_type": "t2.micro"},
+            template_defaults={"machine_types": {"t2.micro": 1}},
             extensions={"volume_type": "gp2"},
         )
 
@@ -307,7 +305,7 @@ class TestCleanArchitectureIntegration:
         assert hasattr(domain_template, "price_type")
 
         # Should be able to convert back to dict
-        template_dict = domain_template.to_dict()
+        template_dict = domain_template.model_dump()
         assert isinstance(template_dict, dict)
         assert template_dict["template_id"] == "e2e-test"
 

@@ -20,7 +20,7 @@ def test_template_defaults_integration():
         )
         from config.manager import ConfigurationManager
         from infrastructure.logging.logger import get_logger
-        from infrastructure.persistence.repositories.template_repository import (
+        from infrastructure.storage.repositories.template_repository import (
             TemplateSerializer,
         )
 
@@ -81,7 +81,7 @@ def test_template_defaults_precedence():
         )
         from config.manager import ConfigurationManager
         from infrastructure.logging.logger import get_logger
-        from infrastructure.persistence.repositories.template_repository import (
+        from infrastructure.storage.repositories.template_repository import (
             TemplateSerializer,
         )
 
@@ -99,20 +99,20 @@ def test_template_defaults_precedence():
             "image_id": "ami-123456",
             "subnet_ids": ["subnet-explicit-123"],  # Explicit value
             "security_group_ids": ["sg-explicit-456"],  # Explicit value
-            "instance_type": "t3.large",  # Explicit value (different from default)
+            "machine_types": {"t3.large": 1},  # Explicit value (different from default)
         }
 
         print("PASS: Testing template with explicit values...")
         print(f"   - Input subnet_ids: {explicit_template_data['subnet_ids']}")
         print(f"   - Input security_group_ids: {explicit_template_data['security_group_ids']}")
-        print(f"   - Input instance_type: {explicit_template_data['instance_type']}")
+        print(f"   - Input machine_types: {explicit_template_data['machine_types']}")
 
         template = serializer.from_dict(explicit_template_data)
 
         print("PASS: Template created successfully with explicit values preserved")
         print(f"   - Final subnet_ids: {template.subnet_ids}")
         print(f"   - Final security_group_ids: {template.security_group_ids}")
-        print(f"   - Final instance_type: {template.instance_type}")
+        print(f"   - Final machine_types: {template.machine_types}")
 
         # Verify explicit values were preserved (not overridden by defaults)
         assert template.subnet_ids == ["subnet-explicit-123"], (
@@ -121,7 +121,9 @@ def test_template_defaults_precedence():
         assert template.security_group_ids == ["sg-explicit-456"], (
             "Explicit security_group_ids should be preserved"
         )
-        assert template.instance_type == "t3.large", "Explicit instance_type should be preserved"
+        assert template.machine_types == {"t3.large": 1}, (
+            "Explicit machine_types should be preserved"
+        )
 
         print("PASS: Template values correctly override defaults (correct precedence)")
 

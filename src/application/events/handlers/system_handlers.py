@@ -13,7 +13,7 @@ from domain.base.events import DomainEvent
 from domain.base.ports import ErrorHandlingPort, EventPublisherPort, LoggingPort
 
 
-@event_handler("SystemStartedEvent")
+@event_handler("SystemStartedEvent")  # type: ignore[arg-type]
 class SystemStartedHandler(BaseLoggingEventHandler[DomainEvent]):
     """Handle system startup events using BaseEventHandler pattern."""
 
@@ -38,7 +38,7 @@ class SystemStartedHandler(BaseLoggingEventHandler[DomainEvent]):
         return "info"
 
 
-@event_handler("SystemShutdownEvent")
+@event_handler("SystemShutdownEvent")  # type: ignore[arg-type]
 class SystemShutdownHandler(BaseLoggingEventHandler[DomainEvent]):
     """Handle system shutdown events using BaseEventHandler pattern."""
 
@@ -66,7 +66,7 @@ class SystemShutdownHandler(BaseLoggingEventHandler[DomainEvent]):
         return "info" if graceful else "warning"
 
 
-@event_handler("ConfigurationUpdatedEvent")
+@event_handler("ConfigurationUpdatedEvent")  # type: ignore[arg-type]
 class ConfigurationUpdatedHandler(BaseLoggingEventHandler[DomainEvent]):
     """Handle configuration update events using BaseEventHandler pattern."""
 

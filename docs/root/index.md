@@ -1,6 +1,6 @@
 # Open Resource Broker
 
-Welcome to the Open Resource Broker documentation! This plugin provides integration between IBM Spectrum Symphony Host Factory and cloud providers, enabling dynamic provisioning of compute resources with a REST API interface.
+Welcome to the Open Resource Broker documentation. ORB integrates with IBM Spectrum Symphony Host Factory and cloud providers to enable dynamic provisioning of compute resources via a CLI and optional REST API.
 
 ## Documentation Navigation
 
@@ -25,87 +25,38 @@ Welcome to the Open Resource Broker documentation! This plugin provides integrat
 
 ## Quick Start
 
-### Docker Deployment (Recommended)
-
-The fastest way to get started:
-
 ```bash
-# Clone repository
-git clone <repository-url>
-cd open-resource-broker
-
-# Copy environment template
-cp .env.example .env
-
-# Start with Docker Compose
-docker-compose up -d
-
-# Access API documentation
-open http://localhost:8000/docs
-```
-
-### Package Installation
-
-```bash
-# Install from PyPI
 pip install orb-py
-
-# Verify installation
-orb --help
+orb init
+orb templates generate
+orb templates list
+orb machines request <template-id> 3
 ```
+
+See the [Quick Start Guide](getting_started/quick_start.md) for a full walkthrough.
 
 ## Features
 
-- **Multi-Cloud Support**: Currently supports AWS with extensible architecture
-- **REST API**: REST API with OpenAPI documentation
-- **Docker Ready**: Suitable for production containerization
-- **Authentication**: Multiple authentication strategies (JWT, AWS IAM, Cognito)
-- **Monitoring**: Built-in health checks and metrics
+- **AWS Provider**: EC2 Instances, Auto Scaling Groups, Spot Fleet, EC2 Fleet
+- **CLI**: Primary interface for all operations
+- **Optional REST API**: Enable with `pip install "orb-py[api]"`
 - **Clean Architecture**: Domain-Driven Design with CQRS patterns
-
-## Architecture
-
-The plugin follows Domain-Driven Design (DDD) principles with a clean architecture approach:
-
-- **Domain Layer**: Pure business logic and entities
-- **Application Layer**: Use cases and application services
-- **Infrastructure Layer**: Technical implementations
-- **API Layer**: REST API endpoints and CLI interface
+- **Extensible**: Strategy/Registry pattern for adding providers and schedulers
 
 ## Supported Providers
 
 ### Amazon Web Services (AWS)
-- **EC2 Instances**: Direct instance provisioning
+- **EC2 Instances**: Direct instance provisioning via RunInstances
 - **Auto Scaling Groups**: Managed scaling groups
 - **Spot Fleet**: Cost-optimized spot instances
-- **Fleet API**: EC2 Fleet provisioning
-
-## Getting Started
-
-Choose your preferred deployment method:
-
-### [Docker Deployment](deployment/docker.md)
-Complete containerization with Docker Compose, security hardening, and production deployment.
-
-### [Cloud Deployment](deployment/readme.md)
-Deploy to Kubernetes, AWS ECS, Google Cloud Run, or other cloud platforms.
-
-### [Traditional Installation](user_guide/installation.md)
-Direct installation on servers with systemd service configuration.
+- **EC2 Fleet**: Fleet provisioning with mixed instance types
 
 ## Documentation Structure
 
-- **[User Guide](user_guide/installation.md)**: End-user documentation and API reference
-- **[Deployment Guide](deployment/readme.md)**: Complete deployment documentation
-- **[Developer Guide](developer_guide/architecture.md)**: Development and architecture documentation
-- **[API Reference](api/readme.md)**: Technical API documentation
-
-## Support
-
-- **Documentation**: Comprehensive guides and examples
-- **Testing**: Complete test suite with Docker integration
-- **Security**: Production security best practices
-- **Performance**: Optimized for high-throughput scenarios
+- **[User Guide](user_guide/installation.md)**: End-user documentation
+- **[Deployment Guide](deployment/readme.md)**: Deployment documentation
+- **[Developer Guide](developer_guide/architecture.md)**: Architecture and development
+- **[API Reference](api/readme.md)**: REST API documentation (optional feature)
 
 ## License
 

@@ -64,7 +64,7 @@ class TestSDKConfig:
             "ORB_TIMEOUT": "600",
             "ORB_RETRY_ATTEMPTS": "5",
             "ORB_LOG_LEVEL": "DEBUG",
-            "ORB_CONFIG_PATH": "/path/to/config",
+            "ORB_CONFIG_FILE": "/path/to/config",
         }
 
         with patch.dict(os.environ, env_vars, clear=True):

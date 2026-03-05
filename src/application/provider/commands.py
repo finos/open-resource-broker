@@ -7,29 +7,19 @@ strategy selection, operation execution, health updates, and configuration.
 from typing import Any, Optional
 
 from application.dto.base import BaseCommand
-from providers.base.strategy import (
-    ProviderHealthStatus,
-    ProviderOperation,
-    ProviderOperationType,
-    SelectionCriteria,
-)
-
-
-class SelectProviderStrategyCommand(BaseCommand):
-    """Command to select optimal provider strategy for an operation."""
-
-    operation_type: ProviderOperationType
-    selection_criteria: SelectionCriteria
-    context: Optional[dict[str, Any]] = None
+from domain.base.operations import Operation
 
 
 class ExecuteProviderOperationCommand(BaseCommand):
     """Command to execute a provider operation through strategy pattern."""
 
-    operation: ProviderOperation
+    operation: Operation
     strategy_override: Optional[str] = None
     retry_count: int = 0
     timeout_seconds: Optional[int] = None
+
+    # Result stored here after execution (CQRS: execute_command returns None)
+    result: Optional[dict[str, Any]] = None
 
 
 class RegisterProviderStrategyCommand(BaseCommand):
@@ -41,21 +31,20 @@ class RegisterProviderStrategyCommand(BaseCommand):
     capabilities: Optional[dict[str, Any]] = None
     priority: int = 0
 
+    # Result stored here after execution (CQRS: execute_command returns None)
+    result: Optional[dict[str, Any]] = None
+
 
 class UpdateProviderHealthCommand(BaseCommand):
-    """Command to update provider health status."""
+    """Command to update provider health status.
+
+    CQRS: Commands should not return data. Results are stored in mutable fields.
+    """
 
     provider_name: str
-    health_status: ProviderHealthStatus
+    health_status: Any
     source: str = "system"
     timestamp: Optional[str] = None
 
-
-class ConfigureProviderStrategyCommand(BaseCommand):
-    """Command to configure provider strategy selection policies."""
-
-    default_selection_policy: str
-    selection_criteria: dict[str, Any]
-    fallback_strategies: Optional[list[str]] = None
-    health_check_interval: int = 300  # 5 minutes default
-    circuit_breaker_config: Optional[dict[str, Any]] = None
+    # Store results for caller to access after command execution
+    result: Optional[dict[str, Any]] = None

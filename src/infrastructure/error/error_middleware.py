@@ -116,7 +116,7 @@ class ErrorMiddleware:
         return wrapped_script_handler
 
 
-def with_error_handling(error_handler: Optional[ExceptionHandler] = None) -> None:
+def with_error_handling(error_handler: Optional[ExceptionHandler] = None) -> Callable:  # type: ignore[return]
     """
     Add error handling to functions.
 
@@ -146,7 +146,7 @@ def with_error_handling(error_handler: Optional[ExceptionHandler] = None) -> Non
     return decorator
 
 
-def with_api_error_handling(error_handler: Optional[ExceptionHandler] = None) -> None:
+def with_api_error_handling(error_handler: Optional[ExceptionHandler] = None) -> Callable:  # type: ignore[return]
     """
     Add API-specific error handling to functions.
 

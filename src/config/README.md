@@ -545,8 +545,7 @@ This section configures default values for VM templates:
     "project": "awscloud",
     "team": "xyz"
   },
-  "ssm_parameter_prefix": "/hostfactory/templates/",
-  "templates_file_path": "config/templates.json"
+  "ssm_parameter_prefix": "/hostfactory/templates/"
 }
 ```
 
@@ -559,11 +558,10 @@ This section configures default values for VM templates:
 - `default_attributes`: Default attributes for templates (used by Host Factory)
 - `default_instance_tags`: Default tags to apply to instances
 - `ssm_parameter_prefix`: Prefix for SSM parameters containing template overrides
-- `templates_file_path`: Path to the templates configuration file
 
 ### Templates File
 
-Templates are defined in a separate file specified by `templates_file_path` (default: `config/templates.json`). This separation allows for better organization and avoids mixing configuration concerns.
+Templates are now discovered using a hierarchical system with configurable filename patterns. The template system supports provider-specific templates that override generic templates, allowing for flexible multi-provider configurations.
 
 Example templates file:
 

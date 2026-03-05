@@ -27,7 +27,7 @@ class RetryConfig(BaseModel):
         Returns:
             Service-specific configuration or default values
         """
-        service_config = self.service_configs.get(service, {})
+        service_config = self.service_configs.get(service, {})  # type: ignore[attr-defined]
 
         return {
             "max_attempts": service_config.get("max_attempts", self.max_attempts),

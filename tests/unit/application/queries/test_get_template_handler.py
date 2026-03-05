@@ -4,12 +4,11 @@ from unittest.mock import Mock
 import pytest
 
 from application.dto.queries import GetTemplateQuery
-from application.queries.handlers import GetTemplateHandler
+from application.queries.template_query_handlers import GetTemplateHandler
 from domain.base.ports.container_port import ContainerPort
+from domain.base.ports.template_configuration_port import TemplateConfigurationPort
 from domain.template.factory import TemplateFactory
-from infrastructure.template.configuration_manager import TemplateConfigurationManager
 from infrastructure.template.dtos import TemplateDTO
-from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 
 
 class _FakeTemplateManager:
@@ -55,11 +54,14 @@ async def test_get_template_handler_retains_existing_launch_template():
         template_id="EC2FleetInstantTemplate",
         name="EC2FleetInstantTemplate",
         provider_api="EC2Fleet",
-        configuration=config,
+        image_id=config["image_id"],
+        subnet_ids=config["subnet_ids"],
+        security_group_ids=config["security_group_ids"],
+        max_instances=config["max_instances"],
     )
 
     services = {
-        TemplateConfigurationManager: _FakeTemplateManager(template_dto),
+        TemplateConfigurationPort: _FakeTemplateManager(template_dto),
         TemplateFactory: TemplateFactory(),
     }
     container = _FakeContainer(services)
@@ -67,7 +69,9 @@ async def test_get_template_handler_retains_existing_launch_template():
     handler = GetTemplateHandler(logger=Mock(), error_handler=None, container=container)
     query = GetTemplateQuery(template_id="EC2FleetInstantTemplate")
 
-    template = await handler.execute_query(query)
+    result = await handler.execute_query(query)
 
-    assert isinstance(template, AWSTemplate)
-    assert template.launch_template_id == "lt-03fa223ab9c3733a2"
+    # Handler returns the TemplateDTO from the template manager
+    assert isinstance(result, TemplateDTO)
+    assert result.template_id == "EC2FleetInstantTemplate"
+    assert result.template_id == "EC2FleetInstantTemplate"

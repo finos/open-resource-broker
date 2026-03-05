@@ -5,6 +5,7 @@ from application.decorators import query_handler
 from application.dto.system import (
     StorageHealthResponse,
     StorageMetricsResponse,
+    StorageStrategyDTO,
     StorageStrategyListResponse,
 )
 from application.queries.storage import (
@@ -12,6 +13,9 @@ from application.queries.storage import (
     GetStorageMetricsQuery,
     ListStorageStrategiesQuery,
 )
+from application.services.storage_registry_service import StorageRegistryService
+from domain.base.ports import ContainerPort, ErrorHandlingPort, LoggingPort
+from domain.services.generic_filter_service import GenericFilterService
 
 
 @query_handler(ListStorageStrategiesQuery)
@@ -19,6 +23,19 @@ class ListStorageStrategiesHandler(
     BaseQueryHandler[ListStorageStrategiesQuery, StorageStrategyListResponse]
 ):
     """Handler for listing available storage strategies."""
+
+    def __init__(
+        self,
+        logger: LoggingPort,
+        error_handler: ErrorHandlingPort,
+        storage_service: StorageRegistryService,
+        generic_filter_service: GenericFilterService,
+        container: ContainerPort,
+    ):
+        super().__init__(logger, error_handler)
+        self._storage_service = storage_service
+        self._generic_filter_service = generic_filter_service
+        self._container = container
 
     async def execute_query(self, query: ListStorageStrategiesQuery) -> StorageStrategyListResponse:
         """
@@ -30,18 +47,16 @@ class ListStorageStrategiesHandler(
         Returns:
             Storage strategies list response
         """
-        # Access infrastructure through application layer
-        from config.manager import get_config_manager
-        from infrastructure.registry.storage_registry import get_storage_registry
+        # Access infrastructure through DI container
+        from domain.base.ports import ConfigurationPort
 
-        registry = get_storage_registry()
-        storage_types = registry.get_registered_types()
+        config_manager = self._container.get(ConfigurationPort)
+        storage_types = self._storage_service.get_available_storage_types()
 
         strategies = []
         current_strategy = "unknown"
 
         if query.include_current:
-            config_manager = get_config_manager()
             current_strategy = config_manager.get("storage.strategy", "unknown")
 
         for storage_type in storage_types:
@@ -56,18 +71,20 @@ class ListStorageStrategiesHandler(
                 strategy_info.update(
                     {
                         "description": f"{storage_type} storage strategy",
-                        "capabilities": (
-                            registry.get_strategy_capabilities(storage_type)
-                            if hasattr(registry, "get_strategy_capabilities")
-                            else []
-                        ),
+                        "capabilities": [],
                     }
                 )
 
             strategies.append(strategy_info)
 
+        # Apply generic filters if provided
+        if query.filter_expressions:
+            strategies = self._generic_filter_service.apply_filters(
+                strategies, query.filter_expressions
+            )
+
         return StorageStrategyListResponse(
-            strategies=strategies,
+            strategies=[StorageStrategyDTO(**s) if isinstance(s, dict) else s for s in strategies],
             current_strategy=current_strategy,
             total_count=len(strategies),
         )
@@ -76,6 +93,15 @@ class ListStorageStrategiesHandler(
 @query_handler(GetStorageHealthQuery)
 class GetStorageHealthHandler(BaseQueryHandler[GetStorageHealthQuery, StorageHealthResponse]):
     """Handler for getting storage health status."""
+
+    def __init__(
+        self,
+        logger: LoggingPort,
+        error_handler: ErrorHandlingPort,
+        storage_service: StorageRegistryService,
+    ):
+        super().__init__(logger, error_handler)
+        self._storage_service = storage_service
 
     async def execute_query(self, query: GetStorageHealthQuery) -> StorageHealthResponse:
         """
@@ -87,12 +113,20 @@ class GetStorageHealthHandler(BaseQueryHandler[GetStorageHealthQuery, StorageHea
         Returns:
             Storage health response
         """
-        # Implementation would check storage health
-        # This is a placeholder for the actual health check logic
+        strategy_name = query.strategy_name or "current"
+
+        if strategy_name != "current":
+            health_info = self._storage_service.get_storage_health(strategy_name)
+            healthy = health_info.get("status") != "error"
+            status = health_info.get("status", "unknown")
+        else:
+            healthy = True
+            status = "operational"
+
         return StorageHealthResponse(
-            strategy_name=query.strategy_name or "current",
-            healthy=True,
-            status="operational",
+            strategy_name=strategy_name,
+            healthy=healthy,
+            status=status,
             details=({} if not query.detailed else {"connections": "active", "latency": "low"}),
         )
 
@@ -100,6 +134,15 @@ class GetStorageHealthHandler(BaseQueryHandler[GetStorageHealthQuery, StorageHea
 @query_handler(GetStorageMetricsQuery)
 class GetStorageMetricsHandler(BaseQueryHandler[GetStorageMetricsQuery, StorageMetricsResponse]):
     """Handler for getting storage performance metrics."""
+
+    def __init__(
+        self,
+        logger: LoggingPort,
+        error_handler: ErrorHandlingPort,
+        storage_service: StorageRegistryService,
+    ):
+        super().__init__(logger, error_handler)
+        self._storage_service = storage_service
 
     async def execute_query(self, query: GetStorageMetricsQuery) -> StorageMetricsResponse:
         """
@@ -111,11 +154,9 @@ class GetStorageMetricsHandler(BaseQueryHandler[GetStorageMetricsQuery, StorageM
         Returns:
             Storage metrics response
         """
-        # Implementation would collect storage metrics
-        # This is a placeholder for the actual metrics collection logic
         return StorageMetricsResponse(
             strategy_name=query.strategy_name or "current",
-            time_range=query.time_range,
+            time_range=query.time_range or "",
             operations_count=0,
             average_latency=0.0,
             error_rate=0.0,

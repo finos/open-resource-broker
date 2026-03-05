@@ -1,20 +1,31 @@
 """Authentication strategy registry."""
 
-import threading
-from typing import Callable
+from typing import Any, Callable
 
 from infrastructure.adapters.ports.auth import AuthPort
-from infrastructure.logging.logger import get_logger
+from infrastructure.registry.base_registry import BaseRegistry, RegistryMode
 
 
-class AuthRegistry:
+class AuthRegistry(BaseRegistry):
     """Registry for authentication strategies."""
 
     def __init__(self) -> None:
         """Initialize authentication registry."""
-        self._strategies: dict[str, Callable[..., AuthPort]] = {}
-        self._lock = threading.Lock()
-        self.logger = get_logger(__name__)
+        super().__init__(mode=RegistryMode.SINGLE_CHOICE)
+
+    def register(
+        self,
+        type_name: str,
+        strategy_factory: Callable,
+        config_factory: Callable,
+        **kwargs,
+    ) -> None:
+        """Register a strategy factory."""
+        self.register_type(type_name, strategy_factory, config_factory, **kwargs)
+
+    def create_strategy(self, type_name: str, config: Any) -> Any:
+        """Create a strategy instance."""
+        return self.create_strategy_by_type(type_name, config)
 
     def register_strategy(
         self, strategy_name: str, strategy_factory: Callable[..., AuthPort]
@@ -26,12 +37,12 @@ class AuthRegistry:
             strategy_name: Name of the strategy (e.g., 'none', 'bearer_token', 'oauth')
             strategy_factory: Factory function that creates the strategy instance
         """
-        with self._lock:
-            if strategy_name in self._strategies:
-                self.logger.warning("Overriding existing auth strategy: %s", strategy_name)
 
-            self._strategies[strategy_name] = strategy_factory
-            self.logger.info("Registered auth strategy: %s", strategy_name)
+        # Create a simple config factory that passes through kwargs
+        def config_factory(**kwargs):
+            return kwargs
+
+        self.register_type(strategy_name, strategy_factory, config_factory)
 
     def get_strategy(self, strategy_name: str, **kwargs) -> AuthPort:
         """
@@ -47,16 +58,8 @@ class AuthRegistry:
         Raises:
             ValueError: If strategy is not registered
         """
-        with self._lock:
-            if strategy_name not in self._strategies:
-                available = list(self._strategies.keys())
-                raise ValueError(
-                    f"Auth strategy '{strategy_name}' not registered. "
-                    f"Available strategies: {available}"
-                )
-
-            strategy_factory = self._strategies[strategy_name]
-            return strategy_factory(**kwargs)
+        registration = self._get_type_registration(strategy_name)
+        return registration.strategy_factory(**kwargs)
 
     def list_strategies(self) -> list[str]:
         """
@@ -65,28 +68,10 @@ class AuthRegistry:
         Returns:
             List of strategy names
         """
-        with self._lock:
-            return list(self._strategies.keys())
-
-    def is_registered(self, strategy_name: str) -> bool:
-        """
-        Check if a strategy is registered.
-
-        Args:
-            strategy_name: Name of the strategy
-
-        Returns:
-            True if strategy is registered
-        """
-        with self._lock:
-            return strategy_name in self._strategies
+        return self.get_registered_types()
 
 
-# Global registry instance
-_auth_registry: AuthRegistry = None
-_registry_lock = threading.Lock()
-
-
+# Global registry instance using BaseRegistry singleton pattern
 def get_auth_registry() -> AuthRegistry:
     """
     Get the global authentication registry instance.
@@ -94,27 +79,22 @@ def get_auth_registry() -> AuthRegistry:
     Returns:
         Global authentication registry
     """
-    global _auth_registry
-
-    if _auth_registry is None:
-        with _registry_lock:
-            if _auth_registry is None:
-                _auth_registry = AuthRegistry()
-                _register_default_strategies()
-
-    return _auth_registry
+    registry = AuthRegistry()
+    # Ensure default strategies are registered
+    _register_default_strategies(registry)  # type: ignore[arg-type]
+    return registry  # type: ignore[return-value]
 
 
-def _register_default_strategies() -> None:
+def _register_default_strategies(registry: AuthRegistry) -> None:  # type: ignore[misc]
     """Register default authentication strategies."""
-    registry = _auth_registry
+    # Only register if not already registered (idempotent)
+    if not registry.get_registered_types():
+        # Register no-auth strategy
+        from .strategy.no_auth_strategy import NoAuthStrategy
 
-    # Register no-auth strategy
-    from .strategy.no_auth_strategy import NoAuthStrategy
+        registry.register_strategy("none", NoAuthStrategy)
 
-    registry.register_strategy("none", NoAuthStrategy)
+        # Register bearer token strategy
+        from .strategy.bearer_token_strategy import BearerTokenStrategy
 
-    # Register bearer token strategy
-    from .strategy.bearer_token_strategy import BearerTokenStrategy
-
-    registry.register_strategy("bearer_token", BearerTokenStrategy)
+        registry.register_strategy("bearer_token", BearerTokenStrategy)

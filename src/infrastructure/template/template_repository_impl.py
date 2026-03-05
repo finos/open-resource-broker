@@ -1,11 +1,37 @@
 """Template repository implementation using configuration management."""
 
+import asyncio
 from typing import Any, Optional
 
 from domain.base.ports import LoggingPort
 from domain.template.repository import TemplateRepository
 from domain.template.template_aggregate import Template
 from infrastructure.template.configuration_manager import TemplateConfigurationManager
+from infrastructure.template.dtos import TemplateDTO
+
+
+def _dto_to_template(dto: TemplateDTO) -> Template:
+    """Convert a TemplateDTO to a Template domain object."""
+    return Template(
+        template_id=dto.template_id,
+        name=dto.name,
+        provider_api=dto.provider_api,
+    )
+
+
+def _run_async(coro):
+    """Run a coroutine synchronously."""
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(asyncio.run, coro)
+                return future.result()
+        return loop.run_until_complete(coro)
+    except RuntimeError:
+        return asyncio.run(coro)
 
 
 class TemplateRepositoryImpl(TemplateRepository):
@@ -20,54 +46,50 @@ class TemplateRepositoryImpl(TemplateRepository):
     def save(self, aggregate: Template) -> None:
         """Save a template aggregate."""
         self._logger.debug("Saving template: %s", aggregate.template_id)
-        self._template_manager.save_template(aggregate)
+        dto = TemplateDTO.from_domain(aggregate)
+        _run_async(self._template_manager.save_template(dto))
 
     def find_by_id(self, aggregate_id: str) -> Optional[Template]:
         """Find template by aggregate ID (required by AggregateRepository)."""
         self._logger.debug("Finding template by ID: %s", aggregate_id)
-        return self._template_manager.get_template(aggregate_id)
+        dto = self._template_manager.get_template(aggregate_id)
+        return _dto_to_template(dto) if dto is not None else None
 
     def delete(self, aggregate_id: str) -> None:
         """Delete template by aggregate ID."""
         self._logger.debug("Deleting template: %s", aggregate_id)
-        self._template_manager.delete_template(aggregate_id)
+        _run_async(self._template_manager.delete_template(aggregate_id))
 
     # Abstract methods from TemplateRepository
     def find_by_template_id(self, template_id: str) -> Optional[Template]:
         """Find template by template ID (required by TemplateRepository)."""
-        # Delegate to the main find_by_id method to avoid duplication
         return self.find_by_id(template_id)
 
     def find_by_provider_api(self, provider_api: str) -> list[Template]:
         """Find templates by provider API type."""
         self._logger.debug("Finding templates by provider API: %s", provider_api)
-        return self._template_manager.get_templates_by_provider(provider_api)
+        dtos = self._template_manager.get_all_templates_sync()
+        return [
+            _dto_to_template(d) for d in dtos if getattr(d, "provider_api", None) == provider_api
+        ]
 
     def find_active_templates(self) -> list[Template]:
         """Find all active templates."""
         self._logger.debug("Finding all active templates")
-        return self._template_manager.get_all_templates_sync()
+        dtos = self._template_manager.get_all_templates_sync()
+        return [_dto_to_template(d) for d in dtos]
 
     def search_templates(self, criteria: dict[str, Any]) -> list[Template]:
         """Search templates by criteria."""
         self._logger.debug("Searching templates with criteria: %s", criteria)
-
-        all_templates = self._template_manager.get_all_templates()
-
-        filtered_templates = []
-        for template in all_templates:
-            matches = True
-
-            for key, value in criteria.items():
-                template_value = getattr(template, key, None)
-                if template_value != value:
-                    matches = False
-                    break
-
+        dtos = self._template_manager.get_all_templates_sync()
+        filtered: list[Template] = []
+        for dto in dtos:
+            template = _dto_to_template(dto)
+            matches = all(getattr(template, k, None) == v for k, v in criteria.items())
             if matches:
-                filtered_templates.append(template)
-
-        return filtered_templates
+                filtered.append(template)
+        return filtered
 
     # Convenience methods
     def get_by_id(self, template_id: str) -> Optional[Template]:
@@ -84,8 +106,10 @@ class TemplateRepositoryImpl(TemplateRepository):
 
     def validate_template(self, template: Template) -> list[str]:
         """Validate template configuration."""
-        validation_result = self._template_manager.validate_template(template)
-        return validation_result.errors if not validation_result.is_valid else []
+        dto = TemplateDTO.from_domain(template)
+        validation_result = _run_async(self._template_manager.validate_template(dto))
+        errors: list[str] = validation_result.get("errors", [])
+        return errors if not validation_result.get("is_valid", True) else []
 
 
 def create_template_repository_impl(

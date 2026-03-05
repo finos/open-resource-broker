@@ -1,7 +1,7 @@
 """Unit tests for configuration management CLI handlers."""
 
 from argparse import Namespace
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -38,60 +38,41 @@ class TestProviderConfigHandlers:
 
     @pytest.mark.asyncio
     async def test_handle_provider_config(self):
-        """Test handle_provider_config function."""
+        """Test handle_provider_config function - takes only args, no app param."""
         args = Namespace(resource="provider", action="config")
-        mock_app = Mock()
 
-        with patch("src.interface.system_command_handlers.get_container") as mock_get_container:
+        with patch("interface.system_command_handlers.get_container") as mock_get_container:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 
-            # Mock configuration manager
-            mock_config_manager = Mock()
-            mock_config_manager.get_provider_config.return_value = {"provider": "aws"}
-            mock_container.get.return_value = mock_config_manager
+            mock_query_bus = AsyncMock()
+            mock_query_bus.execute = AsyncMock(return_value={"provider": "aws"})
+            mock_container.get.return_value = mock_query_bus
 
-            result = await handle_provider_config(args, mock_app)
+            # handle_provider_config takes only args (no app parameter)
+            result = await handle_provider_config(args)
 
             assert isinstance(result, dict)
 
     @pytest.mark.asyncio
     async def test_handle_validate_provider_config(self):
-        """Test handle_validate_provider_config function."""
+        """Test handle_validate_provider_config function - takes only args, no app param."""
         args = Namespace(resource="provider", action="validate")
-        mock_app = Mock()
 
-        with patch("src.interface.system_command_handlers.get_container") as mock_get_container:
-            mock_container = Mock()
-            mock_get_container.return_value = mock_container
+        # handle_validate_provider_config takes only args (no app parameter)
+        result = await handle_validate_provider_config(args)
 
-            # Mock configuration manager
-            mock_config_manager = Mock()
-            mock_config_manager.validate_provider_config.return_value = True
-            mock_container.get.return_value = mock_config_manager
-
-            result = await handle_validate_provider_config(args, mock_app)
-
-            assert isinstance(result, dict)
+        assert isinstance(result, dict)
 
     @pytest.mark.asyncio
     async def test_handle_reload_provider_config(self):
-        """Test handle_reload_provider_config function."""
+        """Test handle_reload_provider_config function - takes only args, no app param."""
         args = Namespace(resource="provider", action="reload")
-        mock_app = Mock()
 
-        with patch("src.interface.system_command_handlers.get_container") as mock_get_container:
-            mock_container = Mock()
-            mock_get_container.return_value = mock_container
+        # handle_reload_provider_config takes only args (no app parameter)
+        result = await handle_reload_provider_config(args)
 
-            # Mock configuration manager
-            mock_config_manager = Mock()
-            mock_config_manager.reload_provider_config.return_value = True
-            mock_container.get.return_value = mock_config_manager
-
-            result = await handle_reload_provider_config(args, mock_app)
-
-            assert isinstance(result, dict)
+        assert isinstance(result, dict)
 
 
 class TestConfigurationHandlerImports:
@@ -125,7 +106,6 @@ class TestGetProviderConfigCLIHandler:
 
     def test_handle_success(self):
         """Test successful provider config retrieval."""
-        # Setup
         mock_command = Mock()
         expected_result = {
             "status": "success",
@@ -134,28 +114,22 @@ class TestGetProviderConfigCLIHandler:
 
         self.mock_query_bus.dispatch.return_value = expected_result
 
-        # Execute
         result = self.handler.handle(mock_command)
 
-        # Verify
         assert result == expected_result
         self.mock_query_bus.dispatch.assert_called_once()
 
-        # Verify query type
         call_args = self.mock_query_bus.dispatch.call_args[0]
         query = call_args[0]
         assert query.__class__.__name__ == "GetProviderConfigQuery"
 
     def test_handle_exception(self):
         """Test handling of exceptions during config retrieval."""
-        # Setup
         mock_command = Mock()
         self.mock_query_bus.dispatch.side_effect = Exception("Query failed")
 
-        # Execute
         result = self.handler.handle(mock_command)
 
-        # Verify
         assert result["error"] == "Failed to get provider configuration: Query failed"
         assert result["status"] == "error"
 
@@ -174,7 +148,6 @@ class TestValidateProviderConfigCLIHandler:
 
     def test_handle_valid_config(self):
         """Test validation of valid provider configuration."""
-        # Setup
         mock_command = Mock()
         expected_result = {
             "status": "success",
@@ -183,21 +156,17 @@ class TestValidateProviderConfigCLIHandler:
 
         self.mock_query_bus.dispatch.return_value = expected_result
 
-        # Execute
         result = self.handler.handle(mock_command)
 
-        # Verify
         assert result == expected_result
         self.mock_query_bus.dispatch.assert_called_once()
 
-        # Verify query type
         call_args = self.mock_query_bus.dispatch.call_args[0]
         query = call_args[0]
         assert query.__class__.__name__ == "ValidateProviderConfigQuery"
 
     def test_handle_invalid_config(self):
         """Test validation of invalid provider configuration."""
-        # Setup
         mock_command = Mock()
         expected_result = {
             "status": "success",
@@ -210,24 +179,19 @@ class TestValidateProviderConfigCLIHandler:
 
         self.mock_query_bus.dispatch.return_value = expected_result
 
-        # Execute
         result = self.handler.handle(mock_command)
 
-        # Verify
         assert result == expected_result
         assert result["validation_result"]["valid"] is False
         assert len(result["validation_result"]["errors"]) > 0
 
     def test_handle_exception(self):
         """Test handling of exceptions during validation."""
-        # Setup
         mock_command = Mock()
         self.mock_query_bus.dispatch.side_effect = Exception("Validation failed")
 
-        # Execute
         result = self.handler.handle(mock_command)
 
-        # Verify
         assert result["valid"] is False
         assert "Configuration validation failed" in result["error"]
         assert result["status"] == "error"
@@ -247,11 +211,10 @@ class TestReloadProviderConfigCLIHandler:
 
     def test_handle_success_with_path(self):
         """Test successful config reload with specific path."""
-        # Setup
         mock_command = Mock()
         mock_command.config_path = "/path/to/config.json"
-        mock_command.file = None  # No file input
-        mock_command.data = None  # No data input
+        mock_command.file = None
+        mock_command.data = None
 
         expected_result = {
             "status": "success",
@@ -261,14 +224,11 @@ class TestReloadProviderConfigCLIHandler:
 
         self.mock_command_bus.dispatch.return_value = expected_result
 
-        # Execute
         result = self.handler.handle(mock_command)
 
-        # Verify
         assert result == expected_result
         self.mock_command_bus.dispatch.assert_called_once()
 
-        # Verify command type and parameters
         call_args = self.mock_command_bus.dispatch.call_args[0]
         command = call_args[0]
         assert command.__class__.__name__ == "ReloadProviderConfigCommand"
@@ -276,11 +236,10 @@ class TestReloadProviderConfigCLIHandler:
 
     def test_handle_success_default_path(self):
         """Test successful config reload with default path."""
-        # Setup
         mock_command = Mock()
         mock_command.config_path = None
-        mock_command.file = None  # No file input
-        mock_command.data = None  # No data input
+        mock_command.file = None
+        mock_command.data = None
 
         expected_result = {
             "status": "success",
@@ -290,47 +249,38 @@ class TestReloadProviderConfigCLIHandler:
 
         self.mock_command_bus.dispatch.return_value = expected_result
 
-        # Execute
         result = self.handler.handle(mock_command)
 
-        # Verify
         assert result == expected_result
 
-        # Verify command parameters
         call_args = self.mock_command_bus.dispatch.call_args[0]
         command = call_args[0]
         assert command.config_path is None
 
     def test_handle_with_input_data(self):
         """Test config reload with input data."""
-        # Setup
         mock_command = Mock()
         mock_command.data = '{"config_path": "/custom/path.json"}'
-        mock_command.file = None  # No file input
+        mock_command.file = None
 
         expected_result = {"status": "success", "config_path": "/custom/path.json"}
 
         self.mock_command_bus.dispatch.return_value = expected_result
 
-        # Execute
         result = self.handler.handle(mock_command)
 
-        # Verify
         assert result == expected_result
 
     def test_handle_exception(self):
         """Test handling of exceptions during reload."""
-        # Setup
         mock_command = Mock()
         mock_command.config_path = "/invalid/path.json"
-        mock_command.file = None  # No file input
-        mock_command.data = None  # No data input
+        mock_command.file = None
+        mock_command.data = None
         self.mock_command_bus.dispatch.side_effect = Exception("Reload failed")
 
-        # Execute
         result = self.handler.handle(mock_command)
 
-        # Verify
         assert result["success"] is False
         assert "Configuration reload failed" in result["error"]
         assert result["status"] == "error"
@@ -350,12 +300,11 @@ class TestMigrateProviderConfigCLIHandler:
 
     def test_handle_success_default_options(self):
         """Test successful config migration with default options."""
-        # Setup
         mock_command = Mock()
         mock_command.save_to_file = False
         mock_command.backup_original = True
-        mock_command.file = None  # No file input
-        mock_command.data = None  # No data input
+        mock_command.file = None
+        mock_command.data = None
 
         expected_result = {
             "status": "success",
@@ -369,14 +318,11 @@ class TestMigrateProviderConfigCLIHandler:
 
         self.mock_command_bus.dispatch.return_value = expected_result
 
-        # Execute
         result = self.handler.handle(mock_command)
 
-        # Verify
         assert result == expected_result
         self.mock_command_bus.dispatch.assert_called_once()
 
-        # Verify command type and parameters
         call_args = self.mock_command_bus.dispatch.call_args[0]
         command = call_args[0]
         assert command.__class__.__name__ == "MigrateProviderConfigCommand"
@@ -385,10 +331,9 @@ class TestMigrateProviderConfigCLIHandler:
 
     def test_handle_with_input_data(self):
         """Test config migration with input data."""
-        # Setup
         mock_command = Mock()
         mock_command.data = '{"save_to_file": true, "backup_original": false}'
-        mock_command.file = None  # No file input
+        mock_command.file = None
 
         expected_result = {
             "status": "success",
@@ -397,13 +342,10 @@ class TestMigrateProviderConfigCLIHandler:
 
         self.mock_command_bus.dispatch.return_value = expected_result
 
-        # Execute
         result = self.handler.handle(mock_command)
 
-        # Verify
         assert result == expected_result
 
-        # Verify command parameters from input data
         call_args = self.mock_command_bus.dispatch.call_args[0]
         command = call_args[0]
         assert command.save_to_file is True
@@ -411,17 +353,14 @@ class TestMigrateProviderConfigCLIHandler:
 
     def test_handle_exception(self):
         """Test handling of exceptions during migration."""
-        # Setup
         mock_command = Mock()
         mock_command.save_to_file = True
-        mock_command.file = None  # No file input
-        mock_command.data = None  # No data input
+        mock_command.file = None
+        mock_command.data = None
         self.mock_command_bus.dispatch.side_effect = Exception("Migration failed")
 
-        # Execute
         result = self.handler.handle(mock_command)
 
-        # Verify
         assert result["success"] is False
         assert "Configuration migration failed" in result["error"]
         assert result["status"] == "error"

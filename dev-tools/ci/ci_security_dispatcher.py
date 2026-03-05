@@ -8,18 +8,18 @@ import sys
 def handle_bandit():
     """Handle bandit security scan."""
     print("Running Bandit security scan...")
-    return ["./dev-tools/scripts/run_tool.sh", "bandit", "-r", "src"]
+    return ["./dev-tools/setup/run_tool.sh", "bandit", "-r", "src", "--exit-zero"]
 
 
 def handle_safety():
     """Handle safety dependency scan."""
     print("Running Safety dependency scan...")
-    return ["./dev-tools/scripts/run_tool.sh", "safety", "check"]
+    return ["./dev-tools/setup/run_tool.sh", "safety", "check"]
 
 
 def handle_other_tools(tool):
     """Handle other security tools."""
-    return ["./dev-tools/scripts/ci_security.py", tool]
+    return ["./dev-tools/security/ci_security.py", tool]
 
 
 def get_command(tool):

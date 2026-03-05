@@ -499,13 +499,13 @@ class AWSOperations:
 ### Implement Provider Interface
 
 ```python
-# src/providers/provider1/azure_provider.py
+# src/providers/provider1/provider1_provider.py
 from src.infrastructure.interfaces.provider import ProviderInterface
 
-class AzureProvider(ProviderInterface):
+class Provider1Provider(ProviderInterface):
     """Provider1 cloud provider implementation."""
 
-    def __init__(self, config: AzureConfig):
+    def __init__(self, config: Provider1Config):
         self.config = config
         # Initialize Provider1 clients
 
@@ -519,46 +519,167 @@ class AzureProvider(ProviderInterface):
     # Implement all abstract methods...
 ```
 
-### Create Provider Configuration
+### Create Provider Configuration with BaseSettings
 
 ```python
 # src/providers/provider1/configuration/config.py
-from pydantic import BaseModel
+from typing import Optional
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from infrastructure.interfaces.provider import BaseProviderConfig
 
-class AzureConfig(BaseModel):
-    """Provider1 provider configuration."""
-    subscription_id: str
-    tenant_id: str
-    client_id: str
-    client_secret: str
-    resource_group: str
-    location: str = "East US"
+class Provider1ProviderConfig(BaseSettings, BaseProviderConfig):
+    """Provider1 provider configuration with automatic environment variable support."""
+    
+    model_config = SettingsConfigDict(
+        env_prefix='ORB_PROVIDER1_',
+        case_sensitive=False,
+        populate_by_name=True,
+        env_nested_delimiter='__'
+    )
+    
+    # Provider identification
+    provider_type: str = "provider1"
+    
+    # Provider1 Authentication - automatically mapped to ORB_PROVIDER1_* env vars
+    account_id: str = Field(..., description="Provider1 account ID")
+    tenant_id: str = Field(..., description="Provider1 tenant ID")
+    client_id: str = Field(..., description="Provider1 client ID")
+    client_secret: str = Field(..., description="Provider1 client secret")
+    
+    # Provider1 Settings
+    resource_group: str = Field(..., description="Provider1 resource group")
+    location: str = Field("Region A", description="Provider1 location")
+    
+    # Optional settings
+    endpoint_url: Optional[str] = Field(None, description="Provider1 endpoint URL")
+    max_retries: int = Field(3, description="Maximum retries for Provider1 API calls")
+    timeout: int = Field(30, description="Request timeout in seconds")
+```
+
+### Register Provider Settings
+
+```python
+# src/providers/provider1/__init__.py
+from config.schemas.provider_settings_registry import ProviderSettingsRegistry
+from .configuration.config import Provider1ProviderConfig
+
+# Register Provider1 provider settings for automatic environment variable support
+ProviderSettingsRegistry.register_provider_settings("provider1", Provider1ProviderConfig)
 ```
 
 ### Register Provider
 
 ```python
 # Register Provider1 provider
-from src.providers.provider1.azure_provider import AzureProvider
-ProviderFactory.register_provider("provider1", AzureProvider)
+from src.providers.provider1.provider1_provider import Provider1Provider
+ProviderFactory.register_provider("provider1", Provider1Provider)
 ```
 
-### Update Configuration
+### Configuration with Environment Variable Support
 
+**Configuration File:**
 ```json
 {
-  "provider": {
+  "providers": [{
+    "name": "provider1-region-a",
     "type": "provider1",
-    "provider1": {
+    "config": {
       "subscription_id": "your-subscription-id",
       "tenant_id": "your-tenant-id",
       "client_id": "your-client-id",
-      "client_secret": "${AZURE_CLIENT_SECRET}",
       "resource_group": "hostfactory-rg",
       "location": "East US"
     }
-  }
+  }]
 }
+```
+
+**Environment Variables (Override Config File):**
+```bash
+# All Provider1 fields support environment variable overrides
+export ORB_PROVIDER1_ACCOUNT_ID="prod-account-id"
+export ORB_PROVIDER1_CLIENT_SECRET="secure-client-secret"
+export ORB_PROVIDER1_RESOURCE_GROUP="production-rg"
+export ORB_PROVIDER1_LOCATION="Region B"
+export ORB_PROVIDER1_MAX_RETRIES=5
+```
+
+## Provider Configuration with BaseSettings
+
+The Open Resource Broker uses Pydantic BaseSettings for provider configuration, enabling automatic environment variable mapping, type validation, and extensible configuration schemas.
+
+### BaseSettings Benefits
+
+- **Automatic Environment Variable Mapping**: No manual mapping required
+- **Type Safety**: Automatic type conversion and validation
+- **Provider Extensibility**: Each provider defines its own configuration schema
+- **Environment Variable Precedence**: Environment variables override configuration file values
+
+### AWS Provider Configuration Example
+
+```python
+class AWSProviderConfig(BaseSettings, BaseProviderConfig):
+    """AWS provider configuration with automatic environment variable support."""
+    
+    model_config = SettingsConfigDict(
+        env_prefix='ORB_AWS_',
+        case_sensitive=False,
+        populate_by_name=True,
+        env_nested_delimiter='__'
+    )
+    
+    # Authentication - automatically mapped to ORB_AWS_* env vars
+    region: str = Field("us-east-1", description="AWS region")
+    profile: Optional[str] = Field(None, description="AWS profile")
+    role_arn: Optional[str] = Field(None, description="AWS role ARN")
+    access_key_id: Optional[str] = Field(None, description="AWS access key ID")
+    secret_access_key: Optional[str] = Field(None, description="AWS secret access key")
+    
+    # Service settings
+    aws_max_retries: int = Field(3, description="Maximum retries for AWS API calls")
+    aws_read_timeout: int = Field(30, description="Read timeout in seconds")
+    
+    # Complex nested objects support JSON environment variables
+    handlers: HandlersConfig = Field(default_factory=HandlersConfig)
+    launch_template: LaunchTemplateConfiguration = Field(default_factory=LaunchTemplateConfiguration)
+```
+
+### Environment Variable Support
+
+All provider configuration fields automatically support environment variable overrides:
+
+```bash
+# Basic configuration
+export ORB_AWS_REGION="us-west-2"
+export ORB_AWS_PROFILE="production"
+export ORB_AWS_ROLE_ARN="arn:aws:iam::123456789012:role/OrbitRole"
+
+# Service settings
+export ORB_AWS_AWS_MAX_RETRIES=5
+export ORB_AWS_AWS_READ_TIMEOUT=60
+
+# Complex nested objects (JSON format)
+export ORB_AWS_HANDLERS='{"ec2_fleet": true, "spot_fleet": false}'
+export ORB_AWS_LAUNCH_TEMPLATE='{"create_per_request": false, "reuse_existing": true}'
+
+# Nested delimiter support
+export ORB_AWS_HANDLERS__EC2_FLEET=true
+export ORB_AWS_HANDLERS__SPOT_FLEET=false
+```
+
+### Provider Settings Registry
+
+The provider settings registry manages BaseSettings classes for automatic environment variable loading:
+
+```python
+from config.schemas.provider_settings_registry import ProviderSettingsRegistry
+
+# Register provider settings class
+ProviderSettingsRegistry.register_provider_settings("aws", AWSProviderConfig)
+
+# Create settings instance with automatic env var loading
+settings = ProviderSettingsRegistry.create_settings("aws", config_dict)
 ```
 
 ## Provider Configuration

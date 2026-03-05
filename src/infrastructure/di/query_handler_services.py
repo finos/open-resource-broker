@@ -4,7 +4,7 @@ All query handlers are now automatically discovered and registered via
 @query_handler decorators through the Handler Discovery System.
 """
 
-from domain.base.ports import LoggingPort
+from domain.base.ports.logging_port import LoggingPort
 from infrastructure.di.buses import QueryBus
 from infrastructure.di.container import DIContainer
 
@@ -77,7 +77,7 @@ def register_query_handlers_with_bus(container: DIContainer) -> None:
                 ListTemplatesQuery,
                 ValidateTemplateQuery,
             )
-            from application.queries.handlers import (
+            from application.queries.template_query_handlers import (
                 GetTemplateHandler,
                 ListTemplatesHandler,
                 ValidateTemplateHandler,
@@ -94,19 +94,16 @@ def register_query_handlers_with_bus(container: DIContainer) -> None:
         try:
             from application.dto.queries import (
                 GetRequestQuery,
-                GetRequestStatusQuery,
                 ListActiveRequestsQuery,
                 ListReturnRequestsQuery,
             )
-            from application.queries.handlers import (
+            from application.queries.request_query_handlers import (
                 GetRequestHandler,
-                GetRequestStatusQueryHandler,
                 ListActiveRequestsHandler,
                 ListReturnRequestsHandler,
             )
 
             query_bus.register(GetRequestQuery, container.get(GetRequestHandler))
-            query_bus.register(GetRequestStatusQuery, container.get(GetRequestStatusQueryHandler))
             query_bus.register(ListActiveRequestsQuery, container.get(ListActiveRequestsHandler))
             query_bus.register(ListReturnRequestsQuery, container.get(ListReturnRequestsHandler))
 
@@ -116,7 +113,7 @@ def register_query_handlers_with_bus(container: DIContainer) -> None:
         # Register machine query handlers
         try:
             from application.dto.queries import GetMachineQuery, ListMachinesQuery
-            from application.queries.handlers import (
+            from application.queries.machine_query_handlers import (
                 GetMachineHandler,
                 ListMachinesHandler,
             )
@@ -124,20 +121,41 @@ def register_query_handlers_with_bus(container: DIContainer) -> None:
             query_bus.register(GetMachineQuery, container.get(GetMachineHandler))
             query_bus.register(ListMachinesQuery, container.get(ListMachinesHandler))
 
+            from application.machine.queries import (
+                ConvertBatchMachineStatusQuery,
+                ConvertMachineStatusQuery,
+                ValidateProviderStateQuery,
+            )
+            from application.queries.machine_query_handlers import (
+                ConvertBatchMachineStatusQueryHandler,
+                ConvertMachineStatusQueryHandler,
+                ValidateProviderStateQueryHandler,
+            )
+
+            query_bus.register(
+                ConvertMachineStatusQuery, container.get(ConvertMachineStatusQueryHandler)
+            )
+            query_bus.register(
+                ConvertBatchMachineStatusQuery, container.get(ConvertBatchMachineStatusQueryHandler)
+            )
+            query_bus.register(
+                ValidateProviderStateQuery, container.get(ValidateProviderStateQueryHandler)
+            )
+
         except ImportError as e:
             logger.debug("Machine query handlers not available for bus registration: %s", e)
 
         # Register system query handlers
         try:
+            from application.provider.queries import GetProviderMetricsQuery
+            from application.queries.provider_handlers import GetProviderMetricsHandler
             from application.queries.system import (
                 GetProviderConfigQuery,
-                GetProviderMetricsQuery,
                 GetSystemStatusQuery,
                 ValidateProviderConfigQuery,
             )
             from application.queries.system_handlers import (
                 GetProviderConfigHandler,
-                GetProviderMetricsHandler,
                 GetSystemStatusHandler,
                 ValidateProviderConfigHandler,
             )
@@ -179,5 +197,5 @@ def register_query_handlers_with_bus(container: DIContainer) -> None:
 
     except Exception as e:
         logger = container.get(LoggingPort)
-        logger.error("Failed to register query handlers with bus: %s", e)
+        logger.error("Failed to register query handlers with bus: %s", e, exc_info=True)
         raise

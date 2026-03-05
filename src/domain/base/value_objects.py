@@ -97,12 +97,6 @@ class ResourceQuota(ValueObject):
         )
 
 
-class InstanceId(ResourceId):
-    """Instance identifier value object."""
-
-    resource_type: ClassVar[str] = "Instance"
-
-
 class IPAddress(ValueObject):
     """IP address value object."""
 
@@ -139,6 +133,26 @@ class InstanceType(ValueObject):
         stripped = v.strip()
         if not stripped:
             raise ValueError("Instance type must be a non-empty string")
+        return stripped
+
+
+class InstanceId(ValueObject):
+    """Instance identifier value object."""
+
+    value: str
+
+    def __str__(self) -> str:
+        return self.value
+
+    @field_validator("value")
+    @classmethod
+    def validate_instance_id(cls, v: str) -> str:
+        """Validate instance ID format."""
+        if not v or not isinstance(v, str):
+            raise ValueError("Instance ID must be a non-empty string")
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("Instance ID must be a non-empty string")
         return stripped
 
 
@@ -185,7 +199,7 @@ class Tags(ValueObject):
 
 
 class ARN(ValueObject):
-    """Amazon Resource Name value object."""
+    """Cloud provider resource name value object (e.g., ARN format)."""
 
     value: str
 
@@ -210,13 +224,3 @@ class PriceType(str, Enum):
     SPOT = "spot"
     RESERVED = "reserved"
     HETEROGENEOUS = "heterogeneous"  # Mix of different pricing types
-
-
-class AllocationStrategy(str, Enum):
-    """Allocation strategy enumeration."""
-
-    LOWEST_PRICE = "lowestPrice"
-    DIVERSIFIED = "diversified"
-    CAPACITY_OPTIMIZED = "capacityOptimized"
-    CAPACITY_OPTIMIZED_PRIORITIZED = "capacityOptimizedPrioritized"
-    PRICE_CAPACITY_OPTIMIZED = "priceCapacityOptimized"

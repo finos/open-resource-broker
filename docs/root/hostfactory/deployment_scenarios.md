@@ -371,7 +371,7 @@ spec:
          |
 [Plugin with Multi-Provider Support]
          |
-[AWS]  <-   ->  [Azure]  <-   ->  [On-Premises]
+[AWS]  <-   ->  [Provider1]  <-   ->  [On-Premises]
 ```
 
 ### Configuration
@@ -393,8 +393,8 @@ spec:
         }
       },
       {
-        "name": "azure-secondary",
-        "type": "azure",
+        "name": "provider1-secondary",
+        "type": "provider1",
         "enabled": true,
         "priority": 2,
         "config": {

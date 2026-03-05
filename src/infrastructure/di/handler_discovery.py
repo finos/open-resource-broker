@@ -52,10 +52,10 @@ class HandlerDiscoveryService:
 
         # Get caching configuration from performance settings
         try:
-            from config.manager import get_config_manager
+            from config.managers.configuration_manager import ConfigurationManager
             from config.schemas.performance_schema import PerformanceConfig
 
-            config_manager = get_config_manager()
+            config_manager = container.get(ConfigurationManager)
             perf_config = config_manager.get_typed(PerformanceConfig)
 
             self.cache_enabled = perf_config.caching.handler_discovery.enabled
@@ -64,32 +64,14 @@ class HandlerDiscoveryService:
             )
 
         except Exception as e:
-            logger.warning("Failed to get caching configuration: %s", e)
-            # Fallback to default behavior
-            self.cache_enabled = True
-            self.cache_file = self._resolve_cache_path_fallback()
+            logger.warning("Failed to get caching configuration: %s", e, exc_info=True)
+            # Caching unavailable — disable rather than guess a wrong path
+            self.cache_enabled = False
+            self.cache_file = None
 
-    def _resolve_cache_path(self, config_manager) -> str:
-        """Resolve cache file path using configuration system."""
-        try:
-            work_dir = config_manager.get_work_dir()
-            cache_dir = os.path.join(work_dir, ".cache")
-            os.makedirs(cache_dir, exist_ok=True)
-            return os.path.join(cache_dir, "handler_discovery.json")
-        except Exception:
-            return self._resolve_cache_path_fallback()
-
-    def _resolve_cache_path_fallback(self) -> str:
-        """Fallback cache path resolution."""
-        try:
-            from infrastructure.di.container import get_container
-
-            container = get_container()
-            scheduler = container.get("scheduler_strategy")
-            workdir = scheduler.get_working_directory()
-        except Exception:
-            workdir = os.getcwd()
-        cache_dir = os.path.join(workdir, ".cache")
+    def _resolve_cache_path(self, config_manager: Any) -> str:
+        """Resolve cache file path from configuration."""
+        cache_dir = config_manager.get_cache_dir()
         os.makedirs(cache_dir, exist_ok=True)
         return os.path.join(cache_dir, "handler_discovery.json")
 
@@ -140,7 +122,7 @@ class HandlerDiscoveryService:
         try:
             # Import the base package
             package = importlib.import_module(base_package)
-            package_path = Path(package.__file__).parent
+            package_path = Path(package.__file__ or "").parent
 
             # Walk through all modules in the package
             for module_info in pkgutil.walk_packages([str(package_path)], f"{base_package}."):
@@ -149,11 +131,13 @@ class HandlerDiscoveryService:
                     importlib.import_module(module_info.name)
                     logger.debug("Imported module: %s", module_info.name)
                 except Exception as e:
-                    logger.warning("Failed to import module %s: %s", module_info.name, e)
+                    logger.warning(
+                        "Failed to import module %s: %s", module_info.name, e, exc_info=True
+                    )
                     continue
 
         except Exception as e:
-            logger.error("Handler discovery failed: %s", e)
+            logger.error("Handler discovery failed: %s", e, exc_info=True)
             raise
 
     def _register_handlers(self) -> None:
@@ -178,7 +162,12 @@ class HandlerDiscoveryService:
                     query_type.__name__,
                 )
             except Exception as e:
-                logger.error("Failed to register query handler %s: %s", handler_class.__name__, e)
+                logger.error(
+                    "Failed to register query handler %s: %s",
+                    handler_class.__name__,
+                    e,
+                    exc_info=True,
+                )
 
         # Register command handlers
         command_handlers = get_registered_command_handlers()
@@ -330,7 +319,7 @@ class HandlerDiscoveryService:
             )
 
         except Exception as e:
-            logger.warning("Failed to register handlers from cache: %s", e)
+            logger.warning("Failed to register handlers from cache: %s", e, exc_info=True)
             self._fallback_to_full_discovery()
 
     def _fallback_to_full_discovery(self) -> None:

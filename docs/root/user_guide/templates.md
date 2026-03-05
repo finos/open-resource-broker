@@ -329,24 +329,21 @@ aws ssm put-parameter \
 ### Validating Templates
 
 ```bash
-# Test template validation
-python run.py getAvailableTemplates
+# List available templates
+orb templates list
 
-# Validate specific template
-echo '{"template_id": "my-template"}' | python run.py getAvailableTemplates --data '{}'
+# Validate a template file before creating it
+orb templates validate --file my-template.json
 ```
 
 ### Template Testing
 
 ```bash
-# Test template provisioning
-echo '{
-  "template_id": "my-template",
-  "machine_count": 1
-}' | python run.py requestMachines --data '{}'
+# Test template provisioning (request 1 machine)
+orb machines request my-template 1
 
 # Check request status
-python run.py getRequestStatus --request-id req-12345678-1234-1234-1234-123456789012
+orb requests status req-12345678-1234-1234-1234-123456789012
 ```
 
 ## Best Practices
@@ -381,14 +378,14 @@ python run.py getRequestStatus --request-id req-12345678-1234-1234-1234-12345678
 
 #### Template Not Found
 ```bash
-# Check available templates using command line
-python run.py getAvailableTemplates
+# Check available templates
+orb templates list
 
-# Check template configuration file
-cat config/templates.json | python -m json.tool
+# Validate JSON syntax of a template file
+python -m json.tool config/templates.json
 
-# Verify template ID exists in configuration
-grep -r "template_id" config/
+# Verify template ID exists
+orb templates show my-template-id
 ```
 
 #### Invalid Configuration
@@ -396,11 +393,8 @@ grep -r "template_id" config/
 # Validate JSON syntax
 python -m json.tool config/templates.json
 
-# Check template structure using command line
-python run.py getAvailableTemplates | python -m json.tool
-
-# List all template IDs
-python run.py getAvailableTemplates | grep -o '"template_id": "[^"]*"'
+# List all templates with details
+orb templates list --long
 ```
 
 #### AWS Resource Issues

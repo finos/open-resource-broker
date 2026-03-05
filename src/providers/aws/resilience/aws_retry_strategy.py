@@ -27,6 +27,7 @@ class AWSRetryStrategy(RetryStrategy):
             **kwargs: Additional configuration parameters
         """
         self.service = service
+        self._logger = logger
 
         # Get AWS service-specific configuration
         service_config = DEFAULT_AWS_RETRY_CONFIG.get_service_config(service)
@@ -131,7 +132,7 @@ class AWSRetryStrategy(RetryStrategy):
             exception: Exception that occurred
         """
         error_info = get_aws_error_info(exception)
-        delay = self.calculate_delay(attempt)
+        delay = self.calculate_delay(attempt)  # type: ignore[attr-defined]
 
         self._logger.warning(
             "Retrying AWS %s operation (attempt %s/%s) after %.2fs delay due to %s",

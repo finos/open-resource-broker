@@ -30,7 +30,6 @@ class TestAPIHandlerInitialization:
 
     def test_get_available_templates_handler_initialization(self):
         """Test that GetAvailableTemplatesRESTHandler can be initialized with all dependencies."""
-        # Act
         handler = GetAvailableTemplatesRESTHandler(
             query_bus=self.query_bus,
             command_bus=self.command_bus,
@@ -38,15 +37,14 @@ class TestAPIHandlerInitialization:
             metrics=self.metrics,
         )
 
-        # Assert
         assert handler._query_bus == self.query_bus
         assert handler._command_bus == self.command_bus
         assert handler._scheduler_strategy == self.scheduler_strategy
-        assert handler._metrics == self.metrics
+        # Handler stores metrics as _metrics_collector
+        assert handler._metrics_collector == self.metrics
 
     def test_request_machines_handler_initialization(self):
         """Test that RequestMachinesRESTHandler can be initialized with all dependencies."""
-        # Act
         handler = RequestMachinesRESTHandler(
             query_bus=self.query_bus,
             command_bus=self.command_bus,
@@ -55,7 +53,6 @@ class TestAPIHandlerInitialization:
             metrics=self.metrics,
         )
 
-        # Assert
         assert handler._query_bus == self.query_bus
         assert handler._command_bus == self.command_bus
         assert handler.logger == self.logger
@@ -64,7 +61,6 @@ class TestAPIHandlerInitialization:
 
     def test_get_request_status_handler_initialization(self):
         """Test that GetRequestStatusRESTHandler can be initialized with all dependencies."""
-        # Act
         handler = GetRequestStatusRESTHandler(
             query_bus=self.query_bus,
             command_bus=self.command_bus,
@@ -74,17 +70,15 @@ class TestAPIHandlerInitialization:
             metrics=self.metrics,
         )
 
-        # Assert
         assert handler._query_bus == self.query_bus
         assert handler._command_bus == self.command_bus
         assert handler._scheduler_strategy == self.scheduler_strategy
         assert handler.logger == self.logger
         assert handler.error_handler == self.error_handler
-        assert handler._metrics == self.metrics
+        assert handler._metrics_collector == self.metrics
 
     def test_get_return_requests_handler_initialization(self):
         """Test that GetReturnRequestsRESTHandler can be initialized with all dependencies."""
-        # Act
         handler = GetReturnRequestsRESTHandler(
             query_bus=self.query_bus,
             command_bus=self.command_bus,
@@ -94,17 +88,15 @@ class TestAPIHandlerInitialization:
             metrics=self.metrics,
         )
 
-        # Assert
         assert handler._query_bus == self.query_bus
         assert handler._command_bus == self.command_bus
         assert handler._scheduler_strategy == self.scheduler_strategy
         assert handler.logger == self.logger
         assert handler.error_handler == self.error_handler
-        assert handler._metrics == self.metrics
+        assert handler._metrics_collector == self.metrics
 
     def test_request_return_machines_handler_initialization(self):
         """Test that RequestReturnMachinesRESTHandler can be initialized with all dependencies."""
-        # Act
         handler = RequestReturnMachinesRESTHandler(
             query_bus=self.query_bus,
             command_bus=self.command_bus,
@@ -114,13 +106,12 @@ class TestAPIHandlerInitialization:
             metrics=self.metrics,
         )
 
-        # Assert
         assert handler._query_bus == self.query_bus
         assert handler._command_bus == self.command_bus
         assert handler._scheduler_strategy == self.scheduler_strategy
         assert handler.logger == self.logger
         assert handler.error_handler == self.error_handler
-        assert handler._metrics == self.metrics
+        assert handler._metrics_collector == self.metrics
 
 
 class TestAPIHandlerRegistration:
@@ -132,7 +123,6 @@ class TestAPIHandlerRegistration:
         self, mock_register_api_handlers, mock_register_fastapi
     ):
         """Test that register_server_services calls handlers when server is enabled and FastAPI is available."""
-        # Arrange
         from config.schemas.server_schema import ServerConfig
         from infrastructure.di.server_services import register_server_services
 
@@ -143,16 +133,13 @@ class TestAPIHandlerRegistration:
         config_manager.get_typed.return_value = server_config
         container.get.return_value = config_manager
 
-        # Act
         register_server_services(container)
 
-        # Assert
         mock_register_fastapi.assert_called_once_with(container, server_config)
         mock_register_api_handlers.assert_called_once_with(container)
 
     def test_register_server_services_without_fastapi(self):
         """Test that register_server_services handles missing FastAPI gracefully."""
-        # Arrange
         from config.schemas.server_schema import ServerConfig
         from infrastructure.di.server_services import register_server_services
 
@@ -163,7 +150,6 @@ class TestAPIHandlerRegistration:
         config_manager.get_typed.return_value = server_config
         container.get.return_value = config_manager
 
-        # Mock FastAPI import to fail
         with patch("infrastructure.di.server_services._register_fastapi_services") as mock_fastapi:
             mock_fastapi.side_effect = ImportError("No module named 'fastapi'")
 
@@ -176,7 +162,6 @@ class TestAPIHandlerRegistration:
     @patch("infrastructure.di.server_services._register_api_handlers")
     def test_register_server_services_disabled(self, mock_register_api_handlers):
         """Test that register_server_services doesn't call _register_api_handlers when server is disabled."""
-        # Arrange
         from config.schemas.server_schema import ServerConfig
         from infrastructure.di.server_services import register_server_services
 
@@ -187,8 +172,6 @@ class TestAPIHandlerRegistration:
         config_manager.get_typed.return_value = server_config
         container.get.return_value = config_manager
 
-        # Act
         register_server_services(container)
 
-        # Assert
         mock_register_api_handlers.assert_not_called()

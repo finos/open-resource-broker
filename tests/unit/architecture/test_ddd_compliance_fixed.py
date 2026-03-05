@@ -11,9 +11,9 @@ This module validates that the codebase properly implements DDD patterns includi
 import pytest
 from pydantic import ValidationError
 
-from src.domain.base.exceptions import DomainException
-from src.domain.base.value_objects import InstanceId, ResourceId, ResourceQuota
-from src.domain.template.template_aggregate import Template
+from domain.base.exceptions import DomainException
+from domain.base.value_objects import InstanceId, ResourceId, ResourceQuota
+from domain.template.template_aggregate import Template
 
 
 @pytest.mark.unit
@@ -254,7 +254,7 @@ class TestDDDComplianceFixed:
 
         # Verify all fields are set correctly
         assert template.template_id == "comprehensive-template"
-        assert template.instance_type == "t3.micro"
+        # instance_type is not a field on the base Template; vm_type is stored in machine_types
         assert template.price_type == "spot"
         assert template.allocation_strategy == "diversified"
         assert template.max_price == 0.05

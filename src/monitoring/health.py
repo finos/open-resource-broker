@@ -8,6 +8,25 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+# Optional monitoring dependencies
+try:
+    import psutil  # type: ignore[import-not-found]
+
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    psutil = None
+
+try:
+    from prometheus_client import Counter, Histogram, generate_latest  # type: ignore
+
+    PROMETHEUS_AVAILABLE = True
+except ImportError:
+    PROMETHEUS_AVAILABLE = False
+    Counter = None
+    Histogram = None
+    generate_latest = None
+
 from botocore.exceptions import ClientError
 
 from config.managers.configuration_manager import ConfigurationManager
@@ -45,7 +64,7 @@ class HealthCheck:
         self, config: ConfigurationManager, aws_client: Optional[AWSClient] = None
     ) -> None:
         """Initialize health check."""
-        self.config = config.get_config()
+        self.config = config.get_raw_config()
         self.aws_client = aws_client
         self.checks: dict[str, Callable[[], HealthStatus]] = {}
         self.status_history: dict[str, list[HealthStatus]] = {}
@@ -99,7 +118,7 @@ class HealthCheck:
                     self.status_history[name].pop(0)
             return status
         except Exception as e:
-            logger.error("Health check %s failed: %s", name, e)
+            logger.error("Health check %s failed: %s", name, e, exc_info=True)
             return HealthStatus(
                 name=name,
                 status="unhealthy",
@@ -156,7 +175,7 @@ class HealthCheck:
                     time.sleep(interval)
 
                 except Exception as e:
-                    logger.error("Health checker error: %s", e)
+                    logger.error("Health checker error: %s", e, exc_info=True)
                     time.sleep(5)  # Shorter sleep on error
 
         thread = threading.Thread(target=check_health, daemon=True)
@@ -185,17 +204,18 @@ class HealthCheck:
 
     def _check_system_health(self) -> HealthStatus:
         """Check system health."""
-        try:
-            import psutil
-        except ImportError:
-            raise ImportError(
-                "System monitoring requires: pip install orb-py[monitoring]"
-            ) from None
+        if not PSUTIL_AVAILABLE:
+            return HealthStatus(
+                name="system",
+                status="unknown",
+                details={"available": False, "reason": "psutil not installed"},
+                dependencies=["os"],
+            )
 
         try:
-            cpu_percent = psutil.cpu_percent()
-            memory = psutil.virtual_memory()
-            disk = psutil.disk_usage("/")
+            cpu_percent = psutil.cpu_percent()  # type: ignore[union-attr]
+            memory = psutil.virtual_memory()  # type: ignore[union-attr]
+            disk = psutil.disk_usage("/")  # type: ignore[union-attr]
 
             status = "healthy"
             if cpu_percent > 90 or memory.percent > 90 or disk.percent > 90:
@@ -425,7 +445,12 @@ class HealthCheck:
             table_prefix = repo_config["table_prefix"]
 
             # List tables
-            tables = self.aws_client.session.client("dynamodb").list_tables()
+            from botocore.config import Config
+
+            tables = self.aws_client.session.client(
+                "dynamodb",
+                config=Config(connect_timeout=10, read_timeout=30, retries={"max_attempts": 3}),
+            ).list_tables()
             project_tables = [t for t in tables["TableNames"] if t.startswith(table_prefix)]
 
             return HealthStatus(

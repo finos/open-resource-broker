@@ -103,7 +103,7 @@ class BearerTokenStrategy(AuthPort):
             if not user_id:
                 return AuthResult(status=AuthStatus.INVALID, error_message="Token missing user ID")
 
-            self.logger.debug("Token validated for user: %s", user_id)
+            self.logger.debug("Auth validated for user: %s", user_id)
 
             return AuthResult(
                 status=AuthStatus.SUCCESS,
@@ -125,7 +125,7 @@ class BearerTokenStrategy(AuthPort):
         except jwt.InvalidTokenError as e:
             return AuthResult(status=AuthStatus.INVALID, error_message=f"Invalid token: {e!s}")
         except Exception as e:
-            self.logger.error("Token validation error: %s", e)
+            self.logger.error("Auth validation error: %s", e)
             return AuthResult(status=AuthStatus.FAILED, error_message="Token validation failed")
 
     async def refresh_token(self, refresh_token: str) -> AuthResult:
@@ -144,9 +144,7 @@ class BearerTokenStrategy(AuthPort):
 
             # Check if it's actually a refresh token
             token_type = payload.get("type")
-            if (
-                token_type != "refresh"  # nosec B105
-            ):  # This is a token type identifier, not a password
+            if token_type != "refresh":  # This is a token type identifier, not a password
                 return AuthResult(status=AuthStatus.INVALID, error_message="Invalid refresh token")
 
             # Create new access token
@@ -154,7 +152,7 @@ class BearerTokenStrategy(AuthPort):
             user_roles = payload.get("roles", [])
             permissions = payload.get("permissions", [])
 
-            new_token = self._create_access_token(user_id, user_roles, permissions)
+            new_token = self._create_access_token(user_id or "", user_roles, permissions)
 
             return AuthResult(
                 status=AuthStatus.SUCCESS,
@@ -172,7 +170,7 @@ class BearerTokenStrategy(AuthPort):
                 error_message=f"Invalid refresh token: {e!s}",
             )
         except Exception as e:
-            self.logger.error("Token refresh error: %s", e)
+            self.logger.error("Auth refresh error: %s", e)
             return AuthResult(status=AuthStatus.FAILED, error_message="Token refresh failed")
 
     async def revoke_token(self, token: str) -> bool:
@@ -188,7 +186,7 @@ class BearerTokenStrategy(AuthPort):
         Returns:
             True if token was revoked
         """
-        self.logger.info("Token revocation requested (not implemented)")
+        self.logger.info("JWT revocation requested (not implemented)")
         return True
 
     def get_strategy_name(self) -> str:

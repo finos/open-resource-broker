@@ -75,7 +75,7 @@ _orb_completion() {
     if [[ $cword -ge 3 ]]; then
         case "${words[1]} ${words[2]}" in
             "templates list")
-                COMPREPLY=($(compgen -W "--provider-api --long --format" -- "$cur"))
+                COMPREPLY=($(compgen -W "--provider-api --format" -- "$cur"))
                 ;;
             "templates show")
                 COMPREPLY=($(compgen -W "--format --legacy" -- "$cur"))
@@ -215,7 +215,6 @@ _orb_options() {
         "templates list")
             _arguments \
                 '--provider-api[Filter by provider API]:provider:' \
-                '--long[Include detailed fields]' \
                 '--format[Output format]:(json yaml table list)'
             ;;
         "templates show")

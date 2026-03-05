@@ -90,6 +90,9 @@ test-cov: dev-install
 test-html: dev-install
 	@./dev-tools/testing/test_dispatcher.py html-coverage
 
+test-docker: dev-install  ## Run Docker containerization tests
+	@./dev-tools/testing/test-docker.sh
+
 # Dummy targets removed (consolidated in quality.mk)
 
 # @SECTION Development Tools
@@ -163,7 +166,7 @@ clean-all: clean  ## Clean everything including virtual environment
 # Quick start for new developers
 quick-start: dev-install create-config  ## Quick start for new developers
 	@echo "Running quick start setup..."
-	./dev-tools/scripts/quick_start.py
+	./dev-tools/setup/quick_start.py
 
 # Configuration management
 create-config:  ## Create default configuration file
@@ -200,28 +203,28 @@ init-db:  ## Initialize database (if applicable)
 # UV management targets
 uv-lock: generate-pyproject  ## Update uv.lock file
 	@echo "Updating uv.lock file..."
-	./dev-tools/scripts/uv_manager.py lock
+	./dev-tools/setup/uv_manager.py lock
 
 uv-sync: generate-pyproject  ## Sync dependencies from uv.lock
 	@echo "Syncing dependencies from uv.lock..."
-	./dev-tools/scripts/uv_manager.py sync
+	./dev-tools/setup/uv_manager.py sync
 
 uv-sync-dev: generate-pyproject  ## Sync all dependencies including dev
 	@echo "Syncing all dependencies including dev..."
-	./dev-tools/scripts/uv_manager.py sync-dev
+	./dev-tools/setup/uv_manager.py sync-dev
 
 uv-check:  ## Check UV configuration and dependencies
 	@echo "Checking UV configuration..."
-	./dev-tools/scripts/uv_manager.py check
+	./dev-tools/setup/uv_manager.py check
 
 uv-benchmark:  ## Benchmark UV vs pip performance
 	@echo "Benchmarking UV vs pip performance..."
-	./dev-tools/scripts/uv_manager.py benchmark
+	./dev-tools/setup/uv_manager.py benchmark
 
 # Utility targets
 generate-pyproject:  ## Update pyproject.toml metadata from .project.yml (preserves dependencies)
 	@echo "Updating pyproject.toml metadata from $(PROJECT_CONFIG)..."
-	@./dev-tools/scripts/generate_pyproject.py --config $(PROJECT_CONFIG)
+	@./dev-tools/package/generate_pyproject.py --config $(PROJECT_CONFIG)
 
 show-package-info:  ## Show package information
 	@echo "Package Name: $(PACKAGE_NAME)"

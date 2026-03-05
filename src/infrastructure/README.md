@@ -7,7 +7,7 @@ The Infrastructure Layer provides concrete implementations of domain ports and h
 ```
 infrastructure/
 ├── di/                # Dependency Injection container and registrations
-├── persistence/       # Data persistence implementations
+├── storage/           # Data storage implementations
 ├── providers/         # Cloud provider integrations
 ├── scheduler/         # Job scheduling and workflow management
 ├── template/          # Template infrastructure components
@@ -273,8 +273,8 @@ class ProviderFactory:
         self.container = container
         self._strategies: Dict[str, Type[ProviderStrategyPort]] = {
             'aws': AWSProviderStrategy,
-            'azure': AzureProviderStrategy,
-            'gcp': GCPProviderStrategy
+            'provider1': Provider1Strategy,
+            'provider2': Provider2Strategy
         }
 
     def create_provider(self, provider_type: str) -> ProviderStrategyPort:
@@ -381,7 +381,7 @@ class TemplateDTO(BaseModel):
     description: Optional[str] = Field(default=None, description="Template description")
 
     # Provider configuration
-    provider_api: str = Field(description="Provider API type (aws, azure, etc.)")
+    provider_api: str = Field(description="Provider API type (aws, provider1, etc.)")
     provider_type: Optional[str] = Field(default=None, description="Provider type")
     provider_name: Optional[str] = Field(default=None, description="Provider instance name")
 

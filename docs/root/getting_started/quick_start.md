@@ -1,310 +1,154 @@
 # Quick Start Guide
 
-Get up and running with the Open Resource Broker in minutes. This guide covers the essential steps to start provisioning cloud resources through IBM Spectrum Symphony Host Factory.
+Get up and running with the Open Resource Broker in minutes.
 
 ## Prerequisites
 
-Before starting, ensure you have:
-
-- Python 3.10 or higher installed
-- AWS CLI configured or IAM role with appropriate permissions
-- Basic familiarity with command-line tools
+- Python 3.10 or higher
+- AWS credentials configured (`~/.aws/credentials` or an IAM instance profile)
+- IAM permissions for EC2, EC2Fleet, SpotFleet, and Auto Scaling — see the [README](https://github.com/awslabs/open-resource-broker#required-iam-permissions) for the full policy
 
 ## Installation
 
-### Option 1: Docker (Recommended)
+### Standard install
 
 ```bash
-# Pull and run the plugin
-docker run -it --rm \
-  -v ~/.aws:/root/.aws:ro \
-  -v $(pwd)/config:/app/config \
-  your-registry/open-resource-broker:latest \
-  getAvailableTemplates
+pip install orb-py
 ```
 
-### Option 2: Local Installation
+### Development install
 
 ```bash
-# Clone and install
-git clone <repository-url>
-cd open-resource-broker
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
-## Basic Configuration
+## Step 1: Initialize
 
-Create a minimal configuration file at `config/config.json`:
+Run `orb init` to create the configuration directory and set up your first provider.
 
-```json
-{
-  "version": "2.0.0",
-  "provider": {
-    "active_provider": "aws-default",
-    "selection_policy": "FIRST_AVAILABLE",
-    "providers": [
-      {
-        "name": "aws-default",
-        "type": "aws",
-        "enabled": true,
-        "priority": 1,
-        "config": {
-          "region": "us-east-1",
-          "profile": "default"
-        }
-      }
-    ]
-  },
-  "storage": {
-    "strategy": "json",
-    "json_strategy": {
-      "storage_type": "single_file",
-      "base_path": "data",
-      "filenames": {
-        "single_file": "request_database.json"
-      }
-    }
-  },
-  "logging": {
-    "level": "INFO",
-    "file_path": "logs/app.log",
-    "console_enabled": true
-  }
-}
-```
-
-## First Commands
-
-### 1. List Available Templates
+By default, `orb init` runs interactively and discovers your AWS VPCs, subnets, and security groups:
 
 ```bash
-# Using Python directly
-python src/run.py templates list
-
-# Using shell script (HostFactory integration)
-./scripts/getAvailableTemplates.sh
+orb init
 ```
 
-Expected output:
-```json
-{
-  "templates": [
-    {
-      "templateId": "basic-template",
-      "maxNumber": 10,
-      "attributes": {
-        "type": ["String", "X86_64"],
-        "ncpus": ["Numeric", "2"],
-        "nram": ["Numeric", "4096"]
-      }
-    }
-  ]
-}
-```
-
-### 2. Request Machines
+For CI/CD pipelines or scripted environments, skip AWS discovery with `--non-interactive`:
 
 ```bash
-# Request 2 machines using basic template
-python src/run.py machines create basic-template 2
-
-# Using shell script
-echo '{"templateId": "basic-template", "maxNumber": 2}' | \
-  ./scripts/requestMachines.sh -f -
+orb init --non-interactive
 ```
 
-Expected output:
-```json
-{
-  "requestId": "req-12345",
-  "machines": [
-    {
-      "machineId": "i-0123456789abcdef0",
-      "status": "pending"
-    },
-    {
-      "machineId": "i-0987654321fedcba0",
-      "status": "pending"
-    }
-  ]
-}
-```
-
-### 3. Check Request Status
+You can also pass infrastructure details directly in non-interactive mode:
 
 ```bash
-# Check status of your request
-python run.py getRequestStatus --request-id req-12345
-
-# Using shell script
-echo '{"requestId": "req-12345"}' | \
-  ./scripts/getRequestStatus.sh
+orb init --non-interactive \
+  --region us-east-1 \
+  --profile my-aws-profile \
+  --subnet-ids subnet-0abc1234,subnet-0def5678 \
+  --security-group-ids sg-0abc1234 \
+  --fleet-role arn:aws:iam::123456789012:role/MySpotFleetRole
 ```
 
-### 4. Return Machines
+## Step 2: Generate templates
+
+Generate example templates for your configured provider:
 
 ```bash
-# Return machines when done
-python run.py requestReturnMachines --request-id req-12345
-
-# Using shell script
-echo '{"requestId": "req-12345"}' | \
-  ./scripts/requestReturnMachines.sh
+orb templates generate
 ```
 
-## Common Use Cases
+This writes template files to your ORB work directory. Templates are scoped to a provider type (e.g., AWS EC2Fleet, SpotFleet) and reusable across provider instances.
 
-### Scenario 1: Development Environment
+## Step 3: List templates
+
+Verify the templates loaded correctly:
 
 ```bash
-# Quick development setup
-python run.py requestMachines \
-  --template-id dev-template \
-  --max-number 1 \
-  --attributes '{"environment": "development"}'
+orb templates list
 ```
 
-### Scenario 2: Batch Processing
+For a more readable view:
 
 ```bash
-# Request multiple machines for batch job
-python run.py requestMachines \
-  --template-id batch-template \
-  --max-number 10 \
-  --attributes '{"job_type": "batch", "priority": "high"}'
+orb templates list --format table
 ```
 
-### Scenario 3: Auto Scaling
+## Step 4: Request machines
+
+Copy a template ID from the output of `orb templates list`, then request machines:
 
 ```bash
-# Use auto scaling template
-python run.py requestMachines \
-  --template-id autoscale-template \
-  --max-number 5 \
-  --attributes '{"min_size": 2, "max_size": 10}'
+orb machines request <template-id> 3
 ```
 
-## Verification
-
-### Health Check
+Or using flags:
 
 ```bash
-# Verify plugin health
-python run.py --health-check
-
-# Check provider connectivity
-python run.py --validate-provider
+orb machines request --template-id <template-id> --count 3
 ```
 
-### Configuration Validation
+The command returns a request ID. Use `--wait` to block until machines are ready:
 
 ```bash
-# Validate configuration
-python run.py --validate-config
-
-# Test AWS connectivity
-aws sts get-caller-identity
+orb machines request aws-ec2fleet-basic 3 --wait --timeout 600
 ```
 
-## Integration with HostFactory
-
-### Shell Script Integration
-
-The plugin provides shell scripts that integrate with IBM Spectrum Symphony Host Factory:
+## Step 5: Check request status
 
 ```bash
-# HostFactory calls these scripts
-./scripts/getAvailableTemplates.sh
-./scripts/requestMachines.sh -f /tmp/input_file
-./scripts/requestReturnMachines.sh -f /tmp/input_file
-./scripts/getRequestStatus.sh -f /tmp/input_file
+orb requests status req-abc123
 ```
 
-### HostFactory Configuration
+Request status values: `pending`, `in_progress`, `completed`, `failed`, `cancelled`, `partial`, `timeout`.
 
-Add to your HostFactory configuration:
+## Step 6: View infrastructure
 
-```xml
-<HostProvider name="aws-provider">
-  <Script>
-    <GetAvailableTemplates>/path/to/getAvailableTemplates.sh</GetAvailableTemplates>
-    <RequestMachines>/path/to/requestMachines.sh</RequestMachines>
-    <RequestReturnMachines>/path/to/requestReturnMachines.sh</RequestReturnMachines>
-    <GetRequestStatus>/path/to/getRequestStatus.sh</GetRequestStatus>
-  </Script>
-</HostProvider>
+Show what infrastructure ORB is configured to use:
+
+```bash
+orb infrastructure show
+```
+
+To scan your AWS account for available VPCs, subnets, and security groups:
+
+```bash
+orb infrastructure discover
+```
+
+## Step 7: View configuration
+
+```bash
+orb config show
+```
+
+## Returning machines
+
+When you're done with machines, return them:
+
+```bash
+orb machines return i-0abc1234def567890 i-0def5678abc123456
 ```
 
 ## Troubleshooting
 
-### Common Issues
-
-#### AWS Permissions
+**AWS permissions error** — verify your credentials are active:
 ```bash
-# Check AWS permissions
-aws ec2 describe-instances --max-items 1
+aws sts get-caller-identity
 ```
 
-#### Configuration Issues
+**No templates loaded** — re-run generate and check your provider config:
 ```bash
-# Validate YAML syntax
-python -c "import yaml; yaml.safe_load(open('config/config.yml'))"
+orb templates generate
+orb config show
 ```
 
-#### Python Dependencies
+**System health check:**
 ```bash
-# Reinstall dependencies
-pip install --force-reinstall -r requirements.txt
+orb system health --detailed
 ```
 
-### Getting Help
+## Next steps
 
-- **Configuration Issues**: See [Configuration Guide](../user_guide/configuration.md)
-- **Installation Problems**: See [Installation Guide](../user_guide/installation.md)
-- **API Usage**: See [API Reference](../user_guide/api_reference.md)
-- **Troubleshooting**: See [Troubleshooting Guide](../user_guide/troubleshooting.md)
-
-## Next Steps
-
-Now that you have the plugin running:
-
-1. **Explore Templates**: Learn about [Template Management](../user_guide/templates.md)
-2. **Advanced Configuration**: Review the [Configuration Guide](../user_guide/configuration.md)
-3. **Production Deployment**: Follow the [Deployment Guide](../deployment/readme.md)
-4. **Monitoring Setup**: Configure [Monitoring](../user_guide/monitoring.md)
-5. **Development**: Read the [Developer Guide](../developer_guide/architecture.md)
-
-## Example Workflows
-
-### Complete Machine Lifecycle
-
-```bash
-# 1. List available templates
-python run.py getAvailableTemplates
-
-# 2. Request machines
-REQUEST_ID=$(python run.py requestMachines \
-  --template-id basic-template \
-  --max-number 2 \
-  --format json | jq -r '.requestId')
-
-# 3. Monitor status
-while true; do
-  STATUS=$(python run.py getRequestStatus \
-    --request-id $REQUEST_ID \
-    --format json | jq -r '.status')
-  echo "Status: $STATUS"
-  [[ "$STATUS" == "completed" ]] && break
-  sleep 30
-done
-
-# 4. Use machines for your workload
-echo "Machines ready for use!"
-
-# 5. Return machines when done
-python run.py requestReturnMachines --request-id $REQUEST_ID
-```
-
-This quick start guide gets you up and running quickly. For detailed information on any topic, refer to the comprehensive guides in the documentation.
+- [CLI Reference](../cli/cli-reference.md) — full command and flag reference
+- [Configuration Guide](../user_guide/configuration.md) — advanced provider and storage config
+- [Template Management](../user_guide/templates.md) — creating and customizing templates

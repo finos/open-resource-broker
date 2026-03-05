@@ -10,18 +10,10 @@ import asyncio
 import time
 from typing import Any, Optional
 
-# Import types - using string imports to avoid circular dependencies
-try:
-    from application.events.base.event_handler import EventHandler
-    from application.events.decorators import EventHandlerRegistry
-    from domain.base.events import DomainEvent
-    from domain.base.ports import LoggingPort
-except ImportError:
-    # Fallback for testing or when dependencies aren't available
-    DomainEvent = Any
-    LoggingPort = Any
-    EventHandler = Any
-    EventHandlerRegistry = Any
+from application.events.base.event_handler import EventHandler
+from application.events.decorators import EventHandlerRegistry
+from domain.base.events import DomainEvent
+from domain.base.ports import LoggingPort
 
 
 class EventBus:
@@ -107,12 +99,12 @@ class EventBus:
         Args:
             logger: Logger to inject into handlers
         """
-        if not EventHandlerRegistry:
-            if self.logger:
-                self.logger.warning("EventHandlerRegistry not available for auto-registration")
-            return
-
         registered_handlers = EventHandlerRegistry.get_handlers()
+
+        if not registered_handlers:
+            if self.logger:
+                self.logger.warning("No event handlers registered for auto-registration")
+            return
 
         for event_type, handler_class in registered_handlers.items():
             self.register_handler_class(event_type, handler_class, logger or self.logger)
@@ -199,17 +191,14 @@ class EventBus:
         Handle event with error isolation.
 
         This ensures that if one handler fails, it doesn't affect other handlers.
+        Exceptions propagate naturally to asyncio.gather(return_exceptions=True)
+        which captures them without cancelling sibling tasks.
 
         Args:
             handler: The event handler
             event: The domain event
         """
-        try:
-            await handler.handle(event)
-        except Exception:
-            # Error is logged by the handler itself, we just need to isolate it
-            # The exception will be caught by asyncio.gather() above
-            raise
+        await handler.handle(event)
 
     def get_handlers_for_event(self, event_type: str) -> list[EventHandler]:
         """

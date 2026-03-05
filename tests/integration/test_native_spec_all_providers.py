@@ -34,31 +34,63 @@ class TestNativeSpecAllProviders:
         mock_logger = Mock(spec=LoggingPort)
         mock_spec_renderer = Mock(spec=SpecRenderingPort)
 
-        # Default renderer behavior: render string placeholders using provided context
+        # Default renderer behavior: render string placeholders using provided context (recursive)
+        def _render_value(v, ctx):
+            """Recursively render a value using Jinja2."""
+            if isinstance(v, str):
+                try:
+                    import base64
+
+                    from jinja2 import Environment, TemplateSyntaxError
+                    from jinja2.exceptions import TemplateError
+
+                    env = Environment()
+                    # Add b64encode filter so templates using it don't fail
+                    env.filters["b64encode"] = lambda s: base64.b64encode(
+                        s.encode() if isinstance(s, str) else s
+                    ).decode()
+
+                    # Distinguish syntax errors (raise) from runtime errors (fallback)
+                    try:
+                        tmpl = env.from_string(v)
+                    except TemplateSyntaxError:
+                        from domain.template.exceptions import InvalidTemplateConfigurationError
+
+                        raise InvalidTemplateConfigurationError(f"Invalid template syntax: {v}")
+                    try:
+                        return tmpl.render(**ctx)
+                    except TemplateError:
+                        # Unknown filter or runtime error — return empty string gracefully
+                        return ""
+                except ImportError:
+                    result = v
+                    for key, val in ctx.items():
+                        result = result.replace("{{ " + key + " }}", str(val))
+                    return result
+            elif isinstance(v, dict):
+                return {k2: _render_value(v2, ctx) for k2, v2 in v.items()}
+            elif isinstance(v, list):
+                return [_render_value(item, ctx) for item in v]
+            else:
+                return v
+
         def _render(spec, ctx):
             if isinstance(spec, dict):
-                # shallow render for simple test fixtures
-                rendered = {}
-                for k, v in spec.items():
-                    if isinstance(v, str):
-                        rendered[k] = (
-                            v.replace("{{ requested_count }}", str(ctx.get("requested_count", "")))
-                            .replace("{{ request_id }}", str(ctx.get("request_id", "")))
-                            .replace("{{ template_id }}", str(ctx.get("template_id", "")))
-                            .replace("{{ image_id }}", str(ctx.get("image_id", "")))
-                            .replace("{{ instance_type }}", str(ctx.get("instance_type", "")))
-                            .replace("{{ package_name }}", str(ctx.get("package_name", "")))
-                            .replace("{{ package_version }}", str(ctx.get("package_version", "")))
-                        )
-                    else:
-                        rendered[k] = v
-                return rendered
+                return {k: _render_value(v, ctx) for k, v in spec.items()}
             return spec
 
+        def _render_from_file(path, ctx):
+            # Load the file content via read_json_file then render
+            try:
+                from infrastructure.utilities.file.json_utils import read_json_file
+
+                content = read_json_file(path)
+                return _render(content, ctx)
+            except Exception:
+                return _render({}, ctx)
+
         mock_spec_renderer.render_spec.side_effect = _render
-        mock_spec_renderer.render_spec_from_file = Mock(
-            side_effect=lambda path, ctx: _render({}, ctx)
-        )
+        mock_spec_renderer.render_spec_from_file = Mock(side_effect=_render_from_file)
 
         # Create real service instances with mocked dependencies
         native_spec_service = NativeSpecService(
@@ -75,7 +107,7 @@ class TestNativeSpecAllProviders:
         template = AWSTemplate(
             template_id="ec2fleet-test",
             image_id="ami-12345",
-            instance_type="t3.micro",
+            machine_types={"t3.micro": 1},
             provider_api=ProviderApi.EC2_FLEET,
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
@@ -126,7 +158,7 @@ class TestNativeSpecAllProviders:
         template = AWSTemplate(
             template_id="spotfleet-test",
             image_id="ami-67890",
-            instance_type="t3.small",
+            machine_types={"t3.small": 1},
             provider_api=ProviderApi.SPOT_FLEET,
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
@@ -188,7 +220,7 @@ class TestNativeSpecAllProviders:
         template = AWSTemplate(
             template_id="asg-test",
             image_id="ami-asg123",
-            instance_type="m5.large",
+            machine_types={"m5.large": 1},
             provider_api=ProviderApi.ASG,
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
@@ -239,7 +271,7 @@ class TestNativeSpecAllProviders:
         template = AWSTemplate(
             template_id="lt-test",
             image_id="ami-lt456",
-            instance_type="t3.medium",
+            machine_types={"t3.medium": 1},
             provider_api=ProviderApi.RUN_INSTANCES,
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
@@ -299,7 +331,7 @@ class TestNativeSpecAllProviders:
         template = AWSTemplate(
             template_id="mixed-test",
             image_id="ami-mixed789",
-            instance_type="c5.xlarge",
+            machine_types={"c5.xlarge": 1},
             provider_api=ProviderApi.EC2_FLEET,
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
@@ -378,7 +410,7 @@ class TestNativeSpecAllProviders:
         template = AWSTemplate(
             template_id="file-test",
             image_id="ami-file123",
-            instance_type="t3.large",
+            machine_types={"t3.large": 1},
             provider_api=ProviderApi.EC2_FLEET,
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
@@ -411,7 +443,7 @@ class TestNativeSpecAllProviders:
         template = AWSTemplate(
             template_id="disabled-test",
             image_id="ami-disabled",
-            instance_type="t3.micro",
+            machine_types={"t3.micro": 1},
             provider_api=ProviderApi.EC2_FLEET,
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
@@ -423,6 +455,8 @@ class TestNativeSpecAllProviders:
 
         request = Request(
             request_id=RequestId.generate(RequestType.ACQUIRE),
+            request_type=RequestType.ACQUIRE,
+            provider_type="aws",
             requested_count=1,
             template_id="disabled-test",
         )
@@ -444,7 +478,7 @@ class TestNativeSpecAllProviders:
         template = AWSTemplate(
             template_id="complex-test",
             image_id="ami-complex",
-            instance_type="t3.micro",
+            machine_types={"t3.micro": 1},
             provider_api=ProviderApi.EC2_FLEET,
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
@@ -506,7 +540,7 @@ class TestNativeSpecAllProviders:
         template_invalid = AWSTemplate(
             template_id="invalid-test",
             image_id="ami-invalid",
-            instance_type="t3.micro",
+            machine_types={"t3.micro": 1},
             provider_api=ProviderApi.EC2_FLEET,
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],
@@ -533,7 +567,7 @@ class TestNativeSpecAllProviders:
         template = AWSTemplate(
             template_id="context-test",
             image_id="ami-context",
-            instance_type="t3.micro",
+            machine_types={"t3.micro": 1},
             provider_api=ProviderApi.EC2_FLEET,
             subnet_ids=["subnet-123"],
             security_group_ids=["sg-123"],

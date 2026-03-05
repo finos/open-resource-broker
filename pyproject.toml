@@ -46,12 +46,14 @@ dependencies = [
     "boto3>=1.42.21",
     "botocore>=1.42.21",
     "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
     "sqlalchemy>=2.0.0",
-    "urllib3>=2.6.0",  # Security: Fix CVE-2025-66471 and CVE-2025-66418
+    "urllib3>=2.6.3", # Security: Fix CVE-2025-66471, CVE-2025-66418, CVE-2026-21441
     "PyJWT>=2.8.0",
-    "cryptography>=41.0.0",
+    "cryptography>=46.0.5", # Security: Fix CVE-2026-26007
+    "filelock>=3.20.1", # Security: Fix CVE-2025-68146 race condition
     "requests>=2.31.0",
-    "PyYAML>=6.0.0",  # Exported API (lazy-loaded)
+    "PyYAML>=6.0.0", # Exported API (lazy-loaded)
     "jsonschema>=4.17.0",
 ]
 
@@ -64,7 +66,8 @@ cli = [
 
 # API server (for REST API mode)
 api = [
-    "fastapi>=0.104.0",
+    "fastapi>=0.128.0",
+    "starlette>=0.49.1", # Security: Fix CVE-2025-62727, CVE-2025-54121, CVE-2024-47874
     "uvicorn>=0.24.0",
     "jinja2>=3.1.0",
 ]
@@ -91,6 +94,7 @@ ci = [
     # Code Quality Tools (ruff replaces black/isort/flake8/pylint)
     "ruff>=0.1.0",
     "pathspec>=0.11.0",  # For gitignore pattern matching in dev-tools
+    "pyright>=1.1.408,<2.0.0",
     "mypy>=1.6.1,<2.0.0",
     "bandit>=1.7.5,<2.0.0",
     "bandit-sarif-formatter>=1.1.1,<2.0.0",
@@ -107,13 +111,20 @@ ci = [
     "pytest-benchmark>=5.1.0,<6.0.0",
     "coverage>=7.3.2,<8.0.0",
 
+    # Test dependencies for API and template tests
+    "fastapi>=0.128.0",
+    "httpx>=0.27.0",  # Required by FastAPI TestClient
+    "jinja2>=3.1.0",
+
     # AWS Testing
     "moto[all]>=5.1.19,<6.0.0",
     "responses>=0.24.0,<1.0.0",
     "requests-mock>=1.11.0,<2.0.0",
     # Security overrides for vulnerable dependencies
     "joserfc>=1.6.1",
-    "werkzeug>=3.1.4",
+    "werkzeug>=3.1.6",
+    # Security override for safety's vulnerable nltk dependency (GHSA-7p94-766c-hgjp)
+    "nltk>=3.9.3",
 
     # Essential Type Stubs
     "types-PyYAML>=6.0.12.12,<7.0.0",
@@ -149,6 +160,7 @@ ci = [
 
 # Dev Dependencies: Additional dev tools (includes all CI deps)
 dev = [
+    "virtualenv>=20.26.6",  # Security: Fix CVE-2024-53899 command injection
     "pre-commit>=3.5.0,<5.0.0",
     "bump2version>=1.0.1,<2.0.0",
     "python-semantic-release>=10.0.0,<11.0.0",
@@ -187,7 +199,7 @@ include-package-data = true
 
 [tool.setuptools.data-files]
 "orb_config" = ["config/*.json"]
-"orb_scripts" = ["scripts/*.sh", "scripts/*.bat"]
+"orb_scripts" = ["src/infrastructure/scheduler/hostfactory/scripts/*.sh", "src/infrastructure/scheduler/hostfactory/scripts/*.bat"]
 
 
 
@@ -197,6 +209,15 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --cov=orb --cov-report=term-missing --cov-report=html"
+markers = [
+    "aws: marks tests that require real AWS credentials",
+    "manual_aws: marks tests that must be run manually against AWS",
+    "rest_api: marks REST API integration tests",
+    "sdk: marks SDK-based integration tests",
+    "provider_contract: part of the provider contract test suite",
+    "simulator_limitation: assertion weakened due to known simulator gap",
+    "requires_real_provider: skipped unless --run-real-provider flag passed",
+]
 env = [
     "AWS_DEFAULT_REGION=us-east-1",
     "AWS_ACCESS_KEY_ID=testing",
@@ -252,6 +273,7 @@ ignore = [
     "E402",   # Module imports not at top - acceptable in scripts/tests
     "E712",   # Equality comparisons to True - style preference
     "E721",   # Type comparisons - style preference
+    "B009",   # getattr with constant — used intentionally after hasattr guards for duck-typing
     "B007",   # Unused loop variables - cosmetic
     "B904",   # Missing exception chaining - important but large effort
     "B024",   # Abstract base class without abstract methods - design choice
@@ -261,6 +283,7 @@ ignore = [
     "I001",   # Import block formatting - handled by formatter
     "N818",   # Exception naming conventions
     "N802",   # Function naming conventions
+    "N804",   # First argument of class method should be cls — false positive with Pydantic @model_validator
     # Pyupgrade and modernization - non-critical style issues
     "UP006",  # Use built-in types for type annotations - style preference
     "UP024",  # Replace aliased errors - style preference
@@ -280,6 +303,16 @@ ignore = [
     "PLC0414", # Import alias does not rename - acceptable pattern
 ]
 
+[tool.ruff.lint.pep8-naming]
+# Treat Pydantic decorators as classmethod-like so N805 ("first arg should be self")
+# does not fire on @field_validator / @model_validator(mode="before"/"after") methods.
+classmethod-decorators = [
+    "classmethod",
+    "pydantic.field_validator",
+    "pydantic.model_validator",
+    "validator",          # pydantic v1 compat
+]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["PLC0415"]  # Allow conditional imports in tests for optional dependencies
 
@@ -290,8 +323,23 @@ skip-magic-trailing-comma = false
 line-ending = "auto"
 
 [tool.ruff.lint.isort]
-known-first-party = ["orb", "application", "domain", "infrastructure", "interface", "api", "monitoring"]
+known-first-party = ["orb", "application", "config", "domain", "infrastructure", "interface", "api", "monitoring"]
 combine-as-imports = true
+
+[tool.pyright]
+pythonVersion = "3.9"
+pythonPlatform = "Linux"
+include = ["src"]
+exclude = ["tests", ".venv", "build", "dist"]
+typeCheckingMode = "basic"
+reportMissingImports = true
+reportMissingTypeStubs = false
+reportUnusedImports = true
+reportUnusedVariable = true
+reportPrivateUsage = false
+useLibraryCodeForTypes = true
+venvPath = "."
+venv = ".venv"
 
 [tool.mypy]
 python_version = "3.14"
@@ -307,7 +355,7 @@ warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
 strict_equality = true
-explicit_package_bases = true
+mypy_path = "src"
 namespace_packages = true
 
 [tool.semantic_release]

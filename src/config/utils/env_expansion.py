@@ -32,4 +32,4 @@ def expand_env_vars(value: Union[str, dict, Any]) -> Union[str, dict, Any]:
 
 def expand_config_env_vars(config: dict[str, Any]) -> dict[str, Any]:
     """Expand environment variables in entire configuration."""
-    return expand_env_vars(config)
+    return expand_env_vars(config)  # type: ignore[return-value]

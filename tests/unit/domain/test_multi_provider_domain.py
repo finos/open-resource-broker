@@ -155,45 +155,45 @@ class TestTemplateMultiProviderFields:
                 max_instances=0,
             )
 
-        # Test image_id validation
-        with pytest.raises(ValueError, match="image_id is required"):
-            Template(
-                template_id="validation-test",
-                subnet_ids=["subnet-123"],
-                max_instances=1,
-            )
+        # image_id is now optional in Template base class — no validation error expected
+        template_no_image = Template(
+            template_id="validation-test",
+            subnet_ids=["subnet-123"],
+            max_instances=1,
+        )
+        assert template_no_image.image_id is None
 
-        # Test subnet_ids validation
-        with pytest.raises(ValueError, match="At least one subnet_id is required"):
-            Template(
-                template_id="validation-test",
-                image_id="ami-12345",
-                subnet_ids=[],
-                max_instances=1,
-            )
+        # Test subnet_ids — empty list is allowed in base Template (AWSTemplate enforces it)
+        template_no_subnets = Template(
+            template_id="validation-test",
+            image_id="ami-12345",
+            subnet_ids=[],
+            max_instances=1,
+        )
+        assert template_no_subnets.subnet_ids == []
 
 
 class TestRequestMultiProviderFields:
     """Test suite for Request aggregate multi-provider fields."""
 
     def test_request_creation_with_provider_instance(self):
-        """Test request creation with provider instance field."""
+        """Test request creation with provider_name field."""
         request = Request.create_new_request(
             request_type=RequestType.ACQUIRE,
             template_id="test-template",
             machine_count=3,
             provider_type="aws",
-            provider_instance="aws-us-east-1",
+            provider_name="aws-us-east-1",
         )
 
         assert request.provider_type == "aws"
-        assert request.provider_instance == "aws-us-east-1"
+        assert request.provider_name == "aws-us-east-1"
         assert request.template_id == "test-template"
         assert request.requested_count == 3
         assert isinstance(request.request_id, RequestId)
 
     def test_request_creation_without_provider_instance(self):
-        """Test request creation without provider instance (backward compatibility)."""
+        """Test request creation without provider_name (backward compatibility)."""
         request = Request.create_new_request(
             request_type=RequestType.ACQUIRE,
             template_id="legacy-template",
@@ -202,7 +202,7 @@ class TestRequestMultiProviderFields:
         )
 
         assert request.provider_type == "aws"
-        assert request.provider_instance is None
+        assert request.provider_name is None
         assert request.template_id == "legacy-template"
         assert request.requested_count == 2
 
@@ -219,11 +219,11 @@ class TestRequestMultiProviderFields:
             template_id="metadata-test",
             machine_count=1,
             provider_type="aws",
-            provider_instance="aws-us-west-2",
+            provider_name="aws-us-west-2",
             metadata=metadata,
         )
 
-        assert request.provider_instance == "aws-us-west-2"
+        assert request.provider_name == "aws-us-west-2"
         assert request.metadata["provider_selection_reason"] == "Load balanced selection"
         assert request.metadata["provider_confidence"] == 0.9
         assert request.metadata["custom_field"] == "custom_value"
@@ -235,14 +235,14 @@ class TestRequestMultiProviderFields:
             template_id="serialization-test",
             machine_count=2,
             provider_type="aws",
-            provider_instance="aws-eu-west-1",
+            provider_name="aws-eu-west-1",
         )
 
         # Test that the request can be serialized (basic check)
         assert hasattr(request, "provider_type")
-        assert hasattr(request, "provider_instance")
+        assert hasattr(request, "provider_name")
         assert request.provider_type == "aws"
-        assert request.provider_instance == "aws-eu-west-1"
+        assert request.provider_name == "aws-eu-west-1"
 
 
 class TestTemplateAdditionalMultiProviderFields:
@@ -336,5 +336,5 @@ class TestMultiProviderBackwardCompatibility:
         assert request.template_id == "backward-compat-request"
         assert request.requested_count == 1
         assert request.provider_type == "aws"
-        # New field should be None
-        assert request.provider_instance is None
+        # provider_name replaces provider_instance — should be None
+        assert request.provider_name is None

@@ -25,9 +25,9 @@ class TokenResult:
     expires_in: Optional[int] = None  # Seconds until expiration
     expires_at: Optional[int] = None  # Unix timestamp
     refresh_token: Optional[str] = None
-    scope: list[str] = None
+    scope: list[str] = None  # type: ignore[assignment]
     error_message: Optional[str] = None
-    metadata: dict[str, Any] = None
+    metadata: dict[str, Any] = None  # type: ignore[assignment]
 
     def __post_init__(self) -> None:
         if self.scope is None:
@@ -43,11 +43,11 @@ class TokenValidationResult:
     valid: bool
     user_id: Optional[str] = None
     client_id: Optional[str] = None
-    scope: list[str] = None
+    scope: list[str] = None  # type: ignore[assignment]
     expires_at: Optional[int] = None
     issued_at: Optional[int] = None
     error_message: Optional[str] = None
-    metadata: dict[str, Any] = None
+    metadata: dict[str, Any] = None  # type: ignore[assignment]
 
     def __post_init__(self) -> None:
         if self.scope is None:

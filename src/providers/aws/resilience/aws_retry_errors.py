@@ -55,10 +55,10 @@ def is_retryable_aws_error(exception: Exception, service: str = "ec2") -> bool:
         True if exception is retryable, False otherwise
     """
     # Check if it's a boto3 ClientError with response
-    if not hasattr(exception, "response") or not isinstance(exception.response, dict):
+    if not hasattr(exception, "response") or not isinstance(exception.response, dict):  # type: ignore[union-attr]
         return False
 
-    error_code = exception.response.get("Error", {}).get("Code", "")
+    error_code = exception.response.get("Error", {}).get("Code", "")  # type: ignore[union-attr]
 
     # Check service-specific retryable errors
     service_errors = AWS_RETRYABLE_ERRORS.get(service, [])
@@ -82,8 +82,8 @@ def get_aws_error_info(exception: Exception) -> dict[str, str]:
     Returns:
         Dictionary with error code and message
     """
-    if hasattr(exception, "response") and isinstance(exception.response, dict):
-        error_info = exception.response.get("Error", {})
+    if hasattr(exception, "response") and isinstance(exception.response, dict):  # type: ignore[union-attr]
+        error_info = exception.response.get("Error", {})  # type: ignore[union-attr]
         return {
             "code": error_info.get("Code", "Unknown"),
             "message": error_info.get("Message", str(exception)),

@@ -152,13 +152,10 @@ class StorageConfig(BaseModel):
     """Storage configuration."""
 
     strategy: str = Field("json", description="Storage strategy (json, sql, dynamodb)")
-    default_storage_path: str = Field(
-        "data", description="Default path for local storage strategies"
-    )
-    json_strategy: JsonStrategyConfig = Field(default_factory=lambda: JsonStrategyConfig())
-    sql_strategy: SqlStrategyConfig = Field(default_factory=lambda: SqlStrategyConfig())
+    json_strategy: JsonStrategyConfig = Field(default_factory=lambda: JsonStrategyConfig())  # type: ignore[call-arg]
+    sql_strategy: SqlStrategyConfig = Field(default_factory=lambda: SqlStrategyConfig())  # type: ignore[call-arg]
     dynamodb_strategy: DynamodbStrategyConfig = Field(
-        default_factory=lambda: DynamodbStrategyConfig()
+        default_factory=lambda: DynamodbStrategyConfig()  # type: ignore[call-arg]
     )
 
     @field_validator("strategy")

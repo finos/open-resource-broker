@@ -6,7 +6,6 @@ It follows the Port-Adapter pattern from Hexagonal Architecture (Ports and Adapt
 """
 
 from abc import ABC, abstractmethod
-from typing import Any
 
 from domain.request.aggregate import Request
 from domain.template.template_aggregate import Template
@@ -39,46 +38,18 @@ class ResourceProvisioningPort(ABC):
         """
 
     @abstractmethod
-    def check_resources_status(self, request: Request) -> list[dict[str, Any]]:
-        """
-        Check the status of provisioned resources.
-
-        Args:
-            request: The request containing resource identifier
-
-        Returns:
-            List of resource details
-
-        Raises:
-            EntityNotFoundError: If the resource is not found
-            InfrastructureError: For other infrastructure errors
-        """
-
-    @abstractmethod
     def release_resources(
-        self, machine_ids: list[str], template_id: str, provider_api: str, context: dict = None
+        self,
+        machine_ids: list[str],
+        template_id: str,
+        provider_api: str,
+        context: dict = None,  # type: ignore[assignment]
     ) -> None:
         """
         Release provisioned resources.
 
         Args:
             request: The request containing resource identifier
-
-        Raises:
-            EntityNotFoundError: If the resource is not found
-            InfrastructureError: For other infrastructure errors
-        """
-
-    @abstractmethod
-    def get_resource_health(self, resource_id: str) -> dict[str, Any]:
-        """
-        Get health information for a specific resource.
-
-        Args:
-            resource_id: Resource identifier
-
-        Returns:
-            Dictionary containing health information
 
         Raises:
             EntityNotFoundError: If the resource is not found

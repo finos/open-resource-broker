@@ -62,13 +62,13 @@ class TestProviderStrategyQueries:
         """Test GetProviderMetricsQuery creation."""
         query = GetProviderMetricsQuery(
             provider_name="aws-primary",
-            time_range_hours=48,
+            timeframe="48h",
             include_operation_breakdown=False,
             include_error_details=True,
         )
 
         assert query.provider_name == "aws-primary"
-        assert query.time_range_hours == 48
+        assert query.timeframe == "48h"
         assert query.include_operation_breakdown is False
         assert query.include_error_details is True
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from application.base.handlers import BaseQueryHandler
 from application.decorators import query_handler
 from application.dto.queries import (
@@ -16,9 +18,6 @@ from domain.base.ports import ErrorHandlingPort, LoggingPort
 
 # Exception handling infrastructure
 from domain.machine.value_objects import MachineStatus
-from infrastructure.adapters.ports.resource_provisioning_port import (
-    ResourceProvisioningPort,
-)
 
 
 @query_handler(GetActiveMachineCountQuery)
@@ -52,7 +51,7 @@ class GetActiveMachineCountHandler(BaseQueryHandler[GetActiveMachineCountQuery, 
                 active_statuses = [
                     MachineStatus.RUNNING,
                     MachineStatus.PENDING,
-                    MachineStatus.STARTING,
+                    MachineStatus.LAUNCHING,
                 ]
 
                 active_machines = uow.machines.find_by_statuses(active_statuses)
@@ -110,14 +109,12 @@ class GetRequestSummaryHandler(BaseQueryHandler[GetRequestSummaryQuery, RequestS
                 summary = RequestSummaryDTO(
                     request_id=str(request.request_id),
                     status=request.status.value,
-                    template_id=request.template_id,
-                    requested_count=request.machine_count,
                     total_machines=total_machines,
-                    running_machines=running_machines,
-                    failed_machines=failed_machines,
+                    machine_statuses={
+                        "running": running_machines,
+                        "failed": failed_machines,
+                    },
                     created_at=request.created_at,
-                    updated_at=request.updated_at,
-                    metadata=request.metadata or {},
                 )
 
                 self.logger.info(
@@ -142,7 +139,7 @@ class GetMachineHealthHandler(BaseQueryHandler[GetMachineHealthQuery, MachineHea
     def __init__(
         self,
         uow_factory: UnitOfWorkFactory,
-        provisioning_port: ResourceProvisioningPort,
+        provisioning_port: Any,
         logger: LoggingPort,
         error_handler: ErrorHandlingPort,
     ) -> None:
@@ -178,7 +175,9 @@ class GetMachineHealthHandler(BaseQueryHandler[GetMachineHealthQuery, MachineHea
                 try:
                     # Try to get health from provisioning service
                     if hasattr(self.provisioning_port, "get_machine_health"):
-                        health_info = self.provisioning_port.get_machine_health(machine.provider_id)
+                        health_info = self.provisioning_port.get_machine_health(
+                            machine.provider_name
+                        )
                         health_status = health_info.get("status", "unknown")
                         health_details = health_info.get("details", {})
                         last_health_check = health_info.get("timestamp")
@@ -196,7 +195,7 @@ class GetMachineHealthHandler(BaseQueryHandler[GetMachineHealthQuery, MachineHea
 
                         health_details = {
                             "machine_status": machine.status.value,
-                            "provider_id": machine.provider_id,
+                            "provider_id": machine.provider_name,
                         }
 
                 except Exception as health_error:
@@ -209,15 +208,15 @@ class GetMachineHealthHandler(BaseQueryHandler[GetMachineHealthQuery, MachineHea
                     health_details = {"error": str(health_error)}
 
                 # Create health DTO
+                from datetime import datetime
+
                 health_dto = MachineHealthDTO(
                     machine_id=str(machine.machine_id),
-                    provider_id=machine.provider_id,
-                    status=machine.status.value,
-                    health_status=health_status,
-                    health_details=health_details,
-                    last_health_check=last_health_check,
-                    created_at=machine.created_at,
-                    updated_at=machine.updated_at,
+                    overall_status=health_status,
+                    system_status=health_status,
+                    instance_status=health_status,
+                    metrics=[health_details] if health_details else [],
+                    last_check=last_health_check or datetime.utcnow(),
                 )
 
                 self.logger.info(

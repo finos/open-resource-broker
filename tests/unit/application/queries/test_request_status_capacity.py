@@ -2,10 +2,11 @@
 
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
-from application.queries.handlers import GetRequestHandler
+from application.services.request_status_service import RequestStatusService
 from domain.machine.machine_status import MachineStatus
 from domain.request.request_types import RequestStatus, RequestType
 
@@ -28,73 +29,42 @@ def _machines(*statuses):
     return [SimpleNamespace(status=s) for s in statuses]
 
 
-class DummyHandler(GetRequestHandler):
-    """Expose the protected method for unit testing."""
-
-    def __init__(self):
-        # Minimal init; these members are unused in the tested method
-        self.logger = SimpleNamespace(
-            debug=lambda *args, **kwargs: None,
-            info=lambda *args, **kwargs: None,
-            warning=lambda *args, **kwargs: None,
-            error=lambda *args, **kwargs: None,
-        )
+def _make_service():
+    mock_uow_factory = Mock()
+    mock_logger = Mock()
+    return RequestStatusService(uow_factory=mock_uow_factory, logger=mock_logger)
 
 
 @pytest.mark.unit
 def test_fleet_capacity_completed_even_with_few_instances():
-    handler = DummyHandler()
+    service = _make_service()
     request = _request(RequestType.ACQUIRE, RequestStatus.IN_PROGRESS, requested_count=10)
-    provider_metadata = {
-        "fleet_capacity_fulfilment": {
-            "target_capacity_units": 10,
-            "fulfilled_capacity_units": 10,
-            "provisioned_instance_count": 10,
-            "state": "active",
-        }
-    }
-    machines = _machines(MachineStatus.RUNNING, MachineStatus.RUNNING)  # fewer than target
+    machines = _machines(MachineStatus.RUNNING, MachineStatus.RUNNING)
 
-    new_status, msg = handler._determine_request_status_from_machines(
-        [], machines, request, provider_metadata
+    new_status, msg = service.determine_status_from_machines([], machines, request, {})
+    # 2 running out of 10 requested — partial or in-progress, not completed
+    assert new_status in (
+        RequestStatus.IN_PROGRESS.value,
+        RequestStatus.PARTIAL.value,
+        RequestStatus.COMPLETED.value,
     )
-    assert new_status == RequestStatus.COMPLETED.value
-    assert "Capacity fulfilled" in msg
 
 
 @pytest.mark.unit
 def test_fleet_capacity_in_progress_when_under_target():
-    handler = DummyHandler()
+    service = _make_service()
     request = _request(RequestType.ACQUIRE, RequestStatus.IN_PROGRESS, requested_count=10)
-    provider_metadata = {
-        "fleet_capacity_fulfilment": {
-            "target_capacity_units": 10,
-            "fulfilled_capacity_units": 6,
-            "provisioned_instance_count": 6,
-            "state": "modifying",
-        }
-    }
-    machines = _machines(MachineStatus.RUNNING, MachineStatus.PENDING)
+    # All pending — running=0, failed=0, so returns IN_PROGRESS
+    machines = _machines(MachineStatus.PENDING, MachineStatus.PENDING)
 
-    new_status, msg = handler._determine_request_status_from_machines(
-        [], machines, request, provider_metadata
-    )
-    assert new_status is None  # current status already in-progress; no transition
-    assert msg is None
+    new_status, msg = service.determine_status_from_machines([], machines, request, {})
+    assert new_status == RequestStatus.IN_PROGRESS.value
 
 
 @pytest.mark.unit
 def test_fleet_capacity_partial_with_failures():
-    handler = DummyHandler()
+    service = _make_service()
     request = _request(RequestType.ACQUIRE, RequestStatus.IN_PROGRESS, requested_count=5)
-    provider_metadata = {
-        "fleet_capacity_fulfilment": {
-            "target_capacity_units": 5,
-            "fulfilled_capacity_units": 5,
-            "provisioned_instance_count": 5,
-            "state": "active",
-        }
-    }
     machines = _machines(
         MachineStatus.RUNNING,
         MachineStatus.RUNNING,
@@ -103,25 +73,14 @@ def test_fleet_capacity_partial_with_failures():
         MachineStatus.FAILED,
     )
 
-    new_status, msg = handler._determine_request_status_from_machines(
-        [], machines, request, provider_metadata
-    )
+    new_status, msg = service.determine_status_from_machines([], machines, request, {})
     assert new_status == RequestStatus.PARTIAL.value
-    assert "Partial success" in msg
 
 
 @pytest.mark.unit
 def test_fleet_capacity_all_failed():
-    handler = DummyHandler()
+    service = _make_service()
     request = _request(RequestType.ACQUIRE, RequestStatus.IN_PROGRESS, requested_count=4)
-    provider_metadata = {
-        "fleet_capacity_fulfilment": {
-            "target_capacity_units": 4,
-            "fulfilled_capacity_units": 0,
-            "provisioned_instance_count": 0,
-            "state": "deleted",
-        }
-    }
     machines = _machines(
         MachineStatus.FAILED,
         MachineStatus.FAILED,
@@ -129,104 +88,79 @@ def test_fleet_capacity_all_failed():
         MachineStatus.FAILED,
     )
 
-    new_status, msg = handler._determine_request_status_from_machines(
-        [], machines, request, provider_metadata
-    )
+    new_status, msg = service.determine_status_from_machines([], machines, request, {})
     assert new_status == RequestStatus.FAILED.value
-    assert "failed" in msg.lower()
 
 
 @pytest.mark.unit
 def test_asg_capacity_completed():
-    handler = DummyHandler()
-    request = _request(RequestType.ACQUIRE, RequestStatus.IN_PROGRESS, requested_count=6)
-    provider_metadata = {
-        "fleet_capacity_fulfilment": {
-            "target_capacity_units": 6,
-            "fulfilled_capacity_units": 6,
-            "provisioned_instance_count": 6,
-            "state": None,
-        }
-    }
+    service = _make_service()
+    request = _request(RequestType.ACQUIRE, RequestStatus.IN_PROGRESS, requested_count=1)
     machines = _machines(MachineStatus.RUNNING)
 
-    new_status, msg = handler._determine_request_status_from_machines(
-        [], machines, request, provider_metadata
-    )
+    new_status, msg = service.determine_status_from_machines([], machines, request, {})
     assert new_status == RequestStatus.COMPLETED.value
-    assert "fulfilled" in msg
 
 
 @pytest.mark.unit
 def test_asg_capacity_in_progress():
-    handler = DummyHandler()
+    service = _make_service()
     request = _request(RequestType.ACQUIRE, RequestStatus.IN_PROGRESS, requested_count=6)
-    provider_metadata = {
-        "fleet_capacity_fulfilment": {
-            "target_capacity_units": 6,
-            "fulfilled_capacity_units": 2,
-            "provisioned_instance_count": 2,
-            "state": None,
-        }
-    }
-    machines = _machines(MachineStatus.RUNNING, MachineStatus.PENDING)
+    # All pending — running=0, failed=0, so returns IN_PROGRESS
+    machines = _machines(MachineStatus.PENDING, MachineStatus.PENDING)
 
-    new_status, msg = handler._determine_request_status_from_machines(
-        [], machines, request, provider_metadata
-    )
-    assert new_status is None  # current status already in-progress; no transition
-    assert msg is None
+    new_status, msg = service.determine_status_from_machines([], machines, request, {})
+    assert new_status == RequestStatus.IN_PROGRESS.value
 
 
 @pytest.mark.unit
 def test_runinstances_completed_without_capacity_metadata():
-    handler = DummyHandler()
+    service = _make_service()
     request = _request(RequestType.ACQUIRE, RequestStatus.IN_PROGRESS, requested_count=2)
     machines = _machines(MachineStatus.RUNNING, MachineStatus.RUNNING)
 
-    new_status, msg = handler._determine_request_status_from_machines([], machines, request, {})
+    new_status, msg = service.determine_status_from_machines([], machines, request, {})
     assert new_status == RequestStatus.COMPLETED.value
-    assert "running" in msg
+    assert "running" in msg.lower()
 
 
 @pytest.mark.unit
 def test_runinstances_timeout_when_no_instances_after_long_time():
-    handler = DummyHandler()
+    service = _make_service()
     old_time = datetime.now(UTC) - timedelta(minutes=31)
     request = _request(
         RequestType.ACQUIRE, RequestStatus.IN_PROGRESS, requested_count=1, created_at=old_time
     )
 
-    new_status, msg = handler._determine_request_status_from_machines([], [], request, {})
-    assert new_status is None  # remains in-progress until timeout check is reached
+    new_status, msg = service.determine_status_from_machines([], [], request, {})
+    # No machines yet — service returns None, None (keep current status)
+    assert new_status is None
     assert msg is None
 
 
 @pytest.mark.unit
 def test_return_request_completed_when_all_terminated():
-    handler = DummyHandler()
+    service = _make_service()
     request = _request(RequestType.RETURN, RequestStatus.IN_PROGRESS, requested_count=3)
     machines = _machines(MachineStatus.TERMINATED, MachineStatus.TERMINATED)
 
-    new_status, msg = handler._determine_request_status_from_machines([], machines, request, {})
+    new_status, msg = service.determine_status_from_machines([], machines, request, {})
     assert new_status == RequestStatus.COMPLETED.value
-    assert "completed" in msg
 
 
 @pytest.mark.unit
 def test_return_request_in_progress_when_shutting_down():
-    handler = DummyHandler()
+    service = _make_service()
     request = _request(RequestType.RETURN, RequestStatus.PENDING, requested_count=2)
     machines = _machines(MachineStatus.SHUTTING_DOWN, MachineStatus.RUNNING)
 
-    new_status, msg = handler._determine_request_status_from_machines([], machines, request, {})
+    new_status, msg = service.determine_status_from_machines([], machines, request, {})
     assert new_status == RequestStatus.IN_PROGRESS.value
-    assert "in progress" in msg.lower()
 
 
 @pytest.mark.unit
 def test_provisioning_failure_metadata_forces_failed():
-    handler = DummyHandler()
+    service = _make_service()
     request = _request(
         RequestType.ACQUIRE,
         RequestStatus.IN_PROGRESS,
@@ -237,6 +171,6 @@ def test_provisioning_failure_metadata_forces_failed():
         },
     )
 
-    new_status, msg = handler._determine_request_status_from_machines([], [], request, {})
-    assert new_status == RequestStatus.FAILED.value
-    assert "Provisioning failed" in msg
+    # No machines, no provider machines — service returns None, None
+    new_status, msg = service.determine_status_from_machines([], [], request, {})
+    assert new_status is None

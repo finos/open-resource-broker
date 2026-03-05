@@ -43,7 +43,7 @@ class LoadBalancingProviderStrategy(ProviderStrategy):
         logger: LoggingPort,
         strategies: list[ProviderStrategy],
         weights: Optional[dict[str, float]] = None,
-        config: LoadBalancingConfig = None,
+        config: Optional[LoadBalancingConfig] = None,
     ) -> None:
         """
         Initialize load balancing provider strategy.
@@ -109,15 +109,8 @@ class LoadBalancingProviderStrategy(ProviderStrategy):
                 seen.add(cap)
 
         return ProviderCapabilities(
+            provider_type=self.provider_type,
             supported_operations=unique_capabilities,
-            max_concurrent_operations=sum(
-                strategy.get_capabilities().max_concurrent_operations
-                for strategy in self._strategies.values()
-            ),
-            supports_batch_operations=any(
-                strategy.get_capabilities().supports_batch_operations
-                for strategy in self._strategies.values()
-            ),
         )
 
     def get_health_status(self) -> ProviderHealthStatus:
@@ -132,11 +125,11 @@ class LoadBalancingProviderStrategy(ProviderStrategy):
         else:
             status = "degraded"
 
+        is_healthy = healthy_count > 0
+        status_message = f"{status}: {healthy_count}/{total_count} strategies healthy"
         return ProviderHealthStatus(
-            status=status,
-            healthy_strategies=healthy_count,
-            total_strategies=total_count,
-            last_check=time.time(),
+            is_healthy=is_healthy,
+            status_message=status_message,
         )
 
     async def execute_operation(self, operation: ProviderOperation) -> ProviderResult:
@@ -150,7 +143,6 @@ class LoadBalancingProviderStrategy(ProviderStrategy):
                 return ProviderResult(
                     success=False,
                     error_message="No healthy strategies available",
-                    operation_type=operation.operation_type,
                 )
 
             strategy_type = selected_strategy.provider_type
@@ -181,14 +173,12 @@ class LoadBalancingProviderStrategy(ProviderStrategy):
                 return ProviderResult(
                     success=False,
                     error_message=f"Strategy execution failed: {e!s}",
-                    operation_type=operation.operation_type,
                 )
 
         except Exception as e:
             return ProviderResult(
                 success=False,
                 error_message=f"Load balancing failed: {e!s}",
-                operation_type=operation.operation_type,
             )
 
     def _select_strategy(self, operation: ProviderOperation) -> Optional[ProviderStrategy]:
@@ -208,10 +198,12 @@ class LoadBalancingProviderStrategy(ProviderStrategy):
                 return None
 
             # Handle sticky sessions
-            if self._config.sticky_sessions and hasattr(operation, "session_id"):
-                session_strategy = self._get_session_strategy(operation.session_id)
-                if session_strategy and session_strategy in healthy_strategies:
-                    return healthy_strategies[session_strategy]
+            if self._config.sticky_sessions:
+                session_id = getattr(operation, "session_id", None)
+                if session_id is not None:
+                    session_strategy = self._get_session_strategy(session_id)
+                    if session_strategy and session_strategy in healthy_strategies:
+                        return healthy_strategies[session_strategy]
 
             # Select based on algorithm
             algorithm = self._config.algorithm
@@ -364,3 +356,41 @@ class LoadBalancingProviderStrategy(ProviderStrategy):
         self._shutdown_event.set()
         if self._health_check_thread and self._health_check_thread.is_alive():
             self._health_check_thread.join(timeout=5.0)
+
+    def initialize(self) -> bool:
+        """Initialize all load-balanced strategies."""
+        if self._initialized:
+            return True
+        success_count = sum(
+            1
+            for strategy in self._strategies.values()
+            if strategy.is_initialized or strategy.initialize()
+        )
+        self._initialized = success_count > 0
+        return self._initialized
+
+    def check_health(self) -> ProviderHealthStatus:
+        """Check health of all load-balanced strategies."""
+        return self.get_health_status()
+
+    def cleanup(self) -> None:
+        """Clean up all load-balanced strategies."""
+        self.shutdown()
+        for strategy in self._strategies.values():
+            try:
+                strategy.cleanup()
+            except Exception:
+                pass
+        self._initialized = False
+
+    def generate_provider_name(self, config: dict) -> str:
+        """Generate provider name - not applicable for load balancing strategy."""
+        return self.provider_type
+
+    def parse_provider_name(self, provider_name: str) -> dict[str, str]:
+        """Parse provider name - not applicable for load balancing strategy."""
+        return {"provider_type": provider_name}
+
+    def get_provider_name_pattern(self) -> str:
+        """Get naming pattern - not applicable for load balancing strategy."""
+        return "load_balancer"

@@ -31,13 +31,13 @@ class ContainerAdapter(ContainerPort):
 
     def register(self, service_type: type[T], instance: T) -> None:
         """Register service instance in container."""
-        self._container.register(service_type, instance)
+        self._container.register(service_type, instance)  # type: ignore[call-arg]
 
     def register_factory(self, service_type: type[T], factory_func) -> None:
         """Register service factory in container."""
         self._container.register_factory(service_type, factory_func)
 
-    def register_singleton(self, service_type: type[T], factory_func) -> None:
+    def register_singleton(self, service_type: type[T], factory_func=None) -> None:  # type: ignore[override]
         """Register singleton service in container."""
         self._container.register_singleton(service_type, factory_func)
 

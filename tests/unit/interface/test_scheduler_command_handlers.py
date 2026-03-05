@@ -1,7 +1,7 @@
 """Unit tests for scheduler command handlers."""
 
 from argparse import Namespace
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -20,14 +20,13 @@ class TestSchedulerCommandHandlers:
         """Test list scheduler strategies handler."""
         args = Namespace(resource="scheduler", action="list")
 
-        with patch("src.interface.scheduler_command_handlers.get_container") as mock_get_container:
+        with patch("interface.scheduler_command_handlers.get_container") as mock_get_container:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 
-            # Mock the scheduler registry
-            mock_registry = Mock()
-            mock_registry.get_registered_types.return_value = ["simple", "advanced"]
-            mock_container.get.return_value = mock_registry
+            mock_query_bus = Mock()
+            mock_query_bus.execute = AsyncMock(return_value=["simple", "advanced"])
+            mock_container.get.return_value = mock_query_bus
 
             result = await handle_list_scheduler_strategies(args)
 
@@ -39,15 +38,13 @@ class TestSchedulerCommandHandlers:
         """Test show scheduler configuration handler."""
         args = Namespace(resource="scheduler", action="show")
 
-        with patch("src.interface.scheduler_command_handlers.get_container") as mock_get_container:
+        with patch("interface.scheduler_command_handlers.get_container") as mock_get_container:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 
-            # Mock configuration manager
-            mock_config_manager = Mock()
-            mock_config_manager.get_scheduler_strategy.return_value = "simple"
-            mock_config_manager.get_app_config.return_value = Mock()
-            mock_container.get.return_value = mock_config_manager
+            mock_query_bus = Mock()
+            mock_query_bus.execute = AsyncMock(return_value=Mock())
+            mock_container.get.return_value = mock_query_bus
 
             result = await handle_show_scheduler_config(args)
 
@@ -58,20 +55,18 @@ class TestSchedulerCommandHandlers:
         """Test validate scheduler configuration handler."""
         args = Namespace(resource="scheduler", action="validate")
 
-        with patch("src.interface.scheduler_command_handlers.get_container") as mock_get_container:
+        with patch("interface.scheduler_command_handlers.get_container") as mock_get_container:
             mock_container = Mock()
             mock_get_container.return_value = mock_container
 
-            # Mock configuration manager
-            mock_config_manager = Mock()
-            mock_config_manager.get_scheduler_strategy.return_value = "simple"
-            mock_config_manager.get_app_config.return_value = Mock()
-            mock_container.get.return_value = mock_config_manager
+            mock_query_bus = Mock()
+            mock_query_bus.execute = AsyncMock(return_value=Mock())
+            mock_container.get.return_value = mock_query_bus
 
             result = await handle_validate_scheduler_config(args)
 
             assert isinstance(result, dict)
-            assert "valid" in result
+            assert "validation" in result
 
 
 class TestSchedulerHandlerImports:

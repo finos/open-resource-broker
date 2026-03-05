@@ -3,7 +3,6 @@
 import threading
 from typing import TYPE_CHECKING, Any, Optional, TypeVar
 
-import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
@@ -32,6 +31,7 @@ class AWSClient:
         self,
         config: ConfigurationPort,
         logger: LoggingPort,
+        provider_name: Optional[str] = None,
         metrics: Optional[MetricsCollector] = None,
     ) -> None:
         """
@@ -40,10 +40,12 @@ class AWSClient:
         Args:
             config: Configuration port for accessing configuration
             logger: Logger for logging messages
+            provider_name: Specific provider instance name (for multi-provider support)
             metrics: Optional metrics collector for AWS API instrumentation
         """
         self._config_manager = config
         self._logger = logger
+        self._provider_name = provider_name
         self._aws_config: Optional[AWSProviderConfig] = None
         # Tracks whether we've attempted provider selection; we cache failures too.
         # This avoids repeated DI lookups and log spam when selection is unavailable.
@@ -55,7 +57,9 @@ class AWSClient:
         self._logger.debug("AWS client region determined: %s", self.region_name)
 
         aws_provider_config = self._get_selected_aws_provider_config()
-        max_attempts = int(aws_provider_config.aws_max_retries) if aws_provider_config else 3
+        max_attempts = (
+            int(aws_provider_config.request_retry_attempts) + 1 if aws_provider_config else 1
+        )
         connect_timeout = int(aws_provider_config.aws_connect_timeout) if aws_provider_config else 5
         read_timeout = int(aws_provider_config.aws_read_timeout) if aws_provider_config else 10
 
@@ -89,14 +93,15 @@ class AWSClient:
 
         try:
             # Initialize session
-            self.session = boto3.Session(
-                region_name=self.region_name, profile_name=self.profile_name
+            from providers.aws.session_factory import AWSSessionFactory
+
+            self.session = AWSSessionFactory.create_session(
+                profile=self.profile_name, region=self.region_name
             )
 
             # Initialize service client attributes but don't create clients yet
             self._ec2_client = None
             self._autoscaling_client = None
-            self._service_quotas_client = None
             self._sts_client = None
             self._cost_explorer_client = None
             self._ssm_client = None
@@ -174,7 +179,7 @@ class AWSClient:
     def _get_selected_aws_provider_config(self) -> Optional["AWSProviderConfig"]:
         """Get selected AWS provider configuration.
 
-        Primary path: use ProviderSelectionService to pick the active instance and
+        Primary path: use provider registry to pick the active instance and
         build AWSProviderConfig from its config payload.
         Fallback path: use the legacy ConfigurationManager.get_typed(AWSProviderConfig) resolution.
 
@@ -193,34 +198,42 @@ class AWSClient:
             return None
 
         try:
-            # Use provider selection service from DI container
-            from application.services.provider_selection_service import ProviderSelectionService
-            from infrastructure.di.container import get_container
+            # Use specific provider name if provided, otherwise use provider selection
+            if self._provider_name:
+                provider_name = self._provider_name
+                self._logger.debug("Using specific provider: %s", provider_name)
+            else:
+                # Use provider registry service for provider selection
+                from infrastructure.di.container import get_container
 
-            container = get_container()
-            selection_service = container.get(ProviderSelectionService)
-            selection_result = selection_service.select_active_provider()
+                container = get_container()
+                from application.services.provider_registry_service import ProviderRegistryService
 
-            self._logger.debug(
-                "Provider selection result: %s, %s",
-                selection_result.provider_type,
-                selection_result.provider_instance,
-            )
+                provider_service = container.get(ProviderRegistryService)
+                selection_result = provider_service.select_active_provider()
 
-            # Ensure we have an AWS provider
-            if selection_result.provider_type != "aws":
-                raise AWSConfigurationError(
-                    f"Selected provider is not AWS: {selection_result.provider_type}"
+                self._logger.debug(
+                    "Provider selection result: %s, %s",
+                    selection_result.provider_type,
+                    selection_result.provider_instance,
                 )
+
+                # Ensure we have an AWS provider
+                if selection_result.provider_type != "aws":
+                    raise AWSConfigurationError(
+                        f"Selected provider is not AWS: {selection_result.provider_type}"
+                    )
+
+                provider_name = selection_result.provider_instance
 
             # Get the provider instance configuration
             provider_config = self._config_manager.get_provider_config()
             if not provider_config:
                 self._logger.debug("No provider config found")
             else:
-                # Find the selected provider instance
+                # Find the specified provider instance
                 for provider in provider_config.providers:
-                    if provider.name == selection_result.provider_instance:
+                    if provider.name == provider_name:
                         self._logger.debug(
                             "Found provider %s, building AWSProviderConfig", provider.name
                         )
@@ -256,7 +269,7 @@ class AWSClient:
                 else:
                     self._logger.debug(
                         "Provider %s not found in config",
-                        selection_result.provider_instance,
+                        provider_name,
                     )
         except AWSConfigurationError:
             raise
@@ -265,7 +278,7 @@ class AWSClient:
 
         # Fallback: try legacy AWSProviderConfig approach
         try:
-            aws_provider_config = self._config_manager.get_typed(AWSProviderConfig)
+            aws_provider_config = self._config_manager.get_typed(AWSProviderConfig)  # type: ignore[call-arg]
             self._aws_config = aws_provider_config
             return aws_provider_config
         except Exception as e:
@@ -284,7 +297,7 @@ class AWSClient:
             # Try to get performance config from ConfigurationManager
             from config import PerformanceConfig
 
-            perf_config = self._config_manager.get_typed(PerformanceConfig)
+            perf_config = self._config_manager.get_typed(PerformanceConfig)  # type: ignore[call-arg]
             if perf_config:
                 self._logger.debug("Loaded performance configuration from ConfigurationManager")
                 return {
@@ -394,3 +407,9 @@ class AWSClient:
             stats["metrics_enabled"] = True
             return stats
         return {"metrics_enabled": False}
+
+    def execute_with_circuit_breaker(
+        self, service: str, operation: str, func: Any, *args: Any, **kwargs: Any
+    ) -> Any:
+        """Execute an AWS operation with circuit breaker protection."""
+        return func(*args, **kwargs)

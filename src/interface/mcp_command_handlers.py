@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from infrastructure.constants import MAX_DESCRIPTION_LENGTH
 from infrastructure.error.decorators import handle_interface_exceptions
 from mcp.tools import OpenResourceBrokerMCPTools
 
@@ -76,10 +77,11 @@ async def handle_mcp_tools_call(args) -> dict[str, Any]:
 
     elif hasattr(args, "args") and args.args:
         # Parse arguments from command line JSON string
-        try:
-            tool_args = json.loads(args.args)
-        except json.JSONDecodeError as e:
-            return {"error": f"Invalid JSON in arguments: {e!s}"}
+        from infrastructure.utilities.json_utils import safe_json_loads
+
+        tool_args = safe_json_loads(args.args, default={}, context="MCP tool arguments")
+        if not tool_args:
+            return {"error": "Invalid JSON in arguments"}
 
     # Execute tool
     async with OpenResourceBrokerMCPTools() as tools:
@@ -248,8 +250,8 @@ def _format_tools_table(tools: list) -> dict[str, Any]:
         rows.append(
             [
                 tool["name"],
-                tool.get("description", "No description")[:60]
-                + ("..." if len(tool.get("description", "")) > 60 else ""),
+                tool.get("description", "No description")[:MAX_DESCRIPTION_LENGTH]
+                + ("..." if len(tool.get("description", "")) > MAX_DESCRIPTION_LENGTH else ""),
                 handler_type,
             ]
         )
@@ -323,7 +325,7 @@ def _format_validation_table(result: dict[str, Any]) -> dict[str, Any]:
     rows = []
 
     for check in result["checks"]:
-        status_symbol = {"PASS": "PASS", "WARNING": "WARN", "FAIL": "FAIL"}.get(  # nosec B105
+        status_symbol = {"PASS": "PASS", "WARNING": "WARN", "FAIL": "FAIL"}.get(
             check["status"], "UNKNOWN"
         )
 

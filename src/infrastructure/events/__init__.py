@@ -5,6 +5,23 @@ from infrastructure.events.publisher import (
     create_event_publisher,
 )
 
+# Import storage events (infrastructure monitoring)
+from infrastructure.events.storage_events import (
+    ConnectionPoolEvent,
+    RepositoryOperationCompletedEvent,
+    RepositoryOperationFailedEvent,
+    RepositoryOperationStartedEvent,
+    SlowQueryDetectedEvent,
+    StorageEvent,
+    StorageHealthCheckEvent,
+    StoragePerformanceEvent,
+    StorageStrategyEvent,
+    StorageStrategyFailoverEvent,
+    StorageStrategySelectedEvent,
+    TransactionCommittedEvent,
+    TransactionStartedEvent,
+)
+
 # Import new EventBus system
 try:
     from application.events import EventBus, create_event_bus
@@ -41,7 +58,7 @@ def get_event_bus():
         container = get_container()
 
         # Try to get EventBus from container
-        event_bus = container.get_optional(EventBus)
+        event_bus = container.get_optional(EventBus)  # type: ignore[arg-type]
         if event_bus is not None:
             return event_bus
 
@@ -49,7 +66,7 @@ def get_event_bus():
         from infrastructure.logging.logger import get_logger
 
         logger = get_logger(__name__)
-        return create_event_bus(logger)
+        return create_event_bus(logger)  # type: ignore[misc]
     except Exception:
         # Final fallback to legacy system
         return get_event_publisher()
@@ -57,7 +74,20 @@ def get_event_bus():
 
 __all__: list[str] = [
     "ConfigurableEventPublisher",
+    "ConnectionPoolEvent",
     "EventBus",
+    "RepositoryOperationCompletedEvent",
+    "RepositoryOperationFailedEvent",
+    "RepositoryOperationStartedEvent",
+    "SlowQueryDetectedEvent",
+    "StorageEvent",
+    "StorageHealthCheckEvent",
+    "StoragePerformanceEvent",
+    "StorageStrategyEvent",
+    "StorageStrategyFailoverEvent",
+    "StorageStrategySelectedEvent",
+    "TransactionCommittedEvent",
+    "TransactionStartedEvent",
     "create_event_bus",
     "create_event_publisher",
     "get_event_bus",

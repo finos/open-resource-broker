@@ -23,7 +23,7 @@ The Storage Registry Pattern eliminates hard-coded storage conditionals and enab
 #### 1. Storage Registry
 - **Purpose**: Registry for storage strategy factories
 - **Responsibility**: Create storage strategies and unit of work instances
-- **Location**: `src/infrastructure/registry/storage_registry.py`
+- **Location**: `src/infrastructure/storage/registry.py`
 
 ```python
 class StorageRegistry:
@@ -49,9 +49,9 @@ class RepositoryFactory:
 - **Purpose**: Register storage types with the registry
 - **Responsibility**: Provide factory functions for each storage type
 - **Locations**: 
-  - `src/infrastructure/persistence/json/registration.py`
-  - `src/infrastructure/persistence/sql/registration.py`
-  - `src/providers/aws/persistence/dynamodb/registration.py`
+  - `src/infrastructure/storage/json/registration.py`
+  - `src/infrastructure/storage/sql/registration.py`
+  - `src/providers/aws/storage/dynamodb/registration.py`
 
 ## Usage
 
@@ -59,7 +59,7 @@ class RepositoryFactory:
 
 #### Create Storage Strategy
 ```python
-# src/infrastructure/persistence/redis/strategy.py
+# src/infrastructure/storage/redis/strategy.py
 class RedisStorageStrategy(BaseStorageStrategy):
     def __init__(self, connection_string: str):
         self.connection_string = connection_string
@@ -68,7 +68,7 @@ class RedisStorageStrategy(BaseStorageStrategy):
 
 #### Create Registration Module
 ```python
-# src/infrastructure/persistence/redis/registration.py
+# src/infrastructure/storage/redis/registration.py
 def create_redis_strategy(config: Any) -> RedisStorageStrategy:
     return RedisStorageStrategy(config.redis_strategy.connection_string)
 
@@ -90,13 +90,13 @@ def register_redis_storage() -> None:
 
 #### Register in Central Module
 ```python
-# src/infrastructure/persistence/registration.py
+# src/infrastructure/storage/registration.py
 def register_all_storage_types() -> None:
     # ... existing registrations
 
     # Add Redis registration
     try:
-        from src.infrastructure.persistence.redis.registration import register_redis_storage
+        from src.infrastructure.storage.redis.registration import register_redis_storage
         register_redis_storage()
         registered_types.append("redis")
     except Exception as e:

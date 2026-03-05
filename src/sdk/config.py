@@ -55,7 +55,7 @@ class SDKConfig:
             timeout=int(os.getenv("ORB_TIMEOUT", "300")),
             retry_attempts=int(os.getenv("ORB_RETRY_ATTEMPTS", "3")),
             log_level=os.getenv("ORB_LOG_LEVEL", "INFO"),
-            config_path=os.getenv("ORB_CONFIG_PATH"),
+            config_path=os.getenv("ORB_CONFIG_FILE"),
         )
 
     @classmethod

@@ -113,6 +113,9 @@ jobs:
       with:
         fail-on-severity: moderate
         allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, Unlicense
+        # werkzeug 3.1.6 reports compound SPDX 'BSD-3-Clause AND LicenseRef-scancode-unknown-license-reference'
+        # due to upstream metadata issue — it is BSD-3-Clause, exempt it from license check
+        allow-dependencies-licenses: 'pkg:pypi/werkzeug'
 
   codeql-analysis:
     name: CodeQL Analysis

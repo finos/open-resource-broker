@@ -15,9 +15,10 @@ Follows DDD/SOLID/DRY principles while preserving domain exception semantics.
 import json
 import threading
 from datetime import datetime
-from functools import lru_cache
 from http import HTTPStatus
-from typing import Any, Callable, Optional
+
+# Import for HTTP error handling delegation
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from pydantic import Field
 
@@ -45,7 +46,11 @@ from domain.template.exceptions import (
     TemplateNotFoundError,
     TemplateValidationError,
 )
+from infrastructure.error.exception_type_mapper import ExceptionTypeMapper
 from infrastructure.logging.logger import get_logger
+
+if TYPE_CHECKING:
+    from infrastructure.error.http_response_handler import HTTPErrorResponseHandler
 
 
 class ErrorCategory:
@@ -78,7 +83,6 @@ class ErrorCategory:
 
     # Legacy compatibility
     NOT_FOUND = "not_found_error"
-    BUSINESS_RULE = "business_rule_error"
     INFRASTRUCTURE = "infrastructure_error"
     EXTERNAL_SERVICE = "external_service_error"
     UNAUTHORIZED = "unauthorized_error"
@@ -304,12 +308,14 @@ class ExceptionHandler:
         """Initialize exception handler with optional logger and metrics."""
         self.logger = logger or get_logger(__name__)
         self.metrics = metrics
-        self._handlers: dict[type[Exception], Callable] = {}
-        self._http_handlers: dict[type[Exception], Callable[[Exception], ErrorResponse]] = {}
+        self._type_mapper = ExceptionTypeMapper()
+        self._http_handler: Optional[HTTPErrorResponseHandler] = None
         self._performance_stats = {"total_handled": 0, "by_type": {}}
         self._lock = threading.Lock()
         self._register_handlers()
-        self._register_http_handlers()
+
+        # Backward compatibility: maintain _handlers reference
+        self._handlers = self._type_mapper._handlers
 
     def handle(self, exception: Exception, context: ExceptionContext, **kwargs) -> Exception:
         """
@@ -342,65 +348,65 @@ class ExceptionHandler:
         # Handle with context
         return handler(exception, context, **kwargs)
 
-    @lru_cache(maxsize=128)
     def _get_handler(self, exception_type: type[Exception]) -> Callable:
         """
         Find the most specific handler for this exception type.
 
-        Uses Method Resolution Order (MRO) to find the best match.
-        Cached for performance.
+        Uses ExceptionTypeMapper with Method Resolution Order (MRO) to find the best match.
         """
-        # 1. Check for exact type match first
-        if exception_type in self._handlers:
-            return self._handlers[exception_type]
-
-        # 2. Walk up inheritance hierarchy (MRO)
-        for parent_type in exception_type.__mro__[1:]:  # Skip self
-            if parent_type in self._handlers:
-                return self._handlers[parent_type]
-
-        # 3. Fall back to generic handler
-        return self._handle_generic_exception
+        return self._type_mapper.get_handler(exception_type, self._handle_generic_exception)
 
     def _register_handlers(self) -> None:
-        """Register handlers for different exception types."""
+        """Register handlers for different exception types using ExceptionTypeMapper."""
 
         # DOMAIN EXCEPTIONS - Preserve with rich logging
-        self._handlers[DomainException] = self._preserve_domain_exception
-        self._handlers[ValidationError] = self._preserve_validation_exception
-        self._handlers[EntityNotFoundError] = self._preserve_entity_not_found
-        self._handlers[BusinessRuleViolationError] = self._preserve_business_rule_violation
+        self._type_mapper.register_handler(DomainException, self._preserve_domain_exception)
+        self._type_mapper.register_handler(ValidationError, self._preserve_validation_exception)
+        self._type_mapper.register_handler(EntityNotFoundError, self._preserve_entity_not_found)
+        self._type_mapper.register_handler(
+            BusinessRuleViolationError, self._preserve_business_rule_violation
+        )
 
         # TEMPLATE EXCEPTIONS - Preserve with template context
-        self._handlers[TemplateException] = self._preserve_template_exception
-        self._handlers[TemplateNotFoundError] = self._preserve_template_not_found
-        self._handlers[TemplateValidationError] = self._preserve_template_validation
+        self._type_mapper.register_handler(TemplateException, self._preserve_template_exception)
+        self._type_mapper.register_handler(TemplateNotFoundError, self._preserve_template_not_found)
+        self._type_mapper.register_handler(
+            TemplateValidationError, self._preserve_template_validation
+        )
 
         # MACHINE EXCEPTIONS - Preserve with machine context
-        self._handlers[MachineException] = self._preserve_machine_exception
-        self._handlers[MachineNotFoundError] = self._preserve_machine_not_found
-        self._handlers[MachineValidationError] = self._preserve_machine_validation
+        self._type_mapper.register_handler(MachineException, self._preserve_machine_exception)
+        self._type_mapper.register_handler(MachineNotFoundError, self._preserve_machine_not_found)
+        self._type_mapper.register_handler(
+            MachineValidationError, self._preserve_machine_validation
+        )
 
         # REQUEST EXCEPTIONS - Preserve with request context
-        self._handlers[RequestException] = self._preserve_request_exception
-        self._handlers[RequestNotFoundError] = self._preserve_request_not_found
-        self._handlers[RequestValidationError] = self._preserve_request_validation
+        self._type_mapper.register_handler(RequestException, self._preserve_request_exception)
+        self._type_mapper.register_handler(RequestNotFoundError, self._preserve_request_not_found)
+        self._type_mapper.register_handler(
+            RequestValidationError, self._preserve_request_validation
+        )
 
         # AWS EXCEPTIONS - Handle dynamically
         # AWS exceptions will be handled by the generic provider exception handler
 
         # INFRASTRUCTURE EXCEPTIONS - Preserve with infrastructure context
-        self._handlers[InfrastructureError] = self._preserve_infrastructure_exception
-        self._handlers[ConfigurationError] = self._preserve_configuration_exception
+        self._type_mapper.register_handler(
+            InfrastructureError, self._preserve_infrastructure_exception
+        )
+        self._type_mapper.register_handler(
+            ConfigurationError, self._preserve_configuration_exception
+        )
 
         # PYTHON BUILT-IN EXCEPTIONS - Wrap appropriately
-        self._handlers[json.JSONDecodeError] = self._wrap_json_decode_error
-        self._handlers[ConnectionError] = self._wrap_connection_error
-        self._handlers[FileNotFoundError] = self._wrap_file_not_found_error
-        self._handlers[ValueError] = self._wrap_value_error
-        self._handlers[KeyError] = self._wrap_key_error
-        self._handlers[TypeError] = self._wrap_type_error
-        self._handlers[AttributeError] = self._wrap_attribute_error
+        self._type_mapper.register_handler(json.JSONDecodeError, self._wrap_json_decode_error)
+        self._type_mapper.register_handler(ConnectionError, self._wrap_connection_error)
+        self._type_mapper.register_handler(FileNotFoundError, self._wrap_file_not_found_error)
+        self._type_mapper.register_handler(ValueError, self._wrap_value_error)
+        self._type_mapper.register_handler(KeyError, self._wrap_key_error)
+        self._type_mapper.register_handler(TypeError, self._wrap_type_error)
+        self._type_mapper.register_handler(AttributeError, self._wrap_attribute_error)
 
     # DOMAIN EXCEPTION HANDLERS (PRESERVE)
 
@@ -680,7 +686,7 @@ class ExceptionHandler:
         """Wrap JSON decode error into appropriate domain exception based on context."""
         # Handle both string context and ExceptionContext object
         if hasattr(context, "operation"):
-            context_str = context.operation
+            context_str = context.operation  # type: ignore[union-attr]
         else:
             context_str = context or ""
 
@@ -688,7 +694,7 @@ class ExceptionHandler:
 
         # Context-aware exception mapping
         if "config" in context_lower or "template" in context_lower:
-            return ConfigurationError(
+            return ConfigurationError(  # type: ignore[return-value]
                 message=f"Invalid JSON format in {context_str or 'configuration'}: {exc.msg}",
                 details={
                     "original_error": str(exc),
@@ -704,7 +710,7 @@ class ExceptionHandler:
                 error_code="INVALID_JSON",  # For backward compatibility
             )
         elif "request" in context_lower or "response" in context_lower:
-            return RequestValidationError(
+            return RequestValidationError(  # type: ignore[return-value]
                 message=f"Invalid JSON in request data: {exc.msg}",
                 details={
                     "original_error": str(exc),
@@ -754,7 +760,7 @@ class ExceptionHandler:
         context_lower = (context or "").lower()
 
         if "config" in context_lower or "template" in context_lower:
-            return ConfigurationError(
+            return ConfigurationError(  # type: ignore[return-value]
                 message=f"Required file not found: {exc.filename or 'unknown file'}",
                 details={
                     "original_error": str(exc),
@@ -850,7 +856,7 @@ class ExceptionHandler:
         """Handle any unrecognized exception by wrapping in InfrastructureError."""
         # Handle both string context and ExceptionContext object
         if hasattr(context, "operation"):
-            context_str = context.operation
+            context_str = context.operation  # type: ignore[union-attr]
         else:
             context_str = context or ""
 
@@ -870,175 +876,23 @@ class ExceptionHandler:
 
     def handle_error_for_http(self, exception: Exception) -> ErrorResponse:
         """Handle an exception and return a standardized HTTP error response."""
+        if self._http_handler is None:
+            # Lazy initialization to avoid circular imports
+            from infrastructure.error.http_response_handler import HTTPErrorResponseHandler
+
+            self._http_handler = HTTPErrorResponseHandler()
+
         try:
-            # Get the appropriate handler for this exception type
-            handler = self._get_http_handler(type(exception))
-            return handler(exception)
+            return self._http_handler.handle_error_for_http(exception)
         except Exception as e:
             self.logger.error("Error in HTTP error handler: %s", str(e))
-            return self._handle_unexpected_error_http(exception)
-
-    def _get_http_handler(
-        self, exception_type: type[Exception]
-    ) -> Callable[[Exception], ErrorResponse]:
-        """Get the appropriate HTTP handler for an exception type."""
-        # Check for exact match first
-        if exception_type in self._http_handlers:
-            return self._http_handlers[exception_type]
-
-        # Check inheritance hierarchy
-        for exc_type, handler in self._http_handlers.items():
-            if issubclass(exception_type, exc_type):
-                return handler
-
-        # Default handler
-        return self._handle_unexpected_error_http
-
-    def _register_http_handlers(self) -> None:
-        """Register HTTP error handlers."""
-        self._http_handlers: dict[
-            type[Exception], Callable[[Exception], ErrorResponse]
-        ] = {  # Domain errors
-            ValidationError: self._handle_validation_error_http,
-            EntityNotFoundError: self._handle_not_found_error_http,
-            BusinessRuleViolationError: self._handle_business_rule_error_http,
-            # Request errors
-            RequestNotFoundError: self._handle_request_not_found_http,
-            RequestValidationError: self._handle_request_validation_http,
-            # Machine errors
-            MachineNotFoundError: self._handle_machine_not_found_http,
-            MachineValidationError: self._handle_machine_validation_http,
-            # Template errors
-            TemplateNotFoundError: self._handle_template_not_found_http,
-            TemplateValidationError: self._handle_template_validation_http,
-            # Infrastructure errors (will handle AWS errors through inheritance)
-            InfrastructureError: self._handle_infrastructure_error_http,
-            ConfigurationError: self._handle_configuration_error_http,
-        }
-
-    # HTTP ERROR HANDLERS
-
-    def _handle_validation_error_http(self, exception: ValidationError) -> ErrorResponse:
-        """Handle validation errors for HTTP responses."""
-        return ErrorResponse(
-            error_code=ErrorCode.INVALID_INPUT,
-            message=str(exception),
-            category=ErrorCategory.VALIDATION,
-            details=getattr(exception, "details", {}),
-            http_status=HTTPStatus.BAD_REQUEST,
-        )
-
-    def _handle_not_found_error_http(self, exception: EntityNotFoundError) -> ErrorResponse:
-        """Handle not found errors for HTTP responses."""
-        return ErrorResponse(
-            error_code=ErrorCode.RESOURCE_NOT_FOUND,
-            message=str(exception),
-            category=ErrorCategory.NOT_FOUND,
-            details=getattr(exception, "details", {}),
-            http_status=HTTPStatus.NOT_FOUND,
-        )
-
-    def _handle_business_rule_error_http(
-        self, exception: BusinessRuleViolationError
-    ) -> ErrorResponse:
-        """Handle business rule violations for HTTP responses."""
-        return ErrorResponse(
-            error_code=ErrorCode.BUSINESS_RULE_VIOLATION,
-            message=str(exception),
-            category=ErrorCategory.BUSINESS_RULE,
-            details=getattr(exception, "details", {}),
-            http_status=HTTPStatus.UNPROCESSABLE_ENTITY,
-        )
-
-    def _handle_request_not_found_http(self, exception: RequestNotFoundError) -> ErrorResponse:
-        """Handle request not found errors for HTTP responses."""
-        return ErrorResponse(
-            error_code=ErrorCode.REQUEST_NOT_FOUND,
-            message=str(exception),
-            category=ErrorCategory.NOT_FOUND,
-            details=getattr(exception, "details", {}),
-            http_status=HTTPStatus.NOT_FOUND,
-        )
-
-    def _handle_request_validation_http(self, exception: RequestValidationError) -> ErrorResponse:
-        """Handle request validation errors for HTTP responses."""
-        return ErrorResponse(
-            error_code=ErrorCode.INVALID_INPUT,
-            message=str(exception),
-            category=ErrorCategory.VALIDATION,
-            details=getattr(exception, "details", {}),
-            http_status=HTTPStatus.BAD_REQUEST,
-        )
-
-    def _handle_machine_not_found_http(self, exception: MachineNotFoundError) -> ErrorResponse:
-        """Handle machine not found errors for HTTP responses."""
-        return ErrorResponse(
-            error_code=ErrorCode.MACHINE_NOT_FOUND,
-            message=str(exception),
-            category=ErrorCategory.NOT_FOUND,
-            details=getattr(exception, "details", {}),
-            http_status=HTTPStatus.NOT_FOUND,
-        )
-
-    def _handle_machine_validation_http(self, exception: MachineValidationError) -> ErrorResponse:
-        """Handle machine validation errors for HTTP responses."""
-        return ErrorResponse(
-            error_code=ErrorCode.INVALID_INPUT,
-            message=str(exception),
-            category=ErrorCategory.VALIDATION,
-            details=getattr(exception, "details", {}),
-            http_status=HTTPStatus.BAD_REQUEST,
-        )
-
-    def _handle_template_not_found_http(self, exception: TemplateNotFoundError) -> ErrorResponse:
-        """Handle template not found errors for HTTP responses."""
-        return ErrorResponse(
-            error_code=ErrorCode.TEMPLATE_NOT_FOUND,
-            message=str(exception),
-            category=ErrorCategory.NOT_FOUND,
-            details=getattr(exception, "details", {}),
-            http_status=HTTPStatus.NOT_FOUND,
-        )
-
-    def _handle_template_validation_http(self, exception: TemplateValidationError) -> ErrorResponse:
-        """Handle template validation errors for HTTP responses."""
-        return ErrorResponse(
-            error_code=ErrorCode.INVALID_INPUT,
-            message=str(exception),
-            category=ErrorCategory.VALIDATION,
-            details=getattr(exception, "details", {}),
-            http_status=HTTPStatus.BAD_REQUEST,
-        )
-
-    def _handle_infrastructure_error_http(self, exception: InfrastructureError) -> ErrorResponse:
-        """Handle infrastructure errors for HTTP responses."""
-        return ErrorResponse(
-            error_code=ErrorCode.EXTERNAL_SERVICE_ERROR,
-            message="An infrastructure error occurred",
-            category=ErrorCategory.INFRASTRUCTURE,
-            details={"original_error": str(exception)},
-            http_status=HTTPStatus.SERVICE_UNAVAILABLE,
-        )
-
-    def _handle_configuration_error_http(self, exception: ConfigurationError) -> ErrorResponse:
-        """Handle configuration errors for HTTP responses."""
-        return ErrorResponse(
-            error_code=ErrorCode.INTERNAL_ERROR,
-            message="A configuration error occurred",
-            category=ErrorCategory.INTERNAL,
-            details={"original_error": str(exception)},
-            http_status=HTTPStatus.INTERNAL_SERVER_ERROR,
-        )
-
-    def _handle_unexpected_error_http(self, exception: Exception) -> ErrorResponse:
-        """Handle unexpected errors for HTTP responses."""
-        return ErrorResponse(
-            error_code=ErrorCode.UNEXPECTED_ERROR,
-            message="An unexpected error occurred",
-            category=ErrorCategory.INTERNAL,
-            details={"error_type": type(exception).__name__},
-            http_status=HTTPStatus.INTERNAL_SERVER_ERROR,
-        )
+            return ErrorResponse(
+                error_code=ErrorCode.UNEXPECTED_ERROR,
+                message="An unexpected error occurred",
+                category=ErrorCategory.INTERNAL,
+                details={"error_type": type(exception).__name__},
+                http_status=HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
 
     # AWS EXCEPTION HANDLERS (PRESERVE)
 

@@ -10,7 +10,7 @@ following the same pattern as other entities in the system.
 from __future__ import annotations
 
 import argparse
-from typing import Any
+from typing import Any, cast
 
 from application.dto.queries import (
     GetTemplateQuery,
@@ -22,7 +22,7 @@ from application.template.commands import (
     DeleteTemplateCommand,
     UpdateTemplateCommand,
 )
-from cli.console import print_command, print_info
+from cli.console import print_info
 from domain.base.ports.scheduler_port import SchedulerPort
 from infrastructure.di.buses import CommandBus, QueryBus
 from infrastructure.di.container import get_container
@@ -55,25 +55,21 @@ async def handle_list_templates(args: argparse.Namespace) -> dict[str, Any]:
         # Extract parameters from args or input_data (HostFactory compatibility)
         provider_api = None
         active_only = True
-        include_config = False
 
         # Check for input data from -f/--data flags first (HostFactory style)
         if hasattr(args, "input_data") and args.input_data:
             input_data = args.input_data
             provider_api = input_data.get("provider_api")
             active_only = input_data.get("active_only", True)
-            include_config = input_data.get("include_config", False)
         else:
             # Use command line arguments
             provider_api = getattr(args, "provider_api", None)
             active_only = getattr(args, "active_only", True)
-            include_config = getattr(args, "include_config", False)
 
         # Create and execute query through CQRS bus
         query = ListTemplatesQuery(
             provider_api=provider_api,
             active_only=active_only,
-            include_configuration=include_config,
         )
 
         templates = await query_bus.execute(query)
@@ -81,35 +77,29 @@ async def handle_list_templates(args: argparse.Namespace) -> dict[str, Any]:
         # Get scheduler strategy from DI container
         scheduler_strategy = container.get(SchedulerPort)
 
-        # Use scheduler strategy for format conversion
+        # Use scheduler strategy for format conversion — always pass domain DTOs
         if scheduler_strategy:
-            formatted_response = scheduler_strategy.format_templates_response(templates)
-            templates_data = formatted_response.get("templates", [])
+            result = scheduler_strategy.format_templates_response(templates)
         else:
             templates_data = [
                 template.model_dump() if hasattr(template, "model_dump") else template
                 for template in templates
             ]
-
-        result = {
-            "success": True,
-            "templates": templates_data,
-            "total_count": len(templates),
-            "message": f"Retrieved {len(templates)} templates successfully",
-        }
+            result = {
+                "success": True,
+                "templates": templates_data,
+                "total_count": len(templates),
+                "message": f"Retrieved {len(templates)} templates successfully",
+            }
 
         # Print helpful message to stderr when no templates found
         if len(templates) == 0:
+            from cli.help_utils import print_getting_started_help
+
             print_info("")  # Empty line
             print_info("No templates found.")
             print_info("")  # Empty line
-            print_info("To get started:")
-            print_command("  orb templates generate    # Generate example templates")
-            print_command("  orb templates create      # Create custom template")
-            print_info("")  # Empty line
-            print_info("Example:")
-            print_command("  $ orb templates generate")
-            print_command("  $ orb templates list")
+            print_getting_started_help()
 
         return result
 
@@ -208,35 +198,47 @@ async def handle_create_template(args: argparse.Namespace) -> dict[str, Any]:
                 "dry_run": True,
             }
 
-        # Extract required fields
-        template_id = getattr(args, "template_id", None)
+        # Read template configuration from file
+        if not hasattr(args, "file") or not args.file:
+            return {"success": False, "error": "Template file is required"}
+
+        import json
+
+        try:
+            with open(args.file) as f:
+                template_config = json.load(f)
+        except FileNotFoundError:
+            return {"success": False, "error": f"Template file not found: {args.file}"}
+        except json.JSONDecodeError as e:
+            return {"success": False, "error": f"Invalid JSON in template file: {e}"}
+
+        # Extract required fields from JSON
+        template_id = template_config.get("templateId")
         if not template_id:
-            return {"success": False, "error": "Template ID is required"}
+            return {"success": False, "error": "templateId is required in template file"}
 
-        provider_api = getattr(args, "provider_api", None)
+        provider_api = template_config.get("providerApi")
         if not provider_api:
-            return {"success": False, "error": "Provider API is required"}
+            return {"success": False, "error": "providerApi is required in template file"}
 
-        image_id = getattr(args, "image_id", None)
+        image_id = template_config.get("imageId")
         if not image_id:
-            return {"success": False, "error": "Image ID is required"}
+            return {"success": False, "error": "imageId is required in template file"}
 
-        # Create command with all fields
+        # Create command with fields from JSON file
         command = CreateTemplateCommand(
             template_id=template_id,
-            name=getattr(args, "name", None),
-            description=getattr(args, "description", None),
+            name=template_config.get("name"),
+            description=template_config.get("description"),
             provider_api=provider_api,
-            instance_type=getattr(args, "instance_type", None),
+            instance_type=template_config.get("instanceType"),
             image_id=image_id,
-            subnet_ids=getattr(args, "subnets", []),
-            security_group_ids=getattr(args, "security_groups", []),
-            tags=getattr(args, "tags", {}),
-            configuration=getattr(args, "configuration", {}),
+            tags=template_config.get("tags", {}),
+            configuration=template_config,
         )
 
         # Execute command through CQRS bus
-        response = await command_bus.execute(command)
+        response = await command_bus.execute(cast(Any, command))
 
         if response and response.validation_errors:
             return {
@@ -305,7 +307,7 @@ async def handle_update_template(args: argparse.Namespace) -> dict[str, Any]:
         )
 
         # Execute command through CQRS bus
-        response = await command_bus.execute(command)
+        response = await command_bus.execute(cast(Any, command))
 
         if response and response.validation_errors:
             return {
@@ -362,7 +364,7 @@ async def handle_delete_template(args: argparse.Namespace) -> dict[str, Any]:
 
         # Create and execute command through CQRS bus
         command = DeleteTemplateCommand(template_id=template_id)
-        response = await command_bus.execute(command)
+        response = await command_bus.execute(cast(Any, command))
 
         if response and response.validation_errors:
             return {
@@ -411,13 +413,13 @@ async def handle_validate_template(args: argparse.Namespace) -> dict[str, Any]:
         template_id = None
 
         # Check if template file is provided
-        if hasattr(args, "template_file") and args.template_file:
+        if hasattr(args, "file") and args.file:
             import json
             from pathlib import Path
 
             import yaml
 
-            template_file = Path(args.template_file)
+            template_file = Path(args.file)
             if not template_file.exists():
                 return {
                     "success": False,
@@ -438,31 +440,44 @@ async def handle_validate_template(args: argparse.Namespace) -> dict[str, Any]:
                     "error": f"Failed to parse template file: {e!s}",
                     "valid": False,
                 }
+
+        # Check for --all flag first
+        elif hasattr(args, "all") and args.all:
+            # Validate all loaded templates
+            from application.dto.queries import ListTemplatesQuery
+
+            list_query = ListTemplatesQuery()
+            templates_result = await query_bus.execute(list_query)
+
+            results = []
+            for template in templates_result:
+                validate_query = ValidateTemplateQuery(
+                    template_config={"template_id": template.template_id},
+                    template_id=template.template_id,
+                )
+                validation_result = await query_bus.execute(validate_query)
+                results.append(validation_result)
+
+            return {
+                "success": True,
+                "message": f"Validated {len(results)} templates",
+                "results": results,
+            }
+
+        # Check if template_id is provided (loaded template)
+        elif hasattr(args, "template_id") and args.template_id:
+            template_id = args.template_id
+            template_config = {"template_id": template_id}  # Will be loaded by handler
+
         else:
-            # Extract from command line args
-            template_id = getattr(args, "template_id", "cli-template")
-
-            # Build configuration from args
-            if hasattr(args, "name"):
-                template_config["name"] = args.name
-            if hasattr(args, "provider_api"):
-                template_config["provider_api"] = args.provider_api
-            if hasattr(args, "image_id"):
-                template_config["image_id"] = args.image_id
-            if hasattr(args, "instance_type"):
-                template_config["instance_type"] = args.instance_type
-            if hasattr(args, "configuration"):
-                template_config.update(args.configuration)
-
-        if not template_config:
             return {
                 "success": False,
-                "error": "No template data provided for validation",
+                "error": "Must provide either template_id, --file, or --all",
                 "valid": False,
             }
 
         # Use ValidateTemplateQuery for validation
-        query = ValidateTemplateQuery(template_config=template_config)
+        query = ValidateTemplateQuery(template_config=template_config, template_id=template_id)
         validation_result = await query_bus.execute(query)
 
         # Check if validation result has errors
@@ -511,7 +526,7 @@ async def handle_refresh_templates(args: argparse.Namespace) -> dict[str, Any]:
 
         # Force refresh by listing templates with force_refresh parameter
         # This will trigger cache refresh in the query handler
-        query = ListTemplatesQuery(provider_api=None, active_only=True, include_configuration=False)
+        query = ListTemplatesQuery(provider_api=None, active_only=True)
 
         templates = await query_bus.execute(query)
         template_count = len(templates) if templates else 0

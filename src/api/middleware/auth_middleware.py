@@ -1,8 +1,10 @@
 """Authentication middleware for FastAPI."""
 
+import os
 from typing import Optional
 
 from fastapi import HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from infrastructure.adapters.ports.auth import (
@@ -15,7 +17,7 @@ from infrastructure.logging.logger import get_logger
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
-    """Authentication middleware for FastAPI requests."""
+    """Authentication middleware with security hardening."""
 
     def __init__(
         self,
@@ -35,12 +37,19 @@ class AuthMiddleware(BaseHTTPMiddleware):
         """
         super().__init__(app)
         self.auth_port = auth_port
-        self.excluded_paths = excluded_paths or [
-            "/health",
-            "/docs",
-            "/redoc",
-            "/openapi.json",
-            "/favicon.ico",
+        # Normalize excluded paths (remove trailing slashes, convert to lowercase)
+        self.excluded_paths = [
+            self._normalize_path(p)
+            for p in (
+                excluded_paths
+                or [
+                    "/health",
+                    "/docs",
+                    "/redoc",
+                    "/openapi.json",
+                    "/favicon.ico",
+                ]
+            )
         ]
         self.require_auth = require_auth
         self.logger = get_logger(__name__)
@@ -56,15 +65,20 @@ class AuthMiddleware(BaseHTTPMiddleware):
         Returns:
             Response from downstream handlers
         """
-        # Skip authentication for excluded paths
-        if self._is_excluded_path(request.url.path):
+        # Normalize request path for comparison
+        normalized_path = self._normalize_path(request.url.path)
+
+        # Skip authentication for excluded paths (exact match only)
+        if self._is_excluded_path(normalized_path):
             self.logger.debug("Skipping auth for excluded path: %s", request.url.path)
-            return await call_next(request)
+            response = await call_next(request)
+            return self._add_security_headers(response)
 
         # Skip authentication if not required and auth is disabled
         if not self.require_auth and not self.auth_port.is_enabled():
             self.logger.debug("Authentication not required and disabled")
-            return await call_next(request)
+            response = await call_next(request)
+            return self._add_security_headers(response)
 
         try:
             # Create authentication context
@@ -83,10 +97,17 @@ class AuthMiddleware(BaseHTTPMiddleware):
             request.state.user_roles = auth_result.user_roles
             request.state.permissions = auth_result.permissions
 
-            self.logger.debug("Authentication successful for user: %s", auth_result.user_id)
+            self.logger.info(
+                "Authentication successful for user: %s from IP: %s",
+                auth_result.user_id,
+                auth_context.client_ip,
+            )
 
             # Continue to next middleware/handler
             response = await call_next(request)
+
+            # Add security headers
+            response = self._add_security_headers(response)
 
             # Add authentication headers to response if needed
             if auth_result.token:
@@ -94,27 +115,47 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
             return response
 
+        except HTTPException:
+            raise
         except Exception as e:
-            self.logger.error("Authentication middleware error: %s", e)
+            self.logger.error("Authentication middleware error: %s", e, exc_info=True)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Authentication service error",
+                detail="Internal server error",
             )
 
-    def _is_excluded_path(self, path: str) -> bool:
+    def _normalize_path(self, path: str) -> str:
         """
-        Check if path is excluded from authentication.
+        Normalize path for secure comparison.
 
         Args:
             path: Request path
 
         Returns:
+            Normalized path
+        """
+        # Remove trailing slashes
+        normalized = path.rstrip("/")
+        # Convert to lowercase for case-insensitive comparison
+        normalized = normalized.lower()
+        # Resolve path traversal attempts
+        normalized = os.path.normpath(normalized)
+        # Remove any remaining .. or . components
+        parts = [p for p in normalized.split("/") if p and p not in (".", "..")]
+        return "/" + "/".join(parts) if parts else "/"
+
+    def _is_excluded_path(self, normalized_path: str) -> bool:
+        """
+        Check if path is excluded from authentication (exact match only).
+
+        Args:
+            normalized_path: Normalized request path
+
+        Returns:
             True if path is excluded
         """
-        for excluded_path in self.excluded_paths:
-            if path.startswith(excluded_path):
-                return True
-        return False
+        # Exact match only - no prefix matching to prevent path traversal
+        return normalized_path in self.excluded_paths
 
     def _create_auth_context(self, request: Request) -> AuthContext:
         """
@@ -126,19 +167,47 @@ class AuthMiddleware(BaseHTTPMiddleware):
         Returns:
             Authentication context
         """
+        # Sanitize headers to prevent header injection
+        sanitized_headers = {
+            k.lower(): str(v)[:1000]  # Limit header value length
+            for k, v in request.headers.items()
+        }
+
         return AuthContext(
             method=request.method,
             path=request.url.path,
-            headers=dict(request.headers),
+            headers=sanitized_headers,
             query_params=dict(request.query_params),
-            client_ip=request.client.host if request.client else None,
-            user_agent=request.headers.get("user-agent"),
-            metadata={"url": str(request.url), "base_url": str(request.base_url)},
+            client_ip=self._get_client_ip(request),
+            user_agent=request.headers.get("user-agent", "")[:500],  # Limit UA length
+            metadata={
+                "url": str(request.url)[:2000],  # Limit URL length
+                "base_url": str(request.base_url)[:2000],
+            },
         )
+
+    def _get_client_ip(self, request: Request) -> Optional[str]:
+        """
+        Get client IP address with proxy support.
+
+        Args:
+            request: FastAPI request
+
+        Returns:
+            Client IP address
+        """
+        # Check X-Forwarded-For header (if behind proxy)
+        forwarded_for = request.headers.get("x-forwarded-for")
+        if forwarded_for:
+            # Take first IP (client IP)
+            return forwarded_for.split(",")[0].strip()
+
+        # Fall back to direct client IP
+        return request.client.host if request.client else None
 
     def _handle_auth_failure(self, auth_result: AuthResult) -> Response:
         """
-        Handle authentication failure.
+        Handle authentication failure with sanitized error messages.
 
         Args:
             auth_result: Failed authentication result
@@ -146,112 +215,71 @@ class AuthMiddleware(BaseHTTPMiddleware):
         Returns:
             HTTP error response
         """
-        if auth_result.status == AuthStatus.EXPIRED:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token expired",
-                headers={"WWW-Authenticate": "Bearer"},
+        # Log detailed error internally
+        self.logger.warning(
+            "Authentication failed: status=%s, error=%s",
+            auth_result.status,
+            auth_result.error_message,
+        )
+
+        # Return generic error messages to prevent information disclosure
+        if auth_result.status == AuthStatus.INSUFFICIENT_PERMISSIONS:
+            return JSONResponse(
+                status_code=status.HTTP_403_FORBIDDEN,
+                content={"detail": "Access denied"},
             )
-        elif auth_result.status == AuthStatus.INSUFFICIENT_PERMISSIONS:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions"
+        elif auth_result.status == AuthStatus.EXPIRED:
+            return JSONResponse(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                content={"detail": "Authentication expired"},
+                headers={"WWW-Authenticate": "Bearer"},
             )
         else:
-            raise HTTPException(
+            return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=auth_result.error_message or "Authentication failed",
+                content={"detail": "Invalid credentials"},
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-
-class AuthDependency:
-    """FastAPI dependency for authentication."""
-
-    def __init__(
-        self,
-        required_permissions: Optional[list[str]] = None,
-        required_roles: Optional[list[str]] = None,
-        allow_service_accounts: bool = True,
-    ) -> None:
+    def _add_security_headers(self, response: Response) -> Response:
         """
-        Initialize auth dependency.
+        Add security headers to response.
 
         Args:
-            required_permissions: Required permissions for access
-            required_roles: Required roles for access
-            allow_service_accounts: Whether to allow service accounts
-        """
-        self.required_permissions = required_permissions or []
-        self.required_roles = required_roles or []
-        self.allow_service_accounts = allow_service_accounts
-        self.logger = get_logger(__name__)
-
-    def __call__(self, request: Request) -> AuthResult:
-        """
-        Dependency function for FastAPI.
-
-        Args:
-            request: FastAPI request with auth state
+            response: Response object
 
         Returns:
-            Authentication result
-
-        Raises:
-            HTTPException: If authentication/authorization fails
+            Response with security headers
         """
-        # Get auth result from middleware
-        auth_result = getattr(request.state, "auth_result", None)
+        # Prevent clickjacking
+        response.headers["X-Frame-Options"] = "DENY"
 
-        if not auth_result:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required",
-            )
+        # Prevent MIME type sniffing
+        response.headers["X-Content-Type-Options"] = "nosniff"
 
-        if not auth_result.is_authenticated:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication failed"
-            )
+        # Enable XSS protection
+        response.headers["X-XSS-Protection"] = "1; mode=block"
 
-        # Check required permissions
-        for permission in self.required_permissions:
-            if not auth_result.has_permission(permission):
-                self.logger.warning(
-                    "User %s missing permission: %s", auth_result.user_id, permission
-                )
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Missing required permission: {permission}",
-                )
+        # Strict Transport Security (HTTPS only)
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
-        # Check required roles
-        for role in self.required_roles:
-            if not auth_result.has_role(role):
-                self.logger.warning("User %s missing role: %s", auth_result.user_id, role)
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Missing required role: {role}",
-                )
+        # Content Security Policy
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; "
+            "font-src 'self'; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none'"
+        )
 
-        return auth_result
+        # Referrer Policy
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
+        # Permissions Policy
+        response.headers["Permissions-Policy"] = (
+            "geolocation=(), microphone=(), camera=(), payment=()"
+        )
 
-# Common auth dependencies
-def require_auth() -> AuthDependency:
-    """Require basic authentication."""
-    return AuthDependency()
-
-
-def require_admin() -> AuthDependency:
-    """Require admin role."""
-    return AuthDependency(required_roles=["admin"])
-
-
-def require_operator() -> AuthDependency:
-    """Require operator role."""
-    return AuthDependency(required_roles=["operator", "admin"])
-
-
-def require_permissions(*permissions: str) -> AuthDependency:
-    """Require specific permissions."""
-    return AuthDependency(required_permissions=list(permissions))
+        return response

@@ -1,7 +1,7 @@
 """Container port for dependency injection concerns."""
 
 from abc import ABC, abstractmethod
-from typing import Callable, TypeVar
+from typing import Callable, Optional, TypeVar
 
 T = TypeVar("T")
 
@@ -28,3 +28,9 @@ class ContainerPort(ABC):
     @abstractmethod
     def has(self, service_type: type[T]) -> bool:
         """Check if service is registered in container."""
+
+    def get_optional(self, service_type: type[T]) -> Optional[T]:
+        """Get service instance from container, returning None if not registered."""
+        if self.has(service_type):
+            return self.get(service_type)
+        return None

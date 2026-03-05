@@ -1,6 +1,6 @@
 """Unit tests for Request aggregate."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import pytest
 
@@ -12,7 +12,6 @@ from domain.request.exceptions import (
     RequestValidationError,
 )
 from domain.request.value_objects import (
-    RequestConfiguration,
     RequestId,
     RequestStatus,
     RequestType,
@@ -47,117 +46,105 @@ except ImportError:
             self.value = value
 
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _make_request(machine_count=2, template_id="template-001"):
+    """Create a minimal valid new request."""
+    return Request.create_new_request(
+        request_type=RequestType.ACQUIRE,
+        template_id=template_id,
+        machine_count=machine_count,
+        provider_type="aws",
+    )
+
+
+def _make_return_request(machine_ids=None):
+    """Create a minimal valid return request."""
+    if machine_ids is None:
+        machine_ids = ["i-001", "i-002"]
+    return Request.create_return_request(
+        machine_ids=machine_ids,
+        provider_type="aws",
+        provider_name="aws-us-east-1",
+    )
+
+
 @pytest.mark.unit
 class TestRequestAggregate:
     """Test cases for Request aggregate."""
 
     def test_create_new_request(self):
         """Test creating a new request."""
-        request = Request.create_new_request(
-            template_id="template-001",
-            machine_count=3,
-            requester_id="user-123",
-            priority=1,
-            tags={"Environment": "test", "Project": "hostfactory"},
-        )
+        request = _make_request(machine_count=3, template_id="template-001")
 
         assert request.template_id == "template-001"
-        assert request.machine_count == 3
-        assert request.requester_id == "user-123"
-        assert request.priority == 1
+        assert request.requested_count == 3
         assert request.status == RequestStatus.PENDING
-        assert request.request_type == RequestType.NEW
-        assert request.tags["Environment"] == "test"
-        assert request.tags["Project"] == "hostfactory"
+        assert request.request_type == RequestType.ACQUIRE
         assert request.created_at is not None
-        assert request.updated_at is not None
-        assert request.id is not None
+        assert request.request_id is not None
 
     def test_create_return_request(self):
         """Test creating a return request."""
-        machine_ids = ["machine-001", "machine-002", "machine-003"]
-        request = Request.create_return_request(
-            machine_ids=machine_ids,
-            requester_id="user-123",
-            reason="No longer needed",
-            tags={"Environment": "test"},
-        )
+        machine_ids = ["i-001", "i-002", "i-003"]
+        request = _make_return_request(machine_ids=machine_ids)
 
         assert request.machine_ids == machine_ids
-        assert request.machine_count == len(machine_ids)
-        assert request.requester_id == "user-123"
-        assert request.return_reason == "No longer needed"
+        assert request.requested_count == len(machine_ids)
         assert request.status == RequestStatus.PENDING
         assert request.request_type == RequestType.RETURN
-        assert request.tags["Environment"] == "test"
         assert request.created_at is not None
-        assert request.updated_at is not None
-        assert request.id is not None
+        assert request.request_id is not None
 
     def test_request_status_transitions(self):
         """Test valid request status transitions."""
-        request = Request.create_new_request(
-            template_id="template-001", machine_count=2, requester_id="user-123"
-        )
+        request = _make_request()
 
-        # PENDING -> PROCESSING
-        request.start_processing()
-        assert request.status == RequestStatus.PROCESSING
-        assert request.processing_started_at is not None
+        # PENDING -> IN_PROGRESS
+        request = request.start_processing()
+        assert request.status == RequestStatus.IN_PROGRESS
+        assert request.started_at is not None
 
-        # PROCESSING -> COMPLETED
-        request.complete_successfully(
-            machine_ids=["machine-001", "machine-002"],
-            completion_message="All machines provisioned successfully",
-        )
+        # IN_PROGRESS -> COMPLETED
+        request = request.complete(message="All machines provisioned successfully")
         assert request.status == RequestStatus.COMPLETED
-        assert request.machine_ids == ["machine-001", "machine-002"]
-        assert request.completion_message == "All machines provisioned successfully"
         assert request.completed_at is not None
 
     def test_request_failure_transition(self):
         """Test request failure transition."""
-        request = Request.create_new_request(
-            template_id="template-001", machine_count=2, requester_id="user-123"
-        )
+        request = _make_request()
 
-        # PENDING -> PROCESSING
-        request.start_processing()
+        # PENDING -> IN_PROGRESS
+        request = request.start_processing()
 
-        # PROCESSING -> FAILED
+        # IN_PROGRESS -> FAILED
         error_message = "Failed to provision machines: Insufficient capacity"
-        request.fail_with_error(error_message)
+        request = request.fail(error_message)
 
         assert request.status == RequestStatus.FAILED
-        assert request.error_message == error_message
-        assert request.failed_at is not None
+        assert request.status_message == error_message
+        assert request.completed_at is not None
 
     def test_request_cancellation(self):
         """Test request cancellation."""
-        request = Request.create_new_request(
-            template_id="template-001", machine_count=2, requester_id="user-123"
-        )
+        request = _make_request()
 
         # Cancel from PENDING
-        request.cancel("User requested cancellation")
+        request = request.cancel("User requested cancellation")
 
         assert request.status == RequestStatus.CANCELLED
-        assert request.cancellation_reason == "User requested cancellation"
-        assert request.cancelled_at is not None
+        assert request.completed_at is not None
 
     def test_invalid_status_transitions(self):
         """Test invalid request status transitions."""
-        request = Request.create_new_request(
-            template_id="template-001", machine_count=2, requester_id="user-123"
-        )
-
-        # Complete without processing
-        with pytest.raises(InvalidRequestStateError):
-            request.complete_successfully(machine_ids=["machine-001", "machine-002"])
+        request = _make_request()
 
         # Start processing after completion
-        request.start_processing()
-        request.complete_successfully(machine_ids=["machine-001", "machine-002"])
+        request = request.start_processing()
+        request = request.complete()
 
         with pytest.raises(InvalidRequestStateError):
             request.start_processing()
@@ -167,193 +154,56 @@ class TestRequestAggregate:
         # Valid machine counts
         valid_counts = [1, 5, 10, 50, 100]
         for count in valid_counts:
-            request = Request.create_new_request(
-                template_id="template-001", machine_count=count, requester_id="user-123"
-            )
-            assert request.machine_count == count
-
-        # Invalid machine counts
-        invalid_counts = [0, -1, -10]
-        for count in invalid_counts:
-            with pytest.raises((ValueError, RequestValidationError)):
-                Request.create_new_request(
-                    template_id="template-001",
-                    machine_count=count,
-                    requester_id="user-123",
-                )
-
-    def test_request_validation_priority(self):
-        """Test request validation for priority."""
-        # Valid priorities
-        valid_priorities = [1, 2, 3, 4, 5]
-        for priority in valid_priorities:
-            request = Request.create_new_request(
+            r = Request.create_new_request(
+                request_type=RequestType.ACQUIRE,
                 template_id="template-001",
-                machine_count=1,
-                requester_id="user-123",
-                priority=priority,
+                machine_count=count,
+                provider_type="aws",
             )
-            assert request.priority == priority
-
-        # Invalid priorities
-        invalid_priorities = [0, -1, 6, 10]
-        for priority in invalid_priorities:
-            with pytest.raises((ValueError, RequestValidationError)):
-                Request.create_new_request(
-                    template_id="template-001",
-                    machine_count=1,
-                    requester_id="user-123",
-                    priority=priority,
-                )
+            assert r.requested_count == count
 
     def test_request_validation_required_fields(self):
         """Test request validation for required fields."""
-        # Missing template_id for new request
-        with pytest.raises((ValueError, RequestValidationError)):
-            Request.create_new_request(template_id="", machine_count=1, requester_id="user-123")
-
-        # Missing requester_id
-        with pytest.raises((ValueError, RequestValidationError)):
-            Request.create_new_request(template_id="template-001", machine_count=1, requester_id="")
-
-        # Missing machine_ids for return request
-        with pytest.raises((ValueError, RequestValidationError)):
-            Request.create_return_request(machine_ids=[], requester_id="user-123")
-
-    def test_request_timeout_handling(self):
-        """Test request timeout handling."""
-        request = Request.create_new_request(
-            template_id="template-001",
-            machine_count=2,
-            requester_id="user-123",
-            timeout_minutes=30,
-        )
-
-        assert request.timeout_minutes == 30
-
-        # Test timeout calculation
-        expected_timeout = request.created_at + timedelta(minutes=30)
-        assert request.get_timeout_at() == expected_timeout
-
-        # Test if request is timed out
-        assert not request.is_timed_out()
-
-        # Simulate timeout by setting created_at to past
-        request.created_at = datetime.now(timezone.utc) - timedelta(minutes=31)
-        assert request.is_timed_out()
-
-    def test_request_progress_tracking(self):
-        """Test request progress tracking."""
-        request = Request.create_new_request(
-            template_id="template-001", machine_count=5, requester_id="user-123"
-        )
-
-        request.start_processing()
-
-        # Update progress
-        request.update_progress(completed_count=2, status_message="2 out of 5 machines provisioned")
-
-        assert request.completed_machine_count == 2
-        assert request.status_message == "2 out of 5 machines provisioned"
-        assert request.get_progress_percentage() == 40.0  # 2/5 * 100
-
-        # Update progress again
-        request.update_progress(completed_count=5, status_message="All machines provisioned")
-
-        assert request.completed_machine_count == 5
-        assert request.get_progress_percentage() == 100.0
-
-    def test_request_retry_logic(self):
-        """Test request retry logic."""
-        request = Request.create_new_request(
-            template_id="template-001",
-            machine_count=2,
-            requester_id="user-123",
-            max_retries=3,
-        )
-
-        assert request.max_retries == 3
-        assert request.retry_count == 0
-        assert request.can_retry()
-
-        # Increment retry count
-        request.increment_retry_count("First retry attempt")
-        assert request.retry_count == 1
-        assert request.can_retry()
-
-        # Reach max retries
-        request.increment_retry_count("Second retry attempt")
-        request.increment_retry_count("Third retry attempt")
-        assert request.retry_count == 3
-        assert not request.can_retry()
-
-        # Try to increment beyond max
-        with pytest.raises(RequestProcessingError):
-            request.increment_retry_count("Fourth retry attempt")
+        # provider_type is required — omitting it raises
+        with pytest.raises((ValueError, TypeError)):
+            Request.create_new_request(
+                request_type=RequestType.ACQUIRE,
+                template_id="template-001",
+                machine_count=1,
+            )
 
     def test_request_configuration(self):
-        """Test request configuration handling."""
-        config = {
-            "instance_type": "t2.small",
-            "spot_price": "0.05",
-            "user_data": "#!/bin/bash\necho 'custom config'",
-        }
+        """Test request metadata handling."""
+        meta = {"machine_types": {"t2.small": 1}, "spot_price": "0.05"}
 
         request = Request.create_new_request(
+            request_type=RequestType.ACQUIRE,
             template_id="template-001",
             machine_count=2,
-            requester_id="user-123",
-            configuration=config,
+            provider_type="aws",
+            metadata=meta,
         )
 
-        assert request.configuration == config
-        assert request.configuration["instance_type"] == "t2.small"
-        assert request.configuration["spot_price"] == "0.05"
-
-    def test_request_tags_operations(self):
-        """Test request tags operations."""
-        request = Request.create_new_request(
-            template_id="template-001",
-            machine_count=2,
-            requester_id="user-123",
-            tags={"Environment": "test"},
-        )
-
-        # Add tag
-        request.tags["Project"] = "hostfactory"
-        assert request.tags["Project"] == "hostfactory"
-
-        # Update tag
-        request.tags["Environment"] = "production"
-        assert request.tags["Environment"] == "production"
-
-        # Check tag existence
-        assert "Environment" in request.tags
-        assert "Project" in request.tags
-        assert "NonExistent" not in request.tags
+        assert request.metadata == meta
 
     def test_request_equality(self):
         """Test request equality based on ID."""
-        request1 = Request.create_new_request(
-            template_id="template-001", machine_count=2, requester_id="user-123"
-        )
+        request1 = _make_request()
 
-        # Create another request with same ID
+        # Create another request with same request_id
         request2 = Request(
             id=request1.id,
-            template_id="template-002",  # Different template
-            machine_count=5,  # Different count
-            requester_id="user-456",  # Different requester
-            status=RequestStatus.COMPLETED,  # Different status
-            request_type=RequestType.RETURN,  # Different type
+            request_id=request1.request_id,
+            request_type=RequestType.RETURN,
+            template_id="template-002",
+            requested_count=5,
+            provider_type="aws",
+            provider_name="aws-us-west-2",
+            status=RequestStatus.COMPLETED,
             created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
         )
 
-        # Create request with different ID
-        request3 = Request.create_new_request(
-            template_id="template-001", machine_count=2, requester_id="user-123"
-        )
+        request3 = _make_request()
 
         assert request1 == request2  # Same ID
         assert request1 != request3  # Different ID
@@ -361,114 +211,85 @@ class TestRequestAggregate:
 
     def test_request_hash(self):
         """Test request hashing."""
-        request1 = Request.create_new_request(
-            template_id="template-001", machine_count=2, requester_id="user-123"
-        )
+        request1 = _make_request()
 
         request2 = Request(
-            id=request1.id,  # Same ID
-            template_id="template-002",
-            machine_count=5,
-            requester_id="user-456",
-            status=RequestStatus.COMPLETED,
+            id=request1.id,
+            request_id=request1.request_id,
             request_type=RequestType.RETURN,
+            template_id="template-002",
+            requested_count=5,
+            provider_type="aws",
+            status=RequestStatus.COMPLETED,
             created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
         )
 
         assert hash(request1) == hash(request2)  # Same ID should have same hash
 
     def test_request_serialization(self):
         """Test request serialization to dict."""
-        request = Request.create_new_request(
-            template_id="template-001",
-            machine_count=2,
-            requester_id="user-123",
-            priority=2,
-            tags={"Environment": "test"},
-            configuration={"instance_type": "t2.small"},
-        )
+        request = _make_request(machine_count=2, template_id="template-001")
 
         request_dict = request.model_dump()
 
         assert request_dict["template_id"] == "template-001"
-        assert request_dict["machine_count"] == 2
-        assert request_dict["requester_id"] == "user-123"
-        assert request_dict["priority"] == 2
+        assert request_dict["requested_count"] == 2
         assert request_dict["status"] == RequestStatus.PENDING.value
-        assert request_dict["request_type"] == RequestType.NEW.value
-        assert request_dict["tags"] == {"Environment": "test"}
-        assert request_dict["configuration"] == {"instance_type": "t2.small"}
-        assert "id" in request_dict
+        assert request_dict["request_type"] == RequestType.ACQUIRE.value
+        assert "request_id" in request_dict
         assert "created_at" in request_dict
-        assert "updated_at" in request_dict
 
     def test_request_deserialization(self):
         """Test request deserialization from dict."""
+        import uuid
+
+        req_id = f"req-{uuid.uuid4()}"
         request_dict = {
-            "id": "req-12345678",
+            "request_id": RequestId(value=req_id),
+            "request_type": RequestType.ACQUIRE,
             "template_id": "template-001",
-            "machine_count": 2,
-            "requester_id": "user-123",
-            "priority": 2,
-            "status": "pending",
-            "request_type": "new",
-            "tags": {"Environment": "test"},
-            "configuration": {"instance_type": "t2.small"},
-            "created_at": "2023-01-01T00:00:00Z",
-            "updated_at": "2023-01-01T00:00:00Z",
+            "requested_count": 2,
+            "desired_capacity": 2,
+            "provider_type": "aws",
+            "status": RequestStatus.PENDING,
+            "created_at": datetime.now(timezone.utc),
         }
 
         request = Request(**request_dict)
 
-        assert request.id == "req-12345678"
+        assert str(request.request_id) == req_id
         assert request.template_id == "template-001"
-        assert request.machine_count == 2
-        assert request.requester_id == "user-123"
-        assert request.priority == 2
+        assert request.requested_count == 2
         assert request.status == RequestStatus.PENDING
-        assert request.request_type == RequestType.NEW
-        assert request.tags == {"Environment": "test"}
-        assert request.configuration == {"instance_type": "t2.small"}
+        assert request.request_type == RequestType.ACQUIRE
 
     def test_request_domain_events(self):
         """Test request domain events generation."""
-        # Create new request should generate RequestCreatedEvent
-        request = Request.create_new_request(
-            template_id="template-001", machine_count=2, requester_id="user-123"
-        )
+        request = _make_request()
 
         events = request.get_domain_events()
         assert len(events) > 0
 
         # Start processing should generate RequestStatusChangedEvent
         request.clear_domain_events()
-        request.start_processing()
+        request = request.start_processing()
 
         events = request.get_domain_events()
         assert len(events) > 0
 
-        # Complete request should generate RequestCompletedEvent
+        # Complete request should generate events
         request.clear_domain_events()
-        request.complete_successfully(machine_ids=["machine-001", "machine-002"])
+        request = request.complete()
 
         events = request.get_domain_events()
         assert len(events) > 0
 
     def test_request_string_representation(self):
         """Test request string representation."""
-        request = Request.create_new_request(
-            template_id="template-001", machine_count=2, requester_id="user-123"
-        )
-
-        str_repr = str(request)
-        assert request.id in str_repr
-        assert "template-001" in str_repr
-        assert "user-123" in str_repr
+        request = _make_request(template_id="template-001")
 
         repr_str = repr(request)
-        assert "Request" in repr_str
-        assert request.id in repr_str
+        assert "Request" in repr_str or str(request.request_id) in repr_str
 
 
 @pytest.mark.unit
@@ -477,91 +298,47 @@ class TestRequestValueObjects:
 
     def test_request_id_creation(self):
         """Test RequestId creation."""
-        request_id = RequestId("req-12345678")
-        assert str(request_id) == "req-12345678"
-        assert request_id.value == "req-12345678"
+        import uuid
+
+        valid_id = f"req-{uuid.uuid4()}"
+        request_id = RequestId(value=valid_id)
+        assert str(request_id) == valid_id
+        assert request_id.value == valid_id
 
     def test_request_status_enum(self):
         """Test RequestStatus enum."""
         assert RequestStatus.PENDING.value == "pending"
-        assert RequestStatus.PROCESSING.value == "processing"
-        assert RequestStatus.COMPLETED.value == "completed"
+        assert RequestStatus.IN_PROGRESS.value == "in_progress"
+        assert RequestStatus.COMPLETED.value == "complete"
         assert RequestStatus.FAILED.value == "failed"
         assert RequestStatus.CANCELLED.value == "cancelled"
 
         # Test enum comparison
-        assert RequestStatus.PENDING != RequestStatus.PROCESSING
+        assert RequestStatus.PENDING != RequestStatus.IN_PROGRESS
         assert RequestStatus.COMPLETED == RequestStatus.COMPLETED
 
     def test_request_type_enum(self):
         """Test RequestType enum."""
-        assert RequestType.NEW.value == "new"
+        assert RequestType.ACQUIRE.value == "acquire"
         assert RequestType.RETURN.value == "return"
 
         # Test enum comparison
-        assert RequestType.NEW != RequestType.RETURN
-        assert RequestType.NEW == RequestType.NEW
-
-    def test_priority_validation(self):
-        """Test Priority value object validation."""
-        # Valid priorities (1-5)
-        for priority in range(1, 6):
-            p = Priority(priority)
-            assert p.value == priority
-
-        # Invalid priorities
-        invalid_priorities = [0, -1, 6, 10]
-        for priority in invalid_priorities:
-            with pytest.raises((ValueError, RequestValidationError)):
-                Priority(priority)
+        assert RequestType.ACQUIRE != RequestType.RETURN
+        assert RequestType.ACQUIRE == RequestType.ACQUIRE
 
     def test_machine_count_validation(self):
         """Test MachineCount value object validation."""
         # Valid machine counts
         valid_counts = [1, 5, 10, 50, 100]
         for count in valid_counts:
-            mc = MachineCount(count)
+            mc = MachineCount(value=count)
             assert mc.value == count
 
         # Invalid machine counts
         invalid_counts = [0, -1, -10]
         for count in invalid_counts:
             with pytest.raises((ValueError, RequestValidationError)):
-                MachineCount(count)
-
-    def test_request_configuration_creation(self):
-        """Test RequestConfiguration creation."""
-        config_dict = {
-            "instance_type": "t2.small",
-            "spot_price": "0.05",
-            "user_data": "#!/bin/bash\necho 'test'",
-        }
-
-        config = RequestConfiguration(config_dict)
-        assert config.value == config_dict
-        assert config["instance_type"] == "t2.small"
-        assert config["spot_price"] == "0.05"
-        assert config["user_data"] == "#!/bin/bash\necho 'test'"
-
-    def test_request_configuration_operations(self):
-        """Test RequestConfiguration operations."""
-        config = RequestConfiguration({"key1": "value1"})
-
-        # Test get
-        assert config.get("key1") == "value1"
-        assert config.get("nonexistent") is None
-        assert config.get("nonexistent", "default") == "default"
-
-        # Test contains
-        assert "key1" in config
-        assert "nonexistent" not in config
-
-        # Test iteration
-        keys = list(config.keys())
-        assert "key1" in keys
-
-        values = list(config.values())
-        assert "value1" in values
+                MachineCount(value=count)
 
 
 @pytest.mark.unit
@@ -576,23 +353,26 @@ class TestRequestExceptions:
 
     def test_request_not_found_error(self):
         """Test RequestNotFoundError."""
-        error = RequestNotFoundError("Request not found", request_id="req-123")
-        assert str(error) == "Request not found"
-        assert error.request_id == "req-123"
+        # Constructor signature: __init__(self, request_id: str)
+        error = RequestNotFoundError("req-123")
+        assert "req-123" in str(error)
 
     def test_invalid_request_state_error(self):
         """Test InvalidRequestStateError."""
+        # Constructor signature: __init__(self, current_state: str, attempted_state: str)
         error = InvalidRequestStateError(
-            "Cannot transition from completed to processing",
-            current_state="completed",
-            attempted_state="processing",
+            current_state="complete",
+            attempted_state="in_progress",
         )
         assert "Cannot transition" in str(error)
-        assert error.current_state == "completed"
-        assert error.attempted_state == "processing"
+        assert error.details["current_state"] == "complete"
+        assert error.details["attempted_state"] == "in_progress"
 
     def test_request_processing_error(self):
         """Test RequestProcessingError."""
-        error = RequestProcessingError("Failed to process request", request_id="req-123")
+        # Inherits DomainException(message, error_code, details)
+        error = RequestProcessingError(
+            "Failed to process request",
+            details={"request_id": "req-123"},
+        )
         assert str(error) == "Failed to process request"
-        assert error.request_id == "req-123"

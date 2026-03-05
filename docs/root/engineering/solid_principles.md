@@ -55,7 +55,7 @@ class ApplicationService:
         # - Specific logging implementation (Python logging, structured logging, etc.)
         # - Specific configuration format (YAML, JSON, environment variables)
         # - Specific DI container implementation
-        # - Specific provider implementation (AWS, Azure, etc.)
+        # - Specific provider implementation (AWS, Provider1, etc.)
 
         self._provider_type = provider_type
         self._command_bus = command_bus
@@ -159,9 +159,9 @@ class AWSProviderStrategy(ProviderStrategy):
         # AWS-specific implementation
         pass
 
-class AzureProviderStrategy(ProviderStrategy):
+class Provider1ProviderStrategy(ProviderStrategy):
     def handle_request(self, request: MachineRequest) -> MachineResponse:
-        # Azure-specific implementation
+        # Provider1-specific implementation
         pass
 ```
 
@@ -223,9 +223,9 @@ class AWSProviderStrategy(ProviderStrategy):
         # AWS implementation - fully compatible with base contract
         return MachineResponse(...)
 
-class AzureProviderStrategy(ProviderStrategy):
+class Provider1ProviderStrategy(ProviderStrategy):
     def handle_request(self, request: MachineRequest) -> MachineResponse:
-        # Azure implementation - fully compatible with base contract
+        # Provider1 implementation - fully compatible with base contract
         return MachineResponse(...)
 ```
 

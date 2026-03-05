@@ -1,5 +1,7 @@
 """FastAPI server factory and application setup."""
 
+from typing import TYPE_CHECKING, Any, cast
+
 try:
     from fastapi import FastAPI, Request
     from fastapi.middleware.cors import CORSMiddleware
@@ -9,14 +11,24 @@ try:
     FASTAPI_AVAILABLE = True
 except ImportError:
     FASTAPI_AVAILABLE = False
-    FastAPI = None  # type: ignore
+    FastAPI = None  # type: ignore[assignment,misc]
+    Request = None  # type: ignore[assignment,misc]
+    CORSMiddleware = None  # type: ignore[assignment,misc]
+    TrustedHostMiddleware = None  # type: ignore[assignment,misc]
+    JSONResponse = None  # type: ignore[assignment,misc]
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.middleware.trustedhost import TrustedHostMiddleware
+    from fastapi.responses import JSONResponse
 
 from _package import __version__
 from infrastructure.auth.registry import get_auth_registry
 from infrastructure.logging.logger import get_logger
 
 
-def create_fastapi_app(server_config):
+def create_fastapi_app(server_config: Any) -> Any:
     """
     Create and configure FastAPI application.
 
@@ -35,12 +47,35 @@ def create_fastapi_app(server_config):
             "Install with: pip install orb-py[api]"
         )
 
+    logger = get_logger(__name__)
+
+    # Validate and default configuration
+    if server_config is None:
+        logger.warning("No server configuration provided, using defaults")
+        from config.schemas.server_schema import ServerConfig
+
+        server_config = ServerConfig()  # type: ignore[call-arg]
+
+    # Validate configuration object has required attributes
+    if not hasattr(server_config, "docs_enabled"):
+        logger.error("Invalid server configuration: missing docs_enabled attribute")
+        from config.schemas.server_schema import ServerConfig
+
+        server_config = ServerConfig()  # type: ignore[call-arg]
+
+    # Final safety check - ensure server_config is not None
+    if server_config is None:
+        logger.error("Server configuration is None after validation, using defaults")
+        from config.schemas.server_schema import ServerConfig
+
+        server_config = ServerConfig()  # type: ignore[call-arg]
+
     from api.documentation import configure_openapi
     from api.middleware import AuthMiddleware, LoggingMiddleware
     from infrastructure.error.exception_handler import get_exception_handler
 
     # Create FastAPI app with configuration
-    app = FastAPI(
+    app = FastAPI(  # type: ignore[operator]
         title="Open Resource Broker API",
         description="REST API for Open Resource Broker - Dynamic cloud resource provisioning",
         version=__version__,
@@ -53,12 +88,12 @@ def create_fastapi_app(server_config):
 
     # Add trusted host middleware if configured
     if server_config.trusted_hosts and server_config.trusted_hosts != ["*"]:
-        app.add_middleware(TrustedHostMiddleware, allowed_hosts=server_config.trusted_hosts)
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=server_config.trusted_hosts)  # type: ignore[arg-type]
 
     # Add CORS middleware
     if server_config.cors.enabled:
-        app.add_middleware(
-            CORSMiddleware,
+        app.add_middleware(  # type: ignore[arg-type]
+            cast(Any, CORSMiddleware),
             allow_origins=server_config.cors.origins,
             allow_credentials=server_config.cors.credentials,
             allow_methods=server_config.cors.methods,
@@ -86,32 +121,34 @@ def create_fastapi_app(server_config):
     exception_handler = get_exception_handler()
 
     @app.exception_handler(Exception)
-    async def global_exception_handler(request: Request, exc: Exception):
+    async def global_exception_handler(request: Any, exc: Exception) -> Any:
         """Global exception handler for all unhandled exceptions."""
         try:
             # Use the existing exception handler infrastructure
             error_response = exception_handler.handle_error_for_http(exc)
-            return JSONResponse(
+            return JSONResponse(  # type: ignore[misc]
                 status_code=error_response.http_status or 500,
                 content={
                     "success": False,
                     "error": {
                         "code": (
                             error_response.error_code.value
-                            if hasattr(error_response.error_code, "value")
-                            else str(error_response.error_code)
+                            if not isinstance(error_response.error_code, str)
+                            else error_response.error_code
                         ),
                         "message": error_response.message,
                         "details": error_response.details,
                     },
-                    "timestamp": error_response.timestamp,
+                    "timestamp": error_response.timestamp.isoformat()
+                    if hasattr(error_response.timestamp, "isoformat")
+                    else error_response.timestamp,
                     "request_id": getattr(request.state, "request_id", "unknown"),
                 },
             )
         except Exception as handler_error:
             # Fallback error response
-            logger.error("Exception handler failed: %s", handler_error)
-            return JSONResponse(
+            logger.error("Exception handler failed: %s", handler_error, exc_info=True)
+            return JSONResponse(  # type: ignore[misc]
                 status_code=500,
                 content={
                     "success": False,
@@ -124,7 +161,7 @@ def create_fastapi_app(server_config):
 
     # Add health check endpoint
     @app.get("/health", tags=["System"])
-    async def health_check():
+    async def health_check() -> dict[str, Any]:
         """Health check endpoint."""
         return {
             "status": "healthy",
@@ -134,7 +171,7 @@ def create_fastapi_app(server_config):
 
     # Add info endpoint
     @app.get("/info", tags=["System"])
-    async def info():
+    async def info() -> dict[str, Any]:
         """Service information endpoint."""
         return {
             "service": "open-resource-broker",
@@ -154,7 +191,7 @@ def create_fastapi_app(server_config):
     return app
 
 
-def _create_auth_strategy(auth_config):
+def _create_auth_strategy(auth_config: Any) -> Any:
     """
     Create authentication strategy based on configuration.
 
@@ -191,7 +228,7 @@ def _create_auth_strategy(auth_config):
 
                 auth_registry.register_strategy("iam", IAMAuthStrategy)
             except ImportError:
-                logger.warning("AWS IAM strategy not available")
+                logger.warning("AWS IAM strategy not available", exc_info=True)
                 return None
 
             return auth_registry.get_strategy(
@@ -210,7 +247,7 @@ def _create_auth_strategy(auth_config):
 
                 auth_registry.register_strategy("cognito", CognitoAuthStrategy)
             except ImportError:
-                logger.warning("AWS Cognito strategy not available")
+                logger.warning("AWS Cognito strategy not available", exc_info=True)
                 return None
 
             return auth_registry.get_strategy(
@@ -226,11 +263,11 @@ def _create_auth_strategy(auth_config):
             return None
 
     except Exception as e:
-        logger.error("Failed to create auth strategy: %s", e)
+        logger.error("Failed to create auth strategy: %s", e, exc_info=True)
         return None
 
 
-def _register_routers(app: FastAPI) -> None:
+def _register_routers(app: Any) -> None:
     """
     Register API routers.
 
@@ -246,5 +283,5 @@ def _register_routers(app: FastAPI) -> None:
 
     except ImportError as e:
         logger = get_logger(__name__)
-        logger.error("Failed to import routers: %s", e)
+        logger.error("Failed to import routers: %s", e, exc_info=True)
         # Continue without routers - they might not be fully implemented yet

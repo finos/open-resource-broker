@@ -243,12 +243,17 @@ class TestImportGuardPatterns:
     def test_availability_flag_pattern(self):
         """Test the FEATURE_AVAILABLE flag pattern."""
         # Test pattern: try/except with boolean flag
-        with patch.dict(sys.modules, {"rich": None}):
-            code = """
+        # Pass PYTHONPATH override to block rich by using a fake module
+        code = """
+import sys
+# Simulate rich not being available
+sys.modules['rich'] = None
+sys.modules['rich.console'] = None
+
 try:
     from rich.console import Console
     RICH_AVAILABLE = True
-except ImportError:
+except (ImportError, TypeError):
     RICH_AVAILABLE = False
     Console = None
 
@@ -263,65 +268,63 @@ try:
     print("RICH_USED")
 except ImportError as e:
     print(f"RICH_ERROR={e}")
-            """
+        """
 
-            result = subprocess.run(
-                [sys.executable, "-c", code], capture_output=True, text=True, check=False
-            )
+        result = subprocess.run(
+            [sys.executable, "-c", code], capture_output=True, text=True, check=False
+        )
 
-            assert result.returncode == 0
-            assert "RICH_AVAILABLE=False" in result.stdout
-            assert "RICH_ERROR=Rich not available" in result.stdout
+        assert result.returncode == 0
+        assert "RICH_AVAILABLE=False" in result.stdout
+        assert "RICH_ERROR=Rich not available" in result.stdout
 
     def test_graceful_degradation_pattern(self):
         """Test the graceful degradation pattern."""
         # Test pattern: fallback class/function
-        with patch.dict(sys.modules, {"rich": None}):
-            code = """
+        code = """
+import sys
+# Simulate rich not being available
+sys.modules['rich'] = None
+sys.modules['rich.console'] = None
+
 try:
     from rich.console import Console
     console = Console()
-except ImportError:
+except (ImportError, TypeError):
     class PlainConsole:
         def print(self, text, **kwargs):
             print(f"PLAIN: {text}")
     console = PlainConsole()
 
 console.print("test message")
-            """
+        """
 
-            result = subprocess.run(
-                [sys.executable, "-c", code], capture_output=True, text=True, check=False
-            )
+        result = subprocess.run(
+            [sys.executable, "-c", code], capture_output=True, text=True, check=False
+        )
 
-            assert result.returncode == 0
-            assert "PLAIN: test message" in result.stdout
+        assert result.returncode == 0
+        assert "PLAIN: test message" in result.stdout
 
     def test_lazy_import_pattern(self):
         """Test the lazy import with error pattern."""
         # Test pattern: import inside function with error
-        code = """
-def api_function():
-    try:
-        from fastapi import FastAPI
-        return "FASTAPI_AVAILABLE"
-    except ImportError:
-        raise ImportError("API functionality requires: pip install orb-py[api]")
-
-try:
-    result = api_function()
-    print(result)
-except ImportError as e:
-    print(f"LAZY_ERROR={e}")
-        """
-
+        # Use patch.dict in-process so the mock actually takes effect
         with patch.dict(sys.modules, {"fastapi": None}):
-            result = subprocess.run(
-                [sys.executable, "-c", code], capture_output=True, text=True, check=False
-            )
 
-            assert result.returncode == 0
-            assert "pip install orb-py[api]" in result.stdout
+            def api_function():
+                try:
+                    from fastapi import FastAPI  # noqa: F401
+
+                    return "FASTAPI_AVAILABLE"
+                except ImportError:
+                    raise ImportError("API functionality requires: pip install orb-py[api]")
+
+            try:
+                api_function()
+                assert False, "Expected ImportError"
+            except ImportError as e:
+                assert "pip install orb-py[api]" in str(e)
 
 
 class TestFeatureDetection:

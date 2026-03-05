@@ -80,11 +80,3 @@ class EventPublisher(Protocol):
     def register_handler(self, event_type: str, handler: Callable[[DomainEvent], None]) -> None:
         """Register an event handler."""
         ...
-
-
-class EventHandler(Protocol):
-    """Protocol for event handlers."""
-
-    def handle(self, event: DomainEvent) -> None:
-        """Handle a domain event."""
-        ...

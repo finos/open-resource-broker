@@ -299,15 +299,10 @@ def setup_rest_api_environment(request):
     else:
         test_name = f"{raw_test_name}[{timestamp}]"
 
-    # Extract scenario from test parameters
-    # (using the original name so the scenario id isn't replaced by timestamp)
-    # scenario_name already determined above
-
     # Get test case configuration
     test_case = scenarios_rest_api.get_test_case_by_name(scenario_name) if scenario_name else {}
 
     overrides = test_case.get("overrides", {})
-    awsprov_base_template = test_case.get("awsprov_base_template")
     metrics_config = test_case.get("metrics_config")
 
     # Generate templates
@@ -320,7 +315,6 @@ def setup_rest_api_environment(request):
 
     processor.generate_test_templates(
         test_name,
-        awsprov_base_template=awsprov_base_template,
         overrides=overrides,
         metrics_config=metrics_config,
     )
@@ -1000,7 +994,9 @@ def test_rest_api_partial_return_reduces_capacity(
     log.debug("Return response: %s", json.dumps(return_response, indent=2))
     return_request_id = return_response.get("request_id")
     if return_request_id:
-        _wait_for_return_completion_rest(rest_api_client, return_request_id)
+        _wait_for_return_completion_rest(
+            rest_api_client, return_request_id, timeout=REST_TIMEOUTS["return_status_timeout"]
+        )
 
     # Wait for fleet/ASG to stabilize
     if (

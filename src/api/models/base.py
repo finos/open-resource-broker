@@ -3,15 +3,22 @@
 from typing import Any, Generic, Optional, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
+from pydantic.alias_generators import to_camel
 
 T = TypeVar("T")
 
 
 class APIBaseModel(BaseModel):
-    """Base model for all API models with automatic validation."""
+    """Base model for all API models with automatic validation.
+
+    JSON serialization uses camelCase via alias_generator.
+    Python code continues to use snake_case field names.
+    Use .model_dump(by_alias=True) or response_model_by_alias=True when serializing.
+    """
 
     model_config = ConfigDict(
         frozen=True,
+        alias_generator=to_camel,
         populate_by_name=True,  # Allow populating by field name (snake_case)
         extra="forbid",  # Forbid extra fields
         validate_assignment=True,  # Validate assignments

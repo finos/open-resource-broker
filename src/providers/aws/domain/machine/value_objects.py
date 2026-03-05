@@ -1,14 +1,8 @@
 """AWS-specific machine value objects."""
 
-from domain.machine.value_objects import (
-    InstanceType,
-    MachineHealth,
-    MachineId,
-    MachineStatus,
-    PrivateIpAddress,
-    PublicIpAddress,
-    Tags,
-)
+from domain.base.value_objects import InstanceType, Tags
+from domain.machine.machine_identifiers import MachineId
+from domain.machine.machine_status import MachineStatus
 from providers.aws.domain.template.value_objects import (
     AWSImageId,
     AWSInstanceType,
@@ -26,11 +20,8 @@ __all__: list[str] = [
     "AWSSubnetId",
     "AWSTags",
     "InstanceType",
-    "MachineHealth",
     # Base machine value objects
     "MachineId",
     "MachineStatus",
-    "PrivateIpAddress",
-    "PublicIpAddress",
     "Tags",
 ]

@@ -45,7 +45,7 @@ class RequestType(str, Enum):
         Map business request type to technical operation type.
 
         This provides the mapping between business concepts and technical operations
-        for AWS provider operations.
+        for provider operations.
 
         Returns:
             Technical operation type string
@@ -80,12 +80,13 @@ class RequestStatus(str, Enum):
     """
 
     PENDING = "pending"
-    IN_PROGRESS = "in_progress"  # KBG TODO in_progress in legacy HF this called "running" but it doesn't trigger an error.
-    COMPLETED = "complete"  # KBG TODO
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "complete"
     FAILED = "failed"
     CANCELLED = "cancelled"
     PARTIAL = "partial"
     TIMEOUT = "timeout"
+    ACQUIRING = "acquiring"
 
     @classmethod
     def from_str(cls, value: str) -> RequestStatus:
@@ -115,11 +116,12 @@ class RequestStatus(str, Enum):
             RequestStatus.FAILED,
             RequestStatus.CANCELLED,
             RequestStatus.TIMEOUT,
+            RequestStatus.PARTIAL,
         ]
 
     def is_active(self) -> bool:
         """Check if this status represents an active state."""
-        return self in [RequestStatus.PENDING, RequestStatus.IN_PROGRESS]
+        return self in [RequestStatus.PENDING, RequestStatus.IN_PROGRESS, RequestStatus.ACQUIRING]
 
     def can_transition_to(self, new_status: RequestStatus) -> bool:
         """
@@ -135,14 +137,25 @@ class RequestStatus(str, Enum):
             RequestStatus.PENDING: [RequestStatus.IN_PROGRESS, RequestStatus.CANCELLED],
             RequestStatus.IN_PROGRESS: [
                 RequestStatus.COMPLETED,
+                RequestStatus.PARTIAL,
                 RequestStatus.FAILED,
                 RequestStatus.CANCELLED,
                 RequestStatus.TIMEOUT,
+                RequestStatus.ACQUIRING,
+            ],
+            RequestStatus.ACQUIRING: [
+                RequestStatus.ACQUIRING,
+                RequestStatus.COMPLETED,
+                RequestStatus.PARTIAL,
+                RequestStatus.FAILED,
+                RequestStatus.TIMEOUT,
+                RequestStatus.CANCELLED,
             ],
             RequestStatus.COMPLETED: [],  # Terminal state
             RequestStatus.FAILED: [],  # Terminal state
             RequestStatus.CANCELLED: [],  # Terminal state
             RequestStatus.TIMEOUT: [],  # Terminal state
+            RequestStatus.PARTIAL: [],  # Terminal state
         }
 
         return new_status in valid_transitions.get(self, [])

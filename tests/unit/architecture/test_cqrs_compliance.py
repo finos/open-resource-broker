@@ -79,14 +79,17 @@ class TestCQRSCompliance:
 
     def test_command_immutability(self):
         """Test that commands are immutable after creation."""
-        command = CreateRequestCommand(template_id="test-template", requested_count=2)
-
-        # Should not be able to modify command after creation
-        # Pydantic frozen models raise ValidationError
+        # UpdateRequestStatusCommand uses frozen=True, so assignment raises ValidationError
         from pydantic_core import ValidationError
 
+        from domain.request.value_objects import RequestStatus
+
+        command = UpdateRequestStatusCommand(
+            request_id="test-request", status=RequestStatus.COMPLETED
+        )
+
         with pytest.raises(ValidationError):
-            command.template_id = "modified"
+            command.request_id = "modified"
 
     def test_query_immutability(self):
         """Test that queries are immutable after creation."""

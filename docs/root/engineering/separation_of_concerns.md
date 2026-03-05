@@ -162,7 +162,7 @@ class GetTemplatesHandler:
 The infrastructure layer is concerned with external systems and technical implementation:
 
 ```python
-# src/infrastructure/persistence/dynamodb/template_repository.py
+# src/infrastructure/storage/dynamodb/template_repository.py
 class DynamoDBTemplateRepository(TemplateRepository):
     """Infrastructure concern: DynamoDB persistence implementation."""
 

@@ -1,11 +1,11 @@
 """API handler for requesting machines."""
 
 import time
-from typing import Optional
+from typing import Any, Optional, cast
 
 from api.models import RequestMachinesModel
 from api.validation import ValidationException
-from application.base.infrastructure_handlers import BaseAPIHandler
+from application.base.infrastructure_handlers import BaseAsyncAPIHandler as BaseAPIHandler
 from application.dto.commands import CreateRequestCommand
 from application.request.dto import RequestMachinesResponse
 from domain.base.dependency_injection import injectable
@@ -106,11 +106,11 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
             )
 
             # Execute command through CQRS command bus
-            result_request_id = await self._command_bus.execute(command)
+            await self._command_bus.execute(cast(Any, command))
 
-            # Create response
+            # Create response — use the pre-generated request_id since the CQRS command returns None
             response = RequestMachinesResponse(
-                request_id=result_request_id,
+                request_id=request_id,
                 metadata={"correlation_id": context.correlation_id, "submitted_at": time.time()},
             )
 
@@ -123,7 +123,7 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
 
             # Record metrics if available
             if self._metrics_collector:
-                self._metrics_collector.record_api_success(
+                cast(Any, self._metrics_collector).record_api_success(
                     "request_machines", request.machine_count
                 )
 
@@ -139,7 +139,7 @@ class RequestMachinesRESTHandler(BaseAPIHandler[RequestMachinesModel, RequestMac
 
             # Record metrics if available
             if self._metrics_collector:
-                self._metrics_collector.record_api_failure("request_machines", str(e))
+                cast(Any, self._metrics_collector).record_api_failure("request_machines", str(e))
 
             raise
 

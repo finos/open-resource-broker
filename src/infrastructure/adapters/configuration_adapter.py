@@ -1,11 +1,15 @@
 """Configuration adapter implementing domain ConfigurationPort."""
 
+import logging
 from typing import Any, Optional
 
-from config import NamingConfig, RequestConfig, TemplateConfig
 from config.manager import ConfigurationManager
 from config.schemas.app_schema import AppConfig
+from config.schemas.common_schema import NamingConfig, RequestConfig
+from config.schemas.template_schema import TemplateConfig
 from domain.base.ports import ConfigurationPort
+
+_logger = logging.getLogger(__name__)
 
 
 class ConfigurationAdapter(ConfigurationPort):
@@ -54,8 +58,8 @@ class ConfigurationAdapter(ConfigurationPort):
                     ),
                 },
             }
-        except Exception:
-            # Fallback configuration if config not available
+        except Exception as e:
+            _logger.warning("Failed to load naming config, using defaults: %s", e)
             return {
                 "patterns": {
                     "request_id": r"^(req-|ret-)[a-f0-9\-]{36}$",
@@ -78,8 +82,8 @@ class ConfigurationAdapter(ConfigurationPort):
                 "min_timeout": getattr(request_config, "min_timeout", 30),
                 "max_timeout": getattr(request_config, "max_timeout", 3600),
             }
-        except Exception:
-            # Fallback validation config
+        except Exception as e:
+            _logger.warning("Failed to load validation config, using defaults: %s", e)
             return {
                 "max_machines_per_request": 100,
                 "default_timeout": 300,
@@ -90,6 +94,10 @@ class ConfigurationAdapter(ConfigurationPort):
     def get_provider_config(self):
         """Get provider configuration - delegate to ConfigurationManager."""
         return self._config_manager.get_provider_config()
+
+    def get_provider_instance_config(self, provider_name: str):
+        """Get configuration for a specific provider instance."""
+        return self._config_manager.get_provider_instance_config(provider_name)
 
     def get_request_config(self) -> dict[str, Any]:
         """Get request configuration for domain layer."""
@@ -102,13 +110,22 @@ class ConfigurationAdapter(ConfigurationPort):
                 "default_timeout": getattr(request_config, "default_timeout", 300),
                 "min_timeout": getattr(request_config, "min_timeout", 30),
                 "max_timeout": getattr(request_config, "max_timeout", 3600),
+                "fulfillment_max_retries": request_config.fulfillment_max_retries,
+                "fulfillment_timeout_seconds": request_config.fulfillment_timeout_seconds,
+                "fulfillment_batch_size": request_config.fulfillment_batch_size,
+                "fulfillment_fallback_template_id": request_config.fulfillment_fallback_template_id,
             }
-        except Exception:
+        except Exception as e:
+            _logger.warning("Failed to load request config, using defaults: %s", e)
             return {
                 "max_machines_per_request": 100,
                 "default_timeout": 300,
                 "min_timeout": 30,
                 "max_timeout": 3600,
+                "fulfillment_max_retries": 3,
+                "fulfillment_timeout_seconds": 300,
+                "fulfillment_batch_size": 1000,
+                "fulfillment_fallback_template_id": None,
             }
 
     def get_template_config(self) -> dict[str, Any]:
@@ -161,8 +178,8 @@ class ConfigurationAdapter(ConfigurationPort):
                     result["aws_metrics"].update(metrics_config["aws_metrics"])
 
             return result
-        except Exception:
-            # Fallback configuration
+        except Exception as e:
+            _logger.warning("Failed to load metrics config, using defaults: %s", e)
             return defaults
 
     def get_storage_config(self) -> dict[str, Any]:
@@ -174,7 +191,8 @@ class ConfigurationAdapter(ConfigurationPort):
                 "path": storage_config.get("path", "data"),
                 "backup_enabled": storage_config.get("backup_enabled", True),
             }
-        except Exception:
+        except Exception as e:
+            _logger.warning("Failed to load storage config, using defaults: %s", e)
             return {"type": "json", "path": "data", "backup_enabled": True}
 
     def get_events_config(self) -> dict[str, Any]:
@@ -186,7 +204,8 @@ class ConfigurationAdapter(ConfigurationPort):
                 "mode": events_config.get("mode", "logging"),
                 "batch_size": events_config.get("batch_size", 10),
             }
-        except Exception:
+        except Exception as e:
+            _logger.warning("Failed to load events config, using defaults: %s", e)
             return {"enabled": True, "mode": "logging", "batch_size": 10}
 
     def get_logging_config(self) -> dict[str, Any]:
@@ -199,13 +218,20 @@ class ConfigurationAdapter(ConfigurationPort):
                     "format", "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
                 ),
                 "file_enabled": logging_config.get("file_enabled", True),
+                "console_enabled": logging_config.get("console_enabled", True),
             }
-        except Exception:
+        except Exception as e:
+            _logger.warning("Failed to load logging config, using defaults: %s", e)
             return {
                 "level": "INFO",
                 "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
                 "file_enabled": True,
+                "console_enabled": True,
             }
+
+    def get_config_file_path(self) -> str:
+        """Get the config file path from configuration."""
+        return self._config_manager.get("config_file", "")
 
     def get_storage_strategy(self) -> str:
         """Get storage strategy - delegate to ConfigurationManager."""
@@ -215,15 +241,15 @@ class ConfigurationAdapter(ConfigurationPort):
         """Get scheduler strategy - delegate to ConfigurationManager."""
         return self._config_manager.get_scheduler_strategy()
 
-    def get_typed(self, config_type):
+    def get_typed(self, key, expected_type=None, default=None):  # type: ignore[override]
         """Get typed configuration for compatibility with ConfigurationManager."""
-        return self._config_manager.get_typed(config_type)
+        return self._config_manager.get_typed(key)  # type: ignore[arg-type]
 
     def resolve_file(
-        self, file_type: str, filename: str, explicit_path: Optional[str] = None
-    ) -> str:
+        self, path: str, filename: str = "", explicit_path: Optional[str] = None
+    ) -> str:  # type: ignore[override]
         """Resolve file path for compatibility with ConfigurationManager."""
-        return self._config_manager.resolve_file(file_type, filename, explicit_path)
+        return self._config_manager.resolve_file(path, filename, explicit_path)
 
     def get_provider_type(self) -> str:
         """Get provider type - delegate to ConfigurationManager."""
@@ -247,6 +273,10 @@ class ConfigurationAdapter(ConfigurationPort):
         """Get log directory - delegate to ConfigurationManager."""
         return self._config_manager.get_log_dir(default_path, config_path)
 
+    def get_cache_dir(self) -> str:
+        """Get cache directory - delegate to ConfigurationManager."""
+        return self._config_manager.get_cache_dir()
+
     def get_native_spec_config(self) -> dict[str, Any]:
         """Get native spec configuration."""
         try:
@@ -254,8 +284,8 @@ class ConfigurationAdapter(ConfigurationPort):
 
             config = self._config_manager.get_typed(NativeSpecConfig)
             return {"enabled": config.enabled, "merge_mode": config.merge_mode}
-        except Exception:
-            # Fallback configuration if config not available
+        except Exception as e:
+            _logger.warning("Failed to load native spec config, using defaults: %s", e)
             return {"enabled": False, "merge_mode": "merge"}
 
     def get_package_info(self) -> dict[str, Any]:
@@ -273,6 +303,115 @@ class ConfigurationAdapter(ConfigurationPort):
             # If _package.py itself fails, we have bigger problems - let it fail
             raise
 
+    def override_scheduler_strategy(self, strategy: str) -> None:  # type: ignore[override]
+        """Override scheduler strategy - delegate to ConfigurationManager."""
+        self._config_manager.override_scheduler_strategy(strategy)
+
+    def override_provider_instance(self, provider_name: str) -> None:
+        """Override provider instance - delegate to ConfigurationManager."""
+        self._config_manager.override_provider_instance(provider_name)
+
+    def override_provider_region(self, region: str) -> None:
+        """Override provider region - delegate to ConfigurationManager."""
+        self._config_manager.override_aws_region(region)
+
+    def override_provider_profile(self, profile: str) -> None:
+        """Override provider credential profile - delegate to ConfigurationManager."""
+        self._config_manager.override_aws_profile(profile)
+
+    def get_effective_region(self, default_region: str = "us-east-1") -> str:
+        """Get effective provider region - delegate to ConfigurationManager."""
+        return self._config_manager.get_effective_aws_region(default_region)
+
+    def get_effective_profile(self, default_profile: str = "default") -> str:
+        """Get effective provider credential profile - delegate to ConfigurationManager."""
+        return self._config_manager.get_effective_aws_profile(default_profile)
+
+    def get_resource_prefix(self, resource_type: str) -> str:
+        """Get resource naming prefix for the given resource type."""
+        try:
+            resource_config = self._config_manager.app_config.resource
+            if hasattr(resource_config.prefixes, resource_type):
+                return getattr(resource_config.prefixes, resource_type)
+            return resource_config.default_prefix
+        except Exception:
+            return ""
+
+    def get_cleanup_config(self) -> dict[str, Any]:
+        """Get cleanup configuration."""
+        try:
+            cleanup = self._config_manager.app_config.cleanup
+            return {
+                "enabled": cleanup.enabled,
+                "delete_launch_template": cleanup.delete_launch_template,
+                "dry_run": cleanup.dry_run,
+                "resources": {
+                    "asg": cleanup.resources.asg,
+                    "ec2_fleet": cleanup.resources.ec2_fleet,
+                    "spot_fleet": cleanup.resources.spot_fleet,
+                    "run_instances": cleanup.resources.run_instances,
+                },
+            }
+        except Exception as e:
+            _logger.warning("Failed to load cleanup config, using defaults: %s", e)
+            return {
+                "enabled": True,
+                "delete_launch_template": True,
+                "dry_run": False,
+                "resources": {
+                    "asg": True,
+                    "ec2_fleet": True,
+                    "spot_fleet": True,
+                    "run_instances": True,
+                },
+            }
+
     def get_active_provider_override(self) -> str | None:
         """Get current provider override from CLI."""
         return self._config_manager.get_active_provider_override()
+
+    def get_configuration_value(self, key: str, default: Any = None) -> Any:
+        """Get configuration value."""
+        return self._config_manager.get(key, default)
+
+    def set_configuration_value(self, key: str, value: Any) -> None:
+        """Set configuration value."""
+        self._config_manager.set(key, value)
+
+    def get_configuration_sources(self) -> dict[str, Any]:
+        """Get configuration source information using existing methods."""
+        # Get actual loaded config file
+        actual_config_file = self._config_manager.get_loaded_config_file()
+
+        # Get active template file from scheduler
+        template_file = self._get_active_template_file()
+
+        return {
+            "config_file": actual_config_file,
+            "template_file": template_file,
+            "config_dir": self.get_conf_dir(),
+            "work_dir": self.get_work_dir(),
+            "primary_source": "config_file" if actual_config_file else "environment",
+        }
+
+    def _get_active_template_file(self) -> str | None:
+        """Get active template file from scheduler."""
+        try:
+            from infrastructure.di.container import get_container
+            from infrastructure.scheduler.factory import SchedulerStrategyFactory
+
+            container = get_container()
+            scheduler_factory = container.get(SchedulerStrategyFactory)
+            scheduler_type = self.get_scheduler_strategy()
+            scheduler = scheduler_factory.create_strategy(scheduler_type, container)
+
+            template_paths = scheduler.get_template_paths()
+            for path in template_paths:
+                import os
+
+                if os.path.exists(path):
+                    return path
+            return None
+        except Exception as e:
+            _logger.debug("Could not determine active template file: %s", e)
+            return None

@@ -127,7 +127,7 @@ class AWSProviderAdapter:
     @property
     def state_mapper(self) -> ProviderStateMapper:
         """Get the state mapper for AWS."""
-        return self._state_mapper
+        return self._state_mapper  # type: ignore[return-value]
 
     @property
     def resource_validator(self) -> ProviderResourceValidator:

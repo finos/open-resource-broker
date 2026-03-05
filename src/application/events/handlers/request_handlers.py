@@ -13,7 +13,7 @@ from domain.base.events import DomainEvent
 from domain.base.ports import ErrorHandlingPort, EventPublisherPort, LoggingPort
 
 
-@event_handler("RequestCreatedEvent")
+@event_handler("RequestCreatedEvent")  # type: ignore[arg-type]
 class RequestCreatedHandler(BaseLoggingEventHandler[DomainEvent]):
     """Handle request creation events using BaseEventHandler pattern."""
 
@@ -38,7 +38,7 @@ class RequestCreatedHandler(BaseLoggingEventHandler[DomainEvent]):
         )
 
 
-@event_handler("RequestStatusUpdatedEvent")
+@event_handler("RequestStatusUpdatedEvent")  # type: ignore[arg-type]
 class RequestStatusUpdatedHandler(BaseLoggingEventHandler[DomainEvent]):
     """Handle request status update events using BaseEventHandler pattern."""
 
@@ -62,7 +62,7 @@ class RequestStatusUpdatedHandler(BaseLoggingEventHandler[DomainEvent]):
         )
 
 
-@event_handler("RequestCompletedEvent")
+@event_handler("RequestCompletedEvent")  # type: ignore[arg-type]
 class RequestCompletedHandler(BaseLoggingEventHandler[DomainEvent]):
     """Handle request completion events using BaseEventHandler pattern."""
 
@@ -87,7 +87,7 @@ class RequestCompletedHandler(BaseLoggingEventHandler[DomainEvent]):
         )
 
 
-@event_handler("RequestFailedEvent")
+@event_handler("RequestFailedEvent")  # type: ignore[arg-type]
 class RequestFailedHandler(BaseLoggingEventHandler[DomainEvent]):
     """Handle request failure events using BaseEventHandler pattern."""
 
@@ -114,7 +114,7 @@ class RequestFailedHandler(BaseLoggingEventHandler[DomainEvent]):
         return "error"
 
 
-@event_handler("RequestCancelledEvent")
+@event_handler("RequestCancelledEvent")  # type: ignore[arg-type]
 class RequestCancelledHandler(BaseLoggingEventHandler[DomainEvent]):
     """Handle request cancellation events using BaseEventHandler pattern."""
 
@@ -141,7 +141,7 @@ class RequestCancelledHandler(BaseLoggingEventHandler[DomainEvent]):
         return "warning"
 
 
-@event_handler("RequestTimeoutEvent")
+@event_handler("RequestTimeoutEvent")  # type: ignore[arg-type]
 class RequestTimeoutHandler(BaseLoggingEventHandler[DomainEvent]):
     """Handle request timeout events using BaseEventHandler pattern."""
 

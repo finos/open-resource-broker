@@ -4,7 +4,7 @@ from typing import Optional
 
 from pydantic import Field, field_validator
 
-from api.models.base import APIRequest, APIResponse
+from api.models.base import APIRequest
 
 
 class MachineTemplate(APIRequest):
@@ -48,14 +48,4 @@ class Machine(APIRequest):
     message: Optional[str] = Field(
         default=None,
         description="Additional message for the request status of this machine",
-    )
-
-
-class RequestMachinesResponse(APIResponse):
-    """Request machines response model."""
-
-    request_id: str = Field(description="Unique ID to identify this request in the cloud provider")
-    message: str = Field(
-        default="Request VM success from provider.",
-        description="Any additional message the caller should know",
     )

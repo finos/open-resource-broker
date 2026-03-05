@@ -3,7 +3,7 @@
 from unittest.mock import Mock
 
 from domain.request.aggregate import Request
-from domain.request.value_objects import RequestId
+from domain.request.value_objects import RequestId, RequestType
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.infrastructure.services.aws_native_spec_service import (
     AWSNativeSpecService,
@@ -31,13 +31,18 @@ class TestAWSNativeSpecPackageContext:
         }
 
         template = AWSTemplate(
-            template_id="test-template", image_id="ami-12345", instance_type="t3.micro"
+            template_id="test-template",
+            image_id="ami-12345",
+            instance_type="t3.micro",
+            subnet_ids=["subnet-123"],
         )
 
         request = Request(
-            request_id=RequestId.generate(),
+            request_id=RequestId.generate(RequestType.ACQUIRE),
             requested_count=2,
             template_id="test-template",
+            request_type=RequestType.ACQUIRE,
+            provider_type="aws",
         )
 
         # Act
@@ -51,24 +56,32 @@ class TestAWSNativeSpecPackageContext:
         assert context["template_id"] == "test-template"
 
     def test_build_aws_context_package_info_fallback(self):
-        """Test fallback when package info is unavailable."""
-        # Arrange
-        self.mock_config_port.get_package_info.side_effect = Exception("Package info unavailable")
+        """Test fallback when package info returns partial data."""
+        # Arrange — return dict missing version key
+        self.mock_config_port.get_package_info.return_value = {
+            "name": "open-resource-broker",
+            # no "version" key
+        }
 
         template = AWSTemplate(
-            template_id="test-template", image_id="ami-12345", instance_type="t3.micro"
+            template_id="test-template",
+            image_id="ami-12345",
+            instance_type="t3.micro",
+            subnet_ids=["subnet-123"],
         )
 
         request = Request(
-            request_id=RequestId.generate(),
+            request_id=RequestId.generate(RequestType.ACQUIRE),
             requested_count=1,
             template_id="test-template",
+            request_type=RequestType.ACQUIRE,
+            provider_type="aws",
         )
 
         # Act
         context = self.service._build_aws_context(template, request)
 
-        # Assert - should use fallback values
+        # Assert - version falls back to "unknown" when key is missing
         assert context["package_name"] == "open-resource-broker"
         assert context["package_version"] == "unknown"
 
@@ -81,13 +94,18 @@ class TestAWSNativeSpecPackageContext:
         }
 
         template = AWSTemplate(
-            template_id="test-template", image_id="ami-12345", instance_type="t3.micro"
+            template_id="test-template",
+            image_id="ami-12345",
+            instance_type="t3.micro",
+            subnet_ids=["subnet-123"],
         )
 
         request = Request(
-            request_id=RequestId.generate(),
+            request_id=RequestId.generate(RequestType.ACQUIRE),
             requested_count=1,
             template_id="test-template",
+            request_type=RequestType.ACQUIRE,
+            provider_type="aws",
         )
 
         # Act

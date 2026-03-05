@@ -141,7 +141,7 @@ def register_logger_with_container() -> None:
         logger_singleton = get_logger_singleton()
 
         # Register the singleton if it's not already registered
-        if LoggerSingleton not in container._singletons:
+        if LoggerSingleton not in container._singletons:  # type: ignore[attr-defined]
             container.register_singleton(LoggerSingleton, logger_singleton)
 
         # Also register with the singleton registry if available

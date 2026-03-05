@@ -1,152 +1,372 @@
-# Security Policy
+# Security Hardening Implementation
 
-## Supported Versions
+> **Note:** This document is an internal implementation reference describing security controls built into ORB. It is not a vulnerability disclosure policy. To report a security vulnerability, follow the standard responsible disclosure process for this repository.
 
-We release patches for security vulnerabilities for the following versions:
+## Overview
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.x.x   | :white_check_mark: |
-| < 1.0   | :x:                |
+This document describes the security hardening implementations for the Open Resource Broker (ORB) project, addressing OWASP Top 10 vulnerabilities and implementing defense-in-depth security controls.
 
-## Reporting a Vulnerability
+## Implemented Security Features
 
-We take the security of AWS Host Factory Plugin seriously. If you believe you have found a security vulnerability, please report it to us as described below.
+### 1. JWT Token Blacklist (OWASP A02: Cryptographic Failures)
 
-### Where to Report
+**Location:** `src/infrastructure/auth/token_blacklist/`
 
-**Please do not report security vulnerabilities through public GitHub issues.**
+**Features:**
+- Token revocation support for secure logout
+- Redis-based blacklist with automatic expiration
+- In-memory fallback for development/testing
+- Automatic cleanup of expired tokens
+- Thread-safe operations with async support
 
-Instead, please report them via email to:
-- **aws-security@amazon.com**
+**Usage:**
+```python
+from infrastructure.auth.token_blacklist import InMemoryTokenBlacklist
 
-You should receive a response within 24 hours. If for some reason you do not, please follow up via email to ensure we received your original message.
+blacklist = InMemoryTokenBlacklist()
+await blacklist.add_token(token, expires_at)
+is_blacklisted = await blacklist.is_blacklisted(token)
+```
 
-### What to Include
+**Security Benefits:**
+- Prevents use of stolen tokens after logout
+- Mitigates session fixation attacks
+- Supports token rotation strategies
 
-Please include the following information in your report:
+### 2. Enhanced Bearer Token Strategy (OWASP A07: Authentication Failures)
 
-- Type of issue (e.g., buffer overflow, SQL injection, cross-site scripting, etc.)
-- Full paths of source file(s) related to the manifestation of the issue
-- The location of the affected source code (tag/branch/commit or direct URL)
-- Any special configuration required to reproduce the issue
-- Step-by-step instructions to reproduce the issue
-- Proof-of-concept or exploit code (if possible)
-- Impact of the issue, including how an attacker might exploit it
+**Location:** `src/infrastructure/auth/strategy/bearer_token_strategy_enhanced.py`
 
-### What to Expect
+**Features:**
+- JWT token validation with blacklist checking
+- Rate limiting (10 attempts per minute per IP)
+- Secret key strength validation (minimum 256 bits)
+- Proper JWT signature verification
+- Token format validation to prevent injection
+- Security logging for all token operations
 
-After you have submitted your report:
+**Security Improvements:**
+- Prevents brute force attacks via rate limiting
+- Validates JWT structure and signature
+- Checks token expiration and issued-at times
+- Requires essential claims (exp, iat, sub)
+- Sanitizes token input to prevent header injection
 
-1. We will acknowledge your report within 24 hours
-2. We will provide a more detailed response within 72 hours
-   - Indicating the next steps in handling your report
-   - If we can reproduce the issue
-   - If we need additional information
-3. We will keep you informed of our progress
-   - How we plan to resolve the issue
-   - If we need additional information
-   - If we have questions
+**Usage:**
+```python
+from infrastructure.auth.strategy.bearer_token_strategy_enhanced import EnhancedBearerTokenStrategy
+from infrastructure.auth.token_blacklist import InMemoryTokenBlacklist
 
-### Protection Policy
+blacklist = InMemoryTokenBlacklist()
+strategy = EnhancedBearerTokenStrategy(
+    secret_key="your-256-bit-secret-key",
+    blacklist=blacklist,
+    rate_limit_enabled=True
+)
+```
 
-We follow these principles:
+### 3. Input Validation Framework (OWASP A03: Injection)
 
-- We will investigate all legitimate reports and do our best to quickly fix the problem
-- We will keep you informed of the progress towards a fix
-- We will not take legal action against you if you:
-  - Follow the instructions above
-  - Give us reasonable time to respond before disclosure
-  - Do not exploit the vulnerability beyond necessary testing
-  - Do not share information about the vulnerability until we fix it
+**Location:** `src/infrastructure/validation/`
 
-### Safe Harbor
+**Features:**
+- Input sanitization to prevent injection attacks
+- Length validation with configurable limits
+- Character whitelisting (alphanumeric, AWS regions, etc.)
+- Type validation (integers, choices, etc.)
+- Secure input function to replace direct `input()` calls
 
-We consider security research conducted under this policy to be:
-- Authorized in accordance with the Computer Fraud and Abuse Act (CFAA)
-- Exempt from DMCA restrictions
-- Exempt from restrictions in our Terms of Service that would interfere with conducting security research
-- Lawful, helpful to the overall security of the Internet, and conducted in good faith
+**Validation Functions:**
+- `sanitize_input()` - Remove dangerous characters
+- `validate_length()` - Enforce min/max length
+- `validate_alphanumeric()` - Whitelist alphanumeric chars
+- `validate_integer()` - Parse and validate integers
+- `validate_choice()` - Validate against allowed choices
+- `validate_aws_region()` - Validate AWS region format
+- `secure_input()` - Secure replacement for `input()`
 
-You are expected, as always, to comply with all applicable laws.
+**Dangerous Characters Blocked:**
+```
+< > & | ; ` $ ( ) { } [ ] \n \r
+```
 
-### Public Disclosure
+**Usage:**
+```python
+from infrastructure.validation import secure_input, validate_aws_region
 
-We aim to resolve security issues as quickly as possible. We would like to ask that you do not share information about the vulnerability until we have had the opportunity to fix it and notify our users.
+# Secure user input
+region = secure_input(
+    "Enter AWS region: ",
+    default="us-east-1",
+    validator=validate_aws_region,
+    max_length=50
+)
+```
 
-Once we have resolved the issue, we will:
-1. Notify affected users
-2. Release a security advisory
-3. Credit you (if desired) for discovering and reporting the issue
+### 4. Enhanced Authentication Middleware (OWASP A05: Security Misconfiguration)
 
-### Security Best Practices
+**Location:** `src/api/middleware/auth_middleware_enhanced.py`
 
-When using this plugin:
+**Features:**
+- Path normalization to prevent traversal attacks
+- Exact path matching for excluded paths (no prefix matching)
+- Security headers on all responses
+- Sanitized error messages to prevent information disclosure
+- Request logging with IP tracking
+- Header length limits to prevent DoS
 
-1. Always use the latest version
-2. Follow AWS security best practices
-3. Use the principle of least privilege for AWS credentials
-4. Regularly rotate credentials
-5. Monitor AWS CloudTrail logs
-6. Enable AWS CloudWatch monitoring
-7. Use secure network configurations
-8. Implement appropriate access controls
+**Security Headers Added:**
+- `X-Frame-Options: DENY` - Prevent clickjacking
+- `X-Content-Type-Options: nosniff` - Prevent MIME sniffing
+- `X-XSS-Protection: 1; mode=block` - Enable XSS protection
+- `Strict-Transport-Security` - Force HTTPS
+- `Content-Security-Policy` - Restrict resource loading
+- `Referrer-Policy` - Control referrer information
+- `Permissions-Policy` - Disable unnecessary features
 
-### Scope
+**Path Traversal Protection:**
+```python
+# Normalizes paths to prevent traversal
+/health/../admin  -> /admin (blocked if not in excluded_paths)
+/health/./../../etc/passwd -> /etc/passwd (blocked)
+```
 
-This security policy applies to:
-- The latest release of the AWS Host Factory Plugin
-- The main branch of our GitHub repository
-- All official documentation and examples
+**Usage:**
+```python
+from api.middleware.auth_middleware_enhanced import EnhancedAuthMiddleware
 
-### Out of Scope
+app.add_middleware(
+    EnhancedAuthMiddleware,
+    auth_port=auth_strategy,
+    excluded_paths=["/health", "/docs"],
+    require_auth=True
+)
+```
 
-The following are not in scope:
-- Issues in dependencies (please report to their maintainers)
-- Theoretical vulnerabilities without proof of exploitability
-- Issues requiring physical access to a user's device
-- Social engineering attacks
-- DOS/DDOS attacks
+## Security Testing
 
-## Security Updates
+### Test Coverage
 
-Security updates will be released as part of our regular release cycle unless a critical vulnerability requires an immediate release.
+**Token Blacklist Tests:** `tests/unit/infrastructure/auth/test_token_blacklist.py`
+- Token addition and removal
+- Expiration handling
+- Automatic cleanup
+- Blacklist size tracking
 
-### Version Numbering
+**Input Validation Tests:** `tests/unit/infrastructure/validation/test_input_validator.py`
+- Dangerous character detection
+- Length validation
+- Type validation
+- Format validation
 
-We follow Semantic Versioning:
-- MAJOR version for incompatible API changes
-- MINOR version for backwards-compatible functionality
-- PATCH version for backwards-compatible bug fixes and security updates
+### Running Security Tests
 
-### Update Process
+```bash
+# Run all security tests
+python -m pytest tests/unit/infrastructure/auth/ -v
+python -m pytest tests/unit/infrastructure/validation/ -v
 
-1. Security updates are marked with a "SECURITY" tag in the changelog
-2. Critical updates will be announced via:
-   - GitHub Security Advisories
-   - Release notes
-   - Our official communication channels
+# Run with coverage
+python -m pytest tests/unit/infrastructure/auth/ --cov=infrastructure.auth
+python -m pytest tests/unit/infrastructure/validation/ --cov=infrastructure.validation
+```
 
-### Automatic Updates
+## OWASP Top 10 Coverage
 
-We recommend:
-1. Using dependency management tools that support automatic updates
-2. Regularly checking for updates
-3. Setting up automated security scanning in your CI/CD pipeline
+### A01: Broken Access Control
+- ✅ Authorization checks in middleware
+- ✅ Role-based access control (RBAC)
+- ✅ Permission validation
 
-## Security-Related Configuration
+### A02: Cryptographic Failures
+- ✅ JWT token blacklist for secure logout
+- ✅ Strong secret key validation (256+ bits)
+- ✅ Proper JWT signature verification
 
-For secure deployment, ensure:
+### A03: Injection
+- ✅ Input sanitization framework
+- ✅ Character whitelisting
+- ✅ Length limits on all inputs
+- ✅ Parameterized queries (existing)
 
-1. AWS IAM roles follow least privilege
-2. Network security groups are properly configured
-3. Encryption is enabled for data at rest
-4. Secure communication channels are used
-5. Logging and monitoring are enabled
-6. Access controls are implemented
-7. Regular security audits are performed
+### A04: Insecure Design
+- ✅ Security-first architecture
+- ✅ Defense in depth
+- ✅ Fail-secure defaults
 
-## Contact
+### A05: Security Misconfiguration
+- ✅ Security headers on all responses
+- ✅ Secure defaults
+- ✅ Error message sanitization
 
-For questions about this security policy, please contact:
-security@awshostfactory.example.com
+### A06: Vulnerable Components
+- ✅ Using PyJWT library for proper JWT handling
+- ✅ Regular dependency updates (existing)
+
+### A07: Authentication Failures
+- ✅ Rate limiting on authentication
+- ✅ Token blacklist
+- ✅ Strong password policies (existing)
+- ✅ Secure session management
+
+### A08: Software and Data Integrity Failures
+- ✅ JWT signature verification
+- ✅ Token integrity checks
+
+### A09: Logging and Monitoring Failures
+- ✅ Security event logging
+- ✅ Authentication attempt tracking
+- ✅ Rate limit violation logging
+
+### A10: Server-Side Request Forgery (SSRF)
+- ✅ Input validation on URLs
+- ✅ Whitelist validation (existing)
+
+## Migration Guide
+
+### Replacing Direct input() Calls
+
+**Before:**
+```python
+region = input("Enter region: ").strip() or "us-east-1"
+```
+
+**After:**
+```python
+from infrastructure.validation import secure_input, validate_aws_region
+
+region = secure_input(
+    "Enter region: ",
+    default="us-east-1",
+    validator=validate_aws_region
+)
+```
+
+### Enabling Token Blacklist
+
+**Before:**
+```python
+strategy = BearerTokenStrategy(secret_key="key")
+```
+
+**After:**
+```python
+from infrastructure.auth.token_blacklist import InMemoryTokenBlacklist
+from infrastructure.auth.strategy.bearer_token_strategy_enhanced import EnhancedBearerTokenStrategy
+
+blacklist = InMemoryTokenBlacklist()
+strategy = EnhancedBearerTokenStrategy(
+    secret_key="your-strong-secret-key-at-least-32-bytes",
+    blacklist=blacklist
+)
+```
+
+### Upgrading Middleware
+
+**Before:**
+```python
+from api.middleware.auth_middleware import AuthMiddleware
+```
+
+**After:**
+```python
+from api.middleware.auth_middleware_enhanced import EnhancedAuthMiddleware
+```
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# JWT Configuration
+ORB_JWT_SECRET_KEY="your-256-bit-secret-key-here"
+ORB_JWT_ALGORITHM="HS256"
+ORB_JWT_EXPIRY=3600
+
+# Rate Limiting
+ORB_RATE_LIMIT_ENABLED=true
+ORB_RATE_LIMIT_MAX_ATTEMPTS=10
+ORB_RATE_LIMIT_WINDOW=60
+
+# Redis (optional, for distributed blacklist)
+ORB_REDIS_URL="redis://localhost:6379"
+```
+
+### Production Recommendations
+
+1. **Secret Key Management:**
+   - Use at least 256-bit (32-byte) secret keys
+   - Rotate keys regularly
+   - Store in secure key management system (AWS Secrets Manager, HashiCorp Vault)
+
+2. **Rate Limiting:**
+   - Enable rate limiting in production
+   - Adjust limits based on traffic patterns
+   - Monitor rate limit violations
+
+3. **Token Blacklist:**
+   - Use Redis for distributed deployments
+   - Configure automatic cleanup intervals
+   - Monitor blacklist size
+
+4. **Security Headers:**
+   - Enable HSTS in production
+   - Configure CSP based on application needs
+   - Test headers with security scanners
+
+5. **Logging:**
+   - Enable security event logging
+   - Monitor authentication failures
+   - Set up alerts for suspicious activity
+
+## Security Scanning
+
+### Recommended Tools
+
+```bash
+# Static analysis
+bandit -r src/
+
+# Dependency scanning
+safety check
+
+# SAST scanning
+semgrep --config=auto src/
+```
+
+## Incident Response
+
+### Token Compromise
+
+1. Revoke compromised token:
+   ```python
+   await auth_strategy.revoke_token(compromised_token)
+   ```
+
+2. Force user re-authentication
+
+3. Rotate secret keys if necessary
+
+4. Review logs for suspicious activity
+
+### Rate Limit Violations
+
+1. Check logs for offending IPs
+2. Investigate for attack patterns
+3. Consider IP blocking if malicious
+4. Adjust rate limits if legitimate traffic
+
+## Compliance
+
+This implementation helps meet requirements for:
+- OWASP ASVS (Application Security Verification Standard)
+- PCI-DSS (Payment Card Industry Data Security Standard)
+- SOC 2 (System and Organization Controls)
+- GDPR (General Data Protection Regulation)
+
+## References
+
+- [OWASP Top 10 2021](https://owasp.org/Top10/)
+- [OWASP ASVS](https://owasp.org/www-project-application-security-verification-standard/)
+- [JWT Best Practices](https://tools.ietf.org/html/rfc8725)
+- [NIST Cybersecurity Framework](https://www.nist.gov/cyberframework)

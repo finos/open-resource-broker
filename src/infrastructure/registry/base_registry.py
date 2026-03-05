@@ -48,7 +48,7 @@ class BaseRegistry(ABC):
     _instances: dict[str, "BaseRegistry"] = {}
     _lock = threading.Lock()
 
-    def __new__(cls):
+    def __new__(cls, *args, **kwargs):
         """Ensure singleton instance per registry type."""
         registry_name = cls.__name__
         if registry_name not in cls._instances:
@@ -57,17 +57,19 @@ class BaseRegistry(ABC):
                     cls._instances[registry_name] = super().__new__(cls)
         return cls._instances[registry_name]
 
-    def __init__(self, mode: RegistryMode = RegistryMode.SINGLE_CHOICE) -> None:
+    def __init__(self, mode: RegistryMode = RegistryMode.SINGLE_CHOICE, factory=None) -> None:
         """
-        Initialize registry with specified mode.
+        Initialize registry with specified mode and factory.
 
         Args:
             mode: Registry operation mode (single or multi choice)
+            factory: RegistryFactory for dependency injection
         """
         if hasattr(self, "_initialized"):
             return
 
         self.mode = mode
+        self._factory = factory
         # Type-based registrations
         self._type_registrations: dict[str, BaseRegistration] = {}
         self._instance_registrations: dict[
@@ -75,9 +77,6 @@ class BaseRegistry(ABC):
         ] = {}  # Instance-based registrations (multi-choice only)
         self._registry_lock = threading.RLock()  # Use RLock for nested locking
 
-        from infrastructure.logging.logger import get_logger
-
-        self.logger = get_logger(__name__)
         self._initialized = True
 
     @abstractmethod
@@ -102,7 +101,7 @@ class BaseRegistry(ABC):
         **additional_factories,
     ) -> None:
         """
-        Register a type with its factories.
+        Register a type with its factories (idempotent operation).
 
         Args:
             type_name: Type identifier
@@ -112,13 +111,17 @@ class BaseRegistry(ABC):
         """
         with self._registry_lock:
             if type_name in self._type_registrations:
-                raise ValueError(f"Type '{type_name}' is already registered")
+                # Idempotent operation - log debug and return
+                return
 
             registration = self._create_registration(
                 type_name, strategy_factory, config_factory, **additional_factories
             )
             self._type_registrations[type_name] = registration
-            self.logger.info("Registered type: %s", type_name)
+
+            # Register with factory if available
+            if self._factory:
+                self._factory.register_constructor(type_name, strategy_factory)
 
     def register_instance(
         self,
@@ -146,18 +149,28 @@ class BaseRegistry(ABC):
 
         with self._registry_lock:
             if instance_name in self._instance_registrations:
-                raise ValueError(f"Instance '{instance_name}' is already registered")
+                # Idempotent operation - log debug and return
+                return
 
             registration = self._create_registration(
                 type_name, strategy_factory, config_factory, **additional_factories
             )
             self._instance_registrations[instance_name] = registration
-            self.logger.info("Registered instance: %s (type: %s)", instance_name, type_name)
+
+            # Register with factory if available
+            if self._factory:
+                self._factory.register_constructor(instance_name, strategy_factory)
 
     def create_strategy_by_type(self, type_name: str, config: Any) -> Any:
         """Create strategy by type name."""
         registration = self._get_type_registration(type_name)
-        return self._create_strategy_from_registration(registration, config, type_name)
+
+        # Use factory if available, otherwise use registration directly
+        if self._factory:
+            # For factory, we need to call the constructor with config as first argument
+            return registration.strategy_factory(config)
+        else:
+            return self._create_strategy_from_registration(registration, config, type_name)
 
     def create_strategy_by_instance(self, instance_name: str, config: Any) -> Any:
         """Create strategy by instance name (multi-choice mode only)."""
@@ -165,7 +178,13 @@ class BaseRegistry(ABC):
             raise ValueError("Instance-based creation only supported in MULTI_CHOICE mode")
 
         registration = self._get_instance_registration(instance_name)
-        return self._create_strategy_from_registration(registration, config, instance_name)
+
+        # Use factory if available, otherwise use registration directly
+        if self._factory:
+            # For factory, we need to call the constructor with config as first argument
+            return registration.strategy_factory(config)
+        else:
+            return self._create_strategy_from_registration(registration, config, instance_name)
 
     def is_registered(self, type_name: str) -> bool:
         """Check if a type is registered."""
@@ -187,12 +206,52 @@ class BaseRegistry(ABC):
         with self._registry_lock:
             return list(self._instance_registrations.keys())
 
+    def format_not_registered_error(self, requested_item: str, registry_type: str) -> str:
+        """Format standardized error message for unregistered items.
+
+        Args:
+            requested_item: The item that was requested
+            registry_type: Type of registry (provider, scheduler, storage)
+
+        Returns:
+            Formatted error message with available options
+        """
+        available_types = self.get_registered_types()
+        available_instances = self.get_registered_instances()
+
+        if not available_types and not available_instances:
+            return f"No {registry_type}s registered"
+
+        parts = [f"{registry_type.title()} '{requested_item}' not found"]
+
+        if available_types:
+            parts.append(f"Available {registry_type} types: {', '.join(available_types)}")
+
+        if available_instances:
+            parts.append(f"Available {registry_type} instances: {', '.join(available_instances)}")
+
+        return ". ".join(parts)
+
+    def format_registry_error(self, requested_item: str, registry_type: str) -> str:
+        """Format error message for unregistered registry item.
+
+        Args:
+            requested_item: The item that was requested
+            registry_type: Type of registry (provider, scheduler, etc.)
+
+        Returns:
+            Formatted error message with available options
+
+        Note:
+            Backward compatibility alias for format_not_registered_error
+        """
+        return self.format_not_registered_error(requested_item, registry_type)
+
     def unregister_type(self, type_name: str) -> bool:
         """Unregister a type."""
         with self._registry_lock:
             if type_name in self._type_registrations:
                 del self._type_registrations[type_name]
-                self.logger.info("Unregistered type: %s", type_name)
                 return True
             return False
 
@@ -201,11 +260,12 @@ class BaseRegistry(ABC):
         with self._registry_lock:
             if instance_name in self._instance_registrations:
                 del self._instance_registrations[instance_name]
-                self.logger.info("Unregistered instance: %s", instance_name)
                 return True
             return False
 
-    def create_additional_component(self, type_name: str, factory_name: str) -> Optional[Any]:
+    def create_additional_component(
+        self, type_name: str, factory_name: str, config: Any = None
+    ) -> Optional[Any]:
         """Create additional component (resolver, validator, etc.) by type."""
         registration = self._get_type_registration(type_name)
         factory = registration.get_factory(factory_name)
@@ -213,21 +273,29 @@ class BaseRegistry(ABC):
             return None
 
         try:
-            component = factory()
-            self.logger.debug("Created %s for type: %s", factory_name, type_name)
+            if config is not None:
+                component = factory(config)
+            else:
+                component = factory()
             return component
-        except Exception as e:
-            self.logger.warning(
-                "Failed to create %s for type '%s': %s", factory_name, type_name, str(e)
-            )
+        except Exception:
             return None
+
+    def ensure_types_registered(self, register_function: Callable) -> None:
+        """Ensure types are registered (idempotent operation)."""
+        if not self.get_registered_types():
+            register_function()
+
+    def get_available_types_with_registration(self, register_function: Callable) -> list[str]:
+        """Get available types, ensuring registration first."""
+        self.ensure_types_registered(register_function)
+        return self.get_registered_types()
 
     def clear_registrations(self) -> None:
         """Clear all registrations (primarily for testing)."""
         with self._registry_lock:
             self._type_registrations.clear()
             self._instance_registrations.clear()
-            self.logger.info("Cleared all registrations")
 
     # Protected methods for subclass implementation
 
@@ -267,11 +335,9 @@ class BaseRegistry(ABC):
         """Create strategy from registration with error handling."""
         try:
             strategy = registration.strategy_factory(config)
-            self.logger.debug("Created strategy for: %s", identifier)
             return strategy
         except Exception as e:
             from domain.base.exceptions import ConfigurationError
 
             error_msg = f"Failed to create strategy for '{identifier}': {e!s}"
-            self.logger.error(error_msg)
             raise ConfigurationError(error_msg)

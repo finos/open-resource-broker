@@ -219,7 +219,7 @@ def requires(*dependencies: type) -> Callable[[type[T]], type[T]]:
 
     def decorator(cls: type[T]) -> type[T]:
         """Apply requires decorator to the class."""
-        cls._dependencies = list(dependencies)
+        cls._dependencies = list(dependencies)  # type: ignore[attr-defined]
         return cls
 
     return decorator
@@ -247,7 +247,7 @@ def factory(factory_func: Callable[[], T]) -> Callable[[type[T]], type[T]]:
 
     def decorator(cls: type[T]) -> type[T]:
         """Attach factory function to class."""
-        cls._factory = factory_func
+        cls._factory = factory_func  # type: ignore[attr-defined]
         return cls
 
     return decorator
@@ -266,7 +266,7 @@ def lazy(cls: type[T]) -> type[T]:
     Returns:
         The decorated class with lazy metadata
     """
-    cls._lazy = True
+    cls._lazy = True  # type: ignore[attr-defined]
     return cls
 
 
@@ -295,9 +295,9 @@ def command_handler(command_type: type) -> Callable[[type[T]], type[T]]:
 
     def decorator(cls: type[T]) -> type[T]:
         """Register class as command handler."""
-        cls._command_type = command_type
-        cls._handler_type = "command"
-        cls._cqrs_handler = True
+        cls._command_type = command_type  # type: ignore[attr-defined]
+        cls._handler_type = "command"  # type: ignore[attr-defined]
+        cls._cqrs_handler = True  # type: ignore[attr-defined]
         return injectable(cls)
 
     return decorator
@@ -325,9 +325,9 @@ def query_handler(query_type: type) -> Callable[[type[T]], type[T]]:
 
     def decorator(cls: type[T]) -> type[T]:
         """Register class as query handler."""
-        cls._query_type = query_type
-        cls._handler_type = "query"
-        cls._cqrs_handler = True
+        cls._query_type = query_type  # type: ignore[attr-defined]
+        cls._handler_type = "query"  # type: ignore[attr-defined]
+        cls._cqrs_handler = True  # type: ignore[attr-defined]
         return injectable(cls)
 
     return decorator
@@ -355,9 +355,9 @@ def event_handler(event_type: type) -> Callable[[type[T]], type[T]]:
 
     def decorator(cls: type[T]) -> type[T]:
         """Register class as event handler."""
-        cls._event_type = event_type
-        cls._handler_type = "event"
-        cls._cqrs_handler = True
+        cls._event_type = event_type  # type: ignore[attr-defined]
+        cls._handler_type = "event"  # type: ignore[attr-defined]
+        cls._cqrs_handler = True  # type: ignore[attr-defined]
         return injectable(cls)
 
     return decorator

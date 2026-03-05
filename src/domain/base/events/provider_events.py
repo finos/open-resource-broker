@@ -1,6 +1,5 @@
 """Provider-agnostic domain events."""
 
-from dataclasses import dataclass, field
 from typing import Any, Optional
 from uuid import uuid4
 
@@ -32,26 +31,25 @@ class ProviderOperationEvent(DomainEvent):
             raise ValueError("Resource type cannot be empty")
 
 
-@dataclass(frozen=True)
 class ProviderRateLimitEvent(DomainEvent):
     """Event raised when provider rate limiting occurs."""
 
     provider_type: ProviderType
     service_name: str
     operation_name: str
-    retry_after: Optional[int] = field(default=None)  # seconds
+    retry_after: Optional[int] = Field(default=None)  # seconds
 
-    def __post_init__(self) -> None:
+    def model_post_init(self, __context: Any) -> None:
+        """Initialize aggregate information after model creation."""
         object.__setattr__(self, "aggregate_id", f"{self.provider_type.value}_{self.service_name}")
         object.__setattr__(self, "aggregate_type", f"{self.provider_type.value}_service")
-        super().__post_init__()
+        super().model_post_init(__context)
         if not self.service_name:
             raise ValueError("Service name cannot be empty")
         if not self.operation_name:
             raise ValueError("Operation name cannot be empty")
 
 
-@dataclass(frozen=True)
 class ProviderCredentialsEvent(DomainEvent):
     """Event raised for provider credentials operations."""
 
@@ -59,12 +57,13 @@ class ProviderCredentialsEvent(DomainEvent):
     credential_type: str  # e.g., "access_key", "service_account", "managed_identity"
     operation: str  # e.g., "refresh", "validate", "expire"
     status: str  # success, failure, warning
-    message: Optional[str] = field(default=None)
+    message: Optional[str] = Field(default=None)
 
-    def __post_init__(self) -> None:
+    def model_post_init(self, __context: Any) -> None:
+        """Initialize aggregate information after model creation."""
         object.__setattr__(self, "aggregate_id", f"{self.provider_type.value}_credentials")
         object.__setattr__(self, "aggregate_type", f"{self.provider_type.value}_auth")
-        super().__post_init__()
+        super().model_post_init(__context)
         if not self.credential_type:
             raise ValueError("Credential type cannot be empty")
         if not self.operation:
@@ -73,61 +72,61 @@ class ProviderCredentialsEvent(DomainEvent):
             raise ValueError("Status cannot be empty")
 
 
-@dataclass(frozen=True)
 class ProviderResourceStateChangedEvent(DomainEvent):
     """Event raised when provider resource state changes."""
 
     provider_type: ProviderType
     resource_type: str
     resource_id: str
-    previous_state: Optional[ProviderInstanceState]
+    previous_state: Optional[ProviderInstanceState] = Field(default=None)
     new_state: ProviderInstanceState
-    state_reason: Optional[str] = field(default=None)
+    state_reason: Optional[str] = Field(default=None)
 
-    def __post_init__(self) -> None:
+    def model_post_init(self, __context: Any) -> None:
+        """Initialize aggregate information after model creation."""
         object.__setattr__(self, "aggregate_id", self.resource_id)
         object.__setattr__(
             self, "aggregate_type", f"{self.provider_type.value}_{self.resource_type}"
         )
-        super().__post_init__()
+        super().model_post_init(__context)
         if not self.resource_type:
             raise ValueError("Resource type cannot be empty")
         if not self.resource_id:
             raise ValueError("Resource ID cannot be empty")
 
 
-@dataclass(frozen=True)
 class ProviderConfigurationEvent(DomainEvent):
     """Event raised for provider configuration changes."""
 
     provider_type: ProviderType
     configuration_type: str  # e.g., "region", "endpoint", "timeout"
-    old_value: Optional[str] = field(default=None)
-    new_value: Optional[str] = field(default=None)
-    operation: str = field(default="update")  # update, validate, reset
+    old_value: Optional[str] = Field(default=None)
+    new_value: Optional[str] = Field(default=None)
+    operation: str = Field(default="update")  # update, validate, reset
 
-    def __post_init__(self) -> None:
+    def model_post_init(self, __context: Any) -> None:
+        """Initialize aggregate information after model creation."""
         object.__setattr__(self, "aggregate_id", f"{self.provider_type.value}_config")
         object.__setattr__(self, "aggregate_type", f"{self.provider_type.value}_configuration")
-        super().__post_init__()
+        super().model_post_init(__context)
         if not self.configuration_type:
             raise ValueError("Configuration type cannot be empty")
 
 
-@dataclass(frozen=True)
 class ProviderHealthCheckEvent(DomainEvent):
     """Event raised for provider health checks."""
 
     provider_type: ProviderType
     service_name: str
     health_status: str  # healthy, unhealthy, degraded
-    response_time_ms: Optional[int] = field(default=None)
-    error_message: Optional[str] = field(default=None)
+    response_time_ms: Optional[int] = Field(default=None)
+    error_message: Optional[str] = Field(default=None)
 
-    def __post_init__(self) -> None:
+    def model_post_init(self, __context: Any) -> None:
+        """Initialize aggregate information after model creation."""
         object.__setattr__(self, "aggregate_id", f"{self.provider_type.value}_{self.service_name}")
         object.__setattr__(self, "aggregate_type", f"{self.provider_type.value}_health")
-        super().__post_init__()
+        super().model_post_init(__context)
         if not self.service_name:
             raise ValueError("Service name cannot be empty")
         if not self.health_status:
@@ -143,7 +142,7 @@ class ProviderStrategySelectedEvent(DomainEvent):
     selection_reason: Optional[str] = None
     confidence_score: Optional[float] = None
 
-    def model_post_init(self, __context) -> None:
+    def model_post_init(self, __context: Any) -> None:
         """Initialize aggregate information after model creation."""
         # Set aggregate info based on strategy
         if not self.aggregate_id:
@@ -163,7 +162,7 @@ class ProviderOperationExecutedEvent(DomainEvent):
     error_message: Optional[str] = None
     error_code: Optional[str] = None
 
-    def model_post_init(self, __context) -> None:
+    def model_post_init(self, __context: Any) -> None:
         """Initialize aggregate information after model creation."""
         # Set aggregate info based on operation
         if not self.aggregate_id:
@@ -185,7 +184,7 @@ class ProviderHealthChangedEvent(DomainEvent):
     new_status: str = ""  # JSON string of new ProviderHealthStatus
     source: str = "system"
 
-    def model_post_init(self, __context) -> None:
+    def model_post_init(self, __context: Any) -> None:
         """Initialize aggregate information after model creation."""
         # Set aggregate info based on provider
         if not self.aggregate_id:
@@ -203,7 +202,7 @@ class ProviderStrategyRegisteredEvent(DomainEvent):
     capabilities: Optional[str] = None  # JSON string of capabilities
     priority: int = 0
 
-    def model_post_init(self, __context) -> None:
+    def model_post_init(self, __context: Any) -> None:
         """Initialize aggregate information after model creation."""
         # Set aggregate info based on registration
         if not self.aggregate_id:

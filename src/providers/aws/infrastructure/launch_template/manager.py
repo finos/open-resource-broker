@@ -7,23 +7,21 @@ moving AWS-specific logic out of the base handler to maintain clean architecture
 
 import hashlib
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 from botocore.exceptions import ClientError
 
 from domain.base.dependency_injection import injectable
 from domain.base.ports import LoggingPort
+from domain.base.ports.configuration_port import ConfigurationPort
 from domain.request.aggregate import Request
-from infrastructure.utilities.common.resource_naming import (
-    get_instance_name,
-    get_launch_template_name,
-)
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.exceptions.aws_exceptions import (
     AWSValidationError,
     InfrastructureError,
 )
 from providers.aws.infrastructure.aws_client import AWSClient
+from providers.aws.infrastructure.tags import build_system_tags, merge_tags
 
 
 @dataclass
@@ -41,41 +39,26 @@ class LaunchTemplateResult:
 class AWSLaunchTemplateManager:
     """Manages AWS launch template creation and updates."""
 
-    def __init__(self, aws_client: AWSClient, logger: LoggingPort) -> None:
+    def __init__(
+        self,
+        aws_client: AWSClient,
+        logger: LoggingPort,
+        config_port: Optional[ConfigurationPort] = None,
+        aws_native_spec_service: Optional[Any] = None,
+    ) -> None:
         """
         Initialize the launch template manager.
 
         Args:
             aws_client: AWS client instance
             logger: Logger for logging messages
+            config_port: Configuration port for resource prefixes and package info
+            aws_native_spec_service: AWS native spec service for template rendering
         """
         self.aws_client = aws_client
         self._logger = logger
-
-        # Get configuration port from container for package info
-        from infrastructure.di.container import get_container
-
-        container = get_container()
-        try:
-            from domain.base.ports.configuration_port import ConfigurationPort
-
-            self.config_port = container.get(ConfigurationPort)
-        except Exception:
-            self.config_port = None
-
-        # Get AWS native spec service from container
-        from infrastructure.di.container import get_container
-
-        container = get_container()
-        try:
-            from providers.aws.infrastructure.services.aws_native_spec_service import (
-                AWSNativeSpecService,
-            )
-
-            self.aws_native_spec_service = container.get(AWSNativeSpecService)
-        except Exception:
-            # Service not available, native specs disabled
-            self.aws_native_spec_service = None
+        self.config_port = config_port
+        self.aws_native_spec_service = aws_native_spec_service
 
     def create_or_update_launch_template(
         self, aws_template: AWSTemplate, request: Request
@@ -130,8 +113,12 @@ class AWSLaunchTemplateManager:
         # Create launch template data
         launch_template_data = self._create_launch_template_data(aws_template, request)
 
-        # Get the launch template name using the helper function
-        launch_template_name = get_launch_template_name(request.request_id)
+        # Get the launch template name
+        assert self.config_port is not None, "config_port must be injected"
+        launch_template_name = (
+            f"{self.config_port.get_resource_prefix('launch_template')}"
+            f"{request.request_id}-{aws_template.template_id}"
+        )
 
         # Generate a deterministic client token for idempotency
         client_token = self._generate_client_token(request, aws_template)
@@ -142,30 +129,21 @@ class AWSLaunchTemplateManager:
                 LaunchTemplateNames=[launch_template_name]
             )
 
-            # Template exists, create a new version
+            # Template exists — reuse the default version, no new version needed for same config
             template_id = existing_template["LaunchTemplates"][0]["LaunchTemplateId"]
+            default_version = str(existing_template["LaunchTemplates"][0]["DefaultVersionNumber"])
             self._logger.info(
-                "Launch template %s exists with ID %s. Creating/reusing version.",
+                "Launch template %s exists (id=%s), reusing default version %s",
                 launch_template_name,
                 template_id,
+                default_version,
             )
-
-            response = self.aws_client.ec2_client.create_launch_template_version(
-                LaunchTemplateId=template_id,
-                VersionDescription=f"For request {request.request_id}",
-                LaunchTemplateData=launch_template_data,
-                ClientToken=client_token,  # Key for idempotency!
-            )
-
-            version = str(response["LaunchTemplateVersion"]["VersionNumber"])
-            self._logger.info("Using version %s of launch template %s", version, template_id)
-
             return LaunchTemplateResult(
                 template_id=template_id,
-                version=version,
+                version=default_version,
                 template_name=launch_template_name,
                 is_new_template=False,
-                is_new_version=True,
+                is_new_version=False,
             )
 
         except ClientError as e:
@@ -207,7 +185,7 @@ class AWSLaunchTemplateManager:
         Returns:
             LaunchTemplateResult with existing template details
         """
-        template_id = aws_template.launch_template_id
+        template_id = aws_template.launch_template_id or ""
         version = aws_template.launch_template_version or "$Latest"
 
         try:
@@ -292,7 +270,7 @@ class AWSLaunchTemplateManager:
             try:
                 package_info = self.config_port.get_package_info()
                 created_by = package_info.get("name", "open-resource-broker")
-            except Exception:  # nosec B110
+            except Exception:
                 pass
 
         # Process custom tags
@@ -301,15 +279,16 @@ class AWSLaunchTemplateManager:
             custom_tags = [{"key": k, "value": v} for k, v in template.tags.items()]
 
         # Get instance name
-        instance_name = get_instance_name(request.request_id)
+        assert self.config_port is not None, "config_port must be injected"
+        instance_name = f"{self.config_port.get_resource_prefix('instance')}{request.request_id}"
 
         return {
             # Basic values
             "image_id": template.image_id,
             "instance_type": (
-                template.instance_type
-                if template.instance_type
-                else next(iter(template.instance_types.keys()))
+                next(iter(template.machine_types.keys()))
+                if template.machine_types
+                else "t3.medium"  # fallback
             ),
             "request_id": str(request.request_id),
             "template_id": str(template.template_id),
@@ -336,11 +315,7 @@ class AWSLaunchTemplateManager:
                 if hasattr(template, "instance_profile") and template.instance_profile
                 else None
             ),
-            "ebs_optimized": (
-                template.ebs_optimized
-                if hasattr(template, "ebs_optimized") and template.ebs_optimized is not None
-                else None
-            ),
+            "ebs_optimized": (getattr(template, "ebs_optimized", None)),
             "monitoring_enabled": (
                 template.monitoring_enabled
                 if hasattr(template, "monitoring_enabled")
@@ -368,8 +343,7 @@ class AWSLaunchTemplateManager:
             "has_key_name": hasattr(template, "key_name") and bool(template.key_name),
             "has_user_data": hasattr(template, "user_data") and bool(template.user_data),
             "has_instance_profile": bool(template.instance_profile),
-            "has_ebs_optimized": hasattr(template, "ebs_optimized")
-            and template.ebs_optimized is not None,
+            "has_ebs_optimized": getattr(template, "ebs_optimized", None) is not None,
             "has_monitoring": hasattr(template, "monitoring_enabled")
             and template.monitoring_enabled is not None,
             "has_root_device_volume_size": hasattr(template, "root_device_volume_size")
@@ -426,7 +400,7 @@ class AWSLaunchTemplateManager:
         Returns:
             Dictionary containing launch template data
         """
-        # Template should already contain resolved AMI ID from boundary resolution
+        # AMI ID is resolved by AWSProvisioningAdapter._resolve_template_image() before this point
         image_id = aws_template.image_id
         if not image_id:
             error_msg = f"Template {aws_template.template_id} has no image_id specified"
@@ -444,15 +418,12 @@ class AWSLaunchTemplateManager:
             hasattr(aws_template, "root_device_volume_size"),
         )
 
-        # Get instance name using the helper function
-        get_instance_name(request.request_id)
-
         launch_template_data = {
             "ImageId": image_id,
             "InstanceType": (
-                aws_template.instance_type
-                if aws_template.instance_type
-                else next(iter(aws_template.instance_types.keys()))
+                next(iter(aws_template.machine_types.keys()))
+                if aws_template.machine_types
+                else "t3.medium"  # fallback
             ),
             "TagSpecifications": [
                 {
@@ -464,13 +435,16 @@ class AWSLaunchTemplateManager:
 
         # Add optional configurations
         if aws_template.subnet_id:
-            launch_template_data["NetworkInterfaces"] = [
-                {
-                    "DeviceIndex": 0,
-                    "SubnetId": aws_template.subnet_id,
-                    "AssociatePublicIpAddress": True,
-                }
-            ]
+            network_interface: dict[str, Any] = {
+                "DeviceIndex": 0,
+                "SubnetId": aws_template.subnet_id,
+                "AssociatePublicIpAddress": True,
+            }
+            if aws_template.security_group_ids:
+                network_interface["Groups"] = aws_template.security_group_ids
+            launch_template_data["NetworkInterfaces"] = [network_interface]
+        elif aws_template.security_group_ids:
+            launch_template_data["SecurityGroupIds"] = aws_template.security_group_ids
 
         if aws_template.key_name:
             launch_template_data["KeyName"] = aws_template.key_name
@@ -494,8 +468,9 @@ class AWSLaunchTemplateManager:
             launch_template_data["IamInstanceProfile"] = {"Name": instance_profile_name}
 
         # Add EBS optimization if specified (check if attribute exists)
-        if hasattr(aws_template, "ebs_optimized") and aws_template.ebs_optimized is not None:
-            launch_template_data["EbsOptimized"] = aws_template.ebs_optimized
+        ebs_optimized = getattr(aws_template, "ebs_optimized", None)
+        if ebs_optimized is not None:
+            launch_template_data["EbsOptimized"] = ebs_optimized
 
         # Add monitoring if specified
         if (
@@ -537,7 +512,7 @@ class AWSLaunchTemplateManager:
         return launch_template_data
 
     def _create_instance_tags(
-        self, aws_template: AWSTemplate, request: Request
+        self, aws_template: AWSTemplate, request: Request, provider_api: str = "LaunchTemplate"
     ) -> list[dict[str, str]]:
         """
         Create instance tags for the launch template.
@@ -545,36 +520,27 @@ class AWSLaunchTemplateManager:
         Args:
             aws_template: The AWS template configuration
             request: The associated request
+            provider_api: The AWS API name to record in orb:provider-api tag
 
         Returns:
             List of tag dictionaries
         """
-        # Get instance name using the helper function
-        instance_name = get_instance_name(request.request_id)
+        # Get instance name
+        assert self.config_port is not None, "config_port must be injected"
+        instance_name = f"{self.config_port.get_resource_prefix('instance')}{request.request_id}"
 
-        # Get package name for CreatedBy tag
-        created_by = "open-resource-broker"  # fallback
-        if self.config_port:
-            try:
-                package_info = self.config_port.get_package_info()
-                created_by = package_info.get("name", "open-resource-broker")
-            except Exception:  # nosec B110
-                # Intentionally silent fallback for package info retrieval
-                pass
-
-        tags = [
-            {"Key": "Name", "Value": instance_name},
-            {"Key": "RequestId", "Value": str(request.request_id)},
-            {"Key": "TemplateId", "Value": str(aws_template.template_id)},
-            {"Key": "CreatedBy", "Value": created_by},
-        ]
-
-        # Add template tags if any
+        user_tags: list[dict[str, str]] = [{"Key": "Name", "Value": instance_name}]
         if aws_template.tags:
-            template_tags = [{"Key": k, "Value": str(v)} for k, v in aws_template.tags.items()]
-            tags.extend(template_tags)
+            user_tags.extend([{"Key": k, "Value": str(v)} for k, v in aws_template.tags.items()])
 
-        return tags
+        return merge_tags(
+            user_tags,
+            build_system_tags(
+                request_id=str(request.request_id),
+                template_id=str(aws_template.template_id),
+                provider_api=provider_api,
+            ),
+        )
 
     def _create_launch_template_tags(
         self, aws_template: AWSTemplate, request: Request
@@ -589,24 +555,20 @@ class AWSLaunchTemplateManager:
         Returns:
             List of tag dictionaries
         """
-        template_name = get_launch_template_name(request.request_id)
+        assert self.config_port is not None, "config_port must be injected"
+        template_name = (
+            f"{self.config_port.get_resource_prefix('launch_template')}"
+            f"{request.request_id}-{aws_template.template_id}"
+        )
 
-        # Get package name for CreatedBy tag
-        created_by = "open-resource-broker"  # fallback
-        if self.config_port:
-            try:
-                package_info = self.config_port.get_package_info()
-                created_by = package_info.get("name", "open-resource-broker")
-            except Exception:  # nosec B110
-                # Intentionally silent fallback for package info retrieval
-                pass
-
-        return [
-            {"Key": "Name", "Value": template_name},
-            {"Key": "RequestId", "Value": str(request.request_id)},
-            {"Key": "TemplateId", "Value": str(aws_template.template_id)},
-            {"Key": "CreatedBy", "Value": created_by},
-        ]
+        return merge_tags(
+            [{"Key": "Name", "Value": template_name}],
+            build_system_tags(
+                request_id=str(request.request_id),
+                template_id=str(aws_template.template_id),
+                provider_api="LaunchTemplate",
+            ),
+        )
 
     def _extract_instance_profile_name(self, instance_profile: str) -> str:
         """

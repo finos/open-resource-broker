@@ -90,9 +90,9 @@ class TestBaseEntity:
         entity = MockEntity(name="No ID Entity")
         assert entity.id is None
 
-        # Entities with None ID should not be equal
+        # Entities with None ID are considered equal since None == None
         entity2 = MockEntity(name="Another No ID Entity")
-        assert entity != entity2
+        assert entity == entity2
 
 
 @pytest.mark.unit

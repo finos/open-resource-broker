@@ -2,6 +2,8 @@ import json
 import logging
 import os
 import time
+import uuid
+from pathlib import Path
 from typing import Any, Dict, List
 
 import boto3
@@ -19,6 +21,8 @@ pytestmark = [  # Apply default markers to every test in this module
     pytest.mark.manual_aws,
     pytest.mark.aws,
 ]
+
+SCHEDULER_TYPE = "hostfactory"
 
 # Set environment variables for local development
 os.environ["USE_LOCAL_DEV"] = "1"
@@ -44,14 +48,7 @@ console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.DEBUG)
 console_handler.setFormatter(formatter)
 
-# Ensure logs directory exists before creating file handler
-os.makedirs("logs", exist_ok=True)
-file_handler = logging.FileHandler("logs/multi_asg_test.log")
-file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(formatter)
-
 log.addHandler(console_handler)
-log.addHandler(file_handler)
 
 MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC = 180
 
@@ -124,187 +121,151 @@ def check_all_instances_terminating_or_terminated(instance_ids: List[str]) -> bo
 def setup_multi_asg_templates():
     """Setup fixture that creates two different ASG templates for testing."""
     processor = TemplateProcessor()
-    test_name = "test_multi_asg_termination"
+    test_name = f"test_multi_asg_termination_{uuid.uuid4().hex[:8]}"
 
-    # Clear any existing files from the test directory first
+    logs_dir = Path(__file__).parent.parent.parent / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    log_file = logs_dir / f"{test_name}.log"
+    file_handler = logging.FileHandler(str(log_file))
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    log.addHandler(file_handler)
+
     test_config_dir = processor.run_templates_dir / test_name
     if test_config_dir.exists():
         import shutil
 
         shutil.rmtree(test_config_dir)
-        log.info(f"Cleared existing test directory: {test_config_dir}")
 
-    # Create two different ASG templates with different configurations
     template_configs = [
         {
             "template_name": "ASG_Template_1",
-            "test_dir": f"{test_name}_asg1",
+            "capacity_to_request": 2,
             "overrides": {
                 "providerApi": "ASG",
-                "instanceType": "t3.micro",
-                "maxSize": 10,
-                "minSize": 0,
-                "desiredCapacity": 2,
             },
         },
         {
             "template_name": "ASG_Template_2",
-            "test_dir": f"{test_name}_asg2",
+            "capacity_to_request": 2,
             "overrides": {
                 "providerApi": "ASG",
-                "instanceType": "t3.small",
-                "maxSize": 8,
-                "minSize": 0,
-                "desiredCapacity": 3,
             },
         },
     ]
 
-    # Generate both templates in separate directories
-    for config in template_configs:
-        processor.generate_test_templates(
-            config["test_dir"],
-            awsprov_base_template="awsprov_templates.base.json",
-            overrides=config["overrides"],
-        )
+    processor.generate_combined_templates(test_name, template_configs)
 
-    # Create a combined config directory that includes both templates
-    combined_config_dir = processor.run_templates_dir / test_name
-    combined_config_dir.mkdir(parents=True, exist_ok=True)
+    # Set environment variables
+    os.environ["HF_PROVIDER_CONFDIR"] = str(test_config_dir)
+    os.environ["HF_PROVIDER_LOGDIR"] = str(test_config_dir / "logs")
+    os.environ["HF_PROVIDER_WORKDIR"] = str(test_config_dir / "work")
+    os.environ["AWS_PROVIDER_LOG_DIR"] = str(test_config_dir / "logs")
+    os.environ["HF_LOGDIR"] = str(test_config_dir / "logs")
 
-    # Copy config files from first template directory (they should be the same)
-    first_template_dir = processor.run_templates_dir / template_configs[0]["test_dir"]
-    import shutil
-
-    shutil.copy2(first_template_dir / "config.json", combined_config_dir / "config.json")
-    shutil.copy2(
-        first_template_dir / "default_config.json", combined_config_dir / "default_config.json"
-    )
-
-    # Combine awsprov_templates.json from both directories
-    combined_templates = {"templates": []}
-
-    for i, config in enumerate(template_configs):
-        template_dir = processor.run_templates_dir / config["test_dir"]
-        awsprov_file = template_dir / "awsprov_templates.json"
-
-        if awsprov_file.exists():
-            with open(awsprov_file) as f:
-                template_data = json.load(f)
-
-            # Update template ID to include our custom name
-            if template_data.get("templates"):
-                template = template_data["templates"][0].copy()
-                template["templateId"] = config["template_name"]
-                combined_templates["templates"].append(template)
-
-    # Write combined templates file
-    with open(combined_config_dir / "awsprov_templates.json", "w") as f:
-        json.dump(combined_templates, f, indent=2)
-
-    log.info(f"Created combined config with {len(combined_templates['templates'])} templates")
-
-    # Set environment variables to use combined config directory
-    os.environ["HF_PROVIDER_CONFDIR"] = str(combined_config_dir)
-    os.environ["HF_PROVIDER_LOGDIR"] = str(combined_config_dir / "logs")
-    os.environ["HF_PROVIDER_WORKDIR"] = str(combined_config_dir / "work")
-    os.environ["AWS_PROVIDER_LOG_DIR"] = str(combined_config_dir / "logs")
-    os.environ["HF_LOGDIR"] = str(combined_config_dir / "logs")
-
-    # Create the log and work directories
-    (combined_config_dir / "logs").mkdir(parents=True, exist_ok=True)
-    (combined_config_dir / "work").mkdir(parents=True, exist_ok=True)
+    (test_config_dir / "logs").mkdir(parents=True, exist_ok=True)
+    (test_config_dir / "work").mkdir(parents=True, exist_ok=True)
 
     hfm = HostFactoryMock()
 
-    return hfm, template_configs
+    yield hfm, template_configs
+
+    processor.cleanup_test_templates(test_name)
+    log.removeHandler(file_handler)
+    file_handler.close()
 
 
-def provision_asg_capacity(
+def provision_asg_capacity(  # dead code - commented out
     hfm: HostFactoryMock, template_json: Dict[str, Any], capacity: int
 ) -> Dict[str, Any]:
-    """Provision capacity for a single ASG template and return the status response."""
-    log.info(f"Provisioning {capacity} instances for template {template_json['templateId']}")
-
-    # Request capacity
-    res = hfm.request_machines(template_json["templateId"], capacity)
-    parse_and_print_output(res)
-
-    # Validate response schema
-    try:
-        validate_json_schema(
-            instance=res, schema=plugin_io_schemas.expected_request_machines_schema
-        )
-    except ValidationError as e:
-        pytest.fail(f"JSON validation failed for request_machines response: {e}")
-
-    # Extract request ID
-    if "requestId" in res:
-        request_id = res["requestId"]
-    elif "request_id" in res:
-        request_id = res["request_id"]
-    else:
-        pytest.fail(f"AWS provider response missing requestId field. Response: {res}")
-
-    # Wait for provisioning to complete with retry logic
-    log.info(f"Waiting for provisioning to complete for request {request_id}")
-    start_time = time.time()
-    status_response = None
-    retry_count = 0
-    max_retries = 3
-
-    while True:
-        status_response = hfm.get_request_status(request_id)
-        log.debug(f"Status for {request_id}: {json.dumps(status_response, indent=2)}")
-
-        # Validate status response schema
-        try:
-            validate_json_schema(
-                instance=status_response, schema=plugin_io_schemas.expected_request_status_schema
-            )
-        except ValidationError as e:
-            pytest.fail(f"JSON validation failed for get_request_status response: {e}")
-
-        if time.time() - start_time > MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC:
-            # Check if instances are in pending state
-            machines = status_response["requests"][0].get("machines", [])
-            pending_instances = [m for m in machines if m.get("status") == "pending"]
-
-            if pending_instances and retry_count < max_retries:
-                retry_count += 1
-                log.warning(
-                    f"Timeout reached but {len(pending_instances)} instances still pending. Retry {retry_count}/{max_retries}"
-                )
-                start_time = time.time()  # Reset timer
-                continue
-
-            pytest.fail(
-                f"Timeout waiting for capacity provisioning for request {request_id} machines {machines} pending {pending_instances}"
-            )
-
-        if status_response["requests"][0]["status"] == "complete":
-            break
-
-        time.sleep(5)
-
-    # Verify all instances are provisioned
-    assert status_response["requests"][0]["status"] == "complete"
-    machines = status_response["requests"][0]["machines"]
-
-    instance_ids = [machine["machineId"] for machine in machines]
-    instance_states = get_instances_states(instance_ids, ec2_client)
-
-    for machine, state in zip(machines, instance_states):
-        assert machine["status"] in ["running", "pending"]
-        instance_id = machine["machineId"]
-        assert state is not None
-        assert state in ["running", "pending"]
-        log.debug(f"EC2 {instance_id} state: {state}")
-
-    log.info(
-        f"Successfully provisioned {len(machines)} instances for template {template_json['templateId']}"
-    )
-    return status_response
+    # """Provision capacity for a single ASG template and return the status response."""
+    # log.info(f"Provisioning {capacity} instances for template {template_json['templateId']}")
+    #
+    # # Request capacity
+    # res = hfm.request_machines(template_json["templateId"], capacity)
+    # parse_and_print_output(res)
+    #
+    # # Validate response schema
+    # try:
+    #     validate_json_schema(
+    #         instance=res, schema=plugin_io_schemas.get_schema_for_scheduler("request_machines", SCHEDULER_TYPE)
+    #     )
+    # except ValidationError as e:
+    #     pytest.fail(f"JSON validation failed for request_machines response: {e}")
+    #
+    # # Extract request ID
+    # if "requestId" in res:
+    #     request_id = res["requestId"]
+    # elif "request_id" in res:
+    #     request_id = res["request_id"]
+    # else:
+    #     pytest.fail(f"AWS provider response missing requestId field. Response: {res}")
+    #
+    # # Wait for provisioning to complete with retry logic
+    # log.info(f"Waiting for provisioning to complete for request {request_id}")
+    # start_time = time.time()
+    # status_response = None
+    # retry_count = 0
+    # max_retries = 3
+    #
+    # while True:
+    #     status_response = hfm.get_request_status(request_id)
+    #     log.debug(f"Status for {request_id}: {json.dumps(status_response, indent=2)}")
+    #
+    #     # Validate status response schema
+    #     try:
+    #         validate_json_schema(
+    #             instance=status_response,
+    #             schema=plugin_io_schemas.get_schema_for_scheduler("request_status", SCHEDULER_TYPE)
+    #         )
+    #     except ValidationError as e:
+    #         pytest.fail(f"JSON validation failed for get_request_status response: {e}")
+    #
+    #     if time.time() - start_time > MAX_TIME_WAIT_FOR_CAPACITY_PROVISIONING_SEC:
+    #         machines = status_response["requests"][0].get("machines", [])
+    #         pending_instances = [m for m in machines if m.get("status") == "pending"]
+    #
+    #         if pending_instances and retry_count < max_retries:
+    #             retry_count += 1
+    #             log.warning(
+    #                 f"Timeout reached but {len(pending_instances)} instances still pending. Retry {retry_count}/{max_retries}"
+    #             )
+    #             start_time = time.time()
+    #             continue
+    #
+    #         pytest.fail(
+    #             f"Timeout waiting for capacity provisioning for request {request_id} machines {machines} pending {pending_instances}"
+    #         )
+    #
+    #     _status = status_response["requests"][0]["status"]
+    #     if _status in {"complete", "complete_with_error", "failed", "partial", "cancelled", "timeout"}:
+    #         if _status != "complete":
+    #             pytest.fail(
+    #                 f"Request {request_id} reached terminal status '{_status}'. Response: {status_response}"
+    #             )
+    #         break
+    #
+    #     time.sleep(5)
+    #
+    # # Verify all instances are provisioned
+    # assert status_response["requests"][0]["status"] == "complete"
+    # machines = status_response["requests"][0]["machines"]
+    #
+    # instance_ids = [machine.get("machineId") or machine.get("machine_id") for machine in machines]
+    # instance_states = get_instances_states(instance_ids, ec2_client)
+    #
+    # for machine, state in zip(machines, instance_states):
+    #     assert machine["status"] in ["running", "pending"]
+    #     instance_id = machine.get("machineId") or machine.get("machine_id")
+    #     assert state is not None
+    #     assert state in ["running", "pending"]
+    #     log.debug(f"EC2 {instance_id} state: {state}")
+    #
+    # log.info(
+    #     f"Successfully provisioned {len(machines)} instances for template {template_json['templateId']}"
+    # )
+    # return status_response
+    raise NotImplementedError("dead code - commented out")
 
 
 @pytest.mark.aws
@@ -340,7 +301,10 @@ def test_multi_asg_termination(setup_multi_asg_templates):
 
     try:
         validate_json_schema(
-            instance=res, schema=plugin_io_schemas.expected_get_available_templates_schema
+            instance=res,
+            schema=plugin_io_schemas.get_schema_for_scheduler(
+                "get_available_templates", SCHEDULER_TYPE
+            ),
         )
     except ValidationError as e:
         log.warning(f"JSON validation failed for get_available_templates: {e}")
@@ -394,7 +358,7 @@ def test_multi_asg_termination(setup_multi_asg_templates):
     # Start both provisioning requests without waiting
     request_ids = []
     for i, template_json in enumerate(asg_templates):
-        capacity_to_request = template_configs[i]["overrides"]["desiredCapacity"]
+        capacity_to_request = template_configs[i].get("capacity_to_request", 2)
         log.info(
             f"Starting provisioning of {capacity_to_request} instances from template {template_json['templateId']}"
         )
@@ -404,7 +368,10 @@ def test_multi_asg_termination(setup_multi_asg_templates):
 
         try:
             validate_json_schema(
-                instance=res, schema=plugin_io_schemas.expected_request_machines_schema
+                instance=res,
+                schema=plugin_io_schemas.get_schema_for_scheduler(
+                    "request_machines", SCHEDULER_TYPE
+                ),
             )
         except ValidationError as e:
             pytest.fail(f"JSON validation failed for request_machines response: {e}")
@@ -436,7 +403,9 @@ def test_multi_asg_termination(setup_multi_asg_templates):
             try:
                 validate_json_schema(
                     instance=status_response,
-                    schema=plugin_io_schemas.expected_request_status_schema,
+                    schema=plugin_io_schemas.get_schema_for_scheduler(
+                        "request_status", SCHEDULER_TYPE
+                    ),
                 )
             except ValidationError as e:
                 pytest.fail(f"JSON validation failed for get_request_status response: {e}")
@@ -455,7 +424,19 @@ def test_multi_asg_termination(setup_multi_asg_templates):
 
                 pytest.fail(f"Timeout waiting for capacity provisioning for request {request_id}")
 
-            if status_response["requests"][0]["status"] == "complete":
+            _status = status_response["requests"][0]["status"]
+            if _status in {
+                "complete",
+                "complete_with_error",
+                "failed",
+                "partial",
+                "cancelled",
+                "timeout",
+            }:
+                if _status != "complete":
+                    pytest.fail(
+                        f"Request {request_id} reached terminal status '{_status}'. Response: {status_response}"
+                    )
                 break
 
             time.sleep(5)
@@ -464,12 +445,14 @@ def test_multi_asg_termination(setup_multi_asg_templates):
         assert status_response["requests"][0]["status"] == "complete"
         machines = status_response["requests"][0]["machines"]
 
-        instance_ids = [machine["machineId"] for machine in machines]
+        instance_ids = [
+            machine.get("machineId") or machine.get("machine_id") for machine in machines
+        ]
         instance_states = get_instances_states(instance_ids, ec2_client)
 
         for machine, state in zip(machines, instance_states):
             assert machine["status"] in ["running", "pending"]
-            instance_id = machine["machineId"]
+            instance_id = machine.get("machineId") or machine.get("machine_id")
             assert state is not None
             assert state in ["running", "pending"]
             log.debug(f"EC2 {instance_id} state: {state}")
@@ -510,7 +493,11 @@ def test_multi_asg_termination(setup_multi_asg_templates):
     log.info(f"Requesting termination of {total_instances} instances: {all_instance_ids}")
 
     return_response = hfm.request_return_machines(all_instance_ids)
-    return_request_id = return_response.get("result") or return_response.get("requestId")
+    return_request_id = (
+        return_response.get("result")
+        or return_response.get("requestId")
+        or return_response.get("request_id")
+    )
     log.info(f"Termination request ID: {return_request_id}")
 
     # Step 6: Monitor termination progress
@@ -569,7 +556,7 @@ def test_multi_asg_termination(setup_multi_asg_templates):
             )
             return len(response.get("AutoScalingGroups", [])) > 0
         except ClientError as e:
-            if e.response["Error"]["Code"] in ["ValidationError", "InvalidGroup.NotFound"]:
+            if e.response["Error"]["Code"] in ["InvalidGroup.NotFound", "AutoScalingGroupNotFound"]:
                 # ASG not found - this means it was deleted
                 return False
             else:

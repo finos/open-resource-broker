@@ -1,4 +1,4 @@
-"""Runtime AMI cache for script execution with optional persistence."""
+"""Runtime AMI cache for script execution with optional storage."""
 
 import json
 import logging
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class RuntimeAMICache:
     """
-    AMI resolution cache with optional persistence across process boundaries.
+    AMI resolution cache with optional storage across process boundaries.
 
     Features:
     - In-memory caching for fast access within process
@@ -29,7 +29,7 @@ class RuntimeAMICache:
 
     def __init__(self, persistent_file: Optional[str] = None, ttl_minutes: int = 60) -> None:
         """
-        Initialize AMI cache with optional persistence.
+        Initialize AMI cache with optional storage.
 
         Args:
             persistent_file: Path to persistent cache file (None = memory only)
@@ -154,10 +154,10 @@ class RuntimeAMICache:
     def _load_from_persistent_cache(self) -> None:
         """Load cache from persistent file, filtering expired entries."""
         try:
-            if not os.path.exists(self._persistent_file):
+            if not os.path.exists(self._persistent_file):  # type: ignore[arg-type]
                 return
 
-            with open(self._persistent_file) as f:
+            with open(self._persistent_file) as f:  # type: ignore[arg-type]
                 data = json.load(f)
 
             current_time = time.time()
@@ -188,14 +188,14 @@ class RuntimeAMICache:
                 pass
 
         except Exception as e:
-            # Silent failure - cache will work without persistence
+            # Silent failure - cache will work without storage
             logger.debug("Failed to load persistent cache: %s", e)
 
     def _save_to_persistent_cache(self) -> None:
         """Save current cache to persistent file using atomic write."""
         try:
             # Ensure directory exists
-            os.makedirs(os.path.dirname(self._persistent_file), exist_ok=True)
+            os.makedirs(os.path.dirname(self._persistent_file), exist_ok=True)  # type: ignore[arg-type]
 
             # Prepare data structure
             cache_data = {
@@ -219,10 +219,10 @@ class RuntimeAMICache:
                 json.dump(cache_data, f, indent=2)
 
             # Atomic replace
-            os.rename(temp_file, self._persistent_file)
+            os.rename(temp_file, self._persistent_file)  # type: ignore[arg-type]
 
         except Exception as e:
-            # Silent failure - cache will work without persistence
+            # Silent failure - cache will work without storage
             logger.debug("Failed to save persistent cache: %s", e)
 
     def _remove_expired_entry(self, ssm_parameter: str) -> None:

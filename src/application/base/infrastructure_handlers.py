@@ -215,7 +215,7 @@ class BaseInfrastructureHandler(
         return self._metrics.copy()
 
 
-class BaseAPIHandler(BaseInfrastructureHandler[TRequest, TResponse]):
+class BaseAsyncAPIHandler(BaseInfrastructureHandler[TRequest, TResponse]):
     """
     Base API handler specialized for HTTP/REST API requests.
 

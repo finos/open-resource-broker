@@ -1,9 +1,15 @@
 """Query handling infrastructure."""
 
-# Import from infrastructure layer (the working implementation)
-from infrastructure.di.buses import QueryBus
+# Import from application ports (clean architecture)
+from application.ports.query_bus_port import QueryBusPort
 
 # Import handlers to ensure decorators are registered
-from . import handlers  # noqa: F401
+from . import (
+    cleanup_query_handlers,  # noqa: F401
+    machine_query_handlers,  # noqa: F401
+    request_query_handlers,  # noqa: F401
+    system_handlers,  # noqa: F401
+    template_query_handlers,  # noqa: F401
+)
 
-__all__: list[str] = ["QueryBus"]
+__all__: list[str] = ["QueryBusPort"]

@@ -66,8 +66,9 @@ def format_request_response(response: Dict[str, Any]) -> str:
         formatted_lines = []
 
         # Extract key information
-        if "requestId" in response:
-            formatted_lines.append(f"Request ID: {response['requestId']}")
+        _request_id = response.get("requestId") or response.get("request_id")
+        if _request_id:
+            formatted_lines.append(f"Request ID: {_request_id}")
 
         if "status" in response:
             formatted_lines.append(f"Status: {response['status']}")

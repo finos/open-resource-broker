@@ -46,7 +46,7 @@ class ConfigTypeConverter:
         try:
             return int(value)
         except (ValueError, TypeError):
-            logger.warning("Could not convert config value '%s' to int", key)
+            logger.warning("Could not convert config value '%s' to int", key, exc_info=True)
             return default
 
     def get_float(self, key: str, default: float = 0.0) -> float:
@@ -55,7 +55,7 @@ class ConfigTypeConverter:
         try:
             return float(value)
         except (ValueError, TypeError):
-            logger.warning("Could not convert config value '%s' to float", key)
+            logger.warning("Could not convert config value '%s' to float", key, exc_info=True)
             return default
 
     def get_str(self, key: str, default: str = "") -> str:
@@ -105,7 +105,9 @@ class ConfigTypeConverter:
             # Create instance with validation
             return config_class(**config_data)
         except Exception as e:
-            logger.error("Failed to create typed config for %s: %s", config_class.__name__, e)
+            logger.error(
+                "Failed to create typed config for %s: %s", config_class.__name__, e, exc_info=True
+            )
             raise ConfigurationError(f"Invalid configuration for {config_class.__name__}: {e}")
 
     def _get_aws_provider_config(self, config_class: type[T]) -> T:
@@ -144,11 +146,10 @@ class ConfigTypeConverter:
             if aws_provider_config:
                 return config_class(**aws_provider_config)
             else:
-                logger.warning("No enabled AWS provider found in configuration")
-                return config_class()
+                raise ValueError("No enabled AWS provider found in configuration")
 
         except Exception as e:
-            logger.error("Failed to resolve AWS provider config: %s", e)
+            logger.error("Failed to resolve AWS provider config: %s", e, exc_info=True)
             raise
 
     def set(self, key: str, value: Any) -> None:

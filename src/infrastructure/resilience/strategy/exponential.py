@@ -2,6 +2,18 @@
 
 import secrets
 
+from botocore.exceptions import ClientError
+
+NON_RETRYABLE_CODES = {
+    "AlreadyExists",
+    "InvalidParameterValue",
+    "ValidationError",
+    "UnauthorizedOperation",
+    "AccessDenied",
+    "InvalidClientTokenId",
+    "OptInRequired",
+}
+
 
 class ExponentialBackoffStrategy:
     """
@@ -46,6 +58,12 @@ class ExponentialBackoffStrategy:
         Returns:
             True if operation should be retried, False otherwise
         """
+        # Never retry non-idempotent errors
+        if isinstance(exception, ClientError):
+            code = exception.response.get("Error", {}).get("Code", "")
+            if code in NON_RETRYABLE_CODES:
+                return False
+
         # Check if we've exceeded max attempts
         if attempt >= self.max_attempts:
             return False

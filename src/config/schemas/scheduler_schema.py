@@ -16,6 +16,7 @@ class SchedulerConfig(BaseModel):
     work_dir: Optional[str] = Field(None, description="Work directory override")
     log_dir: Optional[str] = Field(None, description="Log directory override")
     log_level: Optional[str] = Field(None, description="Log level override")
+    console_enabled: Optional[bool] = Field(None, description="Console logging enabled override")
     templates_filename: Optional[str] = Field(
         None, description="Override templates filename (null = use scheduler default)"
     )

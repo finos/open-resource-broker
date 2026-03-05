@@ -9,10 +9,14 @@ class HostFactoryTransformations:
     """HostFactory-specific field transformations."""
 
     @staticmethod
-    def transform_subnet_id(value: Any) -> list[str]:
-        """Transform HostFactory subnetId field to subnet_ids list."""
+    def transform_aws_subnet_id(value: Any) -> list[str]:
+        """Transform AWS subnetId field to subnet_ids list.
+
+        Handles both single subnet and comma-delimited multiple subnets.
+        """
         if isinstance(value, str):
-            return [value]
+            # Split comma-delimited string and strip whitespace
+            return [s.strip() for s in value.split(",") if s.strip()]
         elif isinstance(value, list):
             return value
         else:
@@ -80,7 +84,7 @@ class HostFactoryTransformations:
                     return value  # Return original value if file doesn't exist
             except Exception as e:
                 logger = get_logger(__name__)
-                logger.error("Failed to read user data file %s: %s", value, e)
+                logger.error("Failed to read user data file %s: %s", value, e, exc_info=True)
                 return value  # Return original value on error
 
         # Return as-is if it doesn't look like a file path
@@ -114,7 +118,7 @@ class HostFactoryTransformations:
         # Transform subnet_ids
         if "subnet_ids" in mapped_data:
             original_value = mapped_data["subnet_ids"]
-            mapped_data["subnet_ids"] = HostFactoryTransformations.transform_subnet_id(
+            mapped_data["subnet_ids"] = HostFactoryTransformations.transform_aws_subnet_id(
                 original_value
             )
             logger.debug(

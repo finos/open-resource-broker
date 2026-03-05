@@ -1,7 +1,6 @@
 """Server service registrations for dependency injection."""
 
 from config.schemas.server_schema import ServerConfig
-from domain.base.ports.configuration_port import ConfigurationPort
 from infrastructure.di.container import DIContainer
 from infrastructure.logging.logger import get_logger
 
@@ -19,8 +18,9 @@ def register_server_services(container: DIContainer) -> None:
         container: DI container instance
     """
     try:
-        # Get configuration manager
-        config_manager = container.get(ConfigurationPort)
+        from config.managers.configuration_manager import ConfigurationManager
+
+        config_manager = container.get(ConfigurationManager)
         server_config = config_manager.get_typed(ServerConfig)
 
         # Only register server services if enabled
@@ -33,7 +33,7 @@ def register_server_services(container: DIContainer) -> None:
             logger.debug("Server disabled - skipping FastAPI service registration")
 
     except Exception as e:
-        logger.warning("Failed to register server services: %s", e)
+        logger.warning("Failed to register server services: %s", e, exc_info=True)
         # Don't raise - server services are optional
 
 
@@ -52,14 +52,21 @@ def _register_fastapi_services(container: DIContainer, server_config: ServerConf
 
 def _register_api_handlers(container: DIContainer) -> None:
     """Register API handlers with dependency injection."""
+    # Import shared dependencies once at the top so they are always bound
+    try:
+        from domain.base.ports import ErrorHandlingPort, SchedulerPort
+        from domain.base.ports.logging_port import LoggingPort
+        from infrastructure.di.buses import CommandBus, QueryBus
+        from monitoring.metrics import MetricsCollector
+    except ImportError as e:
+        logger.debug("Shared API handler dependencies not available: %s", e)
+        return
+
     try:
         # Register template handler with constructor injection
         from api.handlers.get_available_templates_handler import (
             GetAvailableTemplatesRESTHandler,
         )
-        from domain.base.ports import SchedulerPort
-        from infrastructure.di.buses import CommandBus, QueryBus
-        from monitoring.metrics import MetricsCollector
 
         if not container.is_registered(GetAvailableTemplatesRESTHandler):
             container.register_singleton(
@@ -87,7 +94,6 @@ def _register_api_handlers(container: DIContainer) -> None:
                 lambda c: RequestMachinesRESTHandler(
                     query_bus=c.get(QueryBus),
                     command_bus=c.get(CommandBus),
-                    scheduler_strategy=c.get(SchedulerPort),
                     logger=c.get(LoggingPort),
                     error_handler=(
                         c.get(ErrorHandlingPort) if c.is_registered(ErrorHandlingPort) else None
@@ -104,7 +110,6 @@ def _register_api_handlers(container: DIContainer) -> None:
     try:
         # Register request status handler
         from api.handlers.get_request_status_handler import GetRequestStatusRESTHandler
-        from domain.base.ports import ErrorHandlingPort, LoggingPort
 
         if not container.is_registered(GetRequestStatusRESTHandler):
             container.register_singleton(

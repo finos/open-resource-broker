@@ -9,16 +9,10 @@ sending notifications, updating caches, triggering workflows, etc.
 from abc import abstractmethod
 from typing import Any, Optional
 
-from .event_handler import EventHandler
+from domain.base.events import DomainEvent
+from domain.base.ports import LoggingPort
 
-# Import types - using string imports to avoid circular dependencies
-try:
-    from domain.base.events import DomainEvent
-    from domain.base.ports import LoggingPort
-except ImportError:
-    # Fallback for testing or when dependencies aren't available
-    DomainEvent = object
-    LoggingPort = object
+from .event_handler import EventHandler
 
 
 class ActionEventHandler(EventHandler):

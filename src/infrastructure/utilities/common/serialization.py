@@ -61,6 +61,10 @@ def process_value_objects(data: Any) -> Any:
         Processed data with value objects unwrapped
     """
     if isinstance(data, dict):
+        # Handle model_dump() format: {'value': 'actual_value'}
+        if len(data) == 1 and "value" in data and isinstance(data["value"], str):
+            return data["value"]
+        # Handle regular dicts recursively
         return {k: process_value_objects(v) for k, v in data.items()}
     elif isinstance(data, list):
         return [process_value_objects(item) for item in data]

@@ -14,6 +14,7 @@ class ListSchedulerStrategiesQuery(Query, BaseModel):
 
     include_current: bool = True
     include_details: bool = False
+    filter_expressions: list[str] = []
 
 
 class GetSchedulerConfigurationQuery(Query, BaseModel):

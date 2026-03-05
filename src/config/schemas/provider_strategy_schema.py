@@ -95,6 +95,7 @@ class ProviderInstanceConfig(BaseModel):
     enabled: bool = Field(True, description="Whether this provider is enabled")
     priority: int = Field(0, description="Provider priority (lower = higher priority)")
     weight: int = Field(100, description="Provider weight for load balancing")
+    # Keep dict for backward compatibility
     config: dict[str, Any] = Field(
         default_factory=dict, description="Provider-specific configuration"
     )
@@ -123,7 +124,10 @@ class ProviderInstanceConfig(BaseModel):
     )
 
     health_check: HealthCheckConfig = Field(
-        default_factory=HealthCheckConfig, description="Health check configuration"
+        default_factory=lambda: HealthCheckConfig(
+            enabled=True, interval=300, timeout=30, retry_count=3
+        ),  # type: ignore[call-arg]
+        description="Health check configuration",
     )
 
     def get_effective_handlers(
@@ -176,10 +180,19 @@ class ProviderInstanceConfig(BaseModel):
     @field_validator("type")
     @classmethod
     def validate_type(cls, v: str) -> str:
-        """Validate provider type."""
-        valid_types = ["aws", "provider1", "provider2"]  # Extensible list
-        if v not in valid_types:
-            raise ValueError(f"Provider type must be one of {valid_types}")
+        """Validate provider type against registered providers."""
+        # Import here to avoid circular imports
+        from providers.registry import get_provider_registry
+
+        registry = get_provider_registry()
+        registered_types = registry.get_registered_providers()
+
+        # If no providers registered, allow any type (graceful degradation)
+        if registered_types and v not in registered_types:
+            raise ValueError(
+                f"Provider type '{v}' is not registered. Available types: {registered_types}"
+            )
+
         return v
 
     @field_validator("weight")
@@ -209,7 +222,9 @@ class ProviderConfig(BaseModel):
     )
     health_check_interval: int = Field(300, description="Global health check interval in seconds")
     circuit_breaker: CircuitBreakerConfig = Field(
-        default_factory=CircuitBreakerConfig,
+        default_factory=lambda: CircuitBreakerConfig(
+            enabled=True, failure_threshold=5, recovery_timeout=60, half_open_max_calls=3
+        ),  # type: ignore[call-arg]
         description="Circuit breaker configuration",
     )
 

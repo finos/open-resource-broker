@@ -16,7 +16,7 @@ from infrastructure.resilience import CircuitBreakerOpenError
 from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
 from providers.aws.exceptions.aws_exceptions import AWSInfrastructureError
 from providers.aws.infrastructure.aws_client import AWSClient
-from providers.aws.utilities.fleet_tag_builder import FleetTagBuilder
+from providers.aws.infrastructure.tags import build_system_tags, merge_tags
 
 
 @injectable
@@ -95,6 +95,16 @@ class AWSOperations:
                 )
                 self._logger.info("Successfully terminated %s: %s", operation_context, instance_ids)
                 return result
+
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "InvalidInstanceID.NotFound":
+                self._logger.info(
+                    "Instances already gone during %s termination (InvalidInstanceID.NotFound) — treating as success",
+                    operation_context,
+                )
+                return {"terminated_instances": []}
+            self._logger.error("Failed to terminate %s: %s", operation_context, str(e))
+            raise
 
         except Exception as e:
             self._logger.error("Failed to terminate %s: %s", operation_context, str(e))
@@ -299,7 +309,7 @@ class AWSOperations:
             for path_part in status_path.split("."):
                 if isinstance(current_status, list) and current_status:
                     current_status = current_status[0]  # Take first item for lists
-                current_status = current_status.get(path_part, "unknown")
+                current_status = current_status.get(path_part, "unknown")  # type: ignore[union-attr]
 
             self._logger.debug("%s %s status: %s", resource_type, resource_id, current_status)
 
@@ -442,12 +452,9 @@ class AWSOperations:
         error_code = error.response.get("Error", {}).get("Code", "Unknown")
         error_message = error.response.get("Error", {}).get("Message", str(error))
 
-        # Import here to avoid circular imports
         from providers.aws.exceptions.aws_exceptions import (
             AWSEntityNotFoundError,
             AWSInfrastructureError,
-            AWSPermissionError,
-            AWSRateLimitError,
             AWSValidationError,
         )
 
@@ -469,9 +476,9 @@ class AWSOperations:
             "RequestLimitExceeded",
             "TooManyRequestsException",
         ]:
-            return AWSRateLimitError(f"{operation_name} failed: {error_message}")
+            return AWSInfrastructureError(f"{operation_name} failed: {error_message}")
         elif error_code in ["UnauthorizedOperation", "AccessDenied", "Forbidden"]:
-            return AWSPermissionError(f"{operation_name} failed: {error_message}")
+            return AWSInfrastructureError(f"{operation_name} failed: {error_message}")
         else:
             return AWSInfrastructureError(f"{operation_name} failed: {error_message}")
 
@@ -490,9 +497,14 @@ class AWSOperations:
             True if tagging succeeded, False if failed (with warning logged)
         """
         try:
-            package_name = self._get_package_name()
-            tags = FleetTagBuilder.build_base_tags(request, template, package_name)
-            aws_tags = FleetTagBuilder.format_for_aws(tags)
+            aws_tags = merge_tags(
+                [],
+                build_system_tags(
+                    request_id=str(request.request_id),
+                    template_id=str(template.template_id),
+                    provider_api="EC2",
+                ),
+            )
 
             self.aws_client.ec2_client.create_tags(Resources=[resource_id], Tags=aws_tags)
             self._logger.debug(f"Successfully tagged resource {resource_id} with base tags")
@@ -511,16 +523,16 @@ class AWSOperations:
             fleet_id: Fleet ID (EC2Fleet or SpotFleet)
             request: Request domain entity
             template: AWS template domain entity
-            provider_api: Provider API type (ec2_fleet or spot_fleet)
+            provider_api: Provider API type (EC2Fleet or SpotFleet)
 
         Returns:
             Number of instances successfully tagged
         """
         try:
             # Discover instances based on fleet type
-            if provider_api.lower() == "ec2_fleet":
+            if provider_api == "EC2Fleet":
                 instance_ids = self._get_ec2_fleet_instances(fleet_id)
-            elif provider_api.lower() == "spot_fleet":
+            elif provider_api == "SpotFleet":
                 instance_ids = self._get_spot_fleet_instances(fleet_id)
             else:
                 self._logger.warning(f"Unknown provider_api for fleet tagging: {provider_api}")
@@ -571,6 +583,6 @@ class AWSOperations:
             try:
                 package_info = self._config_port.get_package_info()
                 return package_info.get("name", "open-resource-broker")
-            except Exception:  # nosec B110 - Intentional fallback to default package name
+            except Exception:
                 pass
         return "open-resource-broker"

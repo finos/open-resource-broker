@@ -50,14 +50,14 @@ class TestDependencyInjectionComprehensive:
                     container.register("test_service", Mock())
                     # Should not raise exception
                     assert True
-                except Exception:
+                except Exception:  # nosec B110
                     # Registration might require specific format
                     pass
             elif hasattr(container, "bind"):
                 try:
                     container.bind("test_service", Mock())
                     assert True
-                except Exception:
+                except Exception:  # nosec B110
                     pass
 
         except ImportError:
@@ -147,7 +147,7 @@ class TestDependencyInjectionComprehensive:
                 try:
                     mock_command = Mock()
                     await command_bus.send(mock_command)
-                except Exception:
+                except Exception:  # nosec B110
                     # Send might require registered handlers
                     pass
 
@@ -162,7 +162,7 @@ class TestDependencyInjectionComprehensive:
                     mock_query = Mock()
                     result = await query_bus.send(mock_query)
                     assert result is not None or result is None  # Both are valid
-                except Exception:
+                except Exception:  # nosec B110
                     # Send might require registered handlers
                     pass
 
@@ -182,9 +182,7 @@ class TestPersistenceLayerComprehensive:
 
         for repo_file in repo_files:
             try:
-                module = importlib.import_module(
-                    f"src.infrastructure.persistence.repositories.{repo_file}"
-                )
+                module = importlib.import_module(f"infrastructure.storage.repositories.{repo_file}")
                 repo_modules.append((repo_file, module))
             except ImportError:
                 continue
@@ -289,7 +287,7 @@ class TestPersistenceLayerComprehensive:
                                         else:
                                             # Methods that need parameters
                                             await method(Mock())
-                                    except Exception:
+                                    except Exception:  # nosec B110
                                         # Method might require specific parameters
                                         pass
 
@@ -301,11 +299,11 @@ class TestPersistenceLayerComprehensive:
         """Test that persistence strategies exist."""
         strategy_modules = []
 
-        # Check for different persistence strategies
         strategy_paths = [
-            "src.infrastructure.persistence.json.strategy",
-            "src.infrastructure.persistence.sql.strategy",
-            "src.infrastructure.persistence.base.strategy",
+            "infrastructure.storage.json.strategy",
+            "infrastructure.storage.sql.strategy",
+            "infrastructure.storage.base.strategy",
+            "infrastructure.storage.dynamodb.strategy",
         ]
 
         for strategy_path in strategy_paths:
@@ -322,9 +320,10 @@ class TestPersistenceLayerComprehensive:
         uow_modules = []
 
         uow_paths = [
-            "src.infrastructure.persistence.json.unit_of_work",
-            "src.infrastructure.persistence.sql.unit_of_work",
-            "src.infrastructure.persistence.base.unit_of_work",
+            "infrastructure.storage.json.unit_of_work",
+            "infrastructure.storage.sql.unit_of_work",
+            "infrastructure.storage.base.unit_of_work",
+            "infrastructure.storage.dynamodb.unit_of_work",
         ]
 
         for uow_path in uow_paths:
@@ -380,9 +379,9 @@ class TestErrorHandlingComprehensive:
     def test_error_middleware_exists(self):
         """Test that error middleware exists."""
         try:
-            import src
+            from infrastructure.error import error_middleware
 
-            assert src.infrastructure.error.error_middleware is not None
+            assert error_middleware is not None
         except ImportError:
             pytest.skip("Error middleware not available")
 

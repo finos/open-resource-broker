@@ -7,8 +7,14 @@ import threading
 import time
 from unittest.mock import Mock
 
-import psutil
 import pytest
+
+try:
+    import psutil
+
+    HAS_PSUTIL = True
+except ImportError:
+    HAS_PSUTIL = False
 
 # Import components for performance testing
 try:
@@ -22,6 +28,9 @@ try:
 except ImportError as e:
     IMPORTS_AVAILABLE = False
     pytestmark = pytest.mark.skip(f"Performance test imports not available: {e}")
+
+if not HAS_PSUTIL and IMPORTS_AVAILABLE:
+    pytestmark = pytest.mark.skip("psutil not installed")
 
 
 @pytest.mark.performance

@@ -44,8 +44,11 @@ class JinjaSpecRenderer(SpecRenderingPort):
             return json.loads(rendered_content)
 
         except Exception as e:
+            rendered_content_safe = (
+                rendered_content if "rendered_content" in dir() else "<unrendered>"
+            )  # type: ignore[possibly-undefined]
             self.logger.error(
-                f"Failed to render spec from file {file_path}: {e} context: {context} \n file: {rendered_content} "
+                f"Failed to render spec from file {file_path}: {e} context: {context} \n file: {rendered_content_safe} "
             )
             raise
 

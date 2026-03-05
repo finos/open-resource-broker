@@ -6,7 +6,9 @@ from typing import Any, Optional
 from pydantic import ConfigDict, Field
 
 from domain.base.entity import AggregateRoot
-from domain.base.value_objects import InstanceId, InstanceType, IPAddress, Tags
+from domain.base.value_objects import InstanceType, IPAddress, Tags
+from domain.machine.exceptions import InvalidMachineStateError
+from domain.machine.machine_identifiers import MachineId
 
 from .machine_status import MachineStatus
 
@@ -21,20 +23,29 @@ class Machine(AggregateRoot):
     )
 
     # Core machine identification
-    instance_id: InstanceId
+    machine_id: MachineId
+    name: Optional[str] = None
     template_id: str
-    request_id: Optional[str] = None  # Link to the request that created this machine
+    request_id: Optional[str] = None
+    return_request_id: Optional[str] = None
     provider_type: str
+    provider_name: str
+    provider_api: Optional[str] = None
+    resource_id: Optional[str] = None
 
     # Machine configuration
     instance_type: InstanceType
     image_id: str
+    price_type: Optional[str] = None
 
     # Network configuration
     private_ip: Optional[str] = None
     public_ip: Optional[str] = None
+    private_dns_name: Optional[str] = None
+    public_dns_name: Optional[str] = None
     subnet_id: Optional[str] = None
     security_group_ids: list[str] = Field(default_factory=list)
+    vpc_id: Optional[str] = None
 
     # Machine state
     status: MachineStatus = Field(default=MachineStatus.PENDING)
@@ -42,6 +53,7 @@ class Machine(AggregateRoot):
 
     # Lifecycle timestamps
     launch_time: Optional[datetime] = None
+    launched_at: Optional[datetime] = None
     termination_time: Optional[datetime] = None
 
     # Tags and metadata
@@ -56,9 +68,19 @@ class Machine(AggregateRoot):
 
     def __init__(self, **data) -> None:
         """Initialize the instance."""
+        # Handle instance_id parameter (map to machine_id)
+        if "instance_id" in data and "machine_id" not in data:
+            from domain.base.value_objects import InstanceId
+
+            instance_id = data.pop("instance_id")
+            if isinstance(instance_id, InstanceId):
+                data["machine_id"] = MachineId(value=instance_id.value)
+            else:
+                data["machine_id"] = MachineId(value=str(instance_id))
+
         # Set default ID if not provided
         if "id" not in data:
-            data["id"] = data.get("instance_id", f"machine-{data.get('template_id', 'unknown')}")
+            data["id"] = data.get("machine_id", f"machine-{data.get('template_id', 'unknown')}")
 
         # Set default timestamps if not provided
         from datetime import datetime
@@ -68,24 +90,57 @@ class Machine(AggregateRoot):
 
         super().__init__(**data)
 
+    def start_launching(self) -> "Machine":
+        """Transition machine from PENDING to LAUNCHING status."""
+        if self.status != MachineStatus.PENDING:
+            raise InvalidMachineStateError(self.status.value, MachineStatus.LAUNCHING.value)
+
+        fields = self.model_dump()
+        fields["status"] = MachineStatus.LAUNCHING
+        fields["launched_at"] = datetime.utcnow()
+        fields["version"] = self.version + 1
+
+        updated_machine = Machine.model_validate(fields)
+
+        # Generate domain event for status change
+        from domain.base.events.domain_events import MachineStatusChangedEvent
+
+        status_event = MachineStatusChangedEvent(
+            aggregate_id=str(self.machine_id),
+            aggregate_type="Machine",
+            machine_id=str(self.machine_id),
+            old_status=self.status.value,
+            new_status=MachineStatus.LAUNCHING.value,
+            reason="Machine launching initiated",
+            metadata={
+                "reason": "Machine launching initiated",
+                "timestamp": fields["launched_at"].isoformat(),
+                "machine_type": str(self.instance_type),
+                "provider_type": self.provider_type,
+            },
+        )
+        updated_machine.add_domain_event(status_event)
+
+        return updated_machine
+
     def update_status(self, new_status: MachineStatus, reason: Optional[str] = None) -> "Machine":
         """Update machine status and generate domain event."""
         old_status = self.status
 
-        data = self.model_dump()
-        data["status"] = new_status
-        data["status_reason"] = reason
-        data["version"] = self.version + 1
+        fields = self.model_dump()
+        fields["status"] = new_status
+        fields["status_reason"] = reason
+        fields["version"] = self.version + 1
 
         # Update timestamps based on status
         now = datetime.utcnow()
         if new_status == MachineStatus.RUNNING and not self.launch_time:
-            data["launch_time"] = now
+            fields["launch_time"] = now
         elif new_status in [MachineStatus.TERMINATED, MachineStatus.FAILED]:
-            data["termination_time"] = now
+            fields["termination_time"] = now
 
         # Create updated machine instance
-        updated_machine = Machine.model_validate(data)
+        updated_machine = Machine.model_validate(fields)
 
         # Generate domain event for status change (only if status actually changed)
         if old_status != new_status:
@@ -93,11 +148,10 @@ class Machine(AggregateRoot):
 
             status_event = MachineStatusChangedEvent(
                 # DomainEvent required fields
-                aggregate_id=str(self.instance_id),
+                aggregate_id=str(self.machine_id),
                 aggregate_type="Machine",
                 # MachineEvent required fields
-                machine_id=str(self.instance_id),
-                request_id=str(self.request_id) if self.request_id else "unknown",
+                machine_id=str(self.machine_id),
                 # StatusChangeEvent required fields
                 old_status=old_status.value,
                 new_status=new_status.value,
@@ -116,36 +170,36 @@ class Machine(AggregateRoot):
 
     def get_id(self) -> str:
         """Get the machine identifier."""
-        return str(self.instance_id)
+        return str(self.machine_id)
 
     def update_network_info(
         self, private_ip: Optional[str] = None, public_ip: Optional[str] = None
     ) -> "Machine":
         """Update machine network information."""
-        data = self.model_dump()
+        fields = self.model_dump()
 
         if private_ip:
-            data["private_ip"] = IPAddress(value=private_ip)
+            fields["private_ip"] = IPAddress(value=private_ip)
         if public_ip:
-            data["public_ip"] = IPAddress(value=public_ip)
+            fields["public_ip"] = IPAddress(value=public_ip)
 
-        data["version"] = self.version + 1
-        return Machine.model_validate(data)
+        fields["version"] = self.version + 1
+        return Machine.model_validate(fields)
 
     def update_tags(self, new_tags: Tags) -> "Machine":
         """Update machine tags."""
         merged_tags = self.tags.merge(new_tags)
-        data = self.model_dump()
-        data["tags"] = merged_tags
-        data["version"] = self.version + 1
-        return Machine.model_validate(data)
+        fields = self.model_dump()
+        fields["tags"] = merged_tags
+        fields["version"] = self.version + 1
+        return Machine.model_validate(fields)
 
     def set_provider_data(self, provider_data: dict[str, Any]) -> "Machine":
         """Set provider-specific data."""
-        data = self.model_dump()
-        data["provider_data"] = provider_data
-        data["version"] = self.version + 1
-        return Machine.model_validate(data)
+        fields = self.model_dump()
+        fields["provider_data"] = provider_data
+        fields["version"] = self.version + 1
+        return Machine.model_validate(fields)
 
     def get_provider_data(self, key: str, default: Any = None) -> Any:
         """Get provider-specific data value."""
@@ -176,7 +230,7 @@ class Machine(AggregateRoot):
     def to_provider_format(self, provider_type: str) -> dict[str, Any]:
         """Convert machine to provider-specific format."""
         base_format = {
-            "instance_id": self.instance_id.value,
+            "instance_id": self.machine_id.value,
             "template_id": self.template_id,
             "provider_type": self.provider_type,
             "instance_type": self.instance_type.value,
@@ -185,6 +239,7 @@ class Machine(AggregateRoot):
             "status_reason": self.status_reason,
             "subnet_id": self.subnet_id,
             "security_group_ids": self.security_group_ids,
+            "vpc_id": self.vpc_id,
             "tags": self.tags.to_dict(),
             "metadata": self.metadata,
             "provider_data": self.provider_data,
@@ -193,9 +248,9 @@ class Machine(AggregateRoot):
 
         # Add optional fields
         if self.private_ip:
-            base_format["private_ip"] = self.private_ip.value
+            base_format["private_ip"] = str(self.private_ip)
         if self.public_ip:
-            base_format["public_ip"] = self.public_ip.value
+            base_format["public_ip"] = str(self.public_ip)
         if self.launch_time:
             base_format["launch_time"] = self.launch_time.isoformat()
         if self.termination_time:
@@ -207,15 +262,16 @@ class Machine(AggregateRoot):
     def from_provider_format(cls, data: dict[str, Any], provider_type: str) -> "Machine":
         """Create machine from provider-specific format."""
         core_data = {
-            "instance_id": InstanceId(value=data.get("instance_id")),
+            "machine_id": MachineId(value=data.get("instance_id") or ""),
             "template_id": data.get("template_id"),
             "provider_type": provider_type,
-            "instance_type": InstanceType(value=data.get("instance_type")),
+            "instance_type": InstanceType(value=data.get("instance_type") or ""),
             "image_id": data.get("image_id"),
             "status": MachineStatus(data.get("status", MachineStatus.UNKNOWN.value)),
             "status_reason": data.get("status_reason"),
             "subnet_id": data.get("subnet_id"),
             "security_group_ids": data.get("security_group_ids", []),
+            "vpc_id": data.get("vpc_id"),
             "tags": Tags.from_dict(data.get("tags", {})),
             "metadata": data.get("metadata", {}),
             "provider_data": data.get("provider_data", {}),

@@ -51,7 +51,7 @@ class ApplicationStartedEvent(SystemEvent, TimedEvent):
     startup_duration_ms: float = Field(alias="duration_ms")  # Use inherited duration_ms
     mode: str  # "script", "rest", "eda"
     configuration_loaded: bool
-    version: Optional[str] = None
+    version: Optional[str] = None  # type: ignore[assignment]
     environment: Optional[str] = None
 
 
@@ -76,7 +76,7 @@ class ApplicationErrorEvent(SystemEvent, ErrorEvent):
 class SecurityEvent(InfrastructureEvent):
     """Event raised for security-related operations."""
 
-    event_type: str  # "authentication", "authorization", "access_denied", "suspicious_activity"
+    event_type: str = ""  # type: ignore[assignment]  # "authentication", "authorization", "access_denied", "suspicious_activity"
     user_context: str
     resource_accessed: str
     success: bool

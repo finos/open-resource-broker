@@ -37,7 +37,13 @@ This guide covers setting up a development environment, understanding the codeba
    pip install -e ".[cli,api,monitoring,dev]"
    ```
 
-4. **Configure Environment**
+4. **Setup Git Hooks**
+   ```bash
+   # Configure version-controlled hooks (required for beads integration)
+   ./dev-tools/scripts/setup-hooks.sh
+   ```
+
+5. **Configure Environment**
    ```bash
    # Initialize configuration
    orb init
@@ -47,7 +53,7 @@ This guide covers setting up a development environment, understanding the codeba
    vim config/config.json
    ```
 
-5. **Run Tests**
+6. **Run Tests**
    ```bash
    # Run all tests
    make test
@@ -227,7 +233,7 @@ Implements technical concerns and external integrations:
 infrastructure/
 +--- interfaces/             # Technical interfaces
 +--- ports/                  # External system ports
-+--- persistence/            # Data persistence
++--- storage/                # Data storage
 +--- events/                 # Event infrastructure
 +--- logging/                # Logging utilities
 +--- config/                 # Configuration management

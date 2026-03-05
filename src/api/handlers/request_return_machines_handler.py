@@ -1,9 +1,12 @@
 """API handler for returning machines."""
 
 import time
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
-from application.base.infrastructure_handlers import BaseAPIHandler, RequestContext
+from application.base.infrastructure_handlers import (
+    BaseAsyncAPIHandler as BaseAPIHandler,
+    RequestContext,
+)
 from application.dto.commands import CreateReturnRequestCommand
 from application.dto.responses import (
     CleanupResourcesResponse,
@@ -50,7 +53,7 @@ class RequestReturnMachinesRESTHandler(
         self._query_bus = query_bus
         self._command_bus = command_bus
         self._scheduler_strategy = scheduler_strategy
-        self._metrics = metrics
+        self._metrics_collector = metrics
 
     async def validate_api_request(self, request: dict[str, Any], context: RequestContext) -> None:
         """
@@ -114,7 +117,7 @@ class RequestReturnMachinesRESTHandler(
         all_flag = request.get("all_flag", False)
         clean = request.get("clean", False)
         correlation_id = context.correlation_id
-        start_time = time.time() if self._metrics else None
+        start_time = time.time() if self._metrics_collector else None
 
         try:
             # Clean up all resources
@@ -126,7 +129,10 @@ class RequestReturnMachinesRESTHandler(
                     )
 
                 # Create response DTO
-                return CleanupResourcesResponse(metadata={"correlation_id": correlation_id})
+                return cast(
+                    RequestReturnMachinesResponse,
+                    CleanupResourcesResponse(metadata={"correlation_id": correlation_id}),
+                )
 
             if all_flag:
                 # Create metadata for request
@@ -139,11 +145,16 @@ class RequestReturnMachinesRESTHandler(
                 }
 
                 # Create return request for all machines using CQRS command
+                from api.utils.request_id_generator import generate_request_id
+                from domain.request.request_types import RequestType
+
+                request_id = generate_request_id(RequestType.RETURN)
                 command = CreateReturnRequestCommand(
                     machine_ids=[],
                     metadata=metadata,  # Empty list indicates all machines
                 )
-                request_id = await self._command_bus.execute(command)
+                # Execute command — CQRS commands return None; use pre-generated request_id
+                await self._command_bus.execute(cast(Any, command))
 
                 if self.logger:
                     self.logger.info(
@@ -199,14 +210,19 @@ class RequestReturnMachinesRESTHandler(
                 }
 
                 # Create return request using CQRS command
+                from api.utils.request_id_generator import generate_request_id
+                from domain.request.request_types import RequestType
+
+                request_id = generate_request_id(RequestType.RETURN)
                 command = CreateReturnRequestCommand(machine_ids=machine_ids, metadata=metadata)
-                request_id = await self._command_bus.execute(command)
+                # Execute command — CQRS commands return None; use pre-generated request_id
+                await self._command_bus.execute(cast(Any, command))
 
                 # Record metrics if available
-                if self._metrics:
-                    self._metrics.record_success(
+                if self._metrics_collector:
+                    self._metrics_collector.record_success(
                         "request_return_machines",
-                        start_time,
+                        start_time or time.time(),
                         {
                             "machine_count": len(machine_ids),
                             "correlation_id": correlation_id,
@@ -227,10 +243,10 @@ class RequestReturnMachinesRESTHandler(
 
         except Exception as e:
             # Record metrics if available
-            if self._metrics:
-                self._metrics.record_failure(
+            if self._metrics_collector:
+                self._metrics_collector.record_error(
                     "request_return_machines",
-                    start_time,
+                    start_time or time.time(),
                     {"error": str(e), "correlation_id": correlation_id},
                 )
 
@@ -259,7 +275,7 @@ class RequestReturnMachinesRESTHandler(
         if self._scheduler_strategy and hasattr(
             self._scheduler_strategy, "format_return_request_response"
         ):
-            formatted_response = await self._scheduler_strategy.format_return_request_response(
+            formatted_response = await self._scheduler_strategy.format_return_request_response(  # type: ignore[attr-defined]
                 response
             )
             return formatted_response

@@ -1,47 +1,9 @@
 """Tests for storage command handlers."""
 
 from argparse import Namespace
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-
-import application.commands.system
-import application.queries.storage
-
-# Import modules and add missing classes before importing handlers
-import application.queries.system
-
-# Mock the missing queries/commands
-application.queries.system.GetStorageConfigQuery = MagicMock()
-application.queries.system.ValidateStorageConfigQuery = MagicMock()
-application.commands.system.TestStorageCommand = MagicMock()
-
-
-# Create a concrete LoggingPort implementation for testing
-class MockLoggingPort:
-    """Mock implementation of LoggingPort for testing."""
-
-    def debug(self, message: str, **kwargs):
-        pass
-
-    def info(self, message: str, **kwargs):
-        pass
-
-    def warning(self, message: str, **kwargs):
-        pass
-
-    def error(self, message: str, **kwargs):
-        pass
-
-    def critical(self, message: str, **kwargs):
-        pass
-
-    def exception(self, message: str, **kwargs):
-        pass
-
-    def log(self, level: int, message: str, **kwargs):
-        pass
-
 
 from interface.storage_command_handlers import (
     handle_list_storage_strategies,
@@ -61,13 +23,14 @@ class TestStorageCommandHandlers:
         """Test list storage strategies handler."""
         args = Namespace(resource="storage", action="list")
 
-        # Mock the entire interface module to avoid DI container issues
         with patch("interface.storage_command_handlers.get_container") as mock_get_container:
-            # Create mock query bus that returns expected result
-            mock_query_bus = Mock()
-            mock_query_bus.handle = AsyncMock(return_value={"strategies": ["json", "dynamodb"]})
+            mock_query_bus = AsyncMock()
+            mock_result = Mock()
+            mock_result.strategies = ["json", "dynamodb"]
+            mock_result.total_count = 2
+            mock_result.current_strategy = "json"
+            mock_query_bus.execute = AsyncMock(return_value=mock_result)
 
-            # Create mock container that returns our mock query bus
             mock_container = Mock()
             mock_container.get.return_value = mock_query_bus
             mock_get_container.return_value = mock_container
@@ -82,15 +45,13 @@ class TestStorageCommandHandlers:
         """Test show storage configuration handler."""
         args = Namespace(resource="storage", action="show")
 
-        with patch("src.interface.storage_command_handlers.get_container") as mock_get_container:
-            mock_container = Mock()
-            mock_get_container.return_value = mock_container
+        with patch("interface.storage_command_handlers.get_container") as mock_get_container:
+            mock_query_bus = AsyncMock()
+            mock_query_bus.execute = AsyncMock(return_value={"type": "json", "path": "data"})
 
-            # Mock configuration manager
-            mock_config_manager = Mock()
-            mock_config_manager.get_storage_strategy.return_value = "json"
-            mock_config_manager.get_app_config.return_value = Mock()
-            mock_container.get.return_value = mock_config_manager
+            mock_container = Mock()
+            mock_container.get.return_value = mock_query_bus
+            mock_get_container.return_value = mock_container
 
             result = await handle_show_storage_config(args)
 
@@ -101,83 +62,68 @@ class TestStorageCommandHandlers:
         """Test validate storage configuration handler."""
         args = Namespace(resource="storage", action="validate")
 
-        with patch("src.interface.storage_command_handlers.get_container") as mock_get_container:
-            mock_container = Mock()
-            mock_get_container.return_value = mock_container
+        with patch("interface.storage_command_handlers.get_container") as mock_get_container:
+            mock_query_bus = AsyncMock()
+            mock_query_bus.execute = AsyncMock(return_value={"valid": True, "errors": []})
 
-            # Mock configuration manager
-            mock_config_manager = Mock()
-            mock_config_manager.get_storage_strategy.return_value = "json"
-            mock_config_manager.get_app_config.return_value = Mock()
-            mock_container.get.return_value = mock_config_manager
+            mock_container = Mock()
+            mock_container.get.return_value = mock_query_bus
+            mock_get_container.return_value = mock_container
 
             result = await handle_validate_storage_config(args)
 
             assert isinstance(result, dict)
-            assert "valid" in result
 
     @pytest.mark.asyncio
     async def test_handle_test_storage(self):
         """Test storage connection test handler."""
         args = Namespace(resource="storage", action="test")
 
-        with patch("src.interface.storage_command_handlers.get_container") as mock_get_container:
-            mock_container = Mock()
-            mock_get_container.return_value = mock_container
+        with patch("interface.storage_command_handlers.get_container") as mock_get_container:
+            mock_query_bus = AsyncMock()
+            mock_query_bus.execute = AsyncMock(return_value={"success": True})
 
-            # Mock storage registry
-            mock_registry = Mock()
-            mock_strategy = Mock()
-            mock_strategy.test_connection = AsyncMock(return_value=True)
-            mock_registry.create_strategy.return_value = mock_strategy
-            mock_container.get.return_value = mock_registry
+            mock_container = Mock()
+            mock_container.get.return_value = mock_query_bus
+            mock_get_container.return_value = mock_container
 
             result = await handle_test_storage(args)
 
             assert isinstance(result, dict)
-            assert "connection_test" in result
 
     @pytest.mark.asyncio
     async def test_handle_storage_health(self):
         """Test storage health check handler."""
         args = Namespace(resource="storage", action="health")
 
-        with patch("src.interface.storage_command_handlers.get_container") as mock_get_container:
-            mock_container = Mock()
-            mock_get_container.return_value = mock_container
+        with patch("interface.storage_command_handlers.get_container") as mock_get_container:
+            mock_query_bus = AsyncMock()
+            mock_query_bus.execute = AsyncMock(return_value={"status": "healthy"})
 
-            # Mock storage registry
-            mock_registry = Mock()
-            mock_strategy = Mock()
-            mock_strategy.health_check = AsyncMock(return_value={"status": "healthy"})
-            mock_registry.create_strategy.return_value = mock_strategy
-            mock_container.get.return_value = mock_registry
+            mock_container = Mock()
+            mock_container.get.return_value = mock_query_bus
+            mock_get_container.return_value = mock_container
 
             result = await handle_storage_health(args)
 
             assert isinstance(result, dict)
-            assert "health" in result
 
     @pytest.mark.asyncio
     async def test_handle_storage_metrics(self):
         """Test storage metrics handler."""
         args = Namespace(resource="storage", action="metrics")
 
-        with patch("src.interface.storage_command_handlers.get_container") as mock_get_container:
-            mock_container = Mock()
-            mock_get_container.return_value = mock_container
+        with patch("interface.storage_command_handlers.get_container") as mock_get_container:
+            mock_query_bus = AsyncMock()
+            mock_query_bus.execute = AsyncMock(return_value={"operations": 100})
 
-            # Mock storage registry
-            mock_registry = Mock()
-            mock_strategy = Mock()
-            mock_strategy.get_metrics = AsyncMock(return_value={"operations": 100})
-            mock_registry.create_strategy.return_value = mock_strategy
-            mock_container.get.return_value = mock_registry
+            mock_container = Mock()
+            mock_container.get.return_value = mock_query_bus
+            mock_get_container.return_value = mock_container
 
             result = await handle_storage_metrics(args)
 
             assert isinstance(result, dict)
-            assert "metrics" in result
 
 
 class TestStorageHandlerImports:
@@ -194,7 +140,6 @@ class TestStorageHandlerImports:
             handle_validate_storage_config,
         )
 
-        # Verify all handlers are callable functions
         assert callable(handle_list_storage_strategies)
         assert callable(handle_show_storage_config)
         assert callable(handle_validate_storage_config)

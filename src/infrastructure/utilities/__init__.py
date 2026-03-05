@@ -20,12 +20,7 @@ from infrastructure.utilities.common.file_utils import (
     write_json_file,
 )
 from infrastructure.utilities.common.resource_naming import (
-    get_asg_name,
-    get_fleet_name,
-    get_instance_name,
-    get_launch_template_name,
     get_resource_prefix,
-    get_tag_name,
 )
 from infrastructure.utilities.common.serialization import (
     deserialize_enum,
@@ -33,6 +28,7 @@ from infrastructure.utilities.common.serialization import (
     serialize_enum,
 )
 from infrastructure.utilities.common.string_utils import (
+    extract_provider_type,
     mask_sensitive_data as sanitize_string,
     to_camel_case as snake_to_camel,
     to_snake_case as camel_to_snake,
@@ -51,6 +47,7 @@ __all__: list[str] = [
     "SQLEngineFactory",
     "UnitOfWorkFactory",
     # String utilities
+    "extract_provider_type",
     "camel_to_snake",
     # String utilities (aliases)
     "camel_to_snake",
@@ -61,14 +58,9 @@ __all__: list[str] = [
     "filter_dict",
     # Date utilities
     "format_datetime",
-    "get_asg_name",
     "get_current_timestamp",
-    "get_fleet_name",
-    "get_instance_name",
-    "get_launch_template_name",
     # Resource naming
     "get_resource_prefix",
-    "get_tag_name",
     "group_by",
     "parse_datetime",
     "process_value_objects",

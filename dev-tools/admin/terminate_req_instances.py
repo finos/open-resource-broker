@@ -77,13 +77,7 @@ def _terminate_instances(ec2_client, instance_ids: List[str], dry_run: bool) -> 
                     and attempt < TERMINATE_MAX_RETRIES
                 ):
                     print(
-                        "TerminateInstances throttled (%s). Retrying in %ss (attempt %s/%s)."
-                        % (
-                            error_code,
-                            TERMINATE_RETRY_SLEEP_SECONDS,
-                            attempt,
-                            TERMINATE_MAX_RETRIES,
-                        )
+                        f"TerminateInstances throttled ({error_code}). Retrying in {TERMINATE_RETRY_SLEEP_SECONDS}s (attempt {attempt}/{TERMINATE_MAX_RETRIES})."
                     )
                     time.sleep(TERMINATE_RETRY_SLEEP_SECONDS)
                     continue
@@ -96,6 +90,11 @@ def main() -> int:
     )
     parser.add_argument("--region", default="eu-west-1", help="AWS region (default: eu-west-1)")
     parser.add_argument(
+        "--profile",
+        default=None,
+        help="AWS profile name (optional; uses default credential chain otherwise)",
+    )
+    parser.add_argument(
         "--prefix",
         default="req-",
         help='Name tag prefix to match (default: "req-")',
@@ -107,7 +106,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    session = boto3.session.Session()
+    session = boto3.Session(profile_name=args.profile) if args.profile else boto3.Session()
     ec2_client = session.client("ec2", region_name=args.region)
 
     try:

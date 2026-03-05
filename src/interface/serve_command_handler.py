@@ -1,7 +1,7 @@
 """CLI command handler for REST API server."""
 
 import signal
-from typing import Any
+from typing import Any, cast
 
 from infrastructure.error.decorators import handle_interface_exceptions
 from infrastructure.logging.logger import get_logger
@@ -22,7 +22,7 @@ async def handle_serve_api(args) -> dict[str, Any]:
 
     # Extract parameters from args
     # Intentional binding for server deployment
-    host = getattr(args, "host", "0.0.0.0")  # nosec B104
+    host = getattr(args, "host", "0.0.0.0")  # nosec B104 - intentional default, overridable via CLI flag
     port = getattr(args, "port", 8000)
     workers = getattr(args, "workers", 1)
     reload = getattr(args, "reload", False)
@@ -31,7 +31,7 @@ async def handle_serve_api(args) -> dict[str, Any]:
     try:
         # Import here to avoid circular dependencies
         try:
-            import uvicorn
+            import uvicorn  # type: ignore
 
             from api.server import create_fastapi_app
         except ImportError:
@@ -41,10 +41,22 @@ async def handle_serve_api(args) -> dict[str, Any]:
         from domain.base.ports.configuration_port import ConfigurationPort
         from infrastructure.di.container import get_container
 
-        # Get configuration through DI
+        # Get configuration through DI with fallbacks
         container = get_container()
         config_manager = container.get(ConfigurationPort)
-        server_config = config_manager.get_typed(ServerConfig)
+
+        # Use defensive configuration loading
+        try:
+            server_config = cast(Any, config_manager).get_typed_with_defaults(ServerConfig)
+        except Exception as e:
+            logger.warning(f"Configuration loading failed: {e}", exc_info=True)
+            logger.info("Using default server configuration")
+            server_config = ServerConfig()  # type: ignore[call-arg]
+
+        # Validate critical configuration
+        if server_config is None:
+            logger.error("Server configuration is None, creating default", exc_info=True)
+            server_config = ServerConfig()  # type: ignore[call-arg]
 
         # Override with CLI arguments if provided
         if host:
@@ -102,5 +114,5 @@ async def handle_serve_api(args) -> dict[str, Any]:
         }
 
     except Exception as e:
-        logger.error("Failed to start server: %s", e)
+        logger.error("Failed to start server: %s", e, exc_info=True)
         return {"error": str(e), "message": "Failed to start server"}

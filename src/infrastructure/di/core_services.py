@@ -1,5 +1,6 @@
 """Core service registrations for dependency injection."""
 
+from config.managers.configuration_manager import ConfigurationManager
 from domain.base.ports import (
     ConfigurationPort,
     EventPublisherPort,
@@ -16,6 +17,15 @@ from monitoring.metrics import MetricsCollector
 def register_core_services(container: DIContainer) -> None:
     """Register core application services."""
 
+    # ConfigurationManager is now registered earlier in lazy mode
+    # Only register it here if not already registered (eager mode)
+    if not container.has(ConfigurationManager):
+
+        def create_configuration_manager(c):
+            return ConfigurationManager()  # Uses default config discovery
+
+        container.register_singleton(ConfigurationManager, create_configuration_manager)
+
     # Register metrics collector with configuration from ConfigurationPort
     def create_metrics_collector(c):
         config_port = c.get(ConfigurationPort)
@@ -24,6 +34,17 @@ def register_core_services(container: DIContainer) -> None:
 
     # Register as singleton so the same collector instance is shared
     container.register_singleton(MetricsCollector, create_metrics_collector)
+
+    # Register factories
+    from infrastructure.scheduler.factory import SchedulerStrategyFactory
+    from infrastructure.storage.factory import StorageStrategyFactory
+
+    container.register_factory(
+        SchedulerStrategyFactory, lambda c: SchedulerStrategyFactory(c.get(ConfigurationManager))
+    )
+    container.register_factory(
+        StorageStrategyFactory, lambda c: StorageStrategyFactory(c.get(ConfigurationManager))
+    )
 
     # Register template format converter
 
@@ -44,12 +65,18 @@ def register_core_services(container: DIContainer) -> None:
         lambda c: ConfigurableEventPublisher(mode="logging"),  # Default to logging mode
     )
 
-    # Register command and query buses with factory functions
-    container.register_factory(
-        CommandBus, lambda c: CommandBus(container=c, logger=c.get(LoggingPort))
-    )
-
-    container.register_factory(QueryBus, lambda c: QueryBus(container=c, logger=c.get(LoggingPort)))
+    # Register command and query buses conditionally based on lazy loading mode
+    # If lazy loading is enabled, buses will be registered by CQRS handler discovery
+    # If lazy loading is disabled, register them as factories immediately
+    if not container.is_lazy_loading_enabled():
+        container.register_factory(
+            CommandBus,
+            lambda c: CommandBus(container=c, logger=c.get(LoggingPort)),  # type: ignore[call-arg]
+        )
+        container.register_factory(
+            QueryBus,
+            lambda c: QueryBus(container=c, logger=c.get(LoggingPort)),  # type: ignore[call-arg]
+        )
 
     # Register native spec service
     def create_native_spec_service(c):
@@ -57,7 +84,7 @@ def register_core_services(container: DIContainer) -> None:
         from application.services.native_spec_service import NativeSpecService
         from domain.base.ports.spec_rendering_port import SpecRenderingPort
 
-        return NativeSpecService(
+        return NativeSpecService(  # type: ignore[call-arg]
             config_port=c.get(ConfigurationPort), spec_renderer=c.get(SpecRenderingPort)
         )
 
@@ -66,9 +93,9 @@ def register_core_services(container: DIContainer) -> None:
     container.register_factory(NativeSpecService, create_native_spec_service)
 
 
-def _create_scheduler_strategy(container: DIContainer) -> SchedulerPort:
+def _create_scheduler_strategy(container: "DIContainer") -> SchedulerPort:
     """Create scheduler strategy using factory."""
-    from infrastructure.factories.scheduler_strategy_factory import SchedulerStrategyFactory
+    from infrastructure.scheduler.factory import SchedulerStrategyFactory
 
     factory = container.get(SchedulerStrategyFactory)
     config = container.get(ConfigurationPort)
@@ -76,9 +103,9 @@ def _create_scheduler_strategy(container: DIContainer) -> SchedulerPort:
     return factory.create_strategy(scheduler_type, container)
 
 
-def _create_storage_strategy(container: DIContainer) -> StoragePort:
+def _create_storage_strategy(container: "DIContainer") -> StoragePort:
     """Create storage strategy using factory."""
-    from infrastructure.factories.storage_strategy_factory import StorageStrategyFactory
+    from infrastructure.storage.factory import StorageStrategyFactory
 
     factory = container.get(StorageStrategyFactory)
     config = container.get(ConfigurationPort)
@@ -86,10 +113,10 @@ def _create_storage_strategy(container: DIContainer) -> StoragePort:
     return factory.create_strategy(storage_type, config)
 
 
-def _create_provider_strategy(container: DIContainer) -> ProviderPort:
-    """Create provider strategy using adapter pattern."""
-    from infrastructure.adapters.provider_context_adapter import ProviderContextAdapter
-    from providers.base.strategy.provider_context import ProviderContext
+def _create_provider_strategy(container: "DIContainer") -> ProviderPort:
+    """Create provider strategy using registry pattern."""
+    from infrastructure.adapters.provider_registry_adapter import ProviderRegistryAdapter
+    from providers.registry import get_provider_registry
 
-    provider_context = container.get(ProviderContext)
-    return ProviderContextAdapter(provider_context)
+    registry = get_provider_registry()
+    return ProviderRegistryAdapter(registry)

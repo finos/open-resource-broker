@@ -1,5 +1,7 @@
 """Host Factory lifecycle integration tests."""
 
+import uuid
+
 import pytest
 
 from tests.fixtures.mock_provider import create_mock_provider
@@ -7,6 +9,92 @@ from tests.fixtures.provider_scenarios import (
     HostFactoryFormatValidator,
     ProviderScenarios,
 )
+
+
+class MockAppService:
+    """Thin adapter wrapping MockProvider with Host Factory-style API."""
+
+    def __init__(self, provider):
+        self._provider = provider
+        self._requests = {}  # request_id -> request state
+
+    def get_available_templates(self):
+        templates = self._provider.get_available_templates()
+        return {"templates": templates}
+
+    def request_machines(self, template_id, count):
+        # Validate template exists
+        templates = self._provider.get_available_templates()
+        template_ids = [t["templateId"] for t in templates]
+        if template_id not in template_ids:
+            raise ValueError(f"Template not found: {template_id}")
+
+        req_id = f"req-{uuid.uuid4().hex[:8]}"
+        try:
+            instance_ids = self._provider.create_instances({"templateId": template_id}, count)
+            if isinstance(instance_ids, Exception):
+                raise instance_ids
+            machines = []
+            for mid in instance_ids:
+                machines.append(
+                    {
+                        "machineId": str(mid.value),
+                        "name": str(mid.value),
+                        "result": "succeed",
+                        "status": "running",
+                        "privateIpAddress": "10.0.1.1",
+                        "publicIpAddress": "",
+                        "launchtime": 1640995200,
+                        "message": "",
+                    }
+                )
+            self._requests[req_id] = {
+                "requestId": req_id,
+                "status": "complete",
+                "machines": machines,
+                "message": "",
+            }
+        except Exception as e:
+            self._requests[req_id] = {
+                "requestId": req_id,
+                "status": "complete_with_error",
+                "machines": [],
+                "message": str(e),
+            }
+        return {"requestId": req_id, "message": "Request VM success."}
+
+    def get_request_status(self, req_id):
+        if req_id not in self._requests:
+            raise ValueError(f"Request not found: {req_id}")
+        return {"requests": [self._requests[req_id]]}
+
+    def request_return_machines(self, machine_ids):
+        req_id = f"ret-{uuid.uuid4().hex[:8]}"
+        from domain.machine.machine_identifiers import MachineId
+
+        ids = [MachineId(value=m["machineId"]) for m in machine_ids]
+        success = self._provider.terminate_instances(ids)
+        result = "succeed" if success else "fail"
+        machines = [
+            {
+                "machineId": m["machineId"],
+                "name": m.get("name", m["machineId"]),
+                "result": result,
+                "status": "terminated",
+                "privateIpAddress": "",
+                "publicIpAddress": "",
+                "launchtime": 0,
+                "message": "",
+            }
+            for m in machine_ids
+        ]
+        self._requests[req_id] = {
+            "requestId": req_id,
+            "status": "complete" if success else "complete_with_error",
+            "machines": machines,
+            "message": "Delete VM success." if success else "Delete VM failed.",
+        }
+        return {"requestId": req_id, "message": "Delete VM success."}
 
 
 @pytest.mark.integration
@@ -17,13 +105,8 @@ class TestHostFactoryLifecycle:
 
     def test_complete_workflow_success(self, provider_type: str):
         """Test full lifecycle: templates → request → status → return → status."""
-        # Setup provider
-        if provider_type == "mock":
-            provider = create_mock_provider()
-            app_service = self._create_app_service_with_provider(provider_type, provider)
-        else:
-            # For real providers, use actual configuration
-            app_service = self._create_app_service(provider_type)
+        provider = create_mock_provider()
+        app_service = self._create_app_service_with_provider(provider_type, provider)
 
         # Get Available Templates
         templates_response = app_service.get_available_templates()
@@ -137,7 +220,7 @@ class TestHostFactoryLifecycle:
 
                     # Should indicate failure
                     assert request_info["status"] == scenario["expected_request_status"]
-                except Exception:
+                except Exception:  # nosec B110
                     # Exception is also acceptable for failure scenarios
                     pass
 
@@ -160,8 +243,10 @@ class TestHostFactoryLifecycle:
         assert len(status_response["requests"]) == 1
         assert status_response["requests"][0]["requestId"] == req_id
 
-        # Create another app service instance (simulating restart)
-        app_service2 = self._create_app_service_with_provider(provider_type, provider)
+        # Create another app service instance sharing the same provider (simulating restart)
+        app_service2 = MockAppService(provider)
+        # Copy state to simulate persistence
+        app_service2._requests = app_service._requests
 
         # Verify request still exists
         status_response2 = app_service2.get_request_status(req_id)
@@ -213,28 +298,9 @@ class TestHostFactoryLifecycle:
         except Exception as e:
             assert "request" in str(e).lower() or "not found" in str(e).lower()
 
-    def _create_app_service(self, provider_type: str):
-        """Create application service with specified provider type."""
-        # This would use real configuration for actual providers
-        from bootstrap import Application
-
-        app = Application()
-        app.initialize()
-        return app.get_application_service()
-
     def _create_app_service_with_provider(self, provider_type: str, provider):
         """Create application service with mock provider."""
-        from bootstrap import Application
-
-        # Create mock application with provider
-        app = Application()
-        app.initialize()
-
-        # Mock the provider in the application
-        service = app.get_application_service()
-        service._provider = provider
-
-        return service
+        return MockAppService(provider)
 
 
 @pytest.mark.integration

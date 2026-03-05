@@ -12,18 +12,16 @@ from .commands import (
     DeleteTemplateCommand,
     TemplateCommandResponse,
     UpdateTemplateCommand,
-    ValidateTemplateCommand,
 )
 
 __all__: list[str] = [
     # Commands
     "CreateTemplateCommand",
     "DeleteTemplateCommand",
+    "UpdateTemplateCommand",
+    "TemplateCommandResponse",
     # Queries
     "GetTemplateQuery",
     "ListTemplatesQuery",
-    "TemplateCommandResponse",
-    "UpdateTemplateCommand",
-    "ValidateTemplateCommand",
     "ValidateTemplateQuery",
 ]

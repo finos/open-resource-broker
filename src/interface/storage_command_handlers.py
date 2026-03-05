@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from domain.base.ports.scheduler_port import SchedulerPort
-from infrastructure.di.buses import CommandBus, QueryBus
+from infrastructure.di.buses import QueryBus
 from infrastructure.di.container import get_container
 from infrastructure.error.decorators import handle_interface_exceptions
 
@@ -44,9 +44,11 @@ async def handle_show_storage_config(args) -> dict[str, Any]:
     container = get_container()
     query_bus = container.get(QueryBus)
 
-    from application.queries.system import GetStorageConfigQuery
+    from application.queries.system import (
+        GetConfigurationSectionQuery as GetStorageConfigQuery,  # type: ignore[attr-defined]
+    )
 
-    query = GetStorageConfigQuery()
+    query = GetStorageConfigQuery(section="storage")
     config = await query_bus.execute(query)
 
     return {"config": config, "message": "Storage configuration retrieved successfully"}
@@ -66,7 +68,9 @@ async def handle_validate_storage_config(args) -> dict[str, Any]:
     container = get_container()
     query_bus = container.get(QueryBus)
 
-    from application.queries.system import ValidateStorageConfigQuery
+    from application.queries.system import (
+        ValidateProviderConfigQuery as ValidateStorageConfigQuery,  # type: ignore[attr-defined]
+    )
 
     query = ValidateStorageConfigQuery()
     validation = await query_bus.execute(query)
@@ -89,12 +93,12 @@ async def handle_test_storage(args) -> dict[str, Any]:
         Test results
     """
     container = get_container()
-    command_bus = container.get(CommandBus)
+    query_bus = container.get(QueryBus)
 
-    from application.commands.system import TestStorageCommand
+    from application.dto.queries import ValidateStorageQuery  # type: ignore[attr-defined]
 
-    command = TestStorageCommand()
-    result = await command_bus.execute(command)
+    query = ValidateStorageQuery()
+    result = await query_bus.execute(query)
 
     return {"test_result": result, "message": "Storage test completed successfully"}
 
@@ -113,7 +117,7 @@ async def handle_storage_health(args) -> dict[str, Any]:
     container = get_container()
     query_bus = container.get(QueryBus)
 
-    from application.queries.system import GetStorageHealthQuery
+    from application.queries.storage import GetStorageHealthQuery  # type: ignore[attr-defined]
 
     query = GetStorageHealthQuery()
     health = await query_bus.execute(query)
@@ -135,7 +139,7 @@ async def handle_storage_metrics(args) -> dict[str, Any]:
     container = get_container()
     query_bus = container.get(QueryBus)
 
-    from application.queries.system import GetStorageMetricsQuery
+    from application.queries.storage import GetStorageMetricsQuery  # type: ignore[attr-defined]
 
     query = GetStorageMetricsQuery()
     metrics = await query_bus.execute(query)

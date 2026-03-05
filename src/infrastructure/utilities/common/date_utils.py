@@ -7,6 +7,12 @@ This module contains utility functions for working with dates and times.
 import datetime
 import time
 
+from infrastructure.constants import (
+    SECONDS_PER_DAY,
+    SECONDS_PER_HOUR,
+    SECONDS_PER_MINUTE,
+)
+
 
 def get_current_timestamp() -> float:
     """
@@ -232,7 +238,7 @@ def get_time_difference_minutes(dt1: datetime.datetime, dt2: datetime.datetime) 
     Returns:
         Time difference in minutes
     """
-    return (dt1 - dt2).total_seconds() / 60
+    return (dt1 - dt2).total_seconds() / SECONDS_PER_MINUTE
 
 
 def get_time_difference_hours(dt1: datetime.datetime, dt2: datetime.datetime) -> float:
@@ -246,7 +252,7 @@ def get_time_difference_hours(dt1: datetime.datetime, dt2: datetime.datetime) ->
     Returns:
         Time difference in hours
     """
-    return (dt1 - dt2).total_seconds() / 3600
+    return (dt1 - dt2).total_seconds() / SECONDS_PER_HOUR
 
 
 def get_time_difference_days(dt1: datetime.datetime, dt2: datetime.datetime) -> float:
@@ -260,7 +266,7 @@ def get_time_difference_days(dt1: datetime.datetime, dt2: datetime.datetime) -> 
     Returns:
         Time difference in days
     """
-    return (dt1 - dt2).total_seconds() / 86400
+    return (dt1 - dt2).total_seconds() / SECONDS_PER_DAY
 
 
 def is_same_day(dt1: datetime.datetime, dt2: datetime.datetime) -> bool:

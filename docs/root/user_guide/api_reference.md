@@ -1,447 +1,508 @@
 # API Reference
 
-The Open Resource Broker provides a command-line interface that integrates with IBM Spectrum Symphony Host Factory. This reference covers all available commands and their usage.
-
-## Command Line Interface
-
-### Basic Usage
+The Open Resource Broker exposes a REST API when running in server mode. Start the server with:
 
 ```bash
-# Direct Python execution
-python run.py <command> [options]
-
-# Via shell scripts (Symphony integration)
-./scripts/<command>.sh [input]
+orb system serve --host 0.0.0.0 --port 8000
 ```
 
-### Input Methods
+Requires the `api` extra: `pip install "orb-py[api]"`.
 
-The application supports multiple input methods:
+Interactive API docs are available at `http://localhost:8000/docs` (Swagger UI) and `http://localhost:8000/redoc` once the server is running.
 
-1. **Command line arguments** (for simple commands)
-2. **JSON data via --data flag**
-3. **JSON file via --file flag**
-4. **Standard input** (when using shell scripts)
+## Base URL
 
-### Global Options
-
-| Option | Description | Example |
-|--------|-------------|---------|
-| `--data` | JSON string input | `--data '{"template_id": "test"}'` |
-| `--file` | Path to JSON file | `--file input.json` |
-| `--all` | Apply to all items | `--all` |
-| `--long` | Include detailed information | `--long` |
-| `--clean` | Clean up resources | `--clean` |
-| `--config` | Configuration file path | `--config config/prod.json` |
-| `--log-level` | Logging level | `--log-level DEBUG` |
-
-## Available Commands
-
-### getAvailableTemplates
-
-Get list of available VM templates.
-
-#### Usage
-```bash
-# Basic usage
-python run.py getAvailableTemplates
-
-# Via shell script
-./scripts/getAvailableTemplates.sh
-
-# With filter
-python run.py getAvailableTemplates --provider-api RunInstances
+```
+http://<host>:<port>/api/v1
 ```
 
-#### Input Format
-```json
-{
-  "provider_api": "RunInstances|SpotFleet|EC2Fleet|ASG"
-}
-```
+## Authentication
 
-#### Output Format
+Authentication is not enforced by default in development mode. For production deployments, place ORB behind a reverse proxy or API gateway that handles authentication.
+
+## Templates
+
+### List Templates
+
+Returns all available templates.
+
+**Endpoint:** `GET /api/v1/templates/`
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `provider_api` | string | Filter by provider API type (e.g. `EC2Fleet`, `RunInstances`) |
+| `force_refresh` | boolean | Force reload from configuration files (default: `false`) |
+
+**Response (200):**
 ```json
 {
   "templates": [
     {
-      "template_id": "SymphonyOnDemand",
+      "template_id": "aws-basic",
       "provider_api": "RunInstances",
-      "max_number": 5,
-      "attributes": {
-        "type": ["String", "X86_64"],
-        "ncores": ["Numeric", "2"],
-        "ncpus": ["Numeric", "1"],
-        "nram": ["Numeric", "4096"]
-      },
-      "vm_type": "t2.micro",
-      "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64"
+      "instance_type": "t3.medium",
+      "image_id": "ami-0abcdef1234567890",
+      "subnet_ids": ["subnet-aaa111"],
+      "security_group_ids": ["sg-11111111"],
+      "tags": {}
     }
+  ],
+  "total_count": 1,
+  "count": 1,
+  "message": "Retrieved 1 templates successfully",
+  "success": true,
+  "timestamp": "2026-02-23T22:00:00.000000"
+}
+```
+
+**Example:**
+```bash
+curl http://localhost:8000/api/v1/templates/
+curl "http://localhost:8000/api/v1/templates/?provider_api=EC2Fleet"
+```
+
+---
+
+### Get Template
+
+Returns a single template by ID.
+
+**Endpoint:** `GET /api/v1/templates/{template_id}`
+
+**Path Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `template_id` | string | Template identifier |
+
+**Response (200):**
+```json
+{
+  "template": {
+    "template_id": "aws-basic",
+    "provider_api": "RunInstances",
+    "instance_type": "t3.medium",
+    "image_id": "ami-0abcdef1234567890",
+    "subnet_ids": ["subnet-aaa111"],
+    "security_group_ids": ["sg-11111111"],
+    "tags": {}
+  },
+  "timestamp": "2026-02-23T22:00:00.000000"
+}
+```
+
+**Error Responses:**
+- `404 Not Found` — template ID does not exist
+
+**Example:**
+```bash
+curl http://localhost:8000/api/v1/templates/aws-basic
+```
+
+---
+
+### Create Template
+
+Creates a new template.
+
+**Endpoint:** `POST /api/v1/templates/`
+
+**Request Body** (JSON, accepts both `camelCase` and `snake_case`):
+```json
+{
+  "template_id": "aws-spot",
+  "provider_api": "SpotFleet",
+  "instance_type": "c5.xlarge",
+  "image_id": "ami-0abcdef1234567890",
+  "subnet_ids": ["subnet-aaa111"],
+  "security_group_ids": ["sg-11111111"],
+  "key_name": "my-keypair",
+  "tags": {
+    "Environment": "production"
+  }
+}
+```
+
+**Request Fields:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `template_id` | string | Yes | Unique template identifier |
+| `provider_api` | string | No | Provider API type (default: `aws`) |
+| `image_id` | string | No | AMI ID |
+| `instance_type` | string | No | EC2 instance type |
+| `key_name` | string | No | EC2 key pair name |
+| `security_group_ids` | list[string] | No | Security group IDs |
+| `subnet_ids` | list[string] | No | Subnet IDs |
+| `user_data` | string | No | Instance user data (base64) |
+| `tags` | object | No | Key-value tags |
+
+**Response (201):**
+```json
+{
+  "message": "Template aws-spot created successfully",
+  "templateId": "aws-spot",
+  "timestamp": "2026-02-23T22:00:00.000000"
+}
+```
+
+**Error Responses:**
+- `400 Bad Request` — validation failed
+
+**Example:**
+```bash
+curl -X POST http://localhost:8000/api/v1/templates/ \
+  -H "Content-Type: application/json" \
+  -d '{"template_id": "aws-spot", "provider_api": "SpotFleet", "instance_type": "c5.xlarge"}'
+```
+
+---
+
+### Update Template
+
+Updates an existing template.
+
+**Endpoint:** `PUT /api/v1/templates/{template_id}`
+
+**Path Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `template_id` | string | Template identifier |
+
+**Request Body** (JSON, all fields optional, accepts `camelCase` or `snake_case`):
+```json
+{
+  "instance_type": "m5.large",
+  "tags": {
+    "Environment": "staging"
+  }
+}
+```
+
+**Response (200):**
+```json
+{
+  "message": "Template aws-basic updated successfully",
+  "templateId": "aws-basic",
+  "timestamp": "2026-02-23T22:00:00.000000"
+}
+```
+
+**Error Responses:**
+- `400 Bad Request` — validation failed
+
+**Example:**
+```bash
+curl -X PUT http://localhost:8000/api/v1/templates/aws-basic \
+  -H "Content-Type: application/json" \
+  -d '{"instance_type": "m5.large"}'
+```
+
+---
+
+### Delete Template
+
+Deletes a template.
+
+**Endpoint:** `DELETE /api/v1/templates/{template_id}`
+
+**Path Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `template_id` | string | Template identifier |
+
+**Response (200):**
+```json
+{
+  "message": "Template aws-basic deleted successfully",
+  "templateId": "aws-basic",
+  "timestamp": "2026-02-23T22:00:00.000000"
+}
+```
+
+**Example:**
+```bash
+curl -X DELETE http://localhost:8000/api/v1/templates/aws-basic
+```
+
+---
+
+### Validate Template
+
+Validates a template configuration without creating it.
+
+**Endpoint:** `POST /api/v1/templates/validate`
+
+**Request Body:** Any template configuration object (JSON).
+
+**Response (200):**
+```json
+{
+  "valid": true,
+  "templateId": "aws-spot",
+  "validationErrors": [],
+  "validationWarnings": [],
+  "timestamp": "2026-02-23T22:00:00.000000"
+}
+```
+
+**Example:**
+```bash
+curl -X POST http://localhost:8000/api/v1/templates/validate \
+  -H "Content-Type: application/json" \
+  -d '{"template_id": "aws-spot", "provider_api": "SpotFleet"}'
+```
+
+---
+
+### Refresh Templates
+
+Reloads templates from configuration files and clears the cache.
+
+**Endpoint:** `POST /api/v1/templates/refresh`
+
+**Response (200):**
+```json
+{
+  "message": "Templates refreshed successfully. Found 20 templates.",
+  "templateCount": 20,
+  "cacheStats": {"refreshed": true},
+  "timestamp": "2026-02-23T22:00:00.000000"
+}
+```
+
+**Example:**
+```bash
+curl -X POST http://localhost:8000/api/v1/templates/refresh
+```
+
+---
+
+## Machines
+
+### Request Machines
+
+Provisions new machines from a template.
+
+**Endpoint:** `POST /api/v1/machines/request`
+
+**Request Body** (accepts `camelCase` or `snake_case`):
+```json
+{
+  "template_id": "aws-basic",
+  "machine_count": 3,
+  "additional_data": {}
+}
+```
+
+**Request Fields:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `template_id` | string | Yes | Template to use |
+| `machine_count` | integer | Yes | Number of machines to provision |
+| `additional_data` | object | No | Optional extra configuration |
+
+**Response (200):** Format depends on the configured scheduler strategy.
+
+Default scheduler:
+```json
+{
+  "request_id": "req-abc123",
+  "template_id": "aws-basic",
+  "machine_count": 3,
+  "status": "pending"
+}
+```
+
+HostFactory scheduler:
+```json
+{
+  "requestId": "req-abc123",
+  "templateId": "aws-basic",
+  "machineCount": 3,
+  "status": "running"
+}
+```
+
+**Example:**
+```bash
+curl -X POST http://localhost:8000/api/v1/machines/request \
+  -H "Content-Type: application/json" \
+  -d '{"template_id": "aws-basic", "machine_count": 2}'
+```
+
+---
+
+### Return Machines
+
+Returns (terminates) machines.
+
+**Endpoint:** `POST /api/v1/machines/return`
+
+**Request Body** (accepts `camelCase` or `snake_case`):
+```json
+{
+  "machine_ids": [
+    "machine-i-1234567890abcdef0",
+    "machine-i-0987654321fedcba0"
   ]
 }
 ```
 
-### requestMachines
+**Request Fields:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `machine_ids` | list[string] | Yes | Machine IDs to return |
 
-Request new virtual machines based on a template.
+**Response (200):** Scheduler-dependent format.
 
-#### Usage
+**Example:**
 ```bash
-# With command line arguments (optional)
-python run.py requestMachines [template_id] [machine_count]
-
-# With JSON data
-python run.py requestMachines --data '{"template_id": "test", "machine_count": 3}'
-
-# With JSON file
-python run.py requestMachines --file request.json
-
-# Via shell script
-echo '{"template_id": "test", "machine_count": 3}' | ./scripts/requestMachines.sh
+curl -X POST http://localhost:8000/api/v1/machines/return \
+  -H "Content-Type: application/json" \
+  -d '{"machine_ids": ["machine-i-1234567890abcdef0"]}'
 ```
 
-#### Input Format
-```json
-{
-  "template_id": "SymphonyOnDemand",
-  "machine_count": 3,
-  "tags": {
-    "Environment": "test",
-    "Project": "symphony"
-  },
-  "priority": 5
-}
-```
+---
 
-#### Output Format
-```json
-{
-  "request_id": "req-12345678-1234-1234-1234-123456789012",
-  "template_id": "SymphonyOnDemand",
-  "machine_count": 3,
-  "status": "PENDING",
-  "created_at": "2025-06-30T12:00:00Z",
-  "machines": []
-}
-```
+### List Machines
 
-### getRequestStatus
+**Endpoint:** `GET /api/v1/machines/`
 
-Get the status of a machine request.
+**Status:** Not yet implemented. Returns `501 Not Implemented`.
 
-#### Usage
+Use `GET /api/v1/requests/{request_id}/status` to check provisioning status instead.
+
+---
+
+### Get Machine
+
+**Endpoint:** `GET /api/v1/machines/{machine_id}`
+
+**Status:** Not yet implemented. Returns `501 Not Implemented`.
+
+---
+
+## Requests
+
+### List Requests
+
+Returns provisioning requests with optional filtering.
+
+**Endpoint:** `GET /api/v1/requests/`
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `status` | string | Filter by status (`pending`, `in_progress`, `completed`, `failed`, `cancelled`) |
+| `limit` | integer | Limit number of results |
+
+**Response (200):** Scheduler-dependent format.
+
+**Example:**
 ```bash
-# With request ID
-python run.py getRequestStatus --request-id req-12345678-1234-1234-1234-123456789012
-
-# With JSON data
-python run.py getRequestStatus --data '{"request_id": "req-123..."}'
-
-# Via shell script
-echo '{"request_id": "req-123..."}' | ./scripts/getRequestStatus.sh
+curl http://localhost:8000/api/v1/requests/
+curl "http://localhost:8000/api/v1/requests/?status=pending&limit=10"
 ```
 
-#### Input Format
-```json
-{
-  "request_id": "req-12345678-1234-1234-1234-123456789012"
-}
-```
+---
 
-#### Output Format
+### Get Request Status
+
+Returns the status of a specific request.
+
+**Endpoint:** `GET /api/v1/requests/{request_id}/status`
+
+**Path Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `request_id` | string | Request identifier |
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `long` | boolean | Include detailed info and refresh provider state (default: `true`) |
+
+**Response (200):** Scheduler-dependent format.
+
+Default scheduler example:
 ```json
 {
-  "request_id": "req-12345678-1234-1234-1234-123456789012",
-  "template_id": "SymphonyOnDemand",
+  "request_id": "req-abc123",
+  "template_id": "aws-basic",
   "machine_count": 3,
-  "status": "COMPLETED",
-  "created_at": "2025-06-30T12:00:00Z",
-  "updated_at": "2025-06-30T12:05:00Z",
-  "completed_at": "2025-06-30T12:05:00Z",
+  "status": "completed",
   "machines": [
     {
       "machine_id": "machine-i-1234567890abcdef0",
-      "name": "symphony-instance-1",
-      "status": "RUNNING",
-      "instance_type": "t2.micro",
-      "private_ip": "10.0.1.100",
-      "public_ip": null,
-      "provider_instance_id": "i-1234567890abcdef0"
+      "status": "running",
+      "private_ip": "10.0.1.100"
     }
   ]
 }
 ```
 
-### getReturnRequests
-
-Get list of return requests (machines to be terminated).
-
-#### Usage
+**Example:**
 ```bash
-# Get all return requests
-python run.py getReturnRequests
-
-# Get active requests only
-python run.py getReturnRequests --active-only
-
-# Get return requests only
-python run.py getReturnRequests --return-only
-
-# Via shell script
-./scripts/getReturnRequests.sh
+curl http://localhost:8000/api/v1/requests/req-abc123/status
+curl "http://localhost:8000/api/v1/requests/req-abc123/status?long=false"
 ```
 
-#### Input Format
-```json
-{
-  "active_only": true,
-  "return_only": true
-}
-```
+---
 
-#### Output Format
-```json
-{
-  "return_requests": [
-    {
-      "request_id": "ret-12345678-1234-1234-1234-123456789012",
-      "machine_ids": ["machine-i-1234567890abcdef0"],
-      "status": "PENDING",
-      "created_at": "2025-06-30T12:00:00Z"
-    }
-  ]
-}
-```
+### Get Request Details
 
-### requestReturnMachines
+Returns full details for a request.
 
-Request machines to be returned (terminated).
+**Endpoint:** `GET /api/v1/requests/{request_id}`
 
-#### Usage Methods
+**Path Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `request_id` | string | Request identifier |
 
-**Primary Method - Positional Arguments:**
+**Response (200):** Same format as Get Request Status with `long=true`.
+
+**Example:**
 ```bash
-# Machine IDs as command line arguments (recommended for simple cases)
-python run.py requestReturnMachines machine-id-1 machine-id-2 machine-id-3
+curl http://localhost:8000/api/v1/requests/req-abc123
 ```
 
-**Alternative Method - JSON Data:**
-```bash
-# JSON data via --data flag (recommended for complex cases or scripting)
-python run.py requestReturnMachines --data '{"machine_ids": ["machine-id-1", "machine-id-2"]}'
+---
 
-# JSON data via file (recommended for large lists)
-echo '{"machine_ids": ["machine-id-1", "machine-id-2"]}' > return_request.json
-python run.py requestReturnMachines --file return_request.json
-```
+## Error Responses
 
-**Symphony Integration Method:**
-```bash
-# Via shell script (used by Symphony Host Factory)
-echo '{"machine_ids": ["machine-id-1"]}' | ./scripts/requestReturnMachines.sh
-```
-
-#### When to Use Each Method
-
-- **Positional Arguments**: Best for simple cases with few machine IDs
-- **JSON Data**: Best for scripting, automation, or large lists of machines
-- **Shell Scripts**: Used by Symphony Host Factory integration
-
-#### Input Format
-```json
-{
-  "machine_ids": [
-    "machine-i-1234567890abcdef0",
-    "machine-i-0987654321fedcba0"
-  ]
-}
-```
-
-#### Output Format
-```json
-{
-  "request_id": "ret-12345678-1234-1234-1234-123456789012",
-  "machine_ids": [
-    "machine-i-1234567890abcdef0",
-    "machine-i-0987654321fedcba0"
-  ],
-  "status": "PENDING",
-  "created_at": "2025-06-30T12:00:00Z"
-}
-```
-
-### migrateRepository
-
-Migrate data between storage strategies.
-
-#### Usage
-```bash
-# Basic migration
-python run.py migrateRepository --source-type json --target-type sqlite
-
-# With options
-python run.py migrateRepository \
-  --source-type json \
-  --target-type sqlite \
-  --batch-size 100 \
-  --create-backup \
-  --validate-after
-```
-
-#### Options
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--source-type` | Source storage type (json, sqlite, dynamodb) | Required |
-| `--target-type` | Target storage type (json, sqlite, dynamodb) | Required |
-| `--batch-size` | Records per batch | 100 |
-| `--create-backup` | Create backup before migration | true |
-| `--validate-after` | Validate after migration | true |
-| `--cleanup-source` | Remove source data after migration | false |
-
-#### Output Format
-```json
-{
-  "migration_id": "migration-12345678",
-  "source_type": "json",
-  "target_type": "sqlite",
-  "status": "COMPLETED",
-  "records_migrated": 1500,
-  "duration_seconds": 45.2,
-  "backup_created": "/path/to/backup.json"
-}
-```
-
-## Shell Script Integration
-
-### Symphony Integration Flow
-
-```mermaid
-graph LR
-    Symphony[Symphony Host Factory] --> Script[Shell Script]
-    Script --> Wrapper[invoke_provider.sh]
-    Wrapper --> Python[run.py]
-    Python --> AWS[AWS Services]
-    AWS --> Python
-    Python --> Wrapper
-    Wrapper --> Script
-    Script --> Symphony
-```
-
-### Shell Script Usage
-
-#### Input via Standard Input
-```bash
-# Symphony passes JSON data via stdin
-echo '{"template_id": "test", "machine_count": 2}' | ./scripts/requestMachines.sh
-```
-
-#### Environment Variables
-```bash
-# Set Host Factory environment variables
-export HF_PROVIDER_CONFDIR=/etc/hostfactory
-export HF_PROVIDER_WORKDIR=/var/lib/hostfactory
-export HF_PROVIDER_LOGDIR=/var/log/hostfactory
-
-# Execute script
-./scripts/getAvailableTemplates.sh
-```
-
-### Available Shell Scripts
-
-| Script | Purpose | Symphony Command |
-|--------|---------|------------------|
-| `getAvailableTemplates.sh` | Get available templates | `getAvailableTemplates` |
-| `requestMachines.sh` | Request new machines | `requestMachines` |
-| `getRequestStatus.sh` | Check request status | `getRequestStatus` |
-| `getReturnRequests.sh` | Get return requests | `getReturnRequests` |
-| `requestReturnMachines.sh` | Return machines | `requestReturnMachines` |
-
-## Error Handling
-
-### Error Response Format
+All endpoints return a consistent error format on failure:
 
 ```json
 {
-  "error": "Template not found",
-  "error_code": "TEMPLATE_NOT_FOUND",
-  "timestamp": "2025-06-30T12:00:00Z",
-  "request_id": "req-12345678-1234-1234-1234-123456789012",
-  "details": {
-    "template_id": "invalid-template"
-  }
+  "detail": "Template aws-missing not found"
 }
 ```
 
-### Common Error Codes
+| Status Code | Meaning |
+|-------------|---------|
+| `400` | Bad request — invalid input or validation failure |
+| `404` | Not found — resource does not exist |
+| `500` | Internal server error |
+| `501` | Not implemented — endpoint is planned but not yet available |
 
-| Error Code | Description | Resolution |
-|------------|-------------|------------|
-| `TEMPLATE_NOT_FOUND` | Template doesn't exist | Check template ID and configuration |
-| `INVALID_REQUEST` | Invalid request format | Validate JSON input format |
-| `PROVIDER_ERROR` | Cloud provider error | Check AWS credentials and permissions |
-| `CONFIGURATION_ERROR` | Configuration issue | Validate configuration file |
-| `RESOURCE_LIMIT_EXCEEDED` | Resource limits exceeded | Check template max_number setting |
+---
 
-### Exit Codes
-
-| Exit Code | Description |
-|-----------|-------------|
-| 0 | Success |
-| 1 | General error |
-| 2 | Configuration error |
-| 3 | Provider error |
-| 4 | Validation error |
-
-## Examples
-
-### Complete Request Flow
+## Starting the Server
 
 ```bash
-# 1. Get available templates
-python run.py getAvailableTemplates
+# Development (with auto-reload)
+orb system serve --reload --port 8000
 
-# 2. Request machines
-python run.py requestMachines --data '{
-  "template_id": "SymphonyOnDemand",
-  "machine_count": 2
-}'
+# Production
+orb system serve --host 0.0.0.0 --port 8000 --workers 4
 
-# 3. Check request status
-python run.py getRequestStatus --request-id req-12345678-1234-1234-1234-123456789012
-
-# 4. Return machines when done
-python run.py requestReturnMachines --data '{
-  "machine_ids": ["machine-i-1234567890abcdef0"]
-}'
+# Custom log level
+orb system serve --server-log-level warning
 ```
 
-### Symphony Integration Example
+## Related
 
-```bash
-# Symphony calls shell scripts with JSON input
-echo '{
-  "template_id": "SymphonyOnDemand",
-  "machine_count": 3,
-  "tags": {
-    "Environment": "production",
-    "Project": "symphony"
-  }
-}' | ./scripts/requestMachines.sh
-```
-
-### Batch Operations
-
-```bash
-# Process multiple requests
-for template in template1 template2 template3; do
-  echo "{\"template_id\": \"$template\", \"machine_count\": 1}" | \
-    python run.py requestMachines --data '{}'
-done
-```
-
-## Next Steps
-
-- **[Templates](templates.md)**: Learn about template configuration
-- **[Requests](requests.md)**: Understand request management
-- **[Configuration](configuration.md)**: Configure the application
-- **[Deployment](deployment.md)**: Deploy in production environments
+- [CLI Reference](../cli/cli-reference.md) — CLI commands including `orb system serve`
+- [Templates](templates.md) — template configuration
+- [Requests](requests.md) — request management via CLI

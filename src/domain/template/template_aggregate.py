@@ -21,7 +21,6 @@ class Template(BaseModel):
     description: Optional[str] = None
 
     # Instance configuration
-    instance_type: Optional[str] = None
     image_id: Optional[str] = None
     max_instances: int = 1
 
@@ -34,24 +33,25 @@ class Template(BaseModel):
     allocation_strategy: Optional[str] = None  # Will be set based on price_type
     max_price: Optional[float] = None
 
-    # Instance types configuration (extensible for all providers)
-    instance_types: dict[str, int] = Field(default_factory=dict)  # type -> weight
-    primary_instance_type: Optional[str] = None  # for simple cases
+    # Machine types configuration (unified for all providers)
+    machine_types: dict[str, int] = Field(default_factory=dict)
+    machine_types_ondemand: dict[str, int] = Field(default_factory=dict)
+    machine_types_priority: dict[str, int] = Field(default_factory=dict)
 
     # Network configuration (generic concepts)
     network_zones: list[str] = Field(default_factory=list)  # subnets, zones, regions
     public_ip_assignment: Optional[bool] = None  # generic concept
 
     # Storage configuration (generic concepts)
-    root_volume_size: Optional[int] = None  # root disk size
-    root_volume_type: Optional[str] = None  # disk type
-    root_volume_iops: Optional[int] = None  # performance
-    root_volume_throughput: Optional[int] = None  # throughput
+    root_device_volume_size: Optional[int] = None  # root disk size
+    volume_type: Optional[str] = None  # disk type
+    iops: Optional[int] = None  # performance
+    throughput: Optional[int] = None  # throughput
     storage_encryption: Optional[bool] = None  # encryption
     encryption_key: Optional[str] = None  # key reference
 
     # Access and security (generic concepts)
-    key_pair_name: Optional[str] = None  # SSH key, etc.
+    key_name: Optional[str] = None  # SSH key, etc.
     user_data: Optional[str] = None  # cloud-init, etc.
     instance_profile: Optional[str] = None  # IAM role, service principal
 
@@ -109,9 +109,17 @@ class Template(BaseModel):
         # Set allocation strategy default based on price type
         if self.allocation_strategy is None:
             if self.price_type == "spot":
-                self.allocation_strategy = "price_capacity_optimized"
+                self.allocation_strategy = "priceCapacityOptimized"
             else:  # ondemand, heterogeneous
-                self.allocation_strategy = "lowest_price"
+                self.allocation_strategy = "lowestPrice"
+
+        # Reject tag keys that use the reserved system namespace
+        reserved_keys = [k for k in self.tags if k.startswith("orb:")]
+        if reserved_keys:
+            raise ValueError(
+                f"Tag keys must not start with 'orb:' (reserved for system use): "
+                f"{', '.join(sorted(reserved_keys))}"
+            )
 
         return self
 
@@ -147,11 +155,17 @@ class Template(BaseModel):
 
         return self
 
-    # Host Factory standard fields (provider-agnostic interface)
-    vm_type: Optional[str] = None
-    vm_types: dict[str, Any] = Field(default_factory=dict)
-    key_name: Optional[str] = None
-    user_data: Optional[str] = None
+    # Provider configuration (multi-provider support)
+    provider_type: Optional[str] = None
+    provider_name: Optional[str] = None
+    provider_api: Optional[str] = None
+
+    # Timestamps for tracking
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    # Active status flag
+    is_active: bool = True
 
     @property
     def subnet_id(self) -> Optional[str]:
@@ -160,57 +174,57 @@ class Template(BaseModel):
 
     def update_image_id(self, new_image_id: str) -> "Template":
         """Update the image ID and return a new template instance."""
-        data = self.model_dump()
-        data["image_id"] = new_image_id
-        data["updated_at"] = datetime.now()
-        return Template.model_validate(data)
+        fields = self.model_dump(mode="json")
+        fields["image_id"] = new_image_id
+        fields["updated_at"] = datetime.now()
+        return self.__class__.model_validate(fields)
 
     def add_subnet(self, subnet_id: str) -> "Template":
         """Add a subnet ID."""
         if subnet_id not in self.subnet_ids:
             new_subnets = [*self.subnet_ids, subnet_id]
-            data = self.model_dump()
-            data["subnet_ids"] = new_subnets
-            data["updated_at"] = datetime.now()
-            return Template.model_validate(data)
+            fields = self.model_dump(mode="json")
+            fields["subnet_ids"] = new_subnets
+            fields["updated_at"] = datetime.now()
+            return self.__class__.model_validate(fields)
         return self
 
     def remove_subnet(self, subnet_id: str) -> "Template":
         """Remove a subnet ID."""
         if subnet_id in self.subnet_ids:
             new_subnets = [s for s in self.subnet_ids if s != subnet_id]
-            data = self.model_dump()
-            data["subnet_ids"] = new_subnets
-            data["updated_at"] = datetime.now()
-            return Template.model_validate(data)
+            fields = self.model_dump(mode="json")
+            fields["subnet_ids"] = new_subnets
+            fields["updated_at"] = datetime.now()
+            return self.__class__.model_validate(fields)
         return self
 
     def add_security_group(self, security_group_id: str) -> "Template":
         """Add a security group ID."""
         if security_group_id not in self.security_group_ids:
             new_sgs = [*self.security_group_ids, security_group_id]
-            data = self.model_dump()
-            data["security_group_ids"] = new_sgs
-            data["updated_at"] = datetime.now()
-            return Template.model_validate(data)
+            fields = self.model_dump(mode="json")
+            fields["security_group_ids"] = new_sgs
+            fields["updated_at"] = datetime.now()
+            return self.__class__.model_validate(fields)
         return self
 
     def remove_security_group(self, security_group_id: str) -> "Template":
         """Remove a security group ID."""
         if security_group_id in self.security_group_ids:
             new_sgs = [sg for sg in self.security_group_ids if sg != security_group_id]
-            data = self.model_dump()
-            data["security_group_ids"] = new_sgs
-            data["updated_at"] = datetime.now()
-            return Template.model_validate(data)
+            fields = self.model_dump(mode="json")
+            fields["security_group_ids"] = new_sgs
+            fields["updated_at"] = datetime.now()
+            return self.__class__.model_validate(fields)
         return self
 
     def set_provider_config(self, config: dict[str, Any]) -> "Template":
         """Set provider-specific configuration."""
-        data = self.model_dump()
-        data["provider_config"] = {**self.provider_config, **config}
-        data["updated_at"] = datetime.now()
-        return Template.model_validate(data)
+        fields = self.model_dump(mode="json")
+        fields["provider_config"] = {**self.provider_config, **config}  # type: ignore[attr-defined]
+        fields["updated_at"] = datetime.now()
+        return Template.model_validate(fields)
 
     def __str__(self) -> str:
         """Return string representation of template."""

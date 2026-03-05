@@ -44,7 +44,7 @@ class EventHandlerRegistry:
             """Apply event handler registration to the class."""
             cls._handlers[event_type] = handler_class
             # Add event_type as class attribute for introspection
-            handler_class._event_type = event_type
+            handler_class._event_type = event_type  # type: ignore[attr-defined]
             return handler_class
 
         return decorator
@@ -57,7 +57,10 @@ class EventHandlerRegistry:
     @classmethod
     def get_handler_for_event(cls, event_type: str) -> type["EventHandler"]:
         """Get handler class for specific event type."""
-        return cls._handlers.get(event_type)
+        result = cls._handlers.get(event_type)
+        if result is None:
+            raise KeyError(f"No handler registered for event type: {event_type}")
+        return result
 
     @classmethod
     def clear(cls) -> None:

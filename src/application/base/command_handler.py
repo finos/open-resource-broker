@@ -12,14 +12,15 @@ Architecture:
 from typing import Any, Optional, TypeVar
 
 # Import the CQRS interface
+from application.dto.base import BaseCommand
 from application.interfaces.command_handler import CommandHandler
 
-# Type variables for generic command handlers
-TCommand = TypeVar("TCommand")
+# Type variables for generic command handlers - bound to match CommandHandler constraints
+TCommand = TypeVar("TCommand", bound=BaseCommand)
 TResponse = TypeVar("TResponse")
 
 
-class ApplicationCommandHandler(CommandHandler[TCommand, TResponse]):
+class ApplicationCommandHandler(CommandHandler[TCommand, TResponse]):  # type: ignore[type-var]
     """
     Base class for application layer CQRS command handlers.
 
@@ -72,7 +73,7 @@ class ApplicationCommandHandler(CommandHandler[TCommand, TResponse]):
             self.metrics.record(metric_name, value, **tags)
 
 
-class CLICommandHandler(CommandHandler[TCommand, TResponse]):
+class CLICommandHandler(CommandHandler[TCommand, TResponse]):  # type: ignore[type-var]
     """
     Base class for CLI interface command handlers.
 
@@ -137,9 +138,34 @@ class CLICommandHandler(CommandHandler[TCommand, TResponse]):
                     input_data = json.load(f)
                 if self.logger:
                     self.logger.debug("Loaded input from file: %s", command.file)
+            except FileNotFoundError as e:
+                if self.logger:
+                    self.logger.error(
+                        "Input file not found: %s",
+                        command.file,
+                        exc_info=True,
+                        extra={"file_path": command.file, "error_type": type(e).__name__},
+                    )
+                raise ValueError(f"Input file not found: {command.file}") from e
+            except json.JSONDecodeError as e:
+                if self.logger:
+                    self.logger.error(
+                        "Invalid JSON in file %s: %s",
+                        command.file,
+                        e,
+                        exc_info=True,
+                        extra={"file_path": command.file, "error_type": type(e).__name__},
+                    )
+                raise ValueError(f"Invalid JSON in file {command.file}: {e}") from e
             except Exception as e:
                 if self.logger:
-                    self.logger.error("Failed to load input from file %s: %s", command.file, e)
+                    self.logger.error(
+                        "Failed to load input from file %s: %s",
+                        command.file,
+                        e,
+                        exc_info=True,
+                        extra={"file_path": command.file, "error_type": type(e).__name__},
+                    )
                 raise
         elif hasattr(command, "data") and command.data:
             try:
@@ -148,8 +174,13 @@ class CLICommandHandler(CommandHandler[TCommand, TResponse]):
                     self.logger.debug("Loaded input from data string")
             except json.JSONDecodeError as e:
                 if self.logger:
-                    self.logger.error("Failed to parse JSON data: %s", e)
-                raise
+                    self.logger.error(
+                        "Failed to parse JSON data: %s",
+                        e,
+                        exc_info=True,
+                        extra={"data_length": len(command.data), "error_type": type(e).__name__},
+                    )
+                raise ValueError(f"Invalid JSON data: {e}") from e
 
         return input_data
 

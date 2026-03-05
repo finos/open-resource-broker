@@ -2,6 +2,7 @@
 
 import functools
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
@@ -18,7 +19,7 @@ class PerformanceMonitor:
         self._metrics: dict[str, dict[str, Any]] = {}
 
     @contextmanager
-    def measure(self, operation_name: str) -> None:
+    def measure(self, operation_name: str) -> Iterator[None]:
         """Context manager for measuring operation performance."""
         start_time = time.perf_counter()
         try:

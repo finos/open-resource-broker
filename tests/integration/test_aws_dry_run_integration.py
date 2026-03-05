@@ -24,7 +24,11 @@ class TestAWSDryRunIntegration:
 
         with dry_run_context(True):
             assert is_dry_run_active()
-            assert is_aws_dry_run_active()  # Should be True if moto is available
+            # is_aws_dry_run_active() requires moto to be installed
+            # When moto is available it returns True, otherwise False
+            from providers.aws.infrastructure.dry_run_adapter import MOTO_AVAILABLE
+
+            assert is_aws_dry_run_active() == MOTO_AVAILABLE
 
         assert not is_dry_run_active()
         assert not is_aws_dry_run_active()

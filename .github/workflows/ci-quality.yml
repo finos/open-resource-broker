@@ -145,6 +145,25 @@ jobs:
         run: make ci-quality-ruff-optional
         continue-on-error: true
 
+  lint-pyright:
+    name: Type Checking (pyright)
+    runs-on: ubuntu-latest
+    needs: [config, setup-cache, lint-ruff]
+    permissions:
+      contents: read
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6.0.2
+
+    - name: Setup UV with cache
+      uses: ./.github/actions/setup-uv-cached
+      with:
+        cache-key: ${{ needs.setup-cache.outputs.cache-key }}
+        fail-on-cache-miss: false
+
+    - name: Run pyright type check
+      run: make ci-quality-pyright
+
   lint-mypy:
     name: Type Checking (mypy) - Optional
     runs-on: ubuntu-latest
@@ -162,11 +181,11 @@ jobs:
         fail-on-cache-miss: false
 
     - name: Run mypy type check
-      continue-on-error: true  # TODO: Remove once type issues are fixed
+      continue-on-error: true
       run: make ci-quality-mypy
 
   arch-validation:
-    name: Architecture Validation - Optional
+    name: Architecture Validation
     runs-on: ubuntu-latest
     needs: [config, setup-cache, lint-ruff]
     permissions:
@@ -177,7 +196,7 @@ jobs:
         include:
           - check: cqrs
             description: "CQRS Pattern Validation"
-          - check: clean  
+          - check: clean
             description: "Clean Architecture Dependencies"
           - check: imports
             description: "Import Validation"
@@ -194,5 +213,4 @@ jobs:
         fail-on-cache-miss: false
 
     - name: Run architecture validation (${{ matrix.description }})
-      continue-on-error: true  # TODO: Remove once architectural issues are fixed
       run: make ci-arch-${{ matrix.check }}

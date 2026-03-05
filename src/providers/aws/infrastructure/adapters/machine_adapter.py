@@ -38,6 +38,36 @@ class AWSMachineAdapter:
         self._aws_client = aws_client
         self._logger = logger
 
+    def _resolve_machine_name(self, aws_instance_data: dict) -> str:
+        """
+        Resolve machine name using priority order:
+        1. AWS Name tag
+        2. Private DNS name
+        3. Private IP
+        4. Instance ID (fallback)
+        """
+        # 1. Check AWS Name tag
+        tags = aws_instance_data.get("Tags", [])
+        for tag in tags:
+            if tag.get("Key") == "Name" and tag.get("Value"):
+                self._logger.info("Using AWS Name tag for machine: %s", tag["Value"])
+                return tag["Value"]
+
+        # 2. Use private DNS name (more readable than IP)
+        if private_dns := aws_instance_data.get("PrivateDnsName"):
+            self._logger.info("Using private DNS name for machine: %s", private_dns)
+            return private_dns
+
+        # 3. Use private IP
+        if private_ip := aws_instance_data.get("PrivateIpAddress"):
+            self._logger.info("Using private IP for machine: %s", private_ip)
+            return private_ip
+
+        # 4. Fallback to instance ID
+        instance_id = aws_instance_data.get("InstanceId", "")
+        self._logger.info("Using instance ID fallback for machine: %s", instance_id)
+        return instance_id
+
     def create_machine_from_aws_instance(
         self,
         aws_instance_data: dict[str, Any],
@@ -85,15 +115,25 @@ class AWSMachineAdapter:
                     }
                 )
 
-                # Add name if not present
-                if "name" not in machine_data or not machine_data["name"]:
-                    machine_data["name"] = machine_data.get(
-                        "private_ip", machine_data.get("instance_id", "")
-                    )
+                # Add smart machine naming and DNS fields
+                machine_data["name"] = self._resolve_machine_name(aws_instance_data)
+                machine_data["private_dns_name"] = aws_instance_data.get("PrivateDnsName")
+                machine_data["public_dns_name"] = aws_instance_data.get("PublicDnsName")
+
+                # Log DNS data for debugging
+                self._logger.info(
+                    "Machine %s DNS data: private=%s, public=%s",
+                    aws_instance_data.get("InstanceId"),
+                    machine_data["private_dns_name"],
+                    machine_data["public_dns_name"],
+                )
 
                 # Ensure launch_time is present (might be missing in some cases)
                 if "launch_time" not in machine_data:
                     machine_data["launch_time"] = None
+
+                # Store high-value AWS fields in provider_data
+                machine_data["provider_data"] = self._extract_aws_provider_data(aws_instance_data)
 
                 self._logger.debug(
                     "Successfully processed snake_case data for %s", machine_data["instance_id"]
@@ -110,7 +150,6 @@ class AWSMachineAdapter:
                 # Validate required fields for PascalCase format
                 required_fields = [
                     "InstanceId",
-                    "State",
                     "InstanceType",
                     "PrivateIpAddress",
                     "Placement",
@@ -122,6 +161,13 @@ class AWSMachineAdapter:
                     if field not in aws_instance_data:
                         self._logger.error("Missing required field in AWS instance data: %s", field)
                         raise AWSError(f"Missing required field in AWS instance data: {field}")
+
+                # Validate State field (nested dict with Name)
+                if "State" not in aws_instance_data or "Name" not in aws_instance_data.get(
+                    "State", {}
+                ):
+                    self._logger.error("Missing required State.Name in AWS instance data")
+                    raise AWSError("Missing required State.Name in AWS instance data")
 
                 # Validate AWS handler type
                 try:
@@ -143,11 +189,14 @@ class AWSMachineAdapter:
                 machine_data = {
                     "instance_id": aws_instance_data["InstanceId"],
                     "request_id": request_id,
-                    "name": aws_instance_data.get("PrivateDnsName", ""),
+                    "name": self._resolve_machine_name(aws_instance_data),
                     "status": MachineStatus.from_str(aws_instance_data["State"]["Name"]).value,
                     "instance_type": aws_instance_data["InstanceType"],
+                    "image_id": aws_instance_data.get("ImageId", "unknown"),
                     "private_ip": aws_instance_data["PrivateIpAddress"],
                     "public_ip": aws_instance_data.get("PublicIpAddress"),
+                    "private_dns_name": aws_instance_data.get("PrivateDnsName"),
+                    "public_dns_name": aws_instance_data.get("PublicDnsName"),
                     "launch_time": aws_instance_data.get("LaunchTime"),
                     "provider_api": provider_api,
                     "resource_id": resource_id,
@@ -156,7 +205,10 @@ class AWSMachineAdapter:
                         if aws_instance_data.get("InstanceLifecycle") == "spot"
                         else PriceType.ON_DEMAND.value
                     ),
-                    "cloud_host_id": aws_instance_data.get("Placement", {}).get("HostId"),
+                    "subnet_id": aws_instance_data.get("SubnetId"),
+                    "security_group_ids": [
+                        sg["GroupId"] for sg in aws_instance_data.get("SecurityGroups", [])
+                    ],
                     "metadata": {
                         "availability_zone": aws_instance_data["Placement"]["AvailabilityZone"],
                         "subnet_id": aws_instance_data["SubnetId"],
@@ -172,6 +224,9 @@ class AWSMachineAdapter:
                     },
                 }
 
+                # Store high-value AWS fields in provider_data
+                machine_data["provider_data"] = self._extract_aws_provider_data(aws_instance_data)
+
                 self._logger.debug(
                     "Successfully converted PascalCase data for %s", machine_data["instance_id"]
                 )
@@ -183,6 +238,62 @@ class AWSMachineAdapter:
         except Exception as e:
             self._logger.error("Failed to create machine from AWS instance: %s", str(e))
             raise AWSError(f"Failed to create machine from AWS instance: {e!s}")
+
+    def _extract_aws_provider_data(self, aws_instance_data: dict[str, Any]) -> dict[str, Any]:
+        """
+        Extract high-value AWS fields for storage in provider_data.
+
+        Args:
+            aws_instance_data: AWS instance data (either PascalCase or snake_case)
+
+        Returns:
+            Dictionary with high-value AWS fields, None values removed
+        """
+        provider_data = {}
+
+        # Detect format and extract fields accordingly
+        if "instance_id" in aws_instance_data:
+            # snake_case format
+            field_mappings = {
+                "network_interfaces": "network_interfaces",
+                "block_device_mappings": "block_device_mappings",
+                "state_reason": "state_reason",
+                "state_transition_reason": "state_transition_reason",
+                "iam_instance_profile": "iam_instance_profile",
+                "platform_details": "platform_details",
+                "usage_operation": "usage_operation",
+                "boot_mode": "boot_mode",
+                "sriov_net_support": "sriov_net_support",
+                "ena_support": "ena_support",
+                "spot_instance_request_id": "spot_instance_request_id",
+                "public_dns_name": "public_dns_name",
+                "private_dns_name": "private_dns_name",
+            }
+        else:
+            # PascalCase format
+            field_mappings = {
+                "network_interfaces": "NetworkInterfaces",
+                "block_device_mappings": "BlockDeviceMappings",
+                "state_reason": "StateReason",
+                "state_transition_reason": "StateTransitionReason",
+                "iam_instance_profile": "IamInstanceProfile",
+                "platform_details": "PlatformDetails",
+                "usage_operation": "UsageOperation",
+                "boot_mode": "BootMode",
+                "sriov_net_support": "SriovNetSupport",
+                "ena_support": "EnaSupport",
+                "spot_instance_request_id": "SpotInstanceRequestId",
+                "public_dns_name": "PublicDnsName",
+                "private_dns_name": "PrivateDnsName",
+            }
+
+        # Extract fields and remove None values
+        for target_field, source_field in field_mappings.items():
+            value = aws_instance_data.get(source_field)
+            if value is not None:
+                provider_data[target_field] = value
+
+        return provider_data
 
     def perform_health_check(self, machine: Machine) -> dict[str, Any]:
         """
@@ -198,7 +309,7 @@ class AWSMachineAdapter:
             EC2InstanceNotFoundError: If the instance cannot be found
             AWSError: For other AWS-related errors
         """
-        self._logger.debug("Performing health check for machine: %s", machine.instance_id)
+        self._logger.debug("Performing health check for machine: %s", machine.machine_id)
 
         try:
             health_checks = {}

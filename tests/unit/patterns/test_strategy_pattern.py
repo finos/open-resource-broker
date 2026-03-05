@@ -14,6 +14,8 @@ import pytest
 
 # Import strategy components with error handling
 try:
+    from providers.base.strategy.provider_context import ProviderContext
+
     from infrastructure.factories.provider_strategy_factory import (
         ProviderStrategyFactory,
     )
@@ -22,7 +24,6 @@ try:
     from providers.base.strategy.load_balancing_strategy import (
         LoadBalancingProviderStrategy,
     )
-    from providers.base.strategy.provider_context import ProviderContext
     from providers.base.strategy.provider_selector import ProviderSelector
     from providers.base.strategy.provider_strategy import (
         ProviderOperation,
@@ -272,7 +273,7 @@ class TestStrategyPattern:
                 factory.create_strategy(config)
                 # Some invalid configs might still create strategies
                 # Validation might happen at execution time
-            except Exception:
+            except Exception:  # nosec B110
                 # Expected for invalid configurations
                 pass
 
@@ -304,7 +305,7 @@ class TestStrategyPattern:
                 if hasattr(result, "error_message"):
                     assert result.error_message is not None
 
-            except Exception:
+            except Exception:  # nosec B110
                 # Some strategies might raise exceptions - this is acceptable
                 # as long as they're handled at a higher level
                 pass
@@ -354,7 +355,7 @@ class TestStrategyPattern:
             try:
                 result = strategy.execute(operation)
                 results.append(result)
-            except Exception:
+            except Exception:  # nosec B110
                 # Strategy might not be fully configured
                 pass
 

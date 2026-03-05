@@ -232,7 +232,7 @@ if aws_template.instance_type:  # Inherited from CoreTemplate
 
 1. **Single Source of Truth**: All field mappings are centralized in one registry
 2. **Provider Awareness**: Only maps provider-specific fields when the provider is active
-3. **Extensible**: Easy to add new schedulers (LSF, SLURM) and providers (Azure, GCP)
+3. **Extensible**: Easy to add new schedulers (LSF, SLURM) and providers (Provider1, Provider2)
 4. **Type Safety**: Appropriate field inheritance ensures handlers can access required fields
 5. **Maintainable**: Clear separation between scheduler-specific and provider-specific concerns
 
@@ -261,14 +261,14 @@ MAPPINGS = {
 
 ### Adding New Providers
 
-To add support for Azure provider:
+To add support for Provider1 provider:
 
 ```python
 MAPPINGS = {
     'hostfactory': {
         'generic': { ... },
         'aws': { ... },
-        'azure': {
+        'provider1': {
             'vmPriority': 'vm_priority',
             'spotEvictionPolicy': 'spot_eviction_policy',
             'proximityPlacementGroup': 'proximity_placement_group'

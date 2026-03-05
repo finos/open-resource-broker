@@ -10,7 +10,7 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 
-from application.queries.handlers import ListTemplatesQuery
+from application.dto.queries import ListTemplatesQuery
 from bootstrap import Application
 from infrastructure.di.container import get_container
 
@@ -200,6 +200,7 @@ class TestLazyLoadingErrorHandling:
 class TestLazyLoadingCompatibility:
     """Test compatibility with existing functionality."""
 
+    @pytest.mark.slow
     def test_all_cli_commands_compatibility(self):
         """Test that all CLI commands are compatible with lazy loading."""
         # This would ideally test all CLI commands, but we'll test a representative sample
@@ -266,7 +267,7 @@ class TestLazyLoadingPerformanceIntegration:
         import time
 
         start_time = time.time()
-        Application()
+        Application(skip_validation=True)
         creation_time = (time.time() - start_time) * 1000
 
         # Creation should be very fast (lazy loading)

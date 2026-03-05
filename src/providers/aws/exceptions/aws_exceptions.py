@@ -2,7 +2,10 @@
 
 from typing import Any, Optional
 
-from domain.base.exceptions import InfrastructureError
+from domain.base.exceptions import (
+    InfrastructureError,
+    QuotaExceededError as DomainQuotaExceededError,
+)
 
 
 class AWSError(InfrastructureError):
@@ -26,7 +29,7 @@ class AWSError(InfrastructureError):
 
     def to_dict(self) -> dict[str, Any]:
         """Convert error to dictionary."""
-        result: dict[str, Any] = super().to_dict()
+        result: dict[str, Any] = super().to_dict()  # type: ignore[attr-defined]
         if self.error_code and self.error_code != self.__class__.__name__:
             result["error_code"] = self.error_code
         return result
@@ -40,7 +43,7 @@ class AWSEntityNotFoundError(AWSError):
     """Raised when an AWS resource is not found."""
 
 
-class QuotaExceededError(AWSError):
+class QuotaExceededError(AWSError, DomainQuotaExceededError):
     """Raised when AWS service quotas would be exceeded."""
 
 

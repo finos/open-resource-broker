@@ -1,6 +1,6 @@
 """System-level queries for administrative operations."""
 
-from typing import Any, Optional
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -23,26 +23,6 @@ class GetProviderConfigQuery(Query, BaseModel):
 
     provider_name: Optional[str] = None
     include_sensitive: bool = False
-
-
-class GetProviderMetricsQuery(Query, BaseModel):
-    """Query to get provider performance metrics."""
-
-    model_config = ConfigDict(frozen=True)
-
-    provider_name: Optional[str] = None
-    time_range: Optional[str] = "1h"
-    detailed: bool = False
-
-
-class GetConfigurationQuery(Query, BaseModel):
-    """Query to get configuration values."""
-
-    model_config = ConfigDict(frozen=True)
-
-    key: str
-    default: Optional[Any] = None
-    section: Optional[str] = None
 
 
 class GetConfigurationSectionQuery(Query, BaseModel):

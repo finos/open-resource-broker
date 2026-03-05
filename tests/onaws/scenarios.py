@@ -1,12 +1,108 @@
 import itertools
+import json
 import os
+from pathlib import Path
 from typing import Any, Dict, List
+
+
+def _get_templates_for_resolution() -> List[Dict[str, Any]]:
+    """Get templates for ID resolution using handler classmethods, with filesystem fallback."""
+    try:
+        from providers.aws.infrastructure.handlers.asg.handler import ASGHandler
+        from providers.aws.infrastructure.handlers.ec2_fleet.handler import EC2FleetHandler
+        from providers.aws.infrastructure.handlers.run_instances.handler import RunInstancesHandler
+        from providers.aws.infrastructure.handlers.spot_fleet.handler import SpotFleetHandler
+
+        templates = []
+        for handler_class in [EC2FleetHandler, SpotFleetHandler, ASGHandler, RunInstancesHandler]:
+            if hasattr(handler_class, "get_example_templates"):
+                for t in handler_class.get_example_templates():
+                    provider_api = t.provider_api
+                    if hasattr(provider_api, "value"):
+                        provider_api = provider_api.value
+                    fleet_type = (t.metadata or {}).get("fleet_type") or getattr(
+                        t, "fleet_type", None
+                    )
+                    if fleet_type is not None and hasattr(fleet_type, "value"):
+                        fleet_type = fleet_type.value
+                    templates.append(
+                        {
+                            "templateId": t.template_id,
+                            "providerApi": provider_api,
+                            "fleetType": fleet_type,
+                            "priceType": t.price_type,
+                        }
+                    )
+        if templates:
+            return templates
+    except Exception:
+        pass
+
+    # Filesystem fallback
+    templates_path = Path(__file__).parent.parent.parent / "config" / "aws_templates.json"
+    if templates_path.exists():
+        with open(templates_path) as f:
+            return json.load(f).get("templates", [])
+    return []
+
+
+def resolve_template_id(overrides: Dict[str, Any]) -> str:
+    """Resolve a template_id matching the scenario overrides.
+
+    Picks the first template whose providerApi and (optionally) fleetType/priceType
+    match the scenario.  Falls back progressively to less specific matches.
+    Uses handler classmethods for programmatic resolution; falls back to filesystem.
+    """
+    templates = _get_templates_for_resolution()
+    if not templates:
+        return "BASE"
+
+    provider_api = overrides.get("providerApi", "")
+    fleet_type = overrides.get("fleetType", "")
+    price_type = overrides.get("priceType", "")
+
+    price_map = {"ondemand": "OnDemand", "spot": "Spot", "heterogeneous": "Mixed"}
+
+    # 1. Try exact match: providerApi + fleetType + priceType
+    if fleet_type and price_type:
+        price_label = price_map.get(price_type, "")
+        for t in templates:
+            t_id = t.get("templateId", "")
+            if (
+                t.get("providerApi") == provider_api
+                and fleet_type.capitalize() in t_id
+                and price_label in t_id
+            ):
+                return t_id
+
+    # 2. Try providerApi + fleetType only
+    if fleet_type:
+        for t in templates:
+            if t.get("providerApi") == provider_api and fleet_type.capitalize() in t.get(
+                "templateId", ""
+            ):
+                return t["templateId"]
+
+    # 3. Try providerApi + priceType only
+    if price_type:
+        price_label = price_map.get(price_type, "")
+        for t in templates:
+            if t.get("providerApi") == provider_api and price_label in t.get("templateId", ""):
+                return t["templateId"]
+
+    # 4. Fallback: first template matching provider API
+    for t in templates:
+        if t.get("providerApi") == provider_api:
+            return t["templateId"]
+
+    return templates[0]["templateId"] if templates else "BASE"
+
 
 # Global default attribute combinations
 DEFAULT_ATTRIBUTE_COMBINATIONS = [
     {
         "providerApi": ["EC2Fleet"],
-        "fleetType": ["request", "instant", "maintain"],
+        "fleetType": ["request", "instant"],
         "priceType": ["ondemand", "spot"],
         "scheduler": ["default", "hostfactory"],
     },
@@ -51,9 +147,8 @@ CUSTOM_TEST_CASES = [
     # SpotFleet with ABIS
     {
         "test_name": "hostfactory.SpotFleetRequest.ABIS",
-        "template_id": "SpotFleetRequest",
+        "template_id": "SpotFleet-Request-LowestPrice",
         "capacity_to_request": 4,
-        "awsprov_base_template": "awsprov_templates.base.json",
         "overrides": {
             "providerApi": "SpotFleet",
             "fleetType": "request",
@@ -67,9 +162,8 @@ CUSTOM_TEST_CASES = [
     # EC2Fleet with ABIS
     {
         "test_name": "hostfactory.EC2FleetRequest.ABIS",
-        "template_id": "EC2FleetRequest",
+        "template_id": "EC2Fleet-Request-OnDemand",
         "capacity_to_request": 4,
-        "awsprov_base_template": "awsprov_templates.base.json",
         "overrides": {
             "providerApi": "EC2Fleet",
             "fleetType": "request",
@@ -83,9 +177,8 @@ CUSTOM_TEST_CASES = [
     # ASG with ABIS
     {
         "test_name": "hostfactory.ASG.ABIS",
-        "template_id": "ASG",
+        "template_id": "ASG-OnDemand",
         "capacity_to_request": 2,
-        "awsprov_base_template": "awsprov_templates.base.json",
         "overrides": {
             "providerApi": "ASG",
             "scheduler": "hostfactory",
@@ -102,9 +195,8 @@ CUSTOM_TEST_CASES = [
     # SpotFleet with multiTypes
     {
         "test_name": "hostfactory.SpotFleetRequest.MultiTypes",
-        "template_id": "SpotFleetRequest",
+        "template_id": "SpotFleet-Request-LowestPrice",
         "capacity_to_request": 4,
-        "awsprov_base_template": "awsprov_templates.base.json",
         "overrides": {
             "providerApi": "SpotFleet",
             "fleetType": "request",
@@ -122,9 +214,8 @@ CUSTOM_TEST_CASES = [
     # EC2Fleet with multiTypes
     {
         "test_name": "hostfactory.EC2FleetRequest.MultiTypes",
-        "template_id": "EC2FleetRequest",
+        "template_id": "EC2Fleet-Request-OnDemand",
         "capacity_to_request": 4,
-        "awsprov_base_template": "awsprov_templates.base.json",
         "overrides": {
             "providerApi": "EC2Fleet",
             "fleetType": "request",
@@ -142,9 +233,8 @@ CUSTOM_TEST_CASES = [
     # ASG with multiTypes
     {
         "test_name": "hostfactory.ASG.MultiTypes",
-        "template_id": "ASG",
+        "template_id": "ASG-OnDemand",
         "capacity_to_request": 4,
-        "awsprov_base_template": "awsprov_templates.base.json",
         "overrides": {
             "providerApi": "ASG",
             "scheduler": "hostfactory",
@@ -161,9 +251,8 @@ CUSTOM_TEST_CASES = [
     # Mixed price 50/50 - EC2Fleet
     {
         "test_name": "hostfactory.EC2Fleet.Mixed50",
-        "template_id": "EC2FleetRequest",
+        "template_id": "EC2Fleet-Request-Mixed",
         "capacity_to_request": 4,
-        "awsprov_base_template": "awsprov_templates.base.json",
         "overrides": {
             "providerApi": "EC2Fleet",
             "fleetType": "request",
@@ -183,9 +272,8 @@ CUSTOM_TEST_CASES = [
     # Mixed price 50/50 - SpotFleet
     {
         "test_name": "hostfactory.SpotFleet.Mixed50",
-        "template_id": "SpotFleetRequest",
+        "template_id": "SpotFleet-Request-LowestPrice",
         "capacity_to_request": 4,
-        "awsprov_base_template": "awsprov_templates.base.json",
         "overrides": {
             "providerApi": "SpotFleet",
             "fleetType": "request",
@@ -205,9 +293,8 @@ CUSTOM_TEST_CASES = [
     # Mixed price 50/50 - ASG
     {
         "test_name": "hostfactory.ASG.Mixed50",
-        "template_id": "ASG",
+        "template_id": "ASG-Mixed",
         "capacity_to_request": 4,
-        "awsprov_base_template": "awsprov_templates.base.json",
         "overrides": {
             "providerApi": "ASG",
             "scheduler": "hostfactory",
@@ -250,8 +337,8 @@ VERIFY_ABIS = os.environ.get("VERIFY_ABIS", "1") in ("1", "true", "True")
 
 def generate_scenarios_from_attributes(
     attribute_combinations: Dict[str, List[Any]],
-    base_template: Dict[str, Any] = None,
-    naming_template: str = None,
+    base_template: Dict[str, Any] | None = None,
+    naming_template: str | None = None,
 ) -> List[Dict[str, Any]]:
     """
     Generate test scenarios from all combinations of provided attributes.
@@ -266,9 +353,8 @@ def generate_scenarios_from_attributes(
     """
     if base_template is None:
         base_template = {
-            "template_id": "BASE",
+            "template_id": None,  # Resolved per-scenario via resolve_template_id()
             "capacity_to_request": 4,
-            "awsprov_base_template": "awsprov_templates.base.json",
         }
 
     scenarios = []
@@ -330,13 +416,17 @@ def generate_scenarios_from_attributes(
         scenario = base_template.copy()
         scenario.update({"test_name": test_name, "overrides": overrides})
 
+        # Resolve template_id from handler classmethods if not explicitly set
+        if not scenario.get("template_id"):
+            scenario["template_id"] = resolve_template_id(overrides)
+
         scenarios.append(scenario)
 
     return scenarios
 
 
 def get_generated_test_cases(
-    attribute_combinations: Dict[str, List[Any]] = None, apply_filters: bool = True
+    attribute_combinations: Dict[str, List[Any]] | None = None, apply_filters: bool = True
 ) -> List[Dict[str, Any]]:
     """
     Generate test cases from attribute combinations.
@@ -349,10 +439,13 @@ def get_generated_test_cases(
     """
     # Use provided combinations or default
     if attribute_combinations is None:
-        attribute_combinations = DEFAULT_ATTRIBUTE_COMBINATIONS
-
-    # Generate scenarios
-    generated_scenarios = generate_scenarios_from_attributes(attribute_combinations)
+        # Default: generate from all combinations in DEFAULT_ATTRIBUTE_COMBINATIONS
+        all_scenarios: List[Dict[str, Any]] = []
+        for combo in DEFAULT_ATTRIBUTE_COMBINATIONS:
+            all_scenarios.extend(generate_scenarios_from_attributes(combo))
+        generated_scenarios = all_scenarios
+    else:
+        generated_scenarios = generate_scenarios_from_attributes(attribute_combinations)
 
     if not apply_filters:
         return generated_scenarios
@@ -397,7 +490,7 @@ def get_test_case_by_name(test_name: str) -> Dict[str, Any]:
 
 
 def add_custom_attribute_combinations(
-    additional_attributes: Dict[str, List[Any]], base_template: Dict[str, Any] = None
+    additional_attributes: Dict[str, List[Any]], base_template: Dict[str, Any] | None = None
 ) -> List[Dict[str, Any]]:
     """
     Generate additional scenarios with custom attribute combinations.

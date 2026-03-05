@@ -30,7 +30,7 @@ def get_service(service_type: type[T]) -> T:
         container = get_di_container()
         return container.get(service_type)
 
-    return _get_service
+    return _get_service  # type: ignore[return-value]
 
 
 def get_query_bus() -> QueryBus:
@@ -54,7 +54,7 @@ def get_config_manager() -> ConfigurationPort:
 def get_server_config() -> ServerConfig:
     """Get ServerConfig from configuration manager."""
     config_manager = get_config_manager()
-    return config_manager.get_typed(ServerConfig)
+    return config_manager.get_typed(ServerConfig)  # type: ignore[arg-type]
 
 
 # API Handler Dependencies

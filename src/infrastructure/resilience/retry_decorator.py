@@ -89,7 +89,7 @@ def retry(
 
                     # Record success for circuit breaker
                     if hasattr(retry_strategy, "record_success"):
-                        retry_strategy.record_success()
+                        retry_strategy.record_success()  # type: ignore[attr-defined]
 
                     # Log successful retry if this wasn't the first attempt
                     if attempt > 0:

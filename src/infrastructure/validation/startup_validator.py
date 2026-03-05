@@ -4,9 +4,8 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional, cast
 
-import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
 from pydantic import ValidationError
 
@@ -44,7 +43,7 @@ class StartupValidator:
 
         # 2. Config is valid JSON
         try:
-            with open(self.config_path) as f:
+            with open(self.config_path or "") as f:  # type: ignore[arg-type]
                 self.config_data = json.load(f)
         except json.JSONDecodeError as e:
             print_error(f"Invalid JSON in config file: {self.config_path}")
@@ -65,7 +64,7 @@ class StartupValidator:
 
         # 3. Config validates against Pydantic schema
         try:
-            self.app_config = AppConfig(**self.config_data)
+            self.app_config = AppConfig(**(self.config_data or {}))
         except ValidationError as e:
             print_error(f"Invalid configuration in: {self.config_path}")
             for error in e.errors():
@@ -115,35 +114,18 @@ class StartupValidator:
         return False
 
     def _check_templates_file(self) -> bool:
-        """Check if templates file exists."""
+        """Check if any template files exist in the hierarchy."""
         if not self.app_config:
             return False
 
-        from config.loader import ConfigurationLoader
         from domain.base.ports.scheduler_port import SchedulerPort
         from infrastructure.di.container import get_container
 
         container = get_container()
         scheduler = container.get(SchedulerPort)
 
-        provider_config = (
-            self.app_config.provider.providers[0] if self.app_config.provider.providers else None
-        )
-        if not provider_config:
-            return False
-
-        provider_name = provider_config.name
-        provider_type = provider_config.type
-
-        filename = scheduler.get_templates_filename(
-            provider_name, provider_type, self.app_config.model_dump()
-        )
-
-        resolved_path = ConfigurationLoader._resolve_file_path(
-            "template", filename, explicit_path=None, config_manager=None
-        )
-
-        return resolved_path is not None and Path(resolved_path).exists()
+        template_paths = cast(Any, scheduler).get_template_paths()
+        return any(Path(path).exists() for path in template_paths)
 
     def _check_default_config(self) -> bool:
         """Check if default_config.json template exists."""
@@ -174,8 +156,15 @@ class StartupValidator:
             profile = aws_provider.config.get("profile", "default")
             region = aws_provider.config.get("region", "us-east-1")
 
-            session = boto3.Session(profile_name=profile, region_name=region)
-            session.client("sts").get_caller_identity()
+            from botocore.config import Config
+
+            from providers.aws.session_factory import AWSSessionFactory
+
+            session = AWSSessionFactory.create_session(profile, region)
+            session.client(
+                "sts",
+                config=Config(connect_timeout=10, read_timeout=30, retries={"max_attempts": 3}),
+            ).get_caller_identity()
             return True
 
         except (NoCredentialsError, ClientError):

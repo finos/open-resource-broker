@@ -27,5 +27,6 @@ class MetricsConfig(BaseModel):
     trace_buffer_size: int = Field(1000, description="Trace buffer size")
     trace_file_max_size_mb: int = Field(10, description="Maximum trace file size in MB")
     aws_metrics: AwsMetricsConfig = Field(
-        default_factory=AwsMetricsConfig, description="AWS-specific metrics configuration"
+        default_factory=AwsMetricsConfig,  # type: ignore[arg-type]
+        description="AWS-specific metrics configuration",
     )

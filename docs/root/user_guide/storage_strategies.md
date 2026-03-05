@@ -176,7 +176,7 @@ data/
 ```python
 # JSON storage provides atomic file operations
 # Each write operation is atomic at the file level
-from src.infrastructure.persistence.json.strategy import JSONStorageStrategy
+from src.infrastructure.storage.json.strategy import JSONStorageStrategy
 
 json_storage = JSONStorageStrategy(config)
 # Atomic operations are handled internally
@@ -337,7 +337,7 @@ requests = storage.query_entities(
 # DynamoDB: Limited transaction support
 
 # SQL storage transaction example
-from src.infrastructure.persistence.sql.strategy import SQLStorageStrategy
+from src.infrastructure.storage.sql.strategy import SQLStorageStrategy
 
 sql_storage = SQLStorageStrategy(config)
 # SQL transactions are handled internally by the storage strategy
@@ -779,7 +779,7 @@ df -h data/
 ```bash
 # Test connection
 python -c "
-from src.infrastructure.persistence.sql.strategy import SQLStorageStrategy
+from src.infrastructure.storage.sql.strategy import SQLStorageStrategy
 storage = SQLStorageStrategy(config)
 storage.test_connection()
 "

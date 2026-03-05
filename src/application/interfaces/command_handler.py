@@ -4,10 +4,10 @@ import asyncio
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
-from application.dto.base import BaseCommand, BaseResponse
+from application.dto.base import BaseCommand
 
 TCommand = TypeVar("TCommand", bound=BaseCommand)
-TResponse = TypeVar("TResponse", bound=BaseResponse)
+TResponse = TypeVar("TResponse")  # Allow None for CQRS compliance
 
 
 class CommandHandler(Generic[TCommand, TResponse], ABC):
@@ -75,7 +75,7 @@ class CommandHandler(Generic[TCommand, TResponse], ABC):
         """
         # Get the command type from the generic type annotation
         try:
-            command_type = self.__class__.__orig_bases__[0].__args__[0]
+            command_type = self.__class__.__orig_bases__[0].__args__[0]  # type: ignore[attr-defined]
             return isinstance(command, command_type)
         except (AttributeError, IndexError):
             # Fallback for cases where generic type info is not available

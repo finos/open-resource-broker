@@ -14,16 +14,10 @@ class GetRequestQuery(Query, BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
+    provider_name: Optional[str] = None
     request_id: str
     long: bool = False
-
-
-class GetRequestStatusQuery(Query, BaseModel):
-    """Query to get request status."""
-
-    model_config = ConfigDict(frozen=True)
-
-    request_id: str
+    lightweight: bool = False
 
 
 class ListActiveRequestsQuery(Query, BaseModel):
@@ -31,14 +25,25 @@ class ListActiveRequestsQuery(Query, BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
+    provider_name: Optional[str] = None
+    filter_expressions: list[str] = []
+    all_resources: bool = False
+    limit: Optional[int] = 50  # Default: 50, Max: 1000
+    offset: Optional[int] = 0
+
 
 class ListReturnRequestsQuery(Query, BaseModel):
     """Query to list return requests."""
 
     model_config = ConfigDict(frozen=True)
 
+    provider_name: Optional[str] = None
     status: Optional[str] = None
     requester_id: Optional[str] = None
+    machine_names: list[str] = []
+    filter_expressions: list[str] = []
+    limit: Optional[int] = 50  # Default: 50, Max: 1000
+    offset: Optional[int] = 0
 
 
 class GetTemplateQuery(Query, BaseModel):
@@ -46,6 +51,7 @@ class GetTemplateQuery(Query, BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
+    provider_name: Optional[str] = None
     template_id: str
 
 
@@ -54,9 +60,12 @@ class ListTemplatesQuery(Query, BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
+    provider_name: Optional[str] = None
     provider_api: Optional[str] = None
     active_only: bool = True
-    include_configuration: bool = False
+    filter_expressions: list[str] = []
+    limit: Optional[int] = 50  # Default: 50, Max: 1000
+    offset: Optional[int] = 0
 
 
 class ValidateTemplateQuery(Query, BaseModel):
@@ -65,6 +74,7 @@ class ValidateTemplateQuery(Query, BaseModel):
     model_config = ConfigDict(frozen=True)
 
     template_config: dict
+    template_id: Optional[str] = None  # For validating loaded templates
 
 
 class GetMachineQuery(Query, BaseModel):
@@ -72,6 +82,7 @@ class GetMachineQuery(Query, BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
+    provider_name: Optional[str] = None
     machine_id: str
 
 
@@ -80,15 +91,30 @@ class ListMachinesQuery(Query, BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
+    provider_name: Optional[str] = None
     request_id: Optional[str] = None
     status: Optional[str] = None
     active_only: bool = False
+    filter_expressions: list[str] = []  # Generic filters
+    all_resources: bool = False
+    timestamp_format: Optional[str] = None
+    limit: Optional[int] = 50  # Default: 50, Max: 1000
+    offset: Optional[int] = 0
 
 
 class GetActiveMachineCountQuery(Query, BaseModel):
     """Query to get count of active machines."""
 
     model_config = ConfigDict(frozen=True)
+
+
+class GetConfigurationQuery(Query, BaseModel):
+    """Query to get configuration value."""
+
+    model_config = ConfigDict(frozen=True)
+
+    key: str
+    default: Optional[str] = None
 
 
 class GetRequestSummaryQuery(Query, BaseModel):
@@ -105,3 +131,39 @@ class GetMachineHealthQuery(Query, BaseModel):
     model_config = ConfigDict(frozen=True)
 
     machine_id: str
+
+
+class ValidateStorageQuery(Query, BaseModel):
+    """Query to validate storage connectivity."""
+
+    model_config = ConfigDict(frozen=True)
+
+
+class ValidateMCPQuery(Query, BaseModel):
+    """Query to validate MCP configuration."""
+
+    model_config = ConfigDict(frozen=True)
+
+
+# Cleanup Queries for CQRS compliance
+class ListCleanableRequestsQuery(Query, BaseModel):
+    """Query to list requests eligible for cleanup."""
+
+    model_config = ConfigDict(frozen=True)
+
+    older_than_days: int
+
+
+class ListCleanableResourcesQuery(Query, BaseModel):
+    """Query to list resources eligible for cleanup."""
+
+    model_config = ConfigDict(frozen=True)
+
+
+# Template Result Queries
+class GetTemplateValidationResultQuery(Query, BaseModel):
+    """Query to get template validation results."""
+
+    model_config = ConfigDict(frozen=True)
+
+    template_id: str

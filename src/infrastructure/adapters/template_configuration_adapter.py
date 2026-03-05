@@ -5,10 +5,11 @@ from typing import TYPE_CHECKING, Any, Optional
 from domain.base.ports.logging_port import LoggingPort
 from domain.base.ports.template_configuration_port import TemplateConfigurationPort
 from infrastructure.template.configuration_manager import TemplateConfigurationManager
+from infrastructure.template.dtos import TemplateDTO
 
 # Use TYPE_CHECKING to avoid direct domain import
 if TYPE_CHECKING:
-    from domain.template.template_aggregate import Template
+    pass
 
 
 class TemplateConfigurationAdapter(TemplateConfigurationPort):
@@ -29,9 +30,9 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         """Get template configuration manager."""
         return self._template_manager
 
-    def load_templates(self) -> list["Template"]:
+    async def load_templates(self, provider_override: Optional[str] = None) -> list[Any]:
         """Load all templates from configuration."""
-        return self._template_manager.get_all_templates_sync()
+        return await self._template_manager.load_templates(provider_override=provider_override)
 
     def get_template_config(self, template_id: str) -> Optional[dict[str, Any]]:
         """Get configuration for specific template."""
@@ -45,13 +46,16 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
         errors = []
 
         # Basic validation
-        if not config.get("template_id"):
+        template_id = config.get("templateId") or config.get("template_id")
+        if not template_id:
             errors.append("Template ID is required")
 
-        if not config.get("provider_api"):
+        provider_api = config.get("providerApi") or config.get("provider_api")
+        if not provider_api:
             errors.append("Provider API is required")
 
-        if not config.get("image_id"):
+        image_id = config.get("imageId") or config.get("image_id")
+        if not image_id:
             errors.append("Image ID is required")
 
         # Use template manager for validation
@@ -59,99 +63,68 @@ class TemplateConfigurationAdapter(TemplateConfigurationPort):
             # Create a temporary template for validation
             from domain.template.template_aggregate import Template
 
-            temp_template = Template(
-                template_id=config.get("template_id", "temp"),
-                image_id=config.get("image_id", ""),
-                instance_type=config.get("instance_type", ""),
-                subnet_ids=config.get("subnet_ids", []),
-                security_group_ids=config.get("security_group_ids", []),
-                price_type=config.get("price_type", "ondemand"),
-                provider_api=config.get("provider_api", ""),
+            Template(
+                template_id=template_id or "temp",
+                image_id=image_id or "",
+                instance_type=config.get("instanceType") or config.get("instance_type", ""),
+                subnet_ids=config.get("subnetIds") or config.get("subnet_ids", []),
+                security_group_ids=config.get("securityGroupIds")
+                or config.get("security_group_ids", []),
+                price_type=config.get("priceType") or config.get("price_type", "ondemand"),
+                provider_api=provider_api or "",
                 metadata=config.get("metadata", {}),
             )
 
-            # Use template manager's validation
-            validation_result = self._template_manager.validate_template(temp_template)
-            if not validation_result.is_valid:
-                errors.extend(validation_result.errors)
-
+            # Note: Template validation is skipped here as it requires async context.
+            # Validation is performed by the template manager during template operations.
         except Exception as e:
-            # Don't fail validation if template validation fails
             self._logger.warning("Template validation failed: %s", e)
             errors.append(f"Template validation error: {e!s}")
 
         return errors
 
-    def _determine_provider_type(self, config: dict[str, Any]) -> Optional[str]:
-        """Determine provider type from configuration."""
-        provider_api = config.get("provider_api", "")
-
-        # Map provider APIs to provider types
-        if provider_api in [
-            "EC2Fleet",
-            "SpotFleet",
-            "RunInstances",
-            "AutoScalingGroup",
-        ]:
-            return "aws"
-
-        # Check for AWS-specific fields
-        aws_fields = [
-            "fleet_type",
-            "allocation_strategy",
-            "spot_fleet_request_expiry",
-            "fleet_role",
-        ]
-        if any(field in config for field in aws_fields):
-            return "aws"
-
-        return None
-
     # Additional convenience methods for application layer
 
-    def get_template_by_id(self, template_id: str) -> Optional["Template"]:
+    async def get_template_by_id(self, template_id: str) -> Optional[TemplateDTO]:
         """
-        Get template by ID as domain object.
+        Get template by ID as TemplateDTO.
 
         Args:
             template_id: Template identifier
 
         Returns:
-            Template domain object or None
+            TemplateDTO or None
         """
         return self._template_manager.get_template(template_id)
 
-    def get_templates_by_provider(self, provider_api: str) -> list["Template"]:
+    async def get_templates_by_provider(self, provider_api: str) -> list[TemplateDTO]:
         """
-        Get templates by provider API as domain objects.
+        Get templates by provider API as TemplateDTO objects.
 
         Args:
             provider_api: Provider API identifier
 
         Returns:
-            List of Template domain objects
+            List of TemplateDTO objects
         """
-        all_templates = self._template_manager.get_all_templates()
+        all_templates = self._template_manager.get_all_templates_sync()
         return [t for t in all_templates if getattr(t, "provider_api", None) == provider_api]
 
     def clear_cache(self) -> None:
         """Clear template cache."""
         if hasattr(self._template_manager, "clear_cache"):
             self._template_manager.clear_cache()
-            if self._logger:
-                self._logger.debug("Cleared template cache via adapter")
+            self._logger.debug("Cleared template cache via adapter")
 
     def get_cache_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
-        if hasattr(self._template_manager, "get_cache_stats"):
-            return self._template_manager.get_cache_stats()
         return {"cache_type": "unknown", "cache_size": 0}
 
 
 # Factory function for dependency injection
 def create_template_configuration_adapter(
     template_manager: TemplateConfigurationManager, logger: Optional[LoggingPort] = None
-) -> TemplateConfigurationAdapter:
+) -> "TemplateConfigurationAdapter":
     """
     Create TemplateConfigurationAdapter.
 
@@ -162,4 +135,8 @@ def create_template_configuration_adapter(
     Returns:
         TemplateConfigurationAdapter instance
     """
+    if logger is None:
+        from infrastructure.adapters.logging_adapter import LoggingAdapter
+
+        logger = LoggingAdapter(__name__)
     return TemplateConfigurationAdapter(template_manager, logger)

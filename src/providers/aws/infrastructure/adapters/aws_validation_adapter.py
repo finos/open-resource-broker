@@ -5,13 +5,13 @@ from typing import Any
 from domain.base.dependency_injection import injectable
 from domain.base.ports.logging_port import LoggingPort
 from domain.base.ports.provider_validation_port import BaseProviderValidationAdapter
-from providers.aws.configuration.config import (
-    AWSProviderConfig as AWSProviderConfigBase,
-)
 from providers.aws.configuration.validator import (
+    AWSHandlerConfig,
     AWSProviderConfig,
-    get_aws_config_manager,
 )
+
+# Static handler capability data — no runtime config needed.
+_HANDLER_CONFIG = AWSHandlerConfig()
 
 
 @injectable
@@ -55,33 +55,14 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
         Returns:
             True if the API is supported by AWS configuration
         """
-        try:
-            # Get supported APIs from configuration
-            from config.manager import get_config_manager
-
-            config_manager = get_config_manager()
-            raw_config = config_manager.get_raw_config()
-
-            # Navigate to AWS handlers in configuration
-            aws_handlers = (
-                raw_config.get("provider", {})
-                .get("provider_defaults", {})
-                .get("aws", {})
-                .get("handlers", {})
+        is_valid = api in _HANDLER_CONFIG.capabilities
+        if not is_valid:
+            self._logger.debug(
+                "AWS API validation failed: %s not in %s",
+                api,
+                list(_HANDLER_CONFIG.capabilities.keys()),
             )
-
-            supported_apis = list(aws_handlers.keys())
-            is_valid = api in supported_apis
-
-            if not is_valid:
-                self._logger.debug("AWS API validation failed: %s not in %s", api, supported_apis)
-
-            return is_valid
-
-        except Exception as e:
-            self._logger.error("Error validating AWS provider API %s: %s", api, e)
-            # Fallback to hardcoded list for safety
-            return api in ["EC2Fleet", "SpotFleet", "ASG", "RunInstances"]
+        return is_valid
 
     def get_supported_provider_apis(self) -> list[str]:
         """
@@ -90,26 +71,7 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
         Returns:
             List of supported AWS provider API identifiers
         """
-        try:
-            # Get supported APIs from configuration
-            from config.manager import get_config_manager
-
-            config_manager = get_config_manager()
-            raw_config = config_manager.get_raw_config()
-
-            # Navigate to AWS handlers in configuration
-            aws_handlers = (
-                raw_config.get("provider", {})
-                .get("provider_defaults", {})
-                .get("aws", {})
-                .get("handlers", {})
-            )
-
-            return list(aws_handlers.keys())
-        except Exception as e:
-            self._logger.error("Error getting supported AWS APIs: %s", e)
-            # Fallback to hardcoded list for safety
-            return ["EC2Fleet", "SpotFleet", "ASG", "RunInstances"]
+        return list(_HANDLER_CONFIG.capabilities.keys())
 
     def get_default_fleet_type_for_api(self, api: str) -> str:
         """
@@ -129,7 +91,7 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
 
         try:
             # Get handler capabilities from configuration
-            handler_capabilities = self._config.handlers.capabilities.get(api, {})
+            handler_capabilities = self._config.handlers.capabilities.get(api, {})  # type: ignore[attr-defined]
 
             if handler_capabilities and hasattr(handler_capabilities, "default_fleet_type"):
                 return handler_capabilities.default_fleet_type
@@ -162,43 +124,10 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
         if not self.validate_provider_api(api):
             raise ValueError(f"Unsupported AWS provider API: {api}")
 
-        try:
-            # Get fleet types from configuration
-            from config.manager import get_config_manager
-
-            config_manager = get_config_manager()
-            raw_config = config_manager.get_raw_config()
-
-            # Navigate to specific handler configuration
-            handler_config = (
-                raw_config.get("provider", {})
-                .get("provider_defaults", {})
-                .get("aws", {})
-                .get("handlers", {})
-                .get(api, {})
-            )
-
-            # Get supported fleet types from configuration
-            supported_fleet_types = handler_config.get("supported_fleet_types", [])
-
-            if supported_fleet_types:
-                return supported_fleet_types
-
-            # Fallback to hardcoded values if not in config
-            if api == "EC2Fleet":
-                return ["instant", "request", "maintain"]
-            elif api == "SpotFleet":
-                return ["request", "maintain"]
-            elif api == "ASG":
-                return []  # ASG doesn't use fleet types
-            elif api == "RunInstances":
-                return []  # RunInstances doesn't use fleet types
-            else:
-                return ["request"]
-
-        except Exception as e:
-            self._logger.error("Error getting valid fleet types for AWS API %s: %s", api, e)
-            return ["request"]  # Safe fallback
+        capabilities = _HANDLER_CONFIG.capabilities.get(api)
+        if capabilities is None or capabilities.supported_fleet_types is None:
+            return []
+        return list(capabilities.supported_fleet_types)
 
     def validate_fleet_type_for_api(self, fleet_type: str, api: str) -> bool:
         """
@@ -291,11 +220,11 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
             warnings: List to append validation warnings to
             validated_fields: List to append validated field names to
         """
-        # Validate AMI ID format
+        # Validate AMI ID format (skip check for SSM parameter paths)
         image_id = template_config.get("image_id")
         if image_id:
             validated_fields.append("image_id")
-            if not image_id.startswith("ami-"):
+            if not image_id.startswith("/") and not image_id.startswith("ami-"):
                 errors.append(f"Invalid AWS AMI ID format: {image_id}")
 
         # Validate instance type format
@@ -365,26 +294,3 @@ class AWSValidationAdapter(BaseProviderValidationAdapter):
         ]
 
         return family in common_families
-
-
-def create_aws_validation_adapter(logger: LoggingPort) -> AWSValidationAdapter:
-    """
-    Create AWS validation adapter with configuration.
-
-    Args:
-        logger: Logger for validation operations
-
-    Returns:
-        Configured AWS validation adapter
-    """
-    # Create a minimal config for validation purposes only
-    # We don't need full AWS authentication just to validate fleet types
-    try:
-        config_manager = get_aws_config_manager()
-        aws_config = config_manager.get_typed(AWSProviderConfig)
-    except Exception as e:
-        logger.debug("Could not load full AWS config for validation: %s", e)
-        # Create a minimal config with dummy auth for validation only
-        aws_config = AWSProviderConfigBase(profile="validation-only")
-
-    return AWSValidationAdapter(aws_config, logger)

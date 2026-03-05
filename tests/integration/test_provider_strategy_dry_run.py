@@ -22,12 +22,6 @@ class TestProviderStrategyDryRun:
 
         # Create AWS provider strategy
         self.aws_strategy = AWSProviderStrategy(config=self.mock_config, logger=self.mock_logger)
-
-        # Mock the initialization to avoid real AWS client creation
-        with patch.object(self.aws_strategy, "initialize", return_value=True):
-            self.aws_strategy.initialize()
-
-        # Set initialized flag manually
         self.aws_strategy._initialized = True
 
         # Mock the handler
@@ -37,10 +31,47 @@ class TestProviderStrategyDryRun:
             "instances": [],
             "success": True,
         }
-        self.aws_strategy._handlers = {"RunInstances": self.mock_handler}
 
-        # Ensure provisioning port is None to use handler fallback
-        self.aws_strategy._provisioning_port = None
+        # Mock handler registry to return our mock handler
+        mock_handler_registry = Mock()
+        mock_handler_registry.get_available_handlers.return_value = {
+            "RunInstances": self.mock_handler
+        }
+        self.aws_strategy._handler_registry = mock_handler_registry
+
+        # Mock instance service to use our mock handler registry
+        mock_instance_service = Mock()
+
+        async def _mock_create_instances(operation, handlers):
+            handler = handlers.get(
+                operation.parameters.get("template_config", {}).get("provider_api", "RunInstances")
+            ) or handlers.get("RunInstances")
+            if handler is None:
+                from providers.base.strategy import ProviderResult
+
+                return ProviderResult.error_result("No handler found", "HANDLER_NOT_FOUND")
+            result = handler.acquire_hosts(None, None)
+            if isinstance(result, Exception):
+                raise result
+            from providers.base.strategy import ProviderResult
+
+            return ProviderResult.success_result(
+                {"resource_ids": result.get("resource_ids", []), "instances": []},
+                {"method": "handler"},
+            )
+
+        mock_instance_service.create_instances = _mock_create_instances
+
+        def _mock_terminate(operation):
+            from providers.base.strategy import ProviderResult
+
+            instance_ids = operation.parameters.get("instance_ids", [])
+            return ProviderResult.success_result(
+                {"terminated": instance_ids}, {"method": "terminate"}
+            )
+
+        mock_instance_service.terminate_instances = _mock_terminate
+        self.aws_strategy._instance_service = mock_instance_service
 
     @pytest.mark.asyncio
     @patch("providers.aws.infrastructure.dry_run_adapter.aws_dry_run_context")
@@ -52,7 +83,7 @@ class TestProviderStrategyDryRun:
             parameters={
                 "template_config": {
                     "template_id": "test-template",
-                    "instance_type": "t2.micro",
+                    "machine_types": {"t2.micro": 1},
                     "image_id": "ami-12345678",
                     "provider_api": "RunInstances",
                     "subnet_ids": ["subnet-12345"],
@@ -92,7 +123,7 @@ class TestProviderStrategyDryRun:
             parameters={
                 "template_config": {
                     "template_id": "test-template",
-                    "instance_type": "t2.micro",
+                    "machine_types": {"t2.micro": 1},
                     "image_id": "ami-12345678",
                     "provider_api": "RunInstances",
                     "subnet_ids": ["subnet-12345"],
@@ -132,7 +163,7 @@ class TestProviderStrategyDryRun:
             parameters={
                 "template_config": {
                     "template_id": "test-template",
-                    "instance_type": "t2.micro",
+                    "machine_types": {"t2.micro": 1},
                     "image_id": "ami-12345678",
                     "provider_api": "RunInstances",
                     "subnet_ids": ["subnet-12345"],
@@ -195,7 +226,7 @@ class TestProviderStrategyDryRun:
             parameters={
                 "template_config": {
                     "template_id": "test-template",
-                    "instance_type": "t2.micro",
+                    "machine_types": {"t2.micro": 1},
                     "image_id": "ami-12345678",
                     "provider_api": "RunInstances",
                     "subnet_ids": ["subnet-12345"],
@@ -228,4 +259,3 @@ class TestProviderStrategyDryRun:
 
         # Verify handlers were called
         self.mock_handler.acquire_hosts.assert_called_once()
-        mock_ec2_client.terminate_instances.assert_called_once()

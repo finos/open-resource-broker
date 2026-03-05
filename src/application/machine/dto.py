@@ -1,7 +1,7 @@
 """Data Transfer Objects for machine domain operations."""
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from pydantic import Field
 
@@ -20,14 +20,32 @@ class MachineDTO(BaseDTO):
     private_ip: str
     public_ip: Optional[str] = None
     result: str  # 'executing', 'fail', or 'succeed'
-    launch_time: int
+    launch_time: Optional[Union[int, str]] = None  # Unix timestamp or ISO string
     message: str = ""
     provider_api: Optional[str] = None
+    provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
     resource_id: Optional[str] = None
+    request_id: Optional[str] = None
+    return_request_id: Optional[str] = None
     price_type: Optional[str] = None
-    cloud_host_id: Optional[str] = None
+    private_dns_name: Optional[str] = None
+    public_dns_name: Optional[str] = None
     metadata: Optional[dict[str, Any]] = Field(default=None)
     health_checks: Optional[dict[str, Any]] = Field(default=None)
+    provider_data: dict[str, Any] = Field(default_factory=dict)
+    version: int = 0
+
+    # Additional fields needed by formatter
+    template_id: Optional[str] = None
+    image_id: Optional[str] = None
+    subnet_id: Optional[str] = None
+    security_group_ids: Optional[list[str]] = Field(default_factory=list)
+    status_reason: Optional[str] = None
+    termination_time: Optional[Union[int, str]] = None
+    tags: Optional[Any] = None
+    provider_data: dict[str, Any] = Field(default_factory=dict)
+    version: int = 0
 
     @staticmethod
     def _get_result_status(status: str) -> str:
@@ -61,8 +79,21 @@ class MachineDTO(BaseDTO):
             "private_ip": str(machine.private_ip),
             "public_ip": str(machine.public_ip) if machine.public_ip else None,
             "result": cls._get_result_status(status),
-            "launch_time": int(machine.launch_time.timestamp()),
-            "message": machine.message,
+            "launch_time": int(machine.launch_time.timestamp()) if machine.launch_time else None,
+            "message": machine.metadata.get("message", "") if machine.metadata else "",
+            "request_id": str(machine.request_id) if machine.request_id else None,
+            "return_request_id": str(machine.return_request_id)
+            if machine.return_request_id
+            else None,
+            "provider_data": machine.provider_data,
+            "version": machine.version,
+            "subnet_id": machine.subnet_id,
+            "security_group_ids": machine.security_group_ids or [],
+            "template_id": machine.template_id,
+            "image_id": machine.image_id,
+            "status_reason": machine.status_reason,
+            "termination_time": machine.termination_time,
+            "tags": machine.tags,
         }
 
         # Add additional fields for long format
@@ -71,14 +102,10 @@ class MachineDTO(BaseDTO):
                 {
                     "provider_api": (str(machine.provider_api) if machine.provider_api else None),
                     "resource_id": (str(machine.resource_id) if machine.resource_id else None),
-                    "price_type": (
-                        machine.price_type.value
-                        if hasattr(machine.price_type, "value")
-                        else str(machine.price_type)
-                    ),
-                    "cloud_host_id": machine.cloud_host_id,
+                    "price_type": (machine.price_type if machine.price_type else None),
+                    "cloud_host_id": machine.provider_data.get("cloud_host_id"),
                     "metadata": machine.metadata,
-                    "health_checks": machine.health_checks,
+                    "health_checks": machine.provider_data.get("health_checks"),
                 }
             )
 

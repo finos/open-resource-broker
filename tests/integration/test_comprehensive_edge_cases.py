@@ -444,8 +444,8 @@ def test_scheduler_strategy_compliance():
                     "providerApi": "RunInstances",
                 },
                 "expected_fields": [
-                    "root_volume_size",
-                    "root_volume_type",
+                    "root_device_volume_size",
+                    "volume_type",
                     "storage_encryption",
                 ],
             },
@@ -536,9 +536,9 @@ def test_scheduler_strategy_compliance():
 
                 # Storage fields
                 if "rootDeviceVolumeSize" in hf_input:
-                    converted_fields.append("root_volume_size")
+                    converted_fields.append("root_device_volume_size")
                 if "volumeType" in hf_input:
-                    converted_fields.append("root_volume_type")
+                    converted_fields.append("volume_type")
                 if "encrypted" in hf_input:
                     converted_fields.append("storage_encryption")
 
@@ -797,11 +797,11 @@ def test_template_field_variations():
                     "instance_type": "t2.micro",
                     "subnet_ids": ["subnet-12345678", "subnet-87654321"],
                     "security_group_ids": ["sg-12345678"],
-                    "key_pair_name": "my-keypair",
+                    "key_name": "my-keypair",
                     "user_data": '#!/bin/bash\necho "Hello World"',
                     "instance_profile": "arn:aws:iam::123456789012:instance-profile/MyProfile",
-                    "root_volume_size": 20,
-                    "root_volume_type": "gp3",
+                    "root_device_volume_size": 20,
+                    "volume_type": "gp3",
                     "storage_encryption": True,
                     "monitoring_enabled": True,
                     "launch_template_id": "lt-12345678",
@@ -815,7 +815,7 @@ def test_template_field_variations():
                     "template_id": "",  # Empty template ID
                     "image_id": "invalid-ami",  # Invalid AMI format
                     "instance_type": "invalid.type",  # Invalid instance type
-                    "root_volume_size": -10,  # Negative volume size
+                    "root_device_volume_size": -10,  # Negative volume size
                     "launch_template_version": "invalid",  # Invalid version
                 },
                 "expected_validation": "fail",
@@ -845,7 +845,10 @@ def test_template_field_variations():
                 ):
                     validation_errors.append("Invalid AMI format")
 
-                if template_data.get("root_volume_size") and template_data["root_volume_size"] < 0:
+                if (
+                    template_data.get("root_device_volume_size")
+                    and template_data["root_device_volume_size"] < 0
+                ):
                     validation_errors.append("Invalid volume size")
 
                 # Determine validation result

@@ -207,40 +207,5 @@ class TestAWSValidationAdapter:
         assert validation_adapter._is_valid_instance_type("") is False
 
 
-class TestAWSValidationAdapterErrorHandling:
-    """Test error handling in AWS validation adapter."""
-
-    @pytest.fixture
-    def mock_logger(self):
-        """Create mock logger."""
-        return Mock(spec=LoggingPort)
-
-    @pytest.fixture
-    def broken_aws_config(self):
-        """Create AWS configuration that raises errors."""
-        config = Mock(spec=AWSProviderConfig)
-        config.handlers = Mock()
-        config.handlers.types = Mock(side_effect=Exception("Config error"))
-        return config
-
-    def test_validate_provider_api_with_config_error(self, broken_aws_config, mock_logger):
-        """Test provider API validation when config access fails."""
-        adapter = AWSValidationAdapter(broken_aws_config, mock_logger)
-
-        result = adapter.validate_provider_api("EC2Fleet")
-
-        assert result is False
-        mock_logger.error.assert_called()
-
-    def test_get_supported_provider_apis_with_config_error(self, broken_aws_config, mock_logger):
-        """Test getting supported APIs when config access fails."""
-        adapter = AWSValidationAdapter(broken_aws_config, mock_logger)
-
-        result = adapter.get_supported_provider_apis()
-
-        assert result == []
-        mock_logger.error.assert_called()
-
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

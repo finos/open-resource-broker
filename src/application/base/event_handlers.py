@@ -91,7 +91,7 @@ class BaseEventHandler(Generic[TEvent], EventHandler[TEvent], ABC):
 
             # Handle error through error handler
             if self.error_handler:
-                await self.error_handler.handle_error(
+                await self.error_handler.handle_error(  # type: ignore[misc]
                     e,
                     {
                         "event_type": event_type,
@@ -153,7 +153,7 @@ class BaseEventHandler(Generic[TEvent], EventHandler[TEvent], ABC):
         if self.event_publisher and events:
             for cascading_event in events:
                 try:
-                    await self.event_publisher.publish(cascading_event)
+                    await self.event_publisher.publish(cascading_event)  # type: ignore[misc]
                     if self.logger:
                         self.logger.debug(
                             "Published cascading event: %s",

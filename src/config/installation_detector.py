@@ -1,5 +1,6 @@
 """Installation mode detection using modern Python APIs."""
 
+import importlib.metadata
 import json
 import sys
 from pathlib import Path
@@ -17,16 +18,15 @@ def detect_installation_mode(package_name: str = "orb-py") -> Tuple[str, Optiona
         - 'system': System/venv install
     """
     try:
-        import importlib.metadata
         import site
 
         dist = importlib.metadata.distribution(package_name)
-        dist_path = Path(dist._path) if hasattr(dist, "_path") else None
+        dist_path = Path(dist._path) if hasattr(dist, "_path") else None  # type: ignore[attr-defined]
 
         if not dist_path:
             return "development", None
 
-        # Check for editable install (PEP 610)
+        # Check for PEP 610 editable install (newer pip versions)
         direct_url_file = dist_path / "direct_url.json"
         if direct_url_file.exists():
             try:
@@ -43,14 +43,29 @@ def detect_installation_mode(package_name: str = "orb-py") -> Tuple[str, Optiona
             except (json.JSONDecodeError, OSError):
                 pass
 
+        # Check for older editable install (egg-info in source tree)
+        # If dist_path is within current working directory or has .egg-info suffix
+        cwd = Path.cwd()
+        if str(dist_path).startswith(str(cwd)) or dist_path.name.endswith(".egg-info"):
+            # This is likely an editable install
+            if dist_path.name.endswith(".egg-info"):
+                # Source directory is parent of egg-info directory
+                # For src/package.egg-info -> project_root
+                source_path = dist_path.parent.parent
+                return "editable", source_path
+            else:
+                return "editable", cwd
+
         # Check for user install
-        if hasattr(site, "USER_SITE") and site.USER_SITE in str(dist_path):
-            return "user", Path(site.USER_BASE) if hasattr(site, "USER_BASE") else None
+        user_site = getattr(site, "USER_SITE", None)
+        if user_site is not None and user_site in str(dist_path):
+            user_base = getattr(site, "USER_BASE", None)
+            return "user", Path(user_base) if user_base is not None else None
 
         # System or venv install
         return "system", Path(sys.prefix)
 
-    except (importlib.metadata.PackageNotFoundError, Exception):
+    except Exception:
         # Package not installed - running from source
         return "development", None
 
@@ -69,7 +84,7 @@ def get_template_location() -> Path:
 
     elif mode == "editable":
         # Use source directory from PEP 610
-        return base_path / "config" / "default_config.json"
+        return (base_path or Path.cwd()) / "config" / "default_config.json"
 
     elif mode == "user":
         # User install - use posix_user scheme
@@ -93,12 +108,24 @@ def get_scripts_location() -> Path:
     mode, base_path = detect_installation_mode()
 
     if mode == "development":
+        try:
+            from domain.base.ports.scheduler_port import SchedulerPort
+            from infrastructure.di.container import get_container, is_container_ready
+
+            if is_container_ready():
+                strategy = get_container().get(SchedulerPort)
+                scripts_dir = strategy.get_scripts_directory()
+                if scripts_dir is not None:
+                    return scripts_dir
+        except Exception:
+            pass
+
         from config.platform_dirs import get_config_location
 
         return get_config_location().parent / "scripts"
 
     elif mode == "editable":
-        return base_path / "scripts"
+        return (base_path or Path.cwd()) / "src/infrastructure/scheduler/hostfactory/scripts"
 
     elif mode == "user":
         try:

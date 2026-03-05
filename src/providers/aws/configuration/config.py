@@ -1,10 +1,13 @@
 """AWS provider configuration - single source of truth."""
 
+import json
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from infrastructure.interfaces.provider import BaseProviderConfig
+from providers.aws.domain.template.value_objects import ProviderApi
 
 
 class HandlerCapabilityConfig(BaseModel):
@@ -12,14 +15,25 @@ class HandlerCapabilityConfig(BaseModel):
 
     ec2_fleet: bool = Field(True, description="Enable EC2 Fleet handler")
     spot_fleet: bool = Field(True, description="Enable Spot Fleet handler")
-    auto_scaling_group: bool = Field(True, description="Enable Auto Scaling Group handler")
+    asg: bool = Field(True, description="Enable Auto Scaling Group handler")
     run_instances: bool = Field(True, description="Enable Run Instances handler")
 
 
 class HandlerDefaultsConfig(BaseModel):
     """Handler defaults configuration."""
 
-    default_handler: str = Field("ec2_fleet", description="Default handler to use")
+    default_handler: str = Field("EC2Fleet", description="Default handler to use")
+
+    @field_validator("default_handler")
+    @classmethod
+    def validate_default_handler(cls, v: str) -> str:
+        """Reject values that are not valid ProviderApi registry keys."""
+        if ProviderApi(v) is None:
+            valid = [m.value for m in ProviderApi]
+            raise ValueError(
+                f"default_handler {v!r} is not a valid ProviderApi value; expected one of {valid}"
+            )
+        return v
 
 
 class LaunchTemplateConfiguration(BaseModel):
@@ -36,13 +50,13 @@ class LaunchTemplateConfiguration(BaseModel):
 class HandlersConfig(BaseModel):
     """Handlers configuration."""
 
-    capabilities: HandlerCapabilityConfig = Field(default_factory=lambda: HandlerCapabilityConfig())
-    defaults: HandlerDefaultsConfig = Field(default_factory=lambda: HandlerDefaultsConfig())
+    capabilities: HandlerCapabilityConfig = Field(default_factory=lambda: HandlerCapabilityConfig())  # type: ignore[call-arg]
+    defaults: HandlerDefaultsConfig = Field(default_factory=lambda: HandlerDefaultsConfig())  # type: ignore[call-arg]
 
     # Legacy fields for backward compatibility
     ec2_fleet: bool = Field(True, description="Enable EC2 Fleet handler (legacy)")
     spot_fleet: bool = Field(True, description="Enable Spot Fleet handler (legacy)")
-    auto_scaling_group: bool = Field(True, description="Enable Auto Scaling Group handler (legacy)")
+    asg: bool = Field(True, description="Enable Auto Scaling Group handler (legacy)")
     run_instances: bool = Field(True, description="Enable Run Instances handler (legacy)")
 
     @model_validator(mode="after")
@@ -52,27 +66,34 @@ class HandlersConfig(BaseModel):
         if (
             self.ec2_fleet != self.capabilities.ec2_fleet
             or self.spot_fleet != self.capabilities.spot_fleet
-            or self.auto_scaling_group != self.capabilities.auto_scaling_group
+            or self.asg != self.capabilities.asg
             or self.run_instances != self.capabilities.run_instances
         ):
             object.__setattr__(self.capabilities, "ec2_fleet", self.ec2_fleet)
             object.__setattr__(self.capabilities, "spot_fleet", self.spot_fleet)
-            object.__setattr__(self.capabilities, "auto_scaling_group", self.auto_scaling_group)
+            object.__setattr__(self.capabilities, "asg", self.asg)
             object.__setattr__(self.capabilities, "run_instances", self.run_instances)
 
         return self
 
 
-class AWSProviderConfig(BaseProviderConfig):
+class AWSProviderConfig(BaseSettings, BaseProviderConfig):  # type: ignore[misc]
     """Complete AWS provider configuration - single source of truth.
 
     This class consolidates all AWS configuration needs:
     - Schema validation for JSON/YAML config files
     - Runtime configuration for AWS provider implementation
     - Authentication, service settings, and legacy Symphony compatibility
+    - Environment variable support with ORB_AWS_ prefix
     """
 
-    model_config = ConfigDict(populate_by_name=True, extra="allow")
+    model_config = SettingsConfigDict(  # type: ignore[assignment]
+        env_prefix="ORB_AWS_",
+        case_sensitive=False,
+        populate_by_name=True,
+        env_nested_delimiter="__",  # Enable nested environment variables
+        extra="allow",
+    )
 
     # Provider identification (from BaseProviderConfig)
     provider_type: str = "aws"
@@ -85,7 +106,7 @@ class AWSProviderConfig(BaseProviderConfig):
     session_token: Optional[str] = Field(None, description="AWS session token")
 
     # AWS Settings
-    region: str = Field("us-east-1", description="AWS region")
+    region: str = Field("us-east-1", description="AWS region")  # type: ignore[assignment]
     endpoint_url: Optional[str] = Field(None, description="AWS endpoint URL")
     aws_max_retries: int = Field(
         3,
@@ -107,11 +128,11 @@ class AWSProviderConfig(BaseProviderConfig):
     )
 
     # Handler configuration
-    handlers: HandlersConfig = Field(default_factory=lambda: HandlersConfig())
+    handlers: HandlersConfig = Field(default_factory=lambda: HandlersConfig())  # type: ignore[call-arg]
 
     # Launch template configuration
     launch_template: LaunchTemplateConfiguration = Field(
-        default_factory=lambda: LaunchTemplateConfiguration()
+        default_factory=lambda: LaunchTemplateConfiguration()  # type: ignore[call-arg]
     )
 
     # Symphony/Legacy configuration fields
@@ -131,6 +152,28 @@ class AWSProviderConfig(BaseProviderConfig):
         0, description="Number of retries for status requests"
     )
     describe_request_interval: int = Field(0, description="Delay between retries in milliseconds")
+
+    @field_validator("handlers", mode="before")
+    @classmethod
+    def parse_handlers_json(cls, v):
+        """Parse handlers configuration from JSON string if needed."""
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return v
+        return v
+
+    @field_validator("launch_template", mode="before")
+    @classmethod
+    def parse_launch_template_json(cls, v):
+        """Parse launch template configuration from JSON string if needed."""
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return v
+        return v
 
     @model_validator(mode="before")
     @classmethod
@@ -158,31 +201,6 @@ class AWSProviderConfig(BaseProviderConfig):
             updated["aws_connect_timeout"] = raw_timeout
 
         return updated
-
-    @model_validator(mode="after")
-    def check_auth_method(self) -> "AWSProviderConfig":
-        """
-        Validate that at least one authentication method is provided.
-
-        Returns:
-            Validated model
-
-        Raises:
-            ValueError: If no authentication method is provided
-        """
-        profile = self.profile
-        role_arn = self.role_arn
-        access_key = self.access_key_id
-        secret_key = self.secret_access_key
-        credential_file = self.credential_file
-
-        if profile or role_arn or (access_key and secret_key) or credential_file:
-            return self
-
-        raise ValueError(
-            "At least one authentication method must be provided: "
-            "profile, role_arn, credential_file, or access_key_id + secret_access_key"
-        )
 
     @model_validator(mode="after")
     def validate_proxy_config(self) -> "AWSProviderConfig":

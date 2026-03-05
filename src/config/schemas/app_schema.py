@@ -5,6 +5,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from .cleanup_schema import CleanupConfig
 from .common_schema import (
     DatabaseConfig,
     EventsConfig,
@@ -28,20 +29,21 @@ class AppConfig(BaseModel):
 
     version: str = Field("2.0.0", description="Configuration version")
     provider: ProviderConfig
-    scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)
-    naming: NamingConfig = Field(default_factory=lambda: NamingConfig())
-    logging: LoggingConfig = Field(default_factory=lambda: LoggingConfig())
-    metrics: MetricsConfig = Field(default_factory=lambda: MetricsConfig())
+    scheduler: SchedulerConfig = Field(default_factory=lambda: SchedulerConfig())  # type: ignore[call-arg]
+    naming: NamingConfig = Field(default_factory=lambda: NamingConfig())  # type: ignore[call-arg]
+    logging: LoggingConfig = Field(default_factory=lambda: LoggingConfig())  # type: ignore[call-arg]
+    metrics: MetricsConfig = Field(default_factory=lambda: MetricsConfig())  # type: ignore[call-arg]
     template: Optional[TemplateConfig] = None
-    events: EventsConfig = Field(default_factory=lambda: EventsConfig())
-    storage: StorageConfig = Field(default_factory=lambda: StorageConfig())
-    resource: ResourceConfig = Field(default_factory=lambda: ResourceConfig())
-    request: RequestConfig = Field(default_factory=lambda: RequestConfig())
-    database: DatabaseConfig = Field(default_factory=lambda: DatabaseConfig())
-    circuit_breaker: CircuitBreakerConfig = Field(default_factory=lambda: CircuitBreakerConfig())
-    performance: PerformanceConfig = Field(default_factory=lambda: PerformanceConfig())
-    server: ServerConfig = Field(default_factory=lambda: ServerConfig())
-    native_spec: NativeSpecConfig = Field(default_factory=NativeSpecConfig)
+    events: EventsConfig = Field(default_factory=lambda: EventsConfig())  # type: ignore[call-arg]
+    storage: StorageConfig = Field(default_factory=lambda: StorageConfig())  # type: ignore[call-arg]
+    resource: ResourceConfig = Field(default_factory=lambda: ResourceConfig())  # type: ignore[call-arg]
+    request: RequestConfig = Field(default_factory=lambda: RequestConfig())  # type: ignore[call-arg]
+    database: DatabaseConfig = Field(default_factory=lambda: DatabaseConfig())  # type: ignore[call-arg]
+    circuit_breaker: CircuitBreakerConfig = Field(default_factory=lambda: CircuitBreakerConfig())  # type: ignore[call-arg]
+    performance: PerformanceConfig = Field(default_factory=lambda: PerformanceConfig())  # type: ignore[call-arg]
+    server: ServerConfig = Field(default_factory=lambda: ServerConfig())  # type: ignore[call-arg]
+    native_spec: NativeSpecConfig = Field(default_factory=lambda: NativeSpecConfig())  # type: ignore[call-arg]
+    cleanup: CleanupConfig = Field(default_factory=lambda: CleanupConfig())  # type: ignore[call-arg]
     environment: str = Field("development", description="Environment")
     debug: bool = Field(False, description="Debug mode")
     request_timeout: int = Field(300, description="Request timeout in seconds")
@@ -54,53 +56,26 @@ class AppConfig(BaseModel):
             object.__setattr__(
                 self,
                 "template",
-                TemplateConfig(
-                    default_image_id="ami-12345678",
-                    default_instance_type="t2.micro",
-                    subnet_ids=["subnet-12345678"],
-                    security_group_ids=["sg-12345678"],
-                ),
+                TemplateConfig(),  # type: ignore[call-arg]
             )
         return self
 
     def get_config_file_path(self) -> str:
         """Build full config file path using scheduler + provider type."""
         config_root = self.scheduler.get_config_root()
-        # Get provider type using selection logic
+        # Get provider type directly from config without DI container
         provider_type = self._get_selected_provider_type()
         # Generate provider-specific config file name
         config_file = f"{provider_type}prov_config.json"
         return os.path.join(config_root, config_file)
 
-    def get_templates_file_path(self) -> str:
-        """Build full templates file path using scheduler + provider type."""
-        config_root = self.scheduler.get_config_root()
-        # Get provider type using selection logic
-        provider_type = self._get_selected_provider_type()
-        # Generate provider-specific templates file name
-        templates_file = f"{provider_type}prov_templates.json"
-        return os.path.join(config_root, templates_file)
-
     def _get_selected_provider_type(self) -> str:
-        """Get provider type using selection logic."""
-        try:
-            # Use provider selection service for provider selection
-            from application.services.provider_selection_service import (
-                ProviderSelectionService,
-            )
-            from infrastructure.di.container import get_container
-
-            container = get_container()
-            selection_service = container.get(ProviderSelectionService)
-
-            selection_result = selection_service.select_active_provider()
-            return selection_result.provider_type
-        except Exception:
-            # Fallback to first active provider for backward compatibility
-            active_providers = self.provider.get_active_providers()
-            if active_providers:
-                return active_providers[0].type
-            return "aws"  # Ultimate fallback
+        """Get provider type directly from config without circular dependency."""
+        # Get first active provider directly from config
+        active_providers = self.provider.get_active_providers()
+        if active_providers:
+            return active_providers[0].type
+        return "aws"  # Ultimate fallback
 
     @field_validator("environment")
     @classmethod

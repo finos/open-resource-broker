@@ -13,6 +13,10 @@ from application.queries.scheduler import (
     ListSchedulerStrategiesQuery,
     ValidateSchedulerConfigurationQuery,
 )
+from application.services.scheduler_registry_service import SchedulerRegistryService
+from domain.base.ports.error_handling_port import ErrorHandlingPort
+from domain.base.ports.logging_port import LoggingPort
+from domain.services.generic_filter_service import GenericFilterService
 
 
 @query_handler(ListSchedulerStrategiesQuery)
@@ -20,6 +24,17 @@ class ListSchedulerStrategiesHandler(
     BaseQueryHandler[ListSchedulerStrategiesQuery, SchedulerStrategyListResponse]
 ):
     """Handler for listing available scheduler strategies."""
+
+    def __init__(
+        self,
+        logger: LoggingPort,
+        error_handler: ErrorHandlingPort,
+        scheduler_service: SchedulerRegistryService,
+        generic_filter_service: GenericFilterService,
+    ):
+        super().__init__(logger, error_handler)
+        self._scheduler_service = scheduler_service
+        self._generic_filter_service = generic_filter_service
 
     async def execute_query(
         self, query: ListSchedulerStrategiesQuery
@@ -34,10 +49,8 @@ class ListSchedulerStrategiesHandler(
             Scheduler strategies list response
         """
         from config.manager import ConfigurationManager
-        from infrastructure.registry.scheduler_registry import get_scheduler_registry
 
-        registry = get_scheduler_registry()
-        scheduler_types = registry.get_registered_types()
+        scheduler_types = self._scheduler_service.get_available_schedulers()
 
         strategies = []
         current_strategy = "unknown"
@@ -67,10 +80,22 @@ class ListSchedulerStrategiesHandler(
             )
             strategies.append(strategy_info)
 
+        # Convert DTO objects to dictionaries for filtering
+        strategies_dict = [strategy.model_dump() for strategy in strategies]
+
+        # Apply generic filters if provided
+        if query.filter_expressions:
+            strategies_dict = self._generic_filter_service.apply_filters(
+                strategies_dict, query.filter_expressions
+            )
+
+        # Convert back to DTO objects
+        filtered_strategies = [SchedulerStrategyDTO(**strategy) for strategy in strategies_dict]
+
         return SchedulerStrategyListResponse(
-            strategies=strategies,
+            strategies=filtered_strategies,
             current_strategy=current_strategy,
-            total_count=len(strategies),
+            total_count=len(filtered_strategies),
         )
 
     def _get_scheduler_description(self, scheduler_type: str) -> str:
@@ -106,6 +131,15 @@ class GetSchedulerConfigurationHandler(
 ):
     """Handler for getting scheduler configuration."""
 
+    def __init__(
+        self,
+        logger: LoggingPort,
+        error_handler: ErrorHandlingPort,
+        scheduler_service: SchedulerRegistryService,
+    ):
+        super().__init__(logger, error_handler)
+        self._scheduler_service = scheduler_service
+
     async def execute_query(
         self, query: GetSchedulerConfigurationQuery
     ) -> SchedulerConfigurationResponse:
@@ -119,10 +153,8 @@ class GetSchedulerConfigurationHandler(
             Scheduler configuration response
         """
         from config.manager import ConfigurationManager
-        from infrastructure.registry.scheduler_registry import get_scheduler_registry
 
         config_manager = ConfigurationManager()
-        registry = get_scheduler_registry()
 
         if query.scheduler_name:
             scheduler_name = query.scheduler_name
@@ -132,8 +164,7 @@ class GetSchedulerConfigurationHandler(
             is_active = True
 
         # Check if scheduler is registered
-        registered_types = registry.get_registered_types()
-        is_registered = scheduler_name in registered_types
+        is_registered = self._scheduler_service.is_scheduler_registered(scheduler_name)
 
         # Get configuration details
         configuration = {}
@@ -160,6 +191,15 @@ class ValidateSchedulerConfigurationHandler(
 ):
     """Handler for validating scheduler configuration."""
 
+    def __init__(
+        self,
+        logger: LoggingPort,
+        error_handler: ErrorHandlingPort,
+        scheduler_service: SchedulerRegistryService,
+    ):
+        super().__init__(logger, error_handler)
+        self._scheduler_service = scheduler_service
+
     async def execute_query(
         self, query: ValidateSchedulerConfigurationQuery
     ) -> ValidationResultDTO:
@@ -173,10 +213,8 @@ class ValidateSchedulerConfigurationHandler(
             Validation result
         """
         from config.manager import ConfigurationManager
-        from infrastructure.registry.scheduler_registry import get_scheduler_registry
 
         config_manager = ConfigurationManager()
-        registry = get_scheduler_registry()
 
         errors = []
         warnings = []
@@ -188,15 +226,17 @@ class ValidateSchedulerConfigurationHandler(
                 scheduler_name = config_manager.get_scheduler_strategy()
 
             # Check if scheduler is registered
-            registered_types = registry.get_registered_types()
-            if scheduler_name not in registered_types:
+            available_schedulers = self._scheduler_service.get_available_schedulers()
+            if scheduler_name not in available_schedulers:
                 errors.append(
-                    f"Scheduler '{scheduler_name}' is not registered. Available: {', '.join(registered_types)}"
+                    f"Scheduler '{scheduler_name}' is not registered. Available: {', '.join(available_schedulers)}"
                 )
 
             # Try to create scheduler strategy
             try:
-                strategy = registry.create_strategy(scheduler_name, config_manager)
+                strategy = self._scheduler_service.create_scheduler_strategy(
+                    scheduler_name, config_manager
+                )
                 if strategy is None:
                     errors.append(f"Failed to create scheduler strategy '{scheduler_name}'")
             except Exception as e:

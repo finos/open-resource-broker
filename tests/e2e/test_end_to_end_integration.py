@@ -183,7 +183,7 @@ def test_launch_template_integration():
     try:
         from domain.request.aggregate import Request
         from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
-        from providers.aws.infrastructure.handlers.spot_fleet_handler import (
+        from providers.aws.infrastructure.handlers.spot_fleet.handler import (
             SpotFleetHandler,
         )
         from providers.aws.infrastructure.launch_template.manager import (
@@ -287,14 +287,14 @@ def test_handler_routing():
     """Test that handlers are properly routed based on provider API."""
     try:
         from providers.aws.domain.template.value_objects import ProviderApi
-        from providers.aws.infrastructure.handlers.asg_handler import ASGHandler
-        from providers.aws.infrastructure.handlers.ec2_fleet_handler import (
+        from providers.aws.infrastructure.handlers.asg.handler import ASGHandler
+        from providers.aws.infrastructure.handlers.ec2_fleet.handler import (
             EC2FleetHandler,
         )
-        from providers.aws.infrastructure.handlers.run_instances_handler import (
+        from providers.aws.infrastructure.handlers.run_instances.handler import (
             RunInstancesHandler,
         )
-        from providers.aws.infrastructure.handlers.spot_fleet_handler import (
+        from providers.aws.infrastructure.handlers.spot_fleet.handler import (
             SpotFleetHandler,
         )
 
@@ -366,7 +366,7 @@ def test_domain_model_flow():
         from domain.request.aggregate import Request
         from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
         from providers.aws.domain.template.value_objects import ProviderApi
-        from providers.aws.infrastructure.handlers.spot_fleet_handler import (
+        from providers.aws.infrastructure.handlers.spot_fleet.handler import (
             SpotFleetHandler,
         )
 
@@ -451,7 +451,7 @@ def test_error_handling_integration():
     try:
         from providers.aws.exceptions.aws_exceptions import AWSValidationError
         from providers.aws.infrastructure.handlers.base_handler import AWSHandler
-        from providers.aws.infrastructure.handlers.spot_fleet_handler import (
+        from providers.aws.infrastructure.handlers.spot_fleet.handler import (
             SpotFleetHandler,
         )
 
@@ -521,54 +521,20 @@ def test_performance_metrics_integration():
     """Test that performance metrics work across the integration."""
     try:
         from providers.aws.infrastructure.handlers.base_handler import AWSHandler
-        from providers.aws.infrastructure.handlers.spot_fleet_handler import (
-            SpotFleetHandler,
-        )
 
         print("   Testing performance metrics integration...")
 
-        # Test base handler metrics methods
-        print("   Testing base handler metrics methods...")
-
-        metrics_methods = [
+        # Confirm removed metrics methods are no longer present on AWSHandler
+        removed_methods = [
             "get_metrics",
             "_record_success_metrics",
             "_record_failure_metrics",
         ]
 
-        for method_name in metrics_methods:
+        for method_name in removed_methods:
             if hasattr(AWSHandler, method_name):
-                print(f"   PASS: AWSHandler.{method_name} exists")
-            else:
-                print(f"   FAIL: AWSHandler.{method_name} missing")
+                print(f"   FAIL: AWSHandler.{method_name} should have been removed")
                 return False
-
-        # Test handler metrics functionality
-        print("   Testing handler metrics functionality...")
-
-        mock_aws_client = Mock()
-        mock_logger = Mock()
-        mock_aws_ops = Mock()
-        mock_launch_template_manager = Mock()
-
-        handler = SpotFleetHandler(
-            aws_client=mock_aws_client,
-            logger=mock_logger,
-            aws_ops=mock_aws_ops,
-            launch_template_manager=mock_launch_template_manager,
-        )
-
-        # Test get_metrics returns a dict
-        try:
-            metrics = handler.get_metrics()
-            if isinstance(metrics, dict):
-                print("   PASS: get_metrics returns dict")
-            else:
-                print(f"   FAIL: get_metrics returns {type(metrics)}, expected dict")
-                return False
-        except Exception as e:
-            print(f"   FAIL: get_metrics test failed: {e!s}")
-            return False
 
         print("   PASS: Performance metrics integration successful")
         return True
@@ -587,7 +553,7 @@ def test_full_end_to_end_flow():
         from domain.request.aggregate import Request
         from providers.aws.domain.template.aws_template_aggregate import AWSTemplate
         from providers.aws.domain.template.value_objects import ProviderApi
-        from providers.aws.infrastructure.handlers.spot_fleet_handler import (
+        from providers.aws.infrastructure.handlers.spot_fleet.handler import (
             SpotFleetHandler,
         )
         from providers.aws.infrastructure.launch_template.manager import (

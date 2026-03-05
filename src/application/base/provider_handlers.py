@@ -17,18 +17,6 @@ TRequest = TypeVar("TRequest")
 TResponse = TypeVar("TResponse")
 
 
-class ProviderContext:
-    """Context for provider operations."""
-
-    def __init__(self, provider_type: str, region: Optional[str] = None) -> None:
-        """Initialize provider context."""
-        self.provider_type = provider_type
-        self.region = region
-        self.correlation_id = f"{provider_type}-{int(time.time())}"
-        self.start_time = time.time()
-        self.metadata: dict[str, Any] = {}
-
-
 class BaseProviderHandler(Generic[TRequest, TResponse], ProviderHandler[TRequest, TResponse], ABC):
     """
     Base provider handler following CQRS architecture patterns.
@@ -70,9 +58,7 @@ class BaseProviderHandler(Generic[TRequest, TResponse], ProviderHandler[TRequest
         self.error_handler = error_handler
         self._metrics: dict[str, Any] = {}
 
-    async def handle(
-        self, request: TRequest, context: Optional[ProviderContext] = None
-    ) -> TResponse:
+    async def handle(self, request: TRequest, context: Optional[object] = None) -> TResponse:  # type: ignore[override]
         """
         Handle provider request with monitoring and error management.
 
@@ -80,35 +66,36 @@ class BaseProviderHandler(Generic[TRequest, TResponse], ProviderHandler[TRequest
         across all provider handlers, following the same pattern
         as other base handlers in the CQRS system.
         """
-        if not context:
-            context = ProviderContext(self.provider_type)
-
+        start_time = time.time()
         request_type = request.__class__.__name__
+        correlation_id = f"{self.provider_type}-{int(time.time())}"
 
         try:
             # Log request processing start
             if self.logger:
                 self.logger.info(
-                    "Processing %s provider request: %s",
+                    "Processing %s provider request: %s [%s]",
                     self.provider_type,
                     request_type,
+                    correlation_id,
                 )
 
             # Validate request
-            await self.validate_provider_request(request, context)
+            await self.validate_provider_request(request)
 
             # Execute request processing
-            response = await self.execute_provider_request(request, context)
+            response = await self.execute_provider_request(request)
 
             # Record success metrics
-            duration = time.time() - context.start_time
+            duration = time.time() - start_time
             self._record_success_metrics(request_type, duration)
 
             if self.logger:
                 self.logger.info(
-                    "%s provider request processed successfully: %s (%.3fs)",
+                    "%s provider request processed successfully: %s [%s] (%.3fs)",
                     self.provider_type.upper(),
                     request_type,
+                    correlation_id,
                     duration,
                 )
 
@@ -116,7 +103,7 @@ class BaseProviderHandler(Generic[TRequest, TResponse], ProviderHandler[TRequest
 
         except Exception as e:
             # Record failure metrics
-            duration = time.time() - context.start_time
+            duration = time.time() - start_time
             self._record_failure_metrics(request_type, duration, e)
 
             # Handle error through error handler
@@ -126,24 +113,24 @@ class BaseProviderHandler(Generic[TRequest, TResponse], ProviderHandler[TRequest
                     {
                         "provider_type": self.provider_type,
                         "request_type": request_type,
-                        "correlation_id": context.correlation_id,
+                        "correlation_id": correlation_id,
                         "duration": duration,
-                        "context": context.metadata,
                     },
                 )
 
             if self.logger:
                 self.logger.error(
-                    "%s provider request processing failed: %s - %s",
+                    "%s provider request processing failed: %s [%s] - %s",
                     self.provider_type.upper(),
                     request_type,
+                    correlation_id,
                     str(e),
                 )
 
             # Re-raise for upstream handling
             raise
 
-    async def validate_provider_request(self, request: TRequest, context: ProviderContext) -> None:
+    async def validate_provider_request(self, request: TRequest) -> None:
         """
         Validate provider request before processing.
 
@@ -152,7 +139,6 @@ class BaseProviderHandler(Generic[TRequest, TResponse], ProviderHandler[TRequest
 
         Args:
             request: Request to validate
-            context: Provider context
 
         Raises:
             ValidationError: If request is invalid
@@ -161,9 +147,7 @@ class BaseProviderHandler(Generic[TRequest, TResponse], ProviderHandler[TRequest
             raise ValueError("Request cannot be None")
 
     @abstractmethod
-    async def execute_provider_request(
-        self, request: TRequest, context: ProviderContext
-    ) -> TResponse:
+    async def execute_provider_request(self, request: TRequest) -> TResponse:
         """
         Execute provider request processing logic.
 
@@ -172,7 +156,6 @@ class BaseProviderHandler(Generic[TRequest, TResponse], ProviderHandler[TRequest
 
         Args:
             request: Request to process
-            context: Provider context with correlation ID and metadata
 
         Returns:
             Response from processing the request
@@ -249,20 +232,19 @@ class BaseAWSHandler(BaseProviderHandler[TRequest, TResponse]):
         self.base_delay = 1  # seconds
         self.max_delay = 10  # seconds
 
-    async def validate_provider_request(self, request: TRequest, context: ProviderContext) -> None:
+    async def validate_provider_request(self, request: TRequest) -> None:
         """
         Validate AWS request with additional AWS-specific checks.
 
         Args:
             request: AWS request to validate
-            context: Provider context
         """
-        await super().validate_provider_request(request, context)
+        await super().validate_provider_request(request)
 
         # Add AWS-specific validation
-        await self.validate_aws_request(request, context)
+        await self.validate_aws_request(request)
 
-    async def validate_aws_request(self, request: TRequest, context: ProviderContext) -> None:
+    async def validate_aws_request(self, request: TRequest) -> None:
         """
         Validate AWS-specific request properties.
 
@@ -270,32 +252,27 @@ class BaseAWSHandler(BaseProviderHandler[TRequest, TResponse]):
 
         Args:
             request: AWS request to validate
-            context: Provider context
         """
 
-    async def execute_provider_request(
-        self, request: TRequest, context: ProviderContext
-    ) -> TResponse:
+    async def execute_provider_request(self, request: TRequest) -> TResponse:
         """
         Execute AWS request with retry logic and error handling.
 
         Args:
             request: AWS request to process
-            context: Provider context
 
         Returns:
             AWS response
         """
         # Execute with AWS-specific retry logic
-        return await self.execute_with_retry(request, context)
+        return await self.execute_with_retry(request)
 
-    async def execute_with_retry(self, request: TRequest, context: ProviderContext) -> TResponse:
+    async def execute_with_retry(self, request: TRequest) -> TResponse:
         """
         Execute AWS request with exponential backoff retry logic.
 
         Args:
             request: AWS request to process
-            context: Provider context
 
         Returns:
             AWS response
@@ -304,7 +281,7 @@ class BaseAWSHandler(BaseProviderHandler[TRequest, TResponse]):
 
         for attempt in range(self.max_retries + 1):
             try:
-                return await self.execute_aws_request(request, context)
+                return await self.execute_aws_request(request)
 
             except Exception as e:
                 last_exception = e
@@ -328,10 +305,10 @@ class BaseAWSHandler(BaseProviderHandler[TRequest, TResponse]):
                     break
 
         # All retries exhausted, raise the last exception
-        raise last_exception
+        raise last_exception  # type: ignore[misc]
 
     @abstractmethod
-    async def execute_aws_request(self, request: TRequest, context: ProviderContext) -> TResponse:
+    async def execute_aws_request(self, request: TRequest) -> TResponse:
         """
         Execute core AWS request logic.
 
@@ -339,7 +316,6 @@ class BaseAWSHandler(BaseProviderHandler[TRequest, TResponse]):
 
         Args:
             request: AWS request to process
-            context: Provider context
 
         Returns:
             AWS response
@@ -357,7 +333,7 @@ class BaseAWSHandler(BaseProviderHandler[TRequest, TResponse]):
         """
         # AWS-specific retry logic
         if hasattr(exception, "response"):
-            error_code = exception.response.get("Error", {}).get("Code", "")
+            error_code = exception.response.get("Error", {}).get("Code", "")  # type: ignore[union-attr]
 
             # Retry on throttling and temporary errors
             retry_codes = [

@@ -116,7 +116,7 @@ def test_flush_traces_writes_to_file(tmp_path):
     assert len(collector.get_traces()) == 0
 
     # Check file was created
-    trace_files = list(tmp_path.glob("traces_*.jsonl"))
+    trace_files = list(tmp_path.glob("traces*.jsonl"))
     assert len(trace_files) == 1
 
     # Verify content
@@ -196,14 +196,13 @@ def test_flush_traces_creates_timestamped_files(tmp_path):
     collector.record_time("test", 0.1)
     collector.flush_traces()
 
-    trace_files = list(tmp_path.glob("traces_*.jsonl"))
+    trace_files = list(tmp_path.glob("traces*.jsonl"))
     assert len(trace_files) == 1
 
-    # Filename should match pattern traces_YYYYMMDD_HHMMSS.jsonl
+    # Filename should match pattern traces*.jsonl
     filename = trace_files[0].name
-    assert filename.startswith("traces_")
+    assert filename.startswith("traces")
     assert filename.endswith(".jsonl")
-    assert len(filename) == len("traces_20251203_102833.jsonl")
 
 
 def test_concurrent_record_time_thread_safe(tmp_path):

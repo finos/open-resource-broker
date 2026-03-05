@@ -49,16 +49,21 @@ jobs:
         run: make ci-security-safety
 
       # Semgrep Static Analysis
+      - name: Install Semgrep
+        if: inputs.scan-type == 'semgrep'
+        run: pip install semgrep
+
       - name: Run Semgrep security analysis
         if: inputs.scan-type == 'semgrep'
-        uses: returntocorp/semgrep-action@v1
-        with:
-          config: >-
-            p/security-audit
-            p/secrets
-            p/python
-          generateSarif: "1"
-        continue-on-error: true
+        run: |
+          semgrep scan \
+            --config p/security-audit \
+            --config p/secrets \
+            --config p/python \
+            --sarif \
+            --output semgrep.sarif \
+            --error \
+            . || true
 
       - name: Upload Semgrep SARIF results
         if: inputs.scan-type == 'semgrep' && always()

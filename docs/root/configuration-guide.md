@@ -307,28 +307,124 @@ Automatically activated when:
 
 ### Environment Variables
 
-Override configuration values using environment variables:
+The Open Resource Broker provides comprehensive environment variable support using Pydantic BaseSettings for automatic type conversion, validation, and configuration management.
+
+#### Environment Variable Naming Convention
+
+Environment variables follow a hierarchical naming pattern:
+- **Core settings**: `ORB_<FIELD_NAME>`
+- **AWS provider**: `ORB_AWS_<FIELD_NAME>`
+- **Nested objects**: `ORB_<SECTION>__<FIELD_NAME>` (double underscore)
+
+#### Core Application Variables
 
 ```bash
-# Provider configuration
-export HF_PROVIDER_SELECTION_POLICY=ROUND_ROBIN
-export HF_PROVIDER_HEALTH_CHECK_INTERVAL=60
+# Application behavior
+ORB_LOG_LEVEL=DEBUG                    # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+ORB_DEBUG=true                         # Enable debug mode (boolean)
+ORB_ENVIRONMENT=production             # Environment identifier (string)
+ORB_REQUEST_TIMEOUT=600                # Global request timeout in seconds (integer)
+ORB_MAX_MACHINES_PER_REQUEST=200       # Maximum machines per single request (integer)
 
-# Template configuration
-export HF_TEMPLATE_AMI_RESOLUTION_ENABLED=true
-export HF_TEMPLATE_AMI_RESOLUTION_CACHE_ENABLED=true
+# Directory paths (standard across all schedulers)
+ORB_CONFIG_DIR=/opt/orb/config         # Configuration files directory
+ORB_WORK_DIR=/opt/orb/work             # Working directory for temporary files
+ORB_LOG_DIR=/opt/orb/logs              # Log files directory
+```
 
-# Logging configuration
-export HF_LOGGING_LEVEL=DEBUG
-export HF_LOGGING_CONSOLE_ENABLED=true
+#### AWS Provider Variables
 
-# Storage configuration
-export HF_STORAGE_STRATEGY=json
+```bash
+# Authentication and region
+ORB_AWS_REGION=us-west-2               # AWS region (string)
+ORB_AWS_PROFILE=production             # AWS credential profile name (string)
+ORB_AWS_ROLE_ARN=arn:aws:iam::123456789012:role/OrbitRole  # IAM role ARN (string)
+ORB_AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE                 # AWS access key ID (string)
+ORB_AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY  # AWS secret access key (string)
+ORB_AWS_SESSION_TOKEN=AQoEXAMPLEH4aoAH0gNCAPyJxz4ARKDHxyP5XpAa  # Session token (string)
+ORB_AWS_ENDPOINT_URL=https://ec2.us-west-2.amazonaws.com   # Custom endpoint URL (string)
 
-# Scheduler configuration
-export HF_SCHEDULER_STRATEGY=hostfactory
-export HF_SCHEDULER_CONFIG_ROOT=config
-export HF_SCHEDULER_TEMPLATE_PATH=awsprov_templates.json
+# Infrastructure defaults (from infrastructure discovery)
+ORB_AWS_SUBNET_IDS='["subnet-12345678", "subnet-87654321"]'           # JSON array of subnet IDs
+ORB_AWS_SECURITY_GROUP_IDS='["sg-abcdef12", "sg-34567890"]'           # JSON array of security group IDs
+ORB_AWS_KEY_NAME=my-production-key     # EC2 key pair name (string)
+ORB_AWS_IMAGE_ID=ami-0abcdef1234567890  # Default AMI ID (string)
+ORB_AWS_INSTANCE_TYPE=t3.medium        # Default instance type (string)
+
+# AWS service configuration
+ORB_AWS_MAX_RETRIES=5                  # Maximum API retry attempts (integer, 0-10)
+ORB_AWS_TIMEOUT=120                    # AWS API timeout in seconds (integer, 1-300)
+```
+
+#### Nested Configuration Variables
+
+For complex configuration objects, use double underscores (`__`) to separate levels:
+
+```bash
+# Circuit breaker configuration
+ORB_CIRCUIT_BREAKER__ENABLED=true                    # Enable circuit breaker (boolean)
+ORB_CIRCUIT_BREAKER__FAILURE_THRESHOLD=10            # Failures before opening circuit (integer)
+ORB_CIRCUIT_BREAKER__RECOVERY_TIMEOUT=120            # Recovery timeout in seconds (integer)
+ORB_CIRCUIT_BREAKER__HALF_OPEN_MAX_CALLS=3           # Max calls in half-open state (integer)
+
+# Retry configuration
+ORB_RETRY__MAX_ATTEMPTS=5              # Maximum retry attempts (integer)
+ORB_RETRY__BACKOFF_MULTIPLIER=2.0      # Exponential backoff multiplier (float)
+ORB_RETRY__MAX_DELAY=60                # Maximum delay between retries in seconds (integer)
+```
+
+#### Scheduler-Specific Variables (Legacy Support)
+
+For backward compatibility with existing HostFactory deployments:
+
+```bash
+# HostFactory scheduler (legacy)
+HF_PROVIDER_WORKDIR=/var/lib/hostfactory/work        # HostFactory working directory
+HF_PROVIDER_CONFDIR=/etc/hostfactory/config          # HostFactory configuration directory
+HF_PROVIDER_LOGDIR=/var/log/hostfactory              # HostFactory log directory
+HF_LOGLEVEL=DEBUG                                    # HostFactory-specific log level
+HF_LOGGING_CONSOLE_ENABLED=false                     # Disable console output for JSON-only mode
+
+# Default scheduler
+DEFAULT_PROVIDER_WORKDIR=/opt/orb/work               # Default scheduler working directory
+DEFAULT_PROVIDER_CONFDIR=/opt/orb/config             # Default scheduler configuration directory
+DEFAULT_PROVIDER_LOGDIR=/opt/orb/logs                # Default scheduler log directory
+```
+
+#### Configuration Precedence
+
+Environment variables take precedence over configuration files:
+
+1. **Environment Variables** (highest precedence)
+2. **Configuration File** (`config.json`)
+3. **Provider Defaults** (from template_defaults)
+4. **System Defaults** (lowest precedence)
+
+#### Example: Production Environment Setup
+
+```bash
+#!/bin/bash
+# Production environment configuration
+export ORB_ENVIRONMENT=production
+export ORB_LOG_LEVEL=INFO
+export ORB_DEBUG=false
+
+# AWS production account with IAM role
+export ORB_AWS_REGION=us-east-1
+export ORB_AWS_ROLE_ARN=arn:aws:iam::123456789012:role/OrbitProductionRole
+export ORB_AWS_SUBNET_IDS='["subnet-prod123", "subnet-prod456"]'
+export ORB_AWS_SECURITY_GROUP_IDS='["sg-prod123"]'
+export ORB_AWS_KEY_NAME=production-key-pair
+
+# Performance and resilience settings
+export ORB_REQUEST_TIMEOUT=300
+export ORB_MAX_MACHINES_PER_REQUEST=100
+export ORB_AWS_MAX_RETRIES=5
+export ORB_CIRCUIT_BREAKER__ENABLED=true
+export ORB_CIRCUIT_BREAKER__FAILURE_THRESHOLD=5
+
+# Start the application
+orb system serve --port 8000
 ```
 
 ### Configuration Validation
@@ -337,10 +433,10 @@ Validate your configuration before deployment:
 
 ```bash
 # Validate current configuration
-python run.py validateProviderConfig
+orb config validate
 
 # Validate specific configuration file
-python run.py validateProviderConfig --file config/production.json
+orb config validate --config config/production.json
 ```
 
 ### Configuration Reload
@@ -349,10 +445,10 @@ Reload configuration without restarting the application:
 
 ```bash
 # Reload from default location
-python run.py reloadProviderConfig
+orb config show
 
 # Reload from specific file
-python run.py reloadProviderConfig --config-path config/new-config.json
+orb --config config/new-config.json config show
 ```
 
 ## CLI Operations
@@ -361,29 +457,28 @@ python run.py reloadProviderConfig --config-path config/new-config.json
 
 ```bash
 # Get current provider configuration
-python run.py getProviderConfig
+orb config show
 
 # Get provider configuration with sensitive data
-python run.py getProviderConfig --data '{"include_sensitive": true}'
+orb config show
 
 # Validate provider configuration
-python run.py validateProviderConfig
+orb config validate
 
 # Validate with detailed output
-python run.py validateProviderConfig --data '{"detailed": true}'
+orb config validate
 
 # Reload provider configuration
-python run.py reloadProviderConfig --config-path config/updated.json
+orb --config config/updated.json config show
 
-# Migrate legacy configuration
-python run.py migrateProviderConfig --data '{"save_to_file": true, "backup_original": true}'
+# Migrate legacy configuration (manual: update config.json to consolidated format)
 ```
 
 ### Provider Strategy Operations
 
 ```bash
 # Select provider strategy for operation
-python run.py selectProviderStrategy --data '{
+orb providers select --data '{
   "operation_type": "CREATE_INSTANCES",
   "required_capabilities": ["compute"],
   "min_success_rate": 0.95,
@@ -391,7 +486,7 @@ python run.py selectProviderStrategy --data '{
 }'
 
 # Execute provider operation
-python run.py executeProviderOperation --data '{
+orb providers exec --data '{
   "operation_type": "CREATE_INSTANCES",
   "operation_data": {
     "instance_count": 2,
@@ -400,27 +495,23 @@ python run.py executeProviderOperation --data '{
 }'
 
 # Get provider health status
-python run.py getProviderHealth
+orb providers health
 
 # List available providers
-python run.py listAvailableProviders
+orb providers list
 ```
 
 ### Template Operations
 
 ```bash
-# Get available templates (now with provider strategy support)
-python run.py getAvailableTemplates
+# Get available templates
+orb templates list
 
 # Get templates for specific provider
-python run.py getAvailableTemplates --provider-api aws-primary
+orb templates list --provider aws-primary
 
-# Request machines (now with provider selection)
-python run.py requestMachines --data '{
-  "template_id": "basic-template",
-  "machine_count": 2,
-  "provider_preference": "aws-primary"
-}'
+# Request machines
+orb machines request basic-template 2
 ```
 
 ## Migration Guide
@@ -439,21 +530,20 @@ cp config/awsprov_templates.json config/awsprov_templates.json.backup
 
 ```bash
 # Migrate to consolidated format with backup
-python run.py migrateProviderConfig --data '{
-  "save_to_file": true,
-  "backup_original": true
-}'
+# Update config.json manually to the consolidated format shown above.
+# Back up your original first:
+cp config/awsprov_config.json config/awsprov_config.json.backup
 ```
 
 #### Validate Migrated Configuration
 
 ```bash
 # Validate the migrated configuration
-python run.py validateProviderConfig
+orb config validate
 
 # Test provider operations
-python run.py getProviderConfig
-python run.py getAvailableTemplates
+orb config show
+orb templates list
 ```
 
 #### Update Deployment Scripts
@@ -592,10 +682,10 @@ export HF_PROVIDER_HEALTH_CHECK_INTERVAL=30
 **Solution:**
 ```bash
 # Get detailed validation information
-python run.py validateProviderConfig --data '{"detailed": true}'
+orb config validate
 
 # Check provider configuration
-python run.py getProviderConfig
+orb config show
 ```
 
 #### Provider Selection Issues
@@ -605,13 +695,13 @@ python run.py getProviderConfig
 **Diagnosis:**
 ```bash
 # Check provider health
-python run.py getProviderHealth
+orb providers health
 
 # List available providers
-python run.py listAvailableProviders
+orb providers list
 
 # Test provider selection
-python run.py selectProviderStrategy --data '{
+orb providers select --data '{
   "operation_type": "CREATE_INSTANCES",
   "required_capabilities": ["compute"]
 }'
@@ -624,15 +714,10 @@ python run.py selectProviderStrategy --data '{
 **Solution:**
 ```bash
 # Validate original configuration first
-python run.py validateProviderConfig
+orb config validate
 
-# Run migration with backup
-python run.py migrateProviderConfig --data '{
-  "save_to_file": false,
-  "backup_original": true
-}'
-
-# Review migration output before saving
+# Run migration with backup (manual: back up config file first)
+cp config/awsprov_config.json config/awsprov_config.json.backup
 ```
 
 ### Debug Mode
@@ -660,13 +745,13 @@ Monitor provider health and system status:
 
 ```bash
 # Check overall system health
-python run.py healthCheck
+orb system health
 
 # Get provider-specific health
-python run.py getProviderHealth
+orb providers health
 
 # Monitor provider metrics
-python run.py getProviderMetrics
+orb providers metrics
 ```
 
 ### Performance Tuning

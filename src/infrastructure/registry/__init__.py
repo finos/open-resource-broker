@@ -1,6 +1,9 @@
 """Infrastructure registry patterns."""
 
-from .provider_registry import ProviderRegistry
-from .storage_registry import StorageRegistry
+# Registry base classes remain here
+# Specific registries moved to their domain modules:
+# - StorageRegistry -> infrastructure.storage.registry
+# - SchedulerRegistry -> infrastructure.scheduler.registry
+# - ProviderRegistry -> providers.registry
 
-__all__: list[str] = ["ProviderRegistry", "StorageRegistry"]
+__all__: list[str] = []

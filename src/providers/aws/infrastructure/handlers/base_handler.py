@@ -15,6 +15,7 @@ from botocore.exceptions import ClientError
 
 from domain.base.dependency_injection import injectable
 from domain.base.ports import ErrorHandlingPort, LoggingPort
+from domain.base.ports.configuration_port import ConfigurationPort
 from domain.request.aggregate import Request
 from domain.template.template_aggregate import Template
 from infrastructure.resilience import retry
@@ -30,6 +31,7 @@ from providers.aws.exceptions.aws_exceptions import (
     ResourceInUseError,
 )
 from providers.aws.infrastructure.aws_client import AWSClient
+from providers.aws.infrastructure.tags import build_resource_tags
 
 T = TypeVar("T")
 
@@ -66,6 +68,8 @@ class AWSHandler(ABC):
         request_adapter=None,
         machine_adapter=None,
         error_handler: Optional[ErrorHandlingPort] = None,
+        aws_native_spec_service: Optional[Any] = None,
+        config_port: Optional[ConfigurationPort] = None,
     ) -> None:
         """
         Initialize AWS handler with standardized dependencies.
@@ -84,10 +88,11 @@ class AWSHandler(ABC):
         self.launch_template_manager = launch_template_manager
         self._machine_adapter = machine_adapter
         self.error_handler = error_handler
+        self.aws_native_spec_service = aws_native_spec_service
+        self.config_port = config_port
         self.max_retries = 3
         self.base_delay = 1  # seconds
         self.max_delay = 10  # seconds
-        self._metrics: dict[str, Any] = {}
 
         # Setup required dependencies
         self._setup_aws_operations(aws_ops)
@@ -114,10 +119,11 @@ class AWSHandler(ABC):
         if machine_adapter:
             self._logger.debug("Machine adapter provided for AWS handler")
 
-    @abstractmethod
     def acquire_hosts(self, request: Request, aws_template: AWSTemplate) -> str:
         """
         Acquire hosts using the specified AWS template.
+
+        Validates common prerequisites then delegates to _acquire_hosts_internal.
 
         Args:
             request: The request to fulfill
@@ -130,6 +136,24 @@ class AWSHandler(ABC):
             AWSValidationError: If the template is invalid
             QuotaExceededError: If AWS quotas would be exceeded
             InfrastructureError: For other AWS API errors
+        """
+        self._validate_prerequisites(aws_template)
+        return self._acquire_hosts_internal(request, aws_template)
+
+    @abstractmethod
+    def _acquire_hosts_internal(self, request: Request, aws_template: AWSTemplate) -> str:
+        """
+        Handler-specific host acquisition logic.
+
+        Called by acquire_hosts after common prerequisites have been validated.
+        Subclasses implement their AWS-specific provisioning here.
+
+        Args:
+            request: The request to fulfill
+            aws_template: The AWS template to use
+
+        Returns:
+            str: The AWS resource ID (e.g., fleet ID, ASG name)
         """
 
     @abstractmethod
@@ -148,17 +172,66 @@ class AWSHandler(ABC):
             InfrastructureError: For other AWS API errors
         """
 
-    @abstractmethod
-    def release_hosts(self, request: Request) -> None:
+    def _extract_instance_ids(self, api_response: dict[str, Any], extractor: Any) -> list[str]:
+        """Extract instance IDs from API response if available."""
+        return extractor(api_response)
+
+    def _format_instance_data(
+        self,
+        instance_details: list[dict[str, Any]],
+        resource_id: str,
+        provider_api_value: str,
+    ) -> list[dict[str, Any]]:
+        """Stamp resource_id and provider_api onto each instance dict.
+
+        instance_details is already in snake_case domain format from _get_instance_details.
+        Subclasses resolve provider_api_value via _resolve_provider_api and pass it here.
         """
-        Release hosts associated with a request.
+        result = []
+        for inst in instance_details:
+            stamped = dict(inst)
+            stamped.setdefault("resource_id", resource_id)
+            stamped.setdefault("provider_api", provider_api_value)
+            result.append(stamped)
+        return result
+
+    @abstractmethod
+    def release_hosts(
+        self,
+        machine_ids: list[str],
+        resource_mapping: Optional[dict[str, tuple[Optional[str], int]]] = None,
+        request_id: str = "",
+    ) -> None:
+        """
+        Release hosts by instance ID.
 
         Args:
-            request: The request containing hosts to release
+            machine_ids: List of instance IDs to terminate
+            resource_mapping: Optional mapping of instance_id to (resource_id, desired_capacity)
+                              for intelligent resource management (e.g. ASG/fleet capacity reduction)
+            request_id: Original provisioning request ID, used for launch template cleanup
 
         Raises:
             AWSEntityNotFoundError: If the AWS resource is not found
             InfrastructureError: For other AWS API errors
+        """
+
+    @abstractmethod
+    def cancel_resource(self, resource_id: str, request_id: str) -> dict[str, Any]:
+        """
+        Cancel the AWS resource associated with a request.
+
+        Called when a request needs to be cancelled before instances are
+        assigned. Each handler implements the appropriate teardown for its
+        resource type (delete fleet, cancel spot fleet, delete ASG, etc.).
+
+        Args:
+            resource_id: The AWS resource ID (fleet ID, ASG name, etc.)
+            request_id: The ORB request ID, used for launch template cleanup
+
+        Returns:
+            Dictionary with cancellation results containing at minimum a
+            ``status`` key of ``"success"`` or ``"error"``.
         """
 
     @classmethod
@@ -301,7 +374,7 @@ class AWSHandler(ABC):
             and operation_name in critical_operations
         ):
             operation_type = "critical"
-            self.logger.debug("Auto-detected critical operation: %s", operation_name)
+            self._logger.debug("Auto-detected critical operation: %s", operation_name)
 
         if operation_type == "critical":
             # Use circuit breaker for critical operations
@@ -344,7 +417,14 @@ class AWSHandler(ABC):
 
         if error_code in ["ValidationError", "InvalidParameterValue"]:
             return AWSValidationError(error_message)
-        elif error_code in ["LimitExceeded", "InstanceLimitExceeded"]:
+        elif error_code in [
+            "LimitExceeded",
+            "InstanceLimitExceeded",
+            "VcpuLimitExceeded",
+            "MaxSpotInstanceCountExceeded",
+            "ServiceQuotaExceededException",
+            "ResourceCountExceeded",
+        ]:
             return QuotaExceededError(error_message)
         elif error_code == "ResourceInUse":
             return ResourceInUseError(error_message)
@@ -379,8 +459,8 @@ class AWSHandler(ABC):
         self,
         client_method: Callable,
         result_key: str,
-        request_token_param: str = "NextToken",  # nosec B107 - AWS API parameter name, not a password
-        response_token_key: str = "NextToken",  # nosec B107 - AWS API parameter name, not a password
+        request_token_param: str = "NextToken",  # nosec B107
+        response_token_key: str = "NextToken",  # nosec B107
         **kwargs,
     ) -> list[dict[str, Any]]:
         """
@@ -435,15 +515,16 @@ class AWSHandler(ABC):
             "instance_type": inst.get("InstanceType"),
             "image_id": inst.get("ImageId"),
             "subnet_id": inst.get("SubnetId"),
+            "security_group_ids": [sg["GroupId"] for sg in inst.get("SecurityGroups", [])],
             "vpc_id": inst.get("VpcId"),
         }
 
     def _get_instance_details(
         self,
         instance_ids: list[str],
-        request_id: str = None,
-        resource_id: str = None,
-        provider_api: str = "EC2",
+        provider_api: str,
+        request_id: Optional[str] = None,
+        resource_id: Optional[str] = None,
     ) -> list[dict[str, Any]]:
         """
         Get detailed information about EC2 instances using machine adapter for proper formatting.
@@ -461,13 +542,6 @@ class AWSHandler(ABC):
             AWSEntityNotFoundError: If any instance is not found
             InfrastructureError: For other AWS API errors
         """
-        # KBG TODO: Replace this sleep with proper retry logic with exponential backoff
-        # This is a temporary fix for AWS eventual consistency issues where instances
-        # are created but not immediately available for describe_instances calls
-        import time
-
-        time.sleep(2)
-
         try:
             # Use AWS client's EC2 client for describe_instances
             response = self.aws_client.ec2_client.describe_instances(InstanceIds=instance_ids)
@@ -552,8 +626,8 @@ class AWSHandler(ABC):
         # The actual AWS API call will validate the AMI ID format
 
         # Validate instance type(s)
-        if not (template.instance_type or template.instance_types):
-            errors["instanceType"] = "Either instance_type or instance_types must be specified"
+        if not template.machine_types:
+            errors["instanceType"] = "machine_types must be specified"
 
         # Validate subnet(s) - subnet_id is a property of subnet_ids, so only
         # check subnet_ids
@@ -573,52 +647,170 @@ class AWSHandler(ABC):
             detailed_message = f"Template validation failed - {'; '.join(error_details)}"
             raise AWSValidationError(detailed_message, errors)
 
-    # Performance monitoring methods
-    def _record_success_metrics(self, request_type: str, duration: float) -> None:
-        """Record success metrics for monitoring."""
-        key = f"aws_{request_type}"
-        if key not in self._metrics:
-            self._metrics[key] = {
-                "success_count": 0,
-                "failure_count": 0,
-                "total_duration": 0.0,
-                "avg_duration": 0.0,
-            }
+    def get_provider_info(self) -> dict[str, Any]:
+        """Return basic provider metadata for this handler.
 
-        metrics = self._metrics[key]
-        metrics["success_count"] += 1
-        metrics["total_duration"] += duration
-        total_count = metrics["success_count"] + metrics["failure_count"]
-        metrics["avg_duration"] = (
-            metrics["total_duration"] / total_count if total_count > 0 else 0.0
-        )
-
-    def _record_failure_metrics(self, request_type: str, duration: float, error: Exception) -> None:
-        """Record failure metrics for monitoring."""
-        key = f"aws_{request_type}"
-        if key not in self._metrics:
-            self._metrics[key] = {
-                "success_count": 0,
-                "failure_count": 0,
-                "total_duration": 0.0,
-                "avg_duration": 0.0,
-                "last_error": None,
-            }
-
-        metrics = self._metrics[key]
-        metrics["failure_count"] += 1
-        metrics["total_duration"] += duration
-        metrics["last_error"] = str(error)
-        total_count = metrics["success_count"] + metrics["failure_count"]
-        metrics["avg_duration"] = (
-            metrics["total_duration"] / total_count if total_count > 0 else 0.0
-        )
-
-    def get_metrics(self) -> dict[str, Any]:
-        """Get handler performance metrics."""
-        return self._metrics.copy()
+        Satisfies the ProviderMonitoringPort contract. Subclasses may override
+        to add handler-specific fields.
+        """
+        return {
+            "provider_type": "aws",
+            "handler_type": self.get_handler_type(),
+        }
 
     # Utility methods for AWS operations (keeping existing functionality)
     def get_handler_type(self) -> str:
         """Get handler type from class name."""
         return self.__class__.__name__.replace("Handler", "").lower()
+
+    def _get_default_capacity_type(self, price_type: str) -> str:
+        """Get default target capacity type based on price type."""
+        if price_type == "spot":
+            return "spot"
+        elif price_type == "ondemand":
+            return "on-demand"
+        else:  # heterogeneous or None
+            return "on-demand"
+
+    def _build_resource_tags(
+        self,
+        request_id: str,
+        template: AWSTemplate,
+        resource_prefix_key: str,
+        provider_api: str,
+    ) -> list[dict]:
+        """Build the flat tag list for an AWS resource.
+
+        Combines a Name tag (prefix + request_id), any template-level tags, and
+        the standard ORB system tags into a single merged list.
+
+        Args:
+            request_id:          The ORB request UUID (string).
+            template:            The AWS template (provides template_id and tags).
+            resource_prefix_key: Key passed to config_port.get_resource_prefix
+                                 (e.g. "fleet", "spot_fleet", "asg").
+            provider_api:        AWS API label for the system tag (e.g. "EC2Fleet").
+
+        Returns:
+            Merged list of {"Key": k, "Value": v} dicts ready for AWS API calls.
+        """
+        assert self.config_port is not None, "config_port must be injected"
+        return build_resource_tags(
+            config_port=self.config_port,
+            request_id=request_id,
+            template_id=str(template.template_id),
+            resource_prefix_key=resource_prefix_key,
+            provider_api=provider_api,
+            template_tags=template.tags,
+        )
+
+    def _cleanup_on_zero_capacity(self, resource_type: str, request_id: str) -> None:
+        """Delete the ORB-managed launch template when a resource reaches zero capacity.
+
+        Reads the cleanup config, checks that cleanup is enabled and that the
+        resource type is included in the ``resources`` allow-list, then delegates
+        to ``_delete_orb_launch_template``.  All failures are warning-only so
+        that cleanup never blocks the main return flow.
+
+        Args:
+            resource_type: Cleanup config resource key, e.g. ``"asg"``,
+                ``"ec2_fleet"``, or ``"spot_fleet"``.
+            request_id: The ORB request ID used to locate the launch template.
+        """
+        if self.config_port is None:
+            return
+
+        try:
+            cleanup = self.config_port.get_cleanup_config()
+        except Exception:
+            return
+
+        if not cleanup.get("enabled", True):
+            return
+
+        if not cleanup.get("resources", {}).get(resource_type, True):
+            return
+
+        self._delete_orb_launch_template(request_id)
+
+    def _delete_orb_launch_template(self, request_id: str) -> None:
+        """Delete the ORB-managed launch template for a request, if one exists.
+
+        Reconstructs the launch template name from the request ID, verifies the
+        ``orb:managed-by`` tag to confirm ORB ownership, then deletes it.
+        Respects the cleanup config dry_run flag.  All failures are warning-only
+        so that LT cleanup never blocks the main return flow.
+        """
+        if self.config_port is None:
+            self._logger.warning(
+                "config_port not injected; skipping launch template cleanup for %s", request_id
+            )
+            return
+
+        try:
+            cleanup = self.config_port.get_cleanup_config()
+        except Exception as e:
+            self._logger.warning("Could not read cleanup config, skipping LT cleanup: %s", e)
+            return
+
+        if not cleanup.get("enabled", True) or not cleanup.get("delete_launch_template", True):
+            return
+
+        lt_name = f"{self.config_port.get_resource_prefix('launch_template')}{request_id}"
+        dry_run = cleanup.get("dry_run", False)
+
+        try:
+            response = self.aws_client.ec2_client.describe_launch_templates(
+                LaunchTemplateNames=[lt_name]
+            )
+            templates = response.get("LaunchTemplates", [])
+            if not templates:
+                self._logger.debug(
+                    "No launch template named %s found; nothing to clean up", lt_name
+                )
+                return
+
+            lt = templates[0]
+            tags = {t["Key"]: t["Value"] for t in lt.get("Tags", [])}
+            if tags.get("orb:managed-by") != "open-resource-broker":
+                self._logger.warning(
+                    "Launch template %s is not ORB-managed (orb:managed-by tag absent or wrong);"
+                    " skipping deletion",
+                    lt_name,
+                )
+                return
+
+            lt_id = lt["LaunchTemplateId"]
+
+            if dry_run:
+                self._logger.info(
+                    "[dry-run] Would delete launch template %s (%s) for request %s",
+                    lt_name,
+                    lt_id,
+                    request_id,
+                )
+                return
+
+            self.aws_client.ec2_client.delete_launch_template(LaunchTemplateId=lt_id)
+            self._logger.info(
+                "Deleted launch template %s (%s) for request %s", lt_name, lt_id, request_id
+            )
+
+        except ClientError as e:
+            error_code = e.response["Error"]["Code"]
+            if error_code == "InvalidLaunchTemplateName.NotFoundException":
+                self._logger.debug("Launch template %s not found; nothing to clean up", lt_name)
+            else:
+                self._logger.warning(
+                    "Failed to delete launch template %s for request %s: %s",
+                    lt_name,
+                    request_id,
+                    e,
+                )
+        except Exception as e:
+            self._logger.warning(
+                "Unexpected error deleting launch template %s for request %s: %s",
+                lt_name,
+                request_id,
+                e,
+            )

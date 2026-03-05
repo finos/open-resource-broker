@@ -205,9 +205,9 @@ class TestCleanArchitecture:
     def test_dependency_inversion(self):
         """Validate dependency inversion implementation."""
         # Test that high-level modules don't depend on low-level modules
-        # Mock the ProviderCapabilityService since it requires many dependencies
+        # Mock the ProviderValidationService since it requires many dependencies
         with patch(
-            "application.services.provider_capability_service.ProviderCapabilityService"
+            "application.services.provider_validation_service.ProviderValidationService"
         ) as mock_app_service:
             mock_instance = Mock()
             mock_app_service.return_value = mock_instance
@@ -225,19 +225,8 @@ class TestCleanArchitecture:
 
     def test_ports_and_adapters_pattern(self):
         """Test ports and adapters (hexagonal architecture) implementation."""
-        # Test that ports (interfaces) are defined
-        # Ports should be abstract interfaces
-        import inspect
-
-        from infrastructure.adapters.ports.cloud_resource_manager_port import (
-            CloudResourceManagerPort,
-        )
-
-        assert inspect.isabstract(CloudResourceManagerPort) or hasattr(
-            CloudResourceManagerPort, "__abstractmethods__"
-        )
-
         # Test that adapters implement ports
+
         from infrastructure.adapters.logging_adapter import LoggingAdapter
 
         # Adapters should implement the corresponding port interface
@@ -274,9 +263,9 @@ class TestCleanArchitecture:
 
     def test_application_service_layer(self):
         """Test application service layer compliance."""
-        # Mock the ProviderCapabilityService since it requires many dependencies
+        # Mock the ProviderValidationService since it requires many dependencies
         with patch(
-            "application.services.provider_capability_service.ProviderCapabilityService"
+            "application.services.provider_validation_service.ProviderValidationService"
         ) as mock_app_service:
             mock_instance = Mock()
             mock_app_service.return_value = mock_instance
@@ -303,7 +292,7 @@ class TestCleanArchitecture:
         """Test infrastructure layer boundaries and responsibilities."""
         # Infrastructure should handle external concerns
         from infrastructure.di.container import DIContainer
-        from infrastructure.persistence.base.repository import StrategyBasedRepository
+        from infrastructure.storage.base.repository import StrategyBasedRepository
 
         # Infrastructure components should exist
         assert StrategyBasedRepository is not None

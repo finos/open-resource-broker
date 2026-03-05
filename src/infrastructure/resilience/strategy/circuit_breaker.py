@@ -3,8 +3,24 @@
 import secrets
 import time
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+from botocore.exceptions import ClientError
+
+if TYPE_CHECKING:
+    pass
+
+NON_RETRYABLE_CODES = {
+    "AlreadyExists",
+    "InvalidParameterValue",
+    "ValidationError",
+    "UnauthorizedOperation",
+    "AccessDenied",
+    "InvalidClientTokenId",
+    "OptInRequired",
+}
+
+from domain.base.exceptions import QuotaError
 from infrastructure.logging.logger import get_logger
 from infrastructure.resilience.exceptions import CircuitBreakerOpenError
 from infrastructure.resilience.strategy.base import RetryStrategy
@@ -91,6 +107,17 @@ class CircuitBreakerStrategy(RetryStrategy):
             },
         )
 
+    def _force_open(self, service_name: str) -> None:
+        """Force the circuit to OPEN immediately, bypassing the failure threshold."""
+        circuit_state = self._circuit_states[service_name]
+        circuit_state["state"] = CircuitState.OPEN
+        circuit_state["last_failure_time"] = time.time()
+        logger.error(
+            "Circuit breaker force-opened for %s due to quota error",
+            service_name,
+            extra={"service_name": service_name, "state": CircuitState.OPEN.value},
+        )
+
     def should_retry(self, attempt: int, exception: Exception) -> bool:
         """
         Determine if operation should be retried based on circuit state.
@@ -102,6 +129,17 @@ class CircuitBreakerStrategy(RetryStrategy):
         Returns:
             True if should retry, False otherwise
         """
+        # Quota errors are never retryable — force circuit open immediately
+        if isinstance(exception, QuotaError):
+            self._force_open(self.service_name)
+            return False
+
+        # Never retry non-idempotent errors
+        if isinstance(exception, ClientError):
+            code = exception.response.get("Error", {}).get("Code", "")
+            if code in NON_RETRYABLE_CODES:
+                return False
+
         current_time = time.time()
         circuit_state = self._circuit_states[self.service_name]
 

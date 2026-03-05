@@ -324,7 +324,7 @@ docker build --no-cache -t myimage:latest .
 ## References
 
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
-- [SARIF Specification](https://sarifweb.azurewebsites.net/)
+- [SARIF Specification](https://example.com/sarif-spec/)
 - [SPDX Specification](https://spdx.dev/)
 - [CycloneDX Specification](https://cyclonedx.org/)
 - [GitHub Security Features](https://docs.github.com/en/code-security)

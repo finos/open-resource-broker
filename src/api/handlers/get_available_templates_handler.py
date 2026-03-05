@@ -1,9 +1,9 @@
 """API handler for retrieving available templates."""
 
 import time
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
-from application.base.infrastructure_handlers import BaseAPIHandler
+from application.base.infrastructure_handlers import BaseAsyncAPIHandler as BaseAPIHandler
 from application.dto.queries import ListTemplatesQuery
 from domain.base.dependency_injection import injectable
 from domain.base.ports import ErrorHandlingPort, LoggingPort
@@ -48,7 +48,7 @@ class GetAvailableTemplatesRESTHandler(BaseAPIHandler[dict[str, Any], dict[str, 
         self._query_bus = query_bus
         self._command_bus = command_bus
         self._scheduler_strategy = scheduler_strategy
-        self._metrics = metrics
+        self._metrics_collector = metrics
 
     async def validate_api_request(self, request: dict[str, Any], context) -> None:
         """
@@ -63,8 +63,8 @@ class GetAvailableTemplatesRESTHandler(BaseAPIHandler[dict[str, Any], dict[str, 
         if "format" in request and request["format"] not in ["json", "yaml", "table"]:
             raise ValueError(f"Invalid format: {request['format']}")
 
-    @handle_interface_exceptions
-    async def execute_api_request(self, request: dict[str, Any], context) -> dict[str, Any]:
+    @handle_interface_exceptions(context="get_available_templates", interface_type="api")
+    async def execute_api_request(self, request: dict[str, Any], context) -> dict[str, Any]:  # type: ignore[override]
         """
         Execute the core API logic for retrieving available templates.
 
@@ -104,8 +104,10 @@ class GetAvailableTemplatesRESTHandler(BaseAPIHandler[dict[str, Any], dict[str, 
                 )
 
             # Record metrics if available
-            if self._metrics:
-                self._metrics.record_api_success("get_available_templates", len(templates))
+            if self._metrics_collector:
+                cast(Any, self._metrics_collector).record_api_success(
+                    "get_available_templates", len(templates)
+                )
 
             return formatted_response
 
@@ -118,8 +120,10 @@ class GetAvailableTemplatesRESTHandler(BaseAPIHandler[dict[str, Any], dict[str, 
                 )
 
             # Record metrics if available
-            if self._metrics:
-                self._metrics.record_api_failure("get_available_templates", str(e))
+            if self._metrics_collector:
+                cast(Any, self._metrics_collector).record_api_failure(
+                    "get_available_templates", str(e)
+                )
 
             raise
 

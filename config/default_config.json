@@ -47,7 +47,7 @@
             ],
             "default_fleet_type": "request",
             "supports_spot": true,
-            "supports_ondemand": false
+            "supports_ondemand": true
           },
           "ASG": {
             "handler_class": "ASGHandler",
@@ -62,7 +62,7 @@
           }
         },
         "template_defaults": {
-          "image_id": "ami-12345678",
+          "image_id": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64",
           "instance_type": "t2.micro",
           "security_group_ids": [
             "sg-12345678"
@@ -194,28 +194,18 @@
   },
   "template": {
     "max_number": 10,
-    "templates_file_path": "config/templates.json",
-    "legacy_templates_file_path": "config/awsprov_templates.json",
+    "filename_patterns": {
+      "provider_specific": "{provider_name}_templates.json",
+      "provider_type": "{provider_type}_templates.json",
+      "generic": "templates.json"
+    },
     "default_price_type": "ondemand",
     "default_provider_api": "EC2Fleet"
   },
   "events": {
-    "store_type": "memory",
-    "publisher_type": "composite",
-    "enable_logging": true,
-    "default_events_path": "events",
-    "snapshot_store_type": "memory",
-    "default_snapshots_path": "snapshots",
-    "snapshot_threshold": 100,
-    "database_filenames": {
-      "events": "events.db",
-      "snapshots": "snapshots.db"
-    },
-    "registry_storage_type": "json",
-    "registry_file_path": "data/events/registry.json",
-    "registry_db_path": "data/events/registry.db",
-    "registry_max_age_seconds": 86400,
-    "registry_cleanup_interval_seconds": 3600
+    "enabled": true,
+    "max_events_per_request": 1000,
+    "event_retention_days": 30
   },
   "request": {
     "default_timeout": 300,
@@ -223,10 +213,9 @@
     "max_machines_per_request": 100
   },
   "database": {
-    "database_filenames": {
-      "events": "events.db",
-      "snapshots": "snapshots.db"
-    }
+    "connection_timeout": 30,
+    "query_timeout": 60,
+    "max_connections": 10
   },
   "environment": "development",
   "debug": false,
@@ -393,7 +382,27 @@
   "request_timeout": 300,
   "max_machines_per_request": 100,
   "resource": {
-    "max_instances": 1000,
-    "default_timeout": 300
+    "prefixes": {
+      "default": "",
+      "request": "req-",
+      "return_prefix": "ret-",
+      "launch_template": "",
+      "instance": "",
+      "fleet": "",
+      "spot_fleet": "",
+      "asg": "",
+      "tag": ""
+    }
+  },
+  "cleanup": {
+    "enabled": true,
+    "delete_launch_template": true,
+    "dry_run": false,
+    "resources": {
+      "asg": true,
+      "ec2_fleet": true,
+      "spot_fleet": true,
+      "run_instances": true
+    }
   }
 }

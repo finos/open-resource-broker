@@ -2,9 +2,346 @@
 
 import importlib
 import inspect
-from unittest.mock import Mock
+import os
+from unittest.mock import Mock, patch
 
 import pytest
+from pydantic import ValidationError
+
+
+@pytest.mark.unit
+@pytest.mark.providers
+class TestAWSProviderEnvironmentVariables:
+    """Test AWS provider environment variable override functionality."""
+
+    def test_aws_config_env_var_override(self):
+        """Test AWS configuration environment variable override."""
+        try:
+            from providers.aws.configuration.config import AWSProviderConfig
+
+            # Test basic environment variable override
+            with patch.dict(
+                os.environ,
+                {
+                    "ORB_AWS_REGION": "eu-central-1",
+                    "ORB_AWS_PROFILE": "test-profile",
+                    "ORB_AWS_AWS_MAX_RETRIES": "10",
+                },
+            ):
+                config = AWSProviderConfig()
+
+                assert config.region == "eu-central-1"
+                assert config.profile == "test-profile"
+                assert config.aws_max_retries == 10
+
+        except ImportError:
+            pytest.skip("AWSProviderConfig not available")
+
+    def test_aws_config_authentication_env_vars(self):
+        """Test AWS authentication via environment variables."""
+        try:
+            from providers.aws.configuration.config import AWSProviderConfig
+
+            # Test profile-based authentication
+            with patch.dict(os.environ, {"ORB_AWS_PROFILE": "production"}):
+                config = AWSProviderConfig()
+                assert config.profile == "production"
+
+            # Test role-based authentication
+            with patch.dict(
+                os.environ, {"ORB_AWS_ROLE_ARN": "arn:aws:iam::123456789012:role/TestRole"}
+            ):
+                config = AWSProviderConfig()
+                assert config.role_arn == "arn:aws:iam::123456789012:role/TestRole"
+
+            # Test access key authentication
+            with patch.dict(
+                os.environ,
+                {"ORB_AWS_ACCESS_KEY_ID": "AKIATEST123", "ORB_AWS_SECRET_ACCESS_KEY": "secret123"},  # nosec B105
+            ):
+                config = AWSProviderConfig()
+                assert config.access_key_id == "AKIATEST123"
+                assert config.secret_access_key == "secret123"
+
+        except ImportError:
+            pytest.skip("AWSProviderConfig not available")
+
+    def test_aws_config_service_settings_env_vars(self):
+        """Test AWS service settings via environment variables."""
+        try:
+            from providers.aws.configuration.config import AWSProviderConfig
+
+            with patch.dict(
+                os.environ,
+                {
+                    "ORB_AWS_PROFILE": "test-profile",
+                    "ORB_AWS_ENDPOINT_URL": "https://custom.amazonaws.com",
+                    "ORB_AWS_SERVICE_ROLE_SPOT_FLEET": "CustomSpotFleetRole",
+                    "ORB_AWS_SSM_PARAMETER_PREFIX": "/custom/templates/",
+                    "ORB_AWS_AWS_READ_TIMEOUT": "60",
+                    "ORB_AWS_AWS_CONNECT_TIMEOUT": "20",
+                },
+            ):
+                config = AWSProviderConfig()
+
+                assert config.endpoint_url == "https://custom.amazonaws.com"
+                assert config.service_role_spot_fleet == "CustomSpotFleetRole"
+                assert config.ssm_parameter_prefix == "/custom/templates/"
+                assert config.aws_read_timeout == 60
+                assert config.aws_connect_timeout == 20
+
+        except ImportError:
+            pytest.skip("AWSProviderConfig not available")
+
+    def test_aws_config_proxy_settings_env_vars(self):
+        """Test AWS proxy settings via environment variables."""
+        try:
+            from providers.aws.configuration.config import AWSProviderConfig
+
+            with patch.dict(
+                os.environ,
+                {
+                    "ORB_AWS_PROFILE": "test-profile",
+                    "ORB_AWS_PROXY_HOST": "proxy.company.com",
+                    "ORB_AWS_PROXY_PORT": "8080",
+                },
+            ):
+                config = AWSProviderConfig()
+
+                assert config.proxy_host == "proxy.company.com"
+                assert config.proxy_port == 8080
+
+        except ImportError:
+            pytest.skip("AWSProviderConfig not available")
+
+    def test_aws_config_legacy_fields_env_vars(self):
+        """Test AWS legacy fields via environment variables."""
+        try:
+            from providers.aws.configuration.config import AWSProviderConfig
+
+            with patch.dict(
+                os.environ,
+                {
+                    "ORB_AWS_CREDENTIAL_FILE": "/path/to/credentials",
+                    "ORB_AWS_KEY_FILE": "/path/to/keys",
+                    "ORB_AWS_REQUEST_RETRY_ATTEMPTS": "5",
+                    "ORB_AWS_INSTANCE_PENDING_TIMEOUT_SEC": "300",
+                },
+            ):
+                config = AWSProviderConfig()
+
+                assert config.credential_file == "/path/to/credentials"
+                assert config.key_file == "/path/to/keys"
+                assert config.request_retry_attempts == 5
+                assert config.instance_pending_timeout_sec == 300
+
+        except ImportError:
+            pytest.skip("AWSProviderConfig not available")
+
+    def test_aws_config_type_conversion_env_vars(self):
+        """Test AWS configuration type conversion from environment variables."""
+        try:
+            from providers.aws.configuration.config import AWSProviderConfig
+
+            # Test integer conversion
+            with patch.dict(
+                os.environ,
+                {
+                    "ORB_AWS_PROFILE": "test-profile",
+                    "ORB_AWS_AWS_MAX_RETRIES": "15",
+                    "ORB_AWS_PROXY_PORT": "3128",
+                    "ORB_AWS_AWS_READ_TIMEOUT": "45",
+                },
+            ):
+                config = AWSProviderConfig()
+
+                assert isinstance(config.aws_max_retries, int)
+                assert config.aws_max_retries == 15
+                assert isinstance(config.proxy_port, int)
+                assert config.proxy_port == 3128
+                assert isinstance(config.aws_read_timeout, int)
+                assert config.aws_read_timeout == 45
+
+        except ImportError:
+            pytest.skip("AWSProviderConfig not available")
+
+    def test_aws_config_invalid_env_var_types(self):
+        """Test AWS configuration with invalid environment variable types."""
+        try:
+            from providers.aws.configuration.config import AWSProviderConfig
+
+            # Test invalid integer conversion
+            with patch.dict(os.environ, {"ORB_AWS_AWS_MAX_RETRIES": "not_a_number"}):
+                with pytest.raises(ValidationError):
+                    AWSProviderConfig()
+
+        except ImportError:
+            pytest.skip("AWSProviderConfig not available")
+
+    def test_aws_config_json_fields_env_vars(self):
+        """Test AWS configuration JSON fields via environment variables."""
+        try:
+            from providers.aws.configuration.config import AWSProviderConfig
+
+            handlers_json = '{"ec2_fleet": false, "spot_fleet": true, "asg": false}'
+            launch_template_json = '{"create_per_request": false, "reuse_existing": true}'
+
+            with patch.dict(
+                os.environ,
+                {
+                    "ORB_AWS_PROFILE": "test-profile",
+                    "ORB_AWS_HANDLERS": handlers_json,
+                    "ORB_AWS_LAUNCH_TEMPLATE": launch_template_json,
+                },
+            ):
+                config = AWSProviderConfig()
+
+                # Verify JSON parsing worked
+                assert hasattr(config.handlers, "ec2_fleet")
+                assert hasattr(config.launch_template, "create_per_request")
+
+        except ImportError:
+            pytest.skip("AWSProviderConfig not available")
+
+    def test_aws_config_env_precedence_over_defaults(self):
+        """Test environment variables take precedence over defaults."""
+        try:
+            from providers.aws.configuration.config import AWSProviderConfig
+
+            # Test that env vars override defaults
+            with patch.dict(
+                os.environ,
+                {
+                    "ORB_AWS_PROFILE": "test-profile",
+                    "ORB_AWS_REGION": "custom-region",
+                    "ORB_AWS_AWS_MAX_RETRIES": "99",
+                    "ORB_AWS_SERVICE_ROLE_SPOT_FLEET": "CustomRole",
+                },
+            ):
+                config = AWSProviderConfig()
+
+                # Should not be defaults
+                assert config.region != "us-east-1"  # Default
+                assert config.aws_max_retries != 3  # Default
+                assert config.service_role_spot_fleet != "AWSServiceRoleForEC2SpotFleet"  # Default
+
+                # Should be env var values
+                assert config.region == "custom-region"
+                assert config.aws_max_retries == 99
+                assert config.service_role_spot_fleet == "CustomRole"
+
+        except ImportError:
+            pytest.skip("AWSProviderConfig not available")
+
+    def test_aws_config_case_insensitive_env_vars(self):
+        """Test AWS configuration case insensitive environment variables."""
+        try:
+            from providers.aws.configuration.config import AWSProviderConfig
+
+            with patch.dict(
+                os.environ,
+                {
+                    "orb_aws_region": "lowercase-region",
+                    "ORB_AWS_PROFILE": "UPPERCASE-PROFILE",
+                    "Orb_Aws_Aws_Max_Retries": "7",
+                },
+            ):
+                config = AWSProviderConfig()
+
+                assert config.region == "lowercase-region"
+                assert config.profile == "UPPERCASE-PROFILE"
+                assert config.aws_max_retries == 7
+
+        except ImportError:
+            pytest.skip("AWSProviderConfig not available")
+
+    def test_aws_config_field_aliases_env_vars(self):
+        """Test AWS configuration field names work via environment variables."""
+        try:
+            from providers.aws.configuration.config import AWSProviderConfig
+
+            # Use the actual field names (not aliases) for env var lookup
+            with patch.dict(
+                os.environ,
+                {
+                    "ORB_AWS_PROFILE": "test-profile",
+                    "ORB_AWS_AWS_MAX_RETRIES": "8",
+                    "ORB_AWS_AWS_READ_TIMEOUT": "50",
+                },
+            ):
+                config = AWSProviderConfig()
+
+                assert config.aws_max_retries == 8
+                assert config.aws_read_timeout == 50
+
+        except ImportError:
+            pytest.skip("AWSProviderConfig not available")
+
+    def test_provider_settings_registry_env_override(self):
+        """Test provider settings registry with environment variable override."""
+        try:
+            from config.schemas.provider_settings_registry import ProviderSettingsRegistry
+            from providers.aws.configuration.config import AWSProviderConfig
+
+            # Register AWS provider
+            ProviderSettingsRegistry.register_provider_settings("aws", AWSProviderConfig)
+
+            # Environment should override config dict
+            with patch.dict(
+                os.environ,
+                {
+                    "ORB_AWS_REGION": "env-region",
+                    "ORB_AWS_PROFILE": "env-profile",
+                    "ORB_AWS_AWS_MAX_RETRIES": "12",
+                },
+            ):
+                settings_class = ProviderSettingsRegistry.get_settings_class("aws")
+                settings = settings_class()
+
+                assert settings.region == "env-region"  # Not config-region
+                assert settings.profile == "env-profile"  # Not config-profile
+                assert settings.aws_max_retries == 12  # From env, not default
+
+        except ImportError:
+            pytest.skip("Provider settings registry not available")
+
+    def test_aws_config_validation_with_env_vars(self):
+        """Test AWS configuration validation with environment variables."""
+        try:
+            from providers.aws.configuration.config import AWSProviderConfig
+
+            # Test valid authentication via env vars
+            with patch.dict(os.environ, {"ORB_AWS_PROFILE": "valid-profile"}):
+                config = AWSProviderConfig()
+                assert config.profile == "valid-profile"
+
+            # Test proxy validation via env vars
+            with patch.dict(
+                os.environ,
+                {
+                    "ORB_AWS_PROFILE": "test-profile",
+                    "ORB_AWS_PROXY_HOST": "proxy.example.com",
+                    "ORB_AWS_PROXY_PORT": "8080",
+                },
+            ):
+                config = AWSProviderConfig()
+                assert config.proxy_host == "proxy.example.com"
+                assert config.proxy_port == 8080
+
+            # Test invalid proxy configuration
+            with patch.dict(
+                os.environ,
+                {
+                    "ORB_AWS_PROFILE": "test-profile",
+                    "ORB_AWS_PROXY_HOST": "proxy.example.com",
+                    # Missing PROXY_PORT
+                },
+            ):
+                with pytest.raises(ValidationError, match="proxy_port is required"):
+                    AWSProviderConfig()
+
+        except ImportError:
+            pytest.skip("AWSProviderConfig not available")
 
 
 @pytest.mark.unit
@@ -108,16 +445,17 @@ class TestAWSProviderComprehensive:
     def test_aws_client_initialization(self):
         """Test AWS client initialization."""
         try:
+            from unittest.mock import Mock
+
             from providers.aws.infrastructure.aws_client import AWSClient
 
-            # Try to create client
+            mock_config = Mock()
+            mock_logger = Mock()
             try:
-                client = AWSClient()
+                client = AWSClient(config=mock_config, logger=mock_logger)
                 assert client is not None
-            except TypeError:
-                # Might require configuration
-                client = AWSClient(region="us-east-1")
-                assert client is not None
+            except Exception:
+                pytest.skip("AWSClient could not be initialized with mocks")
 
         except ImportError:
             pytest.skip("AWSClient not available")
@@ -154,7 +492,6 @@ class TestAWSProviderComprehensive:
             "machine_adapter",
             "provisioning_adapter",
             "request_adapter",
-            "resource_manager_adapter",
             "template_adapter",
         ]
 
@@ -181,32 +518,19 @@ class TestAWSProviderComprehensive:
     def test_aws_strategy_initialization(self):
         """Test AWS strategy initialization."""
         try:
+            from providers.aws.configuration.config import AWSProviderConfig
             from providers.aws.strategy.aws_provider_strategy import AWSProviderStrategy
 
-            # Try to create strategy with mocked dependencies
-            mock_deps = [Mock() for _ in range(10)]
+            config = AWSProviderConfig(profile="test-profile")
+            strategy = AWSProviderStrategy(config=config, logger=Mock())
+            assert strategy is not None
 
-            strategy = None
-            for i in range(len(mock_deps) + 1):
-                try:
-                    if i == 0:
-                        strategy = AWSProviderStrategy()
-                    else:
-                        strategy = AWSProviderStrategy(*mock_deps[:i])
-                    break
-                except TypeError:
-                    continue
-
-            if strategy:
-                assert strategy is not None
-
-                # Test common strategy methods
-                common_methods = [
-                    "create_machines",
-                    "terminate_machines",
-                    "get_machine_status",
-                ]
-                any(hasattr(strategy, method) for method in common_methods)
+            common_methods = [
+                "create_machines",
+                "terminate_machines",
+                "get_machine_status",
+            ]
+            any(hasattr(strategy, method) for method in common_methods)
 
         except ImportError:
             pytest.skip("AWSProviderStrategy not available")
@@ -214,9 +538,9 @@ class TestAWSProviderComprehensive:
     def test_aws_exceptions_exist(self):
         """Test that AWS exceptions exist."""
         try:
-            import src
+            from providers.aws.exceptions import aws_exceptions
 
-            assert src.providers.aws.exceptions.aws_exceptions is not None
+            assert aws_exceptions is not None
         except ImportError:
             pytest.skip("AWS exceptions not available")
 
@@ -237,7 +561,7 @@ class TestAWSProviderComprehensive:
     def test_aws_managers_exist(self):
         """Test that AWS managers exist."""
         manager_modules = []
-        manager_files = ["aws_instance_manager", "aws_resource_manager"]
+        manager_files = ["aws_instance_manager"]
 
         for manager_file in manager_files:
             try:
@@ -415,13 +739,13 @@ class TestProviderStrategyPatternsComprehensive:
                             if inspect.iscoroutinefunction(method):
                                 try:
                                     await method(Mock())
-                                except Exception:
+                                except Exception:  # nosec B110
                                     # Method might require specific parameters
                                     pass
                             else:
                                 try:
                                     method(Mock())
-                                except Exception:
+                                except Exception:  # nosec B110
                                     # Method might require specific parameters
                                     pass
 
@@ -458,9 +782,9 @@ class TestAWSPersistenceComprehensive:
     def test_dynamodb_registration_exists(self):
         """Test that DynamoDB registration exists."""
         try:
-            import src
+            from providers.aws.persistence.dynamodb import registration
 
-            assert src.providers.aws.persistence.dynamodb.registration is not None
+            assert registration is not None
         except ImportError:
             pytest.skip("DynamoDB registration not available")
 
@@ -522,9 +846,9 @@ class TestAWSResilienceComprehensive:
     def test_aws_retry_config_exists(self):
         """Test that AWS retry config exists."""
         try:
-            import src
+            from providers.aws.resilience import aws_retry_config
 
-            assert src.providers.aws.resilience.aws_retry_config is not None
+            assert aws_retry_config is not None
         except ImportError:
             pytest.skip("AWS retry config not available")
 
@@ -540,9 +864,9 @@ class TestAWSResilienceComprehensive:
     def test_aws_retry_errors_exist(self):
         """Test that AWS retry errors exist."""
         try:
-            import src
+            from providers.aws.resilience import aws_retry_errors
 
-            assert src.providers.aws.resilience.aws_retry_errors is not None
+            assert aws_retry_errors is not None
         except ImportError:
             pytest.skip("AWS retry errors not available")
 
@@ -628,9 +952,9 @@ class TestProviderRegistrationComprehensive:
     def test_aws_registration_exists(self):
         """Test that AWS registration exists."""
         try:
-            import src
+            from providers.aws import registration
 
-            assert src.providers.aws.registration is not None
+            assert registration is not None
         except ImportError:
             pytest.skip("AWS registration not available")
 

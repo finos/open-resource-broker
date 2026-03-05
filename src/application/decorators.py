@@ -58,7 +58,7 @@ from typing import TypeVar
 
 from application.interfaces.command_query import (
     Command,
-    CommandHandler,
+    CommandHandler,  # type: ignore[attr-defined]
     Query,
     QueryHandler,
 )
@@ -108,8 +108,8 @@ def query_handler(query_type: type[TQuery]):
         _query_handler_registry[query_type] = handler_class
 
         # Mark the handler class with metadata for infrastructure discovery
-        handler_class._query_type = query_type
-        handler_class._is_query_handler = True
+        handler_class._query_type = query_type  # type: ignore[attr-defined]
+        handler_class._is_query_handler = True  # type: ignore[attr-defined]
 
         return handler_class
 
@@ -150,8 +150,8 @@ def command_handler(command_type: type[TCommand]):
         _command_handler_registry[command_type] = handler_class
 
         # Mark the handler class with metadata for infrastructure discovery
-        handler_class._command_type = command_type
-        handler_class._is_command_handler = True
+        handler_class._command_type = command_type  # type: ignore[attr-defined]
+        handler_class._is_command_handler = True  # type: ignore[attr-defined]
 
         return handler_class
 

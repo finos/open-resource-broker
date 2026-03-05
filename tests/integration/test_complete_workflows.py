@@ -13,7 +13,7 @@ import pytest
 try:
     from application.service import ApplicationService
     from domain.request.aggregate import Request
-    from infrastructure.persistence.repositories.request_repository import (
+    from infrastructure.storage.repositories.request_repository import (
         RequestRepository,
     )
 
@@ -56,7 +56,7 @@ class TestCompleteWorkflowIntegration:
             "name": "Test Template",
             "provider_api": "RunInstances",
             "image_id": "ami-12345678",
-            "instance_type": "t2.micro",
+            "machine_types": {"t2.micro": 1},
             "max_number": 10,
         }
         mock_template_service.get_available_templates.return_value = [mock_template]
@@ -177,7 +177,7 @@ class TestCompleteWorkflowIntegration:
             "name": "Test Template",
             "provider_api": "RunInstances",
             "image_id": "ami-12345678",
-            "instance_type": "t2.micro",
+            "machine_types": {"t2.micro": 1},
         }
         mock_template_service.get_template_by_id.return_value = mock_template
 
@@ -230,7 +230,7 @@ class TestCompleteWorkflowIntegration:
             "name": "Test Template",
             "provider_api": "RunInstances",
             "image_id": "ami-12345678",
-            "instance_type": "t2.micro",
+            "machine_types": {"t2.micro": 1},
         }
         mock_template_service.get_template_by_id.return_value = mock_template
 
@@ -437,7 +437,7 @@ class TestProviderIntegration:
         provision_request = {
             "template_id": "test-template",
             "machine_count": 2,
-            "instance_type": "t2.micro",
+            "machine_types": {"t2.micro": 1},
             "image_id": "ami-12345678",
         }
 

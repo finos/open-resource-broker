@@ -21,7 +21,7 @@ from domain.base.dependency_injection import injectable
 from infrastructure.logging.logger import get_logger
 
 if TYPE_CHECKING:
-    from application.service import ApplicationService
+    from application.service import ApplicationService  # type: ignore[import]
 
 logger = get_logger(__name__)
 
@@ -87,7 +87,7 @@ class APIHandlerFactory:
                 # Create with default constructor
                 return handler_class()
         except Exception as e:
-            logger.error("Failed to create handler %s: %s", name, e)
+            logger.error("Failed to create handler %s: %s", name, e, exc_info=True)
             raise ValueError(f"Failed to create handler {name}: {e}")
 
     @classmethod
@@ -133,7 +133,7 @@ class APIHandlerFactory:
                 logger.debug("Dynamically loaded handler: %s", name)
 
             except (ImportError, AttributeError) as e:
-                logger.warning("Failed to dynamically load handler %s: %s", name, e)
+                logger.warning("Failed to dynamically load handler %s: %s", name, e, exc_info=True)
 
     @classmethod
     def get_registered_handlers(cls) -> dict[str, type]:

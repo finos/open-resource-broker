@@ -1,9 +1,13 @@
 """Base DTO class with stable API and clean snake_case format."""
 
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from pydantic import BaseModel, ConfigDict
+from pydantic.alias_generators import to_camel
+
+if TYPE_CHECKING:
+    pass
 
 
 class BaseDTO(BaseModel):
@@ -76,7 +80,13 @@ class BaseDTO(BaseModel):
 
 
 class BaseCommand(BaseDTO):
-    """Base class for command DTOs."""
+    """Base class for command DTOs.
+
+    CQRS: Commands can store results in mutable fields for callers to access.
+    This allows commands to return void while still providing result data.
+    """
+
+    model_config = ConfigDict(frozen=False)  # Allow mutation for result storage
 
     command_id: Optional[str] = None
     correlation_id: Optional[str] = None
@@ -102,11 +112,36 @@ class BaseResponse(BaseDTO):
     metadata: dict[str, Any] = {}
 
 
+class PaginationMetadata(BaseModel):
+    """Pagination metadata for list responses.
+
+    JSON serialization uses camelCase via alias_generator.
+    Use .model_dump(by_alias=True) when serializing for API responses.
+    """
+
+    model_config = ConfigDict(
+        frozen=True,
+        alias_generator=to_camel,
+        populate_by_name=True,
+    )
+
+    total_count: int
+    limit: int
+    offset: int
+    has_more: bool
+    returned_count: int
+
+
 class PaginatedResponse(BaseResponse):
-    """Base class for paginated responses."""
+    """Base class for paginated responses.
+
+    JSON serialization uses camelCase via alias_generator inherited from BaseDTO.
+    Use .model_dump(by_alias=True) when serializing for API responses.
+    """
 
     total_count: int = 0
     page: int = 1
     page_size: int = 50
     has_next: bool = False
     has_previous: bool = False
+    pagination: Optional[PaginationMetadata] = None

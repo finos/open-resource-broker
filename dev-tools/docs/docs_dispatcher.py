@@ -28,7 +28,7 @@ def handle_clean():
 
 def handle_list():
     """Handle list versions command."""
-    cmd = ["./dev-tools/scripts/run_tool.sh", "mike", "list"]
+    cmd = ["./dev-tools/setup/run_tool.sh", "mike", "list"]
     subprocess.run(cmd, cwd="docs", check=True)
     return 0
 
@@ -38,7 +38,7 @@ def handle_delete(version_to_delete):
     if not version_to_delete:
         print("ERROR: delete requires version (e.g., delete=1.0.0)")
         return 1
-    cmd = ["./dev-tools/scripts/run_tool.sh", "mike", "delete", version_to_delete]
+    cmd = ["./dev-tools/setup/run_tool.sh", "mike", "delete", version_to_delete]
     subprocess.run(cmd, cwd="docs", check=True)
     return 0
 
@@ -47,7 +47,7 @@ def handle_serve():
     """Handle serve command."""
     print("Starting documentation server at http://127.0.0.1:8000")
     print("Press Ctrl+C to stop the server")
-    cmd = ["./dev-tools/scripts/run_tool.sh", "mike", "serve"]
+    cmd = ["./dev-tools/setup/run_tool.sh", "mike", "serve"]
     subprocess.run(cmd, cwd="docs", check=True)
     return 0
 
@@ -70,7 +70,7 @@ def handle_deploy(version_num):
                 check=True,
             )
         cmd = [
-            "./dev-tools/scripts/run_tool.sh",
+            "./dev-tools/setup/run_tool.sh",
             "mike",
             "deploy",
             "--push",
@@ -83,7 +83,7 @@ def handle_deploy(version_num):
         subprocess.run(["make", "ci-docs-deploy"], check=True)
     else:
         print("WARNING: This will commit to your local gh-pages branch")
-        cmd = ["./dev-tools/scripts/run_tool.sh", "mike", "deploy", "--update-aliases", "latest"]
+        cmd = ["./dev-tools/setup/run_tool.sh", "mike", "deploy", "--update-aliases", "latest"]
         subprocess.run(cmd, cwd="docs", check=True)
         print("Documentation deployed locally. Use 'git push origin gh-pages' to publish.")
     return 0
@@ -95,7 +95,7 @@ def handle_default():
         subprocess.run(["make", "ci-docs-build"], check=True)
     else:
         print("Building documentation locally with mike...")
-        cmd = ["./dev-tools/scripts/run_tool.sh", "mike", "deploy", "--update-aliases", "latest"]
+        cmd = ["./dev-tools/setup/run_tool.sh", "mike", "deploy", "--update-aliases", "latest"]
         subprocess.run(cmd, cwd="docs", check=True)
         print("Documentation built with mike versioning")
     return 0

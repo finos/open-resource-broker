@@ -5,8 +5,11 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from api.models import RequestStatusModel
 from api.validation import RequestValidator, ValidationException
-from application.base.infrastructure_handlers import BaseAPIHandler, RequestContext
-from application.dto.queries import GetRequestQuery, GetRequestStatusQuery, ListActiveRequestsQuery
+from application.base.infrastructure_handlers import (
+    BaseAsyncAPIHandler as BaseAPIHandler,
+    RequestContext,
+)
+from application.dto.queries import GetRequestQuery, ListActiveRequestsQuery
 from application.request.dto import RequestStatusResponse
 from domain.base.dependency_injection import injectable
 from domain.base.ports import ErrorHandlingPort, LoggingPort
@@ -48,7 +51,7 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
         self._query_bus = query_bus
         self._command_bus = command_bus
         self._scheduler_strategy = scheduler_strategy
-        self._metrics = metrics
+        self._metrics_collector = metrics
         self._max_retries = max_retries
         self.validator = RequestValidator()
 
@@ -100,7 +103,7 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
         all_flag = request.get("all_flag", False)
         long = request.get("long", False)
         correlation_id = context.correlation_id
-        start_time = time.time() if self._metrics else None
+        start_time = time.time() if self._metrics_collector else None
 
         if self.logger:
             self.logger.info(
@@ -114,6 +117,7 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
             )
 
         try:
+            errors: list[dict[str, Any]] = []
             if all_flag:
                 # Get all active requests using CQRS query
                 query = ListActiveRequestsQuery()
@@ -136,6 +140,8 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
                 validated_data = context.metadata.get("validated_data")
                 if not validated_data:
                     # Fallback validation if not done in validate_api_request
+                    if input_data is None:
+                        raise ValueError("Input data is required")
                     validated_data = self.validator.validate(RequestStatusModel, input_data)
 
                 request_ids = validated_data.request_ids
@@ -203,8 +209,8 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
                 )
 
             # Record metrics if available
-            if self._metrics:
-                self._metrics.record_success(
+            if self._metrics_collector and start_time is not None:
+                self._metrics_collector.record_success(
                     "get_request_status",
                     start_time,
                     {
@@ -218,8 +224,8 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
 
         except Exception as e:
             # Record metrics if available
-            if self._metrics:
-                self._metrics.record_failure(
+            if self._metrics_collector and start_time is not None:
+                self._metrics_collector.record_error(
                     "get_request_status",
                     start_time,
                     {"error": str(e), "correlation_id": correlation_id},
@@ -246,36 +252,6 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
             response.metadata["processed_at"] = time.time()
             response.metadata["processing_duration"] = time.time() - context.start_time
 
-            # Apply scheduler strategy for format conversion if needed
-            if self._scheduler_strategy and hasattr(
-                self._scheduler_strategy, "format_request_response"
-            ):
-                # Convert Pydantic DTO to dict before formatting
-                response_payload = (
-                    response.model_dump()
-                    if hasattr(response, "model_dump")
-                    else response.to_dict()
-                    if hasattr(response, "to_dict")
-                    else response
-                )
-            formatter = self._scheduler_strategy.format_request_response
-            if callable(formatter):
-                if hasattr(formatter, "__call__") and getattr(formatter, "__name__", ""):
-                    # If formatter is async, await; otherwise call directly
-                    try:
-                        import inspect
-
-                        if inspect.iscoroutinefunction(formatter):
-                            formatted_response = await formatter(response_payload)
-                        else:
-                            formatted_response = formatter(response_payload)
-                    except TypeError:
-                        # Fallback: attempt synchronous call
-                        formatted_response = formatter(response_payload)
-                else:
-                    formatted_response = formatter(response_payload)
-                return formatted_response
-
         return response
 
     def _normalize_request_payload(self, request_data: Any, request_id: str) -> dict[str, Any]:
@@ -292,7 +268,7 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
         if hasattr(request_data, "to_dict"):
             payload = request_data.to_dict()
         elif hasattr(request_data, "model_dump"):
-            payload = request_data.model_dump()
+            payload = request_data.model_dump(by_alias=True)
         elif isinstance(request_data, dict):
             payload = request_data
         else:
@@ -326,8 +302,8 @@ class GetRequestStatusRESTHandler(BaseAPIHandler[dict[str, Any], RequestStatusRe
                     # Get full request details (including machines) via request query
                     query = GetRequestQuery(request_id=request_id, long=long)
                 else:
-                    # Get basic request status via lightweight status query
-                    query = GetRequestStatusQuery(request_id=request_id)
+                    # Get basic request status via lightweight query
+                    query = GetRequestQuery(request_id=request_id, lightweight=True)
 
                 return await self._query_bus.execute(query)
             except RequestNotFoundError:

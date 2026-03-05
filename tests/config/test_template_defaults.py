@@ -39,7 +39,7 @@ class TestTemplateDefaultsService:
                         **{
                             "template_defaults": {
                                 "image_id": "ami-aws-default",
-                                "instance_type": "t2.micro",
+                                "machine_types": {"t2.micro": 1},
                                 "provider_api": "EC2Fleet",
                                 "price_type": "ondemand",
                                 "security_group_ids": ["sg-aws-default"],
@@ -55,7 +55,7 @@ class TestTemplateDefaultsService:
                             "type": "aws",
                             "template_defaults": {
                                 "provider_api": "SpotFleet",  # Override provider type default
-                                "instance_type": "t3.medium",  # Override provider type default
+                                "machine_types": {"t3.medium": 1},  # Override provider type default
                             },
                         }
                     ),
@@ -79,7 +79,7 @@ class TestTemplateDefaultsService:
                     "max_number": 10,
                     "ami_resolution": {"enabled": True},
                     "default_price_type": "ondemand",
-                    "default_allocation_strategy": "capacityOptimized",
+                    "default_allocation_strategy": "capacity_optimized",
                 }
             }
         )
@@ -109,7 +109,7 @@ class TestTemplateDefaultsService:
         assert result["template_id"] == "test-template"
         assert result["image_id"] == "ami-specific"  # Template value (highest priority)
         assert result["provider_api"] == "EC2Fleet"  # Provider type default
-        assert result["instance_type"] == "t2.micro"  # Provider type default
+        assert result["machine_types"] == {"t2.micro": 1}  # Provider type default
         assert result["security_group_ids"] == ["sg-aws-default"]  # Provider type default
         assert result["price_type"] == "ondemand"  # Global default
 
@@ -188,7 +188,7 @@ class TestTemplateDefaultsService:
         assert result["price_type"] == "ondemand"  # Global default
         assert result["image_id"] == "ami-aws-default"  # Provider type default
         assert result["provider_api"] == "EC2Fleet"  # Provider type default
-        assert result["instance_type"] == "t2.micro"  # Provider type default
+        assert result["machine_types"] == {"t2.micro": 1}  # Provider type default
         assert result["security_group_ids"] == ["sg-aws-default"]  # Provider type default
 
     def test_validate_template_defaults(
@@ -263,7 +263,7 @@ class TestTemplateDefaultsService:
         template_dict = {
             "template_id": "test-template",
             "image_id": None,  # None should not override defaults
-            "instance_type": "t3.large",  # Non-None should override
+            "machine_types": {"t3.large": 1},  # Non-None should override
         }
 
         result = template_defaults_service.resolve_template_defaults(template_dict, "aws-primary")
@@ -271,7 +271,7 @@ class TestTemplateDefaultsService:
         # None value should be replaced by default
         assert result["image_id"] == "ami-aws-default"  # From provider type defaults
         # Non-None value should be preserved
-        assert result["instance_type"] == "t3.large"  # From template
+        assert result["machine_types"] == {"t3.large": 1}  # From template
 
 
 class TestTemplateDefaultsIntegration:
@@ -284,8 +284,8 @@ class TestTemplateDefaultsIntegration:
         )
 
         # Create mock dependencies
-        mock_config_manager = Mock()
-        mock_logger = Mock()
+        Mock()
+        Mock()
         mock_template_defaults_service = Mock()
 
         # Setup mock template defaults service
@@ -297,12 +297,9 @@ class TestTemplateDefaultsIntegration:
             "provider_api": "SpotFleet",
         }
 
-        # Create scheduler strategy with template defaults service
-        scheduler = HostFactorySchedulerStrategy(
-            mock_config_manager,
-            mock_logger,
-            template_defaults_service=mock_template_defaults_service,
-        )
+        # Create scheduler strategy (no constructor args) and inject mock service
+        scheduler = HostFactorySchedulerStrategy()
+        scheduler._template_defaults_service = mock_template_defaults_service
 
         # Test template field mapping with defaults service
         template_dict = {
@@ -364,13 +361,12 @@ class TestTemplateDefaultsIntegration:
 
         # Mock the path exists check
         with patch.object(Path, "exists", return_value=True):
-            # Test template conversion with defaults
+            # Test template conversion — defaults are applied at the strategy layer,
+            # not inside _convert_dict_to_template_dto.
             template_dict = {"template_id": "test-template"}
 
             result = manager._convert_dict_to_template_dto(template_dict, file_metadata)
 
-            # Should apply defaults through service
-            mock_template_defaults_service.resolve_template_defaults.assert_called_once()
             assert isinstance(result, TemplateDTO)
             assert result.template_id == "test-template"
 

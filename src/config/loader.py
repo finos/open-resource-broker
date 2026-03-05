@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, TypeVar
 
 from config.schemas import AppConfig, validate_config
 from domain.base.exceptions import ConfigurationError
+from infrastructure.utilities.json_utils import safe_json_dumps, safe_json_loads
 
 if TYPE_CHECKING:
     from config.managers.configuration_manager import ConfigurationManager
@@ -52,46 +53,6 @@ class ConfigurationLoader:
     - Environment variable overrides
     - Configuration validation
     """
-
-    # Environment variable mappings
-    ENV_MAPPING = {
-        "AWS_REGION": ("aws", "region"),
-        "AWS_PROFILE": ("aws", "profile"),
-        "AWS_ROLE_ARN": ("aws", "role_arn"),
-        "AWS_ACCESS_KEY_ID": ("aws", "access_key_id"),
-        "AWS_SECRET_ACCESS_KEY": ("aws", "secret_access_key"),
-        "AWS_SESSION_TOKEN": ("aws", "session_token"),
-        "AWS_ENDPOINT_URL": ("aws", "endpoint_url"),
-        # Symphony AWS configuration fields
-        "AWS_CREDENTIAL_FILE": ("aws", "credential_file"),
-        "AWS_KEY_FILE": ("aws", "key_file"),
-        "AWS_PROXY_HOST": ("aws", "proxy_host"),
-        "AWS_PROXY_PORT": ("aws", "proxy_port"),
-        "AWS_CONNECT_TIMEOUT": ("aws", "aws_connect_timeout"),
-        "AWS_CONNECTION_TIMEOUT_MS": ("aws", "connection_timeout_ms"),
-        "AWS_REQUEST_RETRY_ATTEMPTS": ("aws", "request_retry_attempts"),
-        "AWS_INSTANCE_PENDING_TIMEOUT_SEC": ("aws", "instance_pending_timeout_sec"),
-        "AWS_DESCRIBE_REQUEST_RETRY_ATTEMPTS": (
-            "aws",
-            "describe_request_retry_attempts",
-        ),
-        "AWS_DESCRIBE_REQUEST_INTERVAL": ("aws", "describe_request_interval"),
-        # Logging configuration
-        "LOG_LEVEL": ("logging", "level"),
-        "LOG_FILE": ("logging", "file_path"),
-        "LOG_CONSOLE_ENABLED": ("logging", "console_enabled"),
-        "ACCEPT_PROPAGATED_LOG_SETTING": ("logging", "accept_propagated_setting"),
-        # Events configuration
-        "EVENTS_STORE_TYPE": ("events", "store_type"),
-        "EVENTS_STORE_PATH": ("events", "store_path"),
-        "EVENTS_PUBLISHER_TYPE": ("events", "publisher_type"),
-        "EVENTS_ENABLE_LOGGING": ("events", "enable_logging"),
-        # Application configuration
-        "ENVIRONMENT": ("environment",),
-        "DEBUG": ("debug",),
-        "REQUEST_TIMEOUT": ("request_timeout",),
-        "MAX_MACHINES_PER_REQUEST": ("max_machines_per_request",),
-    }
 
     # Default configuration file name
     DEFAULT_CONFIG_FILENAME = "default_config.json"
@@ -379,26 +340,41 @@ class ConfigurationLoader:
         cls, config: dict[str, Any], config_manager: Optional[ConfigurationManager] = None
     ) -> None:
         """
-        Load configuration from environment variables.
+        Apply ORB_* environment variable overrides to the raw config dict.
+
+        Only variables that are explicitly set in the environment take effect.
+        Precedence: env var > config file > schema default.
 
         Args:
-            config: Configuration dictionary to update
+            config: Configuration dictionary to update in place
+            config_manager: Configuration manager for scheduler directories
         """
-        # Direct environment variables
-        for env_var, config_path in cls.ENV_MAPPING.items():
-            if env_var in os.environ:
-                value = cls._convert_value(os.environ[env_var])
-                current = config
-                for i, key in enumerate(config_path):
-                    if i == len(config_path) - 1:
-                        current[key] = value
-                    else:
-                        current = current.setdefault(key, {})
+        if val := os.environ.get("ORB_LOG_LEVEL"):
+            config.setdefault("logging", {})["level"] = val
+        if val := cls._resolve_console_enabled():
+            config.setdefault("logging", {})["console_enabled"] = val.lower() == "true"
+        if val := os.environ.get("ORB_DEBUG"):
+            config["debug"] = val.lower() == "true"
+        if val := os.environ.get("ORB_ENVIRONMENT"):
+            config["environment"] = val
+        if val := os.environ.get("ORB_REQUEST_TIMEOUT"):
+            config["request_timeout"] = int(val)
+        if val := os.environ.get("ORB_MAX_MACHINES_PER_REQUEST"):
+            config["max_machines_per_request"] = int(val)
+        if val := os.environ.get("ORB_CONFIG_FILE"):
+            config["config_file"] = val
 
-        # Process scheduler-provided directory overrides
         cls._process_scheduler_directories(config, config_manager)
 
-        get_config_logger().debug("Loaded configuration from environment variables")
+    @classmethod
+    def _resolve_console_enabled(cls) -> Optional[str]:
+        """
+        Resolve the console logging enabled setting from environment variables.
+
+        Returns:
+            String value of the env var if set, None otherwise
+        """
+        return os.environ.get("ORB_LOG_CONSOLE_ENABLED")
 
     @classmethod
     def _process_scheduler_directories(
@@ -428,8 +404,10 @@ class ConfigurationLoader:
                 # Update JSON storage strategy
                 storage = config.setdefault("storage", {})
                 json_strategy = storage.setdefault("json_strategy", {})
-                json_strategy["base_path"] = scheduler_dir
-                get_config_logger().debug("Set JSON storage base_path to %s", scheduler_dir)
+                existing_base_path = json_strategy.get("base_path", "data")
+                if not os.path.isabs(existing_base_path):
+                    json_strategy["base_path"] = scheduler_dir
+                    get_config_logger().debug("Set JSON storage base_path to %s", scheduler_dir)
 
                 # Update SQL storage strategy if using SQLite
                 sql_strategy = storage.setdefault("sql_strategy", {})
@@ -467,8 +445,9 @@ class ConfigurationLoader:
             return float(value)
 
         # Try to convert to JSON
-        with suppress(json.JSONDecodeError):
-            return json.loads(value)
+        result = safe_json_loads(value, default=None)
+        if result is not None:
+            return result
 
         # Return as string if no conversion possible
         return value
@@ -503,7 +482,8 @@ class ConfigurationLoader:
         Returns:
             Deep copy of dictionary
         """
-        return json.loads(json.dumps(obj))
+        json_str = safe_json_dumps(obj, raise_on_error=True, context="Deep copy serialization")
+        return safe_json_loads(json_str, raise_on_error=True, context="Deep copy deserialization")
 
     @classmethod
     def _get_scheduler_directory(

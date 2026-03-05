@@ -1,420 +1,176 @@
 # Installation Guide
 
-This guide covers the installation and setup of the Open Resource Broker for IBM Spectrum Symphony integration with cloud providers.
-
-## Overview
-
-The Open Resource Broker is a command-line tool that integrates with IBM Spectrum Symphony Host Factory through shell scripts. Symphony calls the shell scripts, which in turn execute the Python application.
+This guide covers installing the Open Resource Broker (ORB) and getting it running with the `orb` CLI.
 
 ## Prerequisites
 
-### System Requirements
+- Python 3.10 or higher
+- AWS credentials configured (profile or IAM role)
+- Access to EC2 and related AWS services
 
-- **Python**: 3.10 or higher
-- **Operating System**: Linux, macOS, or Windows
-- **Memory**: Minimum 512MB RAM
-- **Disk Space**: 100MB for application and dependencies
-- **Network**: Internet access for cloud provider APIs
+## Install
 
-### Cloud Provider Requirements
-
-#### AWS Requirements
-- AWS CLI configured or IAM role with appropriate permissions
-- Access to EC2, Auto Scaling, and optionally DynamoDB services
-- VPC with subnets and security groups configured
-
-## Installation Methods
-
-### Method 1: PyPI Installation (Recommended)
-
-The package is available on PyPI with optional feature groups:
+ORB is published to PyPI as `orb-py`. Install the base package or include optional feature groups:
 
 ```bash
-# Minimal install (CLI only, 10 dependencies)
+# Minimal install (CLI only)
 pip install orb-py
 
-# With colored CLI output
-pip install orb-py[cli]
+# With colored terminal output
+pip install "orb-py[cli]"
 
-# With API server (for REST API mode)
-pip install orb-py[api]
+# With REST API server
+pip install "orb-py[api]"
 
 # With monitoring (OpenTelemetry, Prometheus)
-pip install orb-py[monitoring]
+pip install "orb-py[monitoring]"
 
-# Everything (all features)
-pip install orb-py[all]
+# Everything
+pip install "orb-py[all]"
+```
 
-# Initialize configuration
-orb init
+Optional dependency groups:
 
-# Verify installation
+| Group | Adds | Use when |
+|-------|------|----------|
+| `cli` | `rich`, `rich-argparse` | You want colored, formatted terminal output |
+| `api` | `fastapi`, `uvicorn`, `jinja2` | You want to run the REST API server |
+| `monitoring` | `opentelemetry-*`, `prometheus-client`, `psutil` | Production deployments with observability |
+| `all` | All of the above | Full-featured install |
+
+Verify the install:
+
+```bash
 orb --version
 ```
 
-**Optional Dependencies:**
-- `[cli]`: Rich console output with colors (adds rich, rich-argparse)
-- `[api]`: REST API server mode (adds fastapi, uvicorn, jinja2)
-- `[monitoring]`: Observability features (adds opentelemetry, prometheus, psutil)
-- `[all]`: All optional features
-
-### Method 2: Git Clone (Development)
+## Development Install
 
 ```bash
-# Clone the repository
 git clone https://github.com/awslabs/open-resource-broker.git
 cd open-resource-broker
 
-# Create virtual environment
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# Install with development dependencies
 pip install -e ".[dev]"
 
-# Or use make targets
-make dev-install
-
-# Verify installation
 orb --version
 ```
 
-### Method 3: Install from Wheel (Local Testing)
+## Initialize ORB
+
+After installing, run `orb init` to create the configuration:
 
 ```bash
-# Build wheel
-python -m build --wheel
+# Interactive — ORB walks you through provider, region, and infrastructure selection
+orb init
 
-# Install minimal (base only)
-pip install dist/orb_py-1.1.1-py3-none-any.whl
-
-# Install with CLI colors
-pip install "dist/orb_py-1.1.1-py3-none-any.whl[cli]"
-
-# Install with API server
-pip install "dist/orb_py-1.1.1-py3-none-any.whl[api]"
-
-# Install with monitoring
-pip install "dist/orb_py-1.1.1-py3-none-any.whl[monitoring]"
-
-# Install everything
-pip install "dist/orb_py-1.1.1-py3-none-any.whl[all]"
+# Non-interactive — supply all values as flags (useful for CI/scripted setup)
+orb init --non-interactive \
+  --provider aws \
+  --region us-east-1 \
+  --profile default \
+  --scheduler hostfactory \
+  --subnet-ids subnet-aaa111,subnet-bbb222 \
+  --security-group-ids sg-11111111 \
+  --fleet-role arn:aws:iam::123456789012:role/SpotFleetRole
 ```
 
-**Note:** Quotes are required when using brackets in bash!
+`orb init` flags:
 
-## Symphony Integration Setup
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--non-interactive` | Skip all prompts | false |
+| `--provider` | Provider type | `aws` |
+| `--region` | AWS region | prompted |
+| `--profile` | AWS profile | prompted |
+| `--scheduler` | Scheduler type (`default`, `hostfactory`) | prompted |
+| `--config-dir` | Custom config directory | OS default |
+| `--subnet-ids` | Comma-separated subnet IDs (non-interactive only) | — |
+| `--security-group-ids` | Comma-separated security group IDs (non-interactive only) | — |
+| `--fleet-role` | Spot Fleet IAM role ARN (non-interactive only) | — |
+| `--force` | Overwrite existing config | false |
 
-### Shell Script Integration
+`--subnet-ids`, `--security-group-ids`, and `--fleet-role` are only used with `--non-interactive`. In interactive mode ORB discovers these from your AWS account automatically.
 
-IBM Spectrum Symphony Host Factory calls the shell scripts in the `scripts/` directory:
+## Basic Usage
 
 ```bash
-# Available shell scripts for Symphony integration:
-scripts/
-+--- getAvailableTemplates.sh    # Get available VM templates
-+--- requestMachines.sh          # Request new machines
-+--- getRequestStatus.sh         # Check request status
-+--- getReturnRequests.sh        # Get return requests
-+--- requestReturnMachines.sh    # Return machines
-+--- invoke_provider.sh          # Main wrapper script
+# Generate example templates for your provider
+orb templates generate
+
+# List available templates
+orb templates list
+
+# Request machines
+orb machines request <template-id> <count>
+
+# Check request status
+orb requests status <request-id>
+
+# Show system health
+orb system health
 ```
 
-### Script Execution Flow
+## Verify Infrastructure
 
-```mermaid
-graph LR
-    Symphony[IBM Symphony] --> Script[Shell Script]
-    Script --> Wrapper[invoke_provider.sh]
-    Wrapper --> Python[run.py]
-    Python --> Provider[Cloud Provider]
-```
-
-### Symphony Configuration
-
-Configure Symphony Host Factory to call the shell scripts:
+After init, confirm ORB can see your AWS infrastructure:
 
 ```bash
-# Example Symphony configuration (adjust paths for your installation)
-PROVIDER_SCRIPT_DIR=/path/to/open-resource-broker/scripts
+# Show what infrastructure ORB is configured to use
+orb infrastructure show
 
-# Symphony will call:
-# $PROVIDER_SCRIPT_DIR/getAvailableTemplates.sh
-# $PROVIDER_SCRIPT_DIR/requestMachines.sh
-# $PROVIDER_SCRIPT_DIR/getRequestStatus.sh
-# etc.
+# Discover available VPCs, subnets, and security groups
+orb infrastructure discover
+
+# Validate configured resources still exist in AWS
+orb infrastructure validate
 ```
 
-### Environment Variables for Symphony
+## Troubleshooting
 
-Set these environment variables for Symphony integration:
-
+**Python version**
 ```bash
-# Required Host Factory environment variables
-export HF_PROVIDER_WORKDIR=/var/lib/hostfactory
-export HF_PROVIDER_LOGDIR=/var/log/hostfactory
-export HF_PROVIDER_CONFDIR=/etc/hostfactory
-
-# Optional environment variables
-export HF_PROVIDER_EVENTSDIR=/var/lib/hostfactory/events
-export HF_PROVIDER_SNAPSHOTSDIR=/var/lib/hostfactory/snapshots
-export HF_PROVIDER_NAME=aws-production
+python --version  # must be 3.10+
 ```
 
-## Configuration Setup
+**AWS credentials not found**
 
-### Basic Configuration
-
-Create the main configuration file:
-
+Ensure your AWS profile is configured:
 ```bash
-# Create configuration directory
-mkdir -p config
-
-# Create basic configuration
-cat > config/config.json << 'EOF'
-{
-  "version": "2.0.0",
-  "provider": {
-    "type": "aws",
-    "aws": {
-      "region": "us-east-1",
-      "profile": "default"
-    }
-  },
-  "logging": {
-    "level": "INFO",
-    "file_path": "logs/app.log",
-    "console_enabled": true
-  },
-  "storage": {
-    "strategy": "json",
-    "json_strategy": {
-      "storage_type": "single_file",
-      "base_path": "data",
-      "filenames": {
-        "single_file": "request_database.json"
-      }
-    }
-  },
-  "template": {
-    "default_image_id": "ami-12345678",
-    "default_instance_type": "t3.medium",
-    "subnet_ids": ["subnet-12345678"],
-    "security_group_ids": ["sg-12345678"],
-    "default_key_name": "",
-    "default_max_number": 10
-  }
-}
-EOF
+aws configure list
+aws sts get-caller-identity
 ```
 
-### Template Configuration
-
-Create template definitions:
-
+Or set environment variables:
 ```bash
-# Create templates file
-cat > config/templates.json << 'EOF'
-{
-  "templates": [
-    {
-      "template_id": "basic-template",
-      "provider_api": "RunInstances",
-      "max_number": 10,
-      "attributes": {
-        "type": ["String", "X86_64"],
-        "ncores": ["Numeric", "2"],
-        "ncpus": ["Numeric", "1"],
-        "nram": ["Numeric", "4096"]
-      },
-      "image_id": "ami-12345678",
-      "vm_type": "t3.medium",
-      "subnet_id": "subnet-12345678",
-      "security_group_ids": ["sg-12345678"],
-      "key_name": "your-key-name"
-    }
-  ]
-}
-EOF
+export AWS_PROFILE=my-profile
+export AWS_DEFAULT_REGION=us-east-1
 ```
 
-## Testing Installation
+**Config not loading**
 
-### Prerequisites for Testing
-
-Before testing the installation, ensure all dependencies are installed:
-
+Show the active configuration:
 ```bash
-# Ensure you're in the virtual environment
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install all required dependencies
-pip install -r requirements.txt
-
-# Verify dependencies are installed
-python -c "import pydantic; print('Dependencies OK')"
+orb config show
 ```
 
-### Test Direct Python Execution
-
+Validate it:
 ```bash
-# Test basic functionality (requires dependencies)
-python run.py getAvailableTemplates
-
-# Test with configuration file
-python run.py getAvailableTemplates --config config/config.json
-
-# Test help command
-python run.py --help
+orb config validate
 ```
 
-### Test Shell Script Integration
+**Re-run infrastructure discovery**
 
+If subnets or security groups change after init:
 ```bash
-# Make scripts executable
-chmod +x scripts/*.sh
-
-# Test shell scripts (as Symphony would call them)
-./scripts/getAvailableTemplates.sh
-
-# Test with input data
-echo '{}' | ./scripts/getAvailableTemplates.sh
-
-# Test request machines
-echo '{"template_id": "basic-template", "machine_count": 1}' | ./scripts/requestMachines.sh
-```
-
-### Verify Symphony Integration
-
-```bash
-# Test the complete integration flow
-export HF_PROVIDER_CONFDIR=$(pwd)/config
-export HF_PROVIDER_WORKDIR=$(pwd)/data
-export HF_PROVIDER_LOGDIR=$(pwd)/logs
-
-# Create directories
-mkdir -p data logs
-
-# Test as Symphony would call
-./scripts/getAvailableTemplates.sh
-```
-
-## Directory Structure
-
-After installation, your directory structure should look like:
-
-```
-open-resource-broker/
-+--- config/
-|   +--- config.json              # Main configuration
-|   +--- templates.json           # Template definitions
-+--- data/                        # Data storage directory
-+--- logs/                        # Log files directory
-+--- scripts/                     # Shell scripts for Symphony
-|   +--- getAvailableTemplates.sh
-|   +--- requestMachines.sh
-|   +--- getRequestStatus.sh
-|   +--- getReturnRequests.sh
-|   +--- requestReturnMachines.sh
-|   +--- invoke_provider.sh
-+--- src/                         # Python source code
-+--- run.py                       # Main Python entry point
-+--- requirements.txt             # Python dependencies
-+--- readme.md                    # Project documentation
-```
-
-## Troubleshooting Installation
-
-### Common Issues
-
-#### Python Version Issues
-```bash
-# Check Python version
-python --version
-python3 --version
-
-# Use specific Python version if needed
-python3.10 -m venv .venv
-```
-
-#### Permission Issues
-```bash
-# Make shell scripts executable
-chmod +x scripts/*.sh
-
-# Check script permissions
-ls -la scripts/
-```
-
-#### Path Issues
-```bash
-# Verify script paths
-which python
-which python3
-
-# Check PYTHONPATH in invoke_provider.sh
-cat scripts/invoke_provider.sh
-```
-
-#### Configuration Issues
-```bash
-# Validate JSON configuration
-python -m json.tool config/config.json
-
-# Check configuration loading
-python -c "
-from src.config.manager import ConfigurationManager
-config = ConfigurationManager()
-print('Configuration loaded successfully')
-"
-```
-
-### Verification Commands
-
-```bash
-# Test complete installation
-./scripts/check_requirements.sh
-
-# Verify all components
-python -c "
-from src.bootstrap import create_application
-app = create_application()
-print('Application created successfully')
-"
-
-# Test Symphony integration
-export HF_PROVIDER_CONFDIR=$(pwd)/config
-./scripts/getAvailableTemplates.sh
+orb infrastructure discover
 ```
 
 ## Next Steps
 
-After successful installation:
-
-1. **[Configuration](configuration.md)**: Configure the application for your environment
-2. **[Templates](templates.md)**: Set up VM templates for your use cases
-3. **[Deployment](deployment.md)**: Deploy in your Symphony environment
-4. **[Monitoring](monitoring.md)**: Set up monitoring and logging
-
-## Production Deployment
-
-For production deployment with Symphony:
-
-```bash
-# Install to system location
-sudo mkdir -p /opt/hostfactory
-sudo cp -r . /opt/hostfactory/
-sudo chown -R symphony:symphony /opt/hostfactory
-
-# Set up system directories
-sudo mkdir -p /var/lib/hostfactory
-sudo mkdir -p /var/log/hostfactory
-sudo mkdir -p /etc/hostfactory
-sudo chown symphony:symphony /var/lib/hostfactory /var/log/hostfactory /etc/hostfactory
-
-# Configure Symphony to use system paths
-export HF_PROVIDER_WORKDIR=/var/lib/hostfactory
-export HF_PROVIDER_LOGDIR=/var/log/hostfactory
-export HF_PROVIDER_CONFDIR=/etc/hostfactory
-```
+- [CLI Reference](../cli/cli-reference.md) — all commands and flags
+- [Infrastructure Commands](../cli/infrastructure-commands.md) — discover and validate AWS infrastructure
+- [Configuration](configuration.md) — configure ORB for your environment
+- [Templates](templates.md) — set up compute templates

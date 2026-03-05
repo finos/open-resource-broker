@@ -297,8 +297,7 @@ orb providers test aws_prod_us-east-1
 The naming convention is designed to be extensible for future provider types:
 
 **Potential Future Patterns:**
-- `azure_{subscription}_{region}` - Azure providers
-- `gcp_{project}_{region}` - Google Cloud providers
-- `openstack_{tenant}_{region}` - OpenStack providers
+- `provider1_{account}_{region}` - Provider1 providers
+- `provider2_{project}_{region}` - Provider2 providers
 
 This structured approach ensures consistency and scalability as new provider types are added to the system.

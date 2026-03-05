@@ -3,38 +3,19 @@
 from application.provider.commands import (
     ExecuteProviderOperationCommand,
     RegisterProviderStrategyCommand,
-    SelectProviderStrategyCommand,
     UpdateProviderHealthCommand,
 )
-from providers.base.strategy import (
-    ProviderHealthStatus,
-    ProviderOperation,
-    ProviderOperationType,
-    SelectionCriteria,
-)
+from domain.base.operations import Operation, OperationType
+from providers.base.strategy import ProviderHealthStatus
 
 
 class TestProviderStrategyCommands:
     """Test provider strategy command creation and validation."""
 
-    def test_select_provider_strategy_command_creation(self):
-        """Test SelectProviderStrategyCommand creation."""
-        criteria = SelectionCriteria()
-
-        command = SelectProviderStrategyCommand(
-            operation_type=ProviderOperationType.HEALTH_CHECK,
-            selection_criteria=criteria,
-            context={"test": "data"},
-        )
-
-        assert command.operation_type == ProviderOperationType.HEALTH_CHECK
-        assert command.selection_criteria == criteria
-        assert command.context == {"test": "data"}
-
     def test_execute_provider_operation_command_creation(self):
         """Test ExecuteProviderOperationCommand creation."""
-        operation = ProviderOperation(
-            operation_type=ProviderOperationType.CREATE_INSTANCES,
+        operation = Operation(
+            operation_type=OperationType.CREATE_INSTANCES,
             parameters={"count": 2},
         )
 

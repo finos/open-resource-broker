@@ -1,9 +1,10 @@
 """Health check command handler."""
 
-import os
 from pathlib import Path
+from typing import Any, cast
 
 from cli.console import print_error, print_info, print_success, print_warning
+from domain.base.ports.configuration_port import ConfigurationPort
 from domain.base.ports.scheduler_port import SchedulerPort
 from infrastructure.di.container import get_container
 
@@ -17,11 +18,12 @@ def handle_health_check(args) -> int:
     try:
         container = get_container()
         scheduler_strategy = container.get(SchedulerPort)
+        config_port = container.get(ConfigurationPort)
 
         checks = []
 
         # 1. Config file check
-        config_path = os.environ.get("ORB_CONFIG_FILE") or "./config/config.json"
+        config_path = config_port.get_config_file_path() or "./config/config.json"
         checks.append(
             {
                 "name": "config_file",
@@ -33,14 +35,27 @@ def handle_health_check(args) -> int:
         # 2. Templates file check
         try:
             scheduler = container.get(SchedulerPort)
-            templates_path = scheduler.get_templates_file_path()
-            checks.append(
-                {
-                    "name": "templates_file",
-                    "status": "pass" if Path(templates_path).exists() else "fail",
-                    "details": templates_path,
-                }
-            )
+            template_paths = cast(Any, scheduler).get_template_paths()
+
+            # Check if any template file exists
+            existing_paths = [path for path in template_paths if Path(path).exists()]
+
+            if existing_paths:
+                checks.append(
+                    {
+                        "name": "templates_file",
+                        "status": "pass",
+                        "details": f"{len(existing_paths)} template files found: {', '.join(existing_paths)}",
+                    }
+                )
+            else:
+                checks.append(
+                    {
+                        "name": "templates_file",
+                        "status": "fail",
+                        "details": f"No template files found. Checked: {', '.join(template_paths)}",
+                    }
+                )
         except Exception as e:
             checks.append({"name": "templates_file", "status": "fail", "error": str(e)})
 
@@ -62,12 +77,14 @@ def handle_health_check(args) -> int:
 
         # 4. Provider health check (provider-agnostic)
         try:
-            from domain.base.ports import ProviderPort
+            from providers.registry import get_provider_registry
 
-            provider_port = container.get(ProviderPort)
-            strategies = provider_port.available_strategies()
+            registry = get_provider_registry()
+            provider_types = registry.get_registered_providers()
+            provider_instances = registry.get_registered_provider_instances()
+            all_providers = provider_types + provider_instances
 
-            if not strategies:
+            if not all_providers:
                 checks.append(
                     {
                         "name": "provider_health",
@@ -78,24 +95,20 @@ def handle_health_check(args) -> int:
             else:
                 # Check all configured providers
                 healthy_count = 0
-                total_count = len(strategies)
+                total_count = len(all_providers)
                 errors = []
 
-                for strategy_name in strategies:
+                for provider_name in all_providers:
                     try:
-                        health_result = provider_port.get_strategy(strategy_name)
-                        if (
-                            health_result
-                            and hasattr(health_result, "is_healthy")
-                            and health_result.is_healthy
-                        ):
+                        health_status = cast(Any, registry).check_strategy_health(provider_name)
+                        if health_status and health_status.is_healthy:
                             healthy_count += 1
-                        elif health_result and hasattr(health_result, "status_message"):
-                            errors.append(f"{strategy_name}: {health_result.status_message}")
+                        elif health_status:
+                            errors.append(f"{provider_name}: {health_status.message}")
                         else:
-                            errors.append(f"{strategy_name}: Unknown health status")
+                            errors.append(f"{provider_name}: No health data available")
                     except Exception as e:
-                        errors.append(f"{strategy_name}: {e!s}")
+                        errors.append(f"{provider_name}: {e!s}")
 
                 if healthy_count == total_count:
                     status = "pass"
@@ -140,10 +153,10 @@ def handle_health_check(args) -> int:
             checks.append({"name": "logs_directory", "status": "fail", "error": str(e)})
 
         # Format response using scheduler strategy
-        response = scheduler_strategy.format_health_response(checks)
+        response = cast(Any, scheduler_strategy).format_health_response(checks)
 
         # Console output for interactive use (not controlled by logging setting)
-        if not scheduler_strategy.should_log_to_console():
+        if not cast(Any, scheduler_strategy).should_log_to_console():
             # HostFactory mode: only output JSON, no extra messages
             pass
         else:

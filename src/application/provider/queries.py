@@ -20,11 +20,13 @@ class GetProviderHealthQuery(BaseQuery):
 class ListAvailableProvidersQuery(BaseQuery):
     """Query to list all available provider strategies."""
 
+    provider_name: Optional[str] = None
     include_health: bool = True
     include_capabilities: bool = True
     include_metrics: bool = False
     filter_healthy_only: bool = False
     provider_type: Optional[str] = None
+    filter_expressions: list[str] = []
 
 
 class GetProviderCapabilitiesQuery(BaseQuery):
@@ -39,7 +41,7 @@ class GetProviderMetricsQuery(BaseQuery):
     """Query to get provider performance metrics."""
 
     provider_name: Optional[str] = None  # None = all providers
-    time_range_hours: int = 24
+    timeframe: str = "24h"
     include_operation_breakdown: bool = True
     include_error_details: bool = False
 

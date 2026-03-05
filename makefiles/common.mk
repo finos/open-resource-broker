@@ -61,9 +61,9 @@ DOCS_BUILD_DIR := $(DOCS_DIR)/site
 # Centralized tool execution function
 # Usage: $(call run-tool,tool-name,arguments[,working-dir])
 define run-tool
-	$(if $(3),cd $(3) && ../dev-tools/scripts/run_tool.sh $(1) $(2),@dev-tools/scripts/run_tool.sh $(1) $(2))
+	$(if $(3),cd $(3) && ../dev-tools/setup/run_tool.sh $(1) $(2),@dev-tools/setup/run_tool.sh $(1) $(2))
 endef
 
 # Virtual environment setup (common dependency for all makefiles)
 venv-setup: uv.lock
-	./dev-tools/scripts/venv_setup.py
+	./dev-tools/setup/venv_setup.py

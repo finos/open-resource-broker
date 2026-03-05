@@ -206,7 +206,7 @@ def test_base_handler_validation():
         print("   Testing base handler validation...")
 
         # Create a concrete handler for testing (using SpotFleetHandler)
-        from providers.aws.infrastructure.handlers.spot_fleet_handler import (
+        from providers.aws.infrastructure.handlers.spot_fleet.handler import (
             SpotFleetHandler,
         )
 

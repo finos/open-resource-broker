@@ -136,16 +136,18 @@ class MetricsCollector:
         with self._lock:
             if name not in self.metrics:
                 self.register_counter(name)
-            if isinstance(self.metrics[name], Counter):
-                self.metrics[name].increment(value)
+            metric = self.metrics[name]
+            if isinstance(metric, Counter):
+                metric.increment(value)
 
     def set_gauge(self, name: str, value: float) -> None:
         """Set a gauge metric value."""
         with self._lock:
             if name not in self.metrics:
                 self.register_gauge(name)
-            if isinstance(self.metrics[name], Gauge):
-                self.metrics[name].set(value)
+            metric = self.metrics[name]
+            if isinstance(metric, Gauge):
+                metric.set(value)
 
     def start_timer(self, name: str = "", labels: Optional[dict[str, str]] = None) -> Timer:
         """Start a new timer."""
@@ -242,7 +244,7 @@ class MetricsCollector:
             logger.debug("Flushed %d traces to %s", len(traces_to_write), trace_file)
 
         except Exception as e:
-            logger.error("Failed to flush traces: %s", e)
+            logger.error("Failed to flush traces: %s", e, exc_info=True)
             # Don't re-raise - tracing failures shouldn't crash the application
 
     def _start_metrics_writer(self) -> None:
@@ -255,7 +257,7 @@ class MetricsCollector:
                     self._write_metrics_snapshot()
                     time.sleep(self.config.get("metrics_interval", 10))
                 except Exception as e:
-                    logger.error("Error writing metrics: %s", e)
+                    logger.error("Error writing metrics: %s", e, exc_info=True)
                     time.sleep(5)  # Shorter sleep on error
 
         thread = threading.Thread(target=write_metrics, daemon=True)
@@ -286,7 +288,7 @@ class MetricsCollector:
         try:
             self._write_metrics_snapshot()
         except Exception as e:
-            logger.error("Error flushing metrics: %s", e)
+            logger.error("Error flushing metrics: %s", e, exc_info=True)
 
     def __del__(self) -> None:
         """Best-effort flush on collector destruction."""
@@ -344,4 +346,6 @@ class MetricsCollector:
                     try:
                         file.unlink()
                     except Exception as e:
-                        logger.warning("Failed to delete old metrics file %s: %s", file, e)
+                        logger.warning(
+                            "Failed to delete old metrics file %s: %s", file, e, exc_info=True
+                        )

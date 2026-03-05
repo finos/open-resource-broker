@@ -39,8 +39,7 @@ def _iter_ec2_fleets(ec2_client) -> Iterable[dict[str, Any]]:
     paginator = ec2_client.get_paginator("describe_fleets")
     filters = [{"Name": "fleet-state", "Values": list(EC2_FLEET_ACTIVE_STATES)}]
     for page in paginator.paginate(Filters=filters):
-        for fleet in page.get("Fleets", []):
-            yield fleet
+        yield from page.get("Fleets", [])
 
 
 def _iter_spot_fleets(ec2_client) -> Iterable[dict[str, Any]]:
@@ -159,11 +158,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    session = (
-        boto3.session.Session(profile_name=args.profile)
-        if args.profile
-        else boto3.session.Session()
-    )
+    session = boto3.Session(profile_name=args.profile) if args.profile else boto3.Session()
     ec2_client = session.client("ec2", region_name=args.region)
 
     try:
@@ -178,11 +173,9 @@ def main() -> int:
     _print_spot_fleets(spot_fleets)
 
     if args.terminate:
-        ec2_fleet_ids = [fleet.get("FleetId") for fleet in ec2_fleets if fleet.get("FleetId")]
-        spot_fleet_ids = [
-            fleet.get("SpotFleetRequestId")
-            for fleet in spot_fleets
-            if fleet.get("SpotFleetRequestId")
+        ec2_fleet_ids: list[str] = [f for fleet in ec2_fleets if (f := fleet.get("FleetId"))]
+        spot_fleet_ids: list[str] = [
+            f for fleet in spot_fleets if (f := fleet.get("SpotFleetRequestId"))
         ]
         try:
             _terminate_ec2_fleets(ec2_client, ec2_fleet_ids)

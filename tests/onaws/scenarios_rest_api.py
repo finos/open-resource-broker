@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 from tests.onaws.scenarios import (
     CUSTOM_TEST_CASES as CUSTOM_TEST_CASES,
     DEFAULT_ATTRIBUTE_COMBINATIONS as _DEFAULT_ATTRIBUTE_COMBINATIONS,
+    resolve_template_id,
 )
 
 REST_API_RUN_DEFAULT_COMBINATIONS = False
@@ -22,7 +23,7 @@ REST_API_BASE_URL = "http://localhost:8000"  # versioned in RestApiClient
 REST_API_PREFIX = "/api/v1"
 REST_API_METRICS_CONFIG: dict[str, Any] | None = {
     "metrics_enabled": True,
-    "metrics_dir": None,  # Filled by TemplateProcessor per test
+    "metrics_dir": None,  # Filled by generate_test_templates per test
     "metrics_interval": 20,
     "trace_enabled": True,
     "trace_buffer_size": 1000,
@@ -139,9 +140,8 @@ def _make_large_scale_tests() -> List[Dict[str, Any]]:
     def spot(cap: int) -> Dict[str, Any]:
         return {
             "test_name": f"hostfactory.SpotFleet.request.ABIS.SIZE.{cap}",
-            "template_id": "SpotFleetRequest",
+            "template_id": "SpotFleet-Request-LowestPrice",
             "capacity_to_request": cap,
-            "awsprov_base_template": "awsprov_templates.base.json",
             "overrides": {
                 "providerApi": "SpotFleet",
                 "fleetType": "request",
@@ -154,9 +154,8 @@ def _make_large_scale_tests() -> List[Dict[str, Any]]:
     def ec2_request(cap: int) -> Dict[str, Any]:
         return {
             "test_name": f"hostfactory.EC2Fleet.request.ABIS.SIZE.{cap}",
-            "template_id": "EC2FleetRequest",
+            "template_id": "EC2Fleet-Request-OnDemand",
             "capacity_to_request": cap,
-            "awsprov_base_template": "awsprov_templates.base.json",
             "overrides": {
                 "providerApi": "EC2Fleet",
                 "scheduler": "hostfactory",
@@ -169,9 +168,8 @@ def _make_large_scale_tests() -> List[Dict[str, Any]]:
     def ec2_instant(cap: int) -> Dict[str, Any]:
         return {
             "test_name": f"hostfactory.EC2Fleet.intant.ABIS.SIZE.{cap}",
-            "template_id": "EC2FleetRequest",
+            "template_id": "EC2Fleet-Instant-OnDemand",
             "capacity_to_request": cap,
-            "awsprov_base_template": "awsprov_templates.base.json",
             "overrides": {
                 "providerApi": "EC2Fleet",
                 "scheduler": "hostfactory",
@@ -184,9 +182,8 @@ def _make_large_scale_tests() -> List[Dict[str, Any]]:
     def asg(cap: int) -> Dict[str, Any]:
         return {
             "test_name": f"hostfactory.ASG.ABIS.SIZE.{cap}",
-            "template_id": "ASG",
+            "template_id": "ASG-OnDemand",
             "capacity_to_request": cap,
-            "awsprov_base_template": "awsprov_templates.base.json",
             "overrides": {
                 "providerApi": "ASG",
                 "scheduler": "hostfactory",
@@ -217,9 +214,8 @@ def generate_scenarios_from_attributes(
     """
     if base_template is None:
         base_template = {
-            "template_id": "BASE",
+            "template_id": None,  # Resolved per-scenario via resolve_template_id()
             "capacity_to_request": 4,
-            "awsprov_base_template": "awsprov_templates.base.json",
         }
 
     scenarios = []
@@ -275,6 +271,10 @@ def generate_scenarios_from_attributes(
         # Create the scenario
         scenario = base_template.copy()
         scenario.update({"test_name": test_name, "overrides": overrides})
+
+        # Resolve template_id from aws_templates.json if not explicitly set
+        if not scenario.get("template_id"):
+            scenario["template_id"] = resolve_template_id(overrides)
 
         scenarios.append(scenario)
 

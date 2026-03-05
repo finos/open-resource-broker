@@ -66,7 +66,6 @@ class MachineEvent(DomainEvent):
     """Base class for machine-related events."""
 
     machine_id: str
-    instance_id: Optional[str] = None
 
 
 class MachineCreatedEvent(MachineEvent):
@@ -86,7 +85,6 @@ class MachineStatusChangedEvent(MachineEvent, StatusChangeEvent):
 class MachineProvisionedEvent(MachineEvent):
     """Event raised when a machine is successfully provisioned."""
 
-    instance_id: str
     private_ip: Optional[str] = None
     public_ip: Optional[str] = None
     provisioning_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -137,7 +135,7 @@ class TemplateUpdatedEvent(TemplateEvent):
     """Event raised when a template is updated."""
 
     changes: dict[str, Any] = Field(default_factory=dict)
-    version: int
+    version: int = 0  # type: ignore[assignment]
 
 
 class TemplateDeletedEvent(TemplateEvent):

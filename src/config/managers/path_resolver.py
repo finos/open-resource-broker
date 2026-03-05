@@ -32,7 +32,7 @@ class ConfigPathResolver:
             path = config_path
         # Use base config path if available
         elif self._base_config_path:
-            base_dir = os.path.dirname(self._base_config_path)
+            base_dir = os.path.dirname(os.path.dirname(self._base_config_path))
             path = os.path.join(base_dir, default_path)
         else:
             path = default_path
@@ -47,7 +47,7 @@ class ConfigPathResolver:
         try:
             os.makedirs(abs_path, exist_ok=True)
         except OSError as e:
-            logger.warning("Could not create directory %s: %s", abs_path, e)
+            logger.warning("Could not create directory %s: %s", abs_path, e, exc_info=True)
 
         return abs_path
 
@@ -98,7 +98,7 @@ class ConfigPathResolver:
         self, default_path: Optional[str] = None, config_path: Optional[str] = None
     ) -> str:
         """Get configuration directory path."""
-        default = default_path or "conf"
+        default = default_path or "config"
         return self.resolve_path("conf", default, config_path)
 
     def get_log_dir(
@@ -114,6 +114,13 @@ class ConfigPathResolver:
         """Get events directory path."""
         default = default_path or "events"
         return self.resolve_path("events", default, config_path)
+
+    def get_cache_dir(
+        self, default_path: Optional[str] = None, config_path: Optional[str] = None
+    ) -> str:
+        """Get cache directory path."""
+        default = default_path or os.path.join("work", ".cache")
+        return self.resolve_path("cache", default, config_path)
 
     def get_snapshots_dir(
         self, default_path: Optional[str] = None, config_path: Optional[str] = None

@@ -37,22 +37,22 @@ class MachineReferenceDTO(BaseDTO):
         Returns:
             MachineReferenceDTO instance
         """
-        # Extract fields from metadata if available
-        metadata = machine_ref.metadata or {}
+        # Extract fields from metadata if available (MachineReference may not have metadata)
+        metadata: dict = getattr(machine_ref, "metadata", None) or {}
 
         return cls(
             machine_id=str(machine_ref.machine_id),
-            name=machine_ref.name,
-            result=cls.serialize_enum(machine_ref.result),  # Fixed: cls instead of self
-            status=cls.serialize_enum(machine_ref.status),  # Fixed: cls instead of self
-            private_ip_address=machine_ref.private_ip,
-            public_ip_address=machine_ref.public_ip,
-            instance_type=metadata.get("instance_type"),  # Fixed: snake_case
-            price_type=metadata.get("price_type"),  # Fixed: snake_case
-            instance_tags=metadata.get("instance_tags"),  # Fixed: snake_case
-            cloud_host_id=metadata.get("cloud_host_id"),  # Fixed: snake_case
-            launch_time=metadata.get("launch_time"),  # Fixed: snake_case
-            message=machine_ref.message,
+            name=getattr(machine_ref, "name", ""),
+            result=cls.serialize_enum(machine_ref.result) or "",
+            status=cls.serialize_enum(machine_ref.status) or "",
+            private_ip_address=getattr(machine_ref, "private_ip", ""),
+            public_ip_address=getattr(machine_ref, "public_ip", None),
+            instance_type=metadata.get("instance_type"),
+            price_type=metadata.get("price_type"),
+            instance_tags=metadata.get("instance_tags"),
+            cloud_host_id=metadata.get("cloud_host_id"),
+            launch_time=metadata.get("launch_time"),
+            message=getattr(machine_ref, "message", machine_ref.error_message or ""),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -63,7 +63,13 @@ class MachineReferenceDTO(BaseDTO):
         Returns:
             Dictionary with snake_case field names
         """
-        return self.model_dump(exclude_none=True)
+        d = self.model_dump(exclude_none=True)
+        # launch_time and cloud_host_id must always be present (even if null)
+        if "launch_time" not in d:
+            d["launch_time"] = None
+        if "cloud_host_id" not in d:
+            d["cloud_host_id"] = None
+        return d
 
 
 class RequestDTO(BaseDTO):
@@ -77,52 +83,85 @@ class RequestDTO(BaseDTO):
     last_status_check: Optional[datetime] = None
     first_status_check: Optional[datetime] = None
     machine_references: list[MachineReferenceDTO] = Field(default_factory=list)
+    machine_ids: list[str] = Field(default_factory=list)
     message: str = ""
     resource_id: Optional[str] = None
     provider_api: Optional[str] = None
+    provider_name: Optional[str] = None
+    provider_type: Optional[str] = None
     launch_template_id: Optional[str] = None
     launch_template_version: Optional[str] = None
     metadata: dict[str, Any] = Field(default_factory=dict)
     request_type: str = "acquire"
     long: bool = False  # Flag to indicate whether to include detailed information
+    desired_capacity: int = 1
+    successful_count: int = 0
+    failed_count: int = 0
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    error_details: dict[str, Any] = Field(default_factory=dict)
+    provider_data: dict[str, Any] = Field(default_factory=dict)
+    version: int = 0
+    resource_ids: list[str] = Field(default_factory=list)
 
     @classmethod
-    def from_domain(cls, request: Request, long: bool = False) -> "RequestDTO":
+    def from_domain(
+        cls,
+        request: Request,
+        long: bool = False,
+        machine_references: Optional[list["MachineReferenceDTO"]] = None,
+    ) -> "RequestDTO":
         """
         Create DTO from domain object.
 
         Args:
             request: Request domain object
             long: Whether to include detailed information
+            machine_references: Optional fresh machine references to use instead of domain object's
 
         Returns:
             RequestDTO instance
         """
-        # Convert machine references
-        machine_refs = []
-
-        # Get existing machine references
-        if hasattr(request, "machine_references") and request.machine_references:
-            machine_refs = [MachineReferenceDTO.from_domain(m) for m in request.machine_references]
+        # Use provided machine references or convert from domain
+        if machine_references is not None:
+            machine_refs = machine_references
+        else:
+            machine_refs = []
+            # Get existing machine references (domain model may not have this field)
+            domain_refs = getattr(request, "machine_references", None)
+            if domain_refs:
+                machine_refs = [MachineReferenceDTO.from_domain(m) for m in domain_refs]
 
         # Create the DTO with all available fields
         return cls(
             request_id=str(request.request_id),
-            status=cls.serialize_enum(request.status),
+            status=cls.serialize_enum(request.status) or "",
             template_id=str(request.template_id) if request.template_id else None,
-            requested_count=request.requested_count,  # Fixed: snake_case field name
-            created_at=request.created_at,
+            requested_count=request.requested_count,
+            created_at=request.created_at,  # type: ignore[arg-type]
             last_status_check=None,  # Not available in current domain model
             first_status_check=None,  # Not available in current domain model
             machine_references=machine_refs,
-            message=request.status_message or "",  # Provide empty string if None
-            resource_id=None,  # Not available in current domain model
-            provider_api=None,  # Not available in current domain model
+            machine_ids=[mid for mid in (request.machine_ids or []) if mid is not None],
+            message=request.status_message or "",
+            resource_id=request.resource_ids[0] if request.resource_ids else None,
+            provider_api=request.provider_api,
+            provider_name=request.provider_name,
+            provider_type=request.provider_type,
             launch_template_id=None,  # Not available in current domain model
             launch_template_version=None,  # Not available in current domain model
             metadata=request.metadata,
-            request_type=cls.serialize_enum(request.request_type),
+            request_type=cls.serialize_enum(request.request_type) or "",
             long=long,
+            desired_capacity=request.desired_capacity,
+            successful_count=request.successful_count,
+            failed_count=request.failed_count,
+            started_at=request.started_at,
+            completed_at=request.completed_at,
+            error_details=request.error_details,
+            provider_data=request.provider_data,
+            version=request.version,
+            resource_ids=request.resource_ids,
         )
 
     def to_dict(self, long: Optional[bool] = None) -> dict[str, Any]:
@@ -213,10 +252,10 @@ class RequestMachinesResponse(BaseDTO):
         Convert to dictionary format matching the expected API format.
 
         Returns:
-            Dictionary with requestId and message fields
+            Dictionary with requestId and message fields (camelCase for API consumers)
         """
         # Clients must use the full prefixed ID for subsequent requests
-        return {"request_id": self.request_id, "message": self.message}
+        return {"requestId": self.request_id, "message": self.message}
 
 
 class RequestReturnMachinesResponse(BaseDTO):
@@ -234,7 +273,7 @@ class RequestReturnMachinesResponse(BaseDTO):
             Dictionary with requestId and message fields
         """
         return {
-            "request_id": self.request_id if self.request_id else "",
+            "requestId": self.request_id if self.request_id else "",
             "message": self.message,
         }
 

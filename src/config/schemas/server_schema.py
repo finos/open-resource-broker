@@ -57,7 +57,7 @@ class ServerConfig(BaseModel):
 
     enabled: bool = Field(False, description="Enable REST API server")
     # Intentional binding for server deployment
-    host: str = Field("0.0.0.0", description="Server host")  # nosec B104
+    host: str = Field("0.0.0.0", description="Server host")  # nosec B104 - intentional default for server deployment, overridable via config
     port: int = Field(8000, description="Server port")
     workers: int = Field(1, description="Number of worker processes")
     reload: bool = Field(False, description="Enable auto-reload for development")
@@ -71,8 +71,8 @@ class ServerConfig(BaseModel):
     openapi_url: str = Field("/openapi.json", description="OpenAPI schema URL")
 
     # Authentication and CORS
-    auth: AuthConfig = Field(default=AuthConfig(), description="Authentication configuration")
-    cors: CORSConfig = Field(default=CORSConfig(), description="CORS configuration")
+    auth: AuthConfig = Field(default_factory=AuthConfig, description="Authentication configuration")  # type: ignore[arg-type]
+    cors: CORSConfig = Field(default_factory=CORSConfig, description="CORS configuration")  # type: ignore[arg-type]
 
     # Security
     require_https: bool = Field(False, description="Require HTTPS for all requests")

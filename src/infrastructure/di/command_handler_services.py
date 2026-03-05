@@ -4,20 +4,22 @@ All command handlers are now automatically discovered and registered via
 @command_handler decorators through the Handler Discovery System.
 """
 
+from typing import TYPE_CHECKING
+
 from application.commands.machine_handlers import (
     CleanupMachineResourcesHandler,
-    ConvertBatchMachineStatusCommandHandler,
-    ConvertMachineStatusCommandHandler,
     UpdateMachineStatusHandler,
-    ValidateProviderStateCommandHandler,
 )
-from domain.base.ports import LoggingPort
+from domain.base.ports.logging_port import LoggingPort
 from infrastructure.di.buses import CommandBus
-from infrastructure.di.container import DIContainer
-from providers.base.strategy.provider_context import ProviderContext
+
+# Provider Context removed - using Provider Registry instead
+
+if TYPE_CHECKING:
+    from infrastructure.di.container import DIContainer
 
 
-def register_command_handler_services(container: DIContainer) -> None:
+def register_command_handler_services(container: "DIContainer") -> None:
     """Register command handler services."""
 
     # Register machine command handlers
@@ -42,80 +44,61 @@ def register_command_handler_services(container: DIContainer) -> None:
     _register_cli_command_handlers(container)
 
 
-def _register_machine_command_handlers(container: DIContainer) -> None:
+def _register_machine_command_handlers(container: "DIContainer") -> None:
     """Register machine-related command handlers."""
 
     # All machine command handlers are now automatically discovered and registered
     # via @command_handler decorators through the Handler Discovery System
 
 
-def _register_request_command_handlers(container: DIContainer) -> None:
+def _register_request_command_handlers(container: "DIContainer") -> None:
     """Register request-related command handlers."""
 
     # All request command handlers are now automatically discovered and registered
     # via @command_handler decorators through the Handler Discovery System
 
 
-def _register_template_command_handlers(container: DIContainer) -> None:
+def _register_template_command_handlers(container: "DIContainer") -> None:
     """Register template-related command handlers."""
 
     # All template command handlers are now automatically discovered and registered
     # via @command_handler decorators through the Handler Discovery System
 
 
-def _register_system_command_handlers(container: DIContainer) -> None:
+def _register_system_command_handlers(container: "DIContainer") -> None:
     """Register system-related command handlers."""
 
     # All system command handlers are now automatically discovered and registered
     # via @command_handler decorators through the Handler Discovery System
 
 
-def _register_provider_command_handlers(container: DIContainer) -> None:
+def _register_provider_command_handlers(container: "DIContainer") -> None:
     """Register provider-related command handlers."""
 
     # All provider command handlers are now automatically discovered and registered
     # via @command_handler decorators through the Handler Discovery System
 
 
-def _register_cleanup_command_handlers(container: DIContainer) -> None:
+def _register_cleanup_command_handlers(container: "DIContainer") -> None:
     """Register cleanup-related command handlers."""
 
     # All cleanup command handlers are now automatically discovered and registered
     # via @command_handler decorators through the Handler Discovery System
 
 
-def register_command_handlers_with_bus(container: DIContainer) -> None:
+def register_command_handlers_with_bus(container: "DIContainer") -> None:
     """Register command handlers with the command bus."""
 
     try:
         command_bus = container.get(CommandBus)
         logger = container.get(LoggingPort)
 
-        # Get provider context for strategy handlers
-        container.get(ProviderContext)
+        # Provider Context removed - using Provider Registry instead
 
         # Register machine command handlers
         from application.machine.commands import (
             CleanupMachineResourcesCommand,
-            ConvertBatchMachineStatusCommand,
-            ConvertMachineStatusCommand,
             UpdateMachineStatusCommand,
-            ValidateProviderStateCommand,
-        )
-
-        command_bus.register(
-            ConvertMachineStatusCommand,
-            container.get(ConvertMachineStatusCommandHandler),
-        )
-
-        command_bus.register(
-            ConvertBatchMachineStatusCommand,
-            container.get(ConvertBatchMachineStatusCommandHandler),
-        )
-
-        command_bus.register(
-            ValidateProviderStateCommand,
-            container.get(ValidateProviderStateCommandHandler),
         )
 
         command_bus.register(UpdateMachineStatusCommand, container.get(UpdateMachineStatusHandler))
@@ -168,14 +151,16 @@ def register_command_handlers_with_bus(container: DIContainer) -> None:
                 logger.debug("CleanupOldRequestsHandler not available: %s", e)
 
         except Exception as e:
-            logger.warning("Failed to register request command handlers with bus: %s", e)
+            logger.warning(
+                "Failed to register request command handlers with bus: %s", e, exc_info=True
+            )
 
     except Exception as e:
         logger = container.get(LoggingPort)
-        logger.warning("Failed to register some command handlers: %s", e)
+        logger.warning("Failed to register some command handlers: %s", e, exc_info=True)
 
 
-def _register_cli_command_handlers(container: DIContainer) -> None:
+def _register_cli_command_handlers(container: "DIContainer") -> None:
     """Register CLI-related command handlers."""
 
     # All CLI command handlers are now automatically discovered and registered

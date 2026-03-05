@@ -17,6 +17,3 @@ class LoggingConfig(BaseModel):
     max_size: int = Field(10 * 1024 * 1024, description="Maximum log file size in bytes")
     backup_count: int = Field(5, description="Number of backup log files")
     console_enabled: bool = Field(True, description="Whether console logging is enabled")
-    accept_propagated_setting: bool = Field(
-        False, description="Whether to use HostFactory service log settings"
-    )

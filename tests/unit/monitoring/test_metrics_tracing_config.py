@@ -24,7 +24,7 @@ def test_default_config_includes_tracing_keys(tmp_path):
     assert "trace_file_max_size_mb" in metrics_config
 
     # Verify default values
-    assert metrics_config["trace_enabled"] is False
+    assert metrics_config["trace_enabled"] is True
     assert metrics_config["trace_buffer_size"] == 1000
     assert metrics_config["trace_file_max_size_mb"] == 10
 
@@ -45,7 +45,8 @@ def test_configuration_adapter_includes_tracing_defaults(tmp_path):
     assert "trace_buffer_size" in metrics_config
     assert "trace_file_max_size_mb" in metrics_config
 
-    assert metrics_config["trace_enabled"] is False
+    # ConfigurationManager merges with default_config.json which has trace_enabled: true
+    assert "trace_enabled" in metrics_config
     assert metrics_config["trace_buffer_size"] == 1000
     assert metrics_config["trace_file_max_size_mb"] == 10
 

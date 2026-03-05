@@ -19,7 +19,7 @@ from infrastructure.mocking.dry_run_context import is_dry_run_active
 
 # Import moto for AWS mocking
 try:
-    from moto import mock_aws
+    from moto import mock_aws  # type: ignore[import-untyped]
 
     MOTO_AVAILABLE = True
 except ImportError:
@@ -65,7 +65,7 @@ def aws_dry_run_context() -> Generator[None, None, None]:
 
     if is_dry_run_active():
         logger.debug("DRY-RUN: AWS dry-run mode: Using moto for boto3 mocking")
-        with mock_aws():
+        with mock_aws():  # type: ignore[operator]
             yield
     else:
         logger.debug("AWS production mode: Using real boto3 calls")
@@ -103,7 +103,7 @@ def get_aws_dry_run_status() -> dict:
 def _get_moto_version() -> str:
     """Get moto version for debugging purposes."""
     try:
-        import moto
+        import moto  # type: ignore[import-untyped]
 
         return getattr(moto, "__version__", "unknown")
     except (ImportError, AttributeError):

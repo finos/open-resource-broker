@@ -29,7 +29,7 @@ class RequestCacheService:
         """Check if request status caching is enabled."""
         try:
             performance = self.config_manager.app_config.performance
-            return performance.caching.request_status_caching.enabled
+            return performance.caching.request_status.enabled
         except Exception as e:
             self.logger.warning("Failed to get caching config, defaulting to disabled: %s", e)
             return False
@@ -38,7 +38,7 @@ class RequestCacheService:
         """Get cache TTL in seconds."""
         try:
             performance = self.config_manager.app_config.performance
-            return performance.caching.request_status_caching.ttl_seconds
+            return performance.caching.request_status.ttl_seconds
         except Exception as e:
             self.logger.warning("Failed to get cache TTL, defaulting to 300 seconds: %s", e)
             return 300
@@ -68,7 +68,7 @@ class RequestCacheService:
                     for machine in machines:
                         machines_data.append(
                             {
-                                "instance_id": str(machine.instance_id),
+                                "instance_id": str(machine.machine_id),
                                 "status": machine.status.value,
                                 "private_ip": machine.private_ip,
                                 "public_ip": machine.public_ip,
@@ -82,10 +82,9 @@ class RequestCacheService:
                     request_dto = RequestDTO(
                         request_id=str(request.request_id),
                         template_id=request.template_id,
-                        machine_count=request.requested_count,
+                        requested_count=request.requested_count,
                         status=request.status.value,
                         created_at=request.created_at,
-                        machines=machines_data,
                         metadata=request.metadata or {},
                     )
 

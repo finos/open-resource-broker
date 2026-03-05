@@ -301,7 +301,7 @@ class AWSTemplateAdapter:
         self._logger.info(f"Validating AWS template configuration")
 
         # AWS-specific validation logic
-        required_fields = ['image_id', 'vm_type', 'subnet_ids']
+        required_fields = ['image_id', 'machine_types', 'subnet_ids']
         for field in required_fields:
             if field not in template_config:
                 self._logger.error(f"Missing required field: {field}")
@@ -365,7 +365,7 @@ class AWSProviderStrategy(ProviderStrategy):
         for instance in response['Instances']:
             machine = Machine(
                 machine_id=instance['InstanceId'],
-                instance_type=instance['InstanceType'],
+                machine_types=instance['InstanceType'],
                 status=instance['State']['Name'],
                 request_id=request.id
             )
@@ -385,7 +385,7 @@ class AWSProviderStrategy(ProviderStrategy):
 #### DynamoDB Template Repository
 
 ```python
-# src/infrastructure/persistence/dynamodb/template_repository.py
+# src/infrastructure/storage/dynamodb/template_repository.py
 from src.domain.template.repository import TemplateRepository
 from src.domain.template.aggregate import Template
 from src.domain.base.ports import LoggingPort
@@ -471,7 +471,7 @@ class DynamoDBTemplateRepository(TemplateRepository):
 **Business Logic Isolation**
 - Domain logic doesn't depend on specific technologies
 - Can switch from DynamoDB to PostgreSQL without changing business rules
-- Can switch from AWS to Azure without changing core functionality
+- Can switch from AWS to Provider1 without changing core functionality
 
 **Framework Flexibility**
 - Infrastructure can use different frameworks

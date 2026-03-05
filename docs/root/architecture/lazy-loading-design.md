@@ -147,7 +147,7 @@ class Application:
 ### 4. Component-Specific Optimizations
 
 #### Storage Registration
-**File**: `src/infrastructure/persistence/registration.py`
+**File**: `src/infrastructure/storage/registration.py`
 
 ```python
 def register_minimal_storage_types():
@@ -175,7 +175,7 @@ def register_active_scheduler_only(scheduler_type="default"):
 ```
 
 #### Idempotent Registration
-**File**: `src/infrastructure/persistence/json/registration.py`
+**File**: `src/infrastructure/storage/json/registration.py`
 
 ```python
 def register_json_storage():

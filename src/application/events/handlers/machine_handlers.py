@@ -13,7 +13,7 @@ from domain.base.events import DomainEvent
 from domain.base.ports import ErrorHandlingPort, EventPublisherPort, LoggingPort
 
 
-@event_handler("MachineCreatedEvent")
+@event_handler("MachineCreatedEvent")  # type: ignore[arg-type]
 class MachineCreatedHandler(BaseLoggingEventHandler[DomainEvent]):
     """Handle machine creation events using BaseEventHandler pattern."""
 
@@ -44,7 +44,7 @@ class MachineCreatedHandler(BaseLoggingEventHandler[DomainEvent]):
         return message
 
 
-@event_handler("MachineStatusUpdatedEvent")
+@event_handler("MachineStatusUpdatedEvent")  # type: ignore[arg-type]
 class MachineStatusUpdatedHandler(BaseLoggingEventHandler[DomainEvent]):
     """Handle machine status update events using BaseEventHandler pattern."""
 
@@ -68,7 +68,7 @@ class MachineStatusUpdatedHandler(BaseLoggingEventHandler[DomainEvent]):
         )
 
 
-@event_handler("MachineTerminatedEvent")
+@event_handler("MachineTerminatedEvent")  # type: ignore[arg-type]
 class MachineTerminatedHandler(BaseLoggingEventHandler[DomainEvent]):
     """Handle machine termination events using BaseEventHandler pattern."""
 
@@ -96,7 +96,7 @@ class MachineTerminatedHandler(BaseLoggingEventHandler[DomainEvent]):
             return "warning"
 
 
-@event_handler("MachineHealthCheckEvent")
+@event_handler("MachineHealthCheckEvent")  # type: ignore[arg-type]
 class MachineHealthCheckHandler(BaseLoggingEventHandler[DomainEvent]):
     """Handle machine health check events using BaseEventHandler pattern."""
 
@@ -130,7 +130,7 @@ class MachineHealthCheckHandler(BaseLoggingEventHandler[DomainEvent]):
             return "info"
 
 
-@event_handler("MachineErrorEvent")
+@event_handler("MachineErrorEvent")  # type: ignore[arg-type]
 class MachineErrorHandler(BaseLoggingEventHandler[DomainEvent]):
     """Handle machine error events using BaseEventHandler pattern."""
 

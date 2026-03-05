@@ -4,7 +4,7 @@ import json
 import time
 import uuid
 from abc import abstractmethod
-from typing import Any, Callable, Generic, Optional, TypeVar
+from typing import Any, Callable, Generic, Optional, TypeVar, cast
 
 from domain.base.exceptions import DomainException, EntityNotFoundError, ValidationError
 from infrastructure.handlers.base.base_handler import BaseHandler
@@ -89,9 +89,7 @@ class BaseAPIHandler(BaseHandler, Generic[T, R]):
 
         # Apply circuit breaker middleware if service_name is provided
         if service_name:
-            wrapped_func = self.with_retry_middleware(
-                service_name=service_name, failure_threshold=3, reset_timeout=30
-            )(wrapped_func)
+            wrapped_func = self.with_retry_middleware(service_name=service_name)(wrapped_func)
 
         # Apply error handling middleware
         wrapped_func = self.with_error_handling_middleware(wrapped_func)
@@ -207,13 +205,13 @@ class BaseAPIHandler(BaseHandler, Generic[T, R]):
                 result = func(request)
 
                 # Convert result to dictionary if needed
-                if hasattr(result, "to_dict") and callable(result.to_dict):
-                    return result.to_dict()
+                if hasattr(result, "to_dict") and callable(getattr(result, "to_dict")):
+                    return cast(Any, result).to_dict()
                 elif isinstance(result, dict):
                     return result
                 else:
                     # Try to convert to JSON and back to ensure it's serializable
-                    return json.loads(json.dumps(result))
+                    return json.loads(json.dumps(result, default=str))
 
             except ValueError as e:
                 # Handle ValueError specifically for better error messages
@@ -233,13 +231,12 @@ class BaseAPIHandler(BaseHandler, Generic[T, R]):
                 }
 
             except DomainException as e:
-                # Handle all application-specific errors (DomainException and
-                # subclasses)
-                error_dict = (
-                    e.to_dict()
-                    if hasattr(e, "to_dict")
-                    else {"code": e.__class__.__name__, "message": str(e)}
-                )
+                # Handle all application-specific errors (DomainException and subclasses)
+                error_dict: dict[str, Any]
+                if hasattr(e, "to_dict") and callable(getattr(e, "to_dict")):
+                    error_dict = cast(Any, e).to_dict()
+                else:
+                    error_dict = {"code": e.__class__.__name__, "message": str(e)}
 
                 # Add correlation ID if available from the request context
                 correlation_id = getattr(request, "correlation_id", None)
@@ -357,13 +354,13 @@ class BaseAPIHandler(BaseHandler, Generic[T, R]):
                 from domain.base.exceptions import ValidationError
 
                 raise ValidationError(
-                    domain="API",
                     message="Invalid input data",
-                    field=".".join(str(p) for p in e.path) if e.path else None,
                     details={
                         "error": str(e),
                         "path": list(e.path),
                         "schema_path": list(e.schema_path),
+                        "domain": "API",
+                        "field": ".".join(str(p) for p in e.path) if e.path else None,
                     },
                 )
 

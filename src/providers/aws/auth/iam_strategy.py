@@ -2,7 +2,7 @@
 
 from typing import Any, Optional
 
-import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError, NoCredentialsError
 
 from domain.base.dependency_injection import injectable
@@ -12,6 +12,13 @@ from infrastructure.adapters.ports.auth import (
     AuthPort,
     AuthResult,
     AuthStatus,
+)
+from providers.aws.session_factory import AWSSessionFactory
+
+_DEFAULT_CONFIG = Config(
+    connect_timeout=10,
+    read_timeout=30,
+    retries={"max_attempts": 3},
 )
 
 
@@ -49,13 +56,9 @@ class IAMAuthStrategy(AuthPort):
 
         # Initialize AWS session
         try:
-            if profile:
-                self.session = boto3.Session(profile_name=profile, region_name=region)
-            else:
-                self.session = boto3.Session(region_name=region)
-
-            self.sts_client = self.session.client("sts")
-            self.iam_client = self.session.client("iam")
+            self.session = AWSSessionFactory.create_session(profile, region)
+            self.sts_client = self.session.client("sts", config=_DEFAULT_CONFIG)
+            self.iam_client = self.session.client("iam", config=_DEFAULT_CONFIG)
 
         except Exception as e:
             self._logger.error("Failed to initialize AWS session: %s", e)
