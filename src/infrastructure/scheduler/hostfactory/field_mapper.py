@@ -135,7 +135,8 @@ class HostFactoryFieldMapper(SchedulerFieldMapper):
             mapped["subnetId"] = ",".join(mapped["subnetIds"])
             del mapped["subnetIds"]
 
-        return mapped
+        # Strip None, empty dicts, and empty lists from output
+        return {k: v for k, v in mapped.items() if v is not None and v != {} and v != []}
 
     def _create_hf_attributes(self, instance_type: str) -> Dict[str, List[str]]:
         """Create HostFactory attributes from instance type."""
