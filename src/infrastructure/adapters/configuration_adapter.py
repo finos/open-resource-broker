@@ -349,6 +349,7 @@ class ConfigurationAdapter(ConfigurationPort):
                     "asg": cleanup.resources.asg,
                     "ec2_fleet": cleanup.resources.ec2_fleet,
                     "spot_fleet": cleanup.resources.spot_fleet,
+                    "run_instances": cleanup.resources.run_instances,
                 },
             }
         except Exception as e:
@@ -357,7 +358,12 @@ class ConfigurationAdapter(ConfigurationPort):
                 "enabled": True,
                 "delete_launch_template": True,
                 "dry_run": False,
-                "resources": {"asg": True, "ec2_fleet": True, "spot_fleet": True},
+                "resources": {
+                    "asg": True,
+                    "ec2_fleet": True,
+                    "spot_fleet": True,
+                    "run_instances": True,
+                },
             }
 
     def get_active_provider_override(self) -> str | None:
