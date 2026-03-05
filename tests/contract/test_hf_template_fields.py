@@ -8,7 +8,6 @@ import pytest
 
 from application.dto.template_dto import TemplateDTO
 
-
 # Fields that must never appear in ondemand templates
 ONDEMAND_FORBIDDEN = {
     "maxSpotPrice",
