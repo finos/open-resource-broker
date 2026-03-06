@@ -97,7 +97,7 @@ class TestAuthenticationFlows:
             auth=AuthConfig(
                 enabled=True,
                 strategy="bearer_token",
-                bearer_token={"secret_key": "test-secret-key", "algorithm": "HS256"},
+                bearer_token={"secret_key": "test-secret-key-minimum-32-bytes!", "algorithm": "HS256"},
             ),
         )
 
@@ -123,7 +123,7 @@ class TestAuthenticationFlows:
         """Test handling of expired tokens."""
         # Create strategy with very short expiry
         strategy = BearerTokenStrategy(
-            secret_key="test-secret-key",
+            secret_key="test-secret-key-minimum-32-bytes!",
             algorithm="HS256",
             token_expiry=1,  # 1 second expiry
             enabled=True,
@@ -181,7 +181,7 @@ class TestAuthenticationFlows:
             auth=AuthConfig(
                 enabled=True,
                 strategy="bearer_token",
-                bearer_token={"secret_key": "test-key"},
+                bearer_token={"secret_key": "test-secret-key-minimum-32-bytes!"},
             ),
         )
 

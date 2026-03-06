@@ -26,6 +26,8 @@ _DEFAULT_CONFIG = Config(
 class IAMAuthStrategy(AuthPort):
     """Authentication strategy using AWS IAM credentials and policies."""
 
+    ADMIN_ROLE_PATTERNS: frozenset[str] = frozenset({"Admin", "Administrator", "OrbAdmin"})
+
     def __init__(
         self,
         logger: LoggingPort,
@@ -249,7 +251,8 @@ class IAMAuthStrategy(AuthPort):
             arn = identity.get("Arn", "")
 
             # Check if user is an admin based on ARN patterns
-            if ":root" in arn or "admin" in arn.lower():
+            resource_name = arn.split("/")[-1] if "/" in arn else ""
+            if arn.endswith(":root") or resource_name in self.ADMIN_ROLE_PATTERNS:
                 roles.append("admin")
 
             # Check if it's a service account (role-based)

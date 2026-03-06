@@ -52,7 +52,7 @@ class TestAPIEndpoints:
             auth=AuthConfig(
                 enabled=True,
                 strategy="bearer_token",
-                bearer_token={"secret_key": "test-secret"},
+                bearer_token={"secret_key": "test-secret-key-minimum-32-bytes!"},
             ),
         )
         with patch("orb.api.server._register_routers") as mock_register:

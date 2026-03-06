@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from fastapi.responses import JSONResponse
 
 from orb._package import __version__
+from orb.domain.base.exceptions import ConfigurationError
 from orb.infrastructure.auth.registry import get_auth_registry
 from orb.infrastructure.logging.logger import get_logger
 
@@ -223,9 +224,19 @@ def _create_auth_strategy(auth_config: Any) -> Any:
 
         elif strategy_name == "bearer_token":
             bearer_config = auth_config.bearer_token or {}
+            secret_key = bearer_config.get("secret_key")
+            if not secret_key:
+                raise ConfigurationError(
+                    "Bearer token authentication requires a secret_key in auth.bearer_token config. "
+                    "Set HF_AUTH_BEARER_SECRET_KEY or configure auth.bearer_token.secret_key."
+                )
+            if len(secret_key.encode()) < 32:
+                raise ConfigurationError(
+                    "Bearer token secret_key must be at least 32 bytes for security."
+                )
             return auth_registry.get_strategy(
                 "bearer_token",
-                secret_key=bearer_config.get("secret_key", "default-secret-change-me"),
+                secret_key=secret_key,
                 algorithm=bearer_config.get("algorithm", "HS256"),
                 token_expiry=bearer_config.get("token_expiry", 3600),
                 enabled=True,

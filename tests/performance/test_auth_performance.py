@@ -33,7 +33,7 @@ class TestAuthenticationPerformance:
                 enabled=True,
                 strategy="bearer_token",
                 bearer_token={
-                    "secret_key": "performance-test-secret-key",
+                    "secret_key": "performance-test-secret-key-32b!",
                     "algorithm": "HS256",
                 },
             ),
@@ -43,7 +43,7 @@ class TestAuthenticationPerformance:
 
         # Create valid token
         strategy = BearerTokenStrategy(
-            secret_key="performance-test-secret-key", algorithm="HS256", enabled=True
+            secret_key="performance-test-secret-key-32b!", algorithm="HS256", enabled=True
         )
         token = strategy._create_access_token(
             user_id="perf-test-user", roles=["user"], permissions=["read"]
@@ -132,7 +132,7 @@ class TestAuthenticationPerformance:
     def test_token_validation_performance(self):
         """Test JWT token validation performance."""
         strategy = BearerTokenStrategy(
-            secret_key="performance-test-secret", algorithm="HS256", enabled=True
+            secret_key="performance-test-secret-key-32b!", algorithm="HS256", enabled=True
         )
 
         # Create test token

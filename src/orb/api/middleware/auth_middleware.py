@@ -109,9 +109,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
             # Add security headers
             response = self._add_security_headers(response)
 
-            # Add authentication headers to response if needed
-            if auth_result.token:
-                response.headers["X-Auth-Token"] = auth_result.token
+            # The token is not echoed back — it was supplied by the client in the
+            # Authorization request header and reflecting it in responses would expose
+            # it to proxy logs, browser devtools, and Referer header leakage.
 
             return response
 
